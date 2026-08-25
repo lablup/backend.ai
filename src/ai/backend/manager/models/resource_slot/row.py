@@ -8,13 +8,31 @@ Database models for normalized resource slot management:
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from ai.backend.common.data.entity.agent_resource import AgentResourceID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.deployment_revision_resource_slot import (
+    DeploymentRevisionResourceSlotID,
+)
+from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.model_card_resource_requirement import (
+    ModelCardResourceRequirementID,
+)
+from ai.backend.common.data.entity.preset_resource_slot import PresetResourceSlotID
+from ai.backend.common.data.entity.resource_allocation import ResourceAllocationID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
+from ai.backend.manager.data.model_card.types import ModelCardResourceRequirementData
+from ai.backend.manager.data.resource_slot.types import (
+    NumberFormatData,
+    ResourceSlotTypeData,
+)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -33,7 +51,7 @@ __all__ = (
 )
 
 
-class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):
     """Registry of known resource slot types with display metadata.
 
     Primary key is slot_name (e.g., 'cpu', 'mem', 'cuda.device').
@@ -41,6 +59,13 @@ class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 
     __tablename__ = "resource_slot_types"
 
+    uuid: Mapped[ResourceSlotTypeUUID] = mapped_column(
+        "uuid",
+        GUID(ResourceSlotTypeUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     slot_type: Mapped[str] = mapped_column("slot_type", sa.String(length=16), nullable=False)
     required: Mapped[bool] = mapped_column(
@@ -96,8 +121,26 @@ class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")
     )
 
+    def to_data(self) -> ResourceSlotTypeData:
+        return ResourceSlotTypeData(
+            uuid=self.uuid,
+            slot_name=self.slot_name,
+            slot_type=self.slot_type,
+            required=self.required,
+            enabled=self.enabled,
+            display_name=self.display_name,
+            description=self.description,
+            display_unit=self.display_unit,
+            display_icon=self.display_icon,
+            number_format=NumberFormatData(
+                binary=self.number_format.binary,
+                round_length=self.number_format.round_length,
+            ),
+            rank=self.rank,
+        )
 
-class AgentResourceRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+
+class AgentResourceRow(LifecycleTimestampsMixin, Base):
     """Per-agent, per-slot resource capacity and usage.
 
     Composite primary key: (agent_id, slot_name).
@@ -105,6 +148,13 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 
     __tablename__ = "agent_resources"
 
+    id: Mapped[AgentResourceID] = mapped_column(
+        "id",
+        GUID(AgentResourceID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
     agent_id: Mapped[str] = mapped_column("agent_id", sa.String(length=64), primary_key=True)
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     capacity: Mapped[Decimal] = mapped_column(
@@ -151,7 +201,7 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
 
-class ResourceAllocationRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class ResourceAllocationRow(CreatedAtMixin, Base):
     """Per-kernel, per-slot resource allocation.
 
     Composite primary key: (kernel_id, slot_name).
@@ -159,7 +209,14 @@ class ResourceAllocationRow(CreatedAtMixin, Base):  # type: ignore[misc]
 
     __tablename__ = "resource_allocations"
 
-    kernel_id: Mapped[uuid.UUID] = mapped_column("kernel_id", GUID, primary_key=True)
+    id: Mapped[ResourceAllocationID] = mapped_column(
+        "id",
+        GUID(ResourceAllocationID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
+    kernel_id: Mapped[KernelID] = mapped_column("kernel_id", GUID(KernelID), primary_key=True)
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     requested: Mapped[Decimal] = mapped_column(
         "requested", sa.Numeric(precision=24, scale=6), nullable=False
@@ -223,7 +280,7 @@ class ResourceAllocationRow(CreatedAtMixin, Base):  # type: ignore[misc]
     )
 
 
-class ModelCardResourceRequirementRow(Base):  # type: ignore[misc]
+class ModelCardResourceRequirementRow(Base):
     """Per-model-card, per-slot minimum resource requirement.
 
     Composite primary key: (model_card_id, slot_name).
@@ -231,7 +288,16 @@ class ModelCardResourceRequirementRow(Base):  # type: ignore[misc]
 
     __tablename__ = "model_card_resource_requirements"
 
-    model_card_id: Mapped[uuid.UUID] = mapped_column("model_card_id", GUID, primary_key=True)
+    id: Mapped[ModelCardResourceRequirementID] = mapped_column(
+        "id",
+        GUID(ModelCardResourceRequirementID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
+    model_card_id: Mapped[ModelCardID] = mapped_column(
+        "model_card_id", GUID(ModelCardID), primary_key=True
+    )
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     min_quantity: Mapped[Decimal] = mapped_column(
         "min_quantity", sa.Numeric(precision=24, scale=6), nullable=False
@@ -252,8 +318,27 @@ class ModelCardResourceRequirementRow(Base):  # type: ignore[misc]
         sa.Index("ix_mc_resource_req_slot_name", "slot_name"),
     )
 
+    def to_data(self) -> ModelCardResourceRequirementData:
+        return ModelCardResourceRequirementData(
+            model_card_id=self.model_card_id,
+            slot_name=self.slot_name,
+            min_quantity=self._formatted_min_quantity(),
+        )
 
-class PresetResourceSlotRow(Base):  # type: ignore[misc]
+    def _formatted_min_quantity(self) -> str:
+        """The quantity as the caller wrote it, not as ``Numeric(24, 6)`` stores it.
+
+        A read of ``"2"`` comes back ``Decimal("2.000000")``; before a flush the
+        attribute may still be the raw string, so normalize before trimming.
+        """
+        value = self.min_quantity
+        quantity = value if isinstance(value, Decimal) else Decimal(value)
+        if quantity == quantity.to_integral_value():
+            return str(int(quantity))
+        return format(quantity.normalize(), "f")
+
+
+class PresetResourceSlotRow(Base):
     """Per-preset, per-slot resource allocation.
 
     Composite primary key: (preset_id, slot_name).
@@ -261,7 +346,16 @@ class PresetResourceSlotRow(Base):  # type: ignore[misc]
 
     __tablename__ = "preset_resource_slots"
 
-    preset_id: Mapped[uuid.UUID] = mapped_column("preset_id", GUID, primary_key=True)
+    id: Mapped[PresetResourceSlotID] = mapped_column(
+        "id",
+        GUID(PresetResourceSlotID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
+    preset_id: Mapped[DeploymentPresetID] = mapped_column(
+        "preset_id", GUID(DeploymentPresetID), primary_key=True
+    )
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     quantity: Mapped[Decimal] = mapped_column(
         "quantity", sa.Numeric(precision=24, scale=6), nullable=False
@@ -283,7 +377,7 @@ class PresetResourceSlotRow(Base):  # type: ignore[misc]
     )
 
 
-class DeploymentRevisionResourceSlotRow(Base):  # type: ignore[misc]
+class DeploymentRevisionResourceSlotRow(Base):
     """Per-revision, per-slot resource allocation.
 
     Composite primary key: (revision_id, slot_name).
@@ -291,7 +385,16 @@ class DeploymentRevisionResourceSlotRow(Base):  # type: ignore[misc]
 
     __tablename__ = "deployment_revision_resource_slots"
 
-    revision_id: Mapped[uuid.UUID] = mapped_column("revision_id", GUID, primary_key=True)
+    id: Mapped[DeploymentRevisionResourceSlotID] = mapped_column(
+        "id",
+        GUID(DeploymentRevisionResourceSlotID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
+    revision_id: Mapped[DeploymentRevisionID] = mapped_column(
+        "revision_id", GUID(DeploymentRevisionID), primary_key=True
+    )
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     quantity: Mapped[Decimal] = mapped_column(
         "quantity", sa.Numeric(precision=24, scale=6), nullable=False

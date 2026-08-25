@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection
 from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
@@ -8,8 +9,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.exception import AgentNotFound
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
@@ -17,24 +18,21 @@ from ai.backend.manager.data.agent.types import (
     AgentDetailData,
     AgentHeartbeatUpsert,
     AgentListResult,
-    AgentStatus,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions
-from ai.backend.manager.errors.resource import ScalingGroupNotFound, UnresolvableResourceGroup
+from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -101,7 +99,14 @@ class AgentDBSource:
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:
             query = (
-                sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
+                sa.select(AgentRow)
+                .where(AgentRow.id == upsert_data.metadata.id)
+                .options(
+                    selectinload(AgentRow.agent_resource_rows).joinedload(
+                        AgentResourceRow.slot_type_row
+                    )
+                )
+                .with_for_update()
             )
             row: AgentRow | None = await session.scalar(query)
             agent_data = row.to_heartbeat_update_data() if row is not None else None
@@ -121,28 +126,28 @@ class AgentDBSource:
     async def _insert_new_agent(
         self, session: AsyncSession, upsert_data: AgentHeartbeatUpsert
     ) -> None:
-        resource_group_name = upsert_data.metadata.scaling_group
+        resource_group_name = upsert_data.metadata.resource_group
         group_filter: sa.ColumnElement[bool]
         group_order: sa.ColumnElement[Any]
         if resource_group_name is not None:
             group_filter = sa.or_(
-                ScalingGroupRow.name == resource_group_name,
-                ScalingGroupRow.is_default,
+                ResourceGroupRow.name == resource_group_name,
+                ResourceGroupRow.is_default,
             )
-            group_order = sa.case((ScalingGroupRow.name == resource_group_name, 0), else_=1)
+            group_order = sa.case((ResourceGroupRow.name == resource_group_name, 0), else_=1)
         else:
-            group_filter = ScalingGroupRow.is_default.is_(True)
-            group_order = sa.asc(ScalingGroupRow.name)
+            group_filter = ResourceGroupRow.is_default.is_(True)
+            group_order = sa.asc(ResourceGroupRow.name)
         group_select = (
             sa.select(
                 *[
                     sa.literal(value, type_=agents.c[key].type).label(key)
                     for key, value in upsert_data.insert_fields.items()
                 ],
-                ScalingGroupRow.name.label("scaling_group"),
-                ScalingGroupRow.id.label("resource_group_id"),
+                ResourceGroupRow.name.label("scaling_group"),
+                ResourceGroupRow.id.label("resource_group_id"),
             )
-            .select_from(ScalingGroupRow)
+            .select_from(ResourceGroupRow)
             .where(group_filter)
             .order_by(group_order)
             .limit(1)
@@ -171,31 +176,6 @@ class AgentDBSource:
                 "No initial resource group name is configured and no default scaling group is set."
             )
 
-    async def update_agent_status_exit(self, updater: Updater[AgentRow]) -> None:
-        async with self._db.begin_session() as session:
-            fetch_query = (
-                sa.select(AgentRow.status)
-                .select_from(AgentRow)
-                .where(AgentRow.id == updater.pk_value)
-                .with_for_update()
-            )
-            prev_status = await session.scalar(fetch_query)
-            if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
-                return
-
-            spec = updater.spec
-            if isinstance(spec, AgentStatusUpdaterSpec):
-                if spec.status == AgentStatus.LOST:
-                    log.warning("agent {0} heartbeat timeout detected.", updater.pk_value)
-                elif spec.status == AgentStatus.TERMINATED:
-                    log.info("agent {0} has terminated.", updater.pk_value)
-
-            await execute_updater(session, updater)
-
-    async def update_agent_status(self, updater: Updater[AgentRow]) -> None:
-        async with self._db.begin_session() as session:
-            await execute_updater(session, updater)
-
     async def update_resource_group(
         self,
         agent_id: AgentId,
@@ -219,10 +199,10 @@ class AgentDBSource:
         )
         async with self._db.begin_session_read_committed() as session:
             resource_group_name = await session.scalar(
-                sa.select(ScalingGroupRow.name).where(ScalingGroupRow.id == resource_group_id)
+                sa.select(ResourceGroupRow.name).where(ResourceGroupRow.id == resource_group_id)
             )
             if resource_group_name is None:
-                raise ScalingGroupNotFound(str(resource_group_id))
+                raise ResourceGroupNotFound(str(resource_group_id))
 
             rows = (
                 (
@@ -286,14 +266,19 @@ class AgentDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def upsert_agent_resource_capacity(
+    async def sync_agent_resource_capacity(
         self,
+        agent_id: AgentId,
         bulk_upserter: BulkUpserter[AgentResourceRow],
+        reported_slot_names: Collection[str],
     ) -> int:
-        """Bulk UPSERT agent resource capacity rows.
+        """Bulk UPSERT agent resource capacity rows and drop the slots the agent
+        no longer reports.
 
         On INSERT: sets capacity (used defaults to 0).
         On CONFLICT: updates capacity only.
+        Rows for unreported slots are deleted only when nothing holds them, so a
+        slot that still carries an allocation survives until it is released.
 
         Returns:
             Number of rows upserted.
@@ -303,5 +288,14 @@ class AgentDBSource:
                 db_sess,
                 bulk_upserter,
                 index_elements=["agent_id", "slot_name"],
+            )
+            await db_sess.execute(
+                sa.delete(AgentResourceRow).where(
+                    (AgentResourceRow.agent_id == str(agent_id))
+                    & AgentResourceRow.slot_name.not_in(reported_slot_names)
+                    & (AgentResourceRow.used == 0)
+                    & (AgentResourceRow.reserved == 0)
+                    & (AgentResourceRow.prereserved == 0)
+                )
             )
             return result.upserted_count

@@ -31,6 +31,21 @@ class ImageNotFound(ObjectNotFound):
         )
 
 
+class ImagePurgeInProgress(BackendAIError, web.HTTPConflict):
+    """Raised when a write names an image a purge is working through."""
+
+    error_type = "https://api.backend.ai/probs/image-purge-in-progress"
+    error_title = "Image is being purged."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class ImageAliasNotFound(ObjectNotFound):
     object_name = "image alias"
 
@@ -163,7 +178,7 @@ class AliasImageActionDBError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class ModifyImageActionValueError(BackendAIError, web.HTTPBadRequest):
+class UpdateImageActionValueError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-parameters"
     error_title = "Invalid parameters for image modification."
 

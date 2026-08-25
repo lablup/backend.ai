@@ -14,8 +14,9 @@ from ai.backend.manager.data.reservoir_registry.types import (
     ReservoirRegistryData,
     ReservoirRegistryListResult,
 )
+from ai.backend.manager.models.reservoir_registry.searchers import ReservoirRegistrySearcher
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
@@ -64,7 +65,7 @@ class TestReservoirRegistryService:
         mock_reservoir_repository: MagicMock,
         sample_reservoir_data: ReservoirRegistryData,
     ) -> None:
-        """Test searching reservoir registries with querier"""
+        """Test searching reservoir registries"""
         mock_reservoir_repository.search_registries = AsyncMock(
             return_value=ReservoirRegistryListResult(
                 items=[sample_reservoir_data],
@@ -74,19 +75,19 @@ class TestReservoirRegistryService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ReservoirRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchReservoirRegistriesAction(querier=querier)
+        action = SearchReservoirRegistriesAction(searcher=searcher)
         result = await artifact_registry_service.search_reservoir_registries(action)
 
         assert result.registries == [sample_reservoir_data]
         assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
-        mock_reservoir_repository.search_registries.assert_called_once_with(querier=querier)
+        mock_reservoir_repository.search_registries.assert_called_once_with(searcher=searcher)
 
     async def test_search_reservoir_registries_empty_result(
         self,
@@ -103,12 +104,12 @@ class TestReservoirRegistryService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ReservoirRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchReservoirRegistriesAction(querier=querier)
+        action = SearchReservoirRegistriesAction(searcher=searcher)
         result = await artifact_registry_service.search_reservoir_registries(action)
 
         assert result.registries == []
@@ -130,12 +131,12 @@ class TestReservoirRegistryService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ReservoirRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
-        action = SearchReservoirRegistriesAction(querier=querier)
+        action = SearchReservoirRegistriesAction(searcher=searcher)
         result = await artifact_registry_service.search_reservoir_registries(action)
 
         assert result.total_count == 25

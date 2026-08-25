@@ -3,11 +3,10 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.entity.types import ScopeType
+from ai.backend.common.data.entity.types import ScopeID, ScopeType
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.permission.virtual_scope import ScopeBindingData
-from ai.backend.common.identifier.scope import ScopeID
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -16,7 +15,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class ScopeBindingRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class ScopeBindingRow(CreatedAtMixin, Base):
     __tablename__ = "scope_bindings"
     __table_args__ = (
         sa.Index("ix_scope_bindings_scope", "scope_type", "scope_id"),

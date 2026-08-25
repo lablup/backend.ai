@@ -10,11 +10,11 @@ from pydantic import HttpUrl
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import RouteHealthStatus
@@ -26,9 +26,6 @@ from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVa
 from ai.backend.manager.services.model_serving.actions.list_model_service import (
     ListModelServiceAction,
     ListModelServiceActionResult,
-)
-from ai.backend.manager.services.model_serving.processors.model_serving import (
-    ModelServingProcessors,
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -46,6 +43,7 @@ class TestListModelService:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)
@@ -102,7 +100,7 @@ class TestListModelService:
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
         mock = MagicMock()
-        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        mock.get_default_architecture_from_resource_group = AsyncMock(return_value=None)
         return mock
 
     @pytest.fixture
@@ -161,19 +159,6 @@ class TestListModelService:
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
             route_controller=mock_route_controller,
-        )
-
-    @pytest.fixture
-    def model_serving_processors(
-        self,
-        mock_action_monitor: MagicMock,
-        model_serving_service: ModelServingService,
-        mock_action_validators: ActionValidators,
-    ) -> ModelServingProcessors:
-        return ModelServingProcessors(
-            service=model_serving_service,
-            action_monitors=[mock_action_monitor],
-            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -251,8 +236,8 @@ class TestListModelService:
     )
     async def test_list_model_service(
         self,
+        model_serving_service: ModelServingService,
         scenario: ScenarioBase[ListModelServiceAction, ListModelServiceActionResult],
-        model_serving_processors: ModelServingProcessors,
         mock_list_endpoints_by_owner_validated: AsyncMock,
     ) -> None:
         # Mock repository responses
@@ -283,6 +268,6 @@ class TestListModelService:
         async def list_model_service(
             action: ListModelServiceAction,
         ) -> ListModelServiceActionResult:
-            return await model_serving_processors.list_model_service.wait_for_complete(action)
+            return await model_serving_service.list_serve(action)
 
         await scenario.test(list_model_service)

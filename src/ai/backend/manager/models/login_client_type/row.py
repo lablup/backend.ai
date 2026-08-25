@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.manager.models.base import GUID, Base
-from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
@@ -16,21 +15,17 @@ if TYPE_CHECKING:
 __all__ = ("LoginClientTypeRow",)
 
 
-class LoginClientTypeRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class LoginClientTypeRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "login_client_types"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[LoginClientTypeID] = mapped_column(
+        "id",
+        GUID(LoginClientTypeID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=64), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
-    modified_at: Mapped[datetime] = mapped_column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-        nullable=False,
-    )
 
     def to_dataclass(self) -> LoginClientTypeData:
         from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
@@ -40,5 +35,5 @@ class LoginClientTypeRow(CreatedAtMixin, Base):  # type: ignore[misc]
             name=self.name,
             description=self.description,
             created_at=self.created_at,
-            modified_at=self.modified_at,
+            updated_at=self.updated_at,
         )

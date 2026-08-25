@@ -23,18 +23,24 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
     PermissionDeniedError,
 )
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
+    LookupKeypairResourcePolicyAction,
+)
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.user_resource_policy.actions.lookup import (
+    LookupUserResourcePolicyAction,
+)
 
 from .audit_log import (
     AuditLogConnection,
@@ -102,8 +108,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.user.repository import UserRepository
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.permission.permission_defs import (
     AgentPermission,
     ComputeSessionPermission,
@@ -114,6 +120,7 @@ from ai.backend.manager.data.permission.permission_defs import (
 from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
 )
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -126,12 +133,14 @@ from ai.backend.manager.models.image.row import (
     PublicImageLoadFilter,
 )
 from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
-from ai.backend.manager.models.scaling_group.row import (
-    ScalingGroupRow,
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupRow,
     and_names,
     query_allowed_sgroups,
 )
 from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .acl import PredefinedAtomicPermission
 from .agent import (
@@ -310,6 +319,7 @@ class GraphQueryContext:
     schema: graphene.Schema
     dataloader_manager: DataLoaderManager[Any, Any, Any]
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     etcd: AsyncEtcd
     user: Mapping[str, Any]  # TODO: express using typed dict
     access_key: str
@@ -331,6 +341,7 @@ class GraphQueryContext:
     scheduler_repository: SchedulerRepository
     user_repository: UserRepository
     agent_repository: AgentRepository
+    network_repository: OpsRepository[NetworkData]
 
 
 class Mutation(graphene.ObjectType):  # type: ignore[misc]
@@ -2122,6 +2133,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 "KeyPairResourcePolicy.by_ak",
             )
             return cast(KeyPairResourcePolicy, await loader.load(client_access_key))
+        # The lookup answers for the policy the name resolves to, so reading someone
+        # else's tier is a read permission on that policy rather than a role check.
+        await ctx.processors.keypair_resource_policy.lookup.run(
+            LookupKeypairResourcePolicyAction(name=name)
+        )
         loader = ctx.dataloader_manager.get_loader(
             ctx,
             "KeyPairResourcePolicy.by_name",
@@ -2156,6 +2172,11 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> UserResourcePolicy:
         ctx: GraphQueryContext = info.context
         user_uuid = ctx.user["uuid"]
+        if name is not None:
+            # Same rule as the keypair policy: the resolved policy answers for the read.
+            await ctx.processors.user_resource_policy.lookup.run(
+                LookupUserResourcePolicyAction(name=name)
+            )
         if name is None:
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
@@ -2286,8 +2307,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 db_conn, domain_name, ProjectID(project_id), access_key
             )
         conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
-        sgroup_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
-        return [ScalingGroup.from_orm_row(row).masked for row in sgroup_rows]
+        sgroup_orm_rows = await ResourceGroupRow.list_by_condition(conditions, db=ctx.db)
+        return [ScalingGroup.from_orm_row(row).masked for row in sgroup_orm_rows]
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)

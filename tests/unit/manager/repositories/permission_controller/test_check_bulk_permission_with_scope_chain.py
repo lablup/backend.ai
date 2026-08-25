@@ -11,10 +11,12 @@ from dataclasses import dataclass, field
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.role import (
     BulkPermissionCheckInput,
     PermissionResolutionKey,
@@ -42,11 +44,11 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
@@ -56,7 +58,7 @@ from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
 )
 
 
@@ -137,6 +139,11 @@ class TestCheckBulkPermissionWithScopeChain:
     ) -> BatchFixture:
         """Create a user with an active role (no permissions yet)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+            domain_id = DomainID(uuid.uuid4())
+            db_sess.add(
+                DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+            )
             policy = UserResourcePolicyRow(
                 name="test-rbac-policy",
                 max_vfolder_count=0,
@@ -147,11 +154,14 @@ class TestCheckBulkPermissionWithScopeChain:
             db_sess.add(policy)
             user = UserRow(
                 uuid=fixture_ids.user_id,
+                username=f"user-{fixture_ids.user_id.hex[:8]}",
                 email="testuser@test.com",
                 resource_policy="test-rbac-policy",
                 status=UserStatus.ACTIVE,
                 need_password_change=False,
                 sudo_session_enabled=False,
+                domain_name=domain_name,
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -181,6 +191,11 @@ class TestCheckBulkPermissionWithScopeChain:
     ) -> BatchFixture:
         """Create a user with an inactive role."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+            domain_id = DomainID(uuid.uuid4())
+            db_sess.add(
+                DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+            )
             policy = UserResourcePolicyRow(
                 name="test-rbac-policy",
                 max_vfolder_count=0,
@@ -191,11 +206,14 @@ class TestCheckBulkPermissionWithScopeChain:
             db_sess.add(policy)
             user = UserRow(
                 uuid=fixture_ids.user_id,
+                username=f"user-{fixture_ids.user_id.hex[:8]}",
                 email="testuser@test.com",
                 resource_policy="test-rbac-policy",
                 status=UserStatus.ACTIVE,
                 need_password_change=False,
                 sudo_session_enabled=False,
+                domain_name=domain_name,
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -227,6 +245,11 @@ class TestCheckBulkPermissionWithScopeChain:
     ) -> None:
         """All vfolders belong to the same PROJECT (auto edge)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+            domain_id = DomainID(uuid.uuid4())
+            db_sess.add(
+                DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+            )
             for vfolder_id in fixture_ids.vfolder_ids:
                 db_sess.add(
                     AssociationScopesEntitiesRow(
@@ -247,6 +270,11 @@ class TestCheckBulkPermissionWithScopeChain:
     ) -> None:
         """PROJECT belongs to DOMAIN (auto edge)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+            domain_id = DomainID(uuid.uuid4())
+            db_sess.add(
+                DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+            )
             db_sess.add(
                 AssociationScopesEntitiesRow(
                     scope_type=ScopeType.DOMAIN,
@@ -266,6 +294,11 @@ class TestCheckBulkPermissionWithScopeChain:
     ) -> None:
         """vfolder[0] AUTO, vfolder[1] REF, vfolder[2] no association."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+            domain_id = DomainID(uuid.uuid4())
+            db_sess.add(
+                DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+            )
             db_sess.add(
                 AssociationScopesEntitiesRow(
                     scope_type=ScopeType.PROJECT,
@@ -300,6 +333,11 @@ class TestCheckBulkPermissionWithScopeChain:
         """
         f = fixture_ids
         async with db_with_rbac_tables.begin_session() as db_sess:
+            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+            domain_id = DomainID(uuid.uuid4())
+            db_sess.add(
+                DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+            )
             # domain_a ← project_a ← vfolder[0]
             db_sess.add(
                 AssociationScopesEntitiesRow(
@@ -375,8 +413,14 @@ class TestCheckBulkPermissionWithScopeChain:
             "domain": (ScopeType.DOMAIN, fixture_ids.domain_id),
         }
         for entry in request.param:
+            domain_id = DomainID(uuid.uuid4())
             scope_type, scope_id = scope_map[entry.scope_key]
             async with db_with_rbac_tables.begin_session() as db_sess:
+                domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+                domain_id = DomainID(uuid.uuid4())
+                db_sess.add(
+                    DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+                )
                 db_sess.add(
                     PermissionRow(
                         role_id=fixture_ids.role_id,
@@ -401,14 +445,22 @@ class TestCheckBulkPermissionWithScopeChain:
         other_user_id = uuid.uuid4()
         other_role_id = uuid.uuid4()
         async with db_with_rbac_tables.begin_session() as db_sess:
+            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+            domain_id = DomainID(uuid.uuid4())
+            db_sess.add(
+                DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+            )
             db_sess.add(
                 UserRow(
                     uuid=other_user_id,
+                    username=f"user-{other_user_id.hex[:8]}",
                     email="other@test.com",
                     resource_policy="test-rbac-policy",
                     status=UserStatus.ACTIVE,
                     need_password_change=False,
                     sudo_session_enabled=False,
+                    domain_name=domain_name,
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
@@ -687,6 +739,11 @@ class TestCheckBulkPermissionWithScopeChain:
     ) -> None:
         """Create a cycle: vfolders -> project -> domain -> project (back-edge)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+            domain_id = DomainID(uuid.uuid4())
+            db_sess.add(
+                DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+            )
             # vfolders -> project (AUTO)
             for vfolder_id in fixture_ids.vfolder_ids:
                 db_sess.add(

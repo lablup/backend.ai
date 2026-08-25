@@ -2,37 +2,30 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.notification import NotificationRuleData
-
-from .base import NotificationAction
+from ai.backend.common.data.entity.notification import NotificationRuleID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
+from ai.backend.manager.data.notification.types import NotificationRuleData
+from ai.backend.manager.models.notification.queriers import NotificationRuleQuerier
+from ai.backend.manager.models.notification.row import NotificationRuleRow
 
 
 @dataclass
-class GetRuleAction(NotificationAction):
-    """Action to get a notification rule by ID."""
+class GetRuleAction(GetSingleEntityOpsAction[NotificationRuleRow, NotificationRuleData]):
+    """Read one notification rule."""
 
-    rule_id: UUID
+    rule_id: NotificationRuleID
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
+    def action_name(cls) -> str:
+        return "get_notification_rule"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.rule_id)
-
-
-@dataclass
-class GetRuleActionResult(BaseActionResult):
-    """Result of getting a notification rule."""
-
-    rule_data: NotificationRuleData
+    def entity_id(self) -> EntityIdentifier:
+        return self.rule_id
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.rule_data.id)
+    def to_querier(self) -> NotificationRuleQuerier:
+        return NotificationRuleQuerier(rule_id=self.rule_id)

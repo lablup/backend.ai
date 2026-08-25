@@ -21,6 +21,10 @@ from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
 from ai.backend.common.data.model_deployment.types import (
     RouteHealthStatus as CommonRouteHealthStatus,
@@ -56,9 +60,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentFilter as DeploymentFilterV2,
 )
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -110,7 +111,7 @@ class TestSearchDeployments:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Search deployments with pagination returns correct page."""
@@ -122,7 +123,7 @@ class TestSearchDeployments:
                 metadata=DeploymentMetadataInput(
                     project_id=group_fixture,
                     domain_name=domain_fixture.domain_name,
-                    resource_group_name=scaling_group_name,
+                    resource_group_name=resource_group_name,
                     name=f"test-deployment-{i}-{secrets.token_hex(4)}",
                 ),
                 network_access=NetworkAccessInput(open_to_public=False),
@@ -172,7 +173,7 @@ class TestGetDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Get deployment by ID returns correct deployment details."""
@@ -181,7 +182,7 @@ class TestGetDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -283,7 +284,7 @@ class TestSearchRoutes:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Search routes for a deployment returns route list."""
@@ -292,7 +293,7 @@ class TestSearchRoutes:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -371,6 +372,7 @@ class TestDeploymentAdapterFilter:
             is_superadmin=True,
             role=UserRole.SUPERADMIN,
             domain_name=domain,
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @staticmethod
@@ -378,7 +380,7 @@ class TestDeploymentAdapterFilter:
         admin_registry: BackendAIClientRegistry,
         project_id: uuid.UUID,
         domain: str,
-        scaling_group: ResourceGroupName,
+        resource_group: ResourceGroupName,
         seed_data: tuple[ImageID, VFolderUUID],
         tags: list[str],
         name: str | None = None,
@@ -388,7 +390,7 @@ class TestDeploymentAdapterFilter:
             metadata=DeploymentMetadataInput(
                 project_id=project_id,
                 domain_name=domain,
-                resource_group_name=scaling_group,
+                resource_group_name=resource_group,
                 name=name or f"test-deployment-{secrets.token_hex(4)}",
                 tags=tags,
             ),
@@ -423,7 +425,7 @@ class TestDeploymentAdapterFilter:
         db_engine: SAEngine,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> dict[str, uuid.UUID]:
         deployment_ids = {
@@ -431,7 +433,7 @@ class TestDeploymentAdapterFilter:
                 admin_registry,
                 group_fixture,
                 domain_fixture.domain_name,
-                scaling_group_name,
+                resource_group_name,
                 deployment_seed_data,
                 [name],
             )
@@ -563,7 +565,7 @@ class TestDeploymentAdapterFilter:
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """AND clause must narrow results to deployments matching every nested filter."""
@@ -571,7 +573,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha", "production"],
         )
@@ -579,7 +581,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["beta", "production"],
         )
@@ -587,7 +589,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha", "beta"],
         )
@@ -615,7 +617,7 @@ class TestDeploymentAdapterFilter:
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """OR clause must widen results to deployments matching any nested filter."""
@@ -623,7 +625,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha"],
         )
@@ -631,7 +633,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["beta"],
         )
@@ -639,7 +641,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["gamma"],
         )
@@ -667,7 +669,7 @@ class TestDeploymentAdapterFilter:
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """OR with multi-field sub-filters must AND fields within each branch.
@@ -682,7 +684,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha"],
             name=f"bar-x-{suffix}",
@@ -691,7 +693,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["beta"],
             name=f"foo-x-{suffix}",
@@ -700,7 +702,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["beta"],
             name=f"bar-y-{suffix}",
@@ -709,7 +711,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha"],
             name=f"foo-y-{suffix}",
@@ -744,7 +746,7 @@ class TestDeploymentAdapterFilter:
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """project_search must also honor AND across nested filters."""
@@ -752,7 +754,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha"],
         )
@@ -760,7 +762,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_name,
+            resource_group_name,
             deployment_seed_data,
             ["alpha", "beta"],
         )

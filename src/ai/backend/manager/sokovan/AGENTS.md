@@ -1,7 +1,7 @@
 # Manager Sokovan layer — Guardrails
 
 > Sokovan is the coordinator layer that advances the deployment / route lifecycle in ticks.
-> For the operating model and rationale, see `CONTEXTS.md` in the same directory (and the `README.md` below it).
+> For the operating model and rationale, see `KNOWLEDGE.md` in the same directory (and the `README.md` below it).
 
 ## Handler file layout
 

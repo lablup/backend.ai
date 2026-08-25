@@ -24,6 +24,21 @@ class UserNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class UserPurgeInProgress(BackendAIError, web.HTTPConflict):
+    """Raised when a write names a user a purge is working through."""
+
+    error_type = "https://api.backend.ai/probs/user-purge-in-progress"
+    error_title = "User is being purged."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class UserConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/user-conflict"
     error_title = "The user already exists."

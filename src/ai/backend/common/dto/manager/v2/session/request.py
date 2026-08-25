@@ -12,6 +12,9 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
@@ -27,7 +30,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionStatusFilter,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchSessionsInput",
@@ -36,7 +39,9 @@ __all__ = (
     "EnqueueSessionInput",
     "DestroySessionInput",
     "DownloadFilesInput",
+    "ExcludeSessionIdleChecksInput",
     "ExecuteInput",
+    "IncludeSessionIdleChecksInput",
     "GetContainerLogsInput",
     "GetSessionLogsQuery",
     "ListFilesInput",
@@ -48,6 +53,7 @@ __all__ = (
     "SearchSessionsInput",
     "SessionFilter",
     "SessionIdPathParam",
+    "SessionIdleCheckTargetInput",
     "SessionOrder",
     "SessionPathParam",
     "ShutdownServiceInput",
@@ -380,6 +386,36 @@ class TerminateSessionsInput(BaseRequestModel):
 
     session_ids: list[UUID] = Field(description="Session UUIDs to terminate.")
     forced: bool = Field(default=False, description="Force-terminate without waiting for cleanup.")
+
+
+class SessionIdleCheckTargetInput(BaseRequestModel):
+    """One (checker, session) pair targeted by an idle-check exclusion or inclusion."""
+
+    checker_id: IdleCheckerID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker UUID of the pair."
+    )
+    session_id: SessionID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Session UUID of the pair."
+    )
+
+
+class ExcludeSessionIdleChecksInput(BaseRequestModel):
+    """Input for excluding session pairs from idle checks."""
+
+    targets: list[SessionIdleCheckTargetInput] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Checker-session pairs to exclude."
+    )
+
+
+class IncludeSessionIdleChecksInput(BaseRequestModel):
+    """Input for including session pairs into idle checks."""
+
+    targets: list[SessionIdleCheckTargetInput] = Field(
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Checker-session pairs to include; "
+            "checks start from the initial grace period."
+        )
+    )
 
 
 # ---------------------------------------------------------------------------

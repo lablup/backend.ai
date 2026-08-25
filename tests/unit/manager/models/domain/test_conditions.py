@@ -8,11 +8,12 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition
@@ -26,14 +27,16 @@ from ai.backend.manager.models.deployment_revision_preset import DeploymentRevis
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
+from ai.backend.manager.models.domain.searchers import DomainSearcher
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -42,14 +45,14 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.domain.db_source import DomainDBSource
-from ai.backend.testutils.db import with_tables
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.secret.types import SecretValue
+from ai.backend.testutils.db import TableOrORM, with_tables
 
 
 def _make_password_info() -> PasswordInfo:
@@ -62,9 +65,9 @@ def _make_password_info() -> PasswordInfo:
 
 
 # Row imports above ensure mapper initialization (FK dependency order).
-_WITH_TABLES = [
+_WITH_TABLES: list[TableOrORM] = [
     DomainRow,
-    ScalingGroupRow,
+    ResourceGroupRow,
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
@@ -72,7 +75,7 @@ _WITH_TABLES = [
     UserRoleRow,
     UserRow,
     KeyPairRow,
-    GroupRow,
+    ProjectRow,
     ContainerRegistryRow,
     ImageRow,
     VFolderRow,
@@ -199,10 +202,10 @@ class TestDomainConditionsProjectNestedFilters:
         """Combined helper wraps raw column conditions into single EXISTS."""
 
         def cond_is_active() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.is_active == True  # noqa: E712
+            return ProjectRow.is_active == True  # noqa: E712
 
         def cond_name_like() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.name.like("%test%")
+            return ProjectRow.name.like("%test%")
 
         conditions: list[QueryCondition] = [cond_is_active, cond_name_like]
         combined = DomainConditions.exists_project_combined(conditions)
@@ -382,7 +385,7 @@ class TestDomainOrdersUserNested:
 
 
 class TestDomainNestedSearchIntegration:
-    """DB integration tests: nested filter/order applied via DomainDBSource.search_domains."""
+    """DB integration tests: nested filter/order applied through the v2 search ops."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -393,11 +396,11 @@ class TestDomainNestedSearchIntegration:
             yield database_connection
 
     @pytest.fixture
-    async def domain_db_source(
+    async def ops_provider(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> DomainDBSource:
-        return DomainDBSource(db=db_with_cleanup)
+    ) -> V2DBOpsProvider:
+        return V2DBOpsProvider(db_with_cleanup)
 
     @pytest.fixture
     async def two_domains_with_children(
@@ -408,6 +411,7 @@ class TestDomainNestedSearchIntegration:
 
         Returns mapping of domain_name -> {project_name, username, email}.
         """
+        domain_id = DomainID(uuid.uuid4())
         domain_alpha = f"domain-alpha-{uuid.uuid4().hex[:8]}"
         domain_beta = f"domain-beta-{uuid.uuid4().hex[:8]}"
         result: dict[str, dict[str, str]] = {}
@@ -417,7 +421,9 @@ class TestDomainNestedSearchIntegration:
                 (domain_alpha, True, "Research lab"),
                 (domain_beta, False, "Archived department"),
             ]:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description=desc,
                     is_active=is_active,
@@ -479,7 +485,7 @@ class TestDomainNestedSearchIntegration:
                 ),
             ]:
                 gid = uuid.uuid4()
-                group = GroupRow(
+                group = ProjectRow(
                     id=gid,
                     name=proj_name,
                     description="test project",
@@ -505,6 +511,7 @@ class TestDomainNestedSearchIntegration:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy.name,
+                    domain_id=domain_id,
                 )
                 session.add(user)
                 keypair_data.append((email, user_uuid))
@@ -520,10 +527,10 @@ class TestDomainNestedSearchIntegration:
 
             for email, user_uuid in keypair_data:
                 keypair = KeyPairRow(
-                    user_id=email,
                     access_key=uuid.uuid4().hex[:20],
-                    secret_key=uuid.uuid4().hex[:20],
+                    secret_key=SecretValue(uuid.uuid4().hex[:20]),
                     user=user_uuid,
+                    is_active=True,
                     resource_policy=kp_policy.name,
                 )
                 session.add(keypair)
@@ -534,17 +541,18 @@ class TestDomainNestedSearchIntegration:
 
     async def test_search_with_description_filter(
         self,
-        domain_db_source: DomainDBSource,
+        ops_provider: V2DBOpsProvider,
         two_domains_with_children: dict[str, dict[str, str]],
     ) -> None:
-        """search_domains with description contains filter."""
+        """The search with description contains filter."""
         spec = StringMatchSpec(value="Research", case_insensitive=True, negated=False)
-        querier = BatchQuerier(
+        searcher = DomainSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[DomainConditions.by_description_contains(spec)],
             orders=[],
         )
-        result = await domain_db_source.search_domains(querier)
+        async with ops_provider.read_ops() as r:
+            result = await r.search_in_global(searcher)
 
         assert result.total_count == 1
         alpha_domain = [d for d in two_domains_with_children if "alpha" in d][0]
@@ -552,17 +560,18 @@ class TestDomainNestedSearchIntegration:
 
     async def test_search_with_project_name_filter(
         self,
-        domain_db_source: DomainDBSource,
+        ops_provider: V2DBOpsProvider,
         two_domains_with_children: dict[str, dict[str, str]],
     ) -> None:
-        """search_domains with project name contains filter returns matching domain."""
+        """The search with project name contains filter returns matching domain."""
         spec = StringMatchSpec(value="ml", case_insensitive=False, negated=False)
-        querier = BatchQuerier(
+        searcher = DomainSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[DomainConditions.by_project_name_contains(spec)],
             orders=[],
         )
-        result = await domain_db_source.search_domains(querier)
+        async with ops_provider.read_ops() as r:
+            result = await r.search_in_global(searcher)
 
         assert result.total_count == 1
         alpha_domain = [d for d in two_domains_with_children if "alpha" in d][0]
@@ -570,16 +579,17 @@ class TestDomainNestedSearchIntegration:
 
     async def test_search_with_project_is_active_filter(
         self,
-        domain_db_source: DomainDBSource,
+        ops_provider: V2DBOpsProvider,
         two_domains_with_children: dict[str, dict[str, str]],
     ) -> None:
-        """search_domains with project is_active(True) returns domain with active project."""
-        querier = BatchQuerier(
+        """The search with project is_active(True) returns domain with active project."""
+        searcher = DomainSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[DomainConditions.by_project_is_active(True)],
             orders=[],
         )
-        result = await domain_db_source.search_domains(querier)
+        async with ops_provider.read_ops() as r:
+            result = await r.search_in_global(searcher)
 
         assert result.total_count == 1
         alpha_domain = [d for d in two_domains_with_children if "alpha" in d][0]
@@ -587,17 +597,18 @@ class TestDomainNestedSearchIntegration:
 
     async def test_search_with_user_username_filter(
         self,
-        domain_db_source: DomainDBSource,
+        ops_provider: V2DBOpsProvider,
         two_domains_with_children: dict[str, dict[str, str]],
     ) -> None:
-        """search_domains with user username contains filter."""
+        """The search with user username contains filter."""
         spec = StringMatchSpec(value="alice", case_insensitive=False, negated=False)
-        querier = BatchQuerier(
+        searcher = DomainSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[DomainConditions.by_user_username_contains(spec)],
             orders=[],
         )
-        result = await domain_db_source.search_domains(querier)
+        async with ops_provider.read_ops() as r:
+            result = await r.search_in_global(searcher)
 
         assert result.total_count == 1
         alpha_domain = [d for d in two_domains_with_children if "alpha" in d][0]
@@ -605,17 +616,18 @@ class TestDomainNestedSearchIntegration:
 
     async def test_search_with_user_email_filter(
         self,
-        domain_db_source: DomainDBSource,
+        ops_provider: V2DBOpsProvider,
         two_domains_with_children: dict[str, dict[str, str]],
     ) -> None:
-        """search_domains with user email contains filter."""
+        """The search with user email contains filter."""
         spec = StringMatchSpec(value="@test.org", case_insensitive=False, negated=False)
-        querier = BatchQuerier(
+        searcher = DomainSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[DomainConditions.by_user_email_contains(spec)],
             orders=[],
         )
-        result = await domain_db_source.search_domains(querier)
+        async with ops_provider.read_ops() as r:
+            result = await r.search_in_global(searcher)
 
         assert result.total_count == 1
         beta_domain = [d for d in two_domains_with_children if "beta" in d][0]
@@ -623,16 +635,17 @@ class TestDomainNestedSearchIntegration:
 
     async def test_search_ordered_by_project_name(
         self,
-        domain_db_source: DomainDBSource,
+        ops_provider: V2DBOpsProvider,
         two_domains_with_children: dict[str, dict[str, str]],
     ) -> None:
-        """search_domains ordered by project_name sorts by correlated MIN(project name)."""
-        querier = BatchQuerier(
+        """The search ordered by project_name sorts by correlated MIN(project name)."""
+        searcher = DomainSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[],
             orders=[DomainOrders.by_project_name(ascending=True)],
         )
-        result = await domain_db_source.search_domains(querier)
+        async with ops_provider.read_ops() as r:
+            result = await r.search_in_global(searcher)
 
         assert result.total_count == 2
         # project-archive < project-ml alphabetically
@@ -643,16 +656,17 @@ class TestDomainNestedSearchIntegration:
 
     async def test_search_ordered_by_user_email(
         self,
-        domain_db_source: DomainDBSource,
+        ops_provider: V2DBOpsProvider,
         two_domains_with_children: dict[str, dict[str, str]],
     ) -> None:
-        """search_domains ordered by user email sorts by correlated MIN(email)."""
-        querier = BatchQuerier(
+        """The search ordered by user email sorts by correlated MIN(email)."""
+        searcher = DomainSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[],
             orders=[DomainOrders.by_user_email(ascending=True)],
         )
-        result = await domain_db_source.search_domains(querier)
+        async with ops_provider.read_ops() as r:
+            result = await r.search_in_global(searcher)
 
         assert result.total_count == 2
         # alice-*@example.com < bob-*@test.org alphabetically
@@ -661,32 +675,34 @@ class TestDomainNestedSearchIntegration:
 
     async def test_search_with_user_is_active_filter(
         self,
-        domain_db_source: DomainDBSource,
+        ops_provider: V2DBOpsProvider,
         two_domains_with_children: dict[str, dict[str, str]],
     ) -> None:
-        """search_domains with user is_active(True) returns domain with active user."""
-        querier = BatchQuerier(
+        """The search with user is_active(True) returns domain with active user."""
+        searcher = DomainSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[DomainConditions.by_user_is_active(True)],
             orders=[],
         )
-        result = await domain_db_source.search_domains(querier)
+        async with ops_provider.read_ops() as r:
+            result = await r.search_in_global(searcher)
 
         # Both users have status=ACTIVE, so both domains match
         assert result.total_count == 2
 
     async def test_search_combined_filter_and_order(
         self,
-        domain_db_source: DomainDBSource,
+        ops_provider: V2DBOpsProvider,
         two_domains_with_children: dict[str, dict[str, str]],
     ) -> None:
         """Combining nested filter + nested order in single search call."""
-        querier = BatchQuerier(
+        searcher = DomainSearcher(
             pagination=OffsetPagination(limit=50, offset=0),
             conditions=[DomainConditions.by_project_is_active(True)],
             orders=[DomainOrders.by_user_username(ascending=True)],
         )
-        result = await domain_db_source.search_domains(querier)
+        async with ops_provider.read_ops() as r:
+            result = await r.search_in_global(searcher)
 
         assert result.total_count == 1
         alpha_domain = [d for d in two_domains_with_children if "alpha" in d][0]

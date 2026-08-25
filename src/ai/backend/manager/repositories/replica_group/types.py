@@ -6,16 +6,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.schema.deployment import TargetGroupSpec
+from ai.backend.manager.data.deployment.types import ReplicaGroupData
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.scheduling_history.creators import (
-    ReplicaGroupHistoryCreatorSpec,
+from ai.backend.manager.models.replica_group_history.creators import (
+    ReplicaGroupHistoryCreator,
 )
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupAutoscaleReconcileView,
     ReplicaGroupLifecycleReconcileView,
@@ -56,8 +56,9 @@ class ReplicaGroupReconcileTransition:
     conditions to find the latest prior history); the history creator carries sub_steps.
     """
 
-    history_spec: ReplicaGroupHistoryCreatorSpec
-    status_updater: Updater[ReplicaGroupRow] | None = None
+    deployment_id: DeploymentID
+    history_creator: ReplicaGroupHistoryCreator
+    status_updater: DataUpdater[ReplicaGroupRow, ReplicaGroupData] | None = None
 
 
 @dataclass
@@ -79,22 +80,6 @@ class ApplyWritesResult:
 
     updated_group_ids: set[ReplicaGroupID]
     updated_endpoint_ids: set[DeploymentID]
-
-
-@dataclass
-class RevisionReplicaCount:
-    """Active route counts for one (group, revision): warming+serving vs serving only."""
-
-    live: int
-    serving: int
-
-
-@dataclass
-class RevisionRouteConfig:
-    """Per-revision settings copied onto each route at creation."""
-
-    health_check: ModelHealthCheck | None
-    termination_grace_period: float
 
 
 @dataclass

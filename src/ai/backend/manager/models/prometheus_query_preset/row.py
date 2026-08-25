@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import uuid
-
 import sqlalchemy as sa
 from pydantic import ConfigDict
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
 from ai.backend.common.types import BackendAISchema
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 from ai.backend.manager.models.base import (
@@ -25,11 +27,14 @@ class PresetOptions(BackendAISchema):
     model_config = ConfigDict(frozen=True)
 
 
-class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "prometheus_query_presets"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[PrometheusQueryPresetID] = mapped_column(
+        "id",
+        GUID(PrometheusQueryPresetID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
     metric_name: Mapped[str] = mapped_column("metric_name", sa.String(length=256), nullable=False)
@@ -41,9 +46,9 @@ class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[
     rank: Mapped[int] = mapped_column(
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")
     )
-    category_id: Mapped[uuid.UUID | None] = mapped_column(
+    category_id: Mapped[PrometheusQueryPresetCategoryID | None] = mapped_column(
         "category_id",
-        GUID,
+        GUID(PrometheusQueryPresetCategoryID),
         sa.ForeignKey("prometheus_query_preset_categories.id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -57,11 +62,15 @@ class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[
     def to_data(self) -> PrometheusQueryPresetData:
         """Convert Row to domain model data."""
         return PrometheusQueryPresetData(
-            id=self.id,
+            id=PrometheusQueryPresetID(self.id),
             name=self.name,
             description=self.description,
             rank=self.rank,
-            category_id=self.category_id,
+            category_id=(
+                PrometheusQueryPresetCategoryID(self.category_id)
+                if self.category_id is not None
+                else None
+            ),
             metric_name=self.metric_name,
             query_template=self.query_template,
             time_window=self.time_window,

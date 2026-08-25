@@ -15,12 +15,12 @@ from typing import TypedDict
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session_group import SessionGroupID
-from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionTypes
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.types import AccessKey, AgentId, SessionTypes
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -31,7 +31,9 @@ from ai.backend.manager.data.session_group.types import (
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import create_pending_session_with_kernels
 
@@ -42,7 +44,7 @@ class SessionScope(TypedDict):
     domain_id: DomainID
     domain_name: str
     resource_group_id: ResourceGroupID
-    scaling_group_name: str
+    resource_group_name: str
     group_id: uuid.UUID
     user_uuid: uuid.UUID
     access_key: AccessKey
@@ -78,7 +80,7 @@ async def _create_session_group(
 async def _create_extra_agent(
     db: ExtendedAsyncSAEngine,
     *,
-    scaling_group_name: str,
+    resource_group_name: str,
     resource_group_id: ResourceGroupID,
 ) -> str:
     agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
@@ -88,10 +90,8 @@ async def _create_extra_agent(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                scaling_group=scaling_group_name,
+                scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
-                available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",
                 version="1.0.0",
                 architecture="x86_64",
@@ -104,7 +104,7 @@ async def _create_extra_agent(
 @pytest.fixture
 def session_scope(
     test_domain_id: DomainID,
-    test_domain_name: str,
+    test_domain: DomainFixtureData,
     test_scaling_group_id: ResourceGroupID,
     test_scaling_group_name: str,
     test_group_id: uuid.UUID,
@@ -113,9 +113,9 @@ def session_scope(
 ) -> SessionScope:
     return {
         "domain_id": test_domain_id,
-        "domain_name": test_domain_name,
+        "domain_name": test_domain.domain_name,
         "resource_group_id": test_scaling_group_id,
-        "scaling_group_name": test_scaling_group_name,
+        "resource_group_name": test_scaling_group_name,
         "group_id": test_group_id,
         "user_uuid": test_user_uuid,
         "access_key": test_access_key,
@@ -149,9 +149,9 @@ class TestSessionGroupPolicyOnWorkload:
             **session_scope,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         policy = fetch.workloads[0].placement.session_group
@@ -174,9 +174,9 @@ class TestSessionGroupPolicyOnWorkload:
             **session_scope,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         assert fetch.workloads[0].placement.session_group is None
@@ -208,9 +208,9 @@ class TestSessionGroupPolicyOnWorkload:
             **session_scope,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         assert fetch.workloads[0].placement.session_group is None
@@ -239,7 +239,7 @@ class TestSessionGroupMemberObservation:
         )
         other_agent_id = await _create_extra_agent(
             db_with_cleanup,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
         )
         await create_pending_session_with_kernels(
@@ -269,9 +269,9 @@ class TestSessionGroupMemberObservation:
             **session_scope,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         assert fetch.session_group_members == {
@@ -299,7 +299,7 @@ class TestSessionGroupMemberObservation:
         )
         other_agent_id = await _create_extra_agent(
             db_with_cleanup,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
         )
         await create_pending_session_with_kernels(
@@ -324,9 +324,9 @@ class TestSessionGroupMemberObservation:
             **session_scope,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         assert fetch.session_group_members == {
@@ -384,9 +384,9 @@ class TestSessionGroupMemberObservation:
             **session_scope,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         assert fetch.session_group_members == {}
@@ -426,9 +426,9 @@ class TestSessionGroupMemberObservation:
             **session_scope,
         )
 
-        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
-            test_scaling_group_id
-        )
+        fetch = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).fetch_scheduling_fetch(test_scaling_group_id)
 
         assert fetch is not None
         assert fetch.session_group_members == {}

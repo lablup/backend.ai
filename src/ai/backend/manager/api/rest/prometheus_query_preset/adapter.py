@@ -5,6 +5,9 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PrometheusQueryPresetID,
+)
 from ai.backend.common.dto.clients.prometheus.response import MetricResponse
 from ai.backend.common.dto.manager.prometheus_query_preset import (
     MetricLabelEntryDTO,
@@ -21,16 +24,18 @@ from ai.backend.common.dto.manager.prometheus_query_preset import (
 )
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
 )
 from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
-from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
-    PrometheusQueryPresetUpdaterSpec,
+from ai.backend.manager.models.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
 )
+from ai.backend.manager.models.prometheus_query_preset.updaters import (
+    PrometheusQueryPresetUpdater,
+)
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -64,9 +69,10 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
 
     def build_updater(
         self, request: ModifyQueryDefinitionRequest, preset_id: UUID
-    ) -> Updater[PrometheusQueryPresetRow]:
-        """Build an Updater from a modify request."""
-        spec = PrometheusQueryPresetUpdaterSpec(
+    ) -> PrometheusQueryPresetUpdater:
+        """Build the update spec from a modify request."""
+        return PrometheusQueryPresetUpdater(
+            preset_id=PrometheusQueryPresetID(preset_id),
             name=(
                 OptionalState.update(request.name)
                 if request.name is not None
@@ -98,13 +104,14 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
                 else OptionalState.nop()
             ),
         )
-        return Updater(spec=spec, pk_value=preset_id)
 
-    def build_querier(self, request: SearchQueryDefinitionsRequest) -> BatchQuerier:
-        """Build a BatchQuerier from search request."""
+    def build_searcher(
+        self, request: SearchQueryDefinitionsRequest
+    ) -> PrometheusQueryPresetSearcher:
+        """Build the searcher from a search request."""
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
-        return BatchQuerier(
+        return PrometheusQueryPresetSearcher(
             conditions=conditions,
             orders=orders,
             pagination=OffsetPagination(limit=request.limit, offset=request.offset),

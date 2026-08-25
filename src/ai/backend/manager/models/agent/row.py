@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, cast, override
+from typing import Any, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -20,7 +20,8 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.auth import PublicKey
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.data.agent.types import (
     AgentData,
@@ -29,16 +30,14 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.permission.permission_defs import (
     AgentPermission,
-    ScalingGroupPermission,
+    ResourceGroupPermission,
 )
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     CurvePublicKeyColumn,
     EnumType,
-    ResourceSlotColumn,
 )
-from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
@@ -51,11 +50,7 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.types import QueryCondition
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (
     "AgentRow",
@@ -64,10 +59,17 @@ __all__: Sequence[str] = (
 )
 
 
-class AgentRow(Base):  # type: ignore[misc]
+class AgentRow(Base):
     __tablename__ = "agents"
 
-    id: Mapped[str] = mapped_column("id", sa.String(length=64), primary_key=True)
+    uuid: Mapped[AgentUUID] = mapped_column(
+        "uuid",
+        GUID(AgentUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
+    id: Mapped[AgentId] = mapped_column("id", sa.String(length=64), primary_key=True)
     status: Mapped[AgentStatus] = mapped_column(
         "status", EnumType(AgentStatus), nullable=False, index=True, default=AgentStatus.ALIVE
     )
@@ -92,15 +94,6 @@ class AgentRow(Base):  # type: ignore[misc]
     )
     schedulable: Mapped[bool] = mapped_column(
         "schedulable", sa.Boolean(), nullable=False, server_default=true(), default=True
-    )
-    available_slots: Mapped[ResourceSlot] = mapped_column(
-        "available_slots", ResourceSlotColumn(), nullable=False
-    )
-    # DEPRECATED (Phase 3, BA-4308): No longer written to.
-    # Agent occupied slots are now tracked by the normalized agent_resources table.
-    # Retained for historical audit; will be dropped in a future major version.
-    occupied_slots: Mapped[ResourceSlot] = mapped_column(
-        "occupied_slots", ResourceSlotColumn(), nullable=False
     )
     addr: Mapped[str] = mapped_column("addr", sa.String(length=128), nullable=False)
     public_host: Mapped[str | None] = mapped_column(
@@ -128,32 +121,34 @@ class AgentRow(Base):  # type: ignore[misc]
         default=False,
     )
 
-    kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="agent_row")
     agent_resource_rows: Mapped[list[AgentResourceRow]] = relationship("AgentResourceRow")
-    scaling_group_row: Mapped[ScalingGroupRow] = relationship(
-        "ScalingGroupRow",
-        back_populates="agents",
-        foreign_keys="[AgentRow.scaling_group]",
-    )
+
+    def _resource_rows_by_rank(self) -> list[AgentResourceRow]:
+        return sorted(self.agent_resource_rows, key=lambda r: r.slot_type_row.rank)
+
+    def actual_available_slots(self) -> ResourceSlot:
+        available = ResourceSlot()
+        for resource_row in self._resource_rows_by_rank():
+            available[resource_row.slot_name] = resource_row.capacity
+        return available
 
     def actual_occupied_slots(self) -> ResourceSlot:
         occupied = ResourceSlot()
-        sorted_rows = sorted(self.agent_resource_rows, key=lambda r: r.slot_type_row.rank)
-        for resource_row in sorted_rows:
+        for resource_row in self._resource_rows_by_rank():
             occupied[resource_row.slot_name] = resource_row.used
         return occupied
 
     def to_data(self) -> AgentData:
         return AgentData(
+            uuid=self.uuid,
             id=AgentId(self.id),
             status=self.status,
             status_changed=self.status_changed,
             region=self.region,
-            scaling_group=self.scaling_group,
+            resource_group=self.scaling_group,
             schedulable=self.schedulable,
-            available_slots=self.available_slots,
-            cached_occupied_slots=self.occupied_slots,
-            actual_occupied_slots=self.actual_occupied_slots(),
+            available_slots=self.actual_available_slots(),
+            occupied_slots=self.actual_occupied_slots(),
             addr=self.addr,
             public_host=self.public_host,
             first_contact=self.first_contact,
@@ -169,7 +164,7 @@ class AgentRow(Base):  # type: ignore[misc]
         return AgentDataForHeartbeatUpdate(
             status=self.status,
             status_changed=self.status_changed,
-            available_slots=self.available_slots,
+            available_slots=self.actual_available_slots(),
             addr=self.addr,
             public_host=self.public_host,
             version=self.version,
@@ -177,33 +172,6 @@ class AgentRow(Base):  # type: ignore[misc]
             compute_plugins=self.compute_plugins,
             public_key=self.public_key,
             auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
-        )
-
-    @classmethod
-    async def get_agents_by_condition(
-        cls, conditions: Sequence[QueryCondition], *, db: ExtendedAsyncSAEngine
-    ) -> Sequence[AgentRow]:
-        query_stmt = sa.select(AgentRow)
-        for cond in conditions:
-            query_stmt = cond(query_stmt)
-
-        async def fetch(db_session: SASession) -> Sequence[AgentRow]:
-            return (await db_session.scalars(query_stmt)).all()
-
-        async with db.connect() as db_conn:
-            return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
-
-    @classmethod
-    async def get_schedulable_agents_by_sgroup(
-        cls, sgroup_name: str, *, db: ExtendedAsyncSAEngine
-    ) -> Sequence[AgentRow]:
-        return await cls.get_agents_by_condition(
-            [
-                by_scaling_group(sgroup_name),
-                by_schedulable(True),
-                by_status(AgentStatus.ALIVE),
-            ],
-            db=db,
         )
 
     @classmethod
@@ -226,40 +194,6 @@ class AgentRow(Base):  # type: ignore[misc]
 
 # For compatibility
 agents = AgentRow.__table__
-
-
-def by_scaling_group(
-    scaling_group: str,
-) -> QueryCondition:
-    def _by_scaling_group(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(AgentRow.scaling_group == scaling_group)
-
-    return _by_scaling_group
-
-
-def by_status(
-    status: AgentStatus,
-) -> QueryCondition:
-    def _by_status(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(AgentRow.status == status)
-
-    return _by_status
-
-
-def by_schedulable(
-    schedulable: bool,
-) -> QueryCondition:
-    def _by_schedulable(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        schedulable_ = true() if schedulable else false()
-        return query_stmt.where(AgentRow.schedulable == schedulable_)
-
-    return _by_schedulable
 
 
 async def list_schedulable_agents_by_sgroup(
@@ -297,9 +231,9 @@ MEMBER_PERMISSIONS: frozenset[AgentPermission] = frozenset([
 
 @dataclass
 class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow, AgentId]):
-    from ai.backend.manager.models.scaling_group import ScalingGroupPermissionContext
+    from ai.backend.manager.models.resource_group import ResourceGroupPermissionContext
 
-    sgroup_permission_ctx: ScalingGroupPermissionContext | None = None
+    sgroup_permission_ctx: ResourceGroupPermissionContext | None = None
 
     @property
     def query_condition(self) -> WhereClauseType | None:
@@ -327,7 +261,7 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
         return cond
 
     def apply_sgroup_permission_ctx(
-        self, sgroup_permission_ctx: ScalingGroupPermissionContext
+        self, sgroup_permission_ctx: ResourceGroupPermissionContext
     ) -> None:
         self.sgroup_permission_ctx = sgroup_permission_ctx
 
@@ -341,7 +275,7 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
     @override
     async def calculate_final_permission(self, rbac_obj: AgentRow) -> frozenset[AgentPermission]:
         agent_row = rbac_obj
-        agent_id = cast(AgentId, agent_row.id)
+        agent_id = agent_row.id
         permissions: set[AgentPermission] = set()
 
         if (
@@ -354,7 +288,10 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
         if self.sgroup_permission_ctx is not None:
             sgroup_permission_map = self.sgroup_permission_ctx.sgroup_to_permissions_map
             sgroup_perms = sgroup_permission_map.get(agent_row.scaling_group)
-            if sgroup_perms is None or ScalingGroupPermission.AGENT_PERMISSIONS not in sgroup_perms:
+            if (
+                sgroup_perms is None
+                or ResourceGroupPermission.AGENT_PERMISSIONS not in sgroup_perms
+            ):
                 permissions = set()
 
         return frozenset(permissions)
@@ -397,20 +334,26 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> AgentPermissionContext:
-        from ai.backend.manager.models.scaling_group import (
-            ScalingGroupForDomainRow,
-            ScalingGroupRow,
+        from ai.backend.manager.models.domain import DomainRow
+        from ai.backend.manager.models.resource_group import (
+            ResourceGroupForDomainRow,
+            ResourceGroupRow,
         )
 
         permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _stmt = (
-            sa.select(ScalingGroupForDomainRow)
-            .where(ScalingGroupForDomainRow.domain == scope.domain_name)
+            sa.select(ResourceGroupForDomainRow)
+            .where(
+                ResourceGroupForDomainRow.domain_id
+                == sa.select(DomainRow.id)
+                .where(DomainRow.name == scope.domain_name)
+                .scalar_subquery()
+            )
             .options(
-                joinedload(ScalingGroupForDomainRow.sgroup_row).options(
-                    selectinload(ScalingGroupRow.agents)
+                joinedload(ResourceGroupForDomainRow.sgroup_row).options(
+                    selectinload(ResourceGroupRow.agents)
                 )
             )
         )
@@ -426,20 +369,20 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> AgentPermissionContext:
-        from ai.backend.manager.models.scaling_group import (
-            ScalingGroupForProjectRow,
-            ScalingGroupRow,
+        from ai.backend.manager.models.resource_group import (
+            ResourceGroupForProjectRow,
+            ResourceGroupRow,
         )
 
         permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _stmt = (
-            sa.select(ScalingGroupForProjectRow)
-            .where(ScalingGroupForProjectRow.group == scope.project_id)
+            sa.select(ResourceGroupForProjectRow)
+            .where(ResourceGroupForProjectRow.group == scope.project_id)
             .options(
-                joinedload(ScalingGroupForProjectRow.sgroup_row).options(
-                    selectinload(ScalingGroupRow.agents)
+                joinedload(ResourceGroupForProjectRow.sgroup_row).options(
+                    selectinload(ResourceGroupRow.agents)
                 )
             )
         )
@@ -455,9 +398,9 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: UserScope,
     ) -> AgentPermissionContext:
-        from ai.backend.manager.models.scaling_group import (
-            ScalingGroupForKeypairsRow,
-            ScalingGroupRow,
+        from ai.backend.manager.models.resource_group import (
+            ResourceGroupForKeypairsRow,
+            ResourceGroupRow,
         )
 
         permissions = await self.calculate_permission(ctx, scope)
@@ -472,11 +415,11 @@ class AgentPermissionContextBuilder(
         access_keys = cast(list[AccessKey], [r.access_key for r in kp_rows])
 
         _stmt = (
-            sa.select(ScalingGroupForKeypairsRow)
-            .where(ScalingGroupForKeypairsRow.access_key.in_(access_keys))
+            sa.select(ResourceGroupForKeypairsRow)
+            .where(ResourceGroupForKeypairsRow.access_key.in_(access_keys))
             .options(
-                joinedload(ScalingGroupForKeypairsRow.sgroup_row).options(
-                    selectinload(ScalingGroupRow.agents)
+                joinedload(ResourceGroupForKeypairsRow.sgroup_row).options(
+                    selectinload(ResourceGroupRow.agents)
                 )
             )
         )
@@ -528,11 +471,11 @@ async def get_permission_ctx(
     target_scope: ScopeType,
     requested_permission: AgentPermission,
 ) -> AgentPermissionContext:
-    from ai.backend.manager.models.scaling_group import ScalingGroupPermissionContextBuilder
+    from ai.backend.manager.models.resource_group import ResourceGroupPermissionContextBuilder
 
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        sgroup_perm_ctx = await ScalingGroupPermissionContextBuilder(db_session).build(
-            ctx, target_scope, ScalingGroupPermission.AGENT_PERMISSIONS
+        sgroup_perm_ctx = await ResourceGroupPermissionContextBuilder(db_session).build(
+            ctx, target_scope, ResourceGroupPermission.AGENT_PERMISSIONS
         )
 
         builder = AgentPermissionContextBuilder(db_session)

@@ -1,59 +1,75 @@
-from typing import override
+from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+    LookupOpsResult,
+)
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    PublicSingleEntityActionProcessor,
+    SingleEntityActionProcessor,
+)
+from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
+from ai.backend.manager.services.runtime_variant.actions.bulk_get import (
+    PublicBulkGetRuntimeVariantsAction,
+)
 from ai.backend.manager.services.runtime_variant.actions.create import (
     CreateRuntimeVariantAction,
-    CreateRuntimeVariantActionResult,
 )
-from ai.backend.manager.services.runtime_variant.actions.delete import (
-    DeleteRuntimeVariantAction,
-    DeleteRuntimeVariantActionResult,
+from ai.backend.manager.services.runtime_variant.actions.get import GetRuntimeVariantAction
+from ai.backend.manager.services.runtime_variant.actions.lookup import (
+    LookupRuntimeVariantAction,
 )
-from ai.backend.manager.services.runtime_variant.actions.resolve_by_name import (
-    ResolveRuntimeVariantByNameAction,
-    ResolveRuntimeVariantByNameActionResult,
+from ai.backend.manager.services.runtime_variant.actions.purge import (
+    PurgeRuntimeVariantAction,
 )
 from ai.backend.manager.services.runtime_variant.actions.search import (
     SearchRuntimeVariantsAction,
-    SearchRuntimeVariantsActionResult,
 )
 from ai.backend.manager.services.runtime_variant.actions.update import (
     UpdateRuntimeVariantAction,
-    UpdateRuntimeVariantActionResult,
 )
-from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
 
 
-class RuntimeVariantProcessors(AbstractProcessorPackage):
-    create: ActionProcessor[CreateRuntimeVariantAction, CreateRuntimeVariantActionResult]
-    update: ActionProcessor[UpdateRuntimeVariantAction, UpdateRuntimeVariantActionResult]
-    delete: ActionProcessor[DeleteRuntimeVariantAction, DeleteRuntimeVariantActionResult]
-    search: ActionProcessor[SearchRuntimeVariantsAction, SearchRuntimeVariantsActionResult]
-    resolve_by_name: ActionProcessor[
-        ResolveRuntimeVariantByNameAction, ResolveRuntimeVariantByNameActionResult
+class RuntimeVariantProcessors:
+    """Every operation runs straight against ops, so this domain has no service."""
+
+    public_get: PublicSingleEntityActionProcessor[
+        GetRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
+    ]
+    public_bulk_get: PartialBulkActionProcessor[
+        PublicBulkGetRuntimeVariantsAction, RuntimeVariantData
+    ]
+    global_create: GlobalActionProcessor[
+        CreateRuntimeVariantAction, CreatedEntityOpsResult[RuntimeVariantData]
+    ]
+    update: SingleEntityActionProcessor[
+        UpdateRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
+    ]
+    purge: SingleEntityActionProcessor[
+        PurgeRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
+    ]
+    public_search: PublicActionProcessor[
+        SearchRuntimeVariantsAction, BatchOpsResult[RuntimeVariantData]
+    ]
+    public_lookup: LookupActionProcessor[
+        LookupRuntimeVariantAction, LookupOpsResult[RuntimeVariantID]
     ]
 
-    def __init__(
-        self,
-        service: RuntimeVariantService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.update = ActionProcessor(service.update, action_monitors)
-        self.delete = ActionProcessor(service.delete, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
-        self.resolve_by_name = ActionProcessor(service.resolve_by_name, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateRuntimeVariantAction.spec(),
-            UpdateRuntimeVariantAction.spec(),
-            DeleteRuntimeVariantAction.spec(),
-            SearchRuntimeVariantsAction.spec(),
-            ResolveRuntimeVariantByNameAction.spec(),
-        ]
+    def __init__(self, group: ProcessorGroup[RuntimeVariantData]) -> None:
+        self.public_get = group.public_get_ops(GetRuntimeVariantAction)
+        self.public_bulk_get = group.public_partial_bulk_get_ops(PublicBulkGetRuntimeVariantsAction)
+        self.global_create = group.global_create_ops(CreateRuntimeVariantAction)
+        self.update = group.single_update_ops(UpdateRuntimeVariantAction)
+        self.purge = group.entity_purge_ops(PurgeRuntimeVariantAction)
+        self.public_search = group.public_search_ops(SearchRuntimeVariantsAction)
+        self.public_lookup = group.public_lookup_ops(LookupRuntimeVariantAction)

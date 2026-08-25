@@ -3,15 +3,16 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
-from typing import cast
-from unittest.mock import MagicMock
+from typing import Any, cast
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
 from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.group.handler import GroupHandler
 from ai.backend.manager.api.rest.group.registry import register_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -19,7 +20,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
@@ -28,14 +29,18 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.group.repositories import GroupRepositories
-from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
+    ContainerRegistryOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.project.repositories import ProjectRepositories
+from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.service.container_registry.harbor import (
     AbstractPerProjectContainerRegistryQuotaService,
 )
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
-from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.project.service import ProjectService
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -67,12 +72,15 @@ class InMemoryQuotaService:
 @pytest.fixture()
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(database_engine)
+    repo = ContainerRegistryRepository(
+        database_engine, ContainerRegistryOpsProvider(database_engine)
+    )
     quota_service = cast(AbstractPerProjectContainerRegistryQuotaService, InMemoryQuotaService())
     service = ContainerRegistryService(database_engine, repo, quota_service=quota_service)
     return ContainerRegistryProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        processor_registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), service
     )
 
 
@@ -96,10 +104,11 @@ def group_repository(
     config_provider: ManagerConfigProvider,
     storage_manager: StorageSessionManager,
     valkey_clients: ValkeyClients,
-) -> GroupRepository:
-    """Provide a GroupRepository backed by the real test database."""
-    return GroupRepository(
+) -> ProjectRepository:
+    """Provide a ProjectRepository backed by the real test database."""
+    return ProjectRepository(
         db=database_engine,
+        v2_ops_provider=V2DBOpsProvider(database_engine),
         config_provider=config_provider,
         valkey_stat_client=valkey_clients.stat,
         storage_manager=storage_manager,
@@ -108,14 +117,14 @@ def group_repository(
 
 @pytest.fixture()
 def group_service(
-    group_repository: GroupRepository,
+    group_repository: ProjectRepository,
     storage_manager: StorageSessionManager,
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
-) -> GroupService:
-    """Provide a GroupService backed by the real test database."""
-    group_repositories = GroupRepositories(repository=group_repository)
-    return GroupService(
+) -> ProjectService:
+    """Provide a ProjectService backed by the real test database."""
+    group_repositories = ProjectRepositories(repository=group_repository)
+    return ProjectService(
         storage_manager=storage_manager,
         config_provider=config_provider,
         valkey_stat_client=valkey_clients.stat,
@@ -134,7 +143,7 @@ async def target_group(
     group_name = f"group-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Test group {group_name}",
@@ -175,4 +184,6 @@ async def target_group(
                 VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )

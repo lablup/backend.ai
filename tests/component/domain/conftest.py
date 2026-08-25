@@ -10,12 +10,15 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.dto.manager.domain import (
     CreateDomainRequest,
     CreateDomainResponse,
     PurgeDomainRequest,
 )
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.domain.handler import DomainHandler
@@ -26,28 +29,39 @@ from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.project.processors import ProjectProcessors
 
 DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 
 
 @pytest.fixture()
-def domain_processors(database_engine: ExtendedAsyncSAEngine) -> DomainProcessors:
-    repo = DomainRepository(database_engine)
+def domain_processors(
+    database_engine: ExtendedAsyncSAEngine, processor_registry: ProcessorRegistry[Any]
+) -> DomainProcessors:
+    repo = DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     service = DomainService(repo)
-    return DomainProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+
+
+@pytest.fixture()
+def project_processors(processor_registry: ProcessorRegistry[Any]) -> ProjectProcessors:
+    """Only the ops-backed create is exercised here, so the service is a stub."""
+    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), MagicMock())
 
 
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     domain_processors: DomainProcessors,
+    project_processors: ProjectProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for domain-domain tests."""
-    domain_registry = register_domain_routes(DomainHandler(domain=domain_processors), route_deps)
+    domain_registry = register_domain_routes(
+        DomainHandler(domain=domain_processors, project=project_processors), route_deps
+    )
     return [
         register_admin_routes(
             AdminHandler(

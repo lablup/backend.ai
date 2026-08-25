@@ -6,19 +6,19 @@ from typing import override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base import BatchPurgerSpec
 from ai.backend.manager.repositories.base.purger import PurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 
 
@@ -68,7 +68,7 @@ class IdleCheckerPurgerSpec(PurgerSpec[IdleCheckerRow]):
 
 
 @dataclass
-class SessionIdleCheckBatchPurgerSpec(BatchPurgerSpec[SessionIdleCheckRow]):
+class SessionIdleCheckSyncPurgerSpec(BatchPurgerSpec[SessionIdleCheckRow]):
     pairs: Sequence[SessionIdleCheckPair]
 
     @override
@@ -80,6 +80,7 @@ class SessionIdleCheckBatchPurgerSpec(BatchPurgerSpec[SessionIdleCheckRow]):
                 SessionIdleCheckRow.idle_checker_id,
             ).in_(pair_values),
             SessionIdleCheckRow.last_status != IdleCheckPhase.IDLE_EXPIRED,
+            sa.not_(SessionIdleCheckRow.is_manual),
         )
 
     @override

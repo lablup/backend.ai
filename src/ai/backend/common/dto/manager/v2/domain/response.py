@@ -10,12 +10,15 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AdminSearchDomainsPayload",
     "DeleteDomainPayload",
+    "RestoreDomainPayload",
     "DomainBasicInfo",
     "DomainLifecycleInfo",
     "DomainNode",
@@ -62,6 +65,12 @@ class DomainLifecycleInfo(BackendAISchema):
             "Inactive domains cannot create new projects or perform operations."
         ),
     )
+    is_default: bool = Field(
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Whether this is the default domain. "
+            "At most one domain carries the marker."
+        ),
+    )
     created_at: datetime = Field(
         description="Timestamp when the domain was created.",
     )
@@ -73,8 +82,8 @@ class DomainLifecycleInfo(BackendAISchema):
 class DomainNode(BaseResponseModel):
     """Domain entity with structured field groups."""
 
-    id: str = Field(
-        description="Domain name (primary key).",
+    id: DomainID = Field(
+        description="Domain uuid. The name lives at basic_info.name.",
     )
     basic_info: DomainBasicInfo = Field(
         description="Basic domain information including name and description.",
@@ -120,6 +129,14 @@ class DeleteDomainPayload(BaseResponseModel):
 
     deleted: bool = Field(
         description="Whether the deletion was successful.",
+    )
+
+
+class RestoreDomainPayload(BaseResponseModel):
+    """Payload for domain restore mutation."""
+
+    restored: bool = Field(
+        description="Whether the restore was successful.",
     )
 
 

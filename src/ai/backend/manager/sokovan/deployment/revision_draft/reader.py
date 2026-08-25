@@ -17,9 +17,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ai.backend.common.config import ModelConfigDraft, ModelDefinitionDraft
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
@@ -114,7 +114,7 @@ class RevisionDraftReader:
 
     def _variant_baseline_to_draft(self, variant: RuntimeVariantData) -> RevisionDraft:
         """Project the variant's ``default_model_definition`` into a RevisionDraft."""
-        return RevisionDraft(model_definition=variant.default_model_definition)
+        return RevisionDraft(model_definition=variant.default_model_definition.to_draft())
 
     def _preset_to_draft(
         self,
@@ -124,11 +124,6 @@ class RevisionDraftReader:
         resource_slots = {entry.resource_type: entry.quantity for entry in slot_entries}
         resource_opts = {o.name: o.value for o in preset.resource_opts}
         environ = {e.key: e.value for e in preset.environ}
-        model_definition: ModelDefinitionDraft | None = (
-            ModelDefinitionDraft.model_validate(preset.model_definition)
-            if preset.model_definition
-            else None
-        )
         return RevisionDraft(
             image_id=preset.image_id,
             resource_slots=resource_slots or None,
@@ -138,7 +133,9 @@ class RevisionDraftReader:
             startup_command=preset.startup_command,
             bootstrap_script=preset.bootstrap_script,
             environ=environ or None,
-            model_definition=model_definition,
+            model_definition=(
+                preset.model_definition.to_draft() if preset.model_definition else None
+            ),
             runtime_variant_preset_values=preset.runtime_variant_preset_values,
         )
 

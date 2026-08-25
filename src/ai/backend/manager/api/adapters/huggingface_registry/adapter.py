@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
     AdminSearchHuggingFaceRegistriesInput,
     CreateHuggingFaceRegistryInput,
@@ -25,12 +26,10 @@ from ai.backend.manager.data.artifact_registries.types import (
 )
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.models.huggingface_registry.conditions import HuggingFaceRegistryConditions
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.huggingface_registry import HuggingFaceRegistryCreatorSpec
-from ai.backend.manager.repositories.huggingface_registry.updaters import (
-    HuggingFaceRegistryUpdaterSpec,
-)
+from ai.backend.manager.models.huggingface_registry.creators import HuggingFaceRegistryCreator
+from ai.backend.manager.models.huggingface_registry.searchers import HuggingFaceRegistrySearcher
+from ai.backend.manager.models.huggingface_registry.updaters import HuggingFaceRegistryUpdater
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
 )
@@ -61,17 +60,10 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         self, input: CreateHuggingFaceRegistryInput
     ) -> CreateHuggingFaceRegistryPayload:
         """Create a new HuggingFace registry."""
-        action_result = (
-            await self._processors.artifact_registry.create_huggingface_registry.wait_for_complete(
-                CreateHuggingFaceRegistryAction(
-                    creator=Creator(
-                        spec=HuggingFaceRegistryCreatorSpec(
-                            url=input.url,
-                            token=input.token,
-                        )
-                    ),
-                    meta=ArtifactRegistryCreatorMeta(name=input.name),
-                )
+        action_result = await self._processors.artifact_registry.create_huggingface_registry.run(
+            CreateHuggingFaceRegistryAction(
+                creator=HuggingFaceRegistryCreator(url=input.url, token=input.token),
+                meta=ArtifactRegistryCreatorMeta(name=input.name),
             )
         )
         return CreateHuggingFaceRegistryPayload(
@@ -86,9 +78,9 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
             limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
             offset=input.offset if input.offset is not None else 0,
         )
-        querier = BatchQuerier(conditions=[], orders=[], pagination=pagination)
-        action_result = await self._processors.artifact_registry.search_huggingface_registries.wait_for_complete(
-            SearchHuggingFaceRegistriesAction(querier=querier)
+        searcher = HuggingFaceRegistrySearcher(pagination=pagination, conditions=[], orders=[])
+        action_result = await self._processors.artifact_registry.search_huggingface_registries.run(
+            SearchHuggingFaceRegistriesAction(searcher=searcher)
         )
         return AdminSearchHuggingFaceRegistriesPayload(
             items=[
@@ -101,10 +93,8 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
 
     async def get(self, registry_id: UUID) -> HuggingFaceRegistryNode:
         """Retrieve a single HuggingFace registry by ID."""
-        action_result = (
-            await self._processors.artifact_registry.get_huggingface_registry.wait_for_complete(
-                GetHuggingFaceRegistryAction(registry_id=registry_id)
-            )
+        action_result = await self._processors.artifact_registry.get_huggingface_registry.run(
+            GetHuggingFaceRegistryAction(registry_id=ArtifactRegistryID(registry_id))
         )
         return self._huggingface_registry_data_to_dto(action_result.result)
 
@@ -112,7 +102,8 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         self, input: UpdateHuggingFaceRegistryInput
     ) -> UpdateHuggingFaceRegistryPayload:
         """Update an existing HuggingFace registry."""
-        spec = HuggingFaceRegistryUpdaterSpec(
+        updater = HuggingFaceRegistryUpdater(
+            registry_id=ArtifactRegistryID(input.id),
             url=OptionalState.update(input.url) if input.url is not None else OptionalState.nop(),
             token=(
                 OptionalState.update(input.token)
@@ -125,12 +116,11 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
         )
-        action_result = (
-            await self._processors.artifact_registry.update_huggingface_registry.wait_for_complete(
-                UpdateHuggingFaceRegistryAction(
-                    updater=Updater(spec=spec, pk_value=input.id),
-                    meta=meta,
-                )
+        action_result = await self._processors.artifact_registry.update_huggingface_registry.run(
+            UpdateHuggingFaceRegistryAction(
+                registry_id=ArtifactRegistryID(input.id),
+                updater=updater,
+                meta=meta,
             )
         )
         return UpdateHuggingFaceRegistryPayload(
@@ -139,10 +129,8 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
 
     async def get_many(self, registry_ids: list[UUID]) -> list[HuggingFaceRegistryNode]:
         """Retrieve multiple HuggingFace registries by IDs."""
-        action_result = (
-            await self._processors.artifact_registry.get_huggingface_registries.wait_for_complete(
-                GetHuggingFaceRegistriesAction(registry_ids=registry_ids)
-            )
+        action_result = await self._processors.artifact_registry.get_huggingface_registries.run(
+            GetHuggingFaceRegistriesAction(registry_ids=registry_ids)
         )
         return [self._huggingface_registry_data_to_dto(item) for item in action_result.result]
 
@@ -153,12 +141,12 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         """
         if not ids:
             return []
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[HuggingFaceRegistryConditions.by_ids(ids)],
         )
-        action_result = await self._processors.artifact_registry.search_huggingface_registries.wait_for_complete(
-            SearchHuggingFaceRegistriesAction(querier=querier)
+        action_result = await self._processors.artifact_registry.search_huggingface_registries.run(
+            SearchHuggingFaceRegistriesAction(searcher=searcher)
         )
         registry_map = {
             item.id: self._huggingface_registry_data_to_dto(item)
@@ -170,10 +158,8 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         self, input: DeleteHuggingFaceRegistryInput
     ) -> DeleteHuggingFaceRegistryPayload:
         """Delete a HuggingFace registry."""
-        action_result = (
-            await self._processors.artifact_registry.delete_huggingface_registry.wait_for_complete(
-                DeleteHuggingFaceRegistryAction(registry_id=input.id)
-            )
+        action_result = await self._processors.artifact_registry.delete_huggingface_registry.run(
+            DeleteHuggingFaceRegistryAction(registry_id=ArtifactRegistryID(input.id))
         )
         return DeleteHuggingFaceRegistryPayload(id=action_result.deleted_registry_id)
 

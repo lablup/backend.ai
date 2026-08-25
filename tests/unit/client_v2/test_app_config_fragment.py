@@ -11,6 +11,8 @@ from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains_v2.app_config_fragment import V2AppConfigFragmentClient
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.entity.app_config import AppConfigScopeID
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     AppConfigFragmentUpsertItem,
@@ -29,8 +31,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     SearchAppConfigFragmentPayload,
     UpsertAppConfigFragmentsPayload,
 )
-from ai.backend.common.identifier.app_config import AppConfigScopeID
-from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 from .conftest import MockAuth
 
@@ -122,7 +122,10 @@ class TestScopedBulkUpsert:
         node_payload: dict[str, Any],
     ) -> None:
         mock_response.json = AsyncMock(
-            return_value={"items": [node_payload]},
+            return_value={
+                "items": [node_payload],
+                "failed": [{"config_name": "menu", "message": "not allowed"}],
+            },
         )
 
         result = await client.scoped_bulk_upsert_app_config_fragments(
@@ -140,6 +143,9 @@ class TestScopedBulkUpsert:
         assert str(call_args[0][1]).endswith("/v2/app-config-fragments/scoped/bulk-upsert")
         assert isinstance(result, UpsertAppConfigFragmentsPayload)
         assert [item.config_name for item in result.items] == ["theme"]
+        assert [(error.config_name, error.message) for error in result.failed] == [
+            ("menu", "not allowed")
+        ]
 
 
 class TestMyByNames:
@@ -172,7 +178,7 @@ class TestMyBulkUpsert:
         node_payload: dict[str, Any],
     ) -> None:
         mock_response.json = AsyncMock(
-            return_value={"items": [node_payload]},
+            return_value={"items": [node_payload], "failed": []},
         )
 
         result = await client.my_bulk_upsert_app_config_fragments(

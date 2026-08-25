@@ -54,8 +54,9 @@ class ResourcePolicyValidator(ValidatorRule):
             user_allocation = occupancy.by_user.get(
                 workload.meta.owner.user_uuid, UserResourceAllocation.empty()
             )
-            if user_allocation.exceeds(request, user_limit):
-                errors.append(UserResourceQuotaExceeded(quota_slots=user_limit.slots))
+            user_excesses = user_allocation.exceeded_slots(request, user_limit)
+            if user_excesses:
+                errors.append(UserResourceQuotaExceeded(excesses=user_excesses))
             if user_allocation.count_exceeds(request, user_limit):
                 if workload.is_private:
                     max_count, session_type = user_limit.max_sftp_session_count, "SFTP"
@@ -73,16 +74,18 @@ class ResourcePolicyValidator(ValidatorRule):
             project_allocation = occupancy.by_project.get(
                 workload.meta.owner.project_id, ResourceAllocation.empty()
             )
-            if project_allocation.exceeds(request, project_limit):
-                errors.append(ProjectResourceQuotaExceeded(quota_slots=project_limit.slots))
+            project_excesses = project_allocation.exceeded_slots(request, project_limit)
+            if project_excesses:
+                errors.append(ProjectResourceQuotaExceeded(excesses=project_excesses))
 
         domain_limit = policy.by_domain.get(workload.meta.owner.domain_id)
         if domain_limit is not None:
             domain_allocation = occupancy.by_domain.get(
                 workload.meta.owner.domain_id, ResourceAllocation.empty()
             )
-            if domain_allocation.exceeds(request, domain_limit):
-                errors.append(DomainResourceQuotaExceeded(quota_slots=domain_limit.slots))
+            domain_excesses = domain_allocation.exceeded_slots(request, domain_limit)
+            if domain_excesses:
+                errors.append(DomainResourceQuotaExceeded(excesses=domain_excesses))
 
         if errors:
             if len(errors) == 1:

@@ -9,14 +9,8 @@ from ai.backend.manager.models.user.orders import UserOrders
 from .repository import (
     UserRepository,
 )
-from .types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
-)
 
 __all__ = (
-    "DomainUserSearchScope",
-    "ProjectUserSearchScope",
     "UserConditions",
     "UserOrders",
     "UserRepository",

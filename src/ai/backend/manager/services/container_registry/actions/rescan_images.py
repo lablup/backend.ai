@@ -2,8 +2,6 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData
@@ -18,12 +16,8 @@ class RescanImagesAction(ContainerRegistryAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.CONTAINER_REGISTRY_IMAGE
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    def action_name(cls) -> str:
+        return "rescan_images"
 
     @override
     @classmethod
@@ -32,11 +26,7 @@ class RescanImagesAction(ContainerRegistryAction):
 
 
 @dataclass
-class RescanImagesActionResult(BaseActionResult):
+class RescanImagesActionResult:
     images: list[ImageData]
     registry: ContainerRegistryData
     errors: list[str]
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.registry.id)

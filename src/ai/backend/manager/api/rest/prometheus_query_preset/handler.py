@@ -5,6 +5,7 @@ from __future__ import annotations
 from http import HTTPStatus
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.dto.manager.prometheus_query_preset import (
     CreateQueryDefinitionRequest,
     CreateQueryDefinitionResponse,
@@ -23,18 +24,11 @@ from ai.backend.common.dto.manager.prometheus_query_preset import (
 from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
 )
-from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.repositories.base import (
-    Creator,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.creators import (
-    PrometheusQueryPresetCreatorSpec,
+from ai.backend.manager.models.prometheus_query_preset.creators import (
+    PrometheusQueryPresetCreator,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.create import (
     CreatePresetAction,
-)
-from ai.backend.manager.services.prometheus_query_preset.actions.delete import (
-    DeletePresetAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
     ExecutePresetAction,
@@ -42,11 +36,14 @@ from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset 
 from ai.backend.manager.services.prometheus_query_preset.actions.get import (
     GetPresetAction,
 )
-from ai.backend.manager.services.prometheus_query_preset.actions.modify import (
-    ModifyPresetAction,
+from ai.backend.manager.services.prometheus_query_preset.actions.purge import (
+    PurgePresetAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.search import (
     SearchPresetsAction,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.update import (
+    UpdatePresetAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.processors import (
     PrometheusQueryPresetProcessors,
@@ -71,22 +68,18 @@ class PrometheusQueryPresetHandler:
         body: BodyParam[CreateQueryDefinitionRequest],
     ) -> APIResponse:
         """Create a new prometheus query preset."""
-        creator: Creator[PrometheusQueryPresetRow] = Creator(
-            spec=PrometheusQueryPresetCreatorSpec(
-                name=body.parsed.name,
-                metric_name=body.parsed.metric_name,
-                query_template=body.parsed.query_template,
-                time_window=body.parsed.time_window,
-                filter_labels=body.parsed.options.filter_labels,
-                group_labels=body.parsed.options.group_labels,
-            )
+        creator = PrometheusQueryPresetCreator(
+            name=body.parsed.name,
+            metric_name=body.parsed.metric_name,
+            query_template=body.parsed.query_template,
+            time_window=body.parsed.time_window,
+            filter_labels=body.parsed.options.filter_labels,
+            group_labels=body.parsed.options.group_labels,
         )
-        action_result = await self._processor.create_preset.wait_for_complete(
+        action_result = await self._processor.global_create_preset.run(
             CreatePresetAction(creator=creator)
         )
-        resp = CreateQueryDefinitionResponse(
-            item=self._adapter.convert_to_dto(action_result.preset)
-        )
+        resp = CreateQueryDefinitionResponse(item=self._adapter.convert_to_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     async def search_presets(
@@ -94,9 +87,9 @@ class PrometheusQueryPresetHandler:
         body: BodyParam[SearchQueryDefinitionsRequest],
     ) -> APIResponse:
         """Search presets with filters, orders, and pagination."""
-        querier = self._adapter.build_querier(body.parsed)
-        action_result = await self._processor.search_presets.wait_for_complete(
-            SearchPresetsAction(querier=querier)
+        searcher = self._adapter.build_searcher(body.parsed)
+        action_result = await self._processor.public_search_presets.run(
+            SearchPresetsAction(searcher=searcher)
         )
         resp = SearchQueryDefinitionsResponse(
             items=[
@@ -115,22 +108,20 @@ class PrometheusQueryPresetHandler:
         path: PathParam[QueryDefinitionIdPathParam],
     ) -> APIResponse:
         """Get a preset by ID."""
-        action_result = await self._processor.get_preset.wait_for_complete(
-            GetPresetAction(preset_id=path.parsed.id)
+        action_result = await self._processor.public_get_preset.run(
+            GetPresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id))
         )
-        resp = GetQueryDefinitionResponse(item=self._adapter.convert_to_dto(action_result.preset))
+        resp = GetQueryDefinitionResponse(item=self._adapter.convert_to_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
-    async def modify_preset(
+    async def update_preset(
         self,
         path: PathParam[QueryDefinitionIdPathParam],
         body: BodyParam[ModifyQueryDefinitionRequest],
     ) -> APIResponse:
         """Modify a preset."""
         updater = self._adapter.build_updater(body.parsed, path.parsed.id)
-        action_result = await self._processor.modify_preset.wait_for_complete(
-            ModifyPresetAction(preset_id=path.parsed.id, updater=updater)
-        )
+        action_result = await self._processor.update_preset.run(UpdatePresetAction(updater=updater))
         resp = ModifyQueryDefinitionResponse(
             item=self._adapter.convert_to_dto(action_result.preset)
         )
@@ -141,10 +132,10 @@ class PrometheusQueryPresetHandler:
         path: PathParam[QueryDefinitionIdPathParam],
     ) -> APIResponse:
         """Delete a preset."""
-        action_result = await self._processor.delete_preset.wait_for_complete(
-            DeletePresetAction(preset_id=path.parsed.id)
+        action_result = await self._processor.purge_preset.run(
+            PurgePresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id))
         )
-        resp = DeleteQueryDefinitionResponse(id=action_result.preset_id)
+        resp = DeleteQueryDefinitionResponse(id=action_result.data.id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def execute_preset(
@@ -159,9 +150,9 @@ class PrometheusQueryPresetHandler:
             group_labels=body.parsed.options.group_labels,
         )
 
-        action_result = await self._processor.execute_preset.wait_for_complete(
+        action_result = await self._processor.execute_preset.run(
             ExecutePresetAction(
-                preset_id=path.parsed.id,
+                preset_id=PrometheusQueryPresetID(path.parsed.id),
                 options=options,
                 time_window=body.parsed.time_window,
                 time_range=body.parsed.time_range,

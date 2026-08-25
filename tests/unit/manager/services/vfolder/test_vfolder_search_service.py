@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -20,13 +20,14 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
     VFolderSearchResult,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
-    AdminSearchVFoldersAction,
-    AdminSearchVFoldersActionResult,
+    GlobalSearchVFoldersAction,
+    GlobalSearchVFoldersActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
     SearchUserVFoldersAction,
@@ -126,11 +127,11 @@ class TestVFolderAdminServiceAdminSearchVFolders:
             )
         )
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
-        action = AdminSearchVFoldersAction(querier=querier)
+        action = GlobalSearchVFoldersAction(querier=querier)
 
         result = await vfolder_admin_service.admin_search_vfolders(action)
 
-        assert isinstance(result, AdminSearchVFoldersActionResult)
+        assert isinstance(result, GlobalSearchVFoldersActionResult)
         assert result.data == [vfolder_1, vfolder_2]
         assert result.total_count == 2
         assert result.has_next_page is False
@@ -204,7 +205,7 @@ class TestVFolderServiceSearchUserVFolders:
                 has_previous_page=False,
             )
         )
-        search_scope = UserVFolderSearchScope(user_id=user_id)
+        search_scope = UserVFolderOperationScope(user_id=user_id)
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = SearchUserVFoldersAction(scope=search_scope, querier=querier)
 

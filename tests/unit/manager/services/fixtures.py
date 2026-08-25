@@ -3,7 +3,8 @@ import uuid
 from datetime import UTC, datetime
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
@@ -11,7 +12,7 @@ from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
 RESOURCE_LIMITS = {"cuda.device": {"min": "1", "max": None}}
 
 CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
-    id=uuid.uuid4(),
+    id=ContainerRegistryID(uuid.uuid4()),
     url="https://registry.example.com",
     registry_name="registry.example.com",
     type=ContainerRegistryType.DOCKER,

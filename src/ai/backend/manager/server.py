@@ -62,6 +62,7 @@ from .api.rest.middleware import (
     build_auth_middleware,
     build_exception_middleware,
 )
+from .api.rest.middleware.auth import TRUSTED_PROXY_NETWORKS_KEY, parse_trusted_proxy_networks
 from .api.rest.routing import RouteRegistry
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
@@ -96,6 +97,7 @@ async def webapp_plugin_ctx(
     root_app["_config_provider"] = r.bootstrap.config_provider
     root_app["_etcd"] = r.bootstrap.etcd
     root_app["_valkey_stat"] = r.infrastructure.valkey.stat
+    root_app["_key_provider_pool"] = r.bootstrap.key_provider_pool
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
         if pidx == 0:
             log.info("Loading webapp plugin: {0}", plugin_name)
@@ -339,9 +341,9 @@ async def server_main(
         _error_monitor_ref = dep_resources.monitoring.error_monitor
 
         # Insert DI-based middlewares now that dependencies are available.
-        # Maintain order: request_id(0) → exception(1) → auth(2) → api → metric
+        # Maintain order: request_id(0) → client_ip(1) → exception(2) → auth(3) → api → metric
         root_app.middlewares.insert(
-            1,
+            2,
             build_exception_middleware(
                 error_monitor=dep_resources.monitoring.error_monitor,
                 stats_monitor=dep_resources.monitoring.stats_monitor,
@@ -349,33 +351,21 @@ async def server_main(
             ),
         )
         root_app.middlewares.insert(
-            2,
+            3,
             build_auth_middleware(
                 db=dep_resources.infrastructure.db,
+                key_provider_pool=dep_resources.bootstrap.key_provider_pool,
                 jwt_validator=dep_resources.system.jwt_validator,
                 valkey_stat=dep_resources.infrastructure.valkey.stat,
                 hook_plugin_ctx=dep_resources.plugins.hook_plugin_ctx,
             ),
         )
 
-        # Set up XForwardedStrict middleware if trusted proxies are configured.
-        # This must be inserted BEFORE auth middleware so that request.remote is
-        # resolved to the real client IP before authentication runs.
+        # Resolve forwarding headers only for requests arriving from these proxies.
         trusted_proxies = dep_resources.bootstrap.config_provider.config.manager.trusted_proxies
+        root_app[TRUSTED_PROXY_NETWORKS_KEY] = parse_trusted_proxy_networks(trusted_proxies)
         if trusted_proxies:
-            from aiohttp_remotes import XForwardedStrict
-
-            xff_middleware = XForwardedStrict(
-                [trusted_proxies],
-                white_paths=root_app.get("auth_middleware_allowlist", []),
-            )
-            await xff_middleware.setup(root_app)
-            root_app["_trusted_proxies_enabled"] = True
-            log.info(
-                "XForwardedStrict middleware enabled with trusted proxies: {}", trusted_proxies
-            )
-        else:
-            root_app["_trusted_proxies_enabled"] = False
+            log.info("Trusting the forwarding headers set by proxies: {}", trusted_proxies)
 
         # Build and mount the API module tree.
         # Must happen before runner.setup() which freezes the application router.

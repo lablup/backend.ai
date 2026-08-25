@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.dto.manager.image import (
     ImageFilter,
     ImageOrder,
@@ -23,7 +24,8 @@ from ai.backend.manager.data.image.types import ImageData, ImageDataWithDetails
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.image.conditions import ImageConditions
 from ai.backend.manager.models.image.orders import ImageOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 
@@ -42,7 +44,7 @@ class ImageAdapter(BaseFilterAdapter):
             id=data.id,
             name=data.name,
             registry=data.registry,
-            registry_id=data.registry_id,
+            registry_id=ArtifactRegistryID(data.registry_id),
             project=data.project,
             tag=data.tag,
             architecture=data.architecture,
@@ -67,7 +69,7 @@ class ImageAdapter(BaseFilterAdapter):
             id=data.id,
             name=data.name,
             registry=data.registry,
-            registry_id=data.registry_id,
+            registry_id=ArtifactRegistryID(data.registry_id),
             project=data.project,
             tag=data.tag,
             architecture=data.architecture,

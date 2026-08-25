@@ -19,7 +19,11 @@ from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.recorder import (
     RecorderContext,
 )
-from ai.backend.manager.sokovan.scheduler.results import PreemptionPlanEntry, ScheduleResult
+from ai.backend.manager.sokovan.scheduler.results import (
+    PreemptionPlanEntry,
+    ScheduleResult,
+    SchedulingSkip,
+)
 from ai.backend.manager.views.sokovan.allocation import (
     KernelAllocation,
     SchedulingFailure,
@@ -27,9 +31,10 @@ from ai.backend.manager.views.sokovan.allocation import (
 )
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
 from ai.backend.manager.views.sokovan.scheduling import SchedulingData
-from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot, UserVictimCandidates
+from ai.backend.manager.views.sokovan.snapshot import ScopeVictimCandidates, SystemSnapshot
 from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
+from .selectors.exceptions import BatchAgentSelectionFailedError, NoAvailableAgentError
 from .selectors.selector import (
     AgentSelection,
     AgentSelectionCriteria,
@@ -136,6 +141,10 @@ class SessionProvisioner:
         3. Agent selection: Select agents using configured strategy
         4. Allocation: Persist allocations to database
 
+        Once a session fails because the group ran out of resources, the
+        sessions behind it are left unattempted and reported as skips, so
+        lower-priority sessions cannot take the resources it is waiting for.
+
         Args:
             scheduling_data: Pre-fetched scheduling data from Handler.
 
@@ -172,8 +181,9 @@ class SessionProvisioner:
         reserved_allocations: list[SessionAllocation] = []
         claimed_victim_ids: set[SessionId] = set()
         scheduling_failures: list[SchedulingFailure] = []
+        scheduling_skips: list[SchedulingSkip] = []
 
-        for session_workload in sequenced_workloads:
+        for index, session_workload in enumerate(sequenced_workloads):
             try:
                 # Sequencing phase is automatically included via shared phases
                 session_allocation = await self._schedule_workload(
@@ -186,33 +196,43 @@ class SessionProvisioner:
                     claimed_victim_ids.update(session_allocation.preempting_session_ids)
                 else:
                     session_allocations.append(session_allocation)
-            except Exception as e:
-                log.debug(
-                    "Scheduling failed for workload {}: {}",
-                    session_workload.meta.session_id,
-                    e,
-                )
-                scheduling_failures.append(
-                    SchedulingFailure(
-                        session_id=session_workload.meta.session_id,
-                        msg=str(e),
+            except (BatchAgentSelectionFailedError, NoAvailableAgentError) as e:
+                # The group ran out of resources. This is the one failure the
+                # sessions behind share: they would take exactly what this one
+                # is waiting for, so they are left unattempted.
+                self._record_failure(scheduling_failures, session_workload, e)
+                scheduling_skips.extend(
+                    self._skips_behind(
+                        sequenced_workloads[index + 1 :], session_workload.meta.session_id
                     )
                 )
-                continue
+                break
+            except Exception as e:
+                # Specific to the session that hit it (an architecture mismatch,
+                # an unsatisfied dependency, an exceeded quota, a group with no
+                # agents at all), so it must not stall the sessions behind it.
+                self._record_failure(scheduling_failures, session_workload, e)
 
         log.info(
-            "Processing {} allocations, {} reservations and {} failures in resource group {}",
+            "Processing {} allocations, {} reservations, {} failures"
+            " and {} skips in resource group {}",
             len(session_allocations),
             len(reserved_allocations),
             len(scheduling_failures),
+            len(scheduling_skips),
             resource_group_id,
         )
         with self._phase_metrics.measure_phase("scheduler", resource_group_id, "allocation"):
             scheduled_session_ids = await self._repository.allocate_sessions(session_allocations)
             reserved_session_ids = await self._repository.reserve_sessions(reserved_allocations)
 
-        failure_ids = [f.session_id for f in scheduling_failures]
-        await self._valkey_schedule.set_pending_queue(state.resource_group.name, failure_ids)
+        # The pending queue is the whole still-waiting queue in sequencing
+        # order (the legacy GraphQL resolver re-sorts by this order), so the
+        # unattempted sessions belong in it just as much as the failed ones.
+        pending_ids = [f.session_id for f in scheduling_failures] + [
+            s.session_id for s in scheduling_skips
+        ]
+        await self._valkey_schedule.set_pending_queue(state.resource_group.name, pending_ids)
         reserved_ids = set(reserved_session_ids)
         return ScheduleResult(
             scheduled_session_ids=scheduled_session_ids,
@@ -226,7 +246,43 @@ class SessionProvisioner:
                 for allocation in reserved_allocations
                 if allocation.session_id in reserved_ids
             ],
+            scheduling_skips=scheduling_skips,
         )
+
+    def _record_failure(
+        self,
+        scheduling_failures: list[SchedulingFailure],
+        session_workload: SessionWorkload,
+        error: Exception,
+    ) -> None:
+        log.debug(
+            "Scheduling failed for workload {}: {}",
+            session_workload.meta.session_id,
+            error,
+        )
+        scheduling_failures.append(
+            SchedulingFailure(
+                session_id=session_workload.meta.session_id,
+                msg=str(error),
+            )
+        )
+
+    def _skips_behind(
+        self,
+        remaining_workloads: Sequence[SessionWorkload],
+        blocking_session_id: SessionId,
+    ) -> list[SchedulingSkip]:
+        """The unattempted tail of the queue, in sequencing order."""
+        return [
+            SchedulingSkip(
+                session_id=workload.meta.session_id,
+                msg=(
+                    "Not attempted: the resource group ran out of resources at the"
+                    f" earlier session {blocking_session_id}"
+                ),
+            )
+            for workload in remaining_workloads
+        ]
 
     async def _schedule_workload(
         self,
@@ -336,11 +392,11 @@ class SessionProvisioner:
         state: SchedulingState,
         session_workload: SessionWorkload,
         claimed_victim_ids: set[SessionId],
-    ) -> UserVictimCandidates | None:
+    ) -> ScopeVictimCandidates | None:
         """The owner's victim candidates still unclaimed by this pass's
         earlier preemption plans (None when nothing is reclaimable)."""
-        owner_candidates = state.snapshot.resource_group.preemption_candidates.by_user.get(
-            session_workload.meta.owner.user_uuid
+        owner_candidates = state.snapshot.resource_group.preemption_candidates.candidates_for(
+            session_workload.meta
         )
         if owner_candidates is None:
             return None
@@ -351,7 +407,7 @@ class SessionProvisioner:
         ]
         if not remaining:
             return None
-        return UserVictimCandidates(candidates=remaining)
+        return ScopeVictimCandidates(candidates=remaining)
 
     @staticmethod
     def _build_session_allocation(

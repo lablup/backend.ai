@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
-from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
-from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
 
@@ -148,13 +148,16 @@ class DataLoaders:
 
         async def load_fn(
             ids: list[AppConfigAllowListID],
-        ) -> list[AppConfigAllowListGQL | None]:
+        ) -> list[AppConfigAllowListGQL | Exception | None]:
             from ai.backend.manager.api.gql.app_config_allow_list.types import (  # pants: no-infer-dep
                 AppConfigAllowListGQL as ACL,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [ACL.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else ACL.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -166,13 +169,16 @@ class DataLoaders:
 
         async def load_fn(
             ids: list[AppConfigDefinitionID],
-        ) -> list[AppConfigDefinitionGQL | None]:
+        ) -> list[AppConfigDefinitionGQL | Exception | None]:
             from ai.backend.manager.api.gql.app_config_definition.types import (  # pants: no-infer-dep
                 AppConfigDefinitionGQL as ACD,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [ACD.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else ACD.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -184,13 +190,16 @@ class DataLoaders:
 
         async def load_fn(
             ids: list[AppConfigFragmentID],
-        ) -> list[AppConfigFragmentGQL | None]:
+        ) -> list[AppConfigFragmentGQL | Exception | None]:
             from ai.backend.manager.api.gql.app_config_fragment.types import (  # pants: no-infer-dep
                 AppConfigFragmentGQL as ACF,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [ACF.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else ACF.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -388,13 +397,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, StorageNamespace | None]:
         adapter = self._adapters.storage_namespace
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[StorageNamespace | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[StorageNamespace | Exception | None]:
             from ai.backend.manager.api.gql.storage_namespace import (  # pants: no-infer-dep
                 StorageNamespace as SN,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [SN.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else SN.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -404,13 +416,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, ObjectStorage | None]:
         adapter = self._adapters.object_storage
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ObjectStorage | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[ObjectStorage | Exception | None]:
             from ai.backend.manager.api.gql.object_storage import (  # pants: no-infer-dep
                 ObjectStorage as OS,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [OS.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else OS.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -995,13 +1010,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, RuntimeVariantGQL | None]:
         adapter = self._adapters.runtime_variant
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[RuntimeVariantGQL | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[RuntimeVariantGQL | Exception | None]:
             from ai.backend.manager.api.gql.runtime_variant.types import (  # pants: no-infer-dep
                 RuntimeVariantGQL as RV,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [RV.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RV.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -1043,12 +1061,15 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, CategoryGQL | None]:
         adapter = self._adapters.prometheus_query_preset_category
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[CategoryGQL | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[CategoryGQL | Exception | None]:
             from ai.backend.manager.api.gql.prometheus_query_preset.types.category import (  # pants: no-infer-dep
                 CategoryGQL as CG,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [CG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else CG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)

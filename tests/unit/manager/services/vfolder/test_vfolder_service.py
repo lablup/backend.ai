@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import yarl
 
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     ValidatedVFolderInfo,
@@ -27,9 +27,6 @@ from ai.backend.manager.errors.storage import (
     VFolderFilterStatusFailed,
     VFolderNotFound,
 )
-from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
-from ai.backend.manager.repositories.vfolder.purgers import VFolderPurgerSpec
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.base import (
     PurgeVFolderAction,
@@ -117,14 +114,8 @@ class TestVFolderServicePurge:
         )
 
     @pytest.fixture
-    def sample_purger(self, sample_vfolder_uuid: uuid.UUID) -> RBACEntityPurger[VFolderRow]:
-        return RBACEntityPurger(
-            spec=VFolderPurgerSpec(vfolder_id=sample_vfolder_uuid),
-        )
-
-    @pytest.fixture
-    def sample_action(self, sample_purger: RBACEntityPurger[VFolderRow]) -> PurgeVFolderAction:
-        return PurgeVFolderAction(purger=sample_purger)
+    def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> PurgeVFolderAction:
+        return PurgeVFolderAction(vfolder_uuid=VFolderUUID(sample_vfolder_uuid))
 
     async def test_purge_vfolder_success(
         self,
@@ -141,7 +132,7 @@ class TestVFolderServicePurge:
 
         assert isinstance(result, PurgeVFolderActionResult)
         assert result.vfolder_uuid == sample_vfolder_uuid
-        mock_vfolder_repository.purge_vfolder.assert_called_once_with(sample_action.purger)
+        mock_vfolder_repository.purge_vfolder.assert_called_once_with(sample_action.vfolder_uuid)
 
     async def test_purge_vfolder_not_found_propagates(
         self,
@@ -158,7 +149,7 @@ class TestVFolderServicePurge:
         with pytest.raises(VFolderNotFound):
             await vfolder_service.purge(sample_action)
 
-        mock_vfolder_repository.purge_vfolder.assert_called_once_with(sample_action.purger)
+        mock_vfolder_repository.purge_vfolder.assert_called_once_with(sample_action.vfolder_uuid)
 
     async def test_purge_vfolder_invalid_status_propagates(
         self,
@@ -172,7 +163,7 @@ class TestVFolderServicePurge:
         with pytest.raises(VFolderFilterStatusFailed):
             await vfolder_service.purge(sample_action)
 
-        mock_vfolder_repository.purge_vfolder.assert_called_once_with(sample_action.purger)
+        mock_vfolder_repository.purge_vfolder.assert_called_once_with(sample_action.vfolder_uuid)
 
 
 class TestVFolderFileServiceCreateArchiveDownload:
@@ -227,7 +218,7 @@ class TestVFolderFileServiceCreateArchiveDownload:
     def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> CreateArchiveDownloadSessionAction:
         return CreateArchiveDownloadSessionAction(
             keypair_resource_policy={"default": {}},
-            vfolder_uuid=sample_vfolder_uuid,
+            vfolder_uuid=VFolderUUID(sample_vfolder_uuid),
             files=self.SAMPLE_FILES,
         )
 
@@ -290,7 +281,7 @@ class TestVFolderFileServiceCreateArchiveDownload:
         """Test that custom filename is forwarded to storage proxy client."""
         action_with_filename = CreateArchiveDownloadSessionAction(
             keypair_resource_policy={"default": {}},
-            vfolder_uuid=sample_vfolder_uuid,
+            vfolder_uuid=VFolderUUID(sample_vfolder_uuid),
             files=self.SAMPLE_FILES,
             filename="my-export.zip",
         )
@@ -353,7 +344,7 @@ class TestVFolderServiceGetFolderUsage:
 
     @pytest.fixture
     def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> GetVFolderUsageAction:
-        return GetVFolderUsageAction(vfolder_uuid=sample_vfolder_uuid)
+        return GetVFolderUsageAction(vfolder_uuid=VFolderUUID(sample_vfolder_uuid))
 
     async def test_managed_vfolder_returns_storage_proxy_measurements(
         self,

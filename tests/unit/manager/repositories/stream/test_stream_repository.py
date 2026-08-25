@@ -8,8 +8,8 @@ from datetime import datetime
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -25,21 +25,22 @@ from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.stream.repository import StreamRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -90,8 +91,6 @@ def _make_session_row(
         starts_at=None,
         startup_command=None,
         callback_url=None,
-        occupying_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-        requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
         vfolder_mounts=[],
         environ=None,
         bootstrap_script=None,
@@ -150,8 +149,6 @@ def _make_kernel_row(
         created_at=created_at,
         terminated_at=None,
         starts_at=None,
-        occupied_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-        requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
         occupied_shares={},
         environ=None,
         vfolder_mounts=[],
@@ -164,7 +161,10 @@ def _make_kernel_row(
 
 
 class TestStreamRepository:
-    """Tests for StreamRepository.get_streaming_session() using a real database."""
+    """Tests for StreamRepository.get_streaming_session() using a real database.
+
+    Ownership is enforced by the lookup that resolves the name, not here.
+    """
 
     @pytest.fixture
     def test_domain_id(self) -> DomainID:
@@ -182,13 +182,13 @@ class TestStreamRepository:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -244,7 +244,7 @@ class TestStreamRepository:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name="default",
                     is_active=True,
@@ -252,7 +252,7 @@ class TestStreamRepository:
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             user_resource_policy = UserResourcePolicyRow(
@@ -299,7 +299,7 @@ class TestStreamRepository:
                     resource_policy=user_resource_policy.name,
                     allowed_client_ip=None,
                     totp_key=None,
-                    main_access_key=None,
+                    domain_id=test_domain_id,
                 )
             )
             db_sess.add(
@@ -318,11 +318,11 @@ class TestStreamRepository:
                     resource_policy=user_resource_policy.name,
                     allowed_client_ip=None,
                     totp_key=None,
-                    main_access_key=None,
+                    domain_id=test_domain_id,
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name="test-group",
                     description="",
@@ -338,10 +338,9 @@ class TestStreamRepository:
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="owner@example.com",
                     user=user_uuid,
                     access_key=active_access_key,
-                    secret_key="active-secret",
+                    secret_key=SecretValue("active-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy=keypair_resource_policy.name,
@@ -350,10 +349,9 @@ class TestStreamRepository:
             )
             db_sess.add(
                 KeyPairRow(
-                    user_id="owner@example.com",
                     user=user_uuid,
                     access_key=inactive_access_key,
-                    secret_key="inactive-secret",
+                    secret_key=SecretValue("inactive-secret"),
                     is_active=False,
                     is_admin=False,
                     resource_policy=keypair_resource_policy.name,
@@ -362,10 +360,9 @@ class TestStreamRepository:
             )
             db_sess.add(
                 KeyPairRow(
-                    user_id="other@example.com",
                     user=other_user_uuid,
                     access_key=other_user_access_key,
-                    secret_key="other-secret",
+                    secret_key=SecretValue("other-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy=keypair_resource_policy.name,
@@ -467,9 +464,7 @@ class TestStreamRepository:
         repository: StreamRepository,
         stream_session: StreamSessionFixture,
     ) -> None:
-        session = await repository.get_streaming_session(
-            stream_session.session_name, stream_session.user_uuid
-        )
+        session = await repository.get_streaming_session(stream_session.session_id)
 
         assert session.id == stream_session.session_id
         assert session.status == SessionStatus.RUNNING
@@ -480,19 +475,9 @@ class TestStreamRepository:
         repository: StreamRepository,
         stream_session: StreamSessionFixture,
     ) -> None:
-        session = await repository.get_streaming_session(
-            stream_session.session_name, stream_session.user_uuid
-        )
+        session = await repository.get_streaming_session(stream_session.session_id)
 
         assert session.main_kernel.id == stream_session.main_kernel_id
-
-    async def test_isolated_from_other_users_session(
-        self,
-        repository: StreamRepository,
-        stream_session: StreamSessionFixture,
-    ) -> None:
-        with pytest.raises(SessionNotFound):
-            await repository.get_streaming_session(stream_session.session_name, uuid.uuid4())
 
     async def test_ignores_terminated_session(
         self,
@@ -507,14 +492,11 @@ class TestStreamRepository:
             session.status = SessionStatus.TERMINATED
 
         with pytest.raises(SessionNotFound):
-            await repository.get_streaming_session(
-                stream_session.session_name, stream_session.user_uuid
-            )
+            await repository.get_streaming_session(stream_session.session_id)
 
-    async def test_session_not_found_for_unknown_name(
+    async def test_session_not_found_for_unknown_id(
         self,
         repository: StreamRepository,
-        stream_session: StreamSessionFixture,
     ) -> None:
         with pytest.raises(SessionNotFound):
-            await repository.get_streaming_session("no-such-session", stream_session.user_uuid)
+            await repository.get_streaming_session(SessionId(uuid.uuid4()))

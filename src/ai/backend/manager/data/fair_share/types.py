@@ -8,7 +8,8 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 
@@ -244,7 +245,7 @@ class FairSharesByLevel:
     domain: Mapping[str, DomainFairShareData]
     """Domain fair shares keyed by domain_name."""
 
-    project: Mapping[uuid.UUID, ProjectFairShareData]
+    project: Mapping[ProjectID, ProjectFairShareData]
     """Project fair shares keyed by project_id."""
 
     user: Mapping[UserProjectKey, UserFairShareData]

@@ -11,6 +11,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.keypair.response import KeypairNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -43,6 +44,13 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     access_key: str = gql_field(description="The access key string.")
     is_active: bool | None = gql_field(description="Whether the keypair is currently active.")
     is_admin: bool | None = gql_field(description="Whether the keypair has admin privileges.")
+    is_default: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether this is the owner's default keypair.",
+        ),
+        default=False,
+    )
     created_at: datetime | None = gql_field(description="Timestamp when the keypair was created.")
     modified_at: datetime | None = gql_field(
         description="Timestamp when the keypair was last modified."

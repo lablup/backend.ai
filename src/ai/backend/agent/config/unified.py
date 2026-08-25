@@ -75,6 +75,11 @@ class ContainerSandboxType(enum.StrEnum):
     JAIL = "jail"
 
 
+class ContainerLogDriver(enum.StrEnum):
+    LOCAL = "local"
+    JSON_FILE = "json-file"
+
+
 class ScratchType(enum.StrEnum):
     HOSTDIR = "hostdir"
     HOSTFILE = "hostfile"
@@ -1094,25 +1099,6 @@ class CommonAgentConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod="/var/log/backend.ai/abuse"),
         ),
     ]
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-            ),
-            serialization_alias="use-experimental-redis-event-dispatcher",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Enables the experimental Redis-based event dispatcher for agent-manager communication. "
-                "Provides improved event delivery reliability and scalability. "
-                "Requires Redis to be configured. Still in experimental phase."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
     docker_mode: Annotated[
         str | None,
         Field(
@@ -1180,11 +1166,16 @@ class OverridableAgentConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Unique identifier for this agent instance. "
-                "If not specified, a random UUID is generated. In multi-agent mode, "
-                "each agent must have a unique ID. Used for tracking, logging, and management."
+                "If not specified, it is detected automatically on startup: the cloud "
+                "instance ID on AWS, Azure and GCP, or 'i-<hostname>' otherwise. "
+                "Because that value follows the host identity, renaming the host changes "
+                "the agent ID and the manager registers it as a separate new agent; "
+                "set this field explicitly to pin the ID. "
+                "In multi-agent mode, each agent must have a unique ID. "
+                "Used for tracking, logging, and management."
             ),
             added_version="25.12.0",
-            example=ConfigExample(local="agent-local-1", prod="agent-prod-001"),
+            example=ConfigExample(local="i-local-agent-01", prod="i-node01"),
         ),
     ]
     agent_sock_port: Annotated[
@@ -1935,6 +1926,23 @@ class ResourceConfig(BaseConfigSchema):
 
 
 class ContainerLogsConfig(BaseConfigSchema):
+    driver: Annotated[
+        ContainerLogDriver,
+        Field(
+            default=ContainerLogDriver.LOCAL,
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Log driver used for kernel containers. "
+                "'local' is Docker-only and stores logs in an efficient binary format. "
+                "'json-file' is accepted by both Docker and Podman, but Podman keeps a "
+                "single size-capped log per container, so only 'max-length' takes effect "
+                "there while file count and compression have no equivalent."
+            ),
+            added_version="26.4.10",
+            example=ConfigExample(local="local", prod="local"),
+        ),
+    ]
     max_length: Annotated[
         BinarySizeField,
         Field(
@@ -2090,6 +2098,8 @@ class DockerExtraConfig(BaseConfigSchema):
     """
     For checking additional Docker configurations
     """
+
+    model_config = ConfigDict(extra="ignore")
 
     swarm_enabled: Annotated[
         bool,

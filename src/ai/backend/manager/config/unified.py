@@ -172,6 +172,8 @@ Alias keys are also URL-quoted in the same way.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import enum
 import logging
 import os
@@ -182,7 +184,7 @@ from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any, Literal, override
+from typing import Annotated, Any, Literal, Self, override
 
 from pydantic import (
     AliasChoices,
@@ -192,6 +194,7 @@ from pydantic import (
     IPvAnyNetwork,
     field_serializer,
     field_validator,
+    model_validator,
 )
 
 from ai.backend.common.config import BaseConfigSchema
@@ -225,6 +228,11 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.secret.types import (
+    KeyProviderType,
+    SecretKeyId,
+    SecretKeyMaterial,
+)
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
 
@@ -529,6 +537,96 @@ class AuthConfig(BaseConfigSchema):
     ]
 
 
+class ConfigKeyProviderConfig(BaseConfigSchema):
+    active_key_id: Annotated[
+        SecretKeyId,
+        Field(
+            validation_alias=AliasChoices("active-key-id", "active_key_id"),
+            serialization_alias="active-key-id",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "The key id new values are encrypted under. Rotating a key is adding a new "
+                "id to the key list and pointing this at it; the previous ids stay so their "
+                "values keep decrypting."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="v1", prod="v1"),
+        ),
+    ]
+    keys: Annotated[
+        dict[SecretKeyId, SecretKeyMaterial],
+        Field(),
+        BackendAIConfigMeta(
+            description=(
+                "Key encryption keys by id, each 32 random bytes in base64 as produced by "
+                "`openssl rand -base64 32`; the standard and url-safe alphabets are both "
+                "accepted. A key wraps the per-value data encryption keys rather than the "
+                "values themselves, so an id may be retired only once no stored value still "
+                "names it."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            secret=True,
+        ),
+    ]
+
+    @model_validator(mode="after")
+    def _validate_keys(self) -> Self:
+        for key_id, material in self.keys.items():
+            if not key_id:
+                raise ValueError("A key encryption key id must not be empty.")
+            try:
+                decoded = base64.b64decode(material, altchars=b"-_", validate=True)
+            except (binascii.Error, ValueError) as e:
+                raise ValueError(f"The key {key_id!r} is not valid base64.") from e
+            if len(decoded) != 32:
+                raise ValueError(
+                    f"The key {key_id!r} must decode to 32 bytes but got {len(decoded)}."
+                )
+        if self.active_key_id not in self.keys:
+            raise ValueError(f"active-key-id {self.active_key_id!r} is not in the key list.")
+        return self
+
+
+class SecretEncryptionConfig(BaseConfigSchema):
+    write_provider_type: Annotated[
+        KeyProviderType,
+        Field(
+            default=KeyProviderType.PLAIN,
+            validation_alias=AliasChoices("write-provider-type", "write_provider_type"),
+            serialization_alias="write-provider-type",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "The key provider new secrets are written through, named by its type. "
+                "'plain' stores them unencrypted; every other type is configured by the "
+                "matching provider section below. Reads are decided by the stored value, so "
+                "secrets written earlier keep decrypting through the provider they name, and "
+                "a batch re-encryption normalizes stored secrets to whatever this names."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="plain", prod="config"),
+        ),
+    ]
+    config_provider: Annotated[
+        ConfigKeyProviderConfig | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("config-provider", "config_provider"),
+            serialization_alias="config-provider",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "The key provider that holds its key encryption keys in this file, under the "
+                "id 'config'. Omit this section to leave that provider unconfigured, in which "
+                "case no stored secret naming it can be read."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+
 class RBACConfig(BaseConfigSchema):
     enforcement_enabled: Annotated[
         bool,
@@ -820,10 +918,14 @@ class ManagerConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "List of trusted reverse proxy IP addresses or CIDR ranges. "
-                "When configured, the manager uses aiohttp_remotes.XForwardedStrict middleware "
-                "to securely resolve client IPs from X-Forwarded-For headers. "
-                "Only proxies in this list are trusted to set forwarding headers. "
-                "If empty (default), the manager falls back to manual X-Forwarded-For parsing."
+                "When configured, the client IP is resolved by walking the X-Forwarded-For chain "
+                "inwards from the peer of the connection and taking the first address that is not "
+                "one of these proxies, so any number of proxy hops is supported. "
+                "The X-Forwarded-URL header, which overrides the host and path used for HMAC "
+                "signature verification, is honored only when the request comes directly from one "
+                "of these proxies. "
+                "If empty (default), the manager falls back to manual X-Forwarded-For parsing and "
+                "accepts X-Forwarded-URL from any client, which is deprecated."
             ),
             added_version="26.4.2",
             example=ConfigExample(local="", prod='["10.0.0.0/8", "172.16.0.0/12"]'),
@@ -1182,25 +1284,6 @@ class ManagerConfig(BaseConfigSchema):
             example=ConfigExample(local="39100", prod="39100"),
         ),
     ]
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-            ),
-            serialization_alias="use-experimental-redis-event-dispatcher",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Whether to use the experimental Redis-based event dispatcher. "
-                "May provide better performance for event handling in large clusters. "
-                "Not recommended for production use unless specifically tested and needed."
-            ),
-            added_version="25.8.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
     status_update_interval: Annotated[
         float | None,
         Field(
@@ -1522,7 +1605,7 @@ class AuditLogConfig(BaseConfigSchema):
                 "Opt-in list: a read operation is recorded only if it is named here. The "
                 "default is an empty list, so successful reads are not recorded at all and "
                 "read volume stays off until an operator turns it on. A listed operation is "
-                "recorded for every entity type. Must be 'get' or 'search': mutating "
+                "recorded for every entity type. Must be 'get', 'search' or 'lookup': mutating "
                 "operations are always recorded and listing them here is rejected. Failed "
                 "and denied reads are recorded either way."
             ),
@@ -2985,7 +3068,7 @@ class VolumeProxyConfig(BaseConfigSchema):
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
-    sftp_scaling_groups: Annotated[
+    sftp_resource_groups: Annotated[
         CommaSeparatedStrList | None,
         Field(
             default=None,
@@ -3701,6 +3784,23 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "password requirements in production environments."
             ),
             added_version="25.8.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    secret_encryption: Annotated[
+        SecretEncryptionConfig,
+        Field(
+            default_factory=SecretEncryptionConfig,
+            validation_alias=AliasChoices("secret-encryption", "secret_encryption"),
+            serialization_alias="secret-encryption",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "At-rest encryption for secret columns such as the keypair secret key. "
+                "Names which key provider writes new secrets and configures the providers. "
+                "New secrets are stored as plaintext until a write provider is named."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]

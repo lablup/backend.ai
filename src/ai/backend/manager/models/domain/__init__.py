@@ -15,7 +15,6 @@ from .row import (
     get_domains,
     get_permission_ctx,
     query_domain_dotfiles,
-    row_to_data,
     verify_dotfile_name,
 )
 
@@ -36,6 +35,5 @@ __all__ = (
     "get_domains",
     "get_permission_ctx",
     "query_domain_dotfiles",
-    "row_to_data",
     "verify_dotfile_name",
 )

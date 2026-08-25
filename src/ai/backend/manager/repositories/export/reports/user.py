@@ -6,8 +6,9 @@ import json
 from decimal import Decimal
 from typing import Any
 
-from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import (
@@ -57,15 +58,15 @@ ASSOC_GROUP_USER_JOIN = JoinDef(
     condition=UserRow.uuid == AssocGroupUserRow.user_id,
 )
 PROJECT_JOIN = JoinDef(
-    table=GroupRow.__table__,
-    condition=AssocGroupUserRow.group_id == GroupRow.id,
+    table=ProjectRow.__table__,
+    condition=AssocGroupUserRow.group_id == ProjectRow.id,
 )
 PROJECT_JOINS = (ASSOC_GROUP_USER_JOIN, PROJECT_JOIN)
 
-# Main Keypair JOIN (N:1, no duplication)
-MAIN_KEYPAIR_JOIN = JoinDef(
+# Default Keypair JOIN (N:1, no duplication)
+DEFAULT_KEYPAIR_JOIN = JoinDef(
     table=KeyPairRow.__table__,
-    condition=UserRow.main_access_key == KeyPairRow.access_key,
+    condition=(KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default,
 )
 
 # Field definitions for user export
@@ -134,7 +135,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         name="Modified At",
         description="Last modification time",
         field_type=ExportFieldType.DATETIME,
-        column=UserRow.modified_at,
+        column=UserRow.updated_at,
         formatter=lambda v: v.isoformat() if v else "",
     ),
     # =========================================================================
@@ -197,7 +198,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         name="Project ID",
         description="Project UUID",
         field_type=ExportFieldType.UUID,
-        column=GroupRow.id,
+        column=ProjectRow.id,
         joins=PROJECT_JOINS,
     ),
     ExportFieldDef(
@@ -205,7 +206,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         name="Project Name",
         description="Project name",
         field_type=ExportFieldType.STRING,
-        column=GroupRow.name,
+        column=ProjectRow.name,
         joins=PROJECT_JOINS,
     ),
     ExportFieldDef(
@@ -213,7 +214,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         name="Project Description",
         description="Project description",
         field_type=ExportFieldType.STRING,
-        column=GroupRow.description,
+        column=ProjectRow.description,
         joins=PROJECT_JOINS,
     ),
     ExportFieldDef(
@@ -221,7 +222,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         name="Project Domain",
         description="Project domain name",
         field_type=ExportFieldType.STRING,
-        column=GroupRow.domain_name,
+        column=ProjectRow.domain_name,
         joins=PROJECT_JOINS,
     ),
     ExportFieldDef(
@@ -229,7 +230,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         name="Project Active",
         description="Project active status",
         field_type=ExportFieldType.BOOLEAN,
-        column=GroupRow.is_active,
+        column=ProjectRow.is_active,
         joins=PROJECT_JOINS,
     ),
     ExportFieldDef(
@@ -237,19 +238,23 @@ USER_FIELDS: list[ExportFieldDef] = [
         name="Project Created At",
         description="Project creation time",
         field_type=ExportFieldType.DATETIME,
-        column=GroupRow.created_at,
+        column=ProjectRow.created_at,
         formatter=lambda v: v.isoformat() if v else "",
         joins=PROJECT_JOINS,
     ),
     # =========================================================================
-    # Main Keypair Fields (N:1, no duplication)
+    # Default Keypair Fields (N:1, no duplication)
     # =========================================================================
     ExportFieldDef(
         key="main_access_key",
         name="Main Access Key",
-        description="Main keypair access key",
+        description=(
+            f"Main keypair access key. Deprecated since {NEXT_RELEASE_VERSION}."
+            " Use the keypair report's is_default field."
+        ),
         field_type=ExportFieldType.STRING,
-        column=UserRow.main_access_key,
+        column=KeyPairRow.access_key,
+        joins=frozenset({DEFAULT_KEYPAIR_JOIN}),
     ),
     ExportFieldDef(
         key="main_keypair_is_active",
@@ -257,7 +262,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         description="Main keypair active status",
         field_type=ExportFieldType.BOOLEAN,
         column=KeyPairRow.is_active,
-        joins=frozenset({MAIN_KEYPAIR_JOIN}),
+        joins=frozenset({DEFAULT_KEYPAIR_JOIN}),
     ),
     ExportFieldDef(
         key="main_keypair_created_at",
@@ -266,7 +271,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         field_type=ExportFieldType.DATETIME,
         column=KeyPairRow.created_at,
         formatter=lambda v: v.isoformat() if v else "",
-        joins=frozenset({MAIN_KEYPAIR_JOIN}),
+        joins=frozenset({DEFAULT_KEYPAIR_JOIN}),
     ),
     ExportFieldDef(
         key="main_keypair_last_used",
@@ -275,7 +280,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         field_type=ExportFieldType.DATETIME,
         column=KeyPairRow.last_used,
         formatter=lambda v: v.isoformat() if v else "",
-        joins=frozenset({MAIN_KEYPAIR_JOIN}),
+        joins=frozenset({DEFAULT_KEYPAIR_JOIN}),
     ),
 ]
 

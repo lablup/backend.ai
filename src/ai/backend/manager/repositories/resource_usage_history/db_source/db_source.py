@@ -13,9 +13,15 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    KernelUsageRecordData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
@@ -23,6 +29,11 @@ from ai.backend.manager.models.resource_usage_history import (
     ProjectUsageBucketRow,
     UsageBucketEntryRow,
     UserUsageBucketRow,
+)
+from ai.backend.manager.models.resource_usage_history.scopes import (
+    DomainUsageBucketOperationScope,
+    ProjectUsageBucketOperationScope,
+    UserUsageBucketOperationScope,
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -35,17 +46,10 @@ from ai.backend.manager.repositories.base import (
     execute_upserter,
 )
 from ai.backend.manager.repositories.resource_usage_history.types import (
-    DomainUsageBucketData,
     DomainUsageBucketSearchResult,
-    DomainUsageBucketSearchScope,
-    KernelUsageRecordData,
     KernelUsageRecordSearchResult,
-    ProjectUsageBucketData,
     ProjectUsageBucketSearchResult,
-    ProjectUsageBucketSearchScope,
-    UserUsageBucketData,
     UserUsageBucketSearchResult,
-    UserUsageBucketSearchScope,
 )
 
 if TYPE_CHECKING:
@@ -81,7 +85,7 @@ class ResourceUsageHistoryDBSource:
         """Create a single kernel usage record."""
         async with self._db.begin_session() as db_sess:
             result = await execute_creator(db_sess, creator)
-            return KernelUsageRecordData.from_row(result.row)
+            return result.row.to_data()
 
     async def bulk_create_kernel_usage_records(
         self,
@@ -94,7 +98,7 @@ class ResourceUsageHistoryDBSource:
         """
         async with self._db.begin_session() as db_sess:
             result = await execute_bulk_creator(db_sess, bulk_creator)
-            return [KernelUsageRecordData.from_row(row) for row in result.rows]
+            return [row.to_data() for row in result.rows]
 
     async def bulk_create_kernel_usage_records_with_observation_update(
         self,
@@ -117,7 +121,7 @@ class ResourceUsageHistoryDBSource:
         async with self._db.begin_session() as db_sess:
             # Step 1: Bulk create kernel usage records
             result = await execute_bulk_creator(db_sess, bulk_creator)
-            records = [KernelUsageRecordData.from_row(row) for row in result.rows]
+            records = [row.to_data() for row in result.rows]
 
             # Step 2: Update last_observed_at for kernels
             updated_count = 0
@@ -178,7 +182,7 @@ class ResourceUsageHistoryDBSource:
         async with self._db.begin_session() as db_sess:
             # Step 1: Bulk create kernel usage records
             result = await execute_bulk_creator(db_sess, bulk_creator)
-            records = [KernelUsageRecordData.from_row(row) for row in result.rows]
+            records = [row.to_data() for row in result.rows]
 
             log.debug("[DBSource] Created {} kernel usage records", len(records))
 
@@ -223,9 +227,7 @@ class ResourceUsageHistoryDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(KernelUsageRecordRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [
-                KernelUsageRecordData.from_row(row.KernelUsageRecordRow) for row in result.rows
-            ]
+            items = [row.KernelUsageRecordRow.to_data() for row in result.rows]
             return KernelUsageRecordSearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -242,7 +244,7 @@ class ResourceUsageHistoryDBSource:
         """Create a new domain usage bucket."""
         async with self._db.begin_session() as db_sess:
             result = await execute_creator(db_sess, creator)
-            return DomainUsageBucketData.from_row(result.row)
+            return result.row.to_data()
 
     async def upsert_domain_usage_bucket(
         self,
@@ -255,12 +257,12 @@ class ResourceUsageHistoryDBSource:
                 upserter,
                 index_elements=["domain_name", "resource_group_id", "period_start"],
             )
-            return DomainUsageBucketData.from_row(result.row)
+            return result.row.to_data()
 
     async def search_domain_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: DomainUsageBucketSearchScope | None = None,
+        scope: DomainUsageBucketOperationScope | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -268,9 +270,7 @@ class ResourceUsageHistoryDBSource:
             result = await execute_batch_querier(
                 db_sess, query, querier, scopes=[scope] if scope is not None else ()
             )
-            items = [
-                DomainUsageBucketData.from_row(row.DomainUsageBucketRow) for row in result.rows
-            ]
+            items = [row.DomainUsageBucketRow.to_data() for row in result.rows]
             return DomainUsageBucketSearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -287,7 +287,7 @@ class ResourceUsageHistoryDBSource:
         """Create a new project usage bucket."""
         async with self._db.begin_session() as db_sess:
             result = await execute_creator(db_sess, creator)
-            return ProjectUsageBucketData.from_row(result.row)
+            return result.row.to_data()
 
     async def upsert_project_usage_bucket(
         self,
@@ -300,12 +300,12 @@ class ResourceUsageHistoryDBSource:
                 upserter,
                 index_elements=["project_id", "resource_group_id", "period_start"],
             )
-            return ProjectUsageBucketData.from_row(result.row)
+            return result.row.to_data()
 
     async def search_project_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: ProjectUsageBucketSearchScope | None = None,
+        scope: ProjectUsageBucketOperationScope | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -313,9 +313,7 @@ class ResourceUsageHistoryDBSource:
             result = await execute_batch_querier(
                 db_sess, query, querier, scopes=[scope] if scope is not None else ()
             )
-            items = [
-                ProjectUsageBucketData.from_row(row.ProjectUsageBucketRow) for row in result.rows
-            ]
+            items = [row.ProjectUsageBucketRow.to_data() for row in result.rows]
             return ProjectUsageBucketSearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -332,7 +330,7 @@ class ResourceUsageHistoryDBSource:
         """Create a new user usage bucket."""
         async with self._db.begin_session() as db_sess:
             result = await execute_creator(db_sess, creator)
-            return UserUsageBucketData.from_row(result.row)
+            return result.row.to_data()
 
     async def upsert_user_usage_bucket(
         self,
@@ -345,12 +343,12 @@ class ResourceUsageHistoryDBSource:
                 upserter,
                 index_elements=["user_uuid", "project_id", "resource_group_id", "period_start"],
             )
-            return UserUsageBucketData.from_row(result.row)
+            return result.row.to_data()
 
     async def search_user_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: UserUsageBucketSearchScope | None = None,
+        scope: UserUsageBucketOperationScope | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -358,7 +356,7 @@ class ResourceUsageHistoryDBSource:
             result = await execute_batch_querier(
                 db_sess, query, querier, scopes=[scope] if scope is not None else ()
             )
-            items = [UserUsageBucketData.from_row(row.UserUsageBucketRow) for row in result.rows]
+            items = [row.UserUsageBucketRow.to_data() for row in result.rows]
             return UserUsageBucketSearchResult(
                 items=items,
                 total_count=result.total_count,

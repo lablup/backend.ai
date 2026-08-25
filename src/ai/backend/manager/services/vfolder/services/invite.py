@@ -212,9 +212,7 @@ class VFolderInviteService:
 
     async def list_invitation(self, action: ListInvitationAction) -> ListInvitationActionResult:
         # Get requester email
-        requester_email = await self._vfolder_repository.get_user_email_by_id(
-            action.requester_user_uuid
-        )
+        requester_email = await self._vfolder_repository.get_user_email_by_id(action.user_uuid)
         if requester_email is None:
             raise UserNotFound()
 
@@ -239,9 +237,7 @@ class VFolderInviteService:
             )
             invs_info.append(info)
 
-        return ListInvitationActionResult(
-            requester_user_uuid=action.requester_user_uuid, info=invs_info
-        )
+        return ListInvitationActionResult(requester_user_uuid=action.user_uuid, info=invs_info)
 
     async def leave_invited_vfolder(
         self, action: LeaveInvitedVFolderAction
@@ -280,26 +276,24 @@ class VFolderInviteService:
         self, action: RevokeInvitedVFolderAction
     ) -> RevokeInvitedVFolderActionResult:
         await self._vfolder_repository.delete_vfolder_permission(
-            action.vfolder_id, action.shared_user_id
+            action.vfolder_uuid, action.shared_user_id
         )
-        return RevokeInvitedVFolderActionResult(action.vfolder_id, action.shared_user_id)
+        return RevokeInvitedVFolderActionResult(action.vfolder_uuid, action.shared_user_id)
 
     async def update_invited_vfolder_mount_permission(
         self, action: UpdateInvitedVFolderMountPermissionAction
     ) -> UpdateInvitedVFolderMountPermissionActionResult:
         await self._vfolder_repository.update_invited_vfolder_mount_permission(
-            action.vfolder_id, action.user_id, action.permission
+            action.vfolder_uuid, action.user_id, action.permission
         )
         return UpdateInvitedVFolderMountPermissionActionResult(
-            action.vfolder_id, action.user_id, action.permission
+            action.vfolder_uuid, action.user_id, action.permission
         )
 
     async def list_sent_invitations(
         self, action: ListSentInvitationsAction
     ) -> ListSentInvitationsActionResult:
-        requester_email = await self._vfolder_repository.get_user_email_by_id(
-            action.requester_user_uuid
-        )
+        requester_email = await self._vfolder_repository.get_user_email_by_id(action.user_uuid)
         if requester_email is None:
             raise UserNotFound()
 

@@ -36,6 +36,7 @@ def _make_processing_input() -> ProcessingInput:
         route_coordinator=MagicMock(),
         reconciler_coordinator=MagicMock(),
         scheduler_repository=MagicMock(),
+        key_provider_pool=MagicMock(),
         event_hub=MagicMock(),
         agent_registry=MagicMock(),
         db=MagicMock(),
@@ -96,7 +97,7 @@ class TestProcessingComposer:
         mock_dispatcher_class.return_value = mock_event_dispatcher
 
         mock_processors = MagicMock()
-        mock_create_processors.return_value = mock_processors
+        mock_create_processors.return_value = MagicMock(processors=mock_processors)
 
         mock_dispatchers = MagicMock()
         mock_dispatchers_class.return_value = mock_dispatchers
@@ -168,7 +169,7 @@ class TestProcessingComposer:
 
         mock_processors = MagicMock()
         mock_create_processors.side_effect = lambda *a, **kw: _track(
-            "Processors.create", mock_processors
+            "Processors.create", MagicMock(processors=mock_processors)
         )
 
         mock_dispatchers = MagicMock()

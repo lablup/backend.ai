@@ -4,21 +4,41 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.keypair import KeyPairID
+from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.data.user.types import (
     BulkPurgeError,
     BulkUserPurgeResultData,
     UserInfoContext,
 )
-from ai.backend.manager.errors.user import UserPurgeFailure
+from ai.backend.manager.errors.storage import DotfileCreationFailed
+from ai.backend.manager.errors.user import KeyPairForbidden, UserPurgeFailure
+from ai.backend.manager.models.domain.row import verify_dotfile_name
+from ai.backend.manager.models.keypair.updaters import (
+    KeypairBootstrapScriptUpdater,
+    KeypairDotfilesUpdater,
+)
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
+)
+from ai.backend.manager.services.user.actions.bootstrap_script import (
+    GetBootstrapScriptAction,
+    GetBootstrapScriptActionResult,
+    UpdateBootstrapScriptAction,
+    UpdateBootstrapScriptActionResult,
+)
+from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
+    CreateKeypairDotfileAction,
+    CreateKeypairDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
@@ -26,11 +46,13 @@ from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
     CreateUserActionResult,
 )
+from ai.backend.manager.services.user.actions.delete_keypair_dotfile import (
+    DeleteKeypairDotfileAction,
+    DeleteKeypairDotfileActionResult,
+)
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
-    DeleteUserByIdAction,
-    DeleteUserByIdActionResult,
 )
 from ai.backend.manager.services.user.actions.get_user import (
     GetUserAction,
@@ -39,64 +61,46 @@ from ai.backend.manager.services.user.actions.get_user import (
 from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairAction,
     AdminCreateKeypairActionResult,
-    AdminDeleteKeypairAction,
-    AdminDeleteKeypairActionResult,
     AdminDeleteSSHKeypairAction,
     AdminDeleteSSHKeypairActionResult,
-    AdminGetKeypairAction,
-    AdminGetKeypairActionResult,
     AdminGetSSHKeypairAction,
     AdminGetSSHKeypairActionResult,
     AdminRegisterSSHKeypairAction,
     AdminRegisterSSHKeypairActionResult,
     AdminSearchKeypairsAction,
     AdminSearchKeypairsActionResult,
-    AdminUpdateKeypairAction,
-    AdminUpdateKeypairActionResult,
+    GetKeypairAction,
+    GetKeypairActionResult,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
-    RevokeMyKeypairAction,
-    RevokeMyKeypairActionResult,
-    SearchKeypairsByResourcePolicyAction,
-    SearchKeypairsByResourcePolicyActionResult,
+    PurgeKeypairAction,
+    PurgeKeypairActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
-    SwitchMyMainAccessKeyAction,
-    SwitchMyMainAccessKeyActionResult,
-    UpdateMyKeypairAction,
-    UpdateMyKeypairActionResult,
-)
-from ai.backend.manager.services.user.actions.modify_user import (
-    BulkModifyUserAction,
-    BulkModifyUserActionResult,
-    ModifyUserAction,
-    ModifyUserActionResult,
-    ModifyUserByIdAction,
-    ModifyUserByIdActionResult,
+    SwitchDefaultAccessKeyAction,
+    SwitchDefaultAccessKeyActionResult,
+    UpdateKeypairAction,
+    UpdateKeypairActionResult,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     BulkPurgeUserActionResult,
     PurgeUserAction,
     PurgeUserActionResult,
-    PurgeUserByIdAction,
-    PurgeUserByIdActionResult,
 )
-from ai.backend.manager.services.user.actions.search_users import (
-    SearchUsersAction,
-    SearchUsersActionResult,
+from ai.backend.manager.services.user.actions.restore_user import (
+    RestoreUserAction,
+    RestoreUserActionResult,
 )
-from ai.backend.manager.services.user.actions.search_users_by_domain import (
-    SearchUsersByDomainAction,
-    SearchUsersByDomainActionResult,
+from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
+    UpdateKeypairDotfileAction,
+    UpdateKeypairDotfileActionResult,
 )
-from ai.backend.manager.services.user.actions.search_users_by_project import (
-    SearchUsersByProjectAction,
-    SearchUsersByProjectActionResult,
-)
-from ai.backend.manager.services.user.actions.search_users_by_role import (
-    SearchUsersByRoleAction,
-    SearchUsersByRoleActionResult,
+from ai.backend.manager.services.user.actions.update_user import (
+    BulkUpdateUserAction,
+    BulkUpdateUserActionResult,
+    UpdateUserAction,
+    UpdateUserActionResult,
 )
 from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
@@ -147,52 +151,21 @@ class UserService:
         result = await self._user_repository.bulk_create_users_validated(action.items)
         return BulkCreateUserActionResult(data=result)
 
-    async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
-        user_data_result = await self._user_repository.update_user_validated(
-            email=action.email,
-            updater=action.updater,
-        )
-        return ModifyUserActionResult(
-            data=user_data_result,
-        )
+    async def update_user(self, action: UpdateUserAction) -> UpdateUserActionResult:
+        user_data = await self._user_repository.update_user_by_uuid_validated(action.updater)
+        return UpdateUserActionResult(data=user_data)
 
-    async def bulk_modify_users(self, action: BulkModifyUserAction) -> BulkModifyUserActionResult:
+    async def bulk_modify_users(self, action: BulkUpdateUserAction) -> BulkUpdateUserActionResult:
         result = await self._user_repository.bulk_update_users_validated(action.items)
-        return BulkModifyUserActionResult(data=result)
+        return BulkUpdateUserActionResult(data=result)
 
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
-        await self._user_repository.soft_delete_user_validated(
-            email=action.email,
-        )
+        await self._user_repository.delete_user_by_uuid_validated(user_uuid=action.user_id)
         return DeleteUserActionResult()
 
-    async def modify_user_by_id(self, action: ModifyUserByIdAction) -> ModifyUserByIdActionResult:
-        user_data = await self._user_repository.update_user_by_uuid_validated(
-            user_uuid=action.user_id,
-            updater=action.updater,
-        )
-        return ModifyUserByIdActionResult(data=user_data)
-
-    async def delete_user_by_id(self, action: DeleteUserByIdAction) -> DeleteUserByIdActionResult:
-        await self._user_repository.delete_user_by_uuid_validated(user_uuid=action.user_id)
-        return DeleteUserByIdActionResult()
-
-    async def purge_user_by_id(self, action: PurgeUserByIdAction) -> PurgeUserByIdActionResult:
-        admin_user = await self._user_repository.get_user_by_uuid(action.admin_user_id)
-        user_info_ctx = UserInfoContext(
-            uuid=admin_user.uuid,
-            email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key or ""),
-        )
-        # Reuse the internal UUID-based purge logic shared with bulk_purge_users
-        bulk_action = BulkPurgeUserAction(
-            user_ids=[action.user_id],
-            admin_user_id=action.admin_user_id,
-            purge_shared_vfolders=action.purge_shared_vfolders,
-            delegate_endpoint_ownership=action.delegate_endpoint_ownership,
-        )
-        await self._purge_single_user(action.user_id, bulk_action, user_info_ctx)
-        return PurgeUserByIdActionResult(user_uuid=action.user_id)
+    async def restore_user(self, action: RestoreUserAction) -> RestoreUserActionResult:
+        await self._user_repository.restore_user_by_uuid_validated(user_uuid=action.user_id)
+        return RestoreUserActionResult()
 
     async def get_user(self, action: GetUserAction) -> GetUserActionResult:
         """Retrieve a single user by UUID.
@@ -206,69 +179,20 @@ class UserService:
         Raises:
             UserNotFound: If the user with the given UUID does not exist.
         """
-        user_data = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        user_data = await self._user_repository.get_user_by_uuid(action.user_id)
         return GetUserActionResult(user=user_data)
 
     async def purge_user(self, action: PurgeUserAction) -> PurgeUserActionResult:
-        email = action.email
-        log.info("Purging all records of the user {0}...", email)
-
-        # Check if user exists
-        user_data = await self._user_repository.get_by_email_validated(
-            email=email,
+        admin_user = await self._user_repository.get_user_by_uuid(action.admin_user_id)
+        user_info_ctx = UserInfoContext(uuid=admin_user.uuid, email=admin_user.email)
+        bulk_action = BulkPurgeUserAction(
+            user_ids=[action.user_id],
+            admin_user_id=action.admin_user_id,
+            purge_shared_vfolders=action.purge_shared_vfolders,
+            delegate_endpoint_ownership=action.delegate_endpoint_ownership,
         )
-        user_uuid = user_data.uuid
-
-        # Check for active vfolder mounts
-        if await self._user_repository.check_user_vfolder_mounted_to_active_kernels(user_uuid):
-            raise UserPurgeFailure(
-                "Some of user's virtual folders are mounted to active kernels. "
-                "Terminate those kernels first.",
-            )
-
-        # Handle shared vfolders migration
-        if action.purge_shared_vfolders.optional_value():
-            await self._user_repository.migrate_shared_vfolders(
-                deleted_user_uuid=user_uuid,
-                target_user_uuid=action.user_info_ctx.uuid,
-                target_user_email=action.user_info_ctx.email,
-            )
-
-        # Handle endpoint ownership delegation
-        if action.delegate_endpoint_ownership.optional_value():
-            await self._user_repository.delegate_endpoint_ownership(
-                user_uuid=user_uuid,
-                target_user_uuid=action.user_info_ctx.uuid,
-                target_main_access_key=action.user_info_ctx.main_access_key,
-            )
-            await self._user_repository.delete_endpoints(
-                user_uuid=user_uuid,
-                delete_destroyed_only=True,
-            )
-        else:
-            await self._user_repository.delete_endpoints(
-                user_uuid=user_uuid,
-                delete_destroyed_only=False,
-            )
-
-        # Handle active sessions
-        if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
-            await self._scheduling_controller.mark_sessions_for_termination(
-                [session.id for session in active_sessions],
-                reason=KernelLifecycleEventReason.USER_PURGED.value,
-                forced=True,
-            )
-
-        # Delete vfolders
-        await self._user_repository.delete_user_vfolders(
-            user_uuid=user_uuid,
-            storage_manager=self._storage_manager,
-        )
-
-        # Finally purge the user completely
-        await self._user_repository.purge_user(email)
-
-        return PurgeUserActionResult(user_uuid=user_uuid)
+        await self._purge_single_user(action.user_id, bulk_action, user_info_ctx)
+        return PurgeUserActionResult(user_uuid=action.user_id)
 
     async def _purge_single_user(
         self,
@@ -280,7 +204,12 @@ class UserService:
 
         This is the UUID-based internal implementation used by bulk_purge_users().
         The existing purge_user() method is email-based.
+
+        Raises ``UserNotFound`` for a user that is not there; a bulk run records that
+        as one item's failure.
         """
+        await self._user_repository.get_user_by_uuid(user_uuid)
+
         # Check for active vfolder mounts
         if await self._user_repository.check_user_vfolder_mounted_to_active_kernels(user_uuid):
             raise UserPurgeFailure(
@@ -301,7 +230,6 @@ class UserService:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=user_info_ctx.uuid,
-                target_main_access_key=user_info_ctx.main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -338,7 +266,6 @@ class UserService:
         user_info_ctx = UserInfoContext(
             uuid=admin_user.uuid,
             email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key or ""),
         )
 
         purged_user_ids: list[UUID] = []
@@ -374,105 +301,52 @@ class UserService:
         )
         return AdminMonthStatsActionResult(stats=stats)
 
-    async def search_users(self, action: SearchUsersAction) -> SearchUsersActionResult:
-        """Search all users (admin only)."""
-        result = await self._user_repository.search_users(querier=action.querier)
-        return SearchUsersActionResult(
-            users=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_users_by_domain(
-        self, action: SearchUsersByDomainAction
-    ) -> SearchUsersByDomainActionResult:
-        """Search users within a domain."""
-        result = await self._user_repository.search_users_by_domain(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchUsersByDomainActionResult(
-            users=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_users_by_project(
-        self, action: SearchUsersByProjectAction
-    ) -> SearchUsersByProjectActionResult:
-        """Search users within a project."""
-        result = await self._user_repository.search_users_by_project(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchUsersByProjectActionResult(
-            users=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_users_by_role(
-        self, action: SearchUsersByRoleAction
-    ) -> SearchUsersByRoleActionResult:
-        """Search users assigned to a role."""
-        result = await self._user_repository.search_users_by_role(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchUsersByRoleActionResult(
-            users=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
     async def issue_my_keypair(self, action: IssueMyKeypairAction) -> IssueMyKeypairActionResult:
-        generated = await self._user_repository.issue_my_keypair(user_uuid=action.user_uuid)
+        generated = await self._user_repository.issue_my_keypair(user_id=action.user_id)
         return IssueMyKeypairActionResult(generated_data=generated)
 
-    async def revoke_my_keypair(self, action: RevokeMyKeypairAction) -> RevokeMyKeypairActionResult:
-        await self._user_repository.revoke_my_keypair(
-            user_uuid=action.user_uuid, access_key=action.access_key
-        )
-        return RevokeMyKeypairActionResult(success=True)
+    async def get_keypair(self, action: GetKeypairAction) -> GetKeypairActionResult:
+        keypair = await self._user_repository.keypair(action.keypair_id)
+        return GetKeypairActionResult(keypair=keypair)
 
-    async def update_my_keypair(self, action: UpdateMyKeypairAction) -> UpdateMyKeypairActionResult:
-        keypair_data = await self._user_repository.update_my_keypair(
-            user_uuid=action.user_uuid,
-            updater=action.updater,
+    async def update_keypair(self, action: UpdateKeypairAction) -> UpdateKeypairActionResult:
+        """Write the keypair's settings. Nothing written means the row is gone or the
+        guard refused; one more read tells the two apart."""
+        written = await self._user_repository.update_keypair(action.to_updater())
+        if written is not None:
+            return UpdateKeypairActionResult(keypair=written)
+        await self._user_repository.keypair(action.keypair_id)
+        raise KeyPairForbidden(
+            "Cannot deactivate the default access key. Switch the default access key first."
         )
-        return UpdateMyKeypairActionResult(keypair=keypair_data)
 
-    async def switch_my_main_access_key(
-        self, action: SwitchMyMainAccessKeyAction
-    ) -> SwitchMyMainAccessKeyActionResult:
-        await self._user_repository.switch_my_main_access_key(
-            user_uuid=action.user_uuid, access_key=action.access_key
+    async def purge_keypair(self, action: PurgeKeypairAction) -> PurgeKeypairActionResult:
+        """Remove the keypair. Nothing removed is told apart the same way a refused
+        edit is."""
+        removed = await self._user_repository.purge_keypair(action.keypair_id)
+        if removed is not None:
+            return PurgeKeypairActionResult(keypair=removed)
+        await self._user_repository.keypair(action.keypair_id)
+        raise KeyPairForbidden(
+            "Cannot delete the default access key. Switch the default access key first."
         )
-        return SwitchMyMainAccessKeyActionResult(success=True)
+
+    async def switch_default_access_key(
+        self, action: SwitchDefaultAccessKeyAction
+    ) -> SwitchDefaultAccessKeyActionResult:
+        await self._user_repository.switch_default_access_key(
+            user_id=action.user_id, access_key=action.access_key
+        )
+        return SwitchDefaultAccessKeyActionResult(success=True)
 
     async def search_my_keypairs(
         self, action: SearchMyKeypairsAction
     ) -> SearchMyKeypairsActionResult:
         """Search keypairs owned by the current user."""
         result = await self._user_repository.search_my_keypairs(
-            scope=action.scope, querier=action.querier
+            scope=action.scope(), querier=action.querier
         )
         return SearchMyKeypairsActionResult(result=result)
-
-    async def search_keypairs_by_resource_policy(
-        self, action: SearchKeypairsByResourcePolicyAction
-    ) -> SearchKeypairsByResourcePolicyActionResult:
-        """Search keypairs assigned to a keypair resource policy."""
-        result = await self._user_repository.search_keypairs_by_resource_policy(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchKeypairsByResourcePolicyActionResult(
-            result=result,
-            resource_policy_name=action.scope.resource_policy_name,
-        )
-
-    # ------------------------------------------------------------------ admin keypair operations
 
     async def admin_create_keypair(
         self, action: AdminCreateKeypairAction
@@ -483,33 +357,12 @@ class UserService:
         )
         return AdminCreateKeypairActionResult(generated_data=generated)
 
-    async def admin_update_keypair(
-        self, action: AdminUpdateKeypairAction
-    ) -> AdminUpdateKeypairActionResult:
-        """Admin updates any keypair."""
-        keypair_data = await self._user_repository.admin_update_keypair(
-            updater=action.updater,
-        )
-        return AdminUpdateKeypairActionResult(keypair=keypair_data)
-
-    async def admin_delete_keypair(
-        self, action: AdminDeleteKeypairAction
-    ) -> AdminDeleteKeypairActionResult:
-        """Admin deletes any keypair."""
-        await self._user_repository.admin_delete_keypair(access_key=action.access_key)
-        return AdminDeleteKeypairActionResult(access_key=action.access_key)
-
     async def admin_search_keypairs(
         self, action: AdminSearchKeypairsAction
     ) -> AdminSearchKeypairsActionResult:
         """Admin search all keypairs."""
         result = await self._user_repository.admin_search_keypairs(querier=action.querier)
         return AdminSearchKeypairsActionResult(result=result)
-
-    async def admin_get_keypair(self, action: AdminGetKeypairAction) -> AdminGetKeypairActionResult:
-        """Admin retrieves a single keypair by access key."""
-        keypair_data = await self._user_repository.admin_get_keypair(access_key=action.access_key)
-        return AdminGetKeypairActionResult(keypair=keypair_data)
 
     # ------------------------------------------------------------------ admin SSH keypair operations
 
@@ -541,4 +394,58 @@ class UserService:
         return AdminGetSSHKeypairActionResult(
             access_key=action.access_key,
             ssh_public_key=ssh_public_key,
+        )
+
+    async def create_dotfile(
+        self, action: CreateKeypairDotfileAction
+    ) -> CreateKeypairDotfileActionResult:
+        if not verify_dotfile_name(action.entry.path):
+            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        keypair_id, current = await self._read_dotfiles(action.access_key)
+        entries = current.added(action.entry)
+        await self._write_dotfiles(keypair_id, entries)
+        return CreateKeypairDotfileActionResult(entries=entries.entries)
+
+    async def update_dotfile(
+        self, action: UpdateKeypairDotfileAction
+    ) -> UpdateKeypairDotfileActionResult:
+        keypair_id, current = await self._read_dotfiles(action.access_key)
+        entries = current.replaced(action.entry)
+        await self._write_dotfiles(keypair_id, entries)
+        return UpdateKeypairDotfileActionResult(entries=entries.entries)
+
+    async def delete_dotfile(
+        self, action: DeleteKeypairDotfileAction
+    ) -> DeleteKeypairDotfileActionResult:
+        keypair_id, current = await self._read_dotfiles(action.access_key)
+        entries = current.removed(action.path)
+        await self._write_dotfiles(keypair_id, entries)
+        return DeleteKeypairDotfileActionResult(entries=entries.entries)
+
+    async def get_bootstrap_script(
+        self, action: GetBootstrapScriptAction
+    ) -> GetBootstrapScriptActionResult:
+        keypair = await self._user_repository.admin_get_keypair(action.access_key)
+        return GetBootstrapScriptActionResult(script=keypair.bootstrap_script)
+
+    async def update_bootstrap_script(
+        self, action: UpdateBootstrapScriptAction
+    ) -> UpdateBootstrapScriptActionResult:
+        script = action.script.strip()
+        if len(script) > MAXIMUM_DOTFILE_SIZE:
+            raise DotfileCreationFailed("Maximum bootstrap script length reached")
+        keypair = await self._user_repository.admin_get_keypair(action.access_key)
+        await self._user_repository.update_keypair_column(
+            KeypairBootstrapScriptUpdater(keypair_id=keypair.id, script=script)
+        )
+        return UpdateBootstrapScriptActionResult()
+
+    async def _read_dotfiles(self, access_key: AccessKey) -> tuple[KeyPairID, DotfileEntries]:
+        """The keypair's id alongside its entries, so the write keys on the row it read."""
+        keypair = await self._user_repository.admin_get_keypair(access_key)
+        return keypair.id, DotfileEntries.unpack(keypair.dotfiles)
+
+    async def _write_dotfiles(self, keypair_id: KeyPairID, entries: DotfileEntries) -> None:
+        await self._user_repository.update_keypair_column(
+            KeypairDotfilesUpdater(keypair_id=keypair_id, dotfiles=entries.pack())
         )

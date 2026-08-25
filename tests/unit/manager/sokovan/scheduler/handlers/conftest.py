@@ -10,11 +10,11 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    ArchName,
     ClusterMode,
     KernelId,
     PreemptionMode,
@@ -81,14 +81,12 @@ from ai.backend.manager.views.sokovan.session import (
 def _create_session(
     session_id: SessionId | None = None,
     status: SessionStatus = SessionStatus.PENDING,
-    scaling_group: str = "default",
+    resource_group: str = "default",
     access_key: str = "test-access-key",
     kernel_count: int = 1,
     kernel_status: KernelStatus = KernelStatus.PENDING,
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-    phase_attempts: int = 0,
-    phase_started_at: datetime | None = None,
 ) -> SessionWithKernels:
     """Create SessionWithKernels with sensible defaults."""
     sid = session_id or SessionId(uuid4())
@@ -119,9 +117,7 @@ def _create_session(
         resource=ResourceSpec(
             cluster_mode=cluster_mode.value,
             cluster_size=kernel_count,
-            occupying_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
-            scaling_group_name=scaling_group,
+            resource_group_name=resource_group,
             target_sgroup_names=None,
             agent_ids=None,
         ),
@@ -198,13 +194,11 @@ def _create_session(
                 cluster_hostname=f"kernel-{i}",
             ),
             resource=ResourceInfo(
-                scaling_group=scaling_group,
+                resource_group=resource_group,
                 resource_group_id=ResourceGroupID(uuid4()),
                 agent=agent_id,
                 agent_addr=f"tcp://agent-{i}:5001",
                 container_id=f"container-{kernel_id}",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 occupied_shares={},
                 attached_devices={},
                 resource_opts={},
@@ -238,8 +232,6 @@ def _create_session(
     return SessionWithKernels(
         session_info=session_info,
         kernel_infos=kernel_infos,
-        phase_attempts=phase_attempts,
-        phase_started_at=phase_started_at,
     )
 
 
@@ -248,7 +240,7 @@ def _create_kernel(
     status: KernelStatus = KernelStatus.RUNNING,
     agent_id: AgentId | None = None,
     agent_addr: str | None = None,
-    scaling_group: str = "default",
+    resource_group: str = "default",
 ) -> KernelInfo:
     """Create KernelInfo with sensible defaults."""
     kid = kernel_id or KernelId(uuid4())
@@ -301,13 +293,11 @@ def _create_kernel(
             cluster_hostname="kernel-0",
         ),
         resource=ResourceInfo(
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             resource_group_id=ResourceGroupID(uuid4()),
             agent=aid,
             agent_addr=agent_addr or f"tcp://{aid}:5001",
             container_id=f"container-{kid}",
-            occupied_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             occupied_shares={},
             attached_devices={},
             resource_opts={},
@@ -585,13 +575,11 @@ def kernel_without_agent() -> KernelInfo:
         network=kernel.network,
         cluster=kernel.cluster,
         resource=ResourceInfo(
-            scaling_group=kernel.resource.scaling_group,
+            resource_group=kernel.resource.resource_group,
             resource_group_id=kernel.resource.resource_group_id,
             agent=None,  # No agent assigned
             agent_addr=None,
             container_id=None,
-            occupied_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             occupied_shares={},
             attached_devices={},
             resource_opts={},
@@ -638,7 +626,7 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
                         kernel_id=KernelId(k.id),
                         agent_id=AgentId(k.resource.agent) if k.resource.agent else None,
                         agent_addr=k.resource.agent_addr,
-                        scaling_group=s.session_info.resource.scaling_group_name or "default",
+                        resource_group=s.session_info.resource.resource_group_name or "default",
                         image="test-image:latest",
                         image_id=None,
                         architecture=ArchName(k.image.architecture or "x86_64"),
@@ -689,7 +677,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                         kernel_id=KernelId(k.id),
                         agent_id=AgentId(k.resource.agent) if k.resource.agent else None,
                         agent_addr=k.resource.agent_addr,
-                        scaling_group=s.session_info.resource.scaling_group_name or "default",
+                        resource_group=s.session_info.resource.resource_group_name or "default",
                         image="test-image:latest",
                         image_id=None,
                         architecture=ArchName(k.image.architecture or "x86_64"),
@@ -746,7 +734,7 @@ def terminating_session_data_factory() -> Callable[..., list[TerminatingSessionD
                         container_id=k.resource.container_id,
                         agent_id=AgentId(k.resource.agent) if k.resource.agent else None,
                         agent_addr=k.resource.agent_addr,
-                        occupied_slots=k.resource.occupied_slots or ResourceSlot(),
+                        occupied_slots=ResourceSlot(),
                     )
                     for k in s.kernel_infos
                 ],

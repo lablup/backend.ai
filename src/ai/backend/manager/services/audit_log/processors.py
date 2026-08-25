@@ -1,52 +1,30 @@
 from __future__ import annotations
 
-from typing import override
-
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.services.audit_log.actions.create import (
-    CreateAuditLogAction,
-    CreateAuditLogActionResult,
-)
+from ai.backend.manager.actions.registry.field import FieldGroup
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, ScopedFieldsOpsResult
+from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
     ScopedSearchAuditLogsAction,
-    ScopedSearchAuditLogsActionResult,
 )
-from ai.backend.manager.services.audit_log.actions.search import (
-    SearchAuditLogsAction,
-    SearchAuditLogsActionResult,
-)
-from ai.backend.manager.services.audit_log.service import AuditLogService
+from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogsAction
 
 
-class AuditLogProcessors(AbstractProcessorPackage):
-    create: ActionProcessor[CreateAuditLogAction, CreateAuditLogActionResult]
-    search: ActionProcessor[SearchAuditLogsAction, SearchAuditLogsActionResult]
+class AuditLogProcessors:
+    """Two reads of the records kept about entities, both straight against ops.
+
+    No create: audit rows are written by the monitors through the repository, which have
+    no caller identity to gate or to record. A record is a field of whatever entity the
+    action was about, so the owned read names those entities and the global one names
+    none.
+    """
+
+    global_search: GlobalActionProcessor[SearchAuditLogsAction, BatchOpsResult[AuditLogData]]
     scoped_search: BulkActionProcessor[
-        ScopedSearchAuditLogsAction, ScopedSearchAuditLogsActionResult
+        ScopedSearchAuditLogsAction, ScopedFieldsOpsResult[AuditLogData]
     ]
 
-    def __init__(
-        self,
-        service: AuditLogService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
-        self.scoped_search = BulkActionProcessor(
-            service.scoped_search,
-            monitors=action_monitors,
-            validators=[validators.rbac.bulk],
-        )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateAuditLogAction.spec(),
-            SearchAuditLogsAction.spec(),
-            ScopedSearchAuditLogsAction.spec(),
-        ]
+    def __init__(self, group: FieldGroup[AuditLogData]) -> None:
+        self.global_search = group.global_search_ops(SearchAuditLogsAction)
+        self.scoped_search = group.atomic_bulk_scoped_search_ops(ScopedSearchAuditLogsAction)

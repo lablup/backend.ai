@@ -61,6 +61,6 @@ class AgentLostCheckerTask(PeriodicTask):
             prev = datetime.fromtimestamp(prev_timestamp, tzutc())
             if now - prev > timeout:
                 await self._event_producer.anycast_event(
-                    AgentTerminatedEvent("agent-lost"),
+                    AgentTerminatedEvent(reason="agent-lost"),
                     source_override=AgentId(agent_id),
                 )

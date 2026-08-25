@@ -6,8 +6,19 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
+    ArtifactRegistryOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
+    ContainerRegistryOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
+from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .base import DomainDependency
 
@@ -31,6 +42,7 @@ class RepositoriesInput:
     db: ExtendedAsyncSAEngine
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     valkey_stat: ValkeyStatClient
     valkey_live: ValkeyLiveClient
     valkey_schedule: ValkeyScheduleClient
@@ -67,8 +79,15 @@ class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
             args=RepositoryArgs(
                 db=setup_input.db,
                 ops_provider=DBOpsProvider(setup_input.db),
+                v2_ops_provider=V2DBOpsProvider(setup_input.db),
+                container_registry_ops_provider=ContainerRegistryOpsProvider(setup_input.db),
+                reconcile_ops_provider=ReconcileOpsProvider(setup_input.db),
+                artifact_registry_ops_provider=ArtifactRegistryOpsProvider(setup_input.db),
+                replica_group_ops_provider=ReplicaGroupOpsProvider(setup_input.db),
+                retention_ops_provider=RetentionOpsProvider(setup_input.db),
                 storage_manager=setup_input.storage_manager,
                 config_provider=setup_input.config_provider,
+                key_provider_pool=setup_input.key_provider_pool,
                 valkey_stat_client=setup_input.valkey_stat,
                 valkey_live_client=setup_input.valkey_live,
                 valkey_schedule_client=setup_input.valkey_schedule,

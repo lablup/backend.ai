@@ -11,10 +11,12 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.schema.deployment import (
     IntOrPercent,
     ReplicaGroupRolloutSpec,
@@ -23,6 +25,7 @@ from ai.backend.common.schema.deployment import (
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
+    ReplicaGroupData,
     ReplicaGroupHandlerCategory,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
@@ -37,13 +40,20 @@ from ai.backend.manager.data.session_group.types import (
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
+from ai.backend.manager.models.replica_group.updaters import (
+    ReplicaGroupDeployUpdater,
+    ReplicaGroupScalingUpdater,
+)
 from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -51,18 +61,15 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
-from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment.updaters import (
-    ReplicaGroupDeployUpdaterSpec,
-    ReplicaGroupScalingUpdaterSpec,
-)
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
 from ai.backend.manager.repositories.replica_group import ReplicaGroupRepository
 from ai.backend.manager.repositories.replica_group.types import (
     GroupRolloutSetup,
@@ -162,8 +169,13 @@ class TestReplicaGroupRepository:
         async with with_tables(
             database_connection,
             [
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
+                EntityLabelRow,
+                PermissionRow,
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 ResourcePresetRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
@@ -172,7 +184,7 @@ class TestReplicaGroupRepository:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 EndpointRow,
                 SessionGroupRow,
                 ReplicaGroupRow,
@@ -188,6 +200,7 @@ class TestReplicaGroupRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> DeploymentID:
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
@@ -199,6 +212,7 @@ class TestReplicaGroupRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -208,14 +222,14 @@ class TestReplicaGroupRepository:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=sgroup_name,
                     description="Test scaling group",
                     is_active=True,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             db_sess.add(
@@ -248,16 +262,22 @@ class TestReplicaGroupRepository:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
                     resource_policy=project_policy_name,
                 )
             )
+            await db_sess.flush()
+            # A session group joins its project and its owner, which must be in the
+            # graph first.
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group_id))
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
             await db_sess.flush()
             db_sess.add(
                 EndpointRow(
@@ -317,7 +337,7 @@ class TestReplicaGroupRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ReplicaGroupRepository:
-        return ReplicaGroupRepository(db=db_with_cleanup)
+        return ReplicaGroupRepository(ReplicaGroupOpsProvider(db_with_cleanup))
 
     async def test_setup_target_groups_gives_a_fresh_group_its_placement_group(
         self,
@@ -362,12 +382,9 @@ class TestReplicaGroupRepository:
         two_group_ids: tuple[ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         rolling_group_id, _ = two_group_ids
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10),
-            conditions=[ReplicaGroupConditions.by_lifecycles([ReplicaGroupLifecycle.ROLLING])],
-        )
+        conditions = [ReplicaGroupConditions.by_lifecycles([ReplicaGroupLifecycle.ROLLING])]
 
-        result = await replica_group_repository.search_deploy_scheduling_views(querier)
+        result = await replica_group_repository.search_deploy_scheduling_views(conditions)
 
         assert len(result) == 1
         assert result[0].group_id == rolling_group_id
@@ -378,52 +395,43 @@ class TestReplicaGroupRepository:
         replica_group_repository: ReplicaGroupRepository,
         two_group_ids: tuple[ReplicaGroupID, ReplicaGroupID],
     ) -> None:
-        scaling_group_id, _ = two_group_ids
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10),
-            conditions=[
-                ReplicaGroupConditions.by_scaling_statuses([ReplicaGroupScalingStatus.SCALING])
-            ],
-        )
+        resource_group_id, _ = two_group_ids
+        conditions = [
+            ReplicaGroupConditions.by_scaling_statuses([ReplicaGroupScalingStatus.SCALING])
+        ]
 
-        result = await replica_group_repository.search_scaling_scheduling_views(querier)
+        result = await replica_group_repository.search_scaling_scheduling_views(conditions)
 
         assert len(result) == 1
-        assert result[0].group_id == scaling_group_id
+        assert result[0].group_id == resource_group_id
         assert result[0].desired_current_replica_count == 1
         assert result[0].scaling_status is ReplicaGroupScalingStatus.SCALING
 
-    async def test_update_replica_groups_applies_per_id_deploy_values(
+    async def test_apply_writes_applies_per_id_deploy_values(
         self,
         replica_group_repository: ReplicaGroupRepository,
         two_group_ids: tuple[ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         first_id, second_id = two_group_ids
-        updaters: list[Updater[ReplicaGroupRow]] = [
-            Updater(
-                spec=ReplicaGroupDeployUpdaterSpec(
-                    lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINING),
-                ),
-                pk_value=first_id,
+        updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = [
+            ReplicaGroupDeployUpdater(
+                replica_group_id=first_id,
+                lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINING),
             ),
-            Updater(
-                spec=ReplicaGroupDeployUpdaterSpec(
-                    lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINED),
-                ),
-                pk_value=second_id,
+            ReplicaGroupDeployUpdater(
+                replica_group_id=second_id,
+                lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINED),
             ),
         ]
 
-        result = await replica_group_repository.update_replica_groups(updaters)
-
-        assert result.success_count() == 2
-        assert result.has_failures() is False
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10),
-            conditions=[ReplicaGroupConditions.by_ids([first_id, second_id])],
+        result = await replica_group_repository.apply_writes(
+            group_updaters=updaters, endpoint_updaters=[]
         )
-        groups = await replica_group_repository.search_deploy_scheduling_views(querier)
+
+        assert result.updated_group_ids == {first_id, second_id}
+
+        conditions = [ReplicaGroupConditions.by_ids([first_id, second_id])]
+        groups = await replica_group_repository.search_deploy_scheduling_views(conditions)
         lifecycle_by_id = {group.group_id: group.lifecycle for group in groups}
         assert lifecycle_by_id[first_id] is ReplicaGroupLifecycle.DRAINING
         assert lifecycle_by_id[second_id] is ReplicaGroupLifecycle.DRAINED
@@ -481,12 +489,9 @@ class TestReplicaGroupRepository:
                 )
             await db_sess.commit()
 
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10),
-            conditions=[ReplicaGroupConditions.by_ids([group_id])],
-        )
+        conditions = [ReplicaGroupConditions.by_ids([group_id])]
         fetch = await replica_group_repository.fetch_autoscale_reconcile_views(
-            querier, ReplicaGroupHandlerCategory.LIFECYCLE
+            conditions, ReplicaGroupHandlerCategory.LIFECYCLE
         )
 
         assert len(fetch.views) == 1
@@ -499,37 +504,31 @@ class TestReplicaGroupRepository:
         assert view.current_live_replica_count == 3
         assert view.current_serving_replica_count == 2
 
-    async def test_update_replica_groups_applies_per_id_scaling_values(
+    async def test_apply_writes_applies_per_id_scaling_values(
         self,
         replica_group_repository: ReplicaGroupRepository,
         two_group_ids: tuple[ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         first_id, second_id = two_group_ids
-        updaters: list[Updater[ReplicaGroupRow]] = [
-            Updater(
-                spec=ReplicaGroupScalingUpdaterSpec(
-                    desired_current_replica_count=OptionalState.update(5),
-                ),
-                pk_value=first_id,
+        updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = [
+            ReplicaGroupScalingUpdater(
+                replica_group_id=first_id,
+                desired_current_replica_count=OptionalState.update(5),
             ),
-            Updater(
-                spec=ReplicaGroupScalingUpdaterSpec(
-                    desired_current_replica_count=OptionalState.update(7),
-                ),
-                pk_value=second_id,
+            ReplicaGroupScalingUpdater(
+                replica_group_id=second_id,
+                desired_current_replica_count=OptionalState.update(7),
             ),
         ]
 
-        result = await replica_group_repository.update_replica_groups(updaters)
-
-        assert result.success_count() == 2
-        assert result.has_failures() is False
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10),
-            conditions=[ReplicaGroupConditions.by_ids([first_id, second_id])],
+        result = await replica_group_repository.apply_writes(
+            group_updaters=updaters, endpoint_updaters=[]
         )
-        groups = await replica_group_repository.search_scaling_scheduling_views(querier)
+
+        assert result.updated_group_ids == {first_id, second_id}
+
+        conditions = [ReplicaGroupConditions.by_ids([first_id, second_id])]
+        groups = await replica_group_repository.search_scaling_scheduling_views(conditions)
         count_by_id = {group.group_id: group.desired_current_replica_count for group in groups}
         assert count_by_id[first_id] == 5
         assert count_by_id[second_id] == 7

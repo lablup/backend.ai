@@ -9,12 +9,12 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
-from ai.backend.common.identifier.entity import EntityID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     CreateRoleInvitationResult,
@@ -81,15 +81,22 @@ from ai.backend.manager.errors.role_invitation import (
     RoleInvitationNotFound,
 )
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
+from ai.backend.manager.models.role_invitation.scopes import (
+    InviteeOperationScope,
+    InviterOperationScope,
+    RoleInvitationOperationScope,
+)
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
@@ -122,19 +129,10 @@ from ai.backend.manager.repositories.permission_controller.purgers import (
     ObjectPermissionPurgerSpec,
     PermissionPurgerSpec,
 )
-from ai.backend.manager.repositories.permission_controller.types import (
-    PermissionSearchScope,
-    ScopedRoleSearchScope,
-)
 from ai.backend.manager.repositories.role_invitation.creators import (
     RoleInvitationCreatorSpec,
 )
-from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeSearchScope,
-    InviterSearchScope,
-    RoleInvitationSearchResult,
-    RoleInvitationSearchScope,
-)
+from ai.backend.manager.repositories.role_invitation.types import RoleInvitationSearchResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -351,7 +349,7 @@ class PermissionDBSource:
             spec=UserRoleCreatorSpec(
                 user_id=data.user_id,
                 role_id=data.role_id,
-                granted_by=data.granted_by,
+                granted_by=None if data.granted_by is None else UserID(data.granted_by),
             )
         )
         result = await execute_creator(db_session, creator)
@@ -379,7 +377,7 @@ class PermissionDBSource:
             await db_session.flush()
 
             # Used by PermissionControllerService.revoke_role() to decide whether
-            # to call GroupDBSource.unbind_user_from_project().
+            # to call ProjectDBSource.unbind_user_from_project().
             # TODO: remove this query when unbind_user_from_project() is retired
             # (i.e. association_groups_users is fully migrated to
             # association_scopes_entities).
@@ -678,7 +676,7 @@ class PermissionDBSource:
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
-        scope: ScopedRoleSearchScope,
+        scope: ScopedRoleOperationScope,
     ) -> RoleListResult:
         """Search roles registered in a given scope via association_scopes_entities."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -703,7 +701,7 @@ class PermissionDBSource:
     async def search_permissions(
         self,
         querier: BatchQuerier,
-        scope: PermissionSearchScope | None = None,
+        scope: PermissionOperationScope | None = None,
     ) -> PermissionListResult:
         """Searches permissions with pagination and filtering."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -813,7 +811,7 @@ class PermissionDBSource:
     ) -> ScopeListResult:
         """Search all projects using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(GroupRow.id, GroupRow.name)
+            query = sa.select(ProjectRow.id, ProjectRow.name)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -1203,10 +1201,11 @@ class PermissionDBSource:
         """Return whether the user holds *permission* on the key's entity via a virtual scope.
 
         Resolves the effective permission through the virtual-scope chain and tests
-        it bitwise (``effective & permission != NONE``).
+        that it covers *every* bit of ``permission``, which may be a mask
+        (``UPSERT`` requires ``CREATE | UPDATE``) rather than a single bit.
         """
         resolved = await self.resolve_effective_permissions_via_virtual_scope([key])
-        return bool(resolved.get(key, Permission.NONE) & permission)
+        return resolved.get(key, Permission.NONE).covers(permission)
 
     async def check_bulk_permission_via_virtual_scope(
         self,
@@ -1215,12 +1214,13 @@ class PermissionDBSource:
     ) -> Mapping[EntityPermissionCheckKey, bool]:
         """Check *permission* on each target entity through the virtual-scope chain in one go.
 
-        Returns a mapping from each input key to whether the permission is granted.
+        Returns a mapping from each input key to whether every bit of ``permission``
+        is granted.
         """
         if not keys:
             return {}
         resolved = await self.resolve_effective_permissions_via_virtual_scope(keys)
-        return {key: bool(resolved.get(key, Permission.NONE) & permission) for key in keys}
+        return {key: resolved.get(key, Permission.NONE).covers(permission) for key in keys}
 
     async def check_scope_permission_via_virtual_scope(
         self,
@@ -1229,12 +1229,13 @@ class PermissionDBSource:
     ) -> Mapping[ScopePermissionCheckKey, bool]:
         """Check *permission* on each target scope through the virtual-scope chain in one go.
 
-        Returns a mapping from each input key to whether the permission is granted.
+        Returns a mapping from each input key to whether every bit of ``permission``
+        is granted.
         """
         if not keys:
             return {}
         resolved = await self._resolve_effective_scope_permissions_via_virtual_scope(keys)
-        return {key: bool(resolved.get(key, Permission.NONE) & permission) for key in keys}
+        return {key: resolved.get(key, Permission.NONE).covers(permission) for key in keys}
 
     async def resolve_effective_permissions_via_virtual_scope(
         self,
@@ -1259,8 +1260,8 @@ class PermissionDBSource:
             groups[
                 _VirtualScopePermissionGroupKey(
                     user_id=key.user_id,
-                    entity_type=key.entity.entity_type,
-                    subject_entity_type=key.entity.entity_type,
+                    entity_type=key.entity.entity_type(),
+                    subject_entity_type=key.entity.entity_type(),
                 )
             ].append(key)
 
@@ -1270,10 +1271,10 @@ class PermissionDBSource:
                 granted = await self._resolve_permissions_for_virtual_scope_group(
                     db_session=db_session,
                     group_key=group_key,
-                    entity_ids=[k.entity.entity_id for k in members],
+                    entity_ids=[k.entity for k in members],
                 )
                 for key in members:
-                    result[key] = granted.get(key.entity.entity_id, Permission.NONE)
+                    result[key] = granted.get(key.entity, Permission.NONE)
         return result
 
     async def _resolve_effective_scope_permissions_via_virtual_scope(
@@ -1474,7 +1475,7 @@ class PermissionDBSource:
     async def search_invitations_by_invitee(
         self,
         querier: BatchQuerier,
-        scope: InviteeSearchScope,
+        scope: InviteeOperationScope,
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)
@@ -1490,7 +1491,7 @@ class PermissionDBSource:
     async def search_invitations_by_inviter(
         self,
         querier: BatchQuerier,
-        scope: InviterSearchScope,
+        scope: InviterOperationScope,
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)
@@ -1506,7 +1507,7 @@ class PermissionDBSource:
     async def search_invitations_by_role(
         self,
         querier: BatchQuerier,
-        scope: RoleInvitationSearchScope,
+        scope: RoleInvitationOperationScope,
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)

@@ -1286,7 +1286,6 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-harbor.json
   ./backend.ai mgr fixture populate fixtures/manager/example-users.json
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
-  ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-slot-types.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
   ./backend.ai mgr fixture populate fixtures/manager/example-runtime-variants.json

@@ -3,10 +3,10 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.retention_policy.types import RetentionPolicyOrderField
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
 
 
 class CreateRetentionPolicyInput(BaseRequestModel):

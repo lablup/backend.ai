@@ -17,10 +17,12 @@ from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.group import association_groups_users
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.project import association_groups_users
 from ai.backend.manager.models.user import users
+from ai.backend.manager.secret.types import SecretValue
 
 
 @dataclass
@@ -74,13 +76,15 @@ async def auth_user_fixture(
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_fixture)
+                .scalar_subquery(),
             )
         )
         await conn.execute(
             sa.insert(keypairs).values(
-                user_id=email,
                 access_key=data.access_key,
-                secret_key=data.secret_key,
+                secret_key=SecretValue(data.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,

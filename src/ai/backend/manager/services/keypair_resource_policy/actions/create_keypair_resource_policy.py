@@ -1,34 +1,38 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.keypair_resource_policy.actions.base import (
-    KeypairResourcePolicyAction,
+from ai.backend.common.data.entity.resource_policy import (
+    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.models.resource_policy.creators import (
+    KeyPairResourcePolicyCreator,
+)
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 
 
 @dataclass
-class CreateKeyPairResourcePolicyAction(KeypairResourcePolicyAction):
-    creator: Creator[KeyPairResourcePolicyRow]
+class CreateKeyPairResourcePolicyAction(
+    CreateGlobalOpsAction[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
+):
+    """Register a keypair resource policy."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: KeyPairResourcePolicyCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreateKeyPairResourcePolicyActionResult(BaseActionResult):
-    keypair_resource_policy: KeyPairResourcePolicyData
+    def entity_type(cls) -> EntityType:
+        return KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return self.keypair_resource_policy.name
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_create_keypair_resource_policy"
+
+    @override
+    def to_creator(self) -> KeyPairResourcePolicyCreator:
+        return self.creator

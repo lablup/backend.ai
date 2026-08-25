@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.schema.deployment import ReplicaGroupRolloutSpec
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
@@ -14,6 +17,33 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.data.reconciler.types import LastHistory
+
+
+@dataclass
+class RevisionReplicaCount:
+    """Active route counts for one (group, revision): warming+serving vs serving only."""
+
+    live: int
+    serving: int
+
+
+@dataclass
+class RevisionRouteConfig:
+    """Per-revision settings copied onto each route at creation."""
+
+    health_check: ModelHealthCheck | None
+    termination_grace_period: float
+
+
+@dataclass
+class DeploymentRolloutContext:
+    """What a rollout needs of the deployment it sets a target group up for."""
+
+    deployment_id: DeploymentID
+    primary_replica_group_id: ReplicaGroupID | None
+    domain_name: str
+    project_id: ProjectID
+    session_owner_id: UserID
 
 
 @dataclass

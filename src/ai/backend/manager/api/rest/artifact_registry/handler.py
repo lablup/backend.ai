@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Final, cast
 import sqlalchemy as sa
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
@@ -43,8 +44,9 @@ from ai.backend.manager.dto.response import (
 )
 from ai.backend.manager.errors.artifact import ArtifactImportDelegationError
 from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact.searchers import ArtifactWithRevisionsSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.retrieve_model import RetrieveModelAction
 from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
@@ -54,13 +56,13 @@ from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsActio
 from ai.backend.manager.services.artifact.actions.search_with_revisions import (
     SearchArtifactsWithRevisionsAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+from ai.backend.manager.services.artifact.revision.actions.delegate_import_revision_batch import (
     DelegateImportArtifactRevisionBatchAction,
 )
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.artifact.processors import ArtifactProcessors
-    from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
+    from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -91,9 +93,11 @@ class ArtifactRegistryHandler:
         This is the first step in the artifact workflow: Scan -> Import -> Use.
         """
 
-        action_result = await self._artifact.scan.wait_for_complete(
+        action_result = await self._artifact.scan.run(
             ScanArtifactsAction(
-                registry_id=body.parsed.registry_id,
+                registry_id=ArtifactRegistryID(body.parsed.registry_id)
+                if body.parsed.registry_id is not None
+                else None,
                 artifact_type=body.parsed.artifact_type,
                 limit=body.parsed.limit,
                 order=ModelSortKey.DOWNLOADS,
@@ -113,7 +117,7 @@ class ArtifactRegistryHandler:
         self,
         body: BodyParam[DelegateScanArtifactsReq],
     ) -> APIResponse:
-        action_result = await self._artifact.delegate_scan.wait_for_complete(
+        action_result = await self._artifact.delegate_scan.run(
             DelegateScanArtifactsAction(
                 delegator_reservoir_id=body.parsed.delegator_reservoir_id,
                 artifact_type=body.parsed.artifact_type,
@@ -131,7 +135,9 @@ class ArtifactRegistryHandler:
                 ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)
                 for artifact in action_result.result
             ],
-            source_registry_id=action_result.source_registry_id,
+            source_registry_id=ArtifactRegistryID(action_result.source_registry_id)
+            if action_result.source_registry_id is not None
+            else None,
             source_registry_type=action_result.source_registry_type,
             readme_data=action_result.readme_data,
         )
@@ -142,17 +148,15 @@ class ArtifactRegistryHandler:
         body: BodyParam[DelegateImportArtifactsReq],
     ) -> APIResponse:
         force = body.parsed.options.force
-        action_result = (
-            await self._artifact_revision.delegate_import_revision_batch.wait_for_complete(
-                DelegateImportArtifactRevisionBatchAction(
-                    delegator_reservoir_id=body.parsed.delegator_reservoir_id,
-                    artifact_type=body.parsed.artifact_type,
-                    delegatee_target=body.parsed.delegatee_target
-                    if body.parsed.delegatee_target
-                    else None,
-                    artifact_revision_ids=body.parsed.artifact_revision_ids,
-                    force=force,
-                )
+        action_result = await self._artifact_revision.delegate_import_revision_batch.run(
+            DelegateImportArtifactRevisionBatchAction(
+                delegator_reservoir_id=body.parsed.delegator_reservoir_id,
+                artifact_type=body.parsed.artifact_type,
+                delegatee_target=body.parsed.delegatee_target
+                if body.parsed.delegatee_target
+                else None,
+                artifact_revision_ids=body.parsed.artifact_revision_ids,
+                force=force,
             )
         )
 
@@ -191,7 +195,7 @@ class ArtifactRegistryHandler:
         filters = body.parsed.filters
         ordering = body.parsed.ordering
 
-        # Build BatchQuerier from REST pagination options
+        # Build the searcher from REST pagination options
         offset_opts = pagination_opts.offset
         pagination = OffsetPagination(
             limit=offset_opts.limit if offset_opts and offset_opts.limit is not None else 20,
@@ -208,14 +212,12 @@ class ArtifactRegistryHandler:
         if ordering is not None:
             orders.extend(_build_artifact_query_orders(ordering))
 
-        querier = BatchQuerier(
-            pagination=pagination,
-            conditions=conditions,
-            orders=orders,
-        )
-
-        action_result = await self._artifact.search_artifacts_with_revisions.wait_for_complete(
-            SearchArtifactsWithRevisionsAction(querier=querier)
+        action_result = await self._artifact.search_artifacts_with_revisions.run(
+            SearchArtifactsWithRevisionsAction(
+                searcher=ArtifactWithRevisionsSearcher(
+                    pagination=pagination, conditions=conditions, orders=orders
+                )
+            )
         )
 
         artifacts = action_result.data
@@ -239,10 +241,12 @@ class ArtifactRegistryHandler:
         unlike single model scanning which retrieves this information immediately.
         """
 
-        action_result = await self._artifact.retrieve_models.wait_for_complete(
+        action_result = await self._artifact.retrieve_models.run(
             RetrieveModelsAction(
                 models=body.parsed.models,
-                registry_id=body.parsed.registry_id,
+                registry_id=ArtifactRegistryID(body.parsed.registry_id)
+                if body.parsed.registry_id is not None
+                else None,
             )
         )
 
@@ -271,10 +275,12 @@ class ArtifactRegistryHandler:
             model_id=path.parsed.model_id,
             revision=query.parsed.revision,
         )
-        action_result = await self._artifact.retrieve_single_model.wait_for_complete(
+        action_result = await self._artifact.retrieve_single_model.run(
             RetrieveModelAction(
                 model=model,
-                registry_id=query.parsed.registry_id,
+                registry_id=ArtifactRegistryID(query.parsed.registry_id)
+                if query.parsed.registry_id is not None
+                else None,
             )
         )
 
@@ -285,7 +291,7 @@ class ArtifactRegistryHandler:
 def _build_artifact_filter_conditions(
     filters: ArtifactFilterOptions,
 ) -> list[QueryCondition]:
-    """Convert ArtifactFilterOptions to a list of QueryConditions for BatchQuerier."""
+    """Convert ArtifactFilterOptions to a list of QueryConditions for the searcher."""
     conditions: list[QueryCondition] = []
 
     if filters.artifact_type:
@@ -331,7 +337,7 @@ def _build_artifact_filter_conditions(
 def _build_artifact_query_orders(
     ordering: ArtifactOrderingOptions,
 ) -> list[QueryOrder]:
-    """Convert ArtifactOrderingOptions to a list of QueryOrders for BatchQuerier."""
+    """Convert ArtifactOrderingOptions to a list of QueryOrders for the searcher."""
     orders: list[QueryOrder] = []
     for field, desc in ordering.order_by:
         column: Any = getattr(ArtifactRow, field.value.lower(), ArtifactRow.name)

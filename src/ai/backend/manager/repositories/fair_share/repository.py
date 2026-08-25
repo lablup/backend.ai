@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from datetime import date
 from typing import TYPE_CHECKING
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -29,7 +29,12 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareFactors,
     UserFairShareSearchResult,
 )
-from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
+from ai.backend.manager.models.fair_share.scopes import (
+    DomainFairShareOperationScope,
+    ProjectFairShareOperationScope,
+    UserFairShareOperationScope,
+)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,
@@ -37,16 +42,13 @@ from ai.backend.manager.repositories.base import (
     Creator,
     Upserter,
 )
+from ai.backend.manager.repositories.fair_share.types import (
+    DomainFairShareEntitySearchResult,
+    ProjectFairShareEntitySearchResult,
+    UserFairShareEntitySearchResult,
+)
 
 from .db_source import FairShareDBSource
-from .types import (
-    DomainFairShareEntitySearchResult,
-    DomainFairShareSearchScope,
-    ProjectFairShareEntitySearchResult,
-    ProjectFairShareSearchScope,
-    UserFairShareEntitySearchResult,
-    UserFairShareSearchScope,
-)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.fair_share import (
@@ -128,7 +130,7 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def search_rg_domain_fair_shares(
         self,
-        scope: DomainFairShareSearchScope,
+        scope: DomainFairShareOperationScope,
         querier: BatchQuerier,
     ) -> DomainFairShareEntitySearchResult:
         """Search domain fair shares within a resource group.
@@ -188,7 +190,7 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def search_rg_project_fair_shares(
         self,
-        scope: ProjectFairShareSearchScope,
+        scope: ProjectFairShareOperationScope,
         querier: BatchQuerier,
     ) -> ProjectFairShareEntitySearchResult:
         """Search project fair shares within a resource group.
@@ -275,7 +277,7 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def search_rg_user_fair_shares(
         self,
-        scope: UserFairShareSearchScope,
+        scope: UserFairShareOperationScope,
         querier: BatchQuerier,
     ) -> UserFairShareEntitySearchResult:
         """Search user fair shares within a resource group.
@@ -332,10 +334,10 @@ class FairShareRepository:
         return await self._db_source.get_domain_exists(domain_name)
 
     @fair_share_repository_resilience.apply()
-    async def get_scaling_group_fair_share_spec(
+    async def get_resource_group_fair_share_spec(
         self,
         resource_group_id: ResourceGroupID,
-    ) -> FairShareScalingGroupSpec:
+    ) -> FairShareResourceGroupSpec:
         """Get fair share spec for a resource group.
 
         Returns:
@@ -344,7 +346,7 @@ class FairShareRepository:
         Raises:
             ScalingGroupNotFound: If scaling group doesn't exist.
         """
-        return await self._db_source.get_scaling_group_fair_share_spec(resource_group_id)
+        return await self._db_source.get_resource_group_fair_share_spec(resource_group_id)
 
     @fair_share_repository_resilience.apply()
     async def get_user_scheduling_ranks_batch(

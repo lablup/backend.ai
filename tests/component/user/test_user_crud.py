@@ -22,8 +22,8 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -63,6 +63,29 @@ class TestUserCreateCrud:
             kp = row.fetchone()
         assert kp is not None, "Keypair should be auto-created for new user"
         assert kp.is_active is True
+
+    async def test_s6_create_marks_the_default_keypair_as_main(
+        self,
+        user_factory: UserFactory,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-6: Exactly the auto-created keypair is marked as the user's main one."""
+        result = await user_factory()
+
+        async with db_engine.begin() as conn:
+            marked = (
+                await conn.execute(
+                    sa.select(KeyPairRow.access_key).where(
+                        (KeyPairRow.user == str(result.user.id)) & KeyPairRow.is_default
+                    )
+                )
+            ).scalars()
+            owned = (
+                await conn.execute(
+                    sa.select(KeyPairRow.access_key).where(KeyPairRow.user == str(result.user.id))
+                )
+            ).scalars()
+        assert marked.all() == owned.all()
 
     async def test_s3_create_with_group_ids(
         self,
@@ -407,7 +430,7 @@ class TestUserCreateAutoAssignRoles:
         project_id = uuid.uuid4()
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.insert(GroupRow.__table__).values(
+                sa.insert(ProjectRow.__table__).values(
                     id=project_id,
                     name=f"model-store-{secrets.token_hex(4)}",
                     description="Model Store",
@@ -450,7 +473,7 @@ class TestUserCreateAutoAssignRoles:
                 )
             )
             await conn.execute(
-                GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id)
+                ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
             )
 
     @pytest.fixture()

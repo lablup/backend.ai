@@ -14,13 +14,13 @@ import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.hub import EventHub
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import MutationResult
@@ -30,10 +30,10 @@ from ai.backend.manager.errors.service import (
     ModelServiceNotFound,
     RouteNotFound,
 )
+from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
-from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.services.model_serving.actions.delete_route import (
     DeleteRouteAction,
@@ -41,11 +41,8 @@ from ai.backend.manager.services.model_serving.actions.delete_route import (
 from ai.backend.manager.services.model_serving.actions.force_sync import (
     ForceSyncAction,
 )
-from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
-    ModifyEndpointAction,
-)
-from ai.backend.manager.services.model_serving.processors.model_serving import (
-    ModelServingProcessors,
+from ai.backend.manager.services.model_serving.actions.update_endpoint import (
+    UpdateEndpointAction,
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -66,6 +63,7 @@ class ModelServingCRUDBaseFixtures:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)
@@ -122,7 +120,7 @@ class ModelServingCRUDBaseFixtures:
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
         mock = MagicMock()
-        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        mock.get_default_architecture_from_resource_group = AsyncMock(return_value=None)
         mock.get_endpoint_info = AsyncMock(return_value=MagicMock(current_revision_id=None))
         mock.fetch_model_definition = AsyncMock(return_value=None)
         return mock
@@ -186,19 +184,6 @@ class ModelServingCRUDBaseFixtures:
         )
 
     @pytest.fixture
-    def model_serving_processors(
-        self,
-        mock_action_monitor: MagicMock,
-        model_serving_service: ModelServingService,
-        mock_action_validators: ActionValidators,
-    ) -> ModelServingProcessors:
-        return ModelServingProcessors(
-            service=model_serving_service,
-            action_monitors=[mock_action_monitor],
-            validators=mock_action_validators,
-        )
-
-    @pytest.fixture
     def mock_check_user_access(self, mocker: Any, model_serving_service: Any) -> AsyncMock:
         mock = cast(
             AsyncMock,
@@ -238,10 +223,10 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             ),
         )
 
-    def _make_updater_spec(
+    def _make_updater(
         self, *, replicas: int | None = None, has_revision_changes: bool = False
     ) -> MagicMock:
-        spec = MagicMock(spec=EndpointUpdaterSpec)
+        spec = MagicMock(spec=LegacyEndpointUpdater)
         if replicas is not None:
             spec.replicas = OptionalState.update(replicas)
             spec.replica_count_modified.return_value = True
@@ -263,15 +248,13 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
 
     async def test_replica_count_change_marks_check_replica(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_modify_endpoint: AsyncMock,
         mock_deployment_controller: MagicMock,
         endpoint_id: uuid.UUID,
     ) -> None:
         """replica_count change (2->5) returns success=true with CHECK_REPLICA marking."""
-        updater_spec = self._make_updater_spec(replicas=5)
-        mock_updater = MagicMock()
-        mock_updater.spec = updater_spec
+        mock_updater = self._make_updater(replicas=5)
 
         mock_endpoint_data = MagicMock()
         mock_endpoint_data.id = endpoint_id
@@ -279,8 +262,8 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             success=True, message="ok", data=mock_endpoint_data
         )
 
-        action = ModifyEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
-        result = await model_serving_processors.modify_endpoint.wait_for_complete(action)
+        action = UpdateEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
+        result = await model_serving_service.update_endpoint(action)
 
         assert result.success is True
         assert result.data == mock_endpoint_data
@@ -297,16 +280,14 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
     )
     async def test_revision_change_calls_add_and_activate_revision(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_modify_endpoint: AsyncMock,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
         endpoint_id: uuid.UUID,
     ) -> None:
         """Revision-level field change delegates to controller.add_revision + activate_revision."""
-        updater_spec = self._make_updater_spec(replicas=None, has_revision_changes=True)
-        mock_updater = MagicMock()
-        mock_updater.spec = updater_spec
+        mock_updater = self._make_updater(replicas=None, has_revision_changes=True)
 
         mock_endpoint_data = MagicMock()
         mock_endpoint_data.id = endpoint_id
@@ -335,8 +316,8 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
         mock_deployment_controller.add_revision = AsyncMock(return_value=mock_revision)
         mock_deployment_controller.activate_revision = AsyncMock()
 
-        action = ModifyEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
-        result = await model_serving_processors.modify_endpoint.wait_for_complete(action)
+        action = UpdateEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
+        result = await model_serving_service.update_endpoint(action)
 
         assert result.success is True
         mock_deployment_controller.add_revision.assert_awaited_once()
@@ -346,15 +327,13 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
 
     async def test_no_replica_change_no_marking(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_modify_endpoint: AsyncMock,
         mock_deployment_controller: MagicMock,
         endpoint_id: uuid.UUID,
     ) -> None:
         """No replica change returns success without CHECK_REPLICA marking."""
-        updater_spec = self._make_updater_spec(replicas=None)
-        mock_updater = MagicMock()
-        mock_updater.spec = updater_spec
+        mock_updater = self._make_updater(replicas=None)
 
         mock_endpoint_data = MagicMock()
         mock_endpoint_data.id = endpoint_id
@@ -362,27 +341,25 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             success=True, message="ok", data=mock_endpoint_data
         )
 
-        action = ModifyEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
-        result = await model_serving_processors.modify_endpoint.wait_for_complete(action)
+        action = UpdateEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
+        result = await model_serving_service.update_endpoint(action)
 
         assert result.success is True
         mock_deployment_controller.mark_lifecycle_needed.assert_not_called()
 
     async def test_non_existent_endpoint_raises(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_modify_endpoint: AsyncMock,
         endpoint_id: uuid.UUID,
     ) -> None:
         """Non-existent endpoint raises error from repository."""
-        updater_spec = self._make_updater_spec(replicas=5)
-        mock_updater = MagicMock()
-        mock_updater.spec = updater_spec
+        mock_updater = self._make_updater(replicas=5)
         mock_modify_endpoint.side_effect = Exception("Endpoint not found")
 
-        action = ModifyEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
+        action = UpdateEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
         with pytest.raises(Exception, match="Endpoint not found"):
-            await model_serving_processors.modify_endpoint.wait_for_complete(action)
+            await model_serving_service.update_endpoint(action)
 
 
 class TestForceSync(ModelServingCRUDBaseFixtures):
@@ -416,7 +393,7 @@ class TestForceSync(ModelServingCRUDBaseFixtures):
 
     async def test_valid_service_returns_success(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_check_user_access: AsyncMock,
         mock_get_endpoint_access_validation_data: AsyncMock,
         mock_notify_appproxy: AsyncMock,
@@ -428,15 +405,15 @@ class TestForceSync(ModelServingCRUDBaseFixtures):
             user_data
         )
 
-        action = ForceSyncAction(service_id=service_id)
-        result = await model_serving_processors.force_sync.wait_for_complete(action)
+        action = ForceSyncAction(deployment_id=DeploymentID(service_id))
+        result = await model_serving_service.force_sync_with_app_proxy(action)
 
         assert result.success is True
         mock_notify_appproxy.assert_awaited_once()
 
     async def test_non_existent_service_raises(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_check_user_access: AsyncMock,
         mock_get_endpoint_access_validation_data: AsyncMock,
         service_id: uuid.UUID,
@@ -444,13 +421,13 @@ class TestForceSync(ModelServingCRUDBaseFixtures):
         """Non-existent service raises ModelServiceNotFound."""
         mock_get_endpoint_access_validation_data.return_value = None
 
-        action = ForceSyncAction(service_id=service_id)
+        action = ForceSyncAction(deployment_id=DeploymentID(service_id))
         with pytest.raises(ModelServiceNotFound):
-            await model_serving_processors.force_sync.wait_for_complete(action)
+            await model_serving_service.force_sync_with_app_proxy(action)
 
     async def test_non_owner_access_raises(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_check_user_access: AsyncMock,
         mock_get_endpoint_access_validation_data: AsyncMock,
         service_id: uuid.UUID,
@@ -462,9 +439,9 @@ class TestForceSync(ModelServingCRUDBaseFixtures):
             domain="other-domain",
         )
 
-        action = ForceSyncAction(service_id=service_id)
+        action = ForceSyncAction(deployment_id=DeploymentID(service_id))
         with pytest.raises(EndpointAccessForbiddenError):
-            await model_serving_processors.force_sync.wait_for_complete(action)
+            await model_serving_service.force_sync_with_app_proxy(action)
 
 
 class TestDeleteRoute(ModelServingCRUDBaseFixtures):
@@ -544,7 +521,7 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
     )
     async def test_healthy_route_deletion_success(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_check_user_access: AsyncMock,
         mock_get_endpoint_access_validation_data: AsyncMock,
         mock_get_route_by_id: AsyncMock,
@@ -566,8 +543,8 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         mock_route_row = MagicMock(session_row=mock_session_row)
         mock_get_route_with_session.return_value = mock_route_row
 
-        action = DeleteRouteAction(service_id=service_id, route_id=route_id)
-        result = await model_serving_processors.delete_route.wait_for_complete(action)
+        action = DeleteRouteAction(deployment_id=DeploymentID(service_id), route_id=route_id)
+        result = await model_serving_service.delete_route(action)
 
         assert result.route_id == route_id
         mock_destroy_session.assert_called_once_with(
@@ -579,7 +556,7 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
 
     async def test_provisioning_state_raises(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_check_user_access: AsyncMock,
         mock_get_endpoint_access_validation_data: AsyncMock,
         mock_get_route_by_id: AsyncMock,
@@ -593,13 +570,13 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         )
         mock_get_route_by_id.return_value = MagicMock(status=RouteStatus.PROVISIONING)
 
-        action = DeleteRouteAction(service_id=service_id, route_id=route_id)
+        action = DeleteRouteAction(deployment_id=DeploymentID(service_id), route_id=route_id)
         with pytest.raises(InvalidAPIParameters, match="PROVISIONING"):
-            await model_serving_processors.delete_route.wait_for_complete(action)
+            await model_serving_service.delete_route(action)
 
     async def test_sessionless_route_deletes_without_session_destruction(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_check_user_access: AsyncMock,
         mock_get_endpoint_access_validation_data: AsyncMock,
         mock_get_route_by_id: AsyncMock,
@@ -617,8 +594,8 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         mock_get_route_by_id.return_value = MagicMock(status=RouteStatus.RUNNING)
         mock_get_route_with_session.return_value = MagicMock(session_row=None)
 
-        action = DeleteRouteAction(service_id=service_id, route_id=route_id)
-        result = await model_serving_processors.delete_route.wait_for_complete(action)
+        action = DeleteRouteAction(deployment_id=DeploymentID(service_id), route_id=route_id)
+        result = await model_serving_service.delete_route(action)
 
         assert result.route_id == route_id
         mock_destroy_session.assert_not_called()
@@ -626,7 +603,7 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
 
     async def test_non_existent_route_raises(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_check_user_access: AsyncMock,
         mock_get_endpoint_access_validation_data: AsyncMock,
         mock_get_route_by_id: AsyncMock,
@@ -640,13 +617,13 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         )
         mock_get_route_by_id.return_value = None
 
-        action = DeleteRouteAction(service_id=service_id, route_id=route_id)
+        action = DeleteRouteAction(deployment_id=DeploymentID(service_id), route_id=route_id)
         with pytest.raises(RouteNotFound):
-            await model_serving_processors.delete_route.wait_for_complete(action)
+            await model_serving_service.delete_route(action)
 
     async def test_non_owner_access_raises(
         self,
-        model_serving_processors: ModelServingProcessors,
+        model_serving_service: ModelServingService,
         mock_check_user_access: AsyncMock,
         mock_get_endpoint_access_validation_data: AsyncMock,
         service_id: uuid.UUID,
@@ -659,6 +636,6 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
             domain="other-domain",
         )
 
-        action = DeleteRouteAction(service_id=service_id, route_id=route_id)
+        action = DeleteRouteAction(deployment_id=DeploymentID(service_id), route_id=route_id)
         with pytest.raises(EndpointAccessForbiddenError):
-            await model_serving_processors.delete_route.wait_for_complete(action)
+            await model_serving_service.delete_route(action)

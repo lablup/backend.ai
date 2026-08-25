@@ -11,6 +11,7 @@ import pytest
 import sqlalchemy as sa
 from aiohttp import web
 
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -23,6 +24,7 @@ from ai.backend.manager.plugin.openid.webapp import (
     create_user_if_not_exists,
     generate_user_data,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 # ===========================================================================
 # TestGenerateUserData — pure function, no DB needed
@@ -115,11 +117,11 @@ class TestCreateUserIfNotExists:
             ["backend-ai-users"],
             seed_data,
             password_info,
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
 
         assert user.email == "newuser@example.com"
         assert user.full_name == "New User"
-        assert user.main_access_key is not None
 
         # Verify keypair was created
         async with seed_data.begin_readonly_session() as sess:
@@ -128,7 +130,7 @@ class TestCreateUserIfNotExists:
                 await conn.execute(sa.select(keypairs).where(keypairs.c.user == user.uuid))
             ).fetchone()
             assert row is not None
-            assert row.access_key == user.main_access_key
+            assert row.is_default is True
 
     async def test_returns_existing_user_without_duplicate(
         self,
@@ -143,6 +145,7 @@ class TestCreateUserIfNotExists:
             ["backend-ai-users"],
             seed_data,
             password_info,
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
         user2 = await create_user_if_not_exists(
             openid_claims,
@@ -150,6 +153,7 @@ class TestCreateUserIfNotExists:
             ["backend-ai-users"],
             seed_data,
             password_info,
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
 
         assert user1.uuid == user2.uuid

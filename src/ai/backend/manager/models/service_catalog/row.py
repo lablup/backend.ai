@@ -7,7 +7,6 @@ Database models for the unified service catalog:
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import Any
 
@@ -15,6 +14,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.models.base import (
     GUID,
@@ -28,7 +28,7 @@ __all__ = (
 )
 
 
-class ServiceCatalogRow(Base):  # type: ignore[misc]
+class ServiceCatalogRow(Base):
     """A registered service instance in the service catalog.
 
     Tracks service identity, health status, and heartbeat information.
@@ -36,8 +36,8 @@ class ServiceCatalogRow(Base):  # type: ignore[misc]
 
     __tablename__ = "service_catalog"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ServiceCatalogID] = mapped_column(
+        "id", GUID(ServiceCatalogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     service_group: Mapped[str] = mapped_column(
         "service_group", sa.String(length=64), nullable=False
@@ -72,7 +72,6 @@ class ServiceCatalogRow(Base):  # type: ignore[misc]
 
     endpoints: Mapped[list[ServiceCatalogEndpointRow]] = relationship(
         "ServiceCatalogEndpointRow",
-        back_populates="service",
         cascade="all, delete-orphan",
     )
 
@@ -87,7 +86,7 @@ class ServiceCatalogRow(Base):  # type: ignore[misc]
     )
 
 
-class ServiceCatalogEndpointRow(Base):  # type: ignore[misc]
+class ServiceCatalogEndpointRow(Base):
     """An endpoint exposed by a service instance.
 
     Describes how a specific role/scope of a service can be reached.
@@ -95,12 +94,12 @@ class ServiceCatalogEndpointRow(Base):  # type: ignore[misc]
 
     __tablename__ = "service_catalog_endpoint"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ServiceCatalogID] = mapped_column(
+        "id", GUID(ServiceCatalogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    service_id: Mapped[uuid.UUID] = mapped_column(
+    service_id: Mapped[ServiceCatalogID] = mapped_column(
         "service_id",
-        GUID,
+        GUID(ServiceCatalogID),
         sa.ForeignKey("service_catalog.id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -111,11 +110,6 @@ class ServiceCatalogEndpointRow(Base):  # type: ignore[misc]
     protocol: Mapped[str] = mapped_column("protocol", sa.String(length=16), nullable=False)
     metadata_: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=True, server_default=sa.text("'{}'::jsonb")
-    )
-
-    service: Mapped[ServiceCatalogRow] = relationship(
-        "ServiceCatalogRow",
-        back_populates="endpoints",
     )
 
     __table_args__ = (

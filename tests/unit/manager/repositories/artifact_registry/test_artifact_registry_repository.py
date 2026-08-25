@@ -13,9 +13,11 @@ import pytest
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
+from ai.backend.manager.models.artifact_registries.searchers import ArtifactRegistrySearcher
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -141,7 +143,9 @@ class TestArtifactRegistryRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ArtifactRegistryRepository, None]:
         """Create ArtifactRegistryRepository instance with database"""
-        repo = ArtifactRegistryRepository(db=db_with_cleanup)
+        repo = ArtifactRegistryRepository(
+            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        )
         yield repo
 
     # =========================================================================
@@ -279,7 +283,7 @@ class TestArtifactRegistryRepository:
         sample_registries_for_filtering: dict[ArtifactRegistryType, uuid.UUID],
     ) -> None:
         """Test searching artifact registries filtered by type returns only matching registries"""
-        querier = BatchQuerier(
+        searcher = ArtifactRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 lambda: ArtifactRegistryRow.type == ArtifactRegistryType.HUGGINGFACE.value,
@@ -287,7 +291,7 @@ class TestArtifactRegistryRepository:
             orders=[],
         )
 
-        result = await artifact_registry_repository.search_artifact_registries(querier=querier)
+        result = await artifact_registry_repository.search_artifact_registries(searcher=searcher)
 
         result_registry_ids = [registry.registry_id for registry in result.items]
         assert (
@@ -304,7 +308,7 @@ class TestArtifactRegistryRepository:
         sample_registries_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching artifact registries filtered by name pattern"""
-        querier = BatchQuerier(
+        searcher = ArtifactRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 lambda: ArtifactRegistryRow.name.like("alpha%"),
@@ -312,7 +316,7 @@ class TestArtifactRegistryRepository:
             orders=[],
         )
 
-        result = await artifact_registry_repository.search_artifact_registries(querier=querier)
+        result = await artifact_registry_repository.search_artifact_registries(searcher=searcher)
 
         assert len(result.items) == 1
         for registry in result.items:
@@ -328,7 +332,7 @@ class TestArtifactRegistryRepository:
         sample_registries_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching artifact registries ordered by name ascending"""
-        querier = BatchQuerier(
+        searcher = ArtifactRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 lambda: ArtifactRegistryRow.name.in_([
@@ -341,7 +345,7 @@ class TestArtifactRegistryRepository:
             orders=[ArtifactRegistryRow.name.asc()],
         )
 
-        result = await artifact_registry_repository.search_artifact_registries(querier=querier)
+        result = await artifact_registry_repository.search_artifact_registries(searcher=searcher)
 
         result_names = [registry.name for registry in result.items]
         assert result_names == sorted(result_names)
@@ -354,7 +358,7 @@ class TestArtifactRegistryRepository:
         sample_registries_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching artifact registries ordered by name descending"""
-        querier = BatchQuerier(
+        searcher = ArtifactRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 lambda: ArtifactRegistryRow.name.in_([
@@ -367,7 +371,7 @@ class TestArtifactRegistryRepository:
             orders=[ArtifactRegistryRow.name.desc()],
         )
 
-        result = await artifact_registry_repository.search_artifact_registries(querier=querier)
+        result = await artifact_registry_repository.search_artifact_registries(searcher=searcher)
 
         result_names = [registry.name for registry in result.items]
         assert result_names == sorted(result_names, reverse=True)
@@ -384,7 +388,7 @@ class TestArtifactRegistryRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test first page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ArtifactRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 lambda: ArtifactRegistryRow.name.like("registry-%"),
@@ -392,7 +396,7 @@ class TestArtifactRegistryRepository:
             orders=[],
         )
 
-        result = await artifact_registry_repository.search_artifact_registries(querier=querier)
+        result = await artifact_registry_repository.search_artifact_registries(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -403,7 +407,7 @@ class TestArtifactRegistryRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test second page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ArtifactRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[
                 lambda: ArtifactRegistryRow.name.like("registry-%"),
@@ -411,7 +415,7 @@ class TestArtifactRegistryRepository:
             orders=[],
         )
 
-        result = await artifact_registry_repository.search_artifact_registries(querier=querier)
+        result = await artifact_registry_repository.search_artifact_registries(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -422,7 +426,7 @@ class TestArtifactRegistryRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test last page of offset-based pagination with partial results"""
-        querier = BatchQuerier(
+        searcher = ArtifactRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[
                 lambda: ArtifactRegistryRow.name.like("registry-%"),
@@ -430,7 +434,7 @@ class TestArtifactRegistryRepository:
             orders=[],
         )
 
-        result = await artifact_registry_repository.search_artifact_registries(querier=querier)
+        result = await artifact_registry_repository.search_artifact_registries(searcher=searcher)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -445,7 +449,7 @@ class TestArtifactRegistryRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test searching artifact registries with pagination, filter condition, and ordering combined"""
-        querier = BatchQuerier(
+        searcher = ArtifactRegistrySearcher(
             pagination=OffsetPagination(limit=5, offset=5),
             conditions=[
                 lambda: ArtifactRegistryRow.name.like("registry-%"),
@@ -454,7 +458,7 @@ class TestArtifactRegistryRepository:
             orders=[ArtifactRegistryRow.name.asc()],
         )
 
-        result = await artifact_registry_repository.search_artifact_registries(querier=querier)
+        result = await artifact_registry_repository.search_artifact_registries(searcher=searcher)
 
         # Total matching registries: 25, so total_count should be 25
         assert result.total_count == 25

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
 import yarl
@@ -14,6 +14,17 @@ from pydantic import ConfigDict, Field
 
 from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     DeploymentStrategy,
@@ -22,20 +33,15 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
 from ai.backend.manager.data.session.options import HandlerOptions
 
 if TYPE_CHECKING:
-    from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
+    from ai.backend.common.schema.deployment import (
+        BlueGreenSpec,
+        ReplicaGroupRolloutSpec,
+        RollingUpdateSpec,
+    )
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 
 from ai.backend.common.types import (
@@ -365,10 +371,10 @@ class RouteStatusTransitions:
 
 
 @dataclass
-class ScalingGroupCleanupConfig:
+class ResourceGroupCleanupConfig:
     """Cleanup configuration for a scaling group."""
 
-    scaling_group_name: str
+    resource_group_name: str
     cleanup_target_statuses: list[RouteHealthStatus]
 
 
@@ -982,7 +988,7 @@ class ModelDeploymentAutoScalingRuleData:
 
 
 @dataclass
-class ModelDeploymentAccessTokenData:
+class ModelDeploymentAccessTokenData(FieldData):
     id: UUID
     token: str
     expires_at: datetime | None
@@ -1083,7 +1089,7 @@ class PresetAttributionData:
 
 
 @dataclass
-class ModelRevisionData:
+class ModelRevisionData(FieldData):
     # Identity
     id: DeploymentRevisionID
     deployment_id: DeploymentID
@@ -1180,7 +1186,7 @@ class ReplicaStateData:
 
 
 @dataclass
-class ModelDeploymentData:
+class ModelDeploymentData(EntityData):
     """Modern (v2 / GraphQL) deployment projection.
 
     Carries revisions as ids only (``current_revision_id`` /
@@ -1207,6 +1213,10 @@ class ModelDeploymentData:
     policy: DeploymentPolicyData | None = None
     access_token_ids: list[UUID] | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
 
 
 @dataclass
@@ -1288,7 +1298,7 @@ class AutoScalingRuleOrderField(enum.StrEnum):
 
 
 @dataclass
-class DeploymentHistoryData:
+class DeploymentHistoryData(FieldData):
     """Domain model for deployment history."""
 
     id: UUID
@@ -1316,7 +1326,7 @@ class DeploymentHistoryData:
 
 
 @dataclass
-class RouteHistoryData:
+class RouteHistoryData(FieldData):
     """Domain model for route history."""
 
     id: UUID
@@ -1342,7 +1352,7 @@ class RouteHistoryData:
 
 
 @dataclass
-class ReplicaGroupHistoryData:
+class ReplicaGroupHistoryData(FieldData):
     """Domain model for replica-group history."""
 
     id: ReplicaGroupHistoryID
@@ -1446,7 +1456,26 @@ class AutoScalingRuleSearchResult:
 
 
 @dataclass
-class DeploymentPolicyData:
+class ReplicaGroupData(FieldData):
+    """Data class for ReplicaGroupRow."""
+
+    id: ReplicaGroupID
+    deployment_id: DeploymentID
+    current_revision_id: DeploymentRevisionID | None
+    target_revision_id: DeploymentRevisionID | None
+    desired_current_replica_count: int
+    desired_target_replica_count: int
+    traffic_weight: int
+    session_group_id: SessionGroupID
+    lifecycle: ReplicaGroupLifecycle
+    scaling_status: ReplicaGroupScalingStatus
+    rollout: ReplicaGroupRolloutSpec
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class DeploymentPolicyData(FieldData):
     """Data class for DeploymentPolicyRow."""
 
     id: UUID
@@ -1491,35 +1520,35 @@ class AccessTokenSearchResult:
 
 
 @dataclass(frozen=True)
-class RouteSearchScope:
+class RouteOperationScope:
     """Scope for searching routes within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class ReplicaSearchScope:
+class ReplicaOperationScope:
     """Scope for searching replicas within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class AccessTokenSearchScope:
+class AccessTokenOperationScope:
     """Scope for searching access tokens within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class AutoScalingRuleSearchScope:
+class AutoScalingRuleOperationScope:
     """Scope for searching auto-scaling rules within a specific deployment."""
 
     deployment_id: UUID
 
 
 @dataclass(frozen=True)
-class RevisionSearchScope:
+class RevisionOperationScope:
     """Scope for searching revisions within a specific deployment."""
 
     deployment_id: UUID

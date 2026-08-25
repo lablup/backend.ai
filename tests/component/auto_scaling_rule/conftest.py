@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -11,14 +12,10 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.auto_scaling_rule.handler import AutoScalingRuleHandler
@@ -33,12 +30,9 @@ from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.permission_controller.repository import (
-    PermissionControllerRepository,
-)
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -67,10 +61,12 @@ def deployment_processors(
     storage_manager: AsyncMock,
     valkey_clients: ValkeyClients,
     mock_appproxy_client_pool: MagicMock,
+    processor_registry: ProcessorRegistry[Any],
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors for auto-scaling-rule tests."""
     repo = DeploymentRepository(
         database_engine,
+        ReconcileOpsProvider(database_engine),
         storage_manager,
         valkey_clients.stat,
         valkey_clients.live,
@@ -82,20 +78,8 @@ def deployment_processors(
         repo,
         appproxy_client_pool=mock_appproxy_client_pool,
     )
-    permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
-                single_entity=SingleEntityActionRBACValidator(
-                    permission_controller_repo, MagicMock()
-                ),
-                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
-            ),
-        ),
+        processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
     )
 
 
@@ -128,7 +112,7 @@ async def model_deployment_fixture(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
-    scaling_group_name: ResourceGroupName,
+    resource_group_name: ResourceGroupName,
     admin_user_fixture: UserFixtureData,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a minimal EndpointRow (model deployment) and yield its UUID.
@@ -179,7 +163,7 @@ async def model_deployment_fixture(
                 session_owner=str(admin_user_fixture.user_uuid),
                 domain=domain_fixture.domain_name,
                 project=str(group_fixture),
-                resource_group=scaling_group_name,
+                resource_group=resource_group_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 url=None,
             )

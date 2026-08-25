@@ -1,13 +1,16 @@
-import uuid
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry_group import ContainerRegistryGroupID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityData, FieldData
 
 
 @dataclass
-class ContainerRegistryData:
-    id: uuid.UUID
+class ContainerRegistryData(EntityData):
+    id: ContainerRegistryID
     url: str
     registry_name: str
     type: ContainerRegistryType
@@ -18,6 +21,19 @@ class ContainerRegistryData:
     is_global: bool | None
     # TODO: Add proper type
     extra: dict[str, Any] | None
+
+    @override
+    def entity_id(self) -> ContainerRegistryID:
+        return self.id
+
+
+@dataclass
+class ContainerRegistryGroupData(FieldData):
+    """One project a container registry is reachable from."""
+
+    id: ContainerRegistryGroupID
+    registry_id: ContainerRegistryID
+    project_id: ProjectID
 
 
 @dataclass
@@ -35,10 +51,10 @@ class PerProjectContainerRegistryInfo:
     """Container registry info resolved from a project's container_registry config.
 
     Unlike ContainerRegistryData, all fields are non-nullable because
-    the data is validated during the lookup process (GroupRow → ContainerRegistryRow).
+    the data is validated during the lookup process (ProjectRow → ContainerRegistryRow).
     """
 
-    id: uuid.UUID
+    id: ContainerRegistryID
     url: str
     registry_name: str
     type: ContainerRegistryType

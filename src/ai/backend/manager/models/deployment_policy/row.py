@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
@@ -21,15 +20,12 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.endpoint import EndpointRow
-
 __all__ = ("DeploymentPolicyRow",)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):
     """
     Represents a deployment policy for a deployment.
 
@@ -50,7 +46,7 @@ class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
     endpoint: Mapped[DeploymentID] = mapped_column(
         "endpoint",
-        GUID,
+        GUID(DeploymentID),
         sa.ForeignKey("endpoints.id", name="fk_deployment_policies_endpoint", ondelete="CASCADE"),
         nullable=False,
     )
@@ -68,13 +64,6 @@ class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         pgsql.JSONB(),
         nullable=False,
         server_default="{}",
-    )
-
-    endpoint_row: Mapped[EndpointRow | None] = relationship(
-        "EndpointRow",
-        back_populates="deployment_policy",
-        foreign_keys=[endpoint],
-        uselist=False,
     )
 
     def to_data(self) -> DeploymentPolicyData:

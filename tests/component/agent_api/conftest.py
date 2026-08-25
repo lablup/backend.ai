@@ -9,13 +9,12 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.types import HostPortPair, ResourceSlot
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.agent_cache import AgentRPCCache
+from ai.backend.common.types import HostPortPair
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.agent.handler import AgentHandler
 from ai.backend.manager.api.rest.agent.registry import register_agent_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -26,6 +25,8 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
@@ -59,11 +60,9 @@ def agent_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
     agent_registry: AgentRegistry,
-    agent_cache: AgentRPCCache,
-    hook_plugin_ctx: HookPluginContext,
-    event_producer: EventProducer,
     async_etcd: AsyncEtcd,
     valkey_clients: Any,
+    processor_registry: ProcessorRegistry[Any],
 ) -> AgentProcessors:
     agent_repository = AgentRepository(
         database_engine,
@@ -71,9 +70,11 @@ def agent_processors(
         valkey_live=valkey_clients.live,
         valkey_stat=valkey_clients.stat,
         config_provider=config_provider,
+        v2_ops_provider=V2DBOpsProvider(database_engine),
     )
     scheduler_repository = SchedulerRepository(
         database_engine,
+        ReconcileOpsProvider(database_engine),
         valkey_stat=valkey_clients.stat,
         valkey_schedule=valkey_clients.schedule,
         config_provider=config_provider,
@@ -86,12 +87,11 @@ def agent_processors(
         agent_repository=agent_repository,
         scheduler_repository=scheduler_repository,
         scheduling_controller=AsyncMock(),
-        hook_plugin_ctx=hook_plugin_ctx,
-        event_producer=event_producer,
-        agent_cache=agent_cache,
     )
     return AgentProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
+        service,
+        [],
     )
 
 
@@ -109,8 +109,8 @@ def server_module_registries(
 @pytest.fixture()
 async def agent_fixture(
     db_engine: SAEngine,
-    scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[str]:
     """Insert a test agent row and yield its ID.
 
@@ -124,11 +124,9 @@ async def agent_fixture(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                scaling_group=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group=resource_group_name,
+                resource_group_id=resource_group_id,
                 schedulable=True,
-                available_slots=ResourceSlot({"cpu": "4", "mem": "8589934592"}),
-                occupied_slots=ResourceSlot(),
                 addr="tcp://127.0.0.1:6011",
                 version="24.12.0",
                 architecture="x86_64",

@@ -378,7 +378,7 @@ class SessionLauncher:
                         "preopen_ports": k.preopen_ports or [],
                         "allocated_host_ports": [],  # Will be populated by agent
                         "agent_addr": k.agent_addr or "",
-                        "scaling_group": k.scaling_group,
+                        "scaling_group": k.resource_group,
                         "endpoint_id": None,  # For inference endpoints
                     }
                     kernel_configs.append(kernel_config)

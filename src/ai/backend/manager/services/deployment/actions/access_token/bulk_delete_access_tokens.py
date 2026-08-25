@@ -2,20 +2,18 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.deployment.actions.access_token.base import (
-    DeploymentAccessTokenBaseAction,
-)
+from ai.backend.manager.services.deployment.actions.base import DeploymentGlobalAction
 
 
 @dataclass
-class BulkDeleteAccessTokensAction(DeploymentAccessTokenBaseAction):
+class BulkDeleteAccessTokensAction(DeploymentGlobalAction):
     access_token_ids: list[UUID]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "bulk_delete_access_tokens"
 
     @override
     @classmethod
@@ -24,9 +22,5 @@ class BulkDeleteAccessTokensAction(DeploymentAccessTokenBaseAction):
 
 
 @dataclass
-class BulkDeleteAccessTokensActionResult(BaseActionResult):
+class BulkDeleteAccessTokensActionResult:
     deleted_ids: list[UUID]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_history.request import (
     AdminSearchLoginHistoryInput,
     LoginHistoryFilter,
@@ -25,12 +26,12 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.login_session.row import LoginHistoryRow
+from ai.backend.manager.models.login_session.searchers import LoginHistorySearcher
 from ai.backend.manager.repositories.auth.options import LoginHistoryConditions, LoginHistoryOrders
-from ai.backend.manager.repositories.auth.types import MyLoginHistorySearchScope
-from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 from ai.backend.manager.services.auth.actions.search_login_history import (
-    AdminSearchLoginHistoryAction,
+    GlobalSearchLoginHistoryAction,
     SearchLoginHistoryAction,
 )
 
@@ -52,7 +53,8 @@ class LoginHistoryAdapter(BaseAdapter):
         """Search login history with admin scope (no scope restriction)."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            LoginHistorySearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_LOGIN_HISTORY_PAGINATION_SPEC,
@@ -63,14 +65,14 @@ class LoginHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.admin_search_login_history.wait_for_complete(
-            AdminSearchLoginHistoryAction(querier=querier)
+        action_result = await self._processors.auth.global_search_login_history.run(
+            GlobalSearchLoginHistoryAction(searcher=searcher)
         )
         return AdminSearchLoginHistoryPayload(
-            items=[self._data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
+            items=[self._data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
         )
 
     async def my_search(self, input: MySearchLoginHistoryInput) -> MySearchLoginHistoryPayload:
@@ -81,10 +83,10 @@ class LoginHistoryAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = MyLoginHistorySearchScope(user_id=me.user_id)
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            LoginHistorySearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_LOGIN_HISTORY_PAGINATION_SPEC,
@@ -95,14 +97,14 @@ class LoginHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.search_login_history.wait_for_complete(
-            SearchLoginHistoryAction(scope=scope, querier=querier)
+        action_result = await self._processors.auth.search_login_history.run(
+            SearchLoginHistoryAction(user_id=UserID(me.user_id), searcher=searcher)
         )
         return MySearchLoginHistoryPayload(
-            items=[self._data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
+            items=[self._data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
         )
 
     def _convert_filter(self, f: LoginHistoryFilter) -> list[QueryCondition]:
@@ -178,5 +180,6 @@ class LoginHistoryAdapter(BaseAdapter):
             domain_name=data.domain_name,
             result=LoginAttemptResult(data.result.value),
             fail_reason=data.fail_reason,
+            client_ip=data.client_ip,
             created_at=data.created_at,
         )

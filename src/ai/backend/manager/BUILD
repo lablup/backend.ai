@@ -151,12 +151,6 @@ python_distribution(
             "mgr": "ai.backend.manager.cli.__main__:main",
             "mgr.start-server": "ai.backend.manager.cli.start_server:main",
         },
-        "backendai_error_monitor_v20": {
-            "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorMonitor",
-        },
-        "backendai_event_dispatcher_v20": {
-            "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorEventDispatcher",
-        },
         "backendai_hook_v20": {
             "totp": "ai.backend.manager.plugin.totp.hook:TOTPHook",
             "openid": "ai.backend.manager.plugin.openid.hook:OIDCHookPlugin",

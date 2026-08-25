@@ -1,61 +1,70 @@
-from typing import override
+from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.services.prometheus_query_preset.actions import (
-    CreatePresetAction,
-    CreatePresetActionResult,
-    DeletePresetAction,
-    DeletePresetActionResult,
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+)
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    PublicSingleEntityActionProcessor,
+    SingleEntityActionProcessor,
+)
+from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
+from ai.backend.manager.services.prometheus_query_preset.actions.create import CreatePresetAction
+from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
     ExecutePresetAction,
     ExecutePresetActionResult,
-    GetPresetAction,
-    GetPresetActionResult,
-    ModifyPresetAction,
-    ModifyPresetActionResult,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.get import GetPresetAction
+from ai.backend.manager.services.prometheus_query_preset.actions.preview import (
     PreviewPresetAction,
     PreviewPresetActionResult,
-    SearchPresetsAction,
-    SearchPresetsActionResult,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.purge import PurgePresetAction
+from ai.backend.manager.services.prometheus_query_preset.actions.search import SearchPresetsAction
+from ai.backend.manager.services.prometheus_query_preset.actions.update import (
+    UpdatePresetAction,
+    UpdatePresetActionResult,
 )
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )
 
 
-class PrometheusQueryPresetProcessors(AbstractProcessorPackage):
-    create_preset: ActionProcessor[CreatePresetAction, CreatePresetActionResult]
-    get_preset: ActionProcessor[GetPresetAction, GetPresetActionResult]
-    search_presets: ActionProcessor[SearchPresetsAction, SearchPresetsActionResult]
-    modify_preset: ActionProcessor[ModifyPresetAction, ModifyPresetActionResult]
-    delete_preset: ActionProcessor[DeletePresetAction, DeletePresetActionResult]
-    execute_preset: ActionProcessor[ExecutePresetAction, ExecutePresetActionResult]
-    preview_preset: ActionProcessor[PreviewPresetAction, PreviewPresetActionResult]
+class PrometheusQueryPresetProcessors:
+    """The catalog CRUD runs against ops; what reads before writing or calls Prometheus stays."""
+
+    global_create_preset: GlobalActionProcessor[
+        CreatePresetAction, CreatedEntityOpsResult[PrometheusQueryPresetData]
+    ]
+    public_get_preset: PublicSingleEntityActionProcessor[
+        GetPresetAction, EntityOpsResult[PrometheusQueryPresetData]
+    ]
+    public_search_presets: PublicActionProcessor[
+        SearchPresetsAction, BatchOpsResult[PrometheusQueryPresetData]
+    ]
+    purge_preset: SingleEntityActionProcessor[
+        PurgePresetAction, EntityOpsResult[PrometheusQueryPresetData]
+    ]
+    update_preset: SingleEntityActionProcessor[UpdatePresetAction, UpdatePresetActionResult]
+    global_preview_preset: GlobalActionProcessor[PreviewPresetAction, PreviewPresetActionResult]
+    execute_preset: SingleEntityActionProcessor[ExecutePresetAction, ExecutePresetActionResult]
 
     def __init__(
         self,
+        group: ProcessorGroup[PrometheusQueryPresetData],
         service: PrometheusQueryPresetService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
-        self.create_preset = ActionProcessor(service.create_preset, action_monitors)
-        self.get_preset = ActionProcessor(service.get_preset, action_monitors)
-        self.search_presets = ActionProcessor(service.search_presets, action_monitors)
-        self.modify_preset = ActionProcessor(service.modify_preset, action_monitors)
-        self.delete_preset = ActionProcessor(service.delete_preset, action_monitors)
-        self.execute_preset = ActionProcessor(service.execute_preset, action_monitors)
-        self.preview_preset = ActionProcessor(service.preview_preset, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreatePresetAction.spec(),
-            GetPresetAction.spec(),
-            SearchPresetsAction.spec(),
-            ModifyPresetAction.spec(),
-            DeletePresetAction.spec(),
-            ExecutePresetAction.spec(),
-            PreviewPresetAction.spec(),
-        ]
+        # The create validates its query template, so it keeps a service method.
+        self.global_create_preset = group.global_scope(CreatePresetAction, service.create_preset)
+        self.public_get_preset = group.public_get_ops(GetPresetAction)
+        self.public_search_presets = group.public_search_ops(SearchPresetsAction)
+        self.purge_preset = group.entity_purge_ops(PurgePresetAction)
+        self.update_preset = group.single_entity(UpdatePresetAction, service.update_preset)
+        self.global_preview_preset = group.global_scope(PreviewPresetAction, service.preview_preset)
+        self.execute_preset = group.single_entity(ExecutePresetAction, service.execute_preset)

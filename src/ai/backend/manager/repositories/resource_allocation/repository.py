@@ -42,7 +42,7 @@ class ResourceAllocationRepository:
         self._config_provider = config_provider
 
     async def get_keypair_context(self, user_id: UUID) -> KeypairContextData:
-        """Resolve a user's main keypair context (access_key + resource_policy)."""
+        """Resolve a user's default keypair context (access_key + resource_policy)."""
         return await self._db_source.get_keypair_context(user_id)
 
     async def _get_known_slot_types(self) -> Mapping[SlotName, SlotTypes]:

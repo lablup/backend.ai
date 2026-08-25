@@ -10,6 +10,9 @@ import pytest
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.dto.manager.config import (
     CreateDomainDotfileRequest,
     CreateDotfileResponse,
@@ -19,7 +22,13 @@ from ai.backend.common.dto.manager.config import (
     DeleteGroupDotfileRequest,
     DeleteUserDotfileRequest,
 )
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    GroupMeta,
+    ProcessorDependencies,
+)
+from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.api.rest.domainconfig.handler import DomainConfigHandler
 from ai.backend.manager.api.rest.domainconfig.registry import register_domainconfig_routes
 from ai.backend.manager.api.rest.groupconfig.handler import GroupConfigHandler
@@ -28,11 +37,21 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.userconfig.handler import UserConfigHandler
 from ai.backend.manager.api.rest.userconfig.registry import register_userconfig_routes
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.dotfile.repository import DotfileRepository
+from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.processors import AuthProcessors
-from ai.backend.manager.services.dotfile.processors import DotfileProcessors
-from ai.backend.manager.services.dotfile.service import DotfileService
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.project.service import ProjectService
+from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 UserDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
@@ -41,11 +60,13 @@ DomainDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 
 
 @pytest.fixture()
-def dotfile_processors(database_engine: ExtendedAsyncSAEngine) -> DotfileProcessors:
-    repo = DotfileRepository(database_engine)
-    service = DotfileService(repo)
-    return DotfileProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+def config_registry(database_engine: ExtendedAsyncSAEngine) -> ProcessorRegistry[Any]:
+    return ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=ActionValidators(),
+            repository=OpsRepository(V2DBOpsProvider(database_engine)),
+        )
     )
 
 
@@ -53,16 +74,50 @@ def dotfile_processors(database_engine: ExtendedAsyncSAEngine) -> DotfileProcess
 def server_module_registries(
     route_deps: RouteDeps,
     auth_processors: AuthProcessors,
-    dotfile_processors: DotfileProcessors,
+    database_engine: ExtendedAsyncSAEngine,
+    config_registry: ProcessorRegistry[Any],
 ) -> list[RouteRegistry]:
     """Load only the modules required for config-domain tests."""
+    v2_ops = V2DBOpsProvider(database_engine)
+    domain = DomainProcessors(
+        config_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+        DomainService(DomainRepository(database_engine, v2_ops)),
+        [],
+    )
+    project = ProjectProcessors(
+        config_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+        ProjectService(
+            MagicMock(),
+            MagicMock(),
+            MagicMock(),
+            MagicMock(
+                repository=ProjectRepository(
+                    database_engine, v2_ops, MagicMock(), MagicMock(), MagicMock()
+                )
+            ),
+        ),
+    )
+    user = UserProcessors(
+        config_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        UserService(
+            MagicMock(),
+            MagicMock(),
+            MagicMock(),
+            UserRepository(
+                database_engine,
+                v2_ops,
+                KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+            ),
+            MagicMock(),
+        ),
+    )
     return [
-        register_groupconfig_routes(GroupConfigHandler(dotfile=dotfile_processors), route_deps),
+        register_groupconfig_routes(GroupConfigHandler(project=project), route_deps),
         register_userconfig_routes(
-            UserConfigHandler(auth=auth_processors, dotfile=dotfile_processors),
+            UserConfigHandler(auth=auth_processors, user=user),
             route_deps,
         ),
-        register_domainconfig_routes(DomainConfigHandler(dotfile=dotfile_processors), route_deps),
+        register_domainconfig_routes(DomainConfigHandler(domain=domain), route_deps),
     ]
 
 

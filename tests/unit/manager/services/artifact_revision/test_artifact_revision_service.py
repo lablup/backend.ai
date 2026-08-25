@@ -16,6 +16,9 @@ from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     ArtifactRevisionDownloadProgress,
 )
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -36,11 +39,13 @@ from ai.backend.manager.errors.artifact import (
 )
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
@@ -53,44 +58,41 @@ from ai.backend.manager.services.artifact.actions.get_revisions import (
 from ai.backend.manager.services.artifact.actions.upsert_multi import (
     UpsertArtifactsAction,
 )
-from ai.backend.manager.services.artifact.service import ArtifactService
-from ai.backend.manager.services.artifact_revision.actions.approve import (
+from ai.backend.manager.services.artifact.revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.associate_with_storage import (
+from ai.backend.manager.services.artifact.revision.actions.associate_with_storage import (
     AssociateWithStorageAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.cancel_import import (
+from ai.backend.manager.services.artifact.revision.actions.cancel_import import (
     CancelImportAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+from ai.backend.manager.services.artifact.revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+from ai.backend.manager.services.artifact.revision.actions.delegate_import_revision_batch import (
     DelegateImportArtifactRevisionBatchAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.disassociate_with_storage import (
+from ai.backend.manager.services.artifact.revision.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get import (
-    GetArtifactRevisionAction,
-)
-from ai.backend.manager.services.artifact_revision.actions.get_download_progress import (
+from ai.backend.manager.services.artifact.revision.actions.get_download_progress import (
     GetDownloadProgressAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_readme import (
+from ai.backend.manager.services.artifact.revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.import_revision import (
+from ai.backend.manager.services.artifact.revision.actions.import_revision import (
     ImportArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.reject import (
+from ai.backend.manager.services.artifact.revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.search import (
+from ai.backend.manager.services.artifact.revision.actions.search import (
     SearchArtifactRevisionsAction,
 )
-from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.manager.services.artifact.revision.service import ArtifactRevisionService
+from ai.backend.manager.services.artifact.service import ArtifactService
 
 
 class TestArtifactRevisionService:
@@ -100,6 +102,11 @@ class TestArtifactRevisionService:
     def mock_artifact_repository(self) -> MagicMock:
         """Create mocked ArtifactRepository"""
         return MagicMock(spec=ArtifactRepository)
+
+    @pytest.fixture
+    def mock_revision_ops(self) -> MagicMock:
+        """Create mocked OpsRepository for artifact revisions"""
+        return MagicMock(spec=OpsRepository)
 
     @pytest.fixture
     def mock_artifact_registry_repository(self) -> MagicMock:
@@ -160,6 +167,7 @@ class TestArtifactRevisionService:
     def artifact_revision_service(
         self,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_artifact_registry_repository: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_vfs_storage_repository: MagicMock,
@@ -175,6 +183,7 @@ class TestArtifactRevisionService:
         """Create ArtifactRevisionService instance with mocked repositories"""
         return ArtifactRevisionService(
             artifact_repository=mock_artifact_repository,
+            revision_ops=mock_revision_ops,
             artifact_registry_repository=mock_artifact_registry_repository,
             object_storage_repository=mock_object_storage_repository,
             vfs_storage_repository=mock_vfs_storage_repository,
@@ -193,8 +202,8 @@ class TestArtifactRevisionService:
         """Create sample artifact revision data"""
         now = datetime.now(UTC)
         return ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="# DialoGPT-medium\n\nA conversational AI model.",
             size=1024000,
@@ -206,29 +215,11 @@ class TestArtifactRevisionService:
             verification_result=None,
         )
 
-    async def test_get_artifact_revision(
-        self,
-        artifact_revision_service: ArtifactRevisionService,
-        mock_artifact_repository: MagicMock,
-        sample_artifact_revision_data: ArtifactRevisionData,
-    ) -> None:
-        """Test getting an artifact revision by ID"""
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_artifact_revision_data
-        )
-
-        action = GetArtifactRevisionAction(artifact_revision_id=sample_artifact_revision_data.id)
-        result = await artifact_revision_service.get(action)
-
-        assert result.revision == sample_artifact_revision_data
-        mock_artifact_repository.get_artifact_revision_by_id.assert_called_once_with(
-            sample_artifact_revision_data.id
-        )
-
     async def test_get_artifact_revision_readme(
         self,
         artifact_revision_service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         sample_artifact_revision_data: ArtifactRevisionData,
     ) -> None:
         """Test getting artifact revision readme"""
@@ -238,7 +229,7 @@ class TestArtifactRevisionService:
         )
 
         action = GetArtifactRevisionReadmeAction(
-            artifact_revision_id=sample_artifact_revision_data.id
+            artifact_revision_id=ArtifactRevisionID(sample_artifact_revision_data.id)
         )
         result = await artifact_revision_service.get_readme(action)
 
@@ -251,9 +242,10 @@ class TestArtifactRevisionService:
         self,
         artifact_revision_service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         sample_artifact_revision_data: ArtifactRevisionData,
     ) -> None:
-        """Test searching artifact revisions with querier"""
+        """Test searching artifact revisions"""
         mock_artifact_repository.search_artifact_revisions = AsyncMock(
             return_value=ArtifactRevisionListResult(
                 items=[sample_artifact_revision_data],
@@ -263,24 +255,27 @@ class TestArtifactRevisionService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRevisionsAction(querier=querier)
+        action = SearchArtifactRevisionsAction(searcher=searcher)
         result = await artifact_revision_service.search_revision(action)
 
         assert result.data == [sample_artifact_revision_data]
         assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
-        mock_artifact_repository.search_artifact_revisions.assert_called_once_with(querier=querier)
+        mock_artifact_repository.search_artifact_revisions.assert_called_once_with(
+            searcher=searcher
+        )
 
     async def test_search_artifact_revisions_empty_result(
         self,
         artifact_revision_service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
     ) -> None:
         """Test searching artifact revisions when no results are found"""
         mock_artifact_repository.search_artifact_revisions = AsyncMock(
@@ -292,12 +287,12 @@ class TestArtifactRevisionService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRevisionsAction(querier=querier)
+        action = SearchArtifactRevisionsAction(searcher=searcher)
         result = await artifact_revision_service.search_revision(action)
 
         assert result.data == []
@@ -307,6 +302,7 @@ class TestArtifactRevisionService:
         self,
         artifact_revision_service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         sample_artifact_revision_data: ArtifactRevisionData,
     ) -> None:
         """Test searching artifact revisions with pagination"""
@@ -319,12 +315,12 @@ class TestArtifactRevisionService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactRevisionSearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactRevisionsAction(querier=querier)
+        action = SearchArtifactRevisionsAction(searcher=searcher)
         result = await artifact_revision_service.search_revision(action)
 
         assert result.total_count == 25
@@ -335,6 +331,7 @@ class TestArtifactRevisionService:
         self,
         artifact_revision_service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         sample_artifact_revision_data: ArtifactRevisionData,
     ) -> None:
         """Test approving an artifact revision"""
@@ -354,7 +351,7 @@ class TestArtifactRevisionService:
         mock_artifact_repository.approve_artifact = AsyncMock(return_value=approved_revision)
 
         action = ApproveArtifactRevisionAction(
-            artifact_revision_id=sample_artifact_revision_data.id
+            artifact_revision_id=ArtifactRevisionID(sample_artifact_revision_data.id)
         )
         result = await artifact_revision_service.approve(action)
 
@@ -367,6 +364,7 @@ class TestArtifactRevisionService:
         self,
         artifact_revision_service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         sample_artifact_revision_data: ArtifactRevisionData,
     ) -> None:
         """Test rejecting an artifact revision"""
@@ -401,6 +399,11 @@ class TestArtifactServiceRevisionOperations:
     def mock_artifact_repository(self) -> MagicMock:
         """Create mocked ArtifactRepository"""
         return MagicMock(spec=ArtifactRepository)
+
+    @pytest.fixture
+    def mock_revision_ops(self) -> MagicMock:
+        """Create mocked OpsRepository for artifact revisions"""
+        return MagicMock(spec=OpsRepository)
 
     @pytest.fixture
     def mock_artifact_registry_repository(self) -> MagicMock:
@@ -446,6 +449,7 @@ class TestArtifactServiceRevisionOperations:
     def artifact_service(
         self,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_artifact_registry_repository: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_vfs_storage_repository: MagicMock,
@@ -472,7 +476,7 @@ class TestArtifactServiceRevisionOperations:
         now = datetime.now(UTC)
         registry_id = uuid.uuid4()
         return ArtifactData(
-            id=uuid.uuid4(),
+            id=ArtifactID(uuid.uuid4()),
             name="microsoft/DialoGPT-medium",
             type=ArtifactType.MODEL,
             description="A conversational AI model by Microsoft",
@@ -492,7 +496,7 @@ class TestArtifactServiceRevisionOperations:
         """Create sample artifact revision data"""
         now = datetime.now(UTC)
         return ArtifactRevisionData(
-            id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
             artifact_id=sample_artifact_data.id,
             version="main",
             readme="# DialoGPT-medium\n\nA conversational AI model.",
@@ -509,6 +513,7 @@ class TestArtifactServiceRevisionOperations:
         self,
         artifact_service: ArtifactService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         sample_artifact_data: ArtifactData,
         sample_artifact_revision: ArtifactRevisionData,
     ) -> None:
@@ -529,6 +534,7 @@ class TestArtifactServiceRevisionOperations:
         self,
         artifact_service: ArtifactService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         sample_artifact_data: ArtifactData,
         sample_artifact_revision: ArtifactRevisionData,
     ) -> None:
@@ -570,6 +576,11 @@ class TestImportArtifactRevisionAction:
     @pytest.fixture
     def mock_artifact_repository(self) -> MagicMock:
         return MagicMock(spec=ArtifactRepository)
+
+    @pytest.fixture
+    def mock_revision_ops(self) -> MagicMock:
+        """Create mocked OpsRepository for artifact revisions"""
+        return MagicMock(spec=OpsRepository)
 
     @pytest.fixture
     def mock_artifact_registry_repository(self) -> MagicMock:
@@ -619,6 +630,7 @@ class TestImportArtifactRevisionAction:
     def service(
         self,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_artifact_registry_repository: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_vfs_storage_repository: MagicMock,
@@ -633,6 +645,7 @@ class TestImportArtifactRevisionAction:
     ) -> ArtifactRevisionService:
         return ArtifactRevisionService(
             artifact_repository=mock_artifact_repository,
+            revision_ops=mock_revision_ops,
             artifact_registry_repository=mock_artifact_registry_repository,
             object_storage_repository=mock_object_storage_repository,
             vfs_storage_repository=mock_vfs_storage_repository,
@@ -650,8 +663,8 @@ class TestImportArtifactRevisionAction:
     def sample_revision(self) -> ArtifactRevisionData:
         now = datetime.now(UTC)
         return ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="# Model",
             size=1024000,
@@ -726,6 +739,7 @@ class TestImportArtifactRevisionAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_huggingface_repository: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
@@ -735,9 +749,7 @@ class TestImportArtifactRevisionAction:
         sample_artifact: ArtifactData,
     ) -> None:
         """HuggingFace: AVAILABLE + matching commit hash + force=False returns early"""
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_revision
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=sample_revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact)
         self._setup_reservoir_config(mock_config_provider)
         storage_proxy_client, _ = self._setup_storage_mocks(
@@ -767,6 +779,7 @@ class TestImportArtifactRevisionAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_huggingface_repository: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
@@ -776,9 +789,7 @@ class TestImportArtifactRevisionAction:
         sample_artifact: ArtifactData,
     ) -> None:
         """HuggingFace: force=True always downloads even if hash matches"""
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_revision
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=sample_revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact)
         mock_artifact_repository.update_artifact_revision_status = AsyncMock()
         mock_artifact_repository.associate_artifact_with_storage = AsyncMock(
@@ -821,14 +832,13 @@ class TestImportArtifactRevisionAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_config_provider: MagicMock,
         sample_revision: ArtifactRevisionData,
         sample_artifact: ArtifactData,
     ) -> None:
         """Failure sets status FAILED and re-raises exception"""
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_revision
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=sample_revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact)
         mock_artifact_repository.update_artifact_revision_status = AsyncMock()
         mock_config_provider.config.reservoir = None
@@ -846,6 +856,7 @@ class TestImportArtifactRevisionAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_storage_manager: MagicMock,
@@ -854,8 +865,8 @@ class TestImportArtifactRevisionAction:
         """Unsupported registry type raises InvalidArtifactRegistryTypeError"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -882,7 +893,7 @@ class TestImportArtifactRevisionAction:
             extra=None,
         )
 
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision)
+        mock_revision_ops.get_field = AsyncMock(return_value=revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=artifact)
         mock_artifact_repository.update_artifact_revision_status = AsyncMock()
         self._setup_reservoir_config(mock_config_provider)
@@ -902,6 +913,11 @@ class TestDelegateImportArtifactRevisionBatchAction:
     @pytest.fixture
     def mock_artifact_repository(self) -> MagicMock:
         return MagicMock(spec=ArtifactRepository)
+
+    @pytest.fixture
+    def mock_revision_ops(self) -> MagicMock:
+        """Create mocked OpsRepository for artifact revisions"""
+        return MagicMock(spec=OpsRepository)
 
     @pytest.fixture
     def mock_artifact_registry_repository(self) -> MagicMock:
@@ -951,6 +967,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
     def service(
         self,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_artifact_registry_repository: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_vfs_storage_repository: MagicMock,
@@ -965,6 +982,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
     ) -> ArtifactRevisionService:
         return ArtifactRevisionService(
             artifact_repository=mock_artifact_repository,
+            revision_ops=mock_revision_ops,
             artifact_registry_repository=mock_artifact_registry_repository,
             object_storage_repository=mock_object_storage_repository,
             vfs_storage_repository=mock_vfs_storage_repository,
@@ -990,7 +1008,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
         mock_config_provider.config.reservoir = reservoir_cfg
 
         registry_meta = ArtifactRegistryData(
-            id=uuid.uuid4(),
+            id=ArtifactRegistryID(uuid.uuid4()),
             registry_id=uuid.uuid4(),
             name="test-registry",
             type=ArtifactRegistryType.RESERVOIR,
@@ -1001,8 +1019,8 @@ class TestDelegateImportArtifactRevisionBatchAction:
 
         revision_id = uuid.uuid4()
         revision_data = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1039,6 +1057,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
         mock_artifact_registry_repository: MagicMock,
         mock_reservoir_repository: MagicMock,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
     ) -> None:
         """use_delegation=True calls remote ReservoirRegistryClient"""
         reservoir_cfg = MagicMock()
@@ -1047,7 +1066,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
 
         registry_id = uuid.uuid4()
         registry_meta = ArtifactRegistryData(
-            id=uuid.uuid4(),
+            id=ArtifactRegistryID(uuid.uuid4()),
             registry_id=registry_id,
             name="reservoir-registry",
             type=ArtifactRegistryType.RESERVOIR,
@@ -1064,8 +1083,8 @@ class TestDelegateImportArtifactRevisionBatchAction:
 
         revision_id = uuid.uuid4()
         revision_data = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1076,7 +1095,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
             digest=None,
             verification_result=None,
         )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision_data)
+        mock_revision_ops.get_field = AsyncMock(return_value=revision_data)
 
         task_id = uuid.uuid4()
         mock_client_resp = MagicMock()
@@ -1085,7 +1104,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
         mock_client_resp.tasks = [mock_task]
 
         with patch(
-            "ai.backend.manager.services.artifact_revision.service.ReservoirRegistryClient"
+            "ai.backend.manager.services.artifact.revision.service.ReservoirRegistryClient"
         ) as MockClient:
             mock_client_instance = MagicMock()
             mock_client_instance.delegate_import_artifacts = AsyncMock(
@@ -1118,7 +1137,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
         mock_config_provider.config.reservoir = reservoir_cfg
 
         registry_meta = ArtifactRegistryData(
-            id=uuid.uuid4(),
+            id=ArtifactRegistryID(uuid.uuid4()),
             registry_id=uuid.uuid4(),
             name="hf-registry",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -1150,7 +1169,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
         mock_config_provider.config.reservoir = reservoir_cfg
 
         registry_meta = ArtifactRegistryData(
-            id=uuid.uuid4(),
+            id=ArtifactRegistryID(uuid.uuid4()),
             registry_id=uuid.uuid4(),
             name="test-registry",
             type=ArtifactRegistryType.RESERVOIR,
@@ -1160,8 +1179,8 @@ class TestDelegateImportArtifactRevisionBatchAction:
         )
 
         revision_data = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1198,9 +1217,17 @@ class TestCancelImportAction:
         return MagicMock(spec=ArtifactRepository)
 
     @pytest.fixture
-    def service(self, mock_artifact_repository: MagicMock) -> ArtifactRevisionService:
+    def mock_revision_ops(self) -> MagicMock:
+        """Create mocked OpsRepository for artifact revisions"""
+        return MagicMock(spec=OpsRepository)
+
+    @pytest.fixture
+    def service(
+        self, mock_artifact_repository: MagicMock, mock_revision_ops: MagicMock
+    ) -> ArtifactRevisionService:
         return ArtifactRevisionService(
             artifact_repository=mock_artifact_repository,
+            revision_ops=mock_revision_ops,
             artifact_registry_repository=MagicMock(spec=ArtifactRegistryRepository),
             object_storage_repository=MagicMock(spec=ObjectStorageRepository),
             vfs_storage_repository=MagicMock(spec=VFSStorageRepository),
@@ -1218,13 +1245,14 @@ class TestCancelImportAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
     ) -> None:
         """PULLING state resets + returns revision data"""
         now = datetime.now(UTC)
         revision_id = uuid.uuid4()
         reset_revision = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1237,11 +1265,9 @@ class TestCancelImportAction:
         )
 
         mock_artifact_repository.reset_artifact_revision_status = AsyncMock()
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=reset_revision
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=reset_revision)
 
-        action = CancelImportAction(artifact_revision_id=revision_id)
+        action = CancelImportAction(artifact_revision_id=ArtifactRevisionID(revision_id))
         result = await service.cancel_import(action)
 
         assert result.result == reset_revision
@@ -1251,13 +1277,14 @@ class TestCancelImportAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
     ) -> None:
         """AVAILABLE state also calls reset (service doesn't check state)"""
         now = datetime.now(UTC)
         revision_id = uuid.uuid4()
         revision = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1270,9 +1297,9 @@ class TestCancelImportAction:
         )
 
         mock_artifact_repository.reset_artifact_revision_status = AsyncMock()
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision)
+        mock_revision_ops.get_field = AsyncMock(return_value=revision)
 
-        action = CancelImportAction(artifact_revision_id=revision_id)
+        action = CancelImportAction(artifact_revision_id=ArtifactRevisionID(revision_id))
         result = await service.cancel_import(action)
 
         assert result.result == revision
@@ -1287,9 +1314,17 @@ class TestAssociateWithStorageAction:
         return MagicMock(spec=ArtifactRepository)
 
     @pytest.fixture
-    def service(self, mock_artifact_repository: MagicMock) -> ArtifactRevisionService:
+    def mock_revision_ops(self) -> MagicMock:
+        """Create mocked OpsRepository for artifact revisions"""
+        return MagicMock(spec=OpsRepository)
+
+    @pytest.fixture
+    def service(
+        self, mock_artifact_repository: MagicMock, mock_revision_ops: MagicMock
+    ) -> ArtifactRevisionService:
         return ArtifactRevisionService(
             artifact_repository=mock_artifact_repository,
+            revision_ops=mock_revision_ops,
             artifact_registry_repository=MagicMock(spec=ArtifactRegistryRepository),
             object_storage_repository=MagicMock(spec=ObjectStorageRepository),
             vfs_storage_repository=MagicMock(spec=VFSStorageRepository),
@@ -1307,6 +1342,7 @@ class TestAssociateWithStorageAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
     ) -> None:
         """OBJECT_STORAGE type association record created"""
         revision_id = uuid.uuid4()
@@ -1321,7 +1357,7 @@ class TestAssociateWithStorageAction:
         )
 
         action = AssociateWithStorageAction(
-            artifact_revision_id=revision_id,
+            artifact_revision_id=ArtifactRevisionID(revision_id),
             storage_namespace_id=namespace_id,
             storage_type=ArtifactStorageType.OBJECT_STORAGE,
         )
@@ -1336,6 +1372,7 @@ class TestAssociateWithStorageAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
     ) -> None:
         """VFS_STORAGE type association record created"""
         revision_id = uuid.uuid4()
@@ -1350,7 +1387,7 @@ class TestAssociateWithStorageAction:
         )
 
         action = AssociateWithStorageAction(
-            artifact_revision_id=revision_id,
+            artifact_revision_id=ArtifactRevisionID(revision_id),
             storage_namespace_id=namespace_id,
             storage_type=ArtifactStorageType.VFS_STORAGE,
         )
@@ -1370,9 +1407,17 @@ class TestDisassociateWithStorageAction:
         return MagicMock(spec=ArtifactRepository)
 
     @pytest.fixture
-    def service(self, mock_artifact_repository: MagicMock) -> ArtifactRevisionService:
+    def mock_revision_ops(self) -> MagicMock:
+        """Create mocked OpsRepository for artifact revisions"""
+        return MagicMock(spec=OpsRepository)
+
+    @pytest.fixture
+    def service(
+        self, mock_artifact_repository: MagicMock, mock_revision_ops: MagicMock
+    ) -> ArtifactRevisionService:
         return ArtifactRevisionService(
             artifact_repository=mock_artifact_repository,
+            revision_ops=mock_revision_ops,
             artifact_registry_repository=MagicMock(spec=ArtifactRegistryRepository),
             object_storage_repository=MagicMock(spec=ObjectStorageRepository),
             vfs_storage_repository=MagicMock(spec=VFSStorageRepository),
@@ -1390,6 +1435,7 @@ class TestDisassociateWithStorageAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
     ) -> None:
         """Association record deleted"""
         revision_id = uuid.uuid4()
@@ -1404,7 +1450,7 @@ class TestDisassociateWithStorageAction:
         )
 
         action = DisassociateWithStorageAction(
-            artifact_revision_id=revision_id,
+            artifact_revision_id=ArtifactRevisionID(revision_id),
             storage_namespace_id=namespace_id,
         )
         result = await service.disassociate_with_storage(action)
@@ -1421,6 +1467,11 @@ class TestCleanupArtifactRevisionAction:
     @pytest.fixture
     def mock_artifact_repository(self) -> MagicMock:
         return MagicMock(spec=ArtifactRepository)
+
+    @pytest.fixture
+    def mock_revision_ops(self) -> MagicMock:
+        """Create mocked OpsRepository for artifact revisions"""
+        return MagicMock(spec=OpsRepository)
 
     @pytest.fixture
     def mock_object_storage_repository(self) -> MagicMock:
@@ -1446,6 +1497,7 @@ class TestCleanupArtifactRevisionAction:
     def service(
         self,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_vfs_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
@@ -1454,6 +1506,7 @@ class TestCleanupArtifactRevisionAction:
     ) -> ArtifactRevisionService:
         return ArtifactRevisionService(
             artifact_repository=mock_artifact_repository,
+            revision_ops=mock_revision_ops,
             artifact_registry_repository=MagicMock(spec=ArtifactRegistryRepository),
             object_storage_repository=mock_object_storage_repository,
             vfs_storage_repository=mock_vfs_storage_repository,
@@ -1471,6 +1524,7 @@ class TestCleanupArtifactRevisionAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_storage_manager: MagicMock,
@@ -1483,8 +1537,8 @@ class TestCleanupArtifactRevisionAction:
         namespace_id = uuid.uuid4()
 
         revision = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=artifact_id,
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(artifact_id),
             version="v1",
             readme="",
             size=100,
@@ -1496,7 +1550,7 @@ class TestCleanupArtifactRevisionAction:
             verification_result=None,
         )
         artifact = ArtifactData(
-            id=artifact_id,
+            id=ArtifactID(artifact_id),
             name="test-model",
             type=ArtifactType.MODEL,
             description="",
@@ -1511,9 +1565,7 @@ class TestCleanupArtifactRevisionAction:
             extra=None,
         )
 
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            side_effect=[revision, revision]
-        )
+        mock_revision_ops.get_field = AsyncMock(side_effect=[revision, revision])
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=artifact)
         mock_artifact_repository.reset_artifact_revision_status = AsyncMock()
         mock_artifact_repository.disassociate_artifact_with_storage = AsyncMock(
@@ -1547,7 +1599,7 @@ class TestCleanupArtifactRevisionAction:
         storage_proxy_client.delete_s3_object = AsyncMock()
         mock_storage_manager.get_manager_facing_client.return_value = storage_proxy_client
 
-        action = CleanupArtifactRevisionAction(artifact_revision_id=revision_id)
+        action = CleanupArtifactRevisionAction(artifact_revision_id=ArtifactRevisionID(revision_id))
         result = await service.cleanup(action)
 
         assert result.result == revision
@@ -1558,12 +1610,13 @@ class TestCleanupArtifactRevisionAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
     ) -> None:
         """SCANNED state raises ArtifactDeletionBadRequestError"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="v1",
             readme="",
             size=100,
@@ -1574,7 +1627,7 @@ class TestCleanupArtifactRevisionAction:
             digest=None,
             verification_result=None,
         )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision)
+        mock_revision_ops.get_field = AsyncMock(return_value=revision)
 
         action = CleanupArtifactRevisionAction(artifact_revision_id=revision.id)
 
@@ -1585,12 +1638,13 @@ class TestCleanupArtifactRevisionAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
     ) -> None:
         """PULLING state raises ArtifactDeletionBadRequestError"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="v1",
             readme="",
             size=100,
@@ -1601,7 +1655,7 @@ class TestCleanupArtifactRevisionAction:
             digest=None,
             verification_result=None,
         )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision)
+        mock_revision_ops.get_field = AsyncMock(return_value=revision)
 
         action = CleanupArtifactRevisionAction(artifact_revision_id=revision.id)
 
@@ -1612,6 +1666,7 @@ class TestCleanupArtifactRevisionAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_vfs_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
@@ -1625,8 +1680,8 @@ class TestCleanupArtifactRevisionAction:
         namespace_id = uuid.uuid4()
 
         revision = ArtifactRevisionData(
-            id=revision_id,
-            artifact_id=artifact_id,
+            id=ArtifactRevisionID(revision_id),
+            artifact_id=ArtifactID(artifact_id),
             version="v1",
             readme="",
             size=100,
@@ -1638,7 +1693,7 @@ class TestCleanupArtifactRevisionAction:
             verification_result=None,
         )
         artifact = ArtifactData(
-            id=artifact_id,
+            id=ArtifactID(artifact_id),
             name="test-model",
             type=ArtifactType.MODEL,
             description="",
@@ -1653,9 +1708,7 @@ class TestCleanupArtifactRevisionAction:
             extra=None,
         )
 
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            side_effect=[revision, revision]
-        )
+        mock_revision_ops.get_field = AsyncMock(side_effect=[revision, revision])
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=artifact)
         mock_artifact_repository.reset_artifact_revision_status = AsyncMock()
         mock_artifact_repository.disassociate_artifact_with_storage = AsyncMock(
@@ -1691,7 +1744,7 @@ class TestCleanupArtifactRevisionAction:
         storage_proxy_client.delete_s3_object = AsyncMock()
         mock_storage_manager.get_manager_facing_client.return_value = storage_proxy_client
 
-        action = CleanupArtifactRevisionAction(artifact_revision_id=revision_id)
+        action = CleanupArtifactRevisionAction(artifact_revision_id=ArtifactRevisionID(revision_id))
         result = await service.cleanup(action)
 
         assert result.result == revision
@@ -1704,6 +1757,11 @@ class TestGetDownloadProgressAction:
     @pytest.fixture
     def mock_artifact_repository(self) -> MagicMock:
         return MagicMock(spec=ArtifactRepository)
+
+    @pytest.fixture
+    def mock_revision_ops(self) -> MagicMock:
+        """Create mocked OpsRepository for artifact revisions"""
+        return MagicMock(spec=OpsRepository)
 
     @pytest.fixture
     def mock_valkey_artifact_client(self) -> MagicMock:
@@ -1721,12 +1779,14 @@ class TestGetDownloadProgressAction:
     def service(
         self,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_valkey_artifact_client: MagicMock,
         mock_config_provider: MagicMock,
         mock_reservoir_repository: MagicMock,
     ) -> ArtifactRevisionService:
         return ArtifactRevisionService(
             artifact_repository=mock_artifact_repository,
+            revision_ops=mock_revision_ops,
             artifact_registry_repository=MagicMock(spec=ArtifactRegistryRepository),
             object_storage_repository=MagicMock(spec=ObjectStorageRepository),
             vfs_storage_repository=MagicMock(spec=VFSStorageRepository),
@@ -1744,13 +1804,14 @@ class TestGetDownloadProgressAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_valkey_artifact_client: MagicMock,
     ) -> None:
         """HuggingFace returns local progress only (remote=None)"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1777,7 +1838,7 @@ class TestGetDownloadProgressAction:
             extra=None,
         )
 
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision)
+        mock_revision_ops.get_field = AsyncMock(return_value=revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=artifact)
 
         local_progress = MagicMock()
@@ -1794,6 +1855,7 @@ class TestGetDownloadProgressAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_valkey_artifact_client: MagicMock,
         mock_config_provider: MagicMock,
         mock_reservoir_repository: MagicMock,
@@ -1801,8 +1863,8 @@ class TestGetDownloadProgressAction:
         """Reservoir+delegation returns local+remote progress"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1829,7 +1891,7 @@ class TestGetDownloadProgressAction:
             extra=None,
         )
 
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision)
+        mock_revision_ops.get_field = AsyncMock(return_value=revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=artifact)
 
         local_progress = MagicMock()
@@ -1853,7 +1915,7 @@ class TestGetDownloadProgressAction:
         remote_resp.download_progress.local = remote_local_progress
 
         with patch(
-            "ai.backend.manager.services.artifact_revision.service.ReservoirRegistryClient"
+            "ai.backend.manager.services.artifact.revision.service.ReservoirRegistryClient"
         ) as MockClient:
             mock_client = MagicMock()
             mock_client.get_download_progress = AsyncMock(return_value=remote_resp)
@@ -1870,6 +1932,7 @@ class TestGetDownloadProgressAction:
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_valkey_artifact_client: MagicMock,
         mock_config_provider: MagicMock,
         mock_reservoir_repository: MagicMock,
@@ -1877,8 +1940,8 @@ class TestGetDownloadProgressAction:
         """Remote query failure logs warning + returns without progress"""
         now = datetime.now(UTC)
         revision = ArtifactRevisionData(
-            id=uuid.uuid4(),
-            artifact_id=uuid.uuid4(),
+            id=ArtifactRevisionID(uuid.uuid4()),
+            artifact_id=ArtifactID(uuid.uuid4()),
             version="main",
             readme="",
             size=100,
@@ -1905,7 +1968,7 @@ class TestGetDownloadProgressAction:
             extra=None,
         )
 
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(return_value=revision)
+        mock_revision_ops.get_field = AsyncMock(return_value=revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=artifact)
 
         local_progress = MagicMock()

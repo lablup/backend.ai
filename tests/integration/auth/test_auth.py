@@ -56,7 +56,12 @@ class TestSignupAndAuthorizeFlow:
                     sa.update(users).where(users.c.email == email).values(status=UserStatus.ACTIVE)
                 )
                 await conn.execute(
-                    sa.update(keypairs).where(keypairs.c.user_id == email).values(is_active=True)
+                    sa.update(keypairs)
+                    .where(
+                        keypairs.c.user
+                        == sa.select(users.c.uuid).where(users.c.email == email).scalar_subquery()
+                    )
+                    .values(is_active=True)
                 )
 
             # 3. Authorize with the signup credentials
@@ -76,7 +81,12 @@ class TestSignupAndAuthorizeFlow:
         finally:
             # Cleanup
             async with db_engine.begin() as conn:
-                await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
+                await conn.execute(
+                    keypairs.delete().where(
+                        keypairs.c.user
+                        == sa.select(users.c.uuid).where(users.c.email == email).scalar_subquery()
+                    )
+                )
                 await conn.execute(users.delete().where(users.c.email == email))
 
 

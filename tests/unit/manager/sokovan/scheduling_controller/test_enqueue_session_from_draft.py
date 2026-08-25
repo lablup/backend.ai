@@ -28,15 +28,15 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.plugin.hook import PASSED, HookResult, HookResults
 from ai.backend.common.types import (
     AccessKey,
@@ -56,7 +56,7 @@ from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePoli
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
-    ScalingGroupNetworkInfo,
+    ResourceGroupNetworkInfo,
 )
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
@@ -209,6 +209,7 @@ def _make_user() -> UserData:
         is_superadmin=False,
         role=UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 
@@ -220,7 +221,7 @@ def _spec_context(
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
             defaults=rg_defaults if rg_defaults is not None else DefaultSessionOptions(),
-            network=ScalingGroupNetworkInfo(use_host_network=False, wsproxy_addr=None),
+            network=ResourceGroupNetworkInfo(use_host_network=False, wsproxy_addr=None),
             allow_fractional=False,
             served_slot_names=frozenset({ResourceSlotName("cpu"), ResourceSlotName("mem")}),
         ),

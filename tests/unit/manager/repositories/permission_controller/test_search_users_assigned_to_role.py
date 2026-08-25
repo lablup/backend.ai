@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.models.agent import AgentRow
 
@@ -26,14 +27,15 @@ from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
 from ai.backend.manager.models.rbac_models.orders import AssignedUserOrders
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import PasswordHashAlgorithm, PasswordInfo, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -41,7 +43,7 @@ from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
     ImageRow,
 )
 
@@ -101,11 +103,13 @@ class TestSearchUsersAssignedToRole:
         db_with_tables: ExtendedAsyncSAEngine,
     ) -> list[CreatedUserAssignment]:
         """Create domain, policy, role, users, and role assignments."""
+        domain_id = DomainID(uuid.uuid4())
         created: list[CreatedUserAssignment] = []
         base_time = datetime(2026, 1, 1, tzinfo=UTC)
 
         async with db_with_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name="test-domain",
                 description="Test domain",
                 is_active=True,
@@ -143,6 +147,7 @@ class TestSearchUsersAssignedToRole:
                     resource_policy="test-policy",
                     status=UserStatus.ACTIVE,
                     need_password_change=False,
+                    domain_id=domain_id,
                 )
                 db_sess.add(user)
                 await db_sess.flush()

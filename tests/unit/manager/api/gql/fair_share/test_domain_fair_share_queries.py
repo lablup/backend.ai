@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
@@ -11,12 +12,13 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     GetDomainFairSharePayload,
     SearchDomainFairSharesPayload,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.gql.fair_share.resolver import domain as domain_resolver
@@ -46,6 +48,7 @@ def mock_superadmin_user() -> UserData:
         is_superadmin=True,
         role=UserRole.SUPERADMIN,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 
@@ -59,6 +62,7 @@ def mock_regular_user() -> UserData:
         is_superadmin=False,
         role=UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 

@@ -13,6 +13,9 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
 from ai.backend.manager.models.agent import AgentRow
@@ -21,13 +24,13 @@ from ai.backend.manager.models.association_container_registries_groups import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForProjectRow,
-    ScalingGroupOpts,
-    ScalingGroupRow,
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.resource_group import (
+    ResourceGroupForProjectRow,
+    ResourceGroupOpts,
+    ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
@@ -78,8 +81,8 @@ class TestProjectReportDefinition:
         assert PROJECT_REPORT.name == "Projects"
 
     def test_select_from_is_group_table(self) -> None:
-        """select_from should be GroupRow table."""
-        assert PROJECT_REPORT.select_from is GroupRow.__table__
+        """select_from should be ProjectRow table."""
+        assert PROJECT_REPORT.select_from is ProjectRow.__table__
 
     def test_total_field_count(self) -> None:
         """Should have 28 fields total."""
@@ -168,11 +171,11 @@ class TestJoinDefinitions:
 
     def test_scaling_group_for_project_join_table(self) -> None:
         """ScalingGroupForProject JOIN should use correct table."""
-        assert SCALING_GROUP_FOR_PROJECT_JOIN.table is ScalingGroupForProjectRow.__table__
+        assert SCALING_GROUP_FOR_PROJECT_JOIN.table is ResourceGroupForProjectRow.__table__
 
     def test_scaling_group_join_table(self) -> None:
         """ScalingGroup JOIN should use correct table."""
-        assert SCALING_GROUP_JOIN.table is ScalingGroupRow.__table__
+        assert SCALING_GROUP_JOIN.table is ResourceGroupRow.__table__
 
     def test_container_registry_join_table(self) -> None:
         """Container registry JOIN should use correct table."""
@@ -275,7 +278,7 @@ class TestBuildProjectQueryWithRealReport:
         )
 
         # Should be the base table, not a Join
-        assert query.select_from is GroupRow.__table__
+        assert query.select_from is ProjectRow.__table__
 
     def test_resource_policy_fields_add_one_join(self, adapter: ExportAdapter) -> None:
         """Selecting resource policy fields should add 1 JOIN."""
@@ -343,7 +346,7 @@ class TestBuildProjectQueryWithRealReport:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        # 4 LEFT OUTER JOINs: 1 (resource_policy) + 2 (scaling_group) + 1 (container_registry)
+        # 4 LEFT OUTER JOINs: 1 (resource_policy) + 2 (resource_group) + 1 (container_registry)
         assert "project_resource_policies" in compiled
         assert "sgroups_for_groups" in compiled
         assert "scaling_groups" in compiled
@@ -416,7 +419,7 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        # 2 JOINs for scaling group (sgroups_for_groups + scaling_groups)
+        # 2 JOINs for scaling group (sgroups_for_groups + resource_groups)
         # 1 JOIN for container registry (with EXISTS subquery for associations)
         assert compiled.count("LEFT OUTER JOIN") == 3
 
@@ -463,7 +466,7 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         )
 
         compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        # Exactly 4 JOINs: 1 (resource_policy) + 2 (scaling_group) + 1 (container_registry)
+        # Exactly 4 JOINs: 1 (resource_policy) + 2 (resource_group) + 1 (container_registry)
         assert compiled.count("LEFT OUTER JOIN") == 4
 
     def test_all_joins_are_left_outer_not_inner(self, adapter: ExportAdapter) -> None:
@@ -624,7 +627,7 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         """sgroups_for_groups must appear before scaling_groups in the JOIN chain.
 
         SCALING_GROUP_JOIN depends on sgroups_for_groups already being joined,
-        because its condition references ScalingGroupForProjectRow.scaling_group.
+        because its condition references ResourceGroupForProjectRow.resource_group_id.
         """
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -699,7 +702,7 @@ class TestJoinDefIdentityAndHashing:
         """
         adapter = ExportAdapter()
         # Build two separate fields both using SCALING_GROUP_JOINS
-        # scaling_group_name, scaling_group_description, scaling_group_is_active all
+        # resource_group_name, resource_group_description, resource_group_is_active all
         # reference the same SCALING_GROUP_JOINS tuple → same JoinDef objects
         fields_map = {f.key: f for f in PROJECT_REPORT.fields}
         selected_fields = [
@@ -749,9 +752,9 @@ class TestProjectExportExecuteStreamingDB:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                GroupRow,
-                ScalingGroupRow,
-                ScalingGroupForProjectRow,
+                ProjectRow,
+                ResourceGroupRow,
+                ResourceGroupForProjectRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
             ],
@@ -768,11 +771,14 @@ class TestProjectExportExecuteStreamingDB:
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
         rg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        rg_id = ResourceGroupID(uuid.uuid4())
         registry_id = uuid.uuid4()
 
         async with db_engine.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -794,7 +800,7 @@ class TestProjectExportExecuteStreamingDB:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
@@ -804,25 +810,26 @@ class TestProjectExportExecuteStreamingDB:
             await db_sess.flush()
 
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
+                    id=rg_id,
                     name=rg_name,
                     description="",
                     is_active=True,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                     wsproxy_addr=None,
                 )
             )
             await db_sess.flush()
 
-            db_sess.add(ScalingGroupForProjectRow(scaling_group=rg_name, group=project_id))
+            db_sess.add(ResourceGroupForProjectRow(resource_group_id=rg_id, group=project_id))
             await db_sess.flush()
 
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url="https://registry.example.com",
                     registry_name="test-registry",
                     type=ContainerRegistryType.DOCKER,
@@ -973,7 +980,7 @@ class TestProjectExportExecuteStreamingDB:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id2,
                     name="project-no-registry",
                     domain_name=project_with_rg_and_registry.domain_name,
@@ -1017,9 +1024,9 @@ class TestGlobalContainerRegistryExport:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                GroupRow,
-                ScalingGroupRow,
-                ScalingGroupForProjectRow,
+                ProjectRow,
+                ResourceGroupRow,
+                ResourceGroupForProjectRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
             ],
@@ -1044,8 +1051,10 @@ class TestGlobalContainerRegistryExport:
         scoped_registry_id = uuid.uuid4()
 
         async with db_engine.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -1063,7 +1072,7 @@ class TestGlobalContainerRegistryExport:
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
@@ -1071,7 +1080,7 @@ class TestGlobalContainerRegistryExport:
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=unassociated_project_id,
                     name="test-project-unassociated",
                     domain_name=domain_name,
@@ -1080,7 +1089,7 @@ class TestGlobalContainerRegistryExport:
             )
             db_sess.add(
                 ContainerRegistryRow(
-                    id=global_registry_id,
+                    id=ContainerRegistryID(global_registry_id),
                     url="https://global-registry.example.com",
                     registry_name="global-registry",
                     type=ContainerRegistryType.DOCKER,
@@ -1089,7 +1098,7 @@ class TestGlobalContainerRegistryExport:
             )
             db_sess.add(
                 ContainerRegistryRow(
-                    id=scoped_registry_id,
+                    id=ContainerRegistryID(scoped_registry_id),
                     url="https://scoped-registry.example.com",
                     registry_name="scoped-registry",
                     type=ContainerRegistryType.DOCKER,

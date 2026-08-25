@@ -15,25 +15,19 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     LivenessStatus,
     ReadinessStatus,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot, SessionId
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
@@ -57,7 +51,8 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
@@ -80,11 +75,9 @@ from ai.backend.manager.services.deployment.actions.search_replicas import (
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
 )
-from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 class DeploymentCRUDBaseFixtures:
@@ -113,21 +106,6 @@ class DeploymentCRUDBaseFixtures:
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
             appproxy_client_pool=mock_appproxy_client_pool,
-        )
-
-    @pytest.fixture
-    def processors(self, deployment_service: DeploymentService) -> DeploymentProcessors:
-        return DeploymentProcessors(
-            deployment_service,
-            [],
-            ActionValidators(
-                virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-                rbac=RBACValidators(
-                    scope=MagicMock(spec=ScopeActionRBACValidator),
-                    single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
-                    bulk=MagicMock(spec=BulkActionRBACValidator),
-                ),
-            ),
         )
 
     @pytest.fixture
@@ -186,7 +164,7 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
 
     async def test_valid_draft_returns_deployment_info(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         endpoint_info: DeploymentInfo,
@@ -200,8 +178,8 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.add_deployment_revision = AsyncMock()
         mock_deployment_repository.get_legacy_endpoint_info = AsyncMock(return_value=endpoint_info)
 
-        action = CreateLegacyDeploymentAction(draft=draft)
-        result = await processors.create_legacy_deployment.wait_for_complete(action)
+        action = CreateLegacyDeploymentAction(project_id=ProjectID(uuid.uuid4()), draft=draft)
+        result = await deployment_service.create_legacy_deployment(action)
 
         assert result.data == endpoint_info
         assert result.data.id == endpoint_info.id
@@ -209,7 +187,7 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
 
     async def test_revision_auto_activated(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         endpoint_info: DeploymentInfo,
@@ -223,8 +201,8 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.add_deployment_revision = AsyncMock()
         mock_deployment_repository.get_legacy_endpoint_info = AsyncMock(return_value=endpoint_info)
 
-        action = CreateLegacyDeploymentAction(draft=draft)
-        await processors.create_legacy_deployment.wait_for_complete(action)
+        action = CreateLegacyDeploymentAction(project_id=ProjectID(uuid.uuid4()), draft=draft)
+        await deployment_service.create_legacy_deployment(action)
 
         mock_deployment_controller.add_deployment_revision.assert_awaited_once()
         kwargs = mock_deployment_controller.add_deployment_revision.await_args.kwargs
@@ -261,7 +239,7 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
 
     async def test_response_carries_eagerly_loaded_revision(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         endpoint_info: DeploymentInfo,
@@ -287,8 +265,8 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         mock_deployment_repository.get_legacy_endpoint_info = AsyncMock(return_value=eager_info)
         mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
 
-        action = CreateLegacyDeploymentAction(draft=draft)
-        result = await processors.create_legacy_deployment.wait_for_complete(action)
+        action = CreateLegacyDeploymentAction(project_id=ProjectID(uuid.uuid4()), draft=draft)
+        result = await deployment_service.create_legacy_deployment(action)
 
         # The target revision (current or deploying) the REST v1 handler reads
         # must be present — this is what fails when the modern getter is used.
@@ -301,7 +279,7 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
 
     async def test_non_existent_domain_raises(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_controller: MagicMock,
         draft: MagicMock,
     ) -> None:
@@ -310,9 +288,9 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
             side_effect=Exception("Domain not found")
         )
 
-        action = CreateLegacyDeploymentAction(draft=draft)
+        action = CreateLegacyDeploymentAction(project_id=ProjectID(uuid.uuid4()), draft=draft)
         with pytest.raises(Exception, match="Domain not found"):
-            await processors.create_legacy_deployment.wait_for_complete(action)
+            await deployment_service.create_legacy_deployment(action)
 
 
 class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
@@ -320,7 +298,7 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
 
     async def test_existing_endpoint_returns_success(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         endpoint_info: DeploymentInfo,
@@ -332,7 +310,7 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
         action = DestroyDeploymentAction(deployment_id=DeploymentID(endpoint_id))
-        result = await processors.destroy_deployment.wait_for_complete(action)
+        result = await deployment_service.destroy_deployment(action)
 
         assert result.success is True
         mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
@@ -341,7 +319,7 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
 
     async def test_non_existent_endpoint_raises(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
     ) -> None:
@@ -352,11 +330,11 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
 
         action = DestroyDeploymentAction(deployment_id=DeploymentID(uuid.uuid4()))
         with pytest.raises(Exception, match="EndpointNotFound"):
-            await processors.destroy_deployment.wait_for_complete(action)
+            await deployment_service.destroy_deployment(action)
 
     async def test_already_destroying_handled_idempotently(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         endpoint_info: DeploymentInfo,
@@ -368,7 +346,7 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
         action = DestroyDeploymentAction(deployment_id=DeploymentID(endpoint_id))
-        result = await processors.destroy_deployment.wait_for_complete(action)
+        result = await deployment_service.destroy_deployment(action)
 
         assert result.success is True
         mock_deployment_controller.destroy_deployment.assert_called_once_with(endpoint_id)
@@ -394,15 +372,17 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
 
     async def test_existing_replica_returns_data(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         route_info: RouteInfo,
     ) -> None:
         """Existing replica_id returns ModelReplicaData with readiness/liveness/activeness."""
         mock_deployment_repository.get_route = AsyncMock(return_value=route_info)
 
-        action = GetReplicaByIdAction(replica_id=route_info.route_id)
-        result = await processors.get_replica_by_id.wait_for_complete(action)
+        action = GetReplicaByIdAction(
+            deployment_id=DeploymentID(uuid.uuid4()), replica_id=route_info.route_id
+        )
+        result = await deployment_service.get_replica_by_id(action)
 
         assert result.data is not None
         assert result.data.id == route_info.route_id
@@ -413,20 +393,22 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
 
     async def test_non_existent_replica_returns_none(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
     ) -> None:
         """Non-existent ID returns data=None."""
         mock_deployment_repository.get_route = AsyncMock(return_value=None)
 
-        action = GetReplicaByIdAction(replica_id=uuid.uuid4())
-        result = await processors.get_replica_by_id.wait_for_complete(action)
+        action = GetReplicaByIdAction(
+            deployment_id=DeploymentID(uuid.uuid4()), replica_id=uuid.uuid4()
+        )
+        result = await deployment_service.get_replica_by_id(action)
 
         assert result.data is None
 
     async def test_zero_weight_traffic_inactive(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         endpoint_id: uuid.UUID,
     ) -> None:
@@ -445,15 +427,17 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
         )
         mock_deployment_repository.get_route = AsyncMock(return_value=inactive_route)
 
-        action = GetReplicaByIdAction(replica_id=inactive_route.route_id)
-        result = await processors.get_replica_by_id.wait_for_complete(action)
+        action = GetReplicaByIdAction(
+            deployment_id=DeploymentID(uuid.uuid4()), replica_id=inactive_route.route_id
+        )
+        result = await deployment_service.get_replica_by_id(action)
 
         assert result.data is not None
         assert result.data.activeness_status == ActivenessStatus.INACTIVE
 
     async def test_unassigned_session_id_is_none(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         endpoint_id: uuid.UUID,
     ) -> None:
@@ -473,8 +457,10 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
         )
         mock_deployment_repository.get_route = AsyncMock(return_value=route)
 
-        action = GetReplicaByIdAction(replica_id=route.route_id)
-        result = await processors.get_replica_by_id.wait_for_complete(action)
+        action = GetReplicaByIdAction(
+            deployment_id=DeploymentID(uuid.uuid4()), replica_id=route.route_id
+        )
+        result = await deployment_service.get_replica_by_id(action)
 
         assert result.data is not None
         assert result.data.session_id is None
@@ -500,7 +486,7 @@ class TestSearchReplicas(DeploymentCRUDBaseFixtures):
 
     async def test_default_pagination(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         route_info: RouteInfo,
         default_querier: BatchQuerier,
@@ -515,8 +501,10 @@ class TestSearchReplicas(DeploymentCRUDBaseFixtures):
             )
         )
 
-        action = SearchReplicasAction(querier=default_querier)
-        result = await processors.search_replicas.wait_for_complete(action)
+        action = SearchReplicasAction(
+            deployment_id=DeploymentID(uuid.uuid4()), querier=default_querier
+        )
+        result = await deployment_service.search_replicas(action)
 
         assert len(result.data) == 1
         assert result.total_count == 1
@@ -525,7 +513,7 @@ class TestSearchReplicas(DeploymentCRUDBaseFixtures):
 
     async def test_empty_result(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         default_querier: BatchQuerier,
     ) -> None:
@@ -539,15 +527,17 @@ class TestSearchReplicas(DeploymentCRUDBaseFixtures):
             )
         )
 
-        action = SearchReplicasAction(querier=default_querier)
-        result = await processors.search_replicas.wait_for_complete(action)
+        action = SearchReplicasAction(
+            deployment_id=DeploymentID(uuid.uuid4()), querier=default_querier
+        )
+        result = await deployment_service.search_replicas(action)
 
         assert result.data == []
         assert result.total_count == 0
 
     async def test_pagination_with_next_page(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         route_info: RouteInfo,
     ) -> None:
@@ -566,8 +556,8 @@ class TestSearchReplicas(DeploymentCRUDBaseFixtures):
             )
         )
 
-        action = SearchReplicasAction(querier=querier)
-        result = await processors.search_replicas.wait_for_complete(action)
+        action = SearchReplicasAction(deployment_id=DeploymentID(uuid.uuid4()), querier=querier)
+        result = await deployment_service.search_replicas(action)
 
         assert result.total_count == 5
         assert result.has_next_page is True
@@ -587,7 +577,7 @@ class TestSearchAccessTokens(DeploymentCRUDBaseFixtures):
 
     async def test_pagination_returns_tokens(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         token_data: ModelDeploymentAccessTokenData,
         default_querier: BatchQuerier,
@@ -602,8 +592,10 @@ class TestSearchAccessTokens(DeploymentCRUDBaseFixtures):
             )
         )
 
-        action = SearchAccessTokensAction(querier=default_querier)
-        result = await processors.search_access_tokens.wait_for_complete(action)
+        action = SearchAccessTokensAction(
+            deployment_id=DeploymentID(uuid.uuid4()), querier=default_querier
+        )
+        result = await deployment_service.search_access_tokens(action)
 
         assert len(result.data) == 1
         assert result.data[0] == token_data
@@ -611,7 +603,7 @@ class TestSearchAccessTokens(DeploymentCRUDBaseFixtures):
 
     async def test_no_tokens_returns_empty(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         default_querier: BatchQuerier,
     ) -> None:
@@ -625,8 +617,10 @@ class TestSearchAccessTokens(DeploymentCRUDBaseFixtures):
             )
         )
 
-        action = SearchAccessTokensAction(querier=default_querier)
-        result = await processors.search_access_tokens.wait_for_complete(action)
+        action = SearchAccessTokensAction(
+            deployment_id=DeploymentID(uuid.uuid4()), querier=default_querier
+        )
+        result = await deployment_service.search_access_tokens(action)
 
         assert result.data == []
         assert result.total_count == 0
@@ -637,7 +631,7 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
 
     async def test_triggers_check_replica_marking(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_controller: MagicMock,
         deployment_id: uuid.UUID,
     ) -> None:
@@ -645,7 +639,7 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
         action = SyncReplicaAction(deployment_id=DeploymentID(deployment_id))
-        result = await processors.sync_replicas.wait_for_complete(action)
+        result = await deployment_service.sync_replicas(action)
 
         assert result.success is True
         mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
@@ -654,7 +648,7 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
 
     async def test_already_synced_still_marks(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_controller: MagicMock,
         deployment_id: uuid.UUID,
     ) -> None:
@@ -662,7 +656,7 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
         action = SyncReplicaAction(deployment_id=DeploymentID(deployment_id))
-        result = await processors.sync_replicas.wait_for_complete(action)
+        result = await deployment_service.sync_replicas(action)
 
         assert result.success is True
         mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
@@ -709,15 +703,17 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
 
     async def test_existing_revision_returns_data(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         revision_data: ModelRevisionData,
     ) -> None:
         """Existing revision returns ModelRevisionData with cluster_config/resource_config/image_id/extra_mounts."""
         mock_deployment_repository.get_revision = AsyncMock(return_value=revision_data)
 
-        action = GetRevisionByIdAction(revision_id=revision_data.id)
-        result = await processors.get_revision_by_id.wait_for_complete(action)
+        action = GetRevisionByIdAction(
+            deployment_id=DeploymentID(uuid.uuid4()), revision_id=revision_data.id
+        )
+        result = await deployment_service.get_revision_by_id(action)
 
         assert result.data == revision_data
         assert result.data.cluster_config.mode == ClusterMode.SINGLE_NODE
@@ -728,7 +724,7 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
 
     async def test_non_existent_revision_raises(
         self,
-        processors: DeploymentProcessors,
+        deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
     ) -> None:
         """Non-existent revision raises DeploymentRevisionNotFound."""
@@ -736,6 +732,8 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
             side_effect=Exception("DeploymentRevisionNotFound")
         )
 
-        action = GetRevisionByIdAction(revision_id=DeploymentRevisionID(uuid.uuid4()))
+        action = GetRevisionByIdAction(
+            deployment_id=DeploymentID(uuid.uuid4()), revision_id=DeploymentRevisionID(uuid.uuid4())
+        )
         with pytest.raises(Exception, match="DeploymentRevisionNotFound"):
-            await processors.get_revision_by_id.wait_for_complete(action)
+            await deployment_service.get_revision_by_id(action)

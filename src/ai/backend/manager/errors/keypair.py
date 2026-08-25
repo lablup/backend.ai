@@ -43,6 +43,32 @@ class InvalidSSHPublicKey(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class KeypairResourcePolicyNotFound(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/keypair-resource-policy-not-found"
+    error_title = "No keypair resource policy goes by that name."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KEYPAIR,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class NoDefaultKeypairResourcePolicy(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/no-default-keypair-resource-policy"
+    error_title = "No keypair resource policy is marked as the default."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KEYPAIR,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class SSHKeypairMismatch(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/ssh-keypair-mismatch"
     error_title = "The SSH public key does not match the private key."

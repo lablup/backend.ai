@@ -99,11 +99,6 @@
   # authority value.
   # Added in 25.9.0
   authority = "worker-1"
-  # Enable the experimental Redis-based event dispatcher for real-time event
-  # propagation from the coordinator. This feature is under development and may
-  # have stability issues. Use with caution in production.
-  # Added in 25.9.0
-  use_experimental_redis_event_dispatcher = false
   # Enable HTTPS/TLS for the worker's API server and proxy connections. When
   # enabled, requires tls_cert and tls_privkey to be configured. Recommended for
   # production deployments to secure communication.

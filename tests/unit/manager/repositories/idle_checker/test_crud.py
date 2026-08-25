@@ -6,24 +6,24 @@ from dataclasses import replace
 
 import pytest
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     NetworkTimeoutSpec,
     SessionLifetimeSpec,
 )
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerConditions
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    NoPagination,
     Purger,
     Updater,
 )

@@ -15,14 +15,16 @@ from decimal import Decimal
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import (
     create_pending_session_with_kernels,
@@ -52,7 +54,7 @@ class TestReservedConcurrency:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -70,7 +72,7 @@ class TestReservedConcurrency:
             cpu_capacity=cpu_capacity,
             mem_capacity=Decimal("1048576"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         # Mix of single- and multi-kernel sessions.
         session_specs: list[list[tuple[str, Decimal, Decimal]]] = [
@@ -91,9 +93,9 @@ class TestReservedConcurrency:
             session_id, kernel_ids = await create_pending_session_with_kernels(
                 db_with_cleanup,
                 domain_id=test_domain_id,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_group_id=test_scaling_group_id,
-                scaling_group_name=test_scaling_group_name,
+                resource_group_name=test_scaling_group_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_access_key,
@@ -141,7 +143,7 @@ class TestReservedConcurrency:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -157,15 +159,15 @@ class TestReservedConcurrency:
             cpu_capacity=Decimal("4"),
             mem_capacity=Decimal("10240"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         async def one_cycle() -> None:
             session_id, kernel_ids = await create_pending_session_with_kernels(
                 db_with_cleanup,
                 domain_id=test_domain_id,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_group_id=test_scaling_group_id,
-                scaling_group_name=test_scaling_group_name,
+                resource_group_name=test_scaling_group_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_access_key,
@@ -204,7 +206,7 @@ class TestReservedConcurrency:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -220,15 +222,15 @@ class TestReservedConcurrency:
             cpu_capacity=Decimal("20"),
             mem_capacity=Decimal("1048576"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         async def allocate_session(*, run: bool) -> tuple[SessionId, KernelId]:
             session_id, kernel_ids = await create_pending_session_with_kernels(
                 db_with_cleanup,
                 domain_id=test_domain_id,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_group_id=test_scaling_group_id,
-                scaling_group_name=test_scaling_group_name,
+                resource_group_name=test_scaling_group_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_access_key,

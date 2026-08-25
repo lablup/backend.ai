@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
-from typing import Any, override
+from typing import override
 
-import msgpack
 import pytest
 
 from ai.backend.common.events.dispatcher import EventDispatcher
@@ -16,25 +13,14 @@ from ai.backend.common.events.types import (
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
-from ai.backend.common.message_queue.types import (
-    BroadcastMessage,
-    MQMessage,
-)
+from ai.backend.common.message_queue.message import MQMessage
+from ai.backend.common.message_queue.payload import AnycastMessagePayload, BroadcastMessagePayload
+from ai.backend.common.message_queue.types import MessageName
 from ai.backend.common.types import AgentId
 
 
-@dataclass
 class DummyAnycastEvent(AbstractAnycastEvent):
     value: int
-
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.value,)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> DummyAnycastEvent:
-        return cls(value[0])
 
     @classmethod
     @override
@@ -55,18 +41,8 @@ class DummyAnycastEvent(AbstractAnycastEvent):
         return "test_anycast"
 
 
-@dataclass
 class DummyBroadcastEvent(AbstractBroadcastEvent):
     value: int
-
-    @override
-    def serialize(self) -> tuple[Any, ...]:
-        return (self.value,)
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:
-        return cls(value[0])
 
     @classmethod
     @override
@@ -88,24 +64,23 @@ class DummyBroadcastEvent(AbstractBroadcastEvent):
 
 
 def _make_anycast_mq_message(event: AbstractAnycastEvent) -> MQMessage:
+    message = event.to_message()
     return MQMessage(
         msg_id=b"test-msg-id",
-        payload={
-            b"name": event.event_name().encode("utf-8"),
-            b"source": b"i-test",
-            b"args": msgpack.packb(event.serialize()),
-        },
+        payload=AnycastMessagePayload(
+            name=message.name,
+            source="i-test",
+            payload=message.payload,
+        ),
     )
 
 
-def _make_broadcast_message(event: AbstractBroadcastEvent) -> BroadcastMessage:
-    args = base64.b64encode(msgpack.packb(event.serialize())).decode("ascii")
-    return BroadcastMessage(
-        payload={
-            "name": event.event_name(),
-            "source": "i-test",
-            "args": args,
-        },
+def _make_broadcast_payload(event: AbstractBroadcastEvent) -> BroadcastMessagePayload:
+    message = event.to_message()
+    return BroadcastMessagePayload(
+        name=message.name,
+        source="i-test",
+        payload=message.payload,
     )
 
 
@@ -115,7 +90,7 @@ class StubMessageQueue:
     def __init__(
         self,
         anycast_messages: list[MQMessage] | None = None,
-        broadcast_messages: list[BroadcastMessage] | None = None,
+        broadcast_messages: list[BroadcastMessagePayload] | None = None,
     ) -> None:
         self._anycast_messages = anycast_messages or []
         self._broadcast_messages = broadcast_messages or []
@@ -125,7 +100,7 @@ class StubMessageQueue:
         for msg in self._anycast_messages:
             yield msg
 
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessage, None]:
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:
         for msg in self._broadcast_messages:
             yield msg
 
@@ -204,7 +179,7 @@ class TestDispatchSubscribers:
     @pytest.fixture
     def mq(self) -> StubMessageQueue:
         return StubMessageQueue(
-            broadcast_messages=[_make_broadcast_message(DummyBroadcastEvent(value=7))],
+            broadcast_messages=[_make_broadcast_payload(DummyBroadcastEvent(value=7))],
         )
 
     @pytest.fixture
@@ -247,3 +222,57 @@ class TestDispatchSubscribers:
         await no_subscriber_dispatcher.start()
         await asyncio.sleep(0.1)
         await no_subscriber_dispatcher.close()
+
+
+class TestUndecodablePayload:
+    """A body the handler's event class cannot validate is dropped, not retried forever.
+
+    Redelivery cannot fix a payload that does not match the schema, so the message has to
+    be acked — otherwise it occupies the stream until the retry limit discards it.
+    """
+
+    @pytest.fixture
+    def received(self) -> list[DummyAnycastEvent]:
+        return []
+
+    @pytest.fixture
+    def mq(self) -> StubMessageQueue:
+        return StubMessageQueue(
+            anycast_messages=[
+                MQMessage(
+                    msg_id=b"test-msg-id",
+                    payload=AnycastMessagePayload(
+                        name=MessageName(DummyAnycastEvent.event_name()),
+                        source="i-test",
+                        payload='{"value":"not-an-int"}',
+                    ),
+                )
+            ],
+        )
+
+    @pytest.fixture
+    async def dispatcher(
+        self,
+        mq: StubMessageQueue,
+        received: list[DummyAnycastEvent],
+    ) -> EventDispatcher:
+        dispatcher = EventDispatcher(mq)  # type: ignore[arg-type]
+
+        async def handler(ctx: object, source: AgentId, ev: DummyAnycastEvent) -> None:
+            received.append(ev)
+
+        dispatcher.consume(DummyAnycastEvent, object(), handler)
+        return dispatcher
+
+    async def test_handler_is_skipped_and_the_message_is_acked(
+        self,
+        dispatcher: EventDispatcher,
+        mq: StubMessageQueue,
+        received: list[DummyAnycastEvent],
+    ) -> None:
+        await dispatcher.start()
+        await asyncio.sleep(0.1)
+        await dispatcher.close()
+
+        assert received == []
+        assert mq.done_calls == [b"test-msg-id"]

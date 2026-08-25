@@ -8,14 +8,14 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
-from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
+from ai.backend.manager.actions.action.bulk import BaseBulkAction, BasePartialBulkActionResult
 from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentOperationScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckerAssignmentSearchScope
 
 
 @dataclass(frozen=True)
@@ -33,8 +33,8 @@ class IdleCheckerAssignmentScopeTarget(SearchableActionTarget):
         )
 
     @override
-    def to_search_scope(self) -> SearchScope:
-        return IdleCheckerAssignmentSearchScope(
+    def to_search_scope(self) -> OperationScope:
+        return IdleCheckerAssignmentOperationScope(
             scope_type=self.scope_type,
             scope_id=self.scope_id,
         )
@@ -65,7 +65,7 @@ class ScopedSearchIdleCheckerAssignmentsAction(BaseBulkAction[SearchableActionTa
 
 
 @dataclass
-class ScopedSearchIdleCheckerAssignmentsActionResult(BaseBulkActionResult):
+class ScopedSearchIdleCheckerAssignmentsActionResult(BasePartialBulkActionResult):
     data: list[IdleCheckerAssignmentData]
     total_count: int
     has_next_page: bool

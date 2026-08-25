@@ -16,9 +16,6 @@ from .row import (
 from .row import (
     generate_ssh_keypair as generate_ssh_keypair,
 )
-from .row import (
-    prepare_new_keypair as prepare_new_keypair,
-)
 
 __all__ = (
     "MAXIMUM_DOTFILE_SIZE",

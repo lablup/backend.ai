@@ -19,26 +19,30 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
 )
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
+from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.upserters import ModelCardScanUpserter
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -49,12 +53,14 @@ from ai.backend.manager.models.resource_slot.row import (
     PresetResourceSlotRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
-from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -64,7 +70,7 @@ if TYPE_CHECKING:
 class TestModelCardScanResourceRequirements:
     """Verify scan upsert syncs the normalized requirements table.
 
-    Background: ModelCardScanUpserterSpec previously skipped `min_resource`
+    Background: ModelCardScanUpserter previously skipped `min_resource`
     in build_insert_values/build_update_values, leaving the
     model_card_resource_requirements table empty even after a full scan.
     That caused search_available_presets's relational division to be
@@ -80,15 +86,18 @@ class TestModelCardScanResourceRequirements:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
                 RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -121,7 +130,9 @@ class TestModelCardScanResourceRequirements:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> DomainRow:
         async with db_with_cleanup.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             domain = DomainRow(
+                id=domain_id,
                 name=f"test-domain-{uuid.uuid4().hex[:8]}",
                 description="Test domain",
                 is_active=True,
@@ -184,6 +195,7 @@ class TestModelCardScanResourceRequirements:
                     rounds=100_000,
                     salt_size=32,
                 ),
+                domain_id=DomainID(test_domain.id),
                 need_password_change=False,
                 full_name="Test User",
                 domain_name=test_domain.name,
@@ -202,9 +214,9 @@ class TestModelCardScanResourceRequirements:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         test_project_resource_policy: ProjectResourcePolicyRow,
-    ) -> GroupRow:
+    ) -> ProjectRow:
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=uuid.uuid4(),
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
@@ -215,6 +227,7 @@ class TestModelCardScanResourceRequirements:
                 allowed_vfolder_hosts={},
             )
             db_sess.add(group)
+            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group.id))
             await db_sess.flush()
         return group
 
@@ -244,7 +257,7 @@ class TestModelCardScanResourceRequirements:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ModelCardDBSource:
-        return ModelCardDBSource(db_with_cleanup)
+        return ModelCardDBSource(V2DBOpsProvider(db_with_cleanup))
 
     def _build_scan_spec(
         self,
@@ -252,11 +265,11 @@ class TestModelCardScanResourceRequirements:
         name: str,
         test_domain: DomainRow,
         test_user: UserRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_vfolder: VFolderRow,
         min_resource: list[ResourceRequirementEntry],
-    ) -> ModelCardScanUpserterSpec:
-        return ModelCardScanUpserterSpec(
+    ) -> ModelCardScanUpserter:
+        return ModelCardScanUpserter(
             name=name,
             vfolder_id=test_vfolder.id,
             domain=test_domain.name,
@@ -283,7 +296,7 @@ class TestModelCardScanResourceRequirements:
         db_source: ModelCardDBSource,
         test_domain: DomainRow,
         test_user: UserRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_vfolder: VFolderRow,
     ) -> None:
         spec = self._build_scan_spec(
@@ -327,7 +340,7 @@ class TestModelCardScanResourceRequirements:
         db_source: ModelCardDBSource,
         test_domain: DomainRow,
         test_user: UserRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_vfolder: VFolderRow,
     ) -> None:
         # Re-running scan with the same input must NOT duplicate child rows.
@@ -366,7 +379,7 @@ class TestModelCardScanResourceRequirements:
         db_source: ModelCardDBSource,
         test_domain: DomainRow,
         test_user: UserRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_vfolder: VFolderRow,
     ) -> None:
         # If the model definition changes its min_resource between scans,
@@ -425,7 +438,7 @@ class TestModelCardScanResourceRequirements:
         db_source: ModelCardDBSource,
         test_domain: DomainRow,
         test_user: UserRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_vfolder: VFolderRow,
     ) -> None:
         # Once the scan populates requirements, the relational division SQL

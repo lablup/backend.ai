@@ -7,6 +7,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair.request import (
     AdminCreateKeypairInput,
@@ -19,6 +20,7 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
     UpdateMyKeypairInput,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import SearchMyKeypairsPayload
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import AccessKeyPathParam
 from ai.backend.manager.dto.context import UserContext
@@ -64,20 +66,18 @@ class V2KeypairHandler:
     async def revoke(
         self,
         body: BodyParam[RevokeMyKeypairInput],
-        ctx: UserContext,
     ) -> APIResponse:
         """Revoke a keypair owned by the current user."""
-        result = await self._adapter.revoke_my_keypair(ctx.user_uuid, body.parsed.access_key)
+        result = await self._adapter.revoke_my_keypair(body.parsed.access_key)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def update(
         self,
         body: BodyParam[UpdateMyKeypairInput],
-        ctx: UserContext,
     ) -> APIResponse:
         """Update a keypair owned by the current user."""
         result = await self._adapter.update_my_keypair(
-            ctx.user_uuid, body.parsed.access_key, body.parsed.is_active
+            body.parsed.access_key, body.parsed.is_active
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -87,8 +87,8 @@ class V2KeypairHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Switch the main access key for the current user."""
-        result = await self._adapter.switch_my_main_access_key(
-            ctx.user_uuid, body.parsed.access_key
+        result = await self._adapter.switch_default_access_key(
+            UserID(ctx.user_uuid), AccessKey(body.parsed.access_key)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

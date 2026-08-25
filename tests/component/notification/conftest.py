@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.notification import (
+    NOTIFICATION_CHANNEL_ENTITY_TYPE,
+    NOTIFICATION_RULE_ENTITY_TYPE,
+)
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.notification.handler import NotificationHandler
 from ai.backend.manager.api.rest.notification.registry import register_notification_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -14,6 +16,7 @@ from ai.backend.manager.notification.notification_center import NotificationCent
 from ai.backend.manager.repositories.notification.repository import NotificationRepository
 from ai.backend.manager.services.notification.processors import NotificationProcessors
 from ai.backend.manager.services.notification.service import NotificationService
+from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
@@ -24,11 +27,13 @@ def notification_processors(
     repo = NotificationRepository(database_engine)
     service = NotificationService(repo, notification_center)
     # Create properly structured ActionValidators mock with async validators
-    validators = MagicMock(spec=ActionValidators)
-    validators.rbac = MagicMock()
-    validators.rbac.scope = AsyncMock()
-    validators.rbac.single_entity = AsyncMock()
-    return NotificationProcessors(service=service, action_monitors=[], validators=validators)
+    return NotificationProcessors(
+        channel_group=ops_processor_group(
+            database_engine, GroupMeta(NOTIFICATION_CHANNEL_ENTITY_TYPE)
+        ),
+        rule_group=ops_processor_group(database_engine, GroupMeta(NOTIFICATION_RULE_ENTITY_TYPE)),
+        service=service,
+    )
 
 
 @pytest.fixture()

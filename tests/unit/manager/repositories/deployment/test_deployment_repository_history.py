@@ -12,9 +12,11 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import RouteHandlerCategory, RouteStatus
@@ -24,13 +26,14 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.endpoint.updaters import EndpointLifecycleBatchUpdater
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -38,26 +41,26 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.scheduling_history import DeploymentHistoryRow, RouteHistoryRow
+from ai.backend.manager.models.scheduling_history.creators import (
+    DeploymentHistoryCreator,
+    RouteHistoryCreator,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.creators import (
-    EndpointLifecycleBatchUpdaterSpec,
-    RouteBatchUpdaterSpec,
+from ai.backend.manager.repositories.deployment.types import (
+    DeploymentHistoryToCreate,
+    RouteHistoryToCreate,
 )
-from ai.backend.manager.repositories.scheduling_history.creators import (
-    DeploymentHistoryCreatorSpec,
-    RouteHistoryCreatorSpec,
-)
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -84,8 +87,8 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             [
                 # FK order: parent -> child
                 DomainRow,
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                ResourceGroupRow,
+                ResourcePresetRow,  # ResourceGroupRow relationship dependency
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -96,7 +99,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 SessionRow,
                 EndpointRow,
@@ -109,15 +112,17 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain and return domain name."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -128,7 +133,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -139,14 +144,14 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -164,7 +169,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
 
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://test-registry.example.com",
                 registry_name=registry_name,
                 type=ContainerRegistryType.DOCKER,
@@ -293,7 +298,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID."""
@@ -308,9 +313,10 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -329,15 +335,9 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Get user email for user_id field
-            user_result = await db_sess.execute(
-                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
-            )
-            user_email = user_result.scalar_one()
-
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="dummy-secret",
-                user_id=user_email,
+                secret_key=SecretValue("dummy-secret"),
                 user=test_user_uuid,
                 is_active=True,
                 resource_policy=test_keypair_resource_policy_name,
@@ -351,17 +351,17 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -373,7 +373,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
     async def test_pending_endpoint_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -389,7 +389,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=test_user_uuid,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
                 desired_replicas=1,
@@ -415,6 +415,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -430,28 +431,28 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
         """Status update and history are created in the same transaction."""
         # Test transition from PENDING to CREATED
         batch_updaters = [
-            BatchUpdater(
-                spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=EndpointLifecycle.CREATED),
-                conditions=[
-                    DeploymentConditions.by_ids([test_pending_endpoint_id]),
-                    DeploymentConditions.by_lifecycle_stages([EndpointLifecycle.PENDING]),
-                ],
+            EndpointLifecycleBatchUpdater(
+                deployment_ids=[test_pending_endpoint_id],
+                lifecycle_stages=[EndpointLifecycle.PENDING],
+                lifecycle_stage=EndpointLifecycle.CREATED,
             )
         ]
         history_specs = [
-            DeploymentHistoryCreatorSpec(
+            DeploymentHistoryToCreate(
                 deployment_id=test_pending_endpoint_id,
-                phase="check_pending",
-                result=SchedulingResult.SUCCESS,
-                message="Test completed successfully",
-                from_status=EndpointLifecycle.PENDING,
-                to_status=EndpointLifecycle.CREATED,
+                creator=DeploymentHistoryCreator(
+                    phase="check_pending",
+                    result=SchedulingResult.SUCCESS,
+                    message="Test completed successfully",
+                    from_status=EndpointLifecycle.PENDING,
+                    to_status=EndpointLifecycle.CREATED,
+                ),
             )
         ]
 
         updated_count = await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
             batch_updaters,
-            new_history_specs=history_specs,
+            new_histories=history_specs,
             merge_history_ids=[],
         )
 
@@ -464,10 +465,10 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             assert endpoint.lifecycle_stage == EndpointLifecycle.CREATED
 
             # Verify history record
-            stmt = sa.select(DeploymentHistoryRow).where(
+            history_stmt = sa.select(DeploymentHistoryRow).where(
                 DeploymentHistoryRow.deployment_id == test_pending_endpoint_id
             )
-            histories = (await db_sess.execute(stmt)).scalars().all()
+            histories = (await db_sess.execute(history_stmt)).scalars().all()
             assert len(histories) == 1
             assert histories[0].phase == "check_pending"
             assert histories[0].result == str(SchedulingResult.SUCCESS)
@@ -479,7 +480,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
         """Empty batch_updaters returns 0."""
         result = await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
             [],
-            new_history_specs=[],
+            new_histories=[],
             merge_history_ids=[],
         )
         assert result == 0
@@ -499,8 +500,8 @@ class TestUpdateRouteStatusBulkWithHistory:
             [
                 # FK order: parent -> child
                 DomainRow,
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                ResourceGroupRow,
+                ResourcePresetRow,  # ResourceGroupRow relationship dependency
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -511,7 +512,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 SessionRow,
                 EndpointRow,
@@ -524,15 +525,17 @@ class TestUpdateRouteStatusBulkWithHistory:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain and return domain name."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -543,7 +546,7 @@ class TestUpdateRouteStatusBulkWithHistory:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -554,14 +557,14 @@ class TestUpdateRouteStatusBulkWithHistory:
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.commit()
@@ -579,7 +582,7 @@ class TestUpdateRouteStatusBulkWithHistory:
 
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://test-registry.example.com",
                 registry_name=registry_name,
                 type=ContainerRegistryType.DOCKER,
@@ -708,7 +711,7 @@ class TestUpdateRouteStatusBulkWithHistory:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID."""
@@ -723,9 +726,10 @@ class TestUpdateRouteStatusBulkWithHistory:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -744,15 +748,9 @@ class TestUpdateRouteStatusBulkWithHistory:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Get user email for user_id field
-            user_result = await db_sess.execute(
-                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
-            )
-            user_email = user_result.scalar_one()
-
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="dummy-secret",
-                user_id=user_email,
+                secret_key=SecretValue("dummy-secret"),
                 user=test_user_uuid,
                 is_active=True,
                 resource_policy=test_keypair_resource_policy_name,
@@ -766,17 +764,17 @@ class TestUpdateRouteStatusBulkWithHistory:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
         group_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -788,7 +786,7 @@ class TestUpdateRouteStatusBulkWithHistory:
     async def test_endpoint_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -804,7 +802,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=test_user_uuid,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
                 desired_replicas=1,
@@ -822,7 +820,7 @@ class TestUpdateRouteStatusBulkWithHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint_id: DeploymentID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> uuid.UUID:
@@ -835,7 +833,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 endpoint=test_endpoint_id,
                 session=None,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 status=RouteStatus.PROVISIONING,
                 traffic_ratio=1.0,
@@ -859,6 +857,7 @@ class TestUpdateRouteStatusBulkWithHistory:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -874,30 +873,29 @@ class TestUpdateRouteStatusBulkWithHistory:
     ) -> None:
         """Status update and history are created in the same transaction."""
         batch_updaters = [
-            BatchUpdater(
-                spec=RouteBatchUpdaterSpec(status=OptionalState.update(RouteStatus.RUNNING)),
-                conditions=[
-                    RouteConditions.by_ids([test_provisioning_route_id]),
-                    RouteConditions.by_statuses([RouteStatus.PROVISIONING]),
-                ],
+            ReplicaBatchUpdater(
+                replica_ids=[test_provisioning_route_id],
+                status=OptionalState.update(RouteStatus.RUNNING),
             )
         ]
         history_specs = [
-            RouteHistoryCreatorSpec(
-                route_id=ReplicaID(test_provisioning_route_id),
+            RouteHistoryToCreate(
                 deployment_id=test_endpoint_id,
-                category=RouteHandlerCategory.LIFECYCLE,
-                phase="provisioning",
-                result=SchedulingResult.SUCCESS,
-                message="Provisioning completed successfully",
-                from_status=RouteStatus.PROVISIONING,
-                to_status=RouteStatus.RUNNING,
+                creator=RouteHistoryCreator(
+                    route_id=ReplicaID(test_provisioning_route_id),
+                    category=RouteHandlerCategory.LIFECYCLE,
+                    phase="provisioning",
+                    result=SchedulingResult.SUCCESS,
+                    message="Provisioning completed successfully",
+                    from_status=RouteStatus.PROVISIONING,
+                    to_status=RouteStatus.RUNNING,
+                ),
             )
         ]
 
         updated_count = await deployment_repository.update_route_status_bulk_with_history(
             batch_updaters,
-            BulkCreator(specs=history_specs),
+            history_specs,
         )
 
         assert updated_count == 1
@@ -909,10 +907,10 @@ class TestUpdateRouteStatusBulkWithHistory:
             assert route.status == RouteStatus.RUNNING
 
             # Verify history record
-            stmt = sa.select(RouteHistoryRow).where(
+            history_stmt = sa.select(RouteHistoryRow).where(
                 RouteHistoryRow.route_id == test_provisioning_route_id
             )
-            histories = (await db_sess.execute(stmt)).scalars().all()
+            histories = (await db_sess.execute(history_stmt)).scalars().all()
             assert len(histories) == 1
             assert histories[0].phase == "provisioning"
             assert histories[0].result == str(SchedulingResult.SUCCESS)
@@ -922,9 +920,7 @@ class TestUpdateRouteStatusBulkWithHistory:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Empty batch_updaters returns 0."""
-        result = await deployment_repository.update_route_status_bulk_with_history(
-            [], BulkCreator(specs=[])
-        )
+        result = await deployment_repository.update_route_status_bulk_with_history([], [])
         assert result == 0
 
 
@@ -941,7 +937,7 @@ class TestDeploymentHistoryMergeLogic:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 ResourcePresetRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -953,7 +949,7 @@ class TestDeploymentHistoryMergeLogic:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 SessionRow,
                 EndpointRow,
@@ -971,6 +967,7 @@ class TestDeploymentHistoryMergeLogic:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[DeploymentID, uuid.UUID]:
         """Create test endpoint with existing history record."""
+        domain_id = DomainID(uuid.uuid4())
         endpoint_id = DeploymentID(uuid.uuid4())
         history_id = uuid.uuid4()
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -987,6 +984,7 @@ class TestDeploymentHistoryMergeLogic:
             # Create domain
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -998,14 +996,14 @@ class TestDeploymentHistoryMergeLogic:
 
             # Create scaling group
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=sgroup_name,
                     description="Test scaling group",
                     is_active=True,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
 
@@ -1059,12 +1057,13 @@ class TestDeploymentHistoryMergeLogic:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
+                    domain_id=domain_id,
                 )
             )
 
             # Create group
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
@@ -1076,7 +1075,7 @@ class TestDeploymentHistoryMergeLogic:
             registry_name = f"test-registry-{uuid.uuid4().hex[:8]}"
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url="https://test-registry.example.com",
                     registry_name=registry_name,
                     type=ContainerRegistryType.DOCKER,
@@ -1154,6 +1153,7 @@ class TestDeploymentHistoryMergeLogic:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -1171,15 +1171,15 @@ class TestDeploymentHistoryMergeLogic:
 
         # Create new history with same phase, error_code, to_status
         batch_updaters = [
-            BatchUpdater(
-                spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=EndpointLifecycle.PENDING),
-                conditions=[DeploymentConditions.by_ids([endpoint_id])],
+            EndpointLifecycleBatchUpdater(
+                deployment_ids=[endpoint_id],
+                lifecycle_stage=EndpointLifecycle.PENDING,
             )
         ]
 
         await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
             batch_updaters,
-            new_history_specs=[],
+            new_histories=[],
             merge_history_ids=[history_id],
         )
 
@@ -1204,26 +1204,29 @@ class TestDeploymentHistoryMergeLogic:
         endpoint_id, _ = test_endpoint_with_history
 
         batch_updaters = [
-            BatchUpdater(
-                spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=EndpointLifecycle.CREATED),
-                conditions=[DeploymentConditions.by_ids([endpoint_id])],
+            EndpointLifecycleBatchUpdater(
+                deployment_ids=[endpoint_id],
+                lifecycle_stage=EndpointLifecycle.CREATED,
             )
         ]
         history_specs = [
-            DeploymentHistoryCreatorSpec(
+            DeploymentHistoryToCreate(
                 deployment_id=endpoint_id,
-                phase="allocation",  # Different
-                result=SchedulingResult.SUCCESS,
-                error_code=None,
-                message="Allocation succeeded",
-                from_status=EndpointLifecycle.PENDING,
-                to_status=EndpointLifecycle.CREATED,
+                creator=DeploymentHistoryCreator(
+                    phase="allocation",
+                    # Different
+                    result=SchedulingResult.SUCCESS,
+                    error_code=None,
+                    message="Allocation succeeded",
+                    from_status=EndpointLifecycle.PENDING,
+                    to_status=EndpointLifecycle.CREATED,
+                ),
             )
         ]
 
         await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
             batch_updaters,
-            new_history_specs=history_specs,
+            new_histories=history_specs,
             merge_history_ids=[],
         )
 
@@ -1256,7 +1259,7 @@ class TestRouteHistoryMergeLogic:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 ResourcePresetRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -1268,7 +1271,7 @@ class TestRouteHistoryMergeLogic:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 VFolderRow,
                 SessionRow,
                 EndpointRow,
@@ -1286,6 +1289,7 @@ class TestRouteHistoryMergeLogic:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[DeploymentID, uuid.UUID, uuid.UUID]:
         """Create test route with existing history record."""
+        domain_id = DomainID(uuid.uuid4())
         endpoint_id = DeploymentID(uuid.uuid4())
         route_id = uuid.uuid4()
         history_id = uuid.uuid4()
@@ -1303,6 +1307,7 @@ class TestRouteHistoryMergeLogic:
             # Create domain
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1314,14 +1319,14 @@ class TestRouteHistoryMergeLogic:
 
             # Create scaling group
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=sgroup_name,
                     description="Test scaling group",
                     is_active=True,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
 
@@ -1375,12 +1380,13 @@ class TestRouteHistoryMergeLogic:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
+                    domain_id=domain_id,
                 )
             )
 
             # Create group
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
@@ -1392,7 +1398,7 @@ class TestRouteHistoryMergeLogic:
             registry_name = f"test-registry-{uuid.uuid4().hex[:8]}"
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url="https://test-registry.example.com",
                     registry_name=registry_name,
                     type=ContainerRegistryType.DOCKER,
@@ -1486,6 +1492,7 @@ class TestRouteHistoryMergeLogic:
 
         return DeploymentRepository(
             db=db_with_cleanup,
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=storage_manager,
             valkey_stat=valkey_stat,
             valkey_live=valkey_live,
@@ -1502,28 +1509,33 @@ class TestRouteHistoryMergeLogic:
         endpoint_id, route_id, history_id = test_route_with_history
 
         batch_updaters = [
-            BatchUpdater(
-                spec=RouteBatchUpdaterSpec(status=OptionalState.update(RouteStatus.PROVISIONING)),
-                conditions=[RouteConditions.by_ids([route_id])],
+            ReplicaBatchUpdater(
+                replica_ids=[route_id],
+                status=OptionalState.update(RouteStatus.PROVISIONING),
             )
         ]
         history_specs = [
-            RouteHistoryCreatorSpec(
-                route_id=ReplicaID(route_id),
+            RouteHistoryToCreate(
                 deployment_id=endpoint_id,
-                category=RouteHandlerCategory.LIFECYCLE,
-                phase="provisioning",  # Same
-                result=SchedulingResult.FAILURE,
-                error_code="SESSION_CREATION_FAILED",  # Same
-                message="Session creation failed again",
-                from_status=RouteStatus.PROVISIONING,
-                to_status=RouteStatus.PROVISIONING,  # Same
+                creator=RouteHistoryCreator(
+                    route_id=ReplicaID(route_id),
+                    category=RouteHandlerCategory.LIFECYCLE,
+                    phase="provisioning",
+                    # Same
+                    result=SchedulingResult.FAILURE,
+                    error_code="SESSION_CREATION_FAILED",
+                    # Same
+                    message="Session creation failed again",
+                    from_status=RouteStatus.PROVISIONING,
+                    to_status=RouteStatus.PROVISIONING,
+                    # Same,
+                ),
             )
         ]
 
         await deployment_repository.update_route_status_bulk_with_history(
             batch_updaters,
-            BulkCreator(specs=history_specs),
+            history_specs,
         )
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -1545,28 +1557,32 @@ class TestRouteHistoryMergeLogic:
         endpoint_id, route_id, _ = test_route_with_history
 
         batch_updaters = [
-            BatchUpdater(
-                spec=RouteBatchUpdaterSpec(status=OptionalState.update(RouteStatus.RUNNING)),
-                conditions=[RouteConditions.by_ids([route_id])],
+            ReplicaBatchUpdater(
+                replica_ids=[route_id],
+                status=OptionalState.update(RouteStatus.RUNNING),
             )
         ]
         history_specs = [
-            RouteHistoryCreatorSpec(
-                route_id=ReplicaID(route_id),
+            RouteHistoryToCreate(
                 deployment_id=endpoint_id,
-                category=RouteHandlerCategory.LIFECYCLE,
-                phase="provisioning",  # Same
-                result=SchedulingResult.SUCCESS,
-                error_code=None,
-                message="Provisioning succeeded",
-                from_status=RouteStatus.PROVISIONING,
-                to_status=RouteStatus.RUNNING,  # Different
+                creator=RouteHistoryCreator(
+                    route_id=ReplicaID(route_id),
+                    category=RouteHandlerCategory.LIFECYCLE,
+                    phase="provisioning",
+                    # Same
+                    result=SchedulingResult.SUCCESS,
+                    error_code=None,
+                    message="Provisioning succeeded",
+                    from_status=RouteStatus.PROVISIONING,
+                    to_status=RouteStatus.RUNNING,
+                    # Different,
+                ),
             )
         ]
 
         await deployment_repository.update_route_status_bulk_with_history(
             batch_updaters,
-            BulkCreator(specs=history_specs),
+            history_specs,
         )
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:

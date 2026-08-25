@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import override
 
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.schema.deployment import TrafficStepInput
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
@@ -11,16 +11,14 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
     DeploymentTargetStatuses,
+    ReplicaGroupData,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment.updaters.replica_group import (
-    ReplicaGroupDeployUpdaterSpec,
-)
+from ai.backend.manager.models.replica_group.updaters import ReplicaGroupDeployUpdater
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import (
@@ -99,18 +97,15 @@ class DeployingPromotingHandler(DeploymentHandler):
     ) -> DeploymentExecutionResult:
         now = await self._replica_group_repository.current_time()
         deployment_ids = [d.deployment_info.id for d in deployments]
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ReplicaGroupConditions.by_deployment_ids(deployment_ids)],
-        )
-        views = await self._replica_group_repository.search_deploy_scheduling_views(querier)
+        conditions = [ReplicaGroupConditions.by_deployment_ids(deployment_ids)]
+        views = await self._replica_group_repository.search_deploy_scheduling_views(conditions)
         groups_by_id: dict[ReplicaGroupID, ReplicaGroupDeploySchedulingView] = {
             view.group_id: view for view in views
         }
 
         completed: list[DeploymentWithHistory] = []
         failures: list[DeploymentExecutionError] = []
-        group_updaters: list[Updater[ReplicaGroupRow]] = []
+        group_updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = []
 
         for deployment in deployments:
             info = deployment.deployment_info
@@ -148,20 +143,16 @@ class DeployingPromotingHandler(DeploymentHandler):
                 )
             )
             group_updaters.append(
-                Updater(
-                    pk_value=target.group_id,
-                    spec=ReplicaGroupDeployUpdaterSpec(
-                        traffic_weight=OptionalState.update(step.target_traffic_weight),
-                    ),
+                ReplicaGroupDeployUpdater(
+                    replica_group_id=target.group_id,
+                    traffic_weight=OptionalState.update(step.target_traffic_weight),
                 )
             )
             if serving is not None:
                 group_updaters.append(
-                    Updater(
-                        pk_value=serving.group_id,
-                        spec=ReplicaGroupDeployUpdaterSpec(
-                            traffic_weight=OptionalState.update(step.serving_traffic_weight),
-                        ),
+                    ReplicaGroupDeployUpdater(
+                        replica_group_id=serving.group_id,
+                        traffic_weight=OptionalState.update(step.serving_traffic_weight),
                     )
                 )
             if step.completed:

@@ -56,8 +56,15 @@ from ai.backend.manager.data.permission.virtual_scope import (
 )
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.role_invitation.scopes import (
+    InviteeOperationScope,
+    InviterOperationScope,
+    RoleInvitationOperationScope,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
@@ -70,16 +77,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
     UserRoleCreatorSpec,
 )
-from ai.backend.manager.repositories.permission_controller.types import (
-    PermissionSearchScope,
-    ScopedRoleSearchScope,
-)
-from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeSearchScope,
-    InviterSearchScope,
-    RoleInvitationSearchResult,
-    RoleInvitationSearchScope,
-)
+from ai.backend.manager.repositories.role_invitation.types import RoleInvitationSearchResult
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
 
@@ -330,7 +328,7 @@ class PermissionControllerRepository:
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
-        scope: ScopedRoleSearchScope,
+        scope: ScopedRoleOperationScope,
     ) -> RoleListResult:
         """Search roles registered in a project scope."""
         return await self._db_source.search_roles_in_scope(querier=querier, scope=scope)
@@ -339,7 +337,7 @@ class PermissionControllerRepository:
     async def search_permissions(
         self,
         querier: BatchQuerier,
-        scope: PermissionSearchScope | None = None,
+        scope: PermissionOperationScope | None = None,
     ) -> PermissionListResult:
         """Searches permissions with pagination and filtering."""
         return await self._db_source.search_permissions(querier=querier, scope=scope)
@@ -452,7 +450,8 @@ class PermissionControllerRepository:
 
         Resolves the effective permission via
         ``entity -> entity_memberships -> scope_bindings -> scope`` with per-hop
-        cap clipping and tests it bitwise against ``permission``.
+        cap clipping and grants only when it covers every bit of ``permission``,
+        which may be a mask (``UPSERT`` requires ``CREATE | UPDATE``).
         """
         return await self._db_source.check_single_entity_permission_via_virtual_scope(
             key, permission
@@ -520,7 +519,7 @@ class PermissionControllerRepository:
     async def search_invitations_by_invitee(
         self,
         querier: BatchQuerier,
-        scope: InviteeSearchScope,
+        scope: InviteeOperationScope,
     ) -> RoleInvitationSearchResult:
         return await self._db_source.search_invitations_by_invitee(querier, scope)
 
@@ -528,7 +527,7 @@ class PermissionControllerRepository:
     async def search_invitations_by_inviter(
         self,
         querier: BatchQuerier,
-        scope: InviterSearchScope,
+        scope: InviterOperationScope,
     ) -> RoleInvitationSearchResult:
         return await self._db_source.search_invitations_by_inviter(querier, scope)
 
@@ -536,7 +535,7 @@ class PermissionControllerRepository:
     async def search_invitations_by_role(
         self,
         querier: BatchQuerier,
-        scope: RoleInvitationSearchScope,
+        scope: RoleInvitationOperationScope,
     ) -> RoleInvitationSearchResult:
         return await self._db_source.search_invitations_by_role(querier, scope)
 

@@ -2,81 +2,65 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.manager.repositories.agent.repositories import AgentRepositories
-from ai.backend.manager.repositories.app_config_allow_list.repositories import (
-    AppConfigAllowListRepositories,
-)
-from ai.backend.manager.repositories.app_config_definition.repositories import (
-    AppConfigDefinitionRepositories,
-)
-from ai.backend.manager.repositories.app_config_fragment.repositories import (
-    AppConfigFragmentRepositories,
-)
 from ai.backend.manager.repositories.artifact.repositories import ArtifactRepositories
 from ai.backend.manager.repositories.artifact_registry.repositories import (
     ArtifactRegistryRepositories,
 )
-from ai.backend.manager.repositories.audit_log.repositories import AuditLogRepositories
 from ai.backend.manager.repositories.auth.repositories import AuthRepositories
+from ai.backend.manager.repositories.client_ip_masking.repositories import (
+    ClientIPMaskingRepositories,
+)
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
 )
 from ai.backend.manager.repositories.deployment.repositories import DeploymentRepositories
 from ai.backend.manager.repositories.deployment_revision_preset.repositories import (
-    DeploymentRevisionPresetRepositories,
+    DeploymentPresetRepositories,
 )
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
-from ai.backend.manager.repositories.dotfile.repositories import DotfileRepositories
+from ai.backend.manager.repositories.entity_invitation.repositories import (
+    EntityInvitationRepositories,
+)
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
 from ai.backend.manager.repositories.etcd_config.repositories import EtcdConfigRepositories
 from ai.backend.manager.repositories.events.repositories import EventsRepositories
 from ai.backend.manager.repositories.export.repositories import ExportRepositories
 from ai.backend.manager.repositories.fair_share.repositories import FairShareRepositories
-from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.huggingface_registry.repositories import (
     HuggingFaceRegistryRepositories,
 )
 from ai.backend.manager.repositories.idle_checker.repositories import IdleCheckerRepositories
 from ai.backend.manager.repositories.image.repositories import ImageRepositories
-from ai.backend.manager.repositories.keypair_resource_policy.repositories import (
-    KeypairResourcePolicyRepositories,
-)
 from ai.backend.manager.repositories.manager_admin.repositories import ManagerAdminRepositories
 from ai.backend.manager.repositories.metric.repositories import MetricRepositories
 from ai.backend.manager.repositories.model_card.repositories import ModelCardRepositories
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.notification.repositories import NotificationRepositories
 from ai.backend.manager.repositories.object_storage.repositories import ObjectStorageRepositories
+from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repositories import (
     PermissionControllerRepositories,
 )
-from ai.backend.manager.repositories.project_resource_policy.repositories import (
-    ProjectResourcePolicyRepositories,
-)
+from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepositories,
-)
-from ai.backend.manager.repositories.prometheus_query_preset_category.repositories import (
-    PrometheusQueryPresetCategoryRepositories,
 )
 from ai.backend.manager.repositories.replica_group.repositories import ReplicaGroupRepositories
 from ai.backend.manager.repositories.reservoir_registry.repositories import (
     ReservoirRegistryRepositories,
 )
+from ai.backend.manager.repositories.resource_group.repositories import ResourceGroupRepositories
 from ai.backend.manager.repositories.resource_preset.repositories import ResourcePresetRepositories
 from ai.backend.manager.repositories.resource_slot.repositories import ResourceSlotRepositories
 from ai.backend.manager.repositories.resource_usage_history.repositories import (
     ResourceUsageHistoryRepositories,
 )
 from ai.backend.manager.repositories.retention.repositories import RetentionRepositories
-from ai.backend.manager.repositories.retention_policy.repositories import (
-    RetentionPolicyRepositories,
-)
-from ai.backend.manager.repositories.role_preset.repositories import RolePresetRepositories
 from ai.backend.manager.repositories.runtime_variant.repositories import RuntimeVariantRepositories
 from ai.backend.manager.repositories.runtime_variant_preset.repositories import (
     RuntimeVariantPresetRepositories,
 )
-from ai.backend.manager.repositories.scaling_group.repositories import ScalingGroupRepositories
 from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
 from ai.backend.manager.repositories.scheduling_history.repositories import (
     SchedulingHistoryRepositories,
@@ -99,42 +83,37 @@ from ai.backend.manager.repositories.vfs_storage.repositories import VFSStorageR
 @dataclass
 class Repositories:
     agent: AgentRepositories
-    app_config_allow_list: AppConfigAllowListRepositories
-    app_config_definition: AppConfigDefinitionRepositories
-    app_config_fragment: AppConfigFragmentRepositories
+    ops_provider: DBOpsProvider
+    v2_ops_provider: V2DBOpsProvider
     auth: AuthRepositories
     container_registry: ContainerRegistryRepositories
     deployment: DeploymentRepositories
     domain: DomainRepositories
-    dotfile: DotfileRepositories
     error_log: ErrorLogRepositories
     etcd_config: EtcdConfigRepositories
     export: ExportRepositories
     fair_share: FairShareRepositories
-    group: GroupRepositories
+    project: ProjectRepositories
     idle_checker: IdleCheckerRepositories
     image: ImageRepositories
-    keypair_resource_policy: KeypairResourcePolicyRepositories
     manager_admin: ManagerAdminRepositories
     metric: MetricRepositories
     model_serving: ModelServingRepositories
     notification: NotificationRepositories
     permission_controller: PermissionControllerRepositories
-    project_resource_policy: ProjectResourcePolicyRepositories
+    entity_invitation: EntityInvitationRepositories
     prometheus_query_preset: PrometheusQueryPresetRepositories
-    prometheus_query_preset_category: PrometheusQueryPresetCategoryRepositories
     replica_group: ReplicaGroupRepositories
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
     resource_slot: ResourceSlotRepositories
-    retention_policy: RetentionPolicyRepositories
-    role_preset: RolePresetRepositories
     runtime_variant: RuntimeVariantRepositories
+    client_ip_masking: ClientIPMaskingRepositories
     runtime_variant_preset: RuntimeVariantPresetRepositories
-    deployment_revision_preset: DeploymentRevisionPresetRepositories
+    deployment_revision_preset: DeploymentPresetRepositories
     model_card: ModelCardRepositories
     resource_usage_history: ResourceUsageHistoryRepositories
-    scaling_group: ScalingGroupRepositories
+    resource_group: ResourceGroupRepositories
     scheduler: SchedulerRepositories
     scheduling_history: SchedulingHistoryRepositories
     session: SessionRepositories
@@ -150,50 +129,40 @@ class Repositories:
     stream: StreamRepositories
     events: EventsRepositories
     storage_namespace: StorageNamespaceRepositories
-    audit_log: AuditLogRepositories
     retention: RetentionRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         agent_repositories = AgentRepositories.create(args)
-        app_config_allow_list_repositories = AppConfigAllowListRepositories.create(args)
-        app_config_definition_repositories = AppConfigDefinitionRepositories.create(args)
-        app_config_fragment_repositories = AppConfigFragmentRepositories.create(args)
         auth_repositories = AuthRepositories.create(args)
         container_registry_repositories = ContainerRegistryRepositories.create(args)
         deployment_repositories = DeploymentRepositories.create(args)
         domain_repositories = DomainRepositories.create(args)
-        dotfile_repositories = DotfileRepositories.create(args)
         error_log_repositories = ErrorLogRepositories.create(args)
         etcd_config_repositories = EtcdConfigRepositories.create(args)
         export_repositories = ExportRepositories.create(args)
         fair_share_repositories = FairShareRepositories.create(args)
-        group_repositories = GroupRepositories.create(args)
+        project_repositories = ProjectRepositories.create(args)
         idle_checker_repositories = IdleCheckerRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
-        keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
         manager_admin_repositories = ManagerAdminRepositories.create(args)
         metric_repositories = MetricRepositories.create(args)
         model_serving_repositories = ModelServingRepositories.create(args)
         notification_repositories = NotificationRepositories.create(args)
         permission_controller_repositories = PermissionControllerRepositories.create(args)
-        project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
         prometheus_query_preset_repositories = PrometheusQueryPresetRepositories.create(args)
-        prometheus_query_preset_category_repositories = (
-            PrometheusQueryPresetCategoryRepositories.create(args)
-        )
+        entity_invitation_repositories = EntityInvitationRepositories.create(args)
         replica_group_repositories = ReplicaGroupRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         resource_slot_repositories = ResourceSlotRepositories.create(args)
-        retention_policy_repositories = RetentionPolicyRepositories.create(args)
-        role_preset_repositories = RolePresetRepositories.create(args)
         runtime_variant_repositories = RuntimeVariantRepositories.create(args)
+        client_ip_masking_repositories = ClientIPMaskingRepositories.create(args)
         runtime_variant_preset_repositories = RuntimeVariantPresetRepositories.create(args)
-        deployment_revision_preset_repositories = DeploymentRevisionPresetRepositories.create(args)
+        deployment_revision_preset_repositories = DeploymentPresetRepositories.create(args)
         model_card_repositories = ModelCardRepositories.create(args)
         resource_usage_history_repositories = ResourceUsageHistoryRepositories.create(args)
-        scaling_group_repositories = ScalingGroupRepositories.create(args)
+        resource_group_repositories = ResourceGroupRepositories.create(args)
         scheduler_repositories = SchedulerRepositories.create(args)
         scheduling_history_repositories = SchedulingHistoryRepositories.create(args)
         session_repositories = SessionRepositories.create(args)
@@ -209,47 +178,41 @@ class Repositories:
         stream_repositories = StreamRepositories.create(args)
         events_repositories = EventsRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
-        audit_log_repositories = AuditLogRepositories.create(args)
         retention_repositories = RetentionRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
-            app_config_allow_list=app_config_allow_list_repositories,
-            app_config_definition=app_config_definition_repositories,
-            app_config_fragment=app_config_fragment_repositories,
+            ops_provider=args.ops_provider,
+            v2_ops_provider=args.v2_ops_provider,
             auth=auth_repositories,
             container_registry=container_registry_repositories,
             deployment=deployment_repositories,
             domain=domain_repositories,
-            dotfile=dotfile_repositories,
             error_log=error_log_repositories,
             etcd_config=etcd_config_repositories,
             export=export_repositories,
             fair_share=fair_share_repositories,
-            group=group_repositories,
+            project=project_repositories,
             idle_checker=idle_checker_repositories,
             image=image_repositories,
-            keypair_resource_policy=keypair_resource_policy_repositories,
             manager_admin=manager_admin_repositories,
             metric=metric_repositories,
             model_serving=model_serving_repositories,
             notification=notification_repositories,
             permission_controller=permission_controller_repositories,
-            project_resource_policy=project_resource_policy_repositories,
             prometheus_query_preset=prometheus_query_preset_repositories,
-            prometheus_query_preset_category=prometheus_query_preset_category_repositories,
             replica_group=replica_group_repositories,
+            entity_invitation=entity_invitation_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
             resource_slot=resource_slot_repositories,
-            retention_policy=retention_policy_repositories,
-            role_preset=role_preset_repositories,
             runtime_variant=runtime_variant_repositories,
+            client_ip_masking=client_ip_masking_repositories,
             runtime_variant_preset=runtime_variant_preset_repositories,
             deployment_revision_preset=deployment_revision_preset_repositories,
             model_card=model_card_repositories,
             resource_usage_history=resource_usage_history_repositories,
-            scaling_group=scaling_group_repositories,
+            resource_group=resource_group_repositories,
             scheduler=scheduler_repositories,
             scheduling_history=scheduling_history_repositories,
             session=session_repositories,
@@ -265,6 +228,5 @@ class Repositories:
             stream=stream_repositories,
             events=events_repositories,
             storage_namespace=storage_namespace_repositories,
-            audit_log=audit_log_repositories,
             retention=retention_repositories,
         )

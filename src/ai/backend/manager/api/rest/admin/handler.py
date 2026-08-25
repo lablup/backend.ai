@@ -113,6 +113,7 @@ class AdminHandler:
             schema=self._gql_schema,
             dataloader_manager=DataLoaderManager(),
             config_provider=gql_deps.config_provider,
+            key_provider_pool=gql_deps.key_provider_pool,
             etcd=gql_deps.etcd,
             user=request["user"],
             access_key=request["keypair"]["access_key"],
@@ -134,6 +135,7 @@ class AdminHandler:
             scheduler_repository=gql_deps.scheduler_repository,
             user_repository=gql_deps.user_repository,
             agent_repository=gql_deps.agent_repository,
+            network_repository=gql_deps.network_repository,
         )
         result = cast(
             ExecutionResult,
@@ -207,8 +209,8 @@ class AdminHandler:
         gql_deps = self._gql_deps
         gql_ctx = StrawberryGQLContext(
             config_provider=gql_deps.config_provider,
-            event_hub=gql_deps.processors.events.event_hub,
-            event_fetcher=gql_deps.processors.events.event_fetcher,
+            event_hub=gql_deps.processors.event_hub,
+            event_fetcher=gql_deps.processors.event_fetcher,
             gql_adapter=gql_deps.strawberry_gql_adapter,
             data_loaders=DataLoaders(gql_deps.adapters),
             metric_observer=gql_deps.metric_observer,
@@ -246,11 +248,10 @@ class AdminHandler:
         self,
         body: BodyParam[GraphQLRequest],
     ) -> APIResponse:
-        """Anonymous (unauthenticated) GraphQL endpoint.
+        """Execute a GraphQL query without credentials.
 
-        Registered without ``auth_required`` so unauthenticated callers reach it. It serves a
-        separate ``PublicQueries`` schema that contains only public fields, so private fields are
-        physically absent and cannot be queried (no runtime gate needed). Authenticated routes are
-        unaffected.
+        Serves the public schema, which holds only the fields that are safe to read anonymously;
+        every other field is absent from it and cannot be queried here. The full schema is at
+        ``POST /admin/gql/strawberry`` and requires authentication.
         """
         return await self._execute_strawberry(body.parsed, schema=self._public_strawberry_schema)

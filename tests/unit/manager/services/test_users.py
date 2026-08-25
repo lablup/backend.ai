@@ -13,10 +13,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.keypair import KeyPairID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.user.types import (
@@ -27,23 +29,22 @@ from ai.backend.manager.data.user.types import (
 )
 from ai.backend.manager.errors.user import UserNotFound, UserPurgeFailure
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.repositories.user.repository import UserRepository
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
 )
-from ai.backend.manager.services.user.actions.modify_user import (
-    ModifyUserAction,
-)
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     PurgeUserAction,
+)
+from ai.backend.manager.services.user.actions.update_user import (
+    UpdateUserAction,
 )
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.types import OptionalState
@@ -89,13 +90,13 @@ class TestCreateUser:
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
             role=UserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -104,11 +105,13 @@ class TestCreateUser:
     @pytest.fixture
     def sample_keypair_data(self, sample_user_uuid: uuid.UUID) -> KeyPairData:
         return KeyPairData(
+            id=KeyPairID(uuid.uuid4()),
             user_id=sample_user_uuid,
             access_key=AccessKey("TESTKEY1234567890"),
-            secret_key=SecretKey("test-secret-key"),
+            secret_key=SecretValue("test-secret-key"),
             is_active=True,
             is_admin=False,
+            is_default=True,
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             resource_policy_name="default",
@@ -151,17 +154,14 @@ class TestCreateUser:
         assert sample_user_data.need_password_change is not None
         assert sample_user_data.domain_name is not None
         action = CreateUserAction(
-            creator=Creator(
-                spec=UserCreatorSpec(
-                    email=sample_user_data.email,
-                    username=sample_user_data.username,
-                    password=sample_password_info,
-                    need_password_change=sample_user_data.need_password_change,
-                    domain_name=sample_user_data.domain_name,
-                )
+            creator=UserCreator(
+                email=sample_user_data.email,
+                username=sample_user_data.username,
+                password=sample_password_info,
+                need_password_change=sample_user_data.need_password_change,
+                domain_id=DomainID(uuid.uuid4()),
             ),
             group_ids=None,
-            _domain_id=DomainID(uuid.uuid4()),
         )
 
         result = await service.create_user(action)
@@ -187,17 +187,14 @@ class TestCreateUser:
         assert sample_user_data.domain_name is not None
         group_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
         action = CreateUserAction(
-            creator=Creator(
-                spec=UserCreatorSpec(
-                    email=sample_user_data.email,
-                    username=sample_user_data.username,
-                    password=sample_password_info,
-                    need_password_change=sample_user_data.need_password_change,
-                    domain_name=sample_user_data.domain_name,
-                )
+            creator=UserCreator(
+                email=sample_user_data.email,
+                username=sample_user_data.username,
+                password=sample_password_info,
+                need_password_change=sample_user_data.need_password_change,
+                domain_id=DomainID(uuid.uuid4()),
             ),
             group_ids=group_ids,
-            _domain_id=DomainID(uuid.uuid4()),
         )
 
         result = await service.create_user(action)
@@ -219,16 +216,13 @@ class TestCreateUser:
         )
 
         action = CreateUserAction(
-            creator=Creator(
-                spec=UserCreatorSpec(
-                    email="existing@example.com",
-                    username="existinguser",
-                    password=sample_password_info,
-                    need_password_change=False,
-                    domain_name="default",
-                )
+            creator=UserCreator(
+                email="existing@example.com",
+                username="existinguser",
+                password=sample_password_info,
+                need_password_change=False,
+                domain_id=DomainID(uuid.uuid4()),
             ),
-            _domain_id=DomainID(uuid.uuid4()),
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -272,13 +266,13 @@ class TestModifyUser:
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
             role=UserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -291,27 +285,23 @@ class TestModifyUser:
         modified_user_data: UserData,
     ) -> None:
         """Modify user with valid data should return updated user."""
-        mock_user_repository.update_user_validated = AsyncMock(return_value=modified_user_data)
+        mock_user_repository.update_user_by_uuid_validated = AsyncMock(
+            return_value=modified_user_data
+        )
 
         assert modified_user_data.username is not None
-        action = ModifyUserAction(
-            email=modified_user_data.email,
-            updater=Updater(
-                spec=UserUpdaterSpec(
-                    username=OptionalState.update(modified_user_data.username),
-                ),
-                pk_value=modified_user_data.email,
+        action = UpdateUserAction(
+            updater=UserUpdater(
+                user_id=UserID(uuid.uuid4()),
+                username=OptionalState.update(modified_user_data.username),
             ),
         )
 
-        result = await service.modify_user(action)
+        result = await service.update_user(action)
 
         assert result.data is not None
         assert result.data.username == modified_user_data.username
-        mock_user_repository.update_user_validated.assert_called_once_with(
-            email=modified_user_data.email,
-            updater=action.updater,
-        )
+        mock_user_repository.update_user_by_uuid_validated.assert_called_once_with(action.updater)
 
     async def test_modify_nonexistent_user_raises_error(
         self,
@@ -319,22 +309,19 @@ class TestModifyUser:
         mock_user_repository: MagicMock,
     ) -> None:
         """Modify non-existent user should raise UserNotFound."""
-        mock_user_repository.update_user_validated = AsyncMock(
+        mock_user_repository.update_user_by_uuid_validated = AsyncMock(
             side_effect=UserNotFound("User not found")
         )
 
-        action = ModifyUserAction(
-            email="nonexistent@example.com",
-            updater=Updater(
-                spec=UserUpdaterSpec(
-                    username=OptionalState.update("new_username"),
-                ),
-                pk_value="nonexistent@example.com",
+        action = UpdateUserAction(
+            updater=UserUpdater(
+                user_id=UserID(uuid.uuid4()),
+                username=OptionalState.update("new_username"),
             ),
         )
 
         with pytest.raises(UserNotFound):
-            await service.modify_user(action)
+            await service.update_user(action)
 
 
 class TestDeleteUser:
@@ -363,15 +350,16 @@ class TestDeleteUser:
         mock_user_repository: MagicMock,
     ) -> None:
         """Delete existing user should return success result."""
-        mock_user_repository.soft_delete_user_validated = AsyncMock(return_value=None)
+        mock_user_repository.delete_user_by_uuid_validated = AsyncMock(return_value=None)
+        user_id = UserID(uuid.uuid4())
 
-        action = DeleteUserAction(email="test@example.com")
+        action = DeleteUserAction(user_id=user_id)
 
         result = await service.delete_user(action)
 
         assert result is not None
-        mock_user_repository.soft_delete_user_validated.assert_called_once_with(
-            email="test@example.com",
+        mock_user_repository.delete_user_by_uuid_validated.assert_called_once_with(
+            user_uuid=user_id,
         )
 
     async def test_delete_nonexistent_user_raises_error(
@@ -380,11 +368,11 @@ class TestDeleteUser:
         mock_user_repository: MagicMock,
     ) -> None:
         """Delete non-existent user should raise UserNotFound."""
-        mock_user_repository.soft_delete_user_validated = AsyncMock(
+        mock_user_repository.delete_user_by_uuid_validated = AsyncMock(
             side_effect=UserNotFound("User not found")
         )
 
-        action = DeleteUserAction(email="nonexistent@example.com")
+        action = DeleteUserAction(user_id=UserID(uuid.uuid4()))
 
         with pytest.raises(UserNotFound):
             await service.delete_user(action)
@@ -435,13 +423,13 @@ class TestPurgeUser:
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
             role=UserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -452,52 +440,62 @@ class TestPurgeUser:
         return UserInfoContext(
             uuid=uuid.uuid4(),
             email="admin@example.com",
-            main_access_key=AccessKey("ADMINKEY123456789"),
         )
+
+    @pytest.fixture
+    def admin_user_row(self, admin_user_info_ctx: UserInfoContext) -> MagicMock:
+        admin = MagicMock()
+        admin.uuid = admin_user_info_ctx.uuid
+        admin.email = admin_user_info_ctx.email
+        return admin
 
     async def test_purge_user_succeeds_without_active_vfolders(
         self,
+        purge_user_uuid: uuid.UUID,
+        admin_user_row: MagicMock,
         service: UserService,
         mock_user_repository: MagicMock,
         purge_user_data: UserData,
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge user without active vfolder mounts should succeed."""
-        mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
+        mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user_row)
         mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=False
         )
         mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
         mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
         mock_user_repository.delete_user_vfolders = AsyncMock(return_value=None)
-        mock_user_repository.purge_user = AsyncMock(return_value=None)
+        mock_user_repository.purge_user_by_uuid = AsyncMock(return_value=None)
 
         action = PurgeUserAction(
-            user_info_ctx=admin_user_info_ctx,
-            email=purge_user_data.email,
+            user_id=UserID(purge_user_uuid),
+            admin_user_id=admin_user_info_ctx.uuid,
         )
 
         result = await service.purge_user(action)
 
         assert result is not None
-        mock_user_repository.purge_user.assert_called_once_with(purge_user_data.email)
+        mock_user_repository.purge_user_by_uuid.assert_called_once_with(purge_user_uuid)
 
     async def test_purge_user_fails_with_active_vfolder_mounts(
         self,
+        purge_user_uuid: uuid.UUID,
+        admin_user_row: MagicMock,
         service: UserService,
         mock_user_repository: MagicMock,
         purge_user_data: UserData,
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge user with active vfolder mounts should raise UserPurgeFailure."""
-        mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
+        mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user_row)
         mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=True
         )
 
         action = PurgeUserAction(
-            user_info_ctx=admin_user_info_ctx,
-            email=purge_user_data.email,
+            user_id=UserID(purge_user_uuid),
+            admin_user_id=admin_user_info_ctx.uuid,
         )
 
         with pytest.raises(UserPurgeFailure):
@@ -505,6 +503,7 @@ class TestPurgeUser:
 
     async def test_purge_user_with_shared_vfolders_migration(
         self,
+        admin_user_row: MagicMock,
         service: UserService,
         mock_user_repository: MagicMock,
         purge_user_uuid: uuid.UUID,
@@ -512,7 +511,7 @@ class TestPurgeUser:
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge user with shared vfolders migration enabled should migrate vfolders."""
-        mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
+        mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user_row)
         mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=False
         )
@@ -520,11 +519,11 @@ class TestPurgeUser:
         mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
         mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
         mock_user_repository.delete_user_vfolders = AsyncMock(return_value=None)
-        mock_user_repository.purge_user = AsyncMock(return_value=None)
+        mock_user_repository.purge_user_by_uuid = AsyncMock(return_value=None)
 
         action = PurgeUserAction(
-            user_info_ctx=admin_user_info_ctx,
-            email=purge_user_data.email,
+            user_id=UserID(purge_user_uuid),
+            admin_user_id=admin_user_info_ctx.uuid,
             purge_shared_vfolders=OptionalState.update(True),
         )
 
@@ -539,6 +538,7 @@ class TestPurgeUser:
 
     async def test_purge_user_with_endpoint_delegation(
         self,
+        admin_user_row: MagicMock,
         service: UserService,
         mock_user_repository: MagicMock,
         purge_user_uuid: uuid.UUID,
@@ -546,7 +546,7 @@ class TestPurgeUser:
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge user with endpoint delegation enabled should delegate endpoints."""
-        mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
+        mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user_row)
         mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=False
         )
@@ -554,11 +554,11 @@ class TestPurgeUser:
         mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
         mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
         mock_user_repository.delete_user_vfolders = AsyncMock(return_value=None)
-        mock_user_repository.purge_user = AsyncMock(return_value=None)
+        mock_user_repository.purge_user_by_uuid = AsyncMock(return_value=None)
 
         action = PurgeUserAction(
-            user_info_ctx=admin_user_info_ctx,
-            email=purge_user_data.email,
+            user_id=UserID(purge_user_uuid),
+            admin_user_id=admin_user_info_ctx.uuid,
             delegate_endpoint_ownership=OptionalState.update(True),
         )
 
@@ -568,7 +568,6 @@ class TestPurgeUser:
         mock_user_repository.delegate_endpoint_ownership.assert_called_once_with(
             user_uuid=purge_user_uuid,
             target_user_uuid=admin_user_info_ctx.uuid,
-            target_main_access_key=admin_user_info_ctx.main_access_key,
         )
         # When delegating, delete_endpoints should be called with delete_destroyed_only=True
         mock_user_repository.delete_endpoints.assert_called_once_with(
@@ -578,6 +577,7 @@ class TestPurgeUser:
 
     async def test_purge_user_without_endpoint_delegation_deletes_all_endpoints(
         self,
+        admin_user_row: MagicMock,
         service: UserService,
         mock_user_repository: MagicMock,
         purge_user_uuid: uuid.UUID,
@@ -585,18 +585,18 @@ class TestPurgeUser:
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge user without endpoint delegation should delete all endpoints."""
-        mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
+        mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user_row)
         mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=False
         )
         mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[])
         mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
         mock_user_repository.delete_user_vfolders = AsyncMock(return_value=None)
-        mock_user_repository.purge_user = AsyncMock(return_value=None)
+        mock_user_repository.purge_user_by_uuid = AsyncMock(return_value=None)
 
         action = PurgeUserAction(
-            user_info_ctx=admin_user_info_ctx,
-            email=purge_user_data.email,
+            user_id=UserID(purge_user_uuid),
+            admin_user_id=admin_user_info_ctx.uuid,
         )
 
         result = await service.purge_user(action)
@@ -614,13 +614,13 @@ class TestPurgeUser:
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
         """Purge non-existent user should raise UserNotFound."""
-        mock_user_repository.get_by_email_validated = AsyncMock(
+        mock_user_repository.get_user_by_uuid = AsyncMock(
             side_effect=UserNotFound("User not found")
         )
 
         action = PurgeUserAction(
-            user_info_ctx=admin_user_info_ctx,
-            email="nonexistent@example.com",
+            user_id=UserID(uuid.uuid4()),
+            admin_user_id=admin_user_info_ctx.uuid,
         )
 
         with pytest.raises(UserNotFound):
@@ -660,7 +660,6 @@ class TestBulkPurgeUsers:
         admin_user = MagicMock()
         admin_user.uuid = uuid.uuid4()
         admin_user.email = "admin@example.com"
-        admin_user.main_access_key = "ADMINKEY123456789"
         mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user)
         return admin_user
 

@@ -7,6 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.session.request import (
     CommitSessionRequest,
     ExecuteRequest,
@@ -19,9 +20,8 @@ from ai.backend.common.dto.manager.session.response import (
     GetContainerLogsResponse,
     StartServiceResponse,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.resource_group import resource_groups
 
 from .conftest import SessionSeedData
 
@@ -45,7 +45,7 @@ class TestSessionExecute:
         }
 
         result = await admin_registry.session.execute(
-            session_seed.session_name,
+            session_seed.session_id,
             ExecuteRequest(mode="query", code='print("Hello World")', run_id="test-run-id"),
         )
         assert isinstance(result, ExecuteResponse)
@@ -68,7 +68,7 @@ class TestSessionCommit:
         }
 
         result = await admin_registry.session.commit(
-            session_seed.session_name,
+            session_seed.session_id,
             CommitSessionRequest(),
         )
         assert isinstance(result, CommitSessionResponse)
@@ -89,7 +89,7 @@ class TestSessionGetLogs:
     ) -> None:
         """Terminated session reads logs from database without agent RPC."""
         result = await admin_registry.session.get_container_logs(
-            terminated_session_seed.session_name,
+            terminated_session_seed.session_id,
         )
         assert isinstance(result, GetContainerLogsResponse)
         assert result.root["result"]["logs"] == "Hello from terminated container\n"
@@ -101,7 +101,7 @@ class TestSessionGetLogs:
     ) -> None:
         """Specific kernel_id returns that kernel's log."""
         result = await admin_registry.session.get_container_logs(
-            terminated_session_seed.session_name,
+            terminated_session_seed.session_id,
             GetContainerLogsRequest(kernel_id=terminated_session_seed.kernel_id),
         )
         assert isinstance(result, GetContainerLogsResponse)
@@ -117,7 +117,7 @@ class TestSessionGetLogs:
         agent_registry.get_logs_from_agent.return_value = "live container log output\n"
 
         result = await admin_registry.session.get_container_logs(
-            session_seed.session_name,
+            session_seed.session_id,
         )
         assert isinstance(result, GetContainerLogsResponse)
         assert result.root["result"]["logs"] == "live container log output\n"
@@ -132,7 +132,7 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
@@ -141,8 +141,8 @@ class TestSessionStartService:
         # Set wsproxy_addr on scaling group
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=wsproxy_addr)
             )
 
@@ -192,7 +192,7 @@ class TestSessionStartService:
 
         with patch("aiohttp.ClientSession", return_value=mock_session_cls):
             result = await admin_registry.session.start_service(
-                session_seed.session_name,
+                session_seed.session_id,
                 StartServiceRequest(app="ttyd"),
             )
 

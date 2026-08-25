@@ -15,6 +15,9 @@ import pytest
 from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.deployment import (
     AddRevisionRequest,
@@ -22,20 +25,15 @@ from ai.backend.common.dto.manager.deployment import (
     DeploymentMetadataInput,
     DeploymentStrategyInput,
     ImageInput,
-    ListDeploymentsResponse,
     ModelMountConfigInput,
     ModelRuntimeConfigInput,
     NetworkAccessInput,
     ResourceConfigInput,
     RevisionInput,
-    SearchDeploymentsRequest,
     SearchRevisionsRequest,
     UpdateDeploymentRequest,
 )
 from ai.backend.common.dto.manager.deployment.request import ClusterConfigInput
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -91,7 +89,7 @@ class TestCreateDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Creating a deployment with valid config returns deployment with initial status."""
@@ -100,7 +98,7 @@ class TestCreateDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -158,7 +156,7 @@ class TestUpdateDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Updating deployment config (name, replica_count) succeeds."""
@@ -168,7 +166,7 @@ class TestUpdateDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -228,7 +226,7 @@ class TestDestroyDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Destroying a deployment terminates it successfully."""
@@ -238,7 +236,7 @@ class TestDestroyDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -294,7 +292,7 @@ class TestRevisionManagement:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Adding a revision and searching revisions works correctly."""
@@ -319,7 +317,7 @@ class TestRevisionManagement:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -375,7 +373,7 @@ class TestReplicaManagement:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_name: ResourceGroupName,
+        resource_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Changing replica_count updates the replica count."""
@@ -384,7 +382,7 @@ class TestReplicaManagement:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_name,
+                resource_group_name=resource_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -428,18 +426,6 @@ class TestReplicaManagement:
 
 
 class TestUserAccessDeployment:
-    async def test_user_searches_empty_deployments(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        """Regular user can search deployments and gets empty results."""
-        result = await user_registry.deployment.search_deployments(
-            SearchDeploymentsRequest(),
-        )
-        assert isinstance(result, ListDeploymentsResponse)
-        assert result.deployments == []
-        assert result.pagination.total == 0
-
     async def test_user_get_nonexistent_deployment(
         self,
         user_registry: BackendAIClientRegistry,

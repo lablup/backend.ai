@@ -27,6 +27,7 @@ __all__ = (
     "ProjectPayload",
     "ProjectStorageInfo",
     "PurgeProjectPayload",
+    "RestoreProjectPayload",
     "SearchProjectsPayload",
     "UnassignUserError",
     "UnassignUsersFromProjectPayload",
@@ -154,6 +155,14 @@ class DeleteProjectPayload(BaseResponseModel):
 
     deleted: bool = Field(
         description="Whether the deletion was successful.",
+    )
+
+
+class RestoreProjectPayload(BaseResponseModel):
+    """Payload for project restore mutation."""
+
+    restored: bool = Field(
+        description="Whether the restore was successful.",
     )
 
 

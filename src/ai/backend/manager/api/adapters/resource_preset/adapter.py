@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
     ResourceSlotEntryInfo,
@@ -34,15 +35,12 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.resource_preset.conditions import ResourcePresetConditions
 from ai.backend.manager.models.resource_preset.orders import ResourcePresetOrders
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
@@ -53,11 +51,11 @@ from ai.backend.manager.services.resource_preset.actions.create_preset import (
 from ai.backend.manager.services.resource_preset.actions.delete_preset import (
     DeleteResourcePresetAction,
 )
-from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-    ModifyResourcePresetAction,
-)
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
+)
+from ai.backend.manager.services.resource_preset.actions.update_preset import (
+    UpdateResourcePresetAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -108,7 +106,7 @@ class ResourcePresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.resource_preset.search_presets_v2.wait_for_complete(
+        result = await self._processors.resource_preset.search_presets_v2.run(
             SearchResourcePresetsV2Action(querier=querier)
         )
         return AdminSearchResourcePresetsPayload(
@@ -124,7 +122,7 @@ class ResourcePresetAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=1),
             conditions=[lambda: ResourcePresetRow.id == preset_id],
         )
-        result = await self._processors.resource_preset.search_presets_v2.wait_for_complete(
+        result = await self._processors.resource_preset.search_presets_v2.run(
             SearchResourcePresetsV2Action(querier=querier)
         )
         if not result.presets:
@@ -145,10 +143,10 @@ class ResourcePresetAdapter(BaseAdapter):
                 name=name,
                 resource_slots=resource_slots,
                 shared_memory=shared_memory_str,
-                scaling_group_name=resource_group_name,
+                resource_group_name=resource_group_name,
             )
         )
-        result = await self._processors.resource_preset.create_preset.wait_for_complete(
+        result = await self._processors.resource_preset.create_preset.run(
             CreateResourcePresetAction(creator=creator)
         )
         return CreateResourcePresetPayload(
@@ -183,11 +181,11 @@ class ResourcePresetAdapter(BaseAdapter):
             resource_slots=resource_slots_state,
             name=name_state,
             shared_memory=shared_memory_value,
-            scaling_group_name=resource_group_state,
+            resource_group_name=resource_group_state,
         )
         updater = Updater(spec=updater_spec, pk_value=input.id)
-        result = await self._processors.resource_preset.modify_preset.wait_for_complete(
-            ModifyResourcePresetAction(updater=updater, id=input.id, name=None)
+        result = await self._processors.resource_preset.update_preset.run(
+            UpdateResourcePresetAction(preset_id=ResourcePresetID(input.id), updater=updater)
         )
         return UpdateResourcePresetPayload(
             resource_preset=self._data_to_node(result.resource_preset),
@@ -195,8 +193,8 @@ class ResourcePresetAdapter(BaseAdapter):
 
     async def delete(self, preset_id: UUID) -> DeleteResourcePresetPayload:
         """Delete a resource preset by ID."""
-        result = await self._processors.resource_preset.delete_preset.wait_for_complete(
-            DeleteResourcePresetAction(id=preset_id, name=None)
+        result = await self._processors.resource_preset.delete_preset.run(
+            DeleteResourcePresetAction(preset_id=ResourcePresetID(preset_id))
         )
         return DeleteResourcePresetPayload(id=result.resource_preset.id)
 
@@ -267,7 +265,7 @@ class ResourcePresetAdapter(BaseAdapter):
                 if data.shared_memory is not None
                 else None
             ),
-            resource_group_name=data.scaling_group_name,
+            resource_group_name=data.resource_group_name,
         )
 
 

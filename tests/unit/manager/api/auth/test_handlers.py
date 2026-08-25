@@ -22,6 +22,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.api_handlers import BodyParam, QueryParam
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -33,7 +34,12 @@ from ai.backend.common.dto.manager.auth.request import (
     UploadSSHKeypairRequest,
     VerifyAuthRequest,
 )
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
+from ai.backend.manager.api.rest.middleware.auth import (
+    TRUSTED_PROXY_NETWORKS_KEY,
+    parse_trusted_proxy_networks,
+)
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.models.user import UserRole, UserStatus
@@ -41,7 +47,7 @@ from ai.backend.manager.services.auth.actions.authorize import AuthorizeActionRe
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairActionResult,
 )
-from ai.backend.manager.services.auth.actions.get_role import GetRoleActionResult
+from ai.backend.manager.services.auth.actions.get_role import PublicGetRoleActionResult
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairActionResult
 from ai.backend.manager.services.auth.actions.signout import SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupActionResult
@@ -120,12 +126,21 @@ class TestGetMyIp:
     def _make_mock_request(
         xff: str | None = None,
         remote: str | None = None,
-        trusted_proxies_enabled: bool = False,
+        trusted_proxies: list[str] | None = None,
+        peer: str | None = None,
     ) -> MagicMock:
         mock_request = MagicMock(spec=web.Request)
         mock_request.headers.get.return_value = xff
         mock_request.remote = remote
-        mock_request.app.get.return_value = trusted_proxies_enabled
+        mock_request.config_dict = {
+            TRUSTED_PROXY_NETWORKS_KEY: parse_trusted_proxy_networks(trusted_proxies or [])
+        }
+        if peer is None:
+            mock_request.transport = None
+        else:
+            transport = MagicMock()
+            transport.get_extra_info.return_value = (peer, 54321)
+            mock_request.transport = transport
         return mock_request
 
     async def test_returns_client_ip_from_x_forwarded_for(
@@ -176,15 +191,15 @@ class TestGetMyIp:
         assert isinstance(data, dict)
         assert data["client_ip"] == "1.2.3.4"
 
-    async def test_returns_remote_when_trusted_proxies_enabled(
+    async def test_skips_trusted_hops_when_trusted_proxies_configured(
         self,
         handler: AuthHandler,
     ) -> None:
-        """When XForwardedStrict is active, use request.remote directly."""
+        """With trusted proxies, every trailing trusted hop is skipped."""
         mock_request = self._make_mock_request(
             xff="1.2.3.4, 10.0.0.1",
-            remote="1.2.3.4",
-            trusted_proxies_enabled=True,
+            trusted_proxies=["10.0.0.0/8"],
+            peer="10.0.0.2",
         )
         request_ctx = RequestCtx(request=mock_request)
 
@@ -227,9 +242,9 @@ class TestAuthorize:
         return AuthorizeActionResult(
             stream_response=None,
             authorization_result=AuthorizationResult(
-                user_id=uuid.uuid4(),
-                access_key="TESTKEY",
-                secret_key="TESTSECRET",
+                user_id=UserID(uuid.uuid4()),
+                access_key=AccessKey("TESTKEY"),
+                secret_key=SecretKey("TESTSECRET"),
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
                 session_token="test_session_token",
@@ -253,11 +268,11 @@ class TestAuthorize:
             "password": "password123",
             "client_type_id": str(sample_client_type_id),
         })
-        mock_processors.auth.authorize.wait_for_complete = AsyncMock(return_value=authorize_result)
+        mock_processors.auth.authorize.run = AsyncMock(return_value=authorize_result)
 
         response = await handler.authorize(body, request_ctx)
 
-        mock_processors.auth.authorize.wait_for_complete.assert_called_once()
+        mock_processors.auth.authorize.run.assert_called_once()
         assert not isinstance(response, web.StreamResponse)
         assert response.status_code == HTTPStatus.OK
         assert authorize_result.authorization_result is not None
@@ -289,11 +304,11 @@ class TestAuthorize:
             "stoken": stoken,
             "client_type_id": str(sample_client_type_id),
         })
-        mock_processors.auth.authorize.wait_for_complete = AsyncMock(return_value=authorize_result)
+        mock_processors.auth.authorize.run = AsyncMock(return_value=authorize_result)
 
         await handler.authorize(body, request_ctx)
 
-        action = mock_processors.auth.authorize.wait_for_complete.call_args[0][0]
+        action = mock_processors.auth.authorize.run.call_args[0][0]
         assert action.domain_name == domain
         assert action.email == email
         assert action.password == password
@@ -321,7 +336,7 @@ class TestAuthorize:
             "password": "pass",
             "client_type_id": str(sample_client_type_id),
         })
-        mock_processors.auth.authorize.wait_for_complete = AsyncMock(return_value=result)
+        mock_processors.auth.authorize.run = AsyncMock(return_value=result)
 
         response = await handler.authorize(body, request_ctx)
 
@@ -353,11 +368,11 @@ class TestSignup:
             "email": "newuser@example.com",
             "password": "securepassword",
         })
-        mock_processors.auth.signup.wait_for_complete = AsyncMock(return_value=signup_result)
+        mock_processors.auth.signup.run = AsyncMock(return_value=signup_result)
 
         response = await handler.signup(body, request_ctx)
 
-        mock_processors.auth.signup.wait_for_complete.assert_called_once()
+        mock_processors.auth.signup.run.assert_called_once()
         assert response.status_code == HTTPStatus.CREATED
         data = response.to_json
         assert data is not None
@@ -386,11 +401,11 @@ class TestSignup:
             "full_name": full_name,
             "description": "Description",
         })
-        mock_processors.auth.signup.wait_for_complete = AsyncMock(return_value=signup_result)
+        mock_processors.auth.signup.run = AsyncMock(return_value=signup_result)
 
         await handler.signup(body, request_ctx)
 
-        action = mock_processors.auth.signup.wait_for_complete.call_args[0][0]
+        action = mock_processors.auth.signup.run.call_args[0][0]
         assert action.domain_name == domain
         assert action.email == email
         assert action.username == username
@@ -410,14 +425,12 @@ class TestSignout:
         email = "test@example.com"
         body: BodyParam[SignoutRequest] = BodyParam(SignoutRequest)
         body.from_body({"email": email, "password": "pass"})
-        mock_processors.auth.signout.wait_for_complete = AsyncMock(
-            return_value=SignoutActionResult(success=True)
-        )
+        mock_processors.auth.signout.run = AsyncMock(return_value=SignoutActionResult(success=True))
 
         response = await handler.signout(body, user_context)
 
-        mock_processors.auth.signout.wait_for_complete.assert_called_once()
-        action = mock_processors.auth.signout.wait_for_complete.call_args[0][0]
+        mock_processors.auth.signout.run.assert_called_once()
+        action = mock_processors.auth.signout.run.call_args[0][0]
         assert action.user_id == user_context.user_uuid
         assert action.email == email
         assert response.status_code == HTTPStatus.OK
@@ -437,8 +450,8 @@ class TestGetRole:
         domain_role = "user"
         query: QueryParam[GetRoleRequest] = QueryParam(GetRoleRequest)
         query.from_query({})
-        mock_processors.auth.get_role.wait_for_complete = AsyncMock(
-            return_value=GetRoleActionResult(
+        mock_processors.auth.public_get_role.run = AsyncMock(
+            return_value=PublicGetRoleActionResult(
                 global_role=global_role,
                 domain_role=domain_role,
                 group_role=None,
@@ -447,7 +460,7 @@ class TestGetRole:
 
         response = await handler.get_role(query, user_context)
 
-        mock_processors.auth.get_role.wait_for_complete.assert_called_once()
+        mock_processors.auth.public_get_role.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
@@ -466,8 +479,8 @@ class TestGetRole:
         group_uuid = uuid.uuid4()
         query: QueryParam[GetRoleRequest] = QueryParam(GetRoleRequest)
         query.from_query({"group": str(group_uuid)})
-        mock_processors.auth.get_role.wait_for_complete = AsyncMock(
-            return_value=GetRoleActionResult(
+        mock_processors.auth.public_get_role.run = AsyncMock(
+            return_value=PublicGetRoleActionResult(
                 global_role="user",
                 domain_role="user",
                 group_role="member",
@@ -476,7 +489,7 @@ class TestGetRole:
 
         await handler.get_role(query, user_context)
 
-        action = mock_processors.auth.get_role.wait_for_complete.call_args[0][0]
+        action = mock_processors.auth.public_get_role.run.call_args[0][0]
         assert action.group_id == group_uuid
 
     async def test_uses_admin_flags_from_context(
@@ -496,8 +509,8 @@ class TestGetRole:
         )
         query: QueryParam[GetRoleRequest] = QueryParam(GetRoleRequest)
         query.from_query({})
-        mock_processors.auth.get_role.wait_for_complete = AsyncMock(
-            return_value=GetRoleActionResult(
+        mock_processors.auth.public_get_role.run = AsyncMock(
+            return_value=PublicGetRoleActionResult(
                 global_role="superadmin",
                 domain_role="admin",
                 group_role=None,
@@ -506,7 +519,7 @@ class TestGetRole:
 
         await handler.get_role(query, admin_ctx)
 
-        action = mock_processors.auth.get_role.wait_for_complete.call_args[0][0]
+        action = mock_processors.auth.public_get_role.run.call_args[0][0]
         assert action.is_admin is True
         assert action.is_superadmin is True
 
@@ -528,13 +541,13 @@ class TestUpdatePassword:
             "new_password": "newpass",
             "new_password2": "newpass",
         })
-        mock_processors.auth.update_password.wait_for_complete = AsyncMock(
+        mock_processors.auth.update_password.run = AsyncMock(
             return_value=UpdatePasswordActionResult(success=True, message="OK")
         )
 
         response = await handler.update_password(body, user_context, request_ctx)
 
-        mock_processors.auth.update_password.wait_for_complete.assert_called_once()
+        mock_processors.auth.update_password.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
 
     async def test_returns_bad_request_on_failure(
@@ -551,7 +564,7 @@ class TestUpdatePassword:
             "new_password": "newpass",
             "new_password2": "differentpass",
         })
-        mock_processors.auth.update_password.wait_for_complete = AsyncMock(
+        mock_processors.auth.update_password.run = AsyncMock(
             return_value=UpdatePasswordActionResult(success=False, message="mismatch")
         )
 
@@ -578,7 +591,7 @@ class TestUpdatePasswordNoAuth:
             "current_password": "current",
             "new_password": "newpass",
         })
-        mock_processors.auth.update_password_no_auth.wait_for_complete = AsyncMock(
+        mock_processors.auth.update_password_no_auth.run = AsyncMock(
             return_value=UpdatePasswordNoAuthActionResult(
                 user_id=uuid.uuid4(),
                 password_changed_at=password_changed_at,
@@ -587,7 +600,7 @@ class TestUpdatePasswordNoAuth:
 
         response = await handler.update_password_no_auth(body, request_ctx)
 
-        mock_processors.auth.update_password_no_auth.wait_for_complete.assert_called_once()
+        mock_processors.auth.update_password_no_auth.run.assert_called_once()
         assert response.status_code == HTTPStatus.CREATED
         data = response.to_json
         assert data is not None
@@ -607,14 +620,14 @@ class TestUpdateFullName:
         full_name = "New Name"
         body: BodyParam[UpdateFullNameRequest] = BodyParam(UpdateFullNameRequest)
         body.from_body({"email": "user@example.com", "full_name": full_name})
-        mock_processors.auth.update_full_name.wait_for_complete = AsyncMock(
+        mock_processors.auth.update_full_name.run = AsyncMock(
             return_value=UpdateFullNameActionResult(success=True)
         )
 
         response = await handler.update_full_name(body, user_context)
 
-        mock_processors.auth.update_full_name.wait_for_complete.assert_called_once()
-        action = mock_processors.auth.update_full_name.wait_for_complete.call_args[0][0]
+        mock_processors.auth.update_full_name.run.assert_called_once()
+        action = mock_processors.auth.update_full_name.run.call_args[0][0]
         assert action.full_name == full_name
         assert response.status_code == HTTPStatus.OK
 
@@ -631,7 +644,7 @@ class TestGetSSHKeypair:
         """Verify processor is called and public key is returned."""
         public_key = "ssh-rsa AAAAB3...\n"
         access_key = "AKIAIOSFODNN7EXAMPLE"
-        mock_processors.auth.get_ssh_keypair.wait_for_complete = AsyncMock(
+        mock_processors.auth.get_ssh_keypair.run = AsyncMock(
             return_value=GetSSHKeypairActionResult(
                 public_key=public_key,
                 access_key=access_key,
@@ -640,7 +653,7 @@ class TestGetSSHKeypair:
 
         response = await handler.get_ssh_keypair(user_context)
 
-        mock_processors.auth.get_ssh_keypair.wait_for_complete.assert_called_once()
+        mock_processors.auth.get_ssh_keypair.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
@@ -660,20 +673,18 @@ class TestGenerateSSHKeypair:
         """Verify processor is called and keypair is returned."""
         ssh_public_key = "ssh-rsa NEWPUB...\n"
         ssh_private_key = "-----BEGIN RSA PRIVATE KEY-----\n...\n"
-        user_id = user_context.user_uuid
-        mock_processors.auth.generate_ssh_keypair.wait_for_complete = AsyncMock(
+        mock_processors.auth.generate_ssh_keypair.run = AsyncMock(
             return_value=GenerateSSHKeypairActionResult(
                 ssh_keypair=SSHKeypair(
                     ssh_public_key=ssh_public_key,
                     ssh_private_key=ssh_private_key,
                 ),
-                user_id=user_id,
             )
         )
 
         response = await handler.generate_ssh_keypair(user_context)
 
-        mock_processors.auth.generate_ssh_keypair.wait_for_complete.assert_called_once()
+        mock_processors.auth.generate_ssh_keypair.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
@@ -697,20 +708,18 @@ class TestUploadSSHKeypair:
             "pubkey": "ssh-rsa AAAAB3...",
             "privkey": "-----BEGIN RSA PRIVATE KEY-----\n...",
         })
-        user_id = user_context.user_uuid
-        mock_processors.auth.upload_ssh_keypair.wait_for_complete = AsyncMock(
+        mock_processors.auth.upload_ssh_keypair.run = AsyncMock(
             return_value=UploadSSHKeypairActionResult(
                 ssh_keypair=SSHKeypair(
                     ssh_public_key="ssh-rsa AAAAB3...\n",
                     ssh_private_key="-----BEGIN RSA PRIVATE KEY-----\n...\n",
                 ),
-                user_id=user_id,
             )
         )
 
         response = await handler.upload_ssh_keypair(body, user_context)
 
-        mock_processors.auth.upload_ssh_keypair.wait_for_complete.assert_called_once()
+        mock_processors.auth.upload_ssh_keypair.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None

@@ -7,12 +7,15 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
 from ai.backend.common.dto.manager.v2.scheduler.request import ComputeScheduleInput
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
+    ExcludeSessionIdleChecksInput,
     GetSessionLogsQuery,
+    IncludeSessionIdleChecksInput,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
     TerminateSessionsInput,
@@ -21,7 +24,6 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.request import (
     SessionIdPathParam as SessionIdPathParamDTO,
 )
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import (
@@ -147,6 +149,22 @@ class V2SessionHandler:
     ) -> APIResponse:
         """Terminate one or more sessions."""
         result = await self._adapter.terminate(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def exclude_idle_checks(
+        self,
+        body: BodyParam[ExcludeSessionIdleChecksInput],
+    ) -> APIResponse:
+        """Exclude checker-session pairs from idle checks."""
+        result = await self._adapter.exclude_idle_checks(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def include_idle_checks(
+        self,
+        body: BodyParam[IncludeSessionIdleChecksInput],
+    ) -> APIResponse:
+        """Include checker-session pairs into idle checks."""
+        result = await self._adapter.include_idle_checks(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def start_service(

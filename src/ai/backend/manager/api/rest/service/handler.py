@@ -22,6 +22,10 @@ from ai.backend.common.api_handlers import (
     PathParam,
     QueryParam,
 )
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.model_serving.request import (
     ListServeRequestModel,
     NewServiceRequestModel,
@@ -48,9 +52,6 @@ from ai.backend.common.dto.manager.model_serving.response import (
     TokenResponseModel,
     TryStartResponseModel,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -82,9 +83,10 @@ from ai.backend.manager.data.model_serving.types import (
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
-    ResolveAccessKeyScopeAction,
+    PublicResolveAccessKeyScopeAction,
 )
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
@@ -129,8 +131,8 @@ from ai.backend.manager.services.model_serving.processors.auto_scaling import (
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-from ai.backend.manager.services.runtime_variant.actions.resolve_by_name import (
-    ResolveRuntimeVariantByNameAction,
+from ai.backend.manager.services.runtime_variant.actions.lookup import (
+    LookupRuntimeVariantAction,
 )
 from ai.backend.manager.services.runtime_variant.actions.search import (
     SearchRuntimeVariantsAction,
@@ -235,12 +237,12 @@ class ServiceHandler:
         field, so the handler re-resolves the name at this single
         boundary via the runtime_variant search action.
         """
-        querier = BatchQuerier(
+        searcher = RuntimeVariantSearcher(
             pagination=OffsetPagination(limit=1),
             conditions=[RuntimeVariantConditions.by_ids([runtime_variant_id])],
         )
-        result = await self._runtime_variant.search.wait_for_complete(
-            SearchRuntimeVariantsAction(querier=querier)
+        result = await self._runtime_variant.public_search.run(
+            SearchRuntimeVariantsAction(searcher=searcher)
         )
         if not result.items:
             raise RuntimeVariantNotFound()
@@ -257,8 +259,8 @@ class ServiceHandler:
         log.info("SERVE.LIST (email:{}, ak:{})", ctx.user_email, ctx.access_key)
 
         action = ListModelServiceAction(session_owener_id=ctx.user_uuid, name=params.name)
-        result: ListModelServiceActionResult = (
-            await self._model_serving.list_model_service.wait_for_complete(action)
+        result: ListModelServiceActionResult = await self._model_serving.list_model_service.run(
+            action
         )
 
         items = [
@@ -297,9 +299,7 @@ class ServiceHandler:
             offset=params.offset,
             limit=params.limit,
         )
-        result: SearchServicesActionResult = (
-            await self._model_serving.search_services.wait_for_complete(action)
-        )
+        result: SearchServicesActionResult = await self._model_serving.search_services.run(action)
 
         resp = SearchServicesResponseModel(
             items=[
@@ -337,9 +337,9 @@ class ServiceHandler:
             params.service_id,
         )
 
-        action = GetModelServiceInfoAction(service_id=params.service_id)
+        action = GetModelServiceInfoAction(deployment_id=DeploymentID(params.service_id))
         result: GetModelServiceInfoActionResult = (
-            await self._model_serving.get_model_service_info.wait_for_complete(action)
+            await self._model_serving.get_model_service_info.run(action)
         )
 
         runtime_variant_name = await self._resolve_runtime_variant_name(
@@ -358,12 +358,13 @@ class ServiceHandler:
         validation_result = await self._run_validation(request, params)
 
         deployment_action = CreateLegacyDeploymentAction(
+            project_id=ProjectID(validation_result.group_id),
             draft=DeploymentCreationDraft(
                 metadata=DeploymentMetadata(
                     name=params.service_name,
                     domain=params.domain_name,
                     project=validation_result.group_id,
-                    resource_group=validation_result.scaling_group,
+                    resource_group=validation_result.resource_group,
                     created_user=request["user"]["uuid"],
                     session_owner=validation_result.owner_uuid,
                     created_at=None,
@@ -377,10 +378,10 @@ class ServiceHandler:
                 network=DeploymentNetworkSpec(
                     open_to_public=params.open_to_public,
                 ),
-            )
+            ),
         )
         deployment_result: CreateLegacyDeploymentActionResult = (
-            await self._deployment.create_legacy_deployment.wait_for_complete(deployment_action)
+            await self._deployment.create_legacy_deployment.run(deployment_action)
         )
         deployment_info = deployment_result.data
         model_revision = _resolve_target_revision_data(deployment_info)
@@ -404,7 +405,7 @@ class ServiceHandler:
         validation_result = await self._run_validation(request, params)
 
         action = self._to_start_action(params, validation_result, request)
-        result = await self._model_serving.dry_run_model_service.wait_for_complete(action)
+        result = await self._model_serving.dry_run_model_service.run(action)
 
         resp = TryStartResponseModel(task_id=str(result.task_id))
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -440,7 +441,7 @@ class ServiceHandler:
 
         deployment_action = DestroyDeploymentAction(deployment_id=DeploymentID(params.service_id))
         deployment_result: DestroyDeploymentActionResult = (
-            await self._deployment.destroy_deployment.wait_for_complete(deployment_action)
+            await self._deployment.destroy_deployment.run(deployment_action)
         )
         resp = SuccessResponseModel(success=deployment_result.success)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -458,8 +459,8 @@ class ServiceHandler:
             params.service_id,
         )
 
-        action = ForceSyncAction(service_id=params.service_id)
-        result = await self._model_serving.force_sync.wait_for_complete(action)
+        action = ForceSyncAction(deployment_id=DeploymentID(params.service_id))
+        result = await self._model_serving.force_sync.run(action)
 
         resp = SuccessResponseModel(success=result.success)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -488,13 +489,11 @@ class ServiceHandler:
             max_session_count_per_model_session=request["user"]["resource_policy"][
                 "max_session_count_per_model_session"
             ],
-            service_id=path_params.service_id,
+            deployment_id=DeploymentID(path_params.service_id),
             to=params.to,
         )
 
-        result = await self._model_serving_auto_scaling.scale_service_replicas.wait_for_complete(
-            action
-        )
+        result = await self._model_serving_auto_scaling.scale_service_replicas.run(action)
 
         resp = ScaleResponseModel(
             current_route_count=result.current_route_count,
@@ -523,12 +522,12 @@ class ServiceHandler:
         )
 
         action = UpdateRouteAction(
-            service_id=path_params.service_id,
+            deployment_id=DeploymentID(path_params.service_id),
             route_id=path_params.route_id,
             traffic_ratio=params.traffic_ratio,
         )
 
-        await self._model_serving.update_route.wait_for_complete(action)
+        await self._model_serving.update_route.run(action)
 
         resp = SuccessResponseModel(success=True)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -549,11 +548,11 @@ class ServiceHandler:
         )
 
         action = DeleteRouteAction(
-            service_id=path_params.service_id,
+            deployment_id=DeploymentID(path_params.service_id),
             route_id=path_params.route_id,
         )
 
-        await self._model_serving.delete_route.wait_for_complete(action)
+        await self._model_serving.delete_route.run(action)
 
         resp = SuccessResponseModel(success=True)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -578,13 +577,13 @@ class ServiceHandler:
         )
 
         action = GenerateTokenAction(
-            service_id=path_params.service_id,
+            deployment_id=DeploymentID(path_params.service_id),
             duration=params.duration,
             valid_until=params.valid_until,
             expires_at=params.expires_at,
         )
 
-        result = await self._model_serving.generate_token.wait_for_complete(action)
+        result = await self._model_serving.generate_token.run(action)
 
         resp = TokenResponseModel(token=result.data.token)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -604,8 +603,8 @@ class ServiceHandler:
             path_params.service_id,
         )
 
-        action = ListErrorsAction(service_id=path_params.service_id)
-        result = await self._model_serving.list_errors.wait_for_complete(action)
+        action = ListErrorsAction(deployment_id=DeploymentID(path_params.service_id))
+        result = await self._model_serving.list_errors.run(action)
 
         resp = ErrorListResponseModel(
             errors=[
@@ -631,8 +630,8 @@ class ServiceHandler:
             path_params.service_id,
         )
 
-        action = ClearErrorAction(service_id=path_params.service_id)
-        await self._model_serving.clear_error.wait_for_complete(action)
+        action = ClearErrorAction(deployment_id=DeploymentID(path_params.service_id))
+        await self._model_serving.clear_error.run(action)
 
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
@@ -645,8 +644,8 @@ class ServiceHandler:
         request: Any,
         params: NewServiceRequestModel,
     ) -> ValidateModelServiceActionResult:
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
@@ -676,7 +675,7 @@ class ServiceHandler:
                     k: MountOption.from_dto(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
-                scaling_group=params.config.scaling_group,
+                resource_group=params.config.scaling_group,
                 resources=params.config.resources,
                 resource_opts=params.config.resource_opts,
             ),
@@ -689,7 +688,7 @@ class ServiceHandler:
             if params.owner_access_key
             else None,
         )
-        return await self._model_serving.validate_model_service.wait_for_complete(action)
+        return await self._model_serving.validate_model_service.run(action)
 
     async def _to_model_revision(
         self,
@@ -742,10 +741,10 @@ class ServiceHandler:
         Uses the dedicated ``resolve_by_name`` processor added for the
         legacy → id migration; v2 surface callers skip this step.
         """
-        result = await self._runtime_variant.resolve_by_name.wait_for_complete(
-            ResolveRuntimeVariantByNameAction(name=str(name))
+        result = await self._runtime_variant.public_lookup.run(
+            LookupRuntimeVariantAction(name=str(name))
         )
-        return result.runtime_variant_id
+        return result.entity_id()
 
     @staticmethod
     def _to_start_action(
@@ -754,6 +753,7 @@ class ServiceHandler:
         request: Any,
     ) -> DryRunModelServiceAction:
         return DryRunModelServiceAction(
+            project_id=ProjectID(validation_result.group_id),
             service_name=params.service_name,
             replicas=params.replicas,
             image=params.image,
@@ -779,7 +779,7 @@ class ServiceHandler:
                     k: MountOption.from_dto(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
-                scaling_group=params.config.scaling_group,
+                resource_group=params.config.scaling_group,
                 resources=params.config.resources,
                 resource_opts=params.config.resource_opts,
             ),
@@ -794,7 +794,7 @@ class ServiceHandler:
                 owner_role=validation_result.owner_role,
                 group_id=validation_result.group_id,
                 resource_policy=validation_result.resource_policy,
-                scaling_group=validation_result.scaling_group,
+                resource_group=validation_result.resource_group,
                 extra_mounts=validation_result.extra_mounts,
             ),
         )

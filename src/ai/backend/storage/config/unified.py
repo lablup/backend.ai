@@ -746,25 +746,6 @@ class StorageProxyConfig(BaseConfigSchema):
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-            ),
-            serialization_alias="use-experimental-redis-event-dispatcher",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Enable the experimental Redis-based event dispatcher for inter-process "
-                "event communication. May provide better scalability and performance for "
-                "event handling in multi-node deployments. Requires Redis configuration."
-            ),
-            added_version="24.09.0",
-            example=ConfigExample(local="false", prod="true"),
-        ),
-    ]
     auto_quota_scope_creation: Annotated[
         bool,
         Field(

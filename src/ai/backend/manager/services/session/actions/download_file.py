@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.actions.file_base import SessionFileAction
@@ -17,8 +16,9 @@ class DownloadFileAction(SessionFileAction):
     owner_access_key: AccessKey
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "download_file"
 
     @override
     @classmethod
@@ -27,10 +27,6 @@ class DownloadFileAction(SessionFileAction):
 
 
 @dataclass
-class DownloadFileActionResult(BaseActionResult):
+class DownloadFileActionResult:
     bytes: bytes
     session_data: SessionData
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_data.id)

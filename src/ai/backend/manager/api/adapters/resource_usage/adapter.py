@@ -6,6 +6,12 @@ from collections.abc import Callable, Mapping
 from datetime import date
 from decimal import Decimal
 
+from ai.backend.common.data.entity.resource_group import (
+    RESOURCE_GROUP_SCOPE_TYPE,
+    ResourceGroupID,
+    ResourceGroupName,
+)
+from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.query import DateFilter as DateFilterDTO
 from ai.backend.common.dto.manager.v2.fair_share.types import (
@@ -45,37 +51,52 @@ from ai.backend.common.dto.manager.v2.resource_usage.types import (
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    combine_conditions_or,
-    negate_conditions,
+from ai.backend.manager.models.resource_usage_history.scopes import (
+    DomainUsageBucketOperationScope,
+    ProjectUsageBucketOperationScope,
+    UserUsageBucketOperationScope,
 )
+from ai.backend.manager.models.resource_usage_history.searchers import (
+    DomainUsageBucketSearcher,
+    ProjectUsageBucketSearcher,
+    UserUsageBucketSearcher,
+)
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.resource_usage_history import (
     DomainUsageBucketConditions,
     DomainUsageBucketData,
     DomainUsageBucketOrders,
-    DomainUsageBucketSearchScope,
     ProjectUsageBucketConditions,
     ProjectUsageBucketData,
     ProjectUsageBucketOrders,
-    ProjectUsageBucketSearchScope,
     UserUsageBucketConditions,
     UserUsageBucketData,
     UserUsageBucketOrders,
-    UserUsageBucketSearchScope,
 )
-from ai.backend.manager.services.resource_usage.actions import (
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_usage.actions.global_search_domain_usage_buckets import (
+    GlobalSearchDomainUsageBucketsAction,
+)
+from ai.backend.manager.services.resource_usage.actions.global_search_project_usage_buckets import (
+    GlobalSearchProjectUsageBucketsAction,
+)
+from ai.backend.manager.services.resource_usage.actions.global_search_user_usage_buckets import (
+    GlobalSearchUserUsageBucketsAction,
+)
+from ai.backend.manager.services.resource_usage.actions.search_domain_usage_buckets import (
     SearchDomainUsageBucketsAction,
+)
+from ai.backend.manager.services.resource_usage.actions.search_project_usage_buckets import (
     SearchProjectUsageBucketsAction,
-    SearchScopedDomainUsageBucketsAction,
-    SearchScopedProjectUsageBucketsAction,
-    SearchScopedUserUsageBucketsAction,
+)
+from ai.backend.manager.services.resource_usage.actions.search_user_usage_buckets import (
     SearchUserUsageBucketsAction,
 )
 
@@ -144,11 +165,13 @@ class ResourceUsageAdapter(BaseAdapter):
             conditions.append(DomainUsageBucketConditions.by_resource_group(input.resource_group))
         orders = [DomainUsageBucketOrders.by_period_start(ascending=False)]
         action_result = (
-            await self._processors.resource_usage.search_domain_usage_buckets.wait_for_complete(
-                SearchDomainUsageBucketsAction(
-                    pagination=pagination,
-                    conditions=conditions,
-                    orders=orders,
+            await self._processors.resource_usage.global_search_domain_usage_buckets.run(
+                GlobalSearchDomainUsageBucketsAction(
+                    searcher=DomainUsageBucketSearcher(
+                        pagination=pagination,
+                        conditions=conditions,
+                        orders=orders,
+                    )
                 )
             )
         )
@@ -181,11 +204,13 @@ class ResourceUsageAdapter(BaseAdapter):
             )
         orders = [ProjectUsageBucketOrders.by_period_start(ascending=False)]
         action_result = (
-            await self._processors.resource_usage.search_project_usage_buckets.wait_for_complete(
-                SearchProjectUsageBucketsAction(
-                    pagination=pagination,
-                    conditions=conditions,
-                    orders=orders,
+            await self._processors.resource_usage.global_search_project_usage_buckets.run(
+                GlobalSearchProjectUsageBucketsAction(
+                    searcher=ProjectUsageBucketSearcher(
+                        pagination=pagination,
+                        conditions=conditions,
+                        orders=orders,
+                    )
                 )
             )
         )
@@ -223,9 +248,9 @@ class ResourceUsageAdapter(BaseAdapter):
                 )
             )
         orders = [UserUsageBucketOrders.by_period_start(ascending=False)]
-        action_result = (
-            await self._processors.resource_usage.search_user_usage_buckets.wait_for_complete(
-                SearchUserUsageBucketsAction(
+        action_result = await self._processors.resource_usage.global_search_user_usage_buckets.run(
+            GlobalSearchUserUsageBucketsAction(
+                searcher=UserUsageBucketSearcher(
                     pagination=pagination,
                     conditions=conditions,
                     orders=orders,
@@ -249,17 +274,28 @@ class ResourceUsageAdapter(BaseAdapter):
         """Search domain usage buckets scoped to a domain/resource-group."""
         limit = input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT
         offset = input.offset if input.offset is not None else 0
-        scope = DomainUsageBucketSearchScope(
+        scope = DomainUsageBucketOperationScope(
             domain_name=input.domain_name,
             resource_group=input.resource_group,
         )
+        resource_group_id = await self._resource_group_id(input.resource_group)
         querier = BatchQuerier(
             conditions=[],
             orders=[DomainUsageBucketOrders.by_period_start(ascending=False)],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
-        action_result = await self._processors.resource_usage.search_scoped_domain_usage_buckets.wait_for_complete(
-            SearchScopedDomainUsageBucketsAction(scope=scope, querier=querier)
+        action_result = await self._processors.resource_usage.search_domain_usage_buckets.run(
+            SearchDomainUsageBucketsAction(
+                scope_target=ScopeRef(
+                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
+                ),
+                scope=scope,
+                searcher=DomainUsageBucketSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
+            )
         )
         has_next_page = (offset + len(action_result.items)) < action_result.total_count
         has_previous_page = offset > 0
@@ -276,18 +312,29 @@ class ResourceUsageAdapter(BaseAdapter):
         """Search project usage buckets scoped to a domain/resource-group/project."""
         limit = input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT
         offset = input.offset if input.offset is not None else 0
-        scope = ProjectUsageBucketSearchScope(
+        scope = ProjectUsageBucketOperationScope(
             domain_name=input.domain_name,
             resource_group=input.resource_group,
             project_id=input.project_id,
         )
+        resource_group_id = await self._resource_group_id(input.resource_group)
         querier = BatchQuerier(
             conditions=[],
             orders=[ProjectUsageBucketOrders.by_period_start(ascending=False)],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
-        action_result = await self._processors.resource_usage.search_scoped_project_usage_buckets.wait_for_complete(
-            SearchScopedProjectUsageBucketsAction(scope=scope, querier=querier)
+        action_result = await self._processors.resource_usage.search_project_usage_buckets.run(
+            SearchProjectUsageBucketsAction(
+                scope_target=ScopeRef(
+                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
+                ),
+                scope=scope,
+                searcher=ProjectUsageBucketSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
+            )
         )
         has_next_page = (offset + len(action_result.items)) < action_result.total_count
         has_previous_page = offset > 0
@@ -304,19 +351,30 @@ class ResourceUsageAdapter(BaseAdapter):
         """Search user usage buckets scoped to a domain/resource-group/project/user."""
         limit = input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT
         offset = input.offset if input.offset is not None else 0
-        scope = UserUsageBucketSearchScope(
+        scope = UserUsageBucketOperationScope(
             domain_name=input.domain_name,
             resource_group=input.resource_group,
             project_id=input.project_id,
             user_uuid=input.user_uuid,
         )
+        resource_group_id = await self._resource_group_id(input.resource_group)
         querier = BatchQuerier(
             conditions=[],
             orders=[UserUsageBucketOrders.by_period_start(ascending=False)],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
-        action_result = await self._processors.resource_usage.search_scoped_user_usage_buckets.wait_for_complete(
-            SearchScopedUserUsageBucketsAction(scope=scope, querier=querier)
+        action_result = await self._processors.resource_usage.search_user_usage_buckets.run(
+            SearchUserUsageBucketsAction(
+                scope_target=ScopeRef(
+                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
+                ),
+                scope=scope,
+                searcher=UserUsageBucketSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
+            )
         )
         has_next_page = (offset + len(action_result.items)) < action_result.total_count
         has_previous_page = offset > 0
@@ -331,7 +389,7 @@ class ResourceUsageAdapter(BaseAdapter):
 
     async def gql_search_domain_scoped(
         self,
-        scope: DomainUsageBucketSearchScope,
+        scope: DomainUsageBucketOperationScope,
         filter: DomainUsageBucketFilter | None = None,
         order: list[DomainUsageBucketOrderBy] | None = None,
         first: int | None = None,
@@ -355,8 +413,19 @@ class ResourceUsageAdapter(BaseAdapter):
             limit=limit,
             offset=offset,
         )
-        action_result = await self._processors.resource_usage.search_scoped_domain_usage_buckets.wait_for_complete(
-            SearchScopedDomainUsageBucketsAction(scope=scope, querier=querier)
+        resource_group_id = await self._resource_group_id(scope.resource_group)
+        action_result = await self._processors.resource_usage.search_domain_usage_buckets.run(
+            SearchDomainUsageBucketsAction(
+                scope_target=ScopeRef(
+                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
+                ),
+                scope=scope,
+                searcher=DomainUsageBucketSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
+            )
         )
         return AdminSearchDomainUsageBucketsPayload(
             items=[self._domain_bucket_to_dto(item) for item in action_result.items],
@@ -367,7 +436,7 @@ class ResourceUsageAdapter(BaseAdapter):
 
     async def gql_search_project_scoped(
         self,
-        scope: ProjectUsageBucketSearchScope,
+        scope: ProjectUsageBucketOperationScope,
         filter: ProjectUsageBucketFilter | None = None,
         order: list[ProjectUsageBucketOrderBy] | None = None,
         first: int | None = None,
@@ -391,8 +460,19 @@ class ResourceUsageAdapter(BaseAdapter):
             limit=limit,
             offset=offset,
         )
-        action_result = await self._processors.resource_usage.search_scoped_project_usage_buckets.wait_for_complete(
-            SearchScopedProjectUsageBucketsAction(scope=scope, querier=querier)
+        resource_group_id = await self._resource_group_id(scope.resource_group)
+        action_result = await self._processors.resource_usage.search_project_usage_buckets.run(
+            SearchProjectUsageBucketsAction(
+                scope_target=ScopeRef(
+                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
+                ),
+                scope=scope,
+                searcher=ProjectUsageBucketSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
+            )
         )
         return AdminSearchProjectUsageBucketsPayload(
             items=[self._project_bucket_to_dto(item) for item in action_result.items],
@@ -403,7 +483,7 @@ class ResourceUsageAdapter(BaseAdapter):
 
     async def gql_search_user_scoped(
         self,
-        scope: UserUsageBucketSearchScope,
+        scope: UserUsageBucketOperationScope,
         filter: UserUsageBucketFilter | None = None,
         order: list[UserUsageBucketOrderBy] | None = None,
         first: int | None = None,
@@ -427,8 +507,19 @@ class ResourceUsageAdapter(BaseAdapter):
             limit=limit,
             offset=offset,
         )
-        action_result = await self._processors.resource_usage.search_scoped_user_usage_buckets.wait_for_complete(
-            SearchScopedUserUsageBucketsAction(scope=scope, querier=querier)
+        resource_group_id = await self._resource_group_id(scope.resource_group)
+        action_result = await self._processors.resource_usage.search_user_usage_buckets.run(
+            SearchUserUsageBucketsAction(
+                scope_target=ScopeRef(
+                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
+                ),
+                scope=scope,
+                searcher=UserUsageBucketSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
+            )
         )
         return AdminSearchUserUsageBucketsPayload(
             items=[self._user_bucket_to_dto(item) for item in action_result.items],
@@ -463,11 +554,13 @@ class ResourceUsageAdapter(BaseAdapter):
             offset=offset,
         )
         action_result = (
-            await self._processors.resource_usage.search_domain_usage_buckets.wait_for_complete(
-                SearchDomainUsageBucketsAction(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+            await self._processors.resource_usage.global_search_domain_usage_buckets.run(
+                GlobalSearchDomainUsageBucketsAction(
+                    searcher=DomainUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    )
                 )
             )
         )
@@ -504,11 +597,13 @@ class ResourceUsageAdapter(BaseAdapter):
             offset=offset,
         )
         action_result = (
-            await self._processors.resource_usage.search_project_usage_buckets.wait_for_complete(
-                SearchProjectUsageBucketsAction(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+            await self._processors.resource_usage.global_search_project_usage_buckets.run(
+                GlobalSearchProjectUsageBucketsAction(
+                    searcher=ProjectUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    )
                 )
             )
         )
@@ -544,9 +639,9 @@ class ResourceUsageAdapter(BaseAdapter):
             limit=limit,
             offset=offset,
         )
-        action_result = (
-            await self._processors.resource_usage.search_user_usage_buckets.wait_for_complete(
-                SearchUserUsageBucketsAction(
+        action_result = await self._processors.resource_usage.global_search_user_usage_buckets.run(
+            GlobalSearchUserUsageBucketsAction(
+                searcher=UserUsageBucketSearcher(
                     pagination=querier.pagination,
                     conditions=querier.conditions,
                     orders=querier.orders,
@@ -588,11 +683,13 @@ class ResourceUsageAdapter(BaseAdapter):
             base_conditions=base_conditions,
         )
         action_result = (
-            await self._processors.resource_usage.search_project_usage_buckets.wait_for_complete(
-                SearchProjectUsageBucketsAction(
-                    pagination=querier.pagination,
-                    conditions=querier.conditions,
-                    orders=querier.orders,
+            await self._processors.resource_usage.global_search_project_usage_buckets.run(
+                GlobalSearchProjectUsageBucketsAction(
+                    searcher=ProjectUsageBucketSearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    )
                 )
             )
         )
@@ -630,9 +727,9 @@ class ResourceUsageAdapter(BaseAdapter):
             offset=offset,
             base_conditions=base_conditions,
         )
-        action_result = (
-            await self._processors.resource_usage.search_user_usage_buckets.wait_for_complete(
-                SearchUserUsageBucketsAction(
+        action_result = await self._processors.resource_usage.global_search_user_usage_buckets.run(
+            GlobalSearchUserUsageBucketsAction(
+                searcher=UserUsageBucketSearcher(
                     pagination=querier.pagination,
                     conditions=querier.conditions,
                     orders=querier.orders,
@@ -983,3 +1080,13 @@ class ResourceUsageAdapter(BaseAdapter):
             resource_usage=ResourceUsageAdapter._resource_slot_to_info(data.resource_usage),
             capacity_snapshot=ResourceUsageAdapter._resource_slot_to_info(data.capacity_snapshot),
         )
+
+    async def _resource_group_id(self, name: str) -> ResourceGroupID:
+        """The resource group's id, which is what a bucket read is answered for.
+
+        The request names the group; a scope has to name its id.
+        """
+        result = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(name))
+        )
+        return result.entity_id()

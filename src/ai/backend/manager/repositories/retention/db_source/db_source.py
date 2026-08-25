@@ -20,6 +20,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.login_session_types import LoginSessionStatus
 from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle, RouteStatus
+from ai.backend.manager.data.entity_invitation.types import EntityInvitationStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.retention.types import (
@@ -34,7 +35,8 @@ from ai.backend.manager.errors.retention import RetentionCategoryNotSupportedErr
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.entity_invitation.row import EntityInvitationRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
@@ -49,6 +51,8 @@ from ai.backend.manager.models.resource_usage_history.row import (
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
+from ai.backend.manager.models.retention.searchers import RetentionPolicySearcher
+from ai.backend.manager.models.retention.updaters import LastSweptAtUpdater
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.scheduling_history.row import (
@@ -59,16 +63,13 @@ from ai.backend.manager.models.scheduling_history.row import (
 )
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.vfolder.row import VFolderInvitationRow
-from ai.backend.manager.repositories.base import (
-    BatchPurger,
-    BatchQuerier,
-    NoPagination,
-    Updater,
+from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
+from ai.backend.manager.repositories.ops.v2.retention.write import (
+    RetentionDrain,
+    RetentionWriteOps,
 )
-from ai.backend.manager.repositories.ops import DBOpsProvider, ReadOps, WriteOps
-from ai.backend.manager.repositories.retention.purgers import RetentionPurgerSpec
-from ai.backend.manager.repositories.retention.updaters import LastSweptAtUpdaterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -80,12 +81,12 @@ _USER_BUCKET_TYPE = "user"
 
 
 class RetentionDBSource:
-    _ops: DBOpsProvider
+    _ops: RetentionOpsProvider
     _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
-        ops_provider: DBOpsProvider,
+        ops_provider: RetentionOpsProvider,
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._ops = ops_provider
@@ -94,7 +95,7 @@ class RetentionDBSource:
     @staticmethod
     def _catalog(
         threshold: datetime,
-    ) -> Mapping[RetentionCategory, Sequence[RetentionPurgerSpec[Any]]]:
+    ) -> Mapping[RetentionCategory, Sequence[RetentionDrain[Any]]]:
         """Build the ``category -> specs`` catalog with ``threshold`` bound.
 
         The ordered-delete categories (``sessions``, ``deployments``,
@@ -130,31 +131,29 @@ class RetentionDBSource:
         )
         return {
             RetentionCategory.LOGS: (
-                RetentionPurgerSpec(EventLogRow, EventLogRow.created_at, threshold),
-                RetentionPurgerSpec(AuditLogRow, AuditLogRow.created_at, threshold),
+                RetentionDrain(EventLogRow, EventLogRow.created_at, threshold),
+                RetentionDrain(AuditLogRow, AuditLogRow.created_at, threshold),
                 # error_logs purges purely on the boundary; is_read/is_cleared are ignored.
-                RetentionPurgerSpec(ErrorLogRow, ErrorLogRow.created_at, threshold),
+                RetentionDrain(ErrorLogRow, ErrorLogRow.created_at, threshold),
             ),
             # updated_at (not created_at): a retry merge touches updated_at, so a
             # recently-retried row keeps an old created_at but survives.
             RetentionCategory.RECONCILE_HISTORY: (
-                RetentionPurgerSpec(
+                RetentionDrain(
                     SessionSchedulingHistoryRow, SessionSchedulingHistoryRow.updated_at, threshold
                 ),
-                RetentionPurgerSpec(
+                RetentionDrain(
                     KernelSchedulingHistoryRow, KernelSchedulingHistoryRow.updated_at, threshold
                 ),
-                RetentionPurgerSpec(
-                    DeploymentHistoryRow, DeploymentHistoryRow.updated_at, threshold
-                ),
-                RetentionPurgerSpec(RouteHistoryRow, RouteHistoryRow.updated_at, threshold),
-                RetentionPurgerSpec(
+                RetentionDrain(DeploymentHistoryRow, DeploymentHistoryRow.updated_at, threshold),
+                RetentionDrain(RouteHistoryRow, RouteHistoryRow.updated_at, threshold),
+                RetentionDrain(
                     ReplicaGroupHistoryRow, ReplicaGroupHistoryRow.updated_at, threshold
                 ),
             ),
             RetentionCategory.LOGIN: (
-                RetentionPurgerSpec(LoginHistoryRow, LoginHistoryRow.created_at, threshold),
-                RetentionPurgerSpec(
+                RetentionDrain(LoginHistoryRow, LoginHistoryRow.created_at, threshold),
+                RetentionDrain(
                     LoginSessionRow,
                     LoginSessionRow.invalidated_at,
                     threshold,
@@ -167,13 +166,13 @@ class RetentionDBSource:
                 ),
             ),
             RetentionCategory.ROLES_INVITATIONS: (
-                RetentionPurgerSpec(
+                RetentionDrain(
                     RoleRow,
                     RoleRow.deleted_at,
                     threshold,
                     conditions=(RoleRow.status == RoleStatus.DELETED,),
                 ),
-                RetentionPurgerSpec(
+                RetentionDrain(
                     RoleInvitationRow,
                     RoleInvitationRow.updated_at,
                     threshold,
@@ -181,28 +180,34 @@ class RetentionDBSource:
                         RoleInvitationRow.state.in_(RoleInvitationState.declined_states()),
                     ),
                 ),
-                RetentionPurgerSpec(
+                RetentionDrain(
                     VFolderInvitationRow,
-                    VFolderInvitationRow.modified_at,
+                    VFolderInvitationRow.updated_at,
                     threshold,
                     conditions=(
                         VFolderInvitationRow.state.in_(VFolderInvitationState.declined_states()),
                     ),
                 ),
-            ),
-            RetentionCategory.USAGE_RECORDS: (
-                RetentionPurgerSpec(
-                    KernelUsageRecordRow, KernelUsageRecordRow.period_end, threshold
+                RetentionDrain(
+                    EntityInvitationRow,
+                    EntityInvitationRow.updated_at,
+                    threshold,
+                    conditions=(
+                        EntityInvitationRow.status.in_(EntityInvitationStatus.unsettled_states()),
+                    ),
                 ),
             ),
+            RetentionCategory.USAGE_RECORDS: (
+                RetentionDrain(KernelUsageRecordRow, KernelUsageRecordRow.period_end, threshold),
+            ),
             RetentionCategory.SESSIONS: (
-                RetentionPurgerSpec(
+                RetentionDrain(
                     KernelRow,
                     KernelRow.terminated_at,
                     threshold,
                     conditions=(KernelRow.status.in_(KernelStatus.terminal_statuses()),),
                 ),
-                RetentionPurgerSpec(
+                RetentionDrain(
                     SessionRow,
                     SessionRow.terminated_at,
                     threshold,
@@ -218,7 +223,7 @@ class RetentionDBSource:
             # Terminal routings / replica_groups outlive a still-live endpoint, so
             # they get their own boundary sweep; endpoint_tokens expire on theirs.
             RetentionCategory.DEPLOYMENTS: (
-                RetentionPurgerSpec(
+                RetentionDrain(
                     DeploymentRevisionRow,
                     EndpointRow.destroyed_at,
                     threshold,
@@ -226,13 +231,13 @@ class RetentionDBSource:
                     source_key=EndpointRow.id,
                     source_conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
                 ),
-                RetentionPurgerSpec(
+                RetentionDrain(
                     RoutingRow,
                     RoutingRow.updated_at,
                     threshold,
                     conditions=(RoutingRow.status.in_(RouteStatus.terminal_statuses()),),
                 ),
-                RetentionPurgerSpec(
+                RetentionDrain(
                     ReplicaGroupRow,
                     ReplicaGroupRow.updated_at,
                     threshold,
@@ -240,13 +245,13 @@ class RetentionDBSource:
                         ReplicaGroupRow.lifecycle.in_(ReplicaGroupLifecycle.terminal_statuses()),
                     ),
                 ),
-                RetentionPurgerSpec(
+                RetentionDrain(
                     EndpointRow,
                     EndpointRow.destroyed_at,
                     threshold,
                     conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
                 ),
-                RetentionPurgerSpec(EndpointTokenRow, EndpointTokenRow.expires_at, threshold),
+                RetentionDrain(EndpointTokenRow, EndpointTokenRow.expires_at, threshold),
                 # session_groups is the parent side of
                 # replica_groups.session_group_id (NO ACTION, non-deferrable): a
                 # group is deletable only once nothing references it, hence the
@@ -257,7 +262,7 @@ class RetentionDBSource:
                 # replica_groups) in the same tick rather than the next one.
                 # Nothing else clears them: the application never hard-deletes a
                 # replica group, and the FK points the wrong way for a DB cascade.
-                RetentionPurgerSpec(
+                RetentionDrain(
                     SessionGroupRow,
                     SessionGroupRow.created_at,
                     threshold,
@@ -267,7 +272,7 @@ class RetentionDBSource:
             # Each bucket kind is purged on its own period_end, with its FK-less
             # usage_bucket_entries (keyed by bucket_id + bucket_type) drained first.
             RetentionCategory.USAGE_BUCKETS: (
-                RetentionPurgerSpec(
+                RetentionDrain(
                     UsageBucketEntryRow,
                     DomainUsageBucketRow.period_end,
                     threshold,
@@ -275,10 +280,8 @@ class RetentionDBSource:
                     match_column=UsageBucketEntryRow.bucket_id,
                     source_key=DomainUsageBucketRow.id,
                 ),
-                RetentionPurgerSpec(
-                    DomainUsageBucketRow, DomainUsageBucketRow.period_end, threshold
-                ),
-                RetentionPurgerSpec(
+                RetentionDrain(DomainUsageBucketRow, DomainUsageBucketRow.period_end, threshold),
+                RetentionDrain(
                     UsageBucketEntryRow,
                     ProjectUsageBucketRow.period_end,
                     threshold,
@@ -286,10 +289,8 @@ class RetentionDBSource:
                     match_column=UsageBucketEntryRow.bucket_id,
                     source_key=ProjectUsageBucketRow.id,
                 ),
-                RetentionPurgerSpec(
-                    ProjectUsageBucketRow, ProjectUsageBucketRow.period_end, threshold
-                ),
-                RetentionPurgerSpec(
+                RetentionDrain(ProjectUsageBucketRow, ProjectUsageBucketRow.period_end, threshold),
+                RetentionDrain(
                     UsageBucketEntryRow,
                     UserUsageBucketRow.period_end,
                     threshold,
@@ -297,7 +298,7 @@ class RetentionDBSource:
                     match_column=UsageBucketEntryRow.bucket_id,
                     source_key=UserUsageBucketRow.id,
                 ),
-                RetentionPurgerSpec(UserUsageBucketRow, UserUsageBucketRow.period_end, threshold),
+                RetentionDrain(UserUsageBucketRow, UserUsageBucketRow.period_end, threshold),
             ),
         }
 
@@ -305,7 +306,7 @@ class RetentionDBSource:
         self,
         category: RetentionCategory,
         threshold: datetime,
-    ) -> Sequence[RetentionPurgerSpec[Any]]:
+    ) -> Sequence[RetentionDrain[Any]]:
         """Look up the category's specs (each already bound to ``threshold``)."""
         specs = self._catalog(threshold).get(category)
         if specs is None:
@@ -359,8 +360,8 @@ class RetentionDBSource:
                 try:
                     async with w.savepoint() as sp:
                         deleted = await self._drain_specs(sp, specs, batch_size)
-                        await sp.update(
-                            Updater(spec=LastSweptAtUpdaterSpec(now), pk_value=policy.id)
+                        await sp.update_data(
+                            LastSweptAtUpdater(policy_id=policy.id, last_swept_at=now)
                         )
                 except Exception:
                     log.exception(
@@ -383,24 +384,25 @@ class RetentionDBSource:
             )
         return results
 
-    async def _load_enabled_policies(self, r: ReadOps) -> list[RetentionPolicyData]:
+    async def _load_enabled_policies(self, r: RetentionWriteOps) -> list[RetentionPolicyData]:
         """Load every enabled policy, least-recently-swept first, on ``r``.
 
         The ordering makes the sweep fair under a per-tick budget: categories
         that have waited longest are drained before ones swept more recently.
         """
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[lambda: RetentionPolicyRow.enabled == sa.true()],
-            orders=[RetentionPolicyRow.last_swept_at.asc().nulls_first()],
+        result = await r.search_in_global(
+            RetentionPolicySearcher(
+                pagination=NoPagination(),
+                conditions=[lambda: RetentionPolicyRow.enabled == sa.true()],
+                orders=[RetentionPolicyRow.last_swept_at.asc().nulls_first()],
+            )
         )
-        result = await r.batch_query_in_global(sa.select(RetentionPolicyRow), querier)
-        return [row.RetentionPolicyRow.to_data() for row in result.rows]
+        return result.items
 
     async def _drain_specs(
         self,
-        w: WriteOps,
-        specs: Sequence[RetentionPurgerSpec[Any]],
+        w: RetentionWriteOps,
+        specs: Sequence[RetentionDrain[Any]],
         batch_size: int,
     ) -> int:
         """Drain each spec's rows on ``w`` in ``batch_size`` chunks; total deleted.
@@ -410,6 +412,5 @@ class RetentionDBSource:
         """
         total_deleted = 0
         for spec in specs:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=batch_size))
-            total_deleted += result.deleted_count
+            total_deleted += await w.drain(spec, batch_size)
         return total_deleted

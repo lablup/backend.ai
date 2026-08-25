@@ -12,8 +12,8 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.types import ImageCanonical, ImageID
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
@@ -32,8 +32,9 @@ from ai.backend.manager.errors.image import (
     HarborWebhookContainerRegistryRowNotFound,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -56,9 +57,6 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
 )
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
-)
-from ai.backend.manager.services.container_registry.processors import (
-    ContainerRegistryProcessors,
 )
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
@@ -93,7 +91,7 @@ def container_registry_service(
 def sample_registry_data() -> ContainerRegistryData:
     """Create sample container registry data."""
     return ContainerRegistryData(
-        id=UUID("12345678-1234-5678-1234-567812345678"),
+        id=ContainerRegistryID(UUID("12345678-1234-5678-1234-567812345678")),
         url="https://registry.example.com",
         registry_name="registry.example.com",
         type=ContainerRegistryType.DOCKER,
@@ -110,7 +108,7 @@ def sample_registry_data() -> ContainerRegistryData:
 def sample_registry_data_2() -> ContainerRegistryData:
     """Create another sample container registry data."""
     return ContainerRegistryData(
-        id=UUID("87654321-4321-8765-4321-876543218765"),
+        id=ContainerRegistryID(UUID("87654321-4321-8765-4321-876543218765")),
         url="https://registry.example.com",
         registry_name="registry.example.com",
         type=ContainerRegistryType.DOCKER,
@@ -128,7 +126,7 @@ def sample_registries() -> list[ContainerRegistryData]:
     """Create sample container registry data list."""
     return [
         ContainerRegistryData(
-            id=UUID("12345678-1234-5678-1234-567812345678"),
+            id=ContainerRegistryID(UUID("12345678-1234-5678-1234-567812345678")),
             url="https://registry1.example.com",
             registry_name="registry1.example.com",
             type=ContainerRegistryType.DOCKER,
@@ -140,7 +138,7 @@ def sample_registries() -> list[ContainerRegistryData]:
             extra=None,
         ),
         ContainerRegistryData(
-            id=UUID("87654321-4321-8765-4321-876543218765"),
+            id=ContainerRegistryID(UUID("87654321-4321-8765-4321-876543218765")),
             url="https://registry2.example.com",
             registry_name="registry2.example.com",
             type=ContainerRegistryType.DOCKER,
@@ -152,7 +150,7 @@ def sample_registries() -> list[ContainerRegistryData]:
             extra={"custom": "data"},
         ),
         ContainerRegistryData(
-            id=UUID("11111111-2222-3333-4444-555555555555"),
+            id=ContainerRegistryID(UUID("11111111-2222-3333-4444-555555555555")),
             url="https://global-registry.example.com",
             registry_name="global-registry.example.com",
             type=ContainerRegistryType.HARBOR2,
@@ -826,7 +824,6 @@ class TestSearchContainerRegistries:
             db=mock_db_engine,
             container_registry_repository=mock_container_registry_repository,
         )
-        processors = ContainerRegistryProcessors(service, [], MagicMock(spec=ActionValidators))
 
         mock_container_registry_repository.search_container_registries = AsyncMock(
             return_value=ContainerRegistrySearchResult(
@@ -844,7 +841,7 @@ class TestSearchContainerRegistries:
         )
         action = SearchContainerRegistriesAction(querier=querier)
 
-        result = await processors.search_container_registries.wait_for_complete(action)
+        result = await service.search_container_registries(action)
 
         assert result.data == [sample_registry_data]
         assert result.total_count == 1

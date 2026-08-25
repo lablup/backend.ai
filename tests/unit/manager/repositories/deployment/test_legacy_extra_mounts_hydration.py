@@ -10,10 +10,12 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
@@ -26,12 +28,13 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -42,16 +45,17 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.testutils.db import with_tables
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.testutils.db import TableOrORM, with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
-_REQUIRED_TABLES = [
+_REQUIRED_TABLES: list[TableOrORM] = [
     DomainRow,
-    ScalingGroupRow,
+    ResourceGroupRow,
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
@@ -59,7 +63,7 @@ _REQUIRED_TABLES = [
     UserRoleRow,
     UserRow,
     KeyPairRow,
-    GroupRow,
+    ProjectRow,
     ContainerRegistryRow,
     ImageRow,
     ResourceSlotTypeRow,
@@ -91,22 +95,33 @@ class TestLegacyExtraMountsHydration:
         return uuid.uuid4().hex[:8]
 
     @pytest.fixture
-    async def domain_name(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
+    async def domain_fixture(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        suffix: str,
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         name = f"d-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=name, total_resource_slots=ResourceSlot()))
-        return name
+            db_sess.add(
+                DomainRow(
+                    id=domain_id,
+                    name=name,
+                    total_resource_slots=ResourceSlot(),
+                )
+            )
+        return DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
     @pytest.fixture
-    async def scaling_group_name(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
+    async def resource_group_name(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
         name = f"sg-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         return name
@@ -149,7 +164,7 @@ class TestLegacyExtraMountsHydration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         user_resource_policy_name: str,
     ) -> uuid.UUID:
         user_uuid = uuid.uuid4()
@@ -165,7 +180,8 @@ class TestLegacyExtraMountsHydration:
                         rounds=1,
                         salt_size=16,
                     ),
-                    domain_name=domain_name,
+                    domain_id=domain_fixture.domain_id,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy=user_resource_policy_name,
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
@@ -178,16 +194,16 @@ class TestLegacyExtraMountsHydration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project_resource_policy_name: str,
     ) -> uuid.UUID:
         project_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_uuid,
                     name=f"g-{suffix}",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_resource_policy_name,
                 )
@@ -201,7 +217,7 @@ class TestLegacyExtraMountsHydration:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_uuid,
+                    id=ContainerRegistryID(registry_uuid),
                     url="https://test-registry.example.com",
                     registry_name=f"reg-{suffix}",
                     type=ContainerRegistryType.DOCKER,
@@ -250,8 +266,8 @@ class TestLegacyExtraMountsHydration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain_name: str,
-        scaling_group_name: str,
+        domain_fixture: DomainFixtureData,
+        resource_group_name: str,
         user_id: uuid.UUID,
         project_id: uuid.UUID,
         image_id: ImageID,
@@ -266,9 +282,9 @@ class TestLegacyExtraMountsHydration:
                 name=f"ep-{suffix}",
                 created_user=user_id,
                 session_owner=user_id,
-                domain=domain_name,
+                domain=domain_fixture.domain_name,
                 project=project_id,
-                resource_group=scaling_group_name,
+                resource_group=resource_group_name,
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.READY,
@@ -295,7 +311,7 @@ class TestLegacyExtraMountsHydration:
                     image=image_id,
                     model=None,
                     model_mount_destination="/models",
-                    resource_group=scaling_group_name,
+                    resource_group=resource_group_name,
                     resource_opts={},
                     cluster_mode=ClusterMode.SINGLE_NODE.name,
                     cluster_size=1,
@@ -313,6 +329,7 @@ class TestLegacyExtraMountsHydration:
     ) -> DeploymentRepository:
         return DeploymentRepository(
             db=db_with_cleanup,
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=AsyncMock(),
             valkey_stat=AsyncMock(),
             valkey_live=AsyncMock(),

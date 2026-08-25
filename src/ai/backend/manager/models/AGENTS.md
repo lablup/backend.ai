@@ -1,17 +1,24 @@
 # Manager Models layer — Guardrails
 
-> This layer defines only the ORM schema. For query patterns see `/repository-guide`; for data type conventions see
-> `manager/data/AGENTS.md`.
+> This layer defines the ORM schema and the declarative write specs. For background, see `KNOWLEDGE.md`
+> in the same directory; for query patterns see `/repository-guide`; for
+> data type conventions see `manager/data/AGENTS.md`.
 
 ## Directory structure (per domain)
 
 Every domain follows `models/{domain}/__init__.py` + `row.py` (ORM classes).
 The single-file shorthand (`models/{domain}.py`) is legacy — do not add new ones.
 
+Domains migrated to the v2 specs add them next to `row.py` — `creators.py` / `purgers.py` /
+`upserters.py` / `updaters.py` for writes, `queriers.py` / `searchers.py` / `lookups.py` for
+reads, `scopes.py` for the `OperationScope` subclasses that filter the row. The spec bases
+live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
+
 ## Row class rules
 
 - Inherit `Base` (defined in `manager/models/base.py`).
 - Every Row class requires a `__tablename__`.
+- Do NOT add new `relationship()` definitions — fetch related rows in `repositories/db_source/` queries. Existing relationships are being phased out; remove them (with their `back_populates` pair) once nothing references them.
 - Inter-entity relationships: keep related Row imports inside a `TYPE_CHECKING` block only.
 
 ## No logic in Row classes
@@ -20,10 +27,19 @@ The single-file shorthand (`models/{domain}.py`) is legacy — do not add new on
 - Do NOT add business-logic methods — that belongs to `services/`.
 - `session/row.py` has legacy query methods, but do not follow that pattern.
 
+## How Rows are handled
+
+- Handle create/delete/upsert through `models/specs/` spec declarations where possible —
+  preferred over direct db-object manipulation because the RBAC side effects are enforced
+  by the spec's type (rationale: `KNOWLEDGE.md`).
+- Do NOT open a db session to manipulate Rows directly — the implementation belongs in a repository.
+
 ## Custom column types
 
 - Where possible, reuse the existing `TypeDecorator` wrappers in `models/base.py`.
 - Add new `TypeDecorator`s only to `models/base.py` — not in individual row files.
+- A `SecretColumn` takes a `SecretValue`. Encrypt through the key provider pool before
+  binding it — the column performs no cryptography and refuses a bare string.
 
 ## `__init__.py` rules
 

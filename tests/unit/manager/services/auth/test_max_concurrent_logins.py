@@ -8,12 +8,16 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
+from ai.backend.common.data.entity.resource_policy import (
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import TooManyConcurrentLoginSessions
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -24,6 +28,8 @@ from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.service import AuthService
 
@@ -52,11 +58,11 @@ def _make_mock_user(resource_policy: str = _DEFAULT_RESOURCE_POLICY) -> MagicMoc
     return mock_user
 
 
-def _make_mock_keypair_row() -> MagicMock:
-    """Create a mock keypair row."""
+def _make_mock_keypair() -> MagicMock:
+    """The keypair data a default-keypair read answers with."""
     mock_keypair = MagicMock()
     mock_keypair.access_key = "AKIAIOSFODNN7EXAMPLE"
-    mock_keypair.secret_key = "secret"
+    mock_keypair.secret_key = SecretValue("secret")
     return mock_keypair
 
 
@@ -76,6 +82,7 @@ def _make_action(*, force: bool = False) -> AuthorizeAction:
 
 def _make_policy(max_concurrent_logins: int | None) -> UserResourcePolicyData:
     return UserResourcePolicyData(
+        uuid=UserResourcePolicyUUID(uuid4()),
         name=_DEFAULT_RESOURCE_POLICY,
         max_vfolder_count=10,
         max_quota_scope_size=0,
@@ -125,6 +132,7 @@ def auth_service(
     mock_user_resource_policy_repository: AsyncMock,
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
+    mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
@@ -135,6 +143,8 @@ def auth_service(
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
         ssh_key_validator=AsyncMock(),
+        client_ip_masking_repository=mock_client_ip_masking_repository,
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
 
 
@@ -242,7 +252,7 @@ class TestMaxConcurrentLoginsEnforcement:
             await auth_service._create_login_session(
                 action=_make_action(force=case.force_evict_oldest),
                 user=_make_mock_user(),
-                keypair_row=_make_mock_keypair_row(),
+                keypair=_make_mock_keypair(),
                 live_sessions=_make_live_sessions(case.existing_active_sessions),
                 auth_config=_make_auth_config(),
                 login_client_type_id=uuid4(),
@@ -343,7 +353,7 @@ class TestMaxConcurrentLoginsEnforcement:
         result = await auth_service._create_login_session(
             action=_make_action(force=case.force_evict_oldest),
             user=_make_mock_user(),
-            keypair_row=_make_mock_keypair_row(),
+            keypair=_make_mock_keypair(),
             live_sessions=_make_live_sessions(case.existing_active_sessions),
             auth_config=_make_auth_config(),
             login_client_type_id=uuid4(),
@@ -354,6 +364,6 @@ class TestMaxConcurrentLoginsEnforcement:
             delete_mock.assert_not_called()
         else:
             delete_mock.assert_called_once_with(
-                case.expected_evicted_tokens, LoginAttemptResult.EVICTED
+                case.expected_evicted_tokens, LoginAttemptResult.EVICTED, None
             )
         assert result.authorization_result is not None

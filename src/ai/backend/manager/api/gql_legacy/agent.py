@@ -17,8 +17,8 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -37,17 +37,17 @@ from ai.backend.manager.models.agent import (
     agents,
     get_permission_ctx,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project import AssocGroupUserRow
 from ai.backend.manager.models.rbac import (
     ScopeType,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 from ai.backend.manager.services.agent.actions.update_resource_group import (
@@ -110,8 +110,6 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
     "first_contact": ("first_contact", None),
     "lost_at": ("lost_at", None),
     "version": ("version", None),
-    "available_slots": ("available_slots", None),
-    "occupied_slots": ("occupied_slots", None),
 }
 
 
@@ -189,10 +187,10 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
             status=data.status.name,
             status_changed=data.status_changed,
             region=data.region,
-            scaling_group=data.scaling_group,
+            scaling_group=data.resource_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
-            occupied_slots=data.actual_occupied_slots.to_json(),
+            occupied_slots=data.occupied_slots.to_json(),
             addr=data.addr,
             architecture=data.architecture,
             first_contact=data.first_contact,
@@ -406,10 +404,10 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
             status=data.status.name,
             status_changed=data.status_changed,
             region=data.region,
-            scaling_group=data.scaling_group,
+            scaling_group=data.resource_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
-            occupied_slots=data.actual_occupied_slots.to_json(),
+            occupied_slots=data.occupied_slots.to_json(),
             addr=data.addr,
             architecture=data.architecture,
             first_contact=data.first_contact,
@@ -422,10 +420,10 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
             cpu_slots=data.available_slots.get("cpu", 0),
             gpu_slots=data.available_slots.get("cuda.device", 0),
             tpu_slots=data.available_slots.get("tpu.device", 0),
-            used_mem_slots=data.actual_occupied_slots.get("mem", 0) // mega,
-            used_cpu_slots=float(data.actual_occupied_slots.get("cpu", 0)),
-            used_gpu_slots=float(data.actual_occupied_slots.get("cuda.device", 0)),
-            used_tpu_slots=float(data.actual_occupied_slots.get("tpu.device", 0)),
+            used_mem_slots=data.occupied_slots.get("mem", 0) // mega,
+            used_cpu_slots=float(data.occupied_slots.get("cpu", 0)),
+            used_gpu_slots=float(data.occupied_slots.get("cuda.device", 0)),
+            used_tpu_slots=float(data.occupied_slots.get("tpu.device", 0)),
         )
 
     async def resolve_compute_containers(
@@ -514,8 +512,6 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
         "first_contact": ("first_contact", None),
         "lost_at": ("lost_at", None),
         "version": ("version", None),
-        "available_slots": ("available_slots", None),
-        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod
@@ -706,7 +702,7 @@ async def _append_sgroup_from_clause(
     domain_name: str | None,
     scaling_group: str | None = None,
 ) -> sa.sql.Select[Any]:
-    from ai.backend.manager.models.scaling_group import query_allowed_sgroups
+    from ai.backend.manager.models.resource_group import query_allowed_sgroups
 
     if scaling_group is not None:
         query = query.where(AgentRow.scaling_group == scaling_group)
@@ -746,10 +742,10 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         return cls(
             id=data.id,
             status=data.status.name,
-            scaling_group=data.scaling_group,
+            scaling_group=data.resource_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
-            occupied_slots=data.actual_occupied_slots.to_json(),
+            occupied_slots=data.occupied_slots.to_json(),
             architecture=data.architecture,
         )
 
@@ -765,8 +761,6 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         "status": ("status", None),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulable", None),
-        "available_slots": ("available_slots", None),
-        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod
@@ -923,13 +917,13 @@ class ModifyAgent(graphene.Mutation):  # type: ignore[misc]
         if scaling_group is not None:
             async with graph_ctx.db.begin_readonly_read_committed() as conn:
                 resource_group_id = await conn.scalar(
-                    sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group)
+                    sa.select(ResourceGroupRow.id).where(ResourceGroupRow.name == scaling_group)
                 )
             if resource_group_id is None:
                 return cls(False, f"no such scaling group: {scaling_group}")
             # The v1 mutation refuses to move an agent that still has sessions
             # under the old group; drain them first.
-            await graph_ctx.processors.agent.update_resource_group.wait_for_complete(
+            await graph_ctx.processors.agent.update_resource_group.run(
                 UpdateAgentResourceGroupAction(
                     agent_id=AgentId(id),
                     resource_group_id=ResourceGroupID(resource_group_id),

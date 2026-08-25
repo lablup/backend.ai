@@ -14,6 +14,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AccessKey, ResourceSlot
@@ -27,15 +28,17 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -44,18 +47,20 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.utils import query_userinfo, query_userinfo_from_session
-from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db import TableOrORM, with_tables
 
-ALL_ROWS = [
+ALL_ROWS: list[TableOrORM] = [
     DomainRow,
-    ScalingGroupRow,
+    ResourceGroupRow,
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
@@ -63,8 +68,11 @@ ALL_ROWS = [
     UserRoleRow,
     UserRow,
     KeyPairRow,
-    GroupRow,
+    ProjectRow,
     AssociationScopesEntitiesRow,
+    VirtualScopeRow,
+    EntityMembershipRow,
+    EntityLabelRow,
     ContainerRegistryRow,
     ImageRow,
     VFolderRow,
@@ -86,6 +94,7 @@ ALL_ROWS = [
 @dataclass
 class SeedData:
     domain_name: str
+    domain_id: DomainID
     group_id: UUID
     group_name: str
     user_uuid: UUID
@@ -136,6 +145,7 @@ class TestQueryUserinfo:
     async def seed(self, db: ExtendedAsyncSAEngine) -> AsyncGenerator[SeedData, None]:
         """Create a normal user who is a member of a group."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         group_id = uuid.uuid4()
         group_name = f"test-group-{uuid.uuid4().hex[:8]}"
         user_uuid = uuid.uuid4()
@@ -147,6 +157,7 @@ class TestQueryUserinfo:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -181,28 +192,30 @@ class TestQueryUserinfo:
                 )
             )
             await sess.flush()
+            user_email = f"test-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=user_uuid,
                     username=f"user-{uuid.uuid4().hex[:8]}",
-                    email=f"test-{uuid.uuid4().hex[:8]}@test.io",
+                    email=user_email,
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
+                    domain_id=domain_id,
                 )
             )
             await sess.flush()
             sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=user_uuid,
                     is_active=True,
                     resource_policy=kp_policy,
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=group_name,
                     domain_name=domain_name,
@@ -221,10 +234,29 @@ class TestQueryUserinfo:
                     relation_type=RelationType.AUTO,
                 )
             )
+            # Membership read model: the project's virtual scope with the user
+            # enrolled in it.
+            project_vs_id = uuid.uuid4()
+            sess.add(
+                VirtualScopeRow(
+                    id=project_vs_id,
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=group_id,
+                )
+            )
+            await sess.flush()
+            sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=project_vs_id,
+                    entity_type=EntityType.USER.value,
+                    entity_id=user_uuid,
+                )
+            )
             await sess.commit()
 
         yield SeedData(
             domain_name=domain_name,
+            domain_id=domain_id,
             group_id=group_id,
             group_name=group_name,
             user_uuid=user_uuid,
@@ -242,7 +274,7 @@ class TestQueryUserinfo:
         name = f"other-group-{uuid.uuid4().hex[:8]}"
         async with db.begin_session() as sess:
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=uuid.uuid4(),
                     name=name,
                     domain_name=seed.domain_name,
@@ -260,6 +292,7 @@ class TestQueryUserinfo:
     ) -> AsyncGenerator[ExtraUserData, None]:
         """A user belonging to an inactive domain."""
         domain = f"inactive-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         user_uuid = uuid.uuid4()
         ak = AccessKey(f"AK{uuid.uuid4().hex[:16]}")
         user_policy = f"inactive-up-{uuid.uuid4().hex[:8]}"
@@ -267,6 +300,7 @@ class TestQueryUserinfo:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain,
                     is_active=False,
                     total_resource_slots=ResourceSlot(),
@@ -284,21 +318,23 @@ class TestQueryUserinfo:
                 )
             )
             await sess.flush()
+            user_email = f"inactive-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=user_uuid,
                     username=f"inactive-{uuid.uuid4().hex[:8]}",
-                    email=f"inactive-{uuid.uuid4().hex[:8]}@test.io",
+                    email=user_email,
                     domain_name=domain,
                     role=UserRole.USER,
                     resource_policy=user_policy,
+                    domain_id=domain_id,
                 )
             )
             await sess.flush()
             sess.add(
                 KeyPairRow(
                     access_key=ak,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=user_uuid,
                     is_active=True,
                     resource_policy=seed.kp_policy_name,
@@ -315,21 +351,23 @@ class TestQueryUserinfo:
         admin_uuid = uuid.uuid4()
         admin_ak = AccessKey(f"AK{uuid.uuid4().hex[:16]}")
         async with db.begin_session() as sess:
+            admin_email = f"admin-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=admin_uuid,
                     username=f"admin-{uuid.uuid4().hex[:8]}",
-                    email=f"admin-{uuid.uuid4().hex[:8]}@test.io",
+                    email=admin_email,
                     domain_name=seed.domain_name,
                     role=UserRole.SUPERADMIN,
                     resource_policy=seed.user_policy_name,
+                    domain_id=seed.domain_id,
                 )
             )
             await sess.flush()
             sess.add(
                 KeyPairRow(
                     access_key=admin_ak,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=admin_uuid,
                     is_active=True,
                     resource_policy=seed.kp_policy_name,
@@ -506,6 +544,7 @@ class TestQueryUserinfoFromSession:
     @pytest.fixture
     async def seed(self, db: ExtendedAsyncSAEngine) -> AsyncGenerator[SeedData, None]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         group_id = uuid.uuid4()
         group_name = f"test-group-{uuid.uuid4().hex[:8]}"
         user_uuid = uuid.uuid4()
@@ -517,6 +556,7 @@ class TestQueryUserinfoFromSession:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -551,28 +591,30 @@ class TestQueryUserinfoFromSession:
                 )
             )
             await sess.flush()
+            user_email = f"test-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=user_uuid,
                     username=f"user-{uuid.uuid4().hex[:8]}",
-                    email=f"test-{uuid.uuid4().hex[:8]}@test.io",
+                    email=user_email,
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
+                    domain_id=domain_id,
                 )
             )
             await sess.flush()
             sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=user_uuid,
                     is_active=True,
                     resource_policy=kp_policy,
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=group_name,
                     domain_name=domain_name,
@@ -591,10 +633,29 @@ class TestQueryUserinfoFromSession:
                     relation_type=RelationType.AUTO,
                 )
             )
+            # Membership read model: the project's virtual scope with the user
+            # enrolled in it.
+            project_vs_id = uuid.uuid4()
+            sess.add(
+                VirtualScopeRow(
+                    id=project_vs_id,
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=group_id,
+                )
+            )
+            await sess.flush()
+            sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=project_vs_id,
+                    entity_type=EntityType.USER.value,
+                    entity_id=user_uuid,
+                )
+            )
             await sess.commit()
 
         yield SeedData(
             domain_name=domain_name,
+            domain_id=domain_id,
             group_id=group_id,
             group_name=group_name,
             user_uuid=user_uuid,

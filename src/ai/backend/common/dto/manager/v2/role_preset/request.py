@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO
@@ -12,7 +13,6 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
 )
 from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField
-from ai.backend.common.identifier.role_preset import RolePresetID
 
 __all__ = (
     "BulkDeleteRolePresetsInput",

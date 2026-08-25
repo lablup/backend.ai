@@ -5,6 +5,7 @@ Tests the repository layer with real database operations.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -14,28 +15,33 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.types import BinarySize, KernelId, ResourceSlot, SessionId
+from ai.backend.common.types import BinarySize, KernelId, SessionId
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.manager.models.image.conditions import ImageConditions
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.image.repository import ImageRepository
+from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
 
@@ -71,7 +77,7 @@ class TestImageRepositorySearch:
 
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://registry.example.com",
                 registry_name="registry.example.com",
                 type=ContainerRegistryType.DOCKER,
@@ -171,6 +177,7 @@ class TestImageRepositorySearch:
         mock_config = MagicMock()
         return ImageRepository(
             db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
             valkey_image=mock_valkey,
             config_provider=mock_config,
         )
@@ -446,13 +453,13 @@ class TestImageRepositoryLastUsedAt:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -471,6 +478,7 @@ class TestImageRepositoryLastUsedAt:
         mock_config = MagicMock()
         return ImageRepository(
             db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
             valkey_image=mock_valkey,
             config_provider=mock_config,
         )
@@ -480,35 +488,37 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> SessionRepository:
-        return SessionRepository(db=db_with_cleanup)
+        return SessionRepository(db=db_with_cleanup, ops_provider=DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> DomainRow:
-        domain = DomainRow(name=f"test-{uuid4()}")
+        name = f"test-{uuid4()}"
+        domain_id = DomainID(uuid.uuid4())
+        domain = DomainRow(id=domain_id, name=name)
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(domain)
             await db_sess.flush()
         return domain
 
     @pytest.fixture
-    async def scaling_group(
+    async def resource_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> str:
-        scaling_group = ScalingGroupRow(
+        resource_group = ResourceGroupRow(
             name="test-sg",
             driver="static",
             driver_opts={},
             scheduler="fifo",
-            scheduler_opts=ScalingGroupOpts(),
+            scheduler_opts=ResourceGroupOpts(),
         )
         async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(scaling_group)
+            db_sess.add(resource_group)
             await db_sess.flush()
-        return scaling_group.name
+        return resource_group.name
 
     @pytest.fixture
     async def user_policy(
@@ -552,9 +562,11 @@ class TestImageRepositoryLastUsedAt:
     ) -> UserRow:
         user = UserRow(
             uuid=uuid4(),
+            username=f"testuser-{uuid4().hex[:8]}",
             email=f"test-{uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
+            domain_id=DomainID(domain.id),
         )
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(user)
@@ -567,8 +579,8 @@ class TestImageRepositoryLastUsedAt:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain: DomainRow,
         group_policy: ProjectResourcePolicyRow,
-    ) -> GroupRow:
-        group = GroupRow(
+    ) -> ProjectRow:
+        group = ProjectRow(
             id=uuid4(),
             name=f"test-group-{uuid4().hex[:8]}",
             domain_name=domain.name,
@@ -587,7 +599,7 @@ class TestImageRepositoryLastUsedAt:
         registry_id = uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://registry.example.com",
                 registry_name="registry.example.com",
                 type=ContainerRegistryType.DOCKER,
@@ -640,9 +652,9 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         user: UserRow,
-        group: GroupRow,
+        group: ProjectRow,
         domain: DomainRow,
-        scaling_group: str,
+        resource_group: str,
     ) -> CreateKernelForImageFunc:
         """Return a factory that creates a session + kernel for the given image."""
 
@@ -655,9 +667,7 @@ class TestImageRepositoryLastUsedAt:
                     user_uuid=user.uuid,
                     group_id=group.id,
                     domain_name=domain.name,
-                    scaling_group_name=scaling_group,
-                    occupying_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
+                    scaling_group_name=resource_group,
                     vfolder_mounts=[],
                 )
                 db_sess.add(session)
@@ -671,8 +681,6 @@ class TestImageRepositoryLastUsedAt:
                     domain_name=domain.name,
                     group_id=group.id,
                     user_uuid=user.uuid,
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,

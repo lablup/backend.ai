@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
 import shlex
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, override
+from typing import Any, Self, override
 
 import humps
 import tomli
@@ -17,11 +18,15 @@ from pydantic import (
     model_validator,
 )
 
+from ai.backend.logging.utils import BraceStyleAdapter
+
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
 from .model_service_start_command_compat import resolve_model_service_start_command
 from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "ConfigurationError",
@@ -40,6 +45,13 @@ __all__ = (
 
 
 class BaseConfigSchema(BackendAISchema):
+    """
+    Use for a component's config file schema (``configs/``). Unknown fields are
+    warned about but kept, so that sections consumed by out-of-tree plugins
+    survive validation; a schema that takes a wider mapping on purpose opts out
+    with ``ConfigDict(extra="ignore")``.
+    """
+
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -49,10 +61,28 @@ class BaseConfigSchema(BackendAISchema):
         from_attributes=True,
         alias_generator=snake_to_kebab_case,
         validate_default=True,
+        extra="allow",
     )
+
+    @model_validator(mode="after")
+    def _warn_unknown_fields(self) -> Self:
+        extra = self.__pydantic_extra__
+        if extra:
+            keys = sorted(extra)
+            log.warning(
+                "Unknown config field(s) in {}: {}",
+                type(self).__name__,
+                ", ".join(keys),
+            )
+        return self
 
 
 class BaseConfigModel(BackendAISchema):
+    """
+    Use for config-shaped payloads authored outside this repository - model service
+    definitions, logging and tester config. Unknown fields are kept, not reported.
+    """
+
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -558,7 +588,7 @@ class ModelServiceConfigDraft(BaseConfigModel):
     pre_start_actions: list[PreStartAction] | None = None
     start_command: str | None = None
     shell: str | None = None
-    port: int | None = None
+    port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
 
     @model_validator(mode="before")
@@ -744,6 +774,83 @@ class ModelDefinitionDraft(BaseConfigModel):
             if health_check.get("enable") is None:
                 health_check["enable"] = True
         return cls.model_validate(data)
+
+
+class DefaultModelServiceConfig(BaseConfigModel):
+    """Baseline model service config; ``port`` stays required so the baseline
+    guarantees every revision resolves a service port."""
+
+    pre_start_actions: list[PreStartAction] | None = None
+    start_command: str | None = None
+    shell: str | None = None
+    port: int = Field(gt=1)
+    health_check: ModelHealthCheckDraft | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_start_command(cls, data: Any) -> Any:
+        return resolve_model_service_start_command(data)
+
+
+class DefaultModelConfig(BaseConfigModel):
+    """Baseline model config stored on a runtime variant. ``name`` and
+    ``service.port`` are required so the always-present baseline layer
+    guarantees them to every revision; ``model_path`` keeps its dynamic
+    mount-destination default in the reader.
+    """
+
+    name: str
+    model_path: str | None = None
+    service: DefaultModelServiceConfig
+    metadata: ModelMetadata | None = None
+
+
+class DefaultModelDefinition(BaseConfigModel):
+    """Stored shape of ``runtime_variants.default_model_definition``."""
+
+    models: list[DefaultModelConfig] | None = None
+
+    def to_draft(self) -> ModelDefinitionDraft:
+        # exclude_unset keeps unset fields from clobbering lower-priority merge layers.
+        return ModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
+
+
+class PresetModelServiceConfig(BaseConfigModel):
+    """Preset-stored model service config. ``port`` may be omitted to inherit
+    the runtime variant baseline's port at revision resolution."""
+
+    pre_start_actions: list[PreStartAction] | None = None
+    start_command: str | None = None
+    shell: str | None = None
+    port: int | None = Field(default=None, gt=1)
+    health_check: ModelHealthCheckDraft | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_start_command(cls, data: Any) -> Any:
+        return resolve_model_service_start_command(data)
+
+
+class PresetModelConfig(BaseConfigModel):
+    """Preset-stored model config. ``name``/``model_path`` may be omitted to
+    inherit merge-chain defaults. ``service`` is required for new preset
+    inputs but may be absent in rows stored via the legacy update API,
+    which accepted ``ModelDefinition`` with an optional ``service``."""
+
+    name: str | None = None
+    model_path: str | None = None
+    service: PresetModelServiceConfig | None = None
+    metadata: ModelMetadata | None = None
+
+
+class PresetModelDefinition(BaseConfigModel):
+    """Stored shape of ``deployment_revision_presets.model_definition``."""
+
+    models: list[PresetModelConfig]
+
+    def to_draft(self) -> ModelDefinitionDraft:
+        # exclude_unset keeps unset fields from clobbering lower-priority merge layers.
+        return ModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
 
 
 def find_config_file(daemon_name: str) -> Path:

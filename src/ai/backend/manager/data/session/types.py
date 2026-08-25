@@ -5,9 +5,20 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
+import yarl
+
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_dependency import SessionDependencyID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.types import EntityData, FieldData
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
     AccessKey,
@@ -16,11 +27,13 @@ from ai.backend.common.types import (
     CIStrEnum,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
+    VFolderMount,
 )
+from ai.backend.manager.data.network.types import NetworkType
+from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.user.types import UserData
 
 if TYPE_CHECKING:
@@ -172,7 +185,7 @@ class KernelMatchType(StrEnum):
 
 # TODO: Add proper types
 @dataclass
-class SessionData:
+class SessionData(EntityData):
     id: UUID
     session_type: SessionTypes
     priority: int
@@ -183,8 +196,6 @@ class SessionData:
     domain_name: str
     group_id: UUID
     user_uuid: UUID
-    occupying_slots: Any  # TODO: ResourceSlot?
-    requested_slots: Any
     use_host_network: bool
     created_at: datetime = field(compare=False)
     status: SessionStatus
@@ -204,7 +215,7 @@ class SessionData:
     timeout: int | None
     batch_timeout: int | None
     terminated_at: datetime | None = field(compare=False)
-    scaling_group_name: str | None
+    resource_group_name: str | None
     starts_at: datetime | None = field(compare=False)
     status_info: str | None = field(compare=False)
     status_data: dict[str, Any] | None = field(compare=False)
@@ -221,6 +232,92 @@ class SessionData:
 
     # The routing replica (RoutingRow.id) this session serves, if any.
     replica_id: UUID | None = None
+
+    @override
+    def entity_id(self) -> SessionID:
+        return SessionID(self.id)
+
+
+class SessionTerminationStatus(StrEnum):
+    """What a termination request did to one session.
+
+    Session-only, so it stays here rather than beside the bulk result: what a bulk
+    run's per-entity value means is the domain's to declare.
+    """
+
+    CANCELLED = "cancelled"
+    TERMINATING = "terminating"
+    FORCE_TERMINATED = "force-terminated"
+    SKIPPED = "skipped"
+
+
+@dataclass(frozen=True)
+class SessionEntityData(EntityData):
+    """A session as its own row states it.
+
+    Every field is a column of ``sessions``; nothing here is read from another table,
+    so building one never loads a relationship. What a caller needs from the kernels
+    or the owner is asked for separately.
+    """
+
+    id: SessionID
+    creation_id: str | None
+    name: str | None
+    session_type: SessionTypes
+    priority: int
+    is_preemptible: bool
+    job_priority: int
+    cluster_mode: str
+    cluster_size: int
+    options: SessionStoredOptions
+    agent_ids: list[str] | None
+    designated_agent_ids: list[str] | None
+    session_group_id: SessionGroupID | None
+    resource_group_id: ResourceGroupID
+    resource_group_name: str
+    target_sgroup_names: list[str] | None
+    domain_name: str
+    domain_id: DomainID
+    group_id: ProjectID
+    user_uuid: UserID
+    access_key: AccessKey | None
+    images: list[str] | None
+    image_ids: list[UUID] | None
+    tag: str | None
+    vfolder_mounts: list[VFolderMount] | None
+    environ: dict[str, Any] | None
+    bootstrap_script: str | None
+    use_host_network: bool
+    timeout: int | None
+    batch_timeout: int | None
+    terminated_at: datetime | None = field(compare=False)
+    starts_at: datetime | None = field(compare=False)
+    requested_starts_at: datetime | None = field(compare=False)
+    status: SessionStatus
+    status_info: str | None = field(compare=False)
+    status_data: dict[str, Any] | None = field(compare=False)
+    status_history: dict[str, Any] | None = field(compare=False)
+    callback_url: yarl.URL | None
+    startup_command: str | None
+    result: SessionResult
+    num_queries: int | None
+    last_stat: dict[str, Any] | None = field(compare=False)
+    network_type: NetworkType | None
+    network_id: str | None
+    replica_id: ReplicaID | None
+
+    @override
+    def entity_id(self) -> SessionID:
+        return self.id
+
+
+@dataclass(frozen=True)
+class SessionDependencyData(FieldData):
+    """One edge of the dependency graph: the session and what it waits for."""
+
+    id: SessionDependencyID
+    session_id: SessionID
+    depends_on: SessionID
 
 
 @dataclass(frozen=True)
@@ -265,9 +362,7 @@ class SessionMetadata:
 class ResourceSpec:
     cluster_mode: str
     cluster_size: int
-    occupying_slots: ResourceSlot
-    requested_slots: ResourceSlot
-    scaling_group_name: str | None
+    resource_group_name: str | None
     target_sgroup_names: list[str] | None
     agent_ids: list[str] | None
 
@@ -411,7 +506,7 @@ class SubStepResult(BackendAISchema):
 
 
 @dataclass
-class SessionSchedulingHistoryData:
+class SessionSchedulingHistoryData(FieldData):
     """Domain model for session scheduling history."""
 
     id: UUID

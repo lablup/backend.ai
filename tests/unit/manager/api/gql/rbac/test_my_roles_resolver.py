@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.api.gql.rbac.resolver import role as role_resolver
 from ai.backend.manager.api.gql.rbac.types import RoleAssignmentConnection
@@ -26,6 +27,7 @@ class TestMyRoles:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     async def test_calls_adapter_with_user_condition(

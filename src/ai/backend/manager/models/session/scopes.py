@@ -1,0 +1,51 @@
+"""Operation scopes for sessions."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import override
+from uuid import UUID
+
+import sqlalchemy as sa
+
+from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.session.row import SessionRow
+
+__all__ = ("ProjectSessionOperationScope",)
+
+
+@dataclass(frozen=True)
+class ProjectSessionOperationScope(OperationScope):
+    """Required scope for searching sessions within a project.
+
+    Used for project-scoped session search (project admin).
+    """
+
+    project_id: UUID
+    """Required. The project (group) to search within."""
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for SessionRow."""
+        project_id = self.project_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.group_id == project_id
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        """Return existence checks for scope validation."""
+        return [
+            ExistenceCheck(
+                column=ProjectRow.id,
+                value=self.project_id,
+                error=ProjectNotFound(str(self.project_id)),
+            ),
+        ]

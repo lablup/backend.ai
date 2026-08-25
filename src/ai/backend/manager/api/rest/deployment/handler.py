@@ -10,6 +10,10 @@ from __future__ import annotations
 from http import HTTPStatus
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
     AddRevisionRequest,
@@ -43,21 +47,12 @@ from ai.backend.common.dto.manager.deployment import (
     UpsertDeploymentPolicyResponse,
 )
 from ai.backend.common.dto.manager.deployment.response import DeploymentDTO, RevisionDTO
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.data.deployment.types import LegacyDeploymentData, ModelRevisionData
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentMetadataUpdaterSpec,
-    DeploymentUpdaterSpec,
-    ReplicaSpecUpdaterSpec,
-)
+from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
 )
@@ -90,7 +85,7 @@ from ai.backend.manager.services.deployment.actions.route import (
     UpdateRouteTrafficStatusAction,
 )
 from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
-    SearchLegacyDeploymentsAction,
+    GlobalSearchLegacyDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentAction,
@@ -171,7 +166,7 @@ class DeploymentAPIHandler:
         its DTO. The REST v1 response embeds the full current revision, which the
         modern (v2) read path does not load.
         """
-        result = await self._deployment.get_legacy_deployment_by_id.wait_for_complete(
+        result = await self._deployment.get_legacy_deployment_by_id.run(
             GetLegacyDeploymentByIdAction(deployment_id=deployment_id)
         )
         return await self._deployment_dto(result.data)
@@ -194,8 +189,12 @@ class DeploymentAPIHandler:
         )
 
         # Call service action
-        action_result = await self._deployment.create_deployment.wait_for_complete(
-            CreateDeploymentAction(creator=creator, auto_activate=True)
+        action_result = await self._deployment.create_deployment.run(
+            CreateDeploymentAction(
+                project_id=ProjectID(creator.metadata.project),
+                creator=creator,
+                auto_activate=True,
+            )
         )
 
         # Build response (re-read via the legacy full-revision path for v1)
@@ -213,8 +212,8 @@ class DeploymentAPIHandler:
         querier = self._deployment_adapter.build_querier(body.parsed)
 
         # Call service action (legacy full-revision read path for v1)
-        action_result = await self._deployment.search_legacy_deployments.wait_for_complete(
-            SearchLegacyDeploymentsAction(querier=querier)
+        action_result = await self._deployment.global_search_legacy.run(
+            GlobalSearchLegacyDeploymentsAction(querier=querier)
         )
 
         # Build response
@@ -246,31 +245,25 @@ class DeploymentAPIHandler:
         body: BodyParam[UpdateDeploymentRequest],
     ) -> APIResponse:
         """Update an existing deployment."""
-        # Build sub-specs only if fields are provided
-        metadata_spec: DeploymentMetadataUpdaterSpec | None = None
-        if body.parsed.name is not None:
-            metadata_spec = DeploymentMetadataUpdaterSpec(
-                name=OptionalState.update(body.parsed.name),
-            )
-
-        replica_spec: ReplicaSpecUpdaterSpec | None = None
-        if body.parsed.replica_count is not None:
-            replica_spec = ReplicaSpecUpdaterSpec(
-                replica_count=OptionalState.update(body.parsed.replica_count),
-            )
-
-        updater_spec = DeploymentUpdaterSpec(
-            metadata=metadata_spec,
-            replica_spec=replica_spec,
-        )
-        updater = Updater[EndpointRow](
-            spec=updater_spec,
-            pk_value=path.parsed.deployment_id,
+        updater = DeploymentUpdater(
+            deployment_id=DeploymentID(path.parsed.deployment_id),
+            name=(
+                OptionalState.update(body.parsed.name)
+                if body.parsed.name is not None
+                else OptionalState[str].nop()
+            ),
+            replica_count=(
+                OptionalState.update(body.parsed.replica_count)
+                if body.parsed.replica_count is not None
+                else OptionalState[int].nop()
+            ),
         )
 
         # Call service action
-        action_result = await self._deployment.update_deployment.wait_for_complete(
-            UpdateDeploymentAction(updater=updater)
+        action_result = await self._deployment.update_deployment.run(
+            UpdateDeploymentAction(
+                deployment_id=DeploymentID(path.parsed.deployment_id), updater=updater
+            )
         )
 
         # Build response (re-read via the legacy full-revision path for v1)
@@ -285,7 +278,7 @@ class DeploymentAPIHandler:
     ) -> APIResponse:
         """Destroy a deployment."""
         # Call service action
-        action_result = await self._deployment.destroy_deployment.wait_for_complete(
+        action_result = await self._deployment.destroy_deployment.run(
             DestroyDeploymentAction(deployment_id=DeploymentID(path.parsed.deployment_id))
         )
 
@@ -312,9 +305,9 @@ class DeploymentAPIHandler:
         )
 
         # Call service action
-        action_result = await self._deployment.add_model_revision.wait_for_complete(
+        action_result = await self._deployment.add_model_revision.run(
             AddModelRevisionAction(
-                model_deployment_id=DeploymentID(path.parsed.deployment_id),
+                deployment_id=DeploymentID(path.parsed.deployment_id),
                 adder=revision_creator,
                 auto_activate=body.parsed.options.auto_activate,
             )
@@ -339,8 +332,10 @@ class DeploymentAPIHandler:
         querier = self._revision_adapter.build_querier(body.parsed)
 
         # Call service action
-        action_result = await self._deployment.search_revisions.wait_for_complete(
-            SearchRevisionsAction(querier=querier)
+        action_result = await self._deployment.search_revisions.run(
+            SearchRevisionsAction(
+                deployment_id=DeploymentID(path.parsed.deployment_id), querier=querier
+            )
         )
 
         # Build response
@@ -360,8 +355,11 @@ class DeploymentAPIHandler:
     ) -> APIResponse:
         """Get a specific revision."""
         # Call service action - raises DeploymentRevisionNotFound if not found
-        action_result = await self._deployment.get_revision_by_id.wait_for_complete(
-            GetRevisionByIdAction(revision_id=DeploymentRevisionID(path.parsed.revision_id))
+        action_result = await self._deployment.get_revision_by_id.run(
+            GetRevisionByIdAction(
+                deployment_id=DeploymentID(path.parsed.deployment_id),
+                revision_id=DeploymentRevisionID(path.parsed.revision_id),
+            )
         )
 
         # Build response
@@ -374,7 +372,7 @@ class DeploymentAPIHandler:
     ) -> APIResponse:
         """Activate a revision to make it the current active revision."""
         # Call service action
-        await self._deployment.activate_revision.wait_for_complete(
+        await self._deployment.activate_revision.run(
             ActivateRevisionAction(
                 deployment_id=DeploymentID(path.parsed.deployment_id),
                 revision_id=DeploymentRevisionID(path.parsed.revision_id),
@@ -412,7 +410,7 @@ class DeploymentAPIHandler:
         querier = self._route_adapter.build_querier(body.parsed)
 
         # Call service action
-        action_result = await self._deployment.search_routes.wait_for_complete(
+        action_result = await self._deployment.search_routes.run(
             SearchRoutesAction(querier=querier)
         )
 
@@ -437,8 +435,9 @@ class DeploymentAPIHandler:
         manager_traffic_status = ManagerRouteTrafficStatus(body.parsed.traffic_status.value)
 
         # Call service action
-        action_result = await self._deployment.update_route_traffic_status.wait_for_complete(
+        action_result = await self._deployment.update_route_traffic_status.run(
             UpdateRouteTrafficStatusAction(
+                deployment_id=DeploymentID(path.parsed.deployment_id),
                 route_id=path.parsed.route_id,
                 traffic_status=manager_traffic_status,
             )
@@ -461,11 +460,11 @@ class DeploymentAPIHandler:
 
         Uses PostgreSQL ON CONFLICT to atomically insert or update.
         """
-        upserter = self._policy_adapter.build_upserter(
-            body.parsed, deployment_id=path.parsed.deployment_id
-        )
-        result = await self._deployment.upsert_deployment_policy.wait_for_complete(
-            UpsertDeploymentPolicyAction(upserter=upserter)
+        upserter = self._policy_adapter.build_upserter(body.parsed)
+        result = await self._deployment.upsert_deployment_policy.run(
+            UpsertDeploymentPolicyAction(
+                deployment_id=DeploymentID(path.parsed.deployment_id), upserter=upserter
+            )
         )
         resp = UpsertDeploymentPolicyResponse(
             deployment_policy=self._policy_adapter.convert_to_dto(result.data),
@@ -479,7 +478,7 @@ class DeploymentAPIHandler:
         path: PathParam[DeploymentPolicyPathParam],
     ) -> APIResponse:
         """Get a deployment policy for a deployment."""
-        action_result = await self._deployment.get_deployment_policy.wait_for_complete(
+        action_result = await self._deployment.get_deployment_policy.run(
             GetDeploymentPolicyAction(deployment_id=DeploymentID(path.parsed.deployment_id))
         )
 

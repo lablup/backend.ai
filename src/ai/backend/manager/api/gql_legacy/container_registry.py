@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
@@ -20,6 +21,9 @@ from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
@@ -29,24 +33,14 @@ from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
-from ai.backend.manager.repositories.container_registry.purgers import (
-    ContainerRegistryPurgerSpec,
-)
-from ai.backend.manager.repositories.container_registry.updaters import (
-    ContainerRegistryUpdaterSpec,
-)
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,
 )
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
 )
-from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
-    ModifyContainerRegistryAction,
+from ai.backend.manager.services.container_registry.actions.update_container_registry import (
+    UpdateContainerRegistryAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -383,27 +377,21 @@ class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
             return None if val is Undefined else val
 
         action = CreateContainerRegistryAction(
-            creator=Creator(
-                spec=ContainerRegistryCreatorSpec(
-                    url=url,
-                    type=type,
-                    registry_name=registry_name,
-                    is_global=value_or_none(is_global),
-                    project=value_or_none(project),
-                    username=value_or_none(username),
-                    password=value_or_none(password),
-                    ssl_verify=value_or_none(ssl_verify),
-                    extra=value_or_none(extra),
-                    allowed_groups=None,  # allowed groups are not supported in v1 mutation
-                )
+            creator=ContainerRegistryCreator(
+                url=url,
+                type=type,
+                registry_name=registry_name,
+                is_global=value_or_none(is_global),
+                project=value_or_none(project),
+                username=value_or_none(username),
+                password=value_or_none(password),
+                ssl_verify=value_or_none(ssl_verify),
+                extra=value_or_none(extra),
+                allowed_groups=None,  # allowed groups are not supported in v1 mutation
             )
         )
 
-        result = (
-            await ctx.processors.container_registry.create_container_registry.wait_for_complete(
-                action
-            )
-        )
+        result = await ctx.processors.container_registry.create_container_registry.run(action)
 
         return cls(
             container_registry=ContainerRegistryNode.from_dataclass(result.data),
@@ -459,30 +447,24 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
-        action = ModifyContainerRegistryAction(
-            updater=Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.from_graphql(url),
-                    type=OptionalState.from_graphql(type),
-                    registry_name=OptionalState.from_graphql(registry_name),
-                    is_global=TriState.from_graphql(is_global),
-                    project=TriState.from_graphql(project),
-                    username=TriState.from_graphql(username),
-                    password=TriState.from_graphql(password),
-                    ssl_verify=TriState.from_graphql(ssl_verify),
-                    extra=TriState.from_graphql(extra),
-                    allowed_groups=TriState.nop(),  # Not handled in this deprecated mutation
-                ),
-                pk_value=reg_id,
+        action = UpdateContainerRegistryAction(
+            updater=ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(reg_id),
+                url=OptionalState.from_graphql(url),
+                type=OptionalState.from_graphql(type),
+                registry_name=OptionalState.from_graphql(registry_name),
+                is_global=TriState.from_graphql(is_global),
+                project=TriState.from_graphql(project),
+                username=TriState.from_graphql(username),
+                password=TriState.from_graphql(password),
+                ssl_verify=TriState.from_graphql(ssl_verify),
+                extra=TriState.from_graphql(extra),
+                allowed_groups=TriState.nop(),  # Not handled in this deprecated mutation
             )
         )
 
         # Execute action through processor
-        result = (
-            await ctx.processors.container_registry.modify_container_registry.wait_for_complete(
-                action
-            )
-        )
+        result = await ctx.processors.container_registry.update_container_registry.run(action)
 
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
@@ -516,11 +498,9 @@ class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
-        result = (
-            await ctx.processors.container_registry.delete_container_registry.wait_for_complete(
-                DeleteContainerRegistryAction(
-                    purger=Purger(spec=ContainerRegistryPurgerSpec(registry_id=reg_id))
-                )
+        result = await ctx.processors.container_registry.delete_container_registry.run(
+            DeleteContainerRegistryAction(
+                purger=ContainerRegistryPurger(registry_id=ContainerRegistryID(reg_id))
             )
         )
         return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
@@ -779,7 +759,7 @@ class CreateContainerRegistry(graphene.Mutation):  # type: ignore[misc]
         set_if_set(props, input_config, "is_global")
 
         async with ctx.db.begin_session() as db_session:
-            reg_row = ContainerRegistryRow(id=uuid.uuid4(), **input_config)
+            reg_row = ContainerRegistryRow(id=ContainerRegistryID(uuid.uuid4()), **input_config)
             db_session.add(reg_row)
             await db_session.flush()
             await db_session.refresh(reg_row)

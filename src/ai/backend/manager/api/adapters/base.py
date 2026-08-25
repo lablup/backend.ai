@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions,
     PaginationSpec,
     build_pagination,
 )
+from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
@@ -33,6 +35,17 @@ class BaseAdapter(BaseFilterAdapter):
 
     def __init__(self, processors: Processors) -> None:
         self._processors = processors
+
+    def batch_load_failure(self, error: Exception | None) -> Exception | None:
+        """What a DataLoader is handed for an id a bulk read returned no data for.
+
+        An id matching no row stays ``None``; a denial is raised at the resolver
+        awaiting it, so a caller is never told a row is missing when it is one they may
+        not read.
+        """
+        if error is None or isinstance(error, EntityNotFoundError):
+            return None
+        return error
 
     def _build_querier(
         self,
@@ -93,3 +106,45 @@ class BaseAdapter(BaseFilterAdapter):
             pagination_spec,
         )
         return BatchQuerier(conditions=all_conditions, orders=all_orders, pagination=pagination)
+
+    def _build_searcher[TSearcher: Searcher[Any, Any]](
+        self,
+        searcher_class: type[TSearcher],
+        conditions: list[QueryCondition],
+        orders: list[QueryOrder],
+        pagination_spec: PaginationSpec,
+        first: int | None = None,
+        after: str | None = None,
+        last: int | None = None,
+        before: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> TSearcher:
+        """Build a domain :class:`Searcher` with the same pagination handling as
+        :meth:`_build_querier`.
+
+        A searcher carries the SELECT and the row conversion as well, so the ORM row
+        never leaves the repository layer. Domains move here as they migrate;
+        ``_build_querier`` goes away once the last one has.
+
+        No ``base_conditions``: it was how a fixed filter — a foreign-key scope, mostly —
+        got prepended before there was a scope to say it with. A scoped search now names
+        its scopes on the action, so a caller reaching for this should be adding a
+        ``OperationScope`` instead.
+        """
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=pagination_spec,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+        return searcher_class(
+            pagination=querier.pagination,
+            conditions=querier.conditions,
+            orders=querier.orders,
+        )

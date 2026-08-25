@@ -7,8 +7,8 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO
-from ai.backend.common.identifier.role_preset import RolePresetID
 
 __all__ = (
     "BulkDeleteRolePresetsPayload",

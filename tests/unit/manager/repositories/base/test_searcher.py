@@ -11,27 +11,23 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.data.role_preset.types import (
     RolePresetData,
     RolePresetSearchResult,
 )
-from ai.backend.manager.errors.repository import EmptySearchScopeError
+from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
-from ai.backend.manager.repositories.base import (
-    OffsetPagination,
-    Searcher,
-)
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
-    from sqlalchemy.engine import Row
-
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -49,7 +45,7 @@ class ItemData:
     category: str
 
 
-class ItemRow(Base):  # type: ignore[misc]
+class ItemRow(Base):
     """ORM model for searcher testing."""
 
     __tablename__ = "test_searcher_item"
@@ -70,14 +66,13 @@ class ItemSearcher(Searcher[ItemRow, ItemData]):
         return sa.select(ItemRow)
 
     @override
-    def to_data(self, row: Row[Any]) -> ItemData:
-        item_row: ItemRow = row.ItemRow
-        return item_row.to_data()
+    def to_data(self, row: ItemRow) -> ItemData:
+        return row.to_data()
 
 
 @dataclass(frozen=True)
-class CategoryScope(SearchScope):
-    """SearchScope restricting rows to a single category."""
+class CategoryScope(OperationScope):
+    """OperationScope restricting rows to a single category."""
 
     category: str
     checks: Sequence[ExistenceCheck[Any]] = field(default_factory=tuple)
@@ -227,7 +222,7 @@ class TestSearcher:
     ) -> None:
         """An empty scope list would degrade into an unscoped scan, so it is refused."""
         async with ops.read_ops() as r:
-            with pytest.raises(EmptySearchScopeError):
+            with pytest.raises(EmptyOperationScopeError):
                 await r.search_with_scopes(
                     [],
                     ItemSearcher(pagination=OffsetPagination(offset=0, limit=10)),
@@ -262,9 +257,8 @@ class RolePresetSearcher(Searcher[RolePresetRow, RolePresetData]):
         return sa.select(RolePresetRow)
 
     @override
-    def to_data(self, row: Row[Any]) -> RolePresetData:
-        preset_row: RolePresetRow = row.RolePresetRow
-        return preset_row.to_data()
+    def to_data(self, row: RolePresetRow) -> RolePresetData:
+        return row.to_data()
 
 
 class TestPassThroughDomainWiring:

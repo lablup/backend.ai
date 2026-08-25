@@ -1,30 +1,56 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE, RolePresetID
+from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.role_preset.actions.base import RolePermissionPresetScopeAction
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_permission_preset.scopes import (
+    RolePresetPermissionOperationScope,
+)
+from ai.backend.manager.models.rbac_models.role_preset.searchers import (
+    RolePermissionPresetSearcher,
+)
+from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass
-class SearchRolePermissionPresetsAction(RolePermissionPresetScopeAction):
-    querier: BatchQuerier
+class SearchRolePermissionPresetsAction(
+    OperationScopeOpsAction[RolePermissionPresetRow, RolePermissionPresetData]
+):
+    """Page through the permission entries inside one preset.
+
+    The preset is the scope, so ops applies that condition and a caller-supplied
+    filter can only narrow within it.
+    """
+
+    preset_id: RolePresetID
+    searcher: RolePermissionPresetSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchRolePermissionPresetsActionResult(BaseActionResult):
-    items: list[RolePermissionPresetData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return ROLE_PRESET_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=ScopeType(ROLE_PRESET_ENTITY_TYPE), scope_id=self.preset_id),)
+
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return (RolePresetPermissionOperationScope(preset_id=self.preset_id),)
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_role_permission_presets"
+
+    @override
+    def to_searcher(self) -> RolePermissionPresetSearcher:
+        return self.searcher

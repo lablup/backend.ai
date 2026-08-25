@@ -10,8 +10,9 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -19,21 +20,24 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -54,7 +58,7 @@ class TestVfolderSearchFilter:
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -68,7 +72,9 @@ class TestVfolderSearchFilter:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
-        return VfolderRepository(db=db_with_cleanup)
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        )
 
     @pytest.fixture
     async def cloneable_data(
@@ -86,6 +92,7 @@ class TestVfolderSearchFilter:
           - vf_shared_clone (cloneable=True, shared to user_a via permission)
           - vf_noclone_b (cloneable=False, NOT shared)
         """
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
@@ -99,6 +106,7 @@ class TestVfolderSearchFilter:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -149,6 +157,7 @@ class TestVfolderSearchFilter:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(
@@ -163,16 +172,16 @@ class TestVfolderSearchFilter:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="usera@example.com",
                     user=user_a_id,
                     access_key="TESTKEYCLONE000A",
-                    secret_key="test-secret-ca",
+                    secret_key=SecretValue("test-secret-ca"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -181,10 +190,9 @@ class TestVfolderSearchFilter:
             )
             db_sess.add(
                 KeyPairRow(
-                    user_id="userb@example.com",
                     user=user_b_id,
                     access_key="TESTKEYCLONE000B",
-                    secret_key="test-secret-cb",
+                    secret_key=SecretValue("test-secret-cb"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -194,7 +202,7 @@ class TestVfolderSearchFilter:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="project-clone",
                     domain_name=domain_name,
@@ -351,7 +359,7 @@ class TestVfolderSearchFilter:
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable={eq: true} returns only cloneable=true vfolders (owned + shared)."""
-        scope = UserVFolderSearchScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[VFolderConditions.by_cloneable(True)],
@@ -374,7 +382,7 @@ class TestVfolderSearchFilter:
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable={eq: false} returns only cloneable=false vfolders."""
-        scope = UserVFolderSearchScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[VFolderConditions.by_cloneable(False)],
@@ -393,7 +401,7 @@ class TestVfolderSearchFilter:
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """No cloneable filter returns all visible vfolders (owned + shared)."""
-        scope = UserVFolderSearchScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -417,7 +425,7 @@ class TestVfolderSearchFilter:
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable filter works with pagination (correct total_count and has_next_page)."""
-        scope = UserVFolderSearchScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[VFolderConditions.by_cloneable(True)],
@@ -436,7 +444,7 @@ class TestVfolderSearchFilter:
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable filter combines correctly with other conditions (usage_mode)."""
-        scope = UserVFolderSearchScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[

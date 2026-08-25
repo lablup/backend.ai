@@ -5,7 +5,7 @@ from __future__ import annotations
 from ai.backend.manager.data.fair_share import (
     FairShareSpec,
 )
-from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,
@@ -35,18 +35,18 @@ from .actions import (
     GetProjectFairShareActionResult,
     GetUserFairShareAction,
     GetUserFairShareActionResult,
-    SearchDomainFairSharesAction,
-    SearchDomainFairSharesActionResult,
-    SearchProjectFairSharesAction,
-    SearchProjectFairSharesActionResult,
+    GlobalSearchDomainFairSharesAction,
+    GlobalSearchDomainFairSharesActionResult,
+    GlobalSearchProjectFairSharesAction,
+    GlobalSearchProjectFairSharesActionResult,
+    GlobalSearchUserFairSharesAction,
+    GlobalSearchUserFairSharesActionResult,
     SearchRGDomainFairSharesAction,
     SearchRGDomainFairSharesActionResult,
     SearchRGProjectFairSharesAction,
     SearchRGProjectFairSharesActionResult,
     SearchRGUserFairSharesAction,
     SearchRGUserFairSharesActionResult,
-    SearchUserFairSharesAction,
-    SearchUserFairSharesActionResult,
     UpsertDomainFairShareWeightAction,
     UpsertDomainFairShareWeightActionResult,
     UpsertProjectFairShareWeightAction,
@@ -72,14 +72,16 @@ class FairShareService:
 
     # Helper methods for creating default fair share data
 
-    def _create_default_spec(self, scaling_group_spec: FairShareScalingGroupSpec) -> FairShareSpec:
+    def _create_default_spec(
+        self, resource_group_spec: FairShareResourceGroupSpec
+    ) -> FairShareSpec:
         """Create default FairShareSpec from scaling group spec."""
         return FairShareSpec(
-            weight=scaling_group_spec.default_weight,
-            half_life_days=scaling_group_spec.half_life_days,
-            lookback_days=scaling_group_spec.lookback_days,
-            decay_unit_days=scaling_group_spec.decay_unit_days,
-            resource_weights=scaling_group_spec.resource_weights,
+            weight=resource_group_spec.default_weight,
+            half_life_days=resource_group_spec.half_life_days,
+            lookback_days=resource_group_spec.lookback_days,
+            decay_unit_days=resource_group_spec.decay_unit_days,
+            resource_weights=resource_group_spec.resource_weights,
         )
 
     # Domain Fair Share
@@ -99,8 +101,8 @@ class FairShareService:
         return GetDomainFairShareActionResult(data=result)
 
     async def search_domain_fair_shares(
-        self, action: SearchDomainFairSharesAction
-    ) -> SearchDomainFairSharesActionResult:
+        self, action: GlobalSearchDomainFairSharesAction
+    ) -> GlobalSearchDomainFairSharesActionResult:
         """Search domain fair shares with pagination."""
         querier = BatchQuerier(
             pagination=action.pagination,
@@ -108,7 +110,7 @@ class FairShareService:
             orders=action.orders,
         )
         result = await self._repository.search_domain_fair_shares(querier)
-        return SearchDomainFairSharesActionResult(
+        return GlobalSearchDomainFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
         )
@@ -146,8 +148,8 @@ class FairShareService:
         return GetProjectFairShareActionResult(data=result)
 
     async def search_project_fair_shares(
-        self, action: SearchProjectFairSharesAction
-    ) -> SearchProjectFairSharesActionResult:
+        self, action: GlobalSearchProjectFairSharesAction
+    ) -> GlobalSearchProjectFairSharesActionResult:
         """Search project fair shares with pagination."""
         querier = BatchQuerier(
             pagination=action.pagination,
@@ -155,7 +157,7 @@ class FairShareService:
             orders=action.orders,
         )
         result = await self._repository.search_project_fair_shares(querier)
-        return SearchProjectFairSharesActionResult(
+        return GlobalSearchProjectFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
         )
@@ -194,8 +196,8 @@ class FairShareService:
         return GetUserFairShareActionResult(data=result)
 
     async def search_user_fair_shares(
-        self, action: SearchUserFairSharesAction
-    ) -> SearchUserFairSharesActionResult:
+        self, action: GlobalSearchUserFairSharesAction
+    ) -> GlobalSearchUserFairSharesActionResult:
         """Search user fair shares with pagination."""
         querier = BatchQuerier(
             pagination=action.pagination,
@@ -203,7 +205,7 @@ class FairShareService:
             orders=action.orders,
         )
         result = await self._repository.search_user_fair_shares(querier)
-        return SearchUserFairSharesActionResult(
+        return GlobalSearchUserFairSharesActionResult(
             items=result.items,
             total_count=result.total_count,
         )

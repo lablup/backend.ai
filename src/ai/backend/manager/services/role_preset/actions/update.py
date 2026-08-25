@@ -1,32 +1,30 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import UpdateSingleEntityOpsAction
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.role_preset.actions.base import RolePresetAction
+from ai.backend.manager.models.rbac_models.role_preset.updaters import RolePresetUpdater
 
 
 @dataclass
-class UpdateRolePresetAction(RolePresetAction):
-    updater: Updater[RolePresetRow]
+class UpdateRolePresetAction(UpdateSingleEntityOpsAction[RolePresetRow, RolePresetData]):
+    """Edit a preset's declaration. The soft-delete state is not reachable here."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.updater.pk_value)
+    updater: RolePresetUpdater
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class UpdateRolePresetActionResult(BaseActionResult):
-    preset: RolePresetData
+    def action_name(cls) -> str:
+        return "update_role_preset"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.preset.id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.updater.preset_id
+
+    @override
+    def to_updater(self) -> RolePresetUpdater:
+        return self.updater

@@ -15,6 +15,7 @@ from typing import Final
 from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -52,7 +53,7 @@ from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
-from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
+from ai.backend.manager.services.auth.actions.get_role import PublicGetRoleAction
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
 from ai.backend.manager.services.auth.actions.logout import LogoutAction
 from ai.backend.manager.services.auth.actions.signout import SignoutAction
@@ -114,13 +115,13 @@ class AuthHandler:
             ctx.user_domain,
             params.group,
         )
-        action = GetRoleAction(
+        action = PublicGetRoleAction(
             user_id=ctx.user_uuid,
             group_id=params.group,
             is_superadmin=ctx.is_superadmin,
             is_admin=ctx.is_admin,
         )
-        result = await self._auth.get_role.wait_for_complete(action)
+        result = await self._auth.public_get_role.run(action)
         resp = GetRoleResponse(
             global_role=result.global_role,
             domain_role=result.domain_role,
@@ -153,7 +154,7 @@ class AuthHandler:
             client_type_id=params.client_type_id,
             force=params.force,
         )
-        result = await self._auth.authorize.wait_for_complete(action)
+        result = await self._auth.authorize.run(action)
 
         if result.stream_response is not None:
             return result.stream_response
@@ -168,6 +169,7 @@ class AuthHandler:
             role=auth_result.role,
             status=auth_result.status,
             session_token=auth_result.session_token,
+            user_id=auth_result.user_id,
         )
         resp = AuthorizeResponse(data=data)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -176,11 +178,14 @@ class AuthHandler:
     # logout (POST /auth/logout)
     # ------------------------------------------------------------------
 
-    async def logout(self, body: BodyParam[LogoutRequest], ctx: RequestCtx) -> APIResponse:
+    async def logout(self, body: BodyParam[LogoutRequest], ctx: UserContext) -> APIResponse:
         params = body.parsed
         log.info("AUTH.LOGOUT(session_token:{}...)", params.session_token[:8])
-        action = LogoutAction(session_token=params.session_token)
-        await self._auth.logout.wait_for_complete(action)
+        action = LogoutAction(
+            user_id=UserID(ctx.user_uuid),
+            session_token=params.session_token,
+        )
+        await self._auth.logout.run(action)
         return APIResponse.build(HTTPStatus.OK, LogoutResponse())
 
     # ------------------------------------------------------------------
@@ -199,7 +204,7 @@ class AuthHandler:
             full_name=params.full_name,
             description=params.description,
         )
-        result = await self._auth.signup.wait_for_complete(action)
+        result = await self._auth.signup.run(action)
         resp = SignupResponse(
             access_key=result.access_key,
             secret_key=result.secret_key,
@@ -213,9 +218,9 @@ class AuthHandler:
     async def signout(self, body: BodyParam[SignoutRequest], ctx: UserContext) -> APIResponse:
         params = body.parsed
         log.info("AUTH.SIGNOUT(d:{}, email:{})", ctx.user_domain, params.email)
-        await self._auth.signout.wait_for_complete(
+        await self._auth.signout.run(
             SignoutAction(
-                user_id=ctx.user_uuid,
+                user_id=UserID(ctx.user_uuid),
                 domain_name=ctx.user_domain,
                 requester_email=ctx.user_email,
                 email=params.email,
@@ -233,9 +238,9 @@ class AuthHandler:
     ) -> APIResponse:
         params = body.parsed
         log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{})", ctx.user_domain, ctx.user_email)
-        await self._auth.update_full_name.wait_for_complete(
+        await self._auth.update_full_name.run(
             UpdateFullNameAction(
-                user_id=str(ctx.user_uuid),
+                user_id=UserID(ctx.user_uuid),
                 full_name=params.full_name,
                 domain_name=ctx.user_domain,
                 email=ctx.user_email,
@@ -257,14 +262,14 @@ class AuthHandler:
         log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{})", ctx.user_domain, ctx.user_email)
         action = UpdatePasswordAction(
             request=req.request,
-            user_id=ctx.user_uuid,
+            user_id=UserID(ctx.user_uuid),
             domain_name=ctx.user_domain,
             email=ctx.user_email,
             old_password=params.old_password,
             new_password=params.new_password,
             new_password_confirm=params.new_password2,
         )
-        result = await self._auth.update_password.wait_for_complete(action)
+        result = await self._auth.update_password.run(action)
         if not result.success:
             resp = UpdatePasswordResponse(error_msg="new password mismatch")
             return APIResponse.build(HTTPStatus.BAD_REQUEST, resp)
@@ -290,7 +295,7 @@ class AuthHandler:
             current_password=params.current_password,
             new_password=params.new_password,
         )
-        result = await self._auth.update_password_no_auth.wait_for_complete(action)
+        result = await self._auth.update_password_no_auth.run(action)
         resp = UpdatePasswordNoAuthResponse(
             password_changed_at=result.password_changed_at.isoformat(),
         )
@@ -302,9 +307,9 @@ class AuthHandler:
 
     async def get_ssh_keypair(self, ctx: UserContext) -> APIResponse:
         log.info("AUTH.GET_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
-        result = await self._auth.get_ssh_keypair.wait_for_complete(
+        result = await self._auth.get_ssh_keypair.run(
             GetSSHKeypairAction(
-                user_id=ctx.user_uuid,
+                user_id=UserID(ctx.user_uuid),
                 access_key=ctx.access_key,
             )
         )
@@ -317,9 +322,9 @@ class AuthHandler:
 
     async def generate_ssh_keypair(self, ctx: UserContext) -> APIResponse:
         log.info("AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
-        result = await self._auth.generate_ssh_keypair.wait_for_complete(
+        result = await self._auth.generate_ssh_keypair.run(
             GenerateSSHKeypairAction(
-                user_id=ctx.user_uuid,
+                user_id=UserID(ctx.user_uuid),
                 access_key=ctx.access_key,
             )
         )
@@ -340,9 +345,9 @@ class AuthHandler:
         pubkey = f"{params.pubkey.rstrip()}\n"
         privkey = f"{params.privkey.rstrip()}\n"
         log.info("AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
-        result = await self._auth.upload_ssh_keypair.wait_for_complete(
+        result = await self._auth.upload_ssh_keypair.run(
             UploadSSHKeypairAction(
-                user_id=ctx.user_uuid,
+                user_id=UserID(ctx.user_uuid),
                 public_key=pubkey,
                 private_key=privkey,
                 access_key=ctx.access_key,

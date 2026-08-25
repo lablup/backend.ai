@@ -42,6 +42,7 @@ from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapte
 
 if TYPE_CHECKING:
     from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from sqlalchemy.sql import ColumnElement
 
 __all__ = ("ExportAdapter",)
 
@@ -261,7 +262,7 @@ class ExportAdapter(BaseFilterAdapter):
         """Build select_from clause with dynamic LEFT JOINs.
 
         Args:
-            base_table: Base table (e.g., GroupRow.__table__)
+            base_table: Base table (e.g., ProjectRow.__table__)
             joins: List of JoinDef to apply
 
         Returns:
@@ -436,7 +437,7 @@ class ExportAdapter(BaseFilterAdapter):
                 cond = self._build_in_condition(filter.status, field)
                 conditions.append(cond)
 
-        # scaling_group_name filter
+        # resource_group_name filter
         if filter.scaling_group_name is not None:
             field = report.get_field("scaling_group_name")
             if field:
@@ -749,7 +750,7 @@ class ExportAdapter(BaseFilterAdapter):
         column = field_def.column
 
         if field_def.field_type == ExportFieldType.ENUM:
-            enum_cls = column.type._enum_cls
+            enum_cls = column.type.python_type
             enum_values = [enum_cls(v) for v in values]
             return lambda: column.in_(enum_values)
 
@@ -764,7 +765,7 @@ class ExportAdapter(BaseFilterAdapter):
         column = field_def.column
 
         def make_contains_factory(
-            col: InstrumentedAttribute[Any],
+            col: InstrumentedAttribute[Any] | ColumnElement[Any],
         ) -> Callable[[StringMatchSpec], QueryCondition]:
             def factory(spec: StringMatchSpec) -> QueryCondition:
                 pattern = f"%{spec.value}%"
@@ -779,7 +780,7 @@ class ExportAdapter(BaseFilterAdapter):
             return factory
 
         def make_equals_factory(
-            col: InstrumentedAttribute[Any],
+            col: InstrumentedAttribute[Any] | ColumnElement[Any],
         ) -> Callable[[StringMatchSpec], QueryCondition]:
             def factory(spec: StringMatchSpec) -> QueryCondition:
                 if spec.case_insensitive:
@@ -793,7 +794,7 @@ class ExportAdapter(BaseFilterAdapter):
             return factory
 
         def make_starts_with_factory(
-            col: InstrumentedAttribute[Any],
+            col: InstrumentedAttribute[Any] | ColumnElement[Any],
         ) -> Callable[[StringMatchSpec], QueryCondition]:
             def factory(spec: StringMatchSpec) -> QueryCondition:
                 pattern = f"{spec.value}%"
@@ -808,7 +809,7 @@ class ExportAdapter(BaseFilterAdapter):
             return factory
 
         def make_ends_with_factory(
-            col: InstrumentedAttribute[Any],
+            col: InstrumentedAttribute[Any] | ColumnElement[Any],
         ) -> Callable[[StringMatchSpec], QueryCondition]:
             def factory(spec: StringMatchSpec) -> QueryCondition:
                 pattern = f"%{spec.value}"
@@ -823,7 +824,7 @@ class ExportAdapter(BaseFilterAdapter):
             return factory
 
         def make_in_factory(
-            col: InstrumentedAttribute[Any],
+            col: InstrumentedAttribute[Any] | ColumnElement[Any],
         ) -> Callable[[StringInMatchSpec], QueryCondition]:
             def factory(spec: StringInMatchSpec) -> QueryCondition:
                 if spec.case_insensitive:
@@ -855,7 +856,7 @@ class ExportAdapter(BaseFilterAdapter):
         column = field_def.column
 
         def make_equals_factory(
-            col: InstrumentedAttribute[Any],
+            col: InstrumentedAttribute[Any] | ColumnElement[Any],
         ) -> Callable[[UUIDEqualMatchSpec], QueryCondition]:
             def factory(spec: UUIDEqualMatchSpec) -> QueryCondition:
                 value = spec.value
@@ -866,7 +867,7 @@ class ExportAdapter(BaseFilterAdapter):
             return factory
 
         def make_in_factory(
-            col: InstrumentedAttribute[Any],
+            col: InstrumentedAttribute[Any] | ColumnElement[Any],
         ) -> Callable[[UUIDInMatchSpec], QueryCondition]:
             def factory(spec: UUIDInMatchSpec) -> QueryCondition:
                 values = spec.values

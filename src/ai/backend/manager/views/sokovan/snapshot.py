@@ -9,22 +9,25 @@ from decimal import Decimal
 from functools import cached_property
 from typing import override
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
     PreemptionOrder,
+    PreemptionVictimScope,
     SessionId,
 )
 
 from .agent import AgentLimit, ResourceGroupResource
 from .workload import (
+    PreemptionScopeKey,
     ResourceRequest,
     SessionDependencyInfo,
     SessionResourceRequest,
+    WorkloadMeta,
 )
 
 
@@ -44,6 +47,20 @@ class SlotAllocation:
     @property
     def allocated(self) -> Decimal:
         return self.requested + self.used
+
+
+@dataclass(frozen=True)
+class SlotExcess:
+    """One slot whose occupancy plus the new request passes a scope's quota."""
+
+    slot_name: ResourceSlotName
+    used: Decimal
+    requested: Decimal
+    limit: Decimal
+
+    @property
+    def excess(self) -> Decimal:
+        return self.used + self.requested - self.limit
 
 
 @dataclass(frozen=True)
@@ -73,20 +90,29 @@ class ResourceAllocation:
     def empty(cls) -> ResourceAllocation:
         return ResourceAllocation(slots={})
 
-    def exceeds(self, request: ResourceRequest, limit: ResourceLimit) -> bool:
-        """True if allocated + requested exceeds the slot quota on any slot.
+    def exceeded_slots(self, request: ResourceRequest, limit: ResourceLimit) -> list[SlotExcess]:
+        """Every slot where allocated + requested exceeds the slot quota.
 
-        Missing keys count as zero on every side, matching the previous
-        ``ResourceSlot`` union-key comparison semantics.
+        Empty when the request fits. Missing keys count as zero on every side,
+        matching the previous ``ResourceSlot`` union-key comparison semantics.
         """
         slot_names = self.slots.keys() | request.slots.keys() | limit.slots.keys()
-        for slot_name in slot_names:
+        excesses: list[SlotExcess] = []
+        for slot_name in sorted(slot_names):
             allocation = self.slots.get(slot_name)
             allocated = allocation.allocated if allocation is not None else Decimal(0)
             requested = request.slots.get(slot_name, Decimal(0))
-            if allocated + requested > limit.slots.get(slot_name, Decimal(0)):
-                return True
-        return False
+            quota = limit.slots.get(slot_name, Decimal(0))
+            if allocated + requested > quota:
+                excesses.append(
+                    SlotExcess(
+                        slot_name=slot_name,
+                        used=allocated,
+                        requested=requested,
+                        limit=quota,
+                    )
+                )
+        return excesses
 
     def _merged_slots(self, request: ResourceRequest) -> dict[ResourceSlotName, SlotAllocation]:
         """Requested slots accumulate as reservations (the session is not running yet)."""
@@ -216,7 +242,6 @@ class PreemptionCandidate:
     # oldest/newest reclaim-order basis. None when the session never ran
     started_at: datetime | None
     # Per-agent live allocations freed by preempting this session
-    # (resource_allocations rows, not the legacy kernels.occupied_slots)
     allocated_slots_by_agent: Mapping[AgentId, Mapping[ResourceSlotName, Decimal]]
 
 
@@ -239,8 +264,8 @@ class AgentVictimCandidates:
 
 
 @dataclass(frozen=True)
-class UserVictimCandidates:
-    """One owner's victim candidates with the per-agent decomposition derived.
+class ScopeVictimCandidates:
+    """One scope key's victim candidates with the per-agent decomposition derived.
 
     ``candidates`` is the stored form (one entry per session — the
     preemption unit); the per-agent grouping and reclaimable totals are
@@ -265,13 +290,18 @@ class UserVictimCandidates:
 
 @dataclass(frozen=True)
 class PreemptionCandidateSnapshot:
-    """Preemption victim candidates of the resource group, grouped per owner."""
+    """Preemption victim candidates of the resource group, grouped by the
+    scope key the group's victim scope derives."""
 
-    by_user: Mapping[UserID, UserVictimCandidates]
+    scope: PreemptionVictimScope
+    by_key: Mapping[PreemptionScopeKey, ScopeVictimCandidates]
 
     @classmethod
     def empty(cls) -> PreemptionCandidateSnapshot:
-        return PreemptionCandidateSnapshot(by_user={})
+        return PreemptionCandidateSnapshot(scope=PreemptionVictimScope.USER, by_key={})
+
+    def candidates_for(self, meta: WorkloadMeta) -> ScopeVictimCandidates | None:
+        return self.by_key.get(meta.preemption_scope_key(self.scope))
 
 
 @dataclass

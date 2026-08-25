@@ -11,14 +11,16 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
-from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.group.types import ProjectResourceInfo
+from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
@@ -38,12 +40,12 @@ from ai.backend.manager.errors.storage import (
     VFolderInvalidParameter,
     VFolderNotFound,
 )
-from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.models.project import ProjectType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderPermission
+from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfolder.types import BulkVFolderPurgeResult
-from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
@@ -53,12 +55,12 @@ from ai.backend.manager.services.vfolder.actions.base import (
     DeleteForeverVFolderActionResult,
     ForceDeleteVFolderAction,
     ForceDeleteVFolderActionResult,
-    GetAccessibleVFolderAction,
-    GetAccessibleVFolderActionResult,
     GetVFolderAction,
     GetVFolderActionResult,
     ListVFolderAction,
     ListVFolderActionResult,
+    LookupAccessibleVFolderAction,
+    LookupAccessibleVFolderActionResult,
     MoveToTrashVFolderAction,
     MoveToTrashVFolderActionResult,
     RestoreVFolderFromTrashAction,
@@ -68,6 +70,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
 )
 from ai.backend.manager.services.vfolder.actions.file_v2 import CloneVFolderV2Action
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.manager.types import OptionalState
 
 
 @pytest.fixture
@@ -200,8 +203,7 @@ class TestCreateVFolderAction:
             mount_permission=VFolderPermission.READ_WRITE,
             usage_mode=VFolderUsageMode.GENERAL,
             cloneable=False,
-            _scope_id=str(user_uuid),
-            _scope_type=ScopeType.USER,
+            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
             user_uuid=user_uuid,
             user_role=UserRole.USER,
             creator_email="test@example.com",
@@ -229,8 +231,7 @@ class TestCreateVFolderAction:
             mount_permission=VFolderPermission.READ_WRITE,
             usage_mode=VFolderUsageMode.GENERAL,
             cloneable=False,
-            _scope_id=str(user_uuid),
-            _scope_type=ScopeType.USER,
+            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
             user_uuid=user_uuid,
             user_role=UserRole.USER,
             creator_email="test@example.com",
@@ -269,8 +270,7 @@ class TestCreateVFolderAction:
             mount_permission=VFolderPermission.READ_WRITE,
             usage_mode=VFolderUsageMode.GENERAL,
             cloneable=False,
-            _scope_id=str(group_uuid),
-            _scope_type=ScopeType.PROJECT,
+            scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=group_uuid),
             user_uuid=user_uuid,
             user_role=UserRole.SUPERADMIN,
             creator_email="admin@example.com",
@@ -299,8 +299,7 @@ class TestCreateVFolderAction:
             mount_permission=VFolderPermission.READ_WRITE,
             usage_mode=VFolderUsageMode.GENERAL,
             cloneable=False,
-            _scope_id=str(user_uuid),
-            _scope_type=ScopeType.USER,
+            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
             user_uuid=user_uuid,
             user_role=UserRole.USER,
             creator_email="test@example.com",
@@ -330,8 +329,7 @@ class TestCreateVFolderAction:
             mount_permission=VFolderPermission.READ_WRITE,
             usage_mode=VFolderUsageMode.GENERAL,
             cloneable=False,
-            _scope_id=str(user_uuid),
-            _scope_type=ScopeType.USER,
+            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
             user_uuid=user_uuid,
             user_role=UserRole.USER,
             creator_email="test@example.com",
@@ -361,8 +359,7 @@ class TestCreateVFolderAction:
             mount_permission=VFolderPermission.READ_WRITE,
             usage_mode=VFolderUsageMode.GENERAL,
             cloneable=False,
-            _scope_id=str(user_uuid),
-            _scope_type=ScopeType.USER,
+            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
             user_uuid=user_uuid,
             user_role=UserRole.USER,
             creator_email="test@example.com",
@@ -387,8 +384,7 @@ class TestCreateVFolderAction:
             mount_permission=VFolderPermission.READ_WRITE,
             usage_mode=VFolderUsageMode.GENERAL,
             cloneable=False,
-            _scope_id=str(group_uuid),
-            _scope_type=ScopeType.PROJECT,
+            scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=group_uuid),
             user_uuid=user_uuid,
             user_role=UserRole.SUPERADMIN,
             creator_email="admin@example.com",
@@ -426,8 +422,7 @@ class TestCreateVFolderAction:
             mount_permission=VFolderPermission.READ_WRITE,
             usage_mode=VFolderUsageMode.GENERAL,
             cloneable=False,
-            _scope_id=str(group_uuid),
-            _scope_type=ScopeType.PROJECT,
+            scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=group_uuid),
             user_uuid=user_uuid,
             user_role=UserRole.SUPERADMIN,
             creator_email="admin@example.com",
@@ -468,8 +463,7 @@ class TestCreateVFolderAction:
             mount_permission=VFolderPermission.READ_WRITE,
             usage_mode=VFolderUsageMode.GENERAL,
             cloneable=False,
-            _scope_id=str(user_uuid),
-            _scope_type=ScopeType.USER,
+            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
             user_uuid=user_uuid,
             user_role=UserRole.USER,
             creator_email="test@example.com",
@@ -503,7 +497,7 @@ class TestGetVFolderAction:
 
         action = GetVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.get(action)
@@ -526,7 +520,7 @@ class TestGetVFolderAction:
 
         action = GetVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         with pytest.raises(VFolderNotFound):
@@ -555,7 +549,7 @@ class TestGetVFolderAction:
 
         action = GetVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.get(action)
@@ -578,8 +572,7 @@ class TestListVFolderAction:
 
         action = ListVFolderAction(
             user_uuid=user_uuid,
-            _scope_type=ScopeType.USER,
-            _scope_id=str(user_uuid),
+            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
         )
 
         result = await vfolder_service.list(action)
@@ -615,8 +608,7 @@ class TestListVFolderAction:
 
         action = ListVFolderAction(
             user_uuid=user_uuid,
-            _scope_type=ScopeType.USER,
-            _scope_id=str(user_uuid),
+            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
         )
 
         result = await vfolder_service.list(action)
@@ -640,8 +632,7 @@ class TestListVFolderAction:
 
         action = ListVFolderAction(
             user_uuid=user_uuid,
-            _scope_type=ScopeType.DOMAIN,
-            _scope_id="default",
+            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
         )
 
         await vfolder_service.list(action)
@@ -673,16 +664,11 @@ class TestUpdateVFolderAttributeAction:
         )
         mock_vfolder_repository.update_vfolder_attribute = AsyncMock()
 
-        mock_name = MagicMock()
-        mock_name.value.side_effect = ValueError
-        spec = MagicMock()
-        spec.name = mock_name
-        updater = MagicMock()
-        updater.spec = spec
+        updater = VFolderAttributeUpdater(vfolder_id=VFolderUUID(vfolder_uuid))
 
         action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             updater=updater,
         )
 
@@ -712,16 +698,14 @@ class TestUpdateVFolderAttributeAction:
             )
         )
 
-        mock_name = MagicMock()
-        mock_name.value.return_value = "existing-name"
-        spec = MagicMock()
-        spec.name = mock_name
-        updater = MagicMock()
-        updater.spec = spec
+        updater = VFolderAttributeUpdater(
+            vfolder_id=VFolderUUID(vfolder_uuid),
+            name=OptionalState[str].update("existing-name"),
+        )
 
         action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             updater=updater,
         )
 
@@ -740,13 +724,11 @@ class TestUpdateVFolderAttributeAction:
             return_value=VFolderListResult(vfolders=[])
         )
 
-        spec = MagicMock(spec=VFolderAttributeUpdaterSpec)
-        updater = MagicMock()
-        updater.spec = spec
+        updater = VFolderAttributeUpdater(vfolder_id=VFolderUUID(vfolder_uuid))
 
         action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             updater=updater,
         )
 
@@ -769,7 +751,7 @@ class TestMoveToTrashVFolderAction:
         action = MoveToTrashVFolderAction(
             user_uuid=user_uuid,
             keypair_resource_policy={"default": {}},
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.move_to_trash(action)
@@ -790,7 +772,7 @@ class TestMoveToTrashVFolderAction:
         action = MoveToTrashVFolderAction(
             user_uuid=user_uuid,
             keypair_resource_policy={"default": {}},
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         with pytest.raises(VFolderNotFound):
@@ -813,7 +795,7 @@ class TestRestoreVFolderFromTrashAction:
 
         action = RestoreVFolderFromTrashAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.restore(action)
@@ -833,7 +815,7 @@ class TestRestoreVFolderFromTrashAction:
 
         action = RestoreVFolderFromTrashAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         with pytest.raises(VFolderNotFound):
@@ -859,7 +841,7 @@ class TestDeleteForeverVFolderAction:
 
         action = DeleteForeverVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.delete_forever(action)
@@ -889,7 +871,7 @@ class TestDeleteForeverVFolderAction:
 
         action = DeleteForeverVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.delete_forever(action)
@@ -915,7 +897,7 @@ class TestDeleteForeverVFolderAction:
 
         action = DeleteForeverVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.delete_forever(action)
@@ -943,7 +925,7 @@ class TestForceDeleteVFolderAction:
 
         action = ForceDeleteVFolderAction(
             user_uuid=user_uuid,
-            vfolder_uuid=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
         )
 
         result = await vfolder_service.force_delete(action)
@@ -994,6 +976,7 @@ class TestCloneVFolderAction:
         )
 
         action = CloneVFolderAction(
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=user_uuid,
             source_vfolder_uuid=vfolder_uuid,
             target_name="cloned-vfolder",
@@ -1032,6 +1015,7 @@ class TestCloneVFolderAction:
         )
 
         action = CloneVFolderAction(
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=user_uuid,
             source_vfolder_uuid=vfolder_uuid,
             target_name="cloned-vfolder",
@@ -1072,6 +1056,7 @@ class TestCloneVFolderAction:
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
 
         action = CloneVFolderAction(
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=user_uuid,
             source_vfolder_uuid=vfolder_uuid,
             target_name="existing-name",
@@ -1114,6 +1099,7 @@ class TestCloneVFolderAction:
         mock_vfolder_repository.count_vfolders_by_user = AsyncMock(return_value=5)
 
         action = CloneVFolderAction(
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=user_uuid,
             source_vfolder_uuid=vfolder_uuid,
             target_name="clone-target",
@@ -1184,6 +1170,7 @@ class TestCloneVFolderAction:
         mock_repo_for_clone_quota.validate_quota_scope_access = AsyncMock()
 
         action = CloneVFolderAction(
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=user_uuid,
             source_vfolder_uuid=vfolder_uuid,
             target_name="cloned-vfolder",
@@ -1218,6 +1205,7 @@ class TestCloneVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         action = CloneVFolderAction(
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=user_uuid,
             source_vfolder_uuid=vfolder_uuid,
             target_name="cloned-vfolder",
@@ -1252,6 +1240,7 @@ class TestCloneVFolderAction:
         )
 
         action = CloneVFolderAction(
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=user_uuid,
             source_vfolder_uuid=vfolder_uuid,
             target_name="cloned-vfolder",
@@ -1309,6 +1298,7 @@ class TestCloneVFolderAction:
         )
 
         action = CloneVFolderAction(
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             requester_user_uuid=user_uuid,
             source_vfolder_uuid=vfolder_uuid,
             target_name="cloned-vfolder",
@@ -1368,7 +1358,7 @@ class TestCloneVFolderV2Action:
 
         action = CloneVFolderV2Action(
             user_id=user_uuid,
-            vfolder_id=vfolder_uuid,
+            vfolder_uuid=VFolderUUID(vfolder_uuid),
             target_name="cloned-vfolder",
             target_host=None,
             usage_mode="general",
@@ -1394,7 +1384,7 @@ class TestGetAccessibleVFolderAction:
             return_value=[{"id": vfolder_uuid, "name": "test-vfolder", "status": "ready"}]
         )
 
-        action = GetAccessibleVFolderAction(
+        action = LookupAccessibleVFolderAction(
             user_uuid=user_uuid,
             user_role=UserRole.USER,
             domain_name="default",
@@ -1405,7 +1395,7 @@ class TestGetAccessibleVFolderAction:
 
         result = await vfolder_service.get_accessible_vfolder(action)
 
-        assert isinstance(result, GetAccessibleVFolderActionResult)
+        assert isinstance(result, LookupAccessibleVFolderActionResult)
         assert result.row["id"] == vfolder_uuid
 
     async def test_lookup_by_name_succeeds(
@@ -1419,7 +1409,7 @@ class TestGetAccessibleVFolderAction:
             return_value=[{"id": vfolder_uuid, "name": "my-folder", "status": "ready"}]
         )
 
-        action = GetAccessibleVFolderAction(
+        action = LookupAccessibleVFolderAction(
             user_uuid=user_uuid,
             user_role=UserRole.USER,
             domain_name="default",
@@ -1440,7 +1430,7 @@ class TestGetAccessibleVFolderAction:
     ) -> None:
         mock_vfolder_repository.get_accessible_rows = AsyncMock(return_value=[])
 
-        action = GetAccessibleVFolderAction(
+        action = LookupAccessibleVFolderAction(
             user_uuid=user_uuid,
             user_role=UserRole.USER,
             domain_name="default",
@@ -1465,7 +1455,7 @@ class TestGetAccessibleVFolderAction:
             ]
         )
 
-        action = GetAccessibleVFolderAction(
+        action = LookupAccessibleVFolderAction(
             user_uuid=user_uuid,
             user_role=UserRole.USER,
             domain_name="default",

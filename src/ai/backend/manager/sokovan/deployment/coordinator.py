@@ -15,6 +15,7 @@ from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.common.data.notification.messages import EndpointLifecycleChangedMessage
 from ai.backend.common.events.dispatcher import EventProducer
@@ -23,7 +24,6 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleEvent,
     DoDeploymentLifecycleIfNeededEvent,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
@@ -38,20 +38,18 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.base.updater import BatchUpdater
+from ai.backend.manager.models.endpoint.updaters import EndpointLifecycleBatchUpdater
+from ai.backend.manager.models.scheduling_history.creators import DeploymentHistoryCreator
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.creators import (
-    EndpointLifecycleBatchUpdaterSpec,
-)
+from ai.backend.manager.repositories.deployment.types import DeploymentHistoryToCreate
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
-from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
 from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
@@ -111,34 +109,35 @@ def _collect_last_history_map(
 
 
 def _classify_history_specs(
-    specs: list[DeploymentHistoryCreatorSpec],
+    histories: list[DeploymentHistoryToCreate],
     last_history_map: dict[DeploymentID, DeploymentLastHistory | None],
-) -> tuple[list[DeploymentHistoryCreatorSpec], list[UUID]]:
-    """Split history specs into (new_inserts, merge_target_ids).
+) -> tuple[list[DeploymentHistoryToCreate], list[UUID]]:
+    """Split the history rows into (new_inserts, merge_target_ids).
 
-    A spec merges onto its deployment's last history row when the
+    A row merges onto its deployment's last history row when the
     (phase, error_code, to_status) triple matches. The category axis
     is already guaranteed to match — ``last_history_map`` was populated
     by a category-scoped query, so every prior row has the current
     handler's category.
     """
-    new_specs: list[DeploymentHistoryCreatorSpec] = []
+    new_histories: list[DeploymentHistoryToCreate] = []
     merge_ids: list[UUID] = []
-    for spec in specs:
-        last = last_history_map.get(spec.deployment_id)
+    for history in histories:
+        creator = history.creator
+        last = last_history_map.get(history.deployment_id)
         if last is None:
-            new_specs.append(spec)
+            new_histories.append(history)
             continue
-        spec_to_status = spec.to_status.value if spec.to_status is not None else None
+        to_status = creator.to_status.value if creator.to_status is not None else None
         if (
-            last.phase == spec.phase
-            and last.error_code == spec.error_code
-            and last.to_status == spec_to_status
+            last.phase == creator.phase
+            and last.error_code == creator.error_code
+            and last.to_status == to_status
         ):
             merge_ids.append(last.id)
         else:
-            new_specs.append(spec)
-    return new_specs, merge_ids
+            new_histories.append(history)
+    return new_histories, merge_ids
 
 
 @dataclass
@@ -172,8 +171,8 @@ class FailureClassificationResult:
 class _TransitionResult:
     """Result of building a lifecycle transition."""
 
-    updater: BatchUpdater[EndpointRow]
-    history_specs: list[DeploymentHistoryCreatorSpec]
+    updater: EndpointLifecycleBatchUpdater
+    history_specs: list[DeploymentHistoryToCreate]
     notification_events: list[NotificationTriggeredEvent]
 
 
@@ -196,11 +195,15 @@ class DeploymentTaskSpec:
 
     def create_if_needed_event(self) -> DoDeploymentLifecycleIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoDeploymentLifecycleIfNeededEvent(self.lifecycle_type.value, sub_step=self.sub_step)
+        return DoDeploymentLifecycleIfNeededEvent(
+            lifecycle_type=self.lifecycle_type.value, sub_step=self.sub_step
+        )
 
     def create_process_event(self) -> DoDeploymentLifecycleEvent:
         """Create event for forced processing."""
-        return DoDeploymentLifecycleEvent(self.lifecycle_type.value, sub_step=self.sub_step)
+        return DoDeploymentLifecycleEvent(
+            lifecycle_type=self.lifecycle_type.value, sub_step=self.sub_step
+        )
 
     @property
     def _suffix(self) -> str:
@@ -495,8 +498,8 @@ class DeploymentCoordinator:
         target = handler.target_statuses()
         target_lifecycle_stages = target.lifecycle_stages
 
-        batch_updaters: list[BatchUpdater[EndpointRow]] = []
-        all_history_specs: list[DeploymentHistoryCreatorSpec] = []
+        batch_updaters: list[EndpointLifecycleBatchUpdater] = []
+        all_history_specs: list[DeploymentHistoryToCreate] = []
         notification_events: list[NotificationTriggeredEvent] = []
         timestamp_now = datetime.now(UTC).isoformat()
 
@@ -588,12 +591,12 @@ class DeploymentCoordinator:
         # Execute all updates in a single transaction
         if batch_updaters:
             last_history_map = _collect_last_history_map(result)
-            new_history_specs, merge_history_ids = _classify_history_specs(
+            new_histories, merge_history_ids = _classify_history_specs(
                 all_history_specs, last_history_map
             )
             await self._deployment_repository.update_endpoint_lifecycle_bulk_with_history(
                 batch_updaters,
-                new_history_specs=new_history_specs,
+                new_histories=new_histories,
                 merge_history_ids=merge_history_ids,
             )
 
@@ -609,21 +612,17 @@ class DeploymentCoordinator:
         deployment_ids: list[DeploymentID],
         lifecycle_status: DeploymentLifecycleStatus,
         target_lifecycles: list[EndpointLifecycle],
-    ) -> BatchUpdater[EndpointRow]:
-        conditions = [DeploymentConditions.by_ids(deployment_ids)]
+    ) -> EndpointLifecycleBatchUpdater:
         # Only narrow by lifecycle stage when the target set actually
         # restricts it — scaling-category transitions accept every
         # lifecycle in the handler's target set, which may already cover
-        # everything the ``by_ids`` condition does.
-        if target_lifecycles:
-            conditions.append(DeploymentConditions.by_lifecycle_stages(target_lifecycles))
-        return BatchUpdater(
-            spec=EndpointLifecycleBatchUpdaterSpec(
-                lifecycle_stage=lifecycle_status.lifecycle,
-                sub_step=lifecycle_status.sub_step,
-                scaling_state=lifecycle_status.scaling_state,
-            ),
-            conditions=conditions,
+        # everything the id condition does.
+        return EndpointLifecycleBatchUpdater(
+            deployment_ids=deployment_ids,
+            lifecycle_stages=target_lifecycles,
+            lifecycle_stage=lifecycle_status.lifecycle,
+            sub_step=lifecycle_status.sub_step,
+            scaling_state=lifecycle_status.scaling_state,
         )
 
     def _build_success_transition(
@@ -640,21 +639,23 @@ class DeploymentCoordinator:
         next_lifecycle = lifecycle_status.lifecycle
         deployment_ids = [deployment.deployment_info.id for deployment in deployments]
         history_specs = [
-            DeploymentHistoryCreatorSpec(
+            DeploymentHistoryToCreate(
                 deployment_id=DeploymentID(deployment.deployment_info.id),
-                phase=handler_name,
-                result=SchedulingResult.SUCCESS,
-                message=f"{handler_name} completed successfully",
-                handler_category=handler_category,
-                from_status=deployment.deployment_info.state.lifecycle,
-                to_status=next_lifecycle
-                if next_lifecycle is not None
-                else deployment.deployment_info.state.lifecycle,
-                sub_steps=self._build_history_sub_steps(
-                    deployment.deployment_info.id,
-                    records,
-                    deployment.deployment_info.sub_step,
-                    SchedulingResult.SUCCESS,
+                creator=DeploymentHistoryCreator(
+                    phase=handler_name,
+                    result=SchedulingResult.SUCCESS,
+                    message=f"{handler_name} completed successfully",
+                    handler_category=handler_category,
+                    from_status=deployment.deployment_info.state.lifecycle,
+                    to_status=next_lifecycle
+                    if next_lifecycle is not None
+                    else deployment.deployment_info.state.lifecycle,
+                    sub_steps=self._build_history_sub_steps(
+                        deployment.deployment_info.id,
+                        records,
+                        deployment.deployment_info.sub_step,
+                        SchedulingResult.SUCCESS,
+                    ),
                 ),
             )
             for deployment in deployments
@@ -700,24 +701,26 @@ class DeploymentCoordinator:
         next_lifecycle = lifecycle_status.lifecycle
         deployment_ids = [error.deployment_info.deployment_info.id for error in errors]
         history_specs = [
-            DeploymentHistoryCreatorSpec(
+            DeploymentHistoryToCreate(
                 deployment_id=DeploymentID(error.deployment_info.deployment_info.id),
-                phase=handler_name,
-                result=scheduling_result,
-                message=error.reason,
-                handler_category=handler_category,
-                from_status=error.deployment_info.deployment_info.state.lifecycle,
-                to_status=(
-                    next_lifecycle
-                    if next_lifecycle is not None
-                    else error.deployment_info.deployment_info.state.lifecycle
-                ),
-                error_code=error.error_code,
-                sub_steps=self._build_history_sub_steps(
-                    error.deployment_info.deployment_info.id,
-                    records,
-                    error.deployment_info.deployment_info.sub_step,
-                    scheduling_result,
+                creator=DeploymentHistoryCreator(
+                    phase=handler_name,
+                    result=scheduling_result,
+                    message=error.reason,
+                    handler_category=handler_category,
+                    from_status=error.deployment_info.deployment_info.state.lifecycle,
+                    to_status=(
+                        next_lifecycle
+                        if next_lifecycle is not None
+                        else error.deployment_info.deployment_info.state.lifecycle
+                    ),
+                    error_code=error.error_code,
+                    sub_steps=self._build_history_sub_steps(
+                        error.deployment_info.deployment_info.id,
+                        records,
+                        error.deployment_info.deployment_info.sub_step,
+                        scheduling_result,
+                    ),
                 ),
             )
             for error in errors

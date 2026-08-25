@@ -1,34 +1,38 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
-from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.prometheus_query_preset.actions.base import (
-    PrometheusQueryPresetAction,
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
+from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
+from ai.backend.manager.models.prometheus_query_preset.creators import (
+    PrometheusQueryPresetCreator,
+)
+from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
 
 
 @dataclass
-class CreatePresetAction(PrometheusQueryPresetAction):
-    creator: Creator[PrometheusQueryPresetRow]
+class CreatePresetAction(
+    CreateGlobalOpsAction[PrometheusQueryPresetRow, PrometheusQueryPresetData]
+):
+    """Add a query preset to the global catalog."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: PrometheusQueryPresetCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreatePresetActionResult(BaseActionResult):
-    preset: PrometheusQueryPresetData
+    def entity_type(cls) -> EntityType:
+        return PROMETHEUS_QUERY_PRESET_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.preset.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_prometheus_query_preset"
+
+    @override
+    def to_creator(self) -> PrometheusQueryPresetCreator:
+        return self.creator

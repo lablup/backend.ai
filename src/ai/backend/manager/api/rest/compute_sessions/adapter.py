@@ -21,12 +21,14 @@ from ai.backend.common.dto.manager.compute_session import (
 )
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import SessionOrders
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 
@@ -55,18 +57,20 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
         return grouped
 
     def convert_session_to_dto(
-        self, session: SessionData, kernels: list[KernelInfo] | None = None
+        self,
+        session: SessionData,
+        allocation: ResourceAllocationAggregate | None,
+        kernels: list[KernelInfo] | None = None,
     ) -> ComputeSessionDTO:
         """Convert SessionData + kernels to ComputeSessionDTO."""
         containers = [self._convert_kernel_to_container(k) for k in kernels] if kernels else []
 
-        resource_slots: dict[str, Any] | None = None
-        if session.requested_slots is not None:
-            resource_slots = dict(session.requested_slots)
-
-        occupied_slots: dict[str, Any] | None = None
-        if session.occupying_slots is not None:
-            occupied_slots = dict(session.occupying_slots)
+        resource_slots: dict[str, Any] | None = (
+            dict(allocation.requested) if allocation is not None else None
+        )
+        occupied_slots: dict[str, Any] | None = (
+            dict(allocation.used) if allocation is not None else None
+        )
 
         return ComputeSessionDTO(
             id=session.id,
@@ -74,7 +78,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
             type=session.session_type.value,
             status=session.status.value,
             image=session.images,
-            scaling_group=session.scaling_group_name,
+            scaling_group=session.resource_group_name,
             resource_slots=resource_slots,
             occupied_slots=occupied_slots,
             created_at=session.created_at,
@@ -143,11 +147,11 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
         if filter.scaling_group_name is not None:
             condition = self.convert_string_filter(
                 filter.scaling_group_name,
-                contains_factory=SessionConditions.by_scaling_group_contains,
-                equals_factory=SessionConditions.by_scaling_group_equals,
-                starts_with_factory=SessionConditions.by_scaling_group_starts_with,
-                ends_with_factory=SessionConditions.by_scaling_group_ends_with,
-                in_factory=SessionConditions.by_scaling_group_in,
+                contains_factory=SessionConditions.by_resource_group_contains,
+                equals_factory=SessionConditions.by_resource_group_equals,
+                starts_with_factory=SessionConditions.by_resource_group_starts_with,
+                ends_with_factory=SessionConditions.by_resource_group_ends_with,
+                in_factory=SessionConditions.by_resource_group_in,
             )
             if condition is not None:
                 conditions.append(condition)

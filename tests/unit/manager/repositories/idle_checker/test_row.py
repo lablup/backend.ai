@@ -8,29 +8,32 @@ from datetime import UTC, datetime
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     IdleCheckPhase,
     SessionLifetimeSpec,
 )
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     ClusterMode,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow, SessionIdleCheckRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 
@@ -52,8 +55,10 @@ class TestSessionIdleCheckRow:
             [
                 ProjectResourcePolicyRow,
                 DomainRow,
-                GroupRow,
-                ScalingGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
+                ProjectRow,
+                ResourceGroupRow,
                 SessionRow,
                 IdleCheckerRow,
                 SessionIdleCheckRow,
@@ -91,7 +96,7 @@ class TestSessionIdleCheckRow:
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name="session-idle-check-project",
                     description=None,
@@ -101,7 +106,7 @@ class TestSessionIdleCheckRow:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=resource_group_id,
                     name="session-idle-check-resource-group",
                     description=None,
@@ -138,8 +143,6 @@ class TestSessionIdleCheckRow:
                     starts_at=created_at,
                     startup_command=None,
                     callback_url=None,
-                    occupying_slots=ResourceSlot({"cpu": "1"}),
-                    requested_slots=ResourceSlot({"cpu": "1"}),
                     vfolder_mounts=[],
                     environ=None,
                     bootstrap_script=None,

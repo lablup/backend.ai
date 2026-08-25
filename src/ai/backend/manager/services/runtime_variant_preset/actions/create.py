@@ -1,34 +1,36 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
-from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.runtime_variant_preset.actions.base import (
-    RuntimeVariantPresetAction,
+from ai.backend.common.data.entity.runtime_variant_preset import (
+    RUNTIME_VARIANT_PRESET_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
+from ai.backend.manager.models.runtime_variant_preset.creators import RuntimeVariantPresetCreator
+from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 
 
 @dataclass
-class CreateRuntimeVariantPresetAction(RuntimeVariantPresetAction):
-    creator: Creator[RuntimeVariantPresetRow]
+class CreateRuntimeVariantPresetAction(
+    CreateGlobalOpsAction[RuntimeVariantPresetRow, RuntimeVariantPresetData]
+):
+    """Add a preset, taking the next rank within its variant."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: RuntimeVariantPresetCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreateRuntimeVariantPresetActionResult(BaseActionResult):
-    preset: RuntimeVariantPresetData
+    def entity_type(cls) -> EntityType:
+        return RUNTIME_VARIANT_PRESET_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.preset.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_runtime_variant_preset"
+
+    @override
+    def to_creator(self) -> RuntimeVariantPresetCreator:
+        return self.creator

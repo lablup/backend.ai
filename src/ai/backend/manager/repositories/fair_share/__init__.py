@@ -20,11 +20,8 @@ from .repositories import FairShareRepositories
 from .repository import FairShareRepository
 from .types import (
     DomainFairShareEntitySearchResult,
-    DomainFairShareSearchScope,
     ProjectFairShareEntitySearchResult,
-    ProjectFairShareSearchScope,
     UserFairShareEntitySearchResult,
-    UserFairShareSearchScope,
 )
 from .upserters import (
     DomainFairShareBulkWeightUpserterSpec,
@@ -59,10 +56,6 @@ __all__ = (
     "DomainFairShareOrders",
     "ProjectFairShareOrders",
     "UserFairShareOrders",
-    # Scope types
-    "DomainFairShareSearchScope",
-    "ProjectFairShareSearchScope",
-    "UserFairShareSearchScope",
     # Entity-based search results
     "DomainFairShareEntitySearchResult",
     "ProjectFairShareEntitySearchResult",

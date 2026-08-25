@@ -49,24 +49,28 @@ For each area, separate **✅ what already exists** from **➕ what to add**.
 
 | | Item |
 |---|---|
-| ✅ | The pydantic section pattern of `ManagerUnifiedConfig` (`AuthConfig` and friends), with the password hash algorithm/rounds settings as precedent |
+| ✅ | The pydantic section pattern of `ManagerUnifiedConfig` (`AuthConfig` and friends), with the password hash algorithm settings as precedent |
 | ✅ | Unified config is loaded at component startup and reached at runtime through `ManagerConfigProvider` |
-| ✅ | A `ManagerConfigProvider` assembly path for one-shot CLI commands - the CLI can read the full unified config too, so no separate key-injection path is needed (3.5) |
-| ➕ | New section `secret-encryption`: `mode = plain \| encrypt`, `algorithm`, **`active-key-version`**, and a **per-version key list** |
+| ✅ | A `ManagerConfigProvider` assembly path for one-shot CLI commands - the CLI reads the full unified config too, so no separate key-injection path is needed (3.5) |
+| ➕ | New section `secret-encryption`: **which provider type writes**, plus an optional subsection per provider type |
 
-- `mode` decides **the write policy only**. Reads are always decided by the value itself. The default is `plain` (opt-in).
-- **Multiple keys are injected at once, one per version.** Decryption uses the version the value names; new encryption uses `active-key-version` only. That is the whole of key rotation.
+- **There is no separate on/off switch.** Naming the provider type that writes is what turns encryption on, and naming `plain` again is what turns it off. The default is `plain`, so it is opt-in.
+- **Reads are decided by the stored value.** A value names the provider type that reads it, so returning writes to plaintext leaves already-encrypted rows readable.
+- A provider subsection that is absent leaves that provider unregistered. A subsection that is present must name its active key and carry the key list.
 
 ```toml
 [secret-encryption]
-mode = "encrypt"
-algorithm = "aes-256-gcm"
-active-key-version = "v2"
+write-provider-type = "config"        # defaults to "plain"
 
-[secret-encryption.keys]
-v1 = "<base64 32B>"   # kept for decryption only
-v2 = "<base64 32B>"   # used for new encryption
+[secret-encryption.config-provider]
+active-key-id = "v2"
+
+[secret-encryption.config-provider.keys]
+v1 = "Zn1QcOyzGX9OfSV9/XThDEPGTVFH2n0+PgZ7sDd1lDM="
+v2 = "hK8vN2pQrL4xW9cE1mYbT7uZ0aJ6dF3sG5nR8iO2kP4="
 ```
+
+A key is 32 random bytes in base64, produced by `openssl rand -base64 32`. Both the standard and url-safe alphabets are accepted. The unified config loader chain holds TOML and etcd only, so **a key cannot be supplied through an environment variable.**
 
 ### 2.2 DB (stored schema)
 
@@ -74,22 +78,26 @@ v2 = "<base64 32B>"   # used for new encryption
 |---|---|
 | ✅ | `keypairs.secret_key` = plaintext `String(40)`, nullable. `secrets.token_urlsafe(30)` fills exactly 40 characters |
 | ✅ | **No SQL query compares, filters, or sorts on `secret_key`** - every comparison happens in Python after fetching. The precondition for non-deterministic encryption is already satisfied |
-| ➕ | Widen the `secret_key` column - ciphertext necessarily exceeds 40 characters (about 120 expected; `String(255)` proposed) |
-| ➕ | **No extra metadata column.** The algorithm and key version live in the stored value's prefix (3.1) |
+| ✅ | `keypairs.ssh_private_key` in the same table is already `Text` |
+| ➕ | Change `secret_key` to `Text`. **No length limit** |
+| ➕ | **No extra metadata column.** One stored value carries everything needed to read it (3.1) |
 
-> A separate `secret_key_version` column was considered. It would let rotation progress be queried through an index, but it breaks the structure where one column type handles one value self-containedly (a type cannot see other columns). Progress queries are served well enough by a prefix `LIKE`, so the **single-column self-describing value** wins.
+> The limit is left off because it cannot be known. The size of a stored value follows two values a key provider decides: the key id it names (a GCP CryptoKey name alone runs 70-80 characters) and the size of a wrapped data encryption key. A limit on the column would turn changing providers into a migration. In PostgreSQL `varchar(n)` and `text` are stored the same way and perform the same, so a limit is pure cost. Measured against the config provider, a stored value is about 190 characters.
+
+> The existing column holds plaintext strings, so it becomes `text`.
 
 ### 2.3 Encryption layer
 
 | | Item |
 |---|---|
-| ✅ | The TypeDecorator convention in `models/base.py`, and the **`PasswordColumn` precedent** - it refuses raw string binding, demands a `PasswordInfo` value object, and performs the transformation at write time |
-| ✅ | Dependencies are already available (`cryptography` and `pycryptodome` are both in the lock file) |
-| ❌ | **There is no precedent for reversible at-rest encryption.** Zero uses of Fernet or an encrypted-string type |
-| ➕ | An `EncryptedSecretColumn` TypeDecorator - **encrypts on write, parses only on read** (3.3) |
-| ➕ | Two value objects - an encryption-request object and a stored-state object (3.3) |
-| ➕ | `SecretKeyCipher` - an injectable component that holds the per-version keys and performs decryption (3.2) |
-| ➕ | A branch for the new column type in `populate_fixture` (isomorphic to the `PasswordColumn` branch) |
+| ✅ | The TypeDecorator convention in `models/base.py`, and the **`PasswordColumn` precedent** - it refuses raw string binding and demands a value object |
+| ✅ | Dependencies are already available (`cryptography`) |
+| ❌ | **There is no precedent for reversible at-rest encryption.** |
+| ➕ | `SecretColumn` - converts between the stored string and its parsed form, and performs no cryptography (3.3) |
+| ➕ | Value types expressing the stored form (3.1) |
+| ➕ | `KeyProvider` - encrypts, decrypts, and rewraps one value (3.2) |
+| ➕ | `KeyProviderPool` - sends a read to the provider its value names, and a write to the provider designated for writes |
+| ➕ | A branch for the new column type in `populate_fixture` (fixtures carry plaintext, so they need no key) |
 
 ### 2.4 Creation and read paths
 
@@ -97,11 +105,10 @@ v2 = "<base64 32B>"   # used for new encryption
 |---|---|
 | ✅ | Creation: `generate_keypair()` from user creation, `issue_my_keypair`, admin creation, signup, the OpenID plugin, and the legacy GQL mutation |
 | ✅ | Read (hot path): the REST auth middleware core-selects the keypair row by access key, then recomputes the HMAC signature and validates JWTs |
-| ✅ | Read (rest): the keypair plugin's `/login` plaintext `compare_digest`, the keypair plugin hook's token signing, legacy GQL `KeyPair.secret_key` (consumed by the admin CLI), and the `/auth/authorize` and `/auth/signup` responses |
-| ➕ | Write paths bind an **encryption-request value object** instead of a plaintext string |
-| ➕ | Read paths get a **stored-state value object** instead of `str`, so every place that needs plaintext calls **explicit decryption** through `SecretKeyCipher` |
-| ➕ | A lazy re-encryption hook - at the decryption point, re-store in the background if the key version is not the active one (3.4) |
-| ➕ | Batch re-encryption exposed on **all three surfaces: REST API, GQL, and the admin CLI** (3.4) |
+| ✅ | Read (rest): the keypair plugin's `/login` plaintext `compare_digest`, the plugin hook's token signing, legacy GQL `KeyPair.secret_key`, and the `/auth/authorize` and `/auth/signup` responses |
+| ➕ | Write paths encrypt through a provider and bind the result. **Encryption is asynchronous, so it finishes before binding** |
+| ➕ | Read paths get a parsed value instead of `str`, and every place that needs plaintext decrypts explicitly through the pool |
+| ➕ | Batch rewrapping exposed on **all three surfaces: REST API, GQL, and the admin CLI** (3.4) |
 
 > **Every read path has to be touched.** In exchange, the column's static type is no longer `str`, so any place left unfixed fails type checking. Making it structurally impossible for a ciphertext string to flow downstream disguised as plaintext is the central benefit of this approach.
 
@@ -111,91 +118,104 @@ v2 = "<base64 32B>"   # used for new encryption
 |---|---|
 | ✅ | The alembic conventions, including the idempotency requirement for backports |
 | ✅ | A plaintext fixture (`example-keypairs.json`) and keypair generation inside alembic migrations |
-| ➕ | One column-widening migration. **No data conversion** (existing rows carry no prefix and are therefore read as plaintext) |
+| ➕ | One column type migration. **No data conversion** (existing rows carry no marker and are therefore read as plaintext) |
 | ➕ | Rollout and rollback procedure, with a warning (3.6) |
-| ➕ | A way to count rows per key version (rotation progress) |
+| ➕ | A way to count rows remaining per key id |
 
 ## 3. Implementation Design
 
-**Core flow:** on write, encrypt with the active key version and store a self-describing string. On read, the column type **parses only** and returns a value object. Where plaintext is needed, decrypt through `SecretKeyCipher`. If the key version is not the active one, lazy re-encryption converges it; batch re-encryption forces convergence.
+**Core flow:** on write, draw a fresh data encryption key per value, encrypt the value with it, wrap that key under the provider's active key, and store a self-describing string. On read the column **parses only**, and the value is decrypted through the provider it names. Rotating a key rewraps the data encryption key, so the ciphertext is never touched.
 
 ### 3.1 Stored format (self-describing)
 
 ```
-bai:enc:1:<algo>:<key_version>:<nonce_b64u>:<ciphertext_b64u>
+bai-enc:1:<provider type>:<key id>:<wrapped data key>:<nonce>:<ciphertext>
 ```
 
 | Field | Meaning |
 |---|---|
-| `bai:enc:1` | Magic plus **format version**. Without this prefix, the value is legacy plaintext |
-| `algo` | AEAD algorithm identifier (v1: `a256gcm`) |
-| `key_version` | Key of the configured key list (e.g. `v1`, `v2`) |
-| `nonce` | Freshly drawn per encryption |
-| `ciphertext` | Ciphertext plus authentication tag |
+| `bai-enc` | Marker. Without it, the value is legacy plaintext |
+| `1` | Format version |
+| provider type | The provider that reads this value. `plain` cannot appear, since plaintext is stored without the marker |
+| key id | Which key within that provider. **The provider defines it** |
+| wrapped data key | This value's own data encryption key, wrapped under the provider's key |
+| nonce | Freshly drawn per encryption |
+| ciphertext | Ciphertext plus authentication tag |
 
-- **Legacy detection**: an existing secret key is `token_urlsafe` output and cannot contain `:`, so it never collides with the prefix.
-- **AAD**: the column type instance uses its own context string (e.g. `keypairs.secret_key`) as AAD, which blocks transplanting a ciphertext from another column or table.
-- **Integrity**: no separate plaintext hash. **The AEAD authentication tag detects both a wrong key and tampering.**
-- **Rotation progress**: `WHERE secret_key LIKE 'bai:enc:1:a256gcm:v1:%'` counts the rows per key version. When it reaches zero, that key can be dropped from the config.
-- The format-version field means that if a KMS later requires a different structure, a v2 format can be added and coexist.
+- **Legacy detection**: an existing secret key is `token_urlsafe` output and cannot contain `:`, so it never collides with the marker.
+- **AAD**: the column's name is the associated data, which blocks transplanting a value from another column.
+- **Integrity**: no separate plaintext hash. The AEAD authentication tag detects both a wrong key and tampering.
+- **No algorithm field.** The format version implies the algorithm; changing the algorithm bumps that version.
+- **No length prefixes.** The three trailing fields are base64url and carry no delimiter, so splitting them off from the right is unambiguous. That is what lets a provider-defined key id contain delimiters.
+- **A data encryption key belongs to one row.** Two users' values are never encrypted under the same key.
+- The format version is a branch on read. A new version **adds** a branch rather than replacing one, so values written by older builds keep parsing.
 
-### 3.2 Key lookup and decryption (`SecretKeyCipher`)
+### 3.2 Key providers and the pool
 
-An **injectable component** holding the per-version keys. It depends on no global state.
+A `KeyProvider` works **on one value**. Which key id it writes under and how it wraps a data encryption key are its own business; a stored value names only which provider to hand it back to.
 
 | Method | Contract |
 |---|---|
-| `active_version()` | The key version to use for new encryption |
-| `encrypt_request(plaintext)` | Builds the **value object to bind** for encryption under the active key (3.3) |
-| `decrypt(stored)` | Turns a stored-state object into plaintext. Returns it as-is when the state is plaintext |
+| `provider_type()` | The type written into stored values |
+| `encrypt(plaintext, context)` | Encrypts a new value under this provider's current key |
+| `decrypt(value, context)` | Recovers the plaintext of a value this provider wrote |
+| `rewrap(value, context)` | Moves a value onto this provider's current key. **Only the wrapped data encryption key changes, so the plaintext is never produced** |
 
-- Key lookup sits behind a **`SecretKeyProvider` interface**. There is **exactly one implementation** for now (config); a KMS attaches to the same interface later.
-- An unknown key version raises rather than being silently passed through (a `BackendAIError` subclass).
-- Decryption is pure CPU work against an in-memory key, with no remote I/O, so it is safe on the authentication hot path.
+There is one implementation for now, backed by the config. It draws a data encryption key per value, encrypts the value with it, and wraps that key under the active key. A KMS attaches to the same interface later.
 
-**Injection points**: decryption is needed in the auth middleware, the keypair plugin (login comparison and token signing), the auth service (login response), and legacy GQL resolvers. The principle is to **decrypt at the repository boundary and pass data objects upward**; where a core select is used directly, as in the auth middleware, the cipher is injected there.
+`KeyProviderPool` holds the registered providers and the one designated for writes.
 
-### 3.3 Column type and value objects
+- A read goes to the provider its value names. Without a marker the value is plaintext and is returned as is.
+- A write goes to the designated provider. When that is `plain`, the value is stored unencrypted.
+- An unknown provider type, or one that is not configured, raises.
 
-The shape mirrors `PasswordColumn`: it **refuses raw `str` binding** and demands a value object.
+**Injection points**: decryption is needed in the auth middleware, the keypair plugin (login comparison and token signing), the auth service, and legacy GQL resolvers. The principle is to **decrypt at the repository boundary and pass data objects upward**; where a core select is used directly, as in the auth middleware, the pool is injected there.
+
+Decryption is pure CPU work against an in-memory key, with no remote I/O, so it is safe on the authentication hot path.
+
+### 3.3 Column type
+
+`SecretColumn` converts between the stored string and its parsed form and **performs no cryptography**. Encrypting needs a key provider and is asynchronous, which SQLAlchemy's synchronous bind hook cannot do, so a value is already encrypted when it reaches the column.
 
 | Direction | Input/output | What the column does |
 |---|---|---|
-| Write | Bind an encryption-request object (plaintext + target key version + key material) | **Performs encryption** and serializes to the 3.1 format. Stores plaintext as-is when `mode=plain` |
-| Read | Return a stored-state object | **Parses only.** With a prefix, splits into algorithm, key version, nonce, and ciphertext; without one, marks it plaintext |
+| Write | Bind a parsed value | Serializes it to the stored string. **Refuses anything but a parsed value** |
+| Read | Return a parsed value | Parses the stored string, marking a value without the marker as plaintext |
 
-- **Why reads do not decrypt**: decryption needs a key, and the column type's result-conversion point has no sensible way to receive one (it would require process-global state). Writes, by contrast, **carry the key material in the bound value object, so no global injection is needed.** This asymmetry is the rationale for the design.
-- The stored-state object holds the `key_version` (absent when plaintext) and the original string; `SecretKeyCipher` performs the decryption. Plaintext rows and ciphertext rows are **expressed by a single type**, so consumers do not branch.
-- The value objects default to frozen dataclasses (there is no serialization requirement). Exact names and fields are the implementer's discretion.
-- Both value objects carry a representation that does not expose plaintext, guarding against logging and `repr` accidents.
+- Refusing a raw `str` is what keeps a plaintext string from being stored by accident.
+- The column's `context` argument is its own name, and is what callers pass the provider as associated data. **It must be a plain attribute rather than a private one** - SQLAlchemy builds a type's statement cache key from the `__init__` arguments it finds as plain attributes, so hiding it would let two columns share a cache key and a compiled statement bind a value under another column's associated data.
+- Plaintext rows and encrypted rows are **expressed by a single type**, so consumers do not branch.
+- The value types are frozen dataclasses, and neither plaintext nor key material appears in `repr`.
 
-### 3.4 Key rotation and re-encryption
+### 3.4 Key rotation and rewrapping
 
-Rotating a key is **adding a new versioned key to the config and changing `active-key-version`** - nothing more. The old key stays for decryption only.
+Rotating a key is **adding a new key to the config and changing the active key id**. The old key stays for decryption only.
 
-**Definition of re-encryption**: read the stored value to obtain plaintext (as-is when plaintext, otherwise decrypted with the key version the value names), then encrypt that plaintext again under the **active key version with a freshly drawn nonce** and overwrite. Nonces are never reused - reusing a nonce under the same key destroys confidentiality in GCM, so a fresh nonce is drawn even when re-encrypting the same plaintext.
+**Definition of rewrapping**: unwrap the value's data encryption key under the old key and wrap it again under the active one. **The data encryption key, the ciphertext, and the nonce are all unchanged** - only about sixty bytes per value differ. The plaintext is never produced, so the work needs no permission to read the values.
 
-**The default is lazy re-encryption**, converging gradually by checking the key version at the decryption point.
+Because each row has its own data encryption key, that key never needs rotating: a new one is drawn on every write, leaving only the key that wraps it to rotate.
 
-| Condition | Action |
+An old key left in the config keeps its values readable. Convergence is needed when that key is to be dropped, and a batch pass is what does it.
+
+The batch takes no direction flag.
+
+| Write target | What the batch does |
 |---|---|
-| Plaintext state, `mode=encrypt` | Encrypt under the active key and re-store |
-| `key_version` != active version, `mode=encrypt` | Decrypt, then re-store under the active key |
-| `key_version` == active version | Nothing |
-| `mode=plain` | No re-store. **No automatic conversion to plaintext either** (ciphertext keeps being decrypted on read) |
+| A provider | Moves plaintext rows and rows on an old key onto the active key |
+| `plain` | Returns encrypted rows to plaintext |
 
-Re-encryption has exactly two constraints to honor.
+Turning ciphertext back into plaintext is not a separate feature but a consequence of the setting.
+
+Rewrapping has one constraint to honor.
 
 | Constraint | Reason |
 |---|---|
-| **Conditional UPDATE** - overwrite only if the stored value is still the exact string just read | If **the keypair is reissued between the read and the re-store, stale plaintext would overwrite the new value.** The condition prevents that. When multiple managers race on the same row, one succeeds and the rest are harmless no-ops |
-| **Performed outside the reading transaction** | The auth middleware queries the keypair in a read-only transaction and cannot write inside it, so this is split into a background task on a separate session |
+| **Conditional UPDATE** - overwrite only if the stored value is still the exact string just read | If **the keypair is reissued between the read and the write, a stale value would overwrite the new one.** The condition prevents that. When several managers race on one row, one succeeds and the rest are harmless no-ops |
 
-- Re-encryption **never blocks the authentication response path.** It is best-effort; failures leave a log and a metric while authentication still succeeds.
-- Total write volume is **one write per row**, a one-off load proportional to the number of keypairs. After convergence the condition is false, so no extra writes remain on the hot path.
-- Since the update does not change the value, a failure loses no consistency. The next read retries it.
+- Total write volume is **one write per row**, a one-off load proportional to the number of keypairs.
+- Since the value does not change, a failure loses no consistency. The next run retries it.
 
-**Batch re-encryption** is the way to force convergence: dropping a key requires zero rows on that version, and lazy convergence leaves rarely used keys behind. **All three surfaces are provided.**
+**The batch is provided on all three surfaces.**
 
 | Surface | Use |
 |---|---|
@@ -203,16 +223,7 @@ Re-encryption has exactly two constraints to honor.
 | GQL mutation (admin) | Management console integration |
 | `mgr` admin CLI | Run directly outside the server, for migration work |
 
-Common requirements: sweep the target column **in chunks, resumably**, report remaining counts per key version, and allow the run's status to be queried.
-
-**The batch is a single operation that normalizes storage to whatever the current config specifies.** There is no direction mode or flag.
-
-| `mode` | What the batch does |
-|---|---|
-| `encrypt` | Encrypts plaintext rows and old-version rows under the active key |
-| `plain` | Decrypts ciphertext rows back to plaintext |
-
-Going from ciphertext back to plaintext is not an actual operational requirement but **a generalization that falls out of the config**. No separate feature is built for it, so it costs nothing extra. The automatic path, lazy re-encryption, still does nothing under `mode=plain` - to avoid surprises, **conversion to plaintext happens only through an explicit batch run**.
+Common requirements: sweep the target column **in chunks, resumably**, report remaining counts per key id, and allow the run's status to be queried.
 
 ### 3.5 Where the key material lives
 
@@ -221,46 +232,54 @@ Going from ciphertext back to plaintext is not an actual operational requirement
 | Process | Needs the key | Basis |
 |---|---|---|
 | Manager server | Yes | Reaches unified config through `ManagerConfigProvider` |
-| `mgr` CLI (batch re-encryption) | Yes | A `ManagerConfigProvider` assembly path for one-shot CLI commands already exists (TOML plus etcd loader chain); `clear-history` and others use it |
-| alembic | **No** | Column widening only, no data conversion |
-| Fixture population | **No** | Written as plaintext and left to lazy re-encryption |
+| `mgr` CLI (batch rewrapping) | Yes | A `ManagerConfigProvider` assembly path for one-shot CLI commands already exists |
+| alembic | **No** | Column type change only, no data conversion |
+| Fixture population | **No** | Written as plaintext and moved later by a batch pass |
 
-Because reads do not decrypt, the bootstrap stages (alembic, fixtures) depend on the key not at all.
+Because reads only parse, the bootstrap stages (alembic, fixtures) depend on the key not at all.
+
+Holding the keys in etcd instead of the file takes no code change. etcd is already in the unified config loader chain, and a watcher that revalidates the whole unified config on change already runs. etcd is a separate store from PostgreSQL, so the threat model of "the DB leaking on its own" still holds.
 
 ### 3.6 Migration and rollout
 
-The migration is **one column widening** with no data conversion. It is written idempotently for backports.
+The migration is **one column type change** with no data conversion, written idempotently for backports. `varchar(40)` to `text` is binary coercible, so no table rewrite happens, and this column carries no index.
 
 Rollout order:
 
-1. Deploy the code (column type applied, `mode=plain`). Storage behavior does not change.
-2. Configure keys, then set `mode=encrypt`. New keypairs are stored encrypted; existing rows converge as they are read.
-3. Force convergence with batch re-encryption if needed.
+1. Deploy the code (column type applied, writes still `plain`). Storage behavior does not change.
+2. Configure keys, then name the write provider type. New keypairs are stored encrypted.
+3. Move existing rows with a batch pass if needed.
 
-**Rollback warning**: rolling back to step 1 is safe (all rows are plaintext). But **rolling back to an older build after step 2 breaks authentication, because ciphertext is mistaken for plaintext.** Reverting requires completing a batch decryption first. State this in the release notes.
+**Rollback warning**: rolling back to step 1 is safe (all rows are plaintext). But **rolling back to an older build after step 2 breaks authentication, because ciphertext is mistaken for plaintext.** Reverting requires setting the write target back to `plain` and completing a batch conversion first. State this in the release notes.
 
-**Performance**: AES-256-GCM decryption is microseconds per request against an in-memory key, so it has no meaningful effect on the authentication hot path.
+**Performance**: decryption is microseconds against an in-memory key, so it has no meaningful effect on the authentication hot path. Reading one value performs two AES operations - unwrapping the data encryption key and decrypting the value.
 
 ## Decision Summary
 
 | Decision | Content |
 |---|---|
-| Mode | Global config `plain \| encrypt`, default `plain` (opt-in). **Decides the write policy only; reads are decided by the value** |
-| Stored format | Single-column self-describing `bai:enc:<format version>:<algo>:<key_version>:<nonce>:<ct>`. No prefix means legacy plaintext |
-| Extra metadata column | None. Rotation progress is queried with a prefix `LIKE` |
-| Column type | Isomorphic to `PasswordColumn`. **Write = take a value object and encrypt; read = parse only, never decrypt** |
-| Decryption site | Explicit calls through an injected `SecretKeyCipher` where plaintext is needed. Every read path is modified, and anything missed fails type checking |
-| Algorithm | AEAD (AES-256-GCM). No separate plaintext hash; the authentication tag detects a wrong key and tampering. AAD binds the column context |
-| Key management | **Inject multiple per-version keys and name an `active-key-version`.** Decrypt with the version the value names, encrypt with the active one |
-| Key-lookup abstraction | A `SecretKeyProvider` interface with exactly one implementation (config). **KMS is out of scope here** |
-| Key rotation | Adding a new version to the config and changing `active-key-version` is the whole procedure. Re-encryption re-stores the read plaintext under the **active key with a fresh nonce** |
-| Re-encryption constraints | **Conditional UPDATE** (guards against a reissue race) plus **a background write outside the reading transaction**. Authentication succeeds even on failure |
+| Turning it on and off | No separate switch. **Naming the write provider type** turns it on, and naming `plain` turns it off. The default is `plain` |
+| Reads | **Decided by the stored value.** A value names the provider that reads it, so reads are independent of the write setting |
+| Stored format | Single-column self-describing `bai-enc:<format version>:<provider type>:<key id>:<wrapped data key>:<nonce>:<ciphertext>`. No marker means legacy plaintext |
+| Algorithm field | None. The format version implies it |
+| Length prefixes | None. The three trailing fields are base64url, so splitting from the right is unambiguous |
+| Extra metadata column | None |
+| Scope of a data encryption key | **One row.** Two users' values are never encrypted under the same key |
+| Column type | Converts between the stored string and its parsed form only. **It performs no cryptography** - encryption is asynchronous and finishes before binding. A raw string is refused |
+| Decryption site | Explicit calls through the pool where plaintext is needed. Every read path is modified, and anything missed fails type checking |
+| Algorithm | AEAD (AES-256-GCM). No separate plaintext hash. The column's name is bound as associated data |
+| Key management | Each provider holds keys by id and names an active id. Decrypt with the id the value names, wrap new values under the active one |
+| Key provider abstraction | `KeyProvider` encrypts, decrypts, and rewraps one value. There is one config-backed implementation, and a KMS attaches to the same interface later |
+| Key rotation | Adding a key to the config and changing the active id is the whole procedure. **Rewrapping touches neither the ciphertext nor the plaintext** |
+| Immediate convergence | Not performed. An old key left in the config keeps its values readable, and convergence happens in a batch when that key is dropped |
+| Rewrapping constraint | **Conditional UPDATE** (guards against a reissue race) |
 | Batch surfaces | **REST admin API, GQL mutation, and the `mgr` admin CLI - all three.** Chunked, resumable, progress-reporting |
-| Batch direction | No direction flag. It **normalizes to whatever the current `mode` specifies**, so `plain` yields conversion to plaintext as a consequence. Nothing converts automatically (lazy does nothing under `plain`) |
-| Backward compatibility | Plaintext and ciphertext rows coexist indefinitely. No bulk conversion, forced re-login, or key reissue |
-| Key material location | **The new unified-config section alone is enough.** The CLI reads it through the same provider assembly path, and alembic and fixtures need no key |
+| Batch direction | No direction flag. It **normalizes to whatever the current write target specifies**, so `plain` yields conversion to plaintext |
+| Column type change | `String(40)` to `Text`, **with no length limit** - the stored size follows the provider implementation, so no limit can be known. `varchar` to `text` needs no table rewrite |
+| Backward compatibility | Plaintext and encrypted rows coexist indefinitely. No bulk conversion, forced re-login, or key reissue |
+| Key material location | **The new unified-config section alone is enough.** The CLI reads it through the same assembly path, alembic and fixtures need no key, and etcd works without code changes |
 | First target | The single column `keypairs.secret_key` |
-| Out of scope | KMS, `ssh_private_key`, exposure-path reduction (BEP-1068), the Valkey and webserver session copies, secret columns in other tables and components |
+| Out of scope | KMS, `ssh_private_key`, exposure-path reduction (BEP-1068), the Valkey and webserver copies, secret columns in other tables and components |
 
 ## Open Questions
 

@@ -77,7 +77,7 @@ async def _calculate_role_in_scope_for_suadmin(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
     from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+    from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
     from ai.backend.manager.models.user import UserRow
 
     match scope:
@@ -94,17 +94,17 @@ async def _calculate_role_in_scope_for_suadmin(
                 return frozenset([PredefinedRole.ADMIN])
             return _EMPTY_FSET
         case ProjectScope(project_id):
-            stmt = (
-                sa.select(GroupRow)
-                .where(GroupRow.id == project_id)
+            project_stmt = (
+                sa.select(ProjectRow)
+                .where(ProjectRow.id == project_id)
                 .options(
-                    selectinload(GroupRow.users),
+                    selectinload(ProjectRow.users),
                     with_loader_criteria(
                         AssocGroupUserRow, AssocGroupUserRow.user_id == ctx.user_id
                     ),
                 )
             )
-            project_row = cast(GroupRow | None, await db_session.scalar(stmt))
+            project_row = cast(ProjectRow | None, await db_session.scalar(project_stmt))
             if project_row is None:
                 return _EMPTY_FSET
             result = frozenset([PredefinedRole.ADMIN])
@@ -114,10 +114,10 @@ async def _calculate_role_in_scope_for_suadmin(
         case UserScope(user_id):
             if ctx.user_id == user_id:
                 return frozenset([PredefinedRole.OWNER])
-            stmt = (
+            user_stmt = (
                 sa.select(UserRow).where(UserRow.uuid == user_id).options(load_only(UserRow.uuid))
             )
-            user_row = cast(UserRow | None, await db_session.scalar(stmt))
+            user_row = cast(UserRow | None, await db_session.scalar(user_stmt))
             if user_row is not None:
                 return frozenset([PredefinedRole.ADMIN])
             return _EMPTY_FSET
@@ -127,7 +127,7 @@ async def _calculate_role_in_scope_for_monitor(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
     from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+    from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
     from ai.backend.manager.models.user import UserRow
 
     match scope:
@@ -144,18 +144,18 @@ async def _calculate_role_in_scope_for_monitor(
                 return frozenset([PredefinedRole.MONITOR])
             return _EMPTY_FSET
         case ProjectScope(project_id):
-            stmt = (
-                sa.select(GroupRow)
-                .where(GroupRow.id == project_id)
+            project_stmt = (
+                sa.select(ProjectRow)
+                .where(ProjectRow.id == project_id)
                 .options(
-                    load_only(GroupRow.id, GroupRow.domain_name),
-                    selectinload(GroupRow.users),
+                    load_only(ProjectRow.id, ProjectRow.domain_name),
+                    selectinload(ProjectRow.users),
                     with_loader_criteria(
                         AssocGroupUserRow, AssocGroupUserRow.user_id == ctx.user_id
                     ),
                 )
             )
-            project_row = cast(GroupRow | None, await db_session.scalar(stmt))
+            project_row = cast(ProjectRow | None, await db_session.scalar(project_stmt))
             if project_row is None:
                 return _EMPTY_FSET
             if project_row.domain_name == ctx.domain_name:
@@ -168,10 +168,10 @@ async def _calculate_role_in_scope_for_monitor(
         case UserScope(user_id):
             if ctx.user_id == user_id:
                 return frozenset([PredefinedRole.OWNER])
-            stmt = (
+            user_stmt = (
                 sa.select(UserRow).where(UserRow.uuid == user_id).options(load_only(UserRow.uuid))
             )
-            user_row = cast(UserRow | None, await db_session.scalar(stmt))
+            user_row = cast(UserRow | None, await db_session.scalar(user_stmt))
             if user_row is not None:
                 return frozenset([PredefinedRole.MONITOR])
             return _EMPTY_FSET
@@ -180,7 +180,7 @@ async def _calculate_role_in_scope_for_monitor(
 async def _calculate_role_in_scope_for_admin(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
-    from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+    from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
     from ai.backend.manager.models.user import UserRow
 
     match scope:
@@ -191,18 +191,18 @@ async def _calculate_role_in_scope_for_admin(
                 return frozenset([PredefinedRole.ADMIN])
             return _EMPTY_FSET
         case ProjectScope(project_id):
-            stmt = (
-                sa.select(GroupRow)
-                .where(GroupRow.id == project_id)
+            project_stmt = (
+                sa.select(ProjectRow)
+                .where(ProjectRow.id == project_id)
                 .options(
-                    load_only(GroupRow.id, GroupRow.domain_name),
-                    selectinload(GroupRow.users),
+                    load_only(ProjectRow.id, ProjectRow.domain_name),
+                    selectinload(ProjectRow.users),
                     with_loader_criteria(
                         AssocGroupUserRow, AssocGroupUserRow.user_id == ctx.user_id
                     ),
                 )
             )
-            project_row = cast(GroupRow | None, await db_session.scalar(stmt))
+            project_row = cast(ProjectRow | None, await db_session.scalar(project_stmt))
             if project_row is None:
                 return _EMPTY_FSET
 
@@ -219,15 +219,13 @@ async def _calculate_role_in_scope_for_admin(
             if domain_name is not None:
                 _domain_name = domain_name
             else:
-                stmt = (
+                user_stmt = (
                     sa.select(UserRow)
                     .where(UserRow.uuid == user_id)
                     .options(load_only(UserRow.domain_name))
                 )
-                user_row = cast(UserRow | None, await db_session.scalar(stmt))
+                user_row = cast(UserRow | None, await db_session.scalar(user_stmt))
                 if user_row is None:
-                    return _EMPTY_FSET
-                if user_row.domain_name is None:
                     return _EMPTY_FSET
                 _domain_name = user_row.domain_name
             if _domain_name == ctx.domain_name:
@@ -238,7 +236,7 @@ async def _calculate_role_in_scope_for_admin(
 async def _calculate_role_in_scope_for_user(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
-    from ai.backend.manager.models.group import AssocGroupUserRow
+    from ai.backend.manager.models.project import AssocGroupUserRow
 
     match scope:
         case SystemScope():
@@ -444,7 +442,7 @@ class ImageRegistry(ExtraScope):
 
 
 @dataclass(frozen=True)
-class ScalingGroup(ExtraScope):
+class ResourceGroup(ExtraScope):
     name: str
 
 

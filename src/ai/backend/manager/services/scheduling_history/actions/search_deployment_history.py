@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -21,27 +21,24 @@ class SearchDeploymentHistoryAction(SchedulingHistoryAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.DEPLOYMENT_HISTORY
+        return DEPLOYMENT_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_deployment_history"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass
-class SearchDeploymentHistoryActionResult(BaseActionResult):
+class SearchDeploymentHistoryActionResult:
     """Result of searching deployment history."""
 
     histories: list[DeploymentHistoryData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

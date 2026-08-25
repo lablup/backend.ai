@@ -184,6 +184,7 @@ class ErrorDomain(enum.StrEnum):
     STORAGE_PROXY = "storage-proxy"
     APPPROXY = "appproxy"
     MESSAGE_QUEUE = "message-queue"
+    EVENT = "event"
     NOTIFICATION = "notification"
     HEALTH_CHECK = "health-check"
     KEYPAIR_RESOURCE_POLICY = "keypair-resource-policy"
@@ -193,7 +194,9 @@ class ErrorDomain(enum.StrEnum):
     PROMETHEUS_QUERY_PRESET_CATEGORY = "prometheus-query-preset-category"
     RUNTIME_VARIANT = "runtime-variant"
     ROLE_INVITATION = "role-invitation"
+    ENTITY_INVITATION = "entity-invitation"
     RETENTION_POLICY = "retention-policy"
+    SECRET = "secret"
 
     EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
 
@@ -821,7 +824,7 @@ class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ScalingGroupConflict(BackendAIError, web.HTTPConflict):
+class ResourceGroupConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-scaling-group"
     error_title = "Duplicate Scaling Group"
 

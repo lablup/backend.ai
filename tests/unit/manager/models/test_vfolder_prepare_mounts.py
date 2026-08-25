@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
@@ -10,6 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import (
     BinarySize,
     QuotaScopeID,
@@ -28,13 +30,14 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -43,7 +46,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import (
@@ -119,7 +121,7 @@ class TestPrepareVFolderMountsSubpathFlow:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -127,7 +129,7 @@ class TestPrepareVFolderMountsSubpathFlow:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 VFolderRow,
                 VFolderPermissionRow,
@@ -159,6 +161,7 @@ class TestPrepareVFolderMountsSubpathFlow:
 
         Yields ``(user_uuid, domain_name, group_id, vfolder_id)``.
         """
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid4().hex[:8]}"
         user_policy_name = f"test-user-pol-{uuid4().hex[:8]}"
         project_policy_name = f"test-proj-pol-{uuid4().hex[:8]}"
@@ -168,6 +171,7 @@ class TestPrepareVFolderMountsSubpathFlow:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -207,10 +211,11 @@ class TestPrepareVFolderMountsSubpathFlow:
                     status=UserStatus.ACTIVE,
                     status_info="active",
                     resource_policy=user_policy_name,
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"g-{group_id.hex[:6]}",
                     description="",

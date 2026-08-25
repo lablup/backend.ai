@@ -9,13 +9,13 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetFilter,
     RolePermissionPresetOrder,
     SearchRolePermissionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
-from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,

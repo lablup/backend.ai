@@ -4,8 +4,8 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
-from ai.backend.manager.data.app_config_allow_list.types import (
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
+from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
 )
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
@@ -14,7 +14,7 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 __all__ = ("AppConfigAllowListRow",)
 
 
-class AppConfigAllowListRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class AppConfigAllowListRow(LifecycleTimestampsMixin, Base):
     """Permission to write config fragments for one config name at one scope type.
 
     A config fragment may be created only when a matching row exists here.

@@ -3,19 +3,15 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, override
-from uuid import UUID
-
-import sqlalchemy as sa
+from typing import Any
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
@@ -24,11 +20,10 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scheduling_history.creators import (
+    DeploymentHistoryCreator,
+    RouteHistoryCreator,
+)
 
 
 @dataclass
@@ -44,7 +39,7 @@ class EndpointCreationArgs:
     runtime_variant: str
     desired_session_count: int
     resource_opts: dict[str, Any] | None = None
-    scaling_group: str | None = None
+    resource_group: str | None = None
 
 
 @dataclass
@@ -147,31 +142,17 @@ class RouteServiceDiscoveryInfo:
     project: uuid.UUID
 
 
-@dataclass(frozen=True)
-class ProjectDeploymentSearchScope(SearchScope):
-    """Required scope for searching endpoints within a project.
+@dataclass
+class RouteHistoryToCreate:
+    """One replica transition to record, under the deployment it serves."""
 
-    Used for project-scoped deployment search (project admin).
-    """
+    deployment_id: DeploymentID
+    creator: RouteHistoryCreator
 
-    project_id: UUID
 
-    @override
-    def to_condition(self) -> QueryCondition:
-        project_id = self.project_id
+@dataclass
+class DeploymentHistoryToCreate:
+    """One deployment transition to record, under the deployment it is about."""
 
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.project == project_id
-
-        return inner
-
-    @property
-    @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
-        return [
-            ExistenceCheck(
-                column=GroupRow.id,
-                value=self.project_id,
-                error=ProjectNotFound(str(self.project_id)),
-            ),
-        ]
+    deployment_id: DeploymentID
+    creator: DeploymentHistoryCreator

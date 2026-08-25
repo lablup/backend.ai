@@ -6,8 +6,8 @@ import pytest
 
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_group import ResourceGroupForKeypairsRow, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import ExportFieldDef
@@ -39,8 +39,8 @@ class TestKeypairReportDefinition:
         assert KEYPAIR_REPORT.select_from is KeyPairRow.__table__
 
     def test_total_field_count(self) -> None:
-        """Should have 37 fields total (6 basic + 31 relationship)."""
-        assert len(KEYPAIR_REPORT.fields) == 37
+        """Should have 38 fields total (7 basic + 31 relationship)."""
+        assert len(KEYPAIR_REPORT.fields) == 38
 
 
 class TestKeypairFieldDefinitions:
@@ -57,6 +57,7 @@ class TestKeypairFieldDefinitions:
             "access_key",
             "is_active",
             "is_admin",
+            "is_default",
             "created_at",
             "modified_at",
             "last_used",
@@ -138,11 +139,11 @@ class TestJoinDefinitions:
 
     def test_sgroup_for_keypair_join_table(self) -> None:
         """ScalingGroupForKeypairs JOIN should use correct table."""
-        assert SGROUP_FOR_KEYPAIR_JOIN.table is ScalingGroupForKeypairsRow.__table__
+        assert SGROUP_FOR_KEYPAIR_JOIN.table is ResourceGroupForKeypairsRow.__table__
 
     def test_resource_group_join_table(self) -> None:
-        """Resource group JOIN should use ScalingGroupRow table."""
-        assert RESOURCE_GROUP_JOIN.table is ScalingGroupRow.__table__
+        """Resource group JOIN should use ResourceGroupRow table."""
+        assert RESOURCE_GROUP_JOIN.table is ResourceGroupRow.__table__
 
     def test_session_join_table(self) -> None:
         """Session JOIN should use SessionRow table."""
@@ -163,6 +164,7 @@ class TestFieldJoinAssignments:
             "access_key",
             "is_active",
             "is_admin",
+            "is_default",
         ]
         for key in basic_keys:
             field = fields_by_key[key]

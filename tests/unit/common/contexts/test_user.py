@@ -8,6 +8,7 @@ from ai.backend.common.contexts.user import (
     with_triggered_user,
     with_user,
 )
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 
 
@@ -23,6 +24,7 @@ def test_triggered_user_inside_context() -> None:
         is_superadmin=False,
         role=UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
     with with_triggered_user(user):
         assert triggered_user() == user
@@ -37,6 +39,7 @@ def test_current_and_triggered_are_independent() -> None:
         is_superadmin=False,
         role=UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
     trigger = UserData(
         user_id=uuid.uuid4(),
@@ -45,6 +48,7 @@ def test_current_and_triggered_are_independent() -> None:
         is_superadmin=True,
         role=UserRole.SUPERADMIN,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
     with with_user(effective), with_triggered_user(trigger):
         assert current_user() == effective
@@ -61,6 +65,7 @@ def test_nested_triggered_user_restores_previous() -> None:
         is_superadmin=False,
         role=UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
     inner = UserData(
         user_id=uuid.uuid4(),
@@ -69,6 +74,7 @@ def test_nested_triggered_user_restores_previous() -> None:
         is_superadmin=False,
         role=UserRole.ADMIN,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
     with with_triggered_user(outer):
         assert triggered_user() == outer

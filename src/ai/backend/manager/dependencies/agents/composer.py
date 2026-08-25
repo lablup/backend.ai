@@ -32,7 +32,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.deployment_revision_preset.repository import (
-        DeploymentRevisionPresetRepository,
+        DeploymentPresetRepository,
     )
 
 from .agent_client_pool import AgentClientPoolDependency, AgentClientPoolInput
@@ -63,7 +63,7 @@ class AgentsInput:
     network_plugin_ctx: NetworkPluginContext
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
-    deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
+    deployment_revision_preset_repository: DeploymentPresetRepository | None
     runtime_variant_repository: RuntimeVariantRepository
     agent_selector: AgentSelector
 

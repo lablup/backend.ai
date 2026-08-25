@@ -3,13 +3,15 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import cast
 from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -23,6 +25,9 @@ from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyRow,
 )
@@ -31,15 +36,21 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -48,24 +59,20 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.container_registry.creators import (
-    ContainerRegistryCreatorSpec,
-)
-from ai.backend.manager.repositories.container_registry.purgers import ContainerRegistryPurgerSpec
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.container_registry.updaters import (
-    ContainerRegistryUpdaterSpec,
+from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
+    ContainerRegistryOpsProvider,
 )
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
@@ -103,7 +110,7 @@ class _RegistryWithGroups:
     """Registry with associated group IDs."""
 
     registry: ContainerRegistryData
-    group_ids: list[UUID]
+    group_ids: list[ProjectID]
 
 
 class TestContainerRegistryRepository:
@@ -119,7 +126,7 @@ class TestContainerRegistryRepository:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -127,7 +134,7 @@ class TestContainerRegistryRepository:
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
@@ -145,6 +152,14 @@ class TestContainerRegistryRepository:
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
                 AssociationScopesEntitiesRow,
+                PermissionRow,
+                RolePresetRow,
+                RolePermissionPresetRow,
+                # The registry's owner virtual scope and the allowed-project edges
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityLabelRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -152,7 +167,9 @@ class TestContainerRegistryRepository:
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
         """Create ContainerRegistryRepository instance with real database"""
-        return ContainerRegistryRepository(db=db_with_cleanup)
+        return ContainerRegistryRepository(
+            db=db_with_cleanup, ops_provider=ContainerRegistryOpsProvider(db_with_cleanup)
+        )
 
     @pytest.fixture
     async def sample_domain(
@@ -166,10 +183,10 @@ class TestContainerRegistryRepository:
     @pytest.fixture
     async def sample_groups(
         self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: DomainFixtureData
-    ) -> list[UUID]:
+    ) -> list[ProjectID]:
         """Pre-created 2 groups with required policies. Depends on sample_domain.domain_name."""
         resource_policy_name = f"test-policy-{sample_domain.domain_name}"
-        group_ids: list[UUID] = []
+        group_ids: list[ProjectID] = []
 
         async with db_with_cleanup.begin_session() as session:
             # Create resource policies
@@ -192,7 +209,7 @@ class TestContainerRegistryRepository:
 
             # Create 2 groups
             for i in range(2):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}",
                     domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -213,7 +230,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -234,7 +251,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -259,7 +276,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -302,14 +319,14 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry1 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
                 project="project-" + str(uuid.uuid4())[:8],
             )
             registry2 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -350,14 +367,14 @@ class TestContainerRegistryRepository:
             registry2_name = str(uuid.uuid4())[:8] + ".example.com"
 
             registry1 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry1_name}",
                 registry_name=registry1_name,
                 type=ContainerRegistryType.HARBOR2,
                 project="project-" + str(uuid.uuid4())[:8],
             )
             registry2 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry2_name}",
                 registry_name=registry2_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -385,39 +402,37 @@ class TestContainerRegistryRepository:
         assert len(result) == 2
 
     @pytest.fixture
-    async def creator(self) -> Creator[ContainerRegistryRow]:
+    async def creator(self) -> ContainerRegistryCreator:
         """Fixture that provides a minimal creator spec for creating registries."""
-        return Creator(
-            spec=ContainerRegistryCreatorSpec(
-                url="https://minimal.example.com",
-                type=ContainerRegistryType.HARBOR2,
-                registry_name="minimal-registry",
-                project="minimal-project",
-            )
+        return ContainerRegistryCreator(
+            url="https://minimal.example.com",
+            type=ContainerRegistryType.HARBOR2,
+            registry_name="minimal-registry",
+            project="minimal-project",
         )
 
     async def test_create_registry_minimal(
         self,
         repository: ContainerRegistryRepository,
-        creator: Creator[ContainerRegistryRow],
+        creator: ContainerRegistryCreator,
     ) -> None:
         """Test creating registry with minimal required fields"""
         # When
         result = await repository.create_registry(creator)
 
         # Then - Verify result
-        spec: ContainerRegistryCreatorSpec = cast(ContainerRegistryCreatorSpec, creator.spec)
         assert result is not None
-        assert result.registry_name == spec.registry_name
-        assert result.url == spec.url
-        assert result.type == spec.type
-        assert result.project == spec.project
+        assert result.registry_name == creator.registry_name
+        assert result.url == creator.url
+        assert result.type == creator.type
+        assert result.project == creator.project
         assert result.id is not None
 
     @pytest.fixture
     async def creator_spec_with_allowed_groups(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> tuple[ContainerRegistryCreatorSpec, list[str]]:
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> tuple[ContainerRegistryCreator, list[str]]:
         """Fixture that provides a creator spec with allowed_groups for creating registries."""
         registry_name = "registry-with-groups-" + str(uuid.uuid4())[:8]
         project = "project-with-groups-" + str(uuid.uuid4())[:8]
@@ -428,7 +443,12 @@ class TestContainerRegistryRepository:
         group_ids: list[str] = []
         async with db_with_cleanup.begin_session() as session:
             # Create domain
-            domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
+            domain_id = DomainID(uuid.uuid4())
+            domain = DomainRow(
+                id=domain_id,
+                name=domain_name,
+                total_resource_slots=ResourceSlot(),
+            )
             session.add(domain)
 
             # Create project resource policy
@@ -444,7 +464,7 @@ class TestContainerRegistryRepository:
 
             # Create 2 groups
             for i in range(2):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-for-registry-{i}-{registry_name}",
                     domain_name=domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -455,30 +475,30 @@ class TestContainerRegistryRepository:
                 group_ids.append(str(group.id))
             await session.commit()
 
-        spec = ContainerRegistryCreatorSpec(
+        creator = ContainerRegistryCreator(
             url=f"https://{registry_name}",
             type=ContainerRegistryType.HARBOR2,
             registry_name=registry_name,
             project=project,
             allowed_groups=AllowedGroupsModel(add=group_ids, remove=[]),
         )
-        return spec, group_ids
+        return creator, group_ids
 
     async def test_create_registry_with_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        creator_spec_with_allowed_groups: tuple[ContainerRegistryCreatorSpec, list[str]],
+        creator_spec_with_allowed_groups: tuple[ContainerRegistryCreator, list[str]],
     ) -> None:
         """Test creating registry with allowed_groups"""
         # Given - Registry and groups
-        spec, group_ids = creator_spec_with_allowed_groups
+        creator, group_ids = creator_spec_with_allowed_groups
         # When
-        result = await repository.create_registry(Creator(spec=spec))
+        result = await repository.create_registry(creator)
 
         # Then - Verify registry created
         assert result is not None
-        assert result.registry_name == spec.registry_name
+        assert result.registry_name == creator.registry_name
 
         # Then - Verify allowed_groups associations created
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -507,7 +527,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -599,14 +619,14 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry1 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
                 project=project1,
             )
             registry2 = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -717,7 +737,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -744,20 +764,18 @@ class TestContainerRegistryRepository:
         changed_extra = {"modified_key": "modified_value"}
 
         result = await repository.modify_registry(
-            Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.nop(),
-                    type=OptionalState.nop(),
-                    registry_name=OptionalState.nop(),
-                    project=TriState.nop(),
-                    username=TriState.update(changed_username),
-                    password=TriState.update(changed_password),
-                    ssl_verify=TriState.nop(),
-                    is_global=TriState.nop(),
-                    extra=TriState.update(changed_extra),
-                    allowed_groups=TriState.nop(),
-                ),
-                pk_value=registry_for_modification.id,
+            ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_for_modification.id),
+                url=OptionalState.nop(),
+                type=OptionalState.nop(),
+                registry_name=OptionalState.nop(),
+                project=TriState.nop(),
+                username=TriState.update(changed_username),
+                password=TriState.update(changed_password),
+                ssl_verify=TriState.nop(),
+                is_global=TriState.nop(),
+                extra=TriState.update(changed_extra),
+                allowed_groups=TriState.nop(),
             )
         )
 
@@ -781,20 +799,18 @@ class TestContainerRegistryRepository:
         # Then
         with pytest.raises(ContainerRegistryNotFound):
             await repository.modify_registry(
-                Updater(
-                    spec=ContainerRegistryUpdaterSpec(
-                        url=OptionalState.nop(),
-                        type=OptionalState.nop(),
-                        registry_name=OptionalState.nop(),
-                        project=TriState.nop(),
-                        username=TriState.update("new-user"),
-                        password=TriState.nop(),
-                        ssl_verify=TriState.nop(),
-                        is_global=TriState.nop(),
-                        extra=TriState.nop(),
-                        allowed_groups=TriState.nop(),
-                    ),
-                    pk_value=non_existent_id,
+                ContainerRegistryUpdater(
+                    registry_id=ContainerRegistryID(non_existent_id),
+                    url=OptionalState.nop(),
+                    type=OptionalState.nop(),
+                    registry_name=OptionalState.nop(),
+                    project=TriState.nop(),
+                    username=TriState.update("new-user"),
+                    password=TriState.nop(),
+                    ssl_verify=TriState.nop(),
+                    is_global=TriState.nop(),
+                    extra=TriState.nop(),
+                    allowed_groups=TriState.nop(),
                 )
             )
 
@@ -803,11 +819,11 @@ class TestContainerRegistryRepository:
         """Registry with available groups for adding."""
 
         registry: ContainerRegistryData
-        group_ids: list[UUID]
+        group_ids: list[ProjectID]
 
     @pytest.fixture
     async def registry_and_groups_for_adding(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_groups: list[UUID]
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_groups: list[ProjectID]
     ) -> _RegistryWithAvailableGroups:
         """Pre-created registry and 2 groups for testing adding allowed_groups."""
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
@@ -815,7 +831,7 @@ class TestContainerRegistryRepository:
 
         async with db_with_cleanup.begin_session() as session:
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -838,25 +854,23 @@ class TestContainerRegistryRepository:
         """Test adding allowed_groups to an existing registry"""
         # When
         result = await repository.modify_registry(
-            Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.nop(),
-                    type=OptionalState.nop(),
-                    registry_name=OptionalState.nop(),
-                    project=TriState.nop(),
-                    username=TriState.nop(),
-                    password=TriState.nop(),
-                    ssl_verify=TriState.update(True),
-                    is_global=TriState.nop(),
-                    extra=TriState.nop(),
-                    allowed_groups=TriState.update(
-                        AllowedGroupsModel(
-                            add=[str(g) for g in registry_and_groups_for_adding.group_ids],
-                            remove=[],
-                        )
-                    ),
+            ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_and_groups_for_adding.registry.id),
+                url=OptionalState.nop(),
+                type=OptionalState.nop(),
+                registry_name=OptionalState.nop(),
+                project=TriState.nop(),
+                username=TriState.nop(),
+                password=TriState.nop(),
+                ssl_verify=TriState.update(True),
+                is_global=TriState.nop(),
+                extra=TriState.nop(),
+                allowed_groups=TriState.update(
+                    AllowedGroupsModel(
+                        add=[str(g) for g in registry_and_groups_for_adding.group_ids],
+                        remove=[],
+                    )
                 ),
-                pk_value=registry_and_groups_for_adding.registry.id,
             )
         )
 
@@ -891,12 +905,12 @@ class TestContainerRegistryRepository:
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
         project = "project-" + str(uuid.uuid4())[:8]
         resource_policy_name = f"test-policy-{sample_domain.domain_name}-3groups"
-        group_ids: list[UUID] = []
+        group_ids: list[ProjectID] = []
 
         async with db_with_cleanup.begin_session() as session:
             # Create registry
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -924,7 +938,7 @@ class TestContainerRegistryRepository:
 
             # Create 3 groups and associate them
             for i in range(3):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}-assoc",
                     domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -956,24 +970,22 @@ class TestContainerRegistryRepository:
 
         # When - Request to remove one group
         result = await repository.modify_registry(
-            Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.nop(),
-                    type=OptionalState.nop(),
-                    registry_name=OptionalState.nop(),
-                    project=TriState.nop(),
-                    username=TriState.nop(),
-                    password=TriState.nop(),
-                    ssl_verify=TriState.update(True),
-                    is_global=TriState.nop(),
-                    extra=TriState.nop(),
-                    allowed_groups=TriState.update(
-                        AllowedGroupsModel(
-                            add=[], remove=[str(registry_with_associated_groups.group_ids[0])]
-                        )
-                    ),
+            ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_with_associated_groups.registry.id),
+                url=OptionalState.nop(),
+                type=OptionalState.nop(),
+                registry_name=OptionalState.nop(),
+                project=TriState.nop(),
+                username=TriState.nop(),
+                password=TriState.nop(),
+                ssl_verify=TriState.update(True),
+                is_global=TriState.nop(),
+                extra=TriState.nop(),
+                allowed_groups=TriState.update(
+                    AllowedGroupsModel(
+                        add=[], remove=[str(registry_with_associated_groups.group_ids[0])]
+                    )
                 ),
-                pk_value=registry_with_associated_groups.registry.id,
             )
         )
 
@@ -1006,9 +1018,9 @@ class TestContainerRegistryRepository:
         """Registry with 2 groups associated out of 4 available."""
 
         registry: ContainerRegistryData
-        all_group_ids: list[UUID]
-        initially_associated_group_ids: list[UUID]
-        available_group_ids: list[UUID]
+        all_group_ids: list[ProjectID]
+        initially_associated_group_ids: list[ProjectID]
+        available_group_ids: list[ProjectID]
 
     @pytest.fixture
     async def registry_with_partial_groups(
@@ -1018,12 +1030,12 @@ class TestContainerRegistryRepository:
         registry_name = str(uuid.uuid4())[:8] + ".example.com"
         project = "project-" + str(uuid.uuid4())[:8]
         resource_policy_name = f"test-policy-{sample_domain.domain_name}-4groups"
-        group_ids: list[UUID] = []
+        group_ids: list[ProjectID] = []
 
         async with db_with_cleanup.begin_session() as session:
             # Create registry
             registry = ContainerRegistryRow(
-                id=uuid.uuid4(),
+                id=ContainerRegistryID(uuid.uuid4()),
                 url=f"https://{registry_name}",
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
@@ -1051,7 +1063,7 @@ class TestContainerRegistryRepository:
 
             # Create 4 groups
             for i in range(4):
-                group = GroupRow(
+                group = ProjectRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}-partial",
                     domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
@@ -1089,25 +1101,23 @@ class TestContainerRegistryRepository:
 
         # When - Remove group 0, add group 2, 3
         result = await repository.modify_registry(
-            Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.nop(),
-                    type=OptionalState.nop(),
-                    registry_name=OptionalState.nop(),
-                    project=TriState.nop(),
-                    username=TriState.nop(),
-                    password=TriState.nop(),
-                    ssl_verify=TriState.update(True),
-                    is_global=TriState.nop(),
-                    extra=TriState.nop(),
-                    allowed_groups=TriState.update(
-                        AllowedGroupsModel(
-                            add=[str(group_ids[2]), str(group_ids[3])],
-                            remove=[str(group_ids[0])],
-                        )
-                    ),
+            ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_with_partial_groups.registry.id),
+                url=OptionalState.nop(),
+                type=OptionalState.nop(),
+                registry_name=OptionalState.nop(),
+                project=TriState.nop(),
+                username=TriState.nop(),
+                password=TriState.nop(),
+                ssl_verify=TriState.update(True),
+                is_global=TriState.nop(),
+                extra=TriState.nop(),
+                allowed_groups=TriState.update(
+                    AllowedGroupsModel(
+                        add=[str(group_ids[2]), str(group_ids[3])],
+                        remove=[str(group_ids[0])],
+                    )
                 ),
-                pk_value=registry_with_partial_groups.registry.id,
             )
         )
 
@@ -1141,22 +1151,20 @@ class TestContainerRegistryRepository:
     ) -> None:
         """Test removing non-existent allowed_groups raises error"""
         # Given - An updater attempting to remove a non-existent group
-        updater = Updater(
-            spec=ContainerRegistryUpdaterSpec(
-                url=OptionalState.nop(),
-                type=OptionalState.nop(),
-                registry_name=OptionalState.nop(),
-                project=TriState.nop(),
-                username=TriState.update("user"),
-                password=TriState.nop(),
-                ssl_verify=TriState.nop(),
-                is_global=TriState.nop(),
-                extra=TriState.nop(),
-                allowed_groups=TriState.update(
-                    AllowedGroupsModel(add=[], remove=["00000000-0000-0000-0000-000000000000"])
-                ),
+        updater = ContainerRegistryUpdater(
+            registry_id=ContainerRegistryID(sample_registry.id),
+            url=OptionalState.nop(),
+            type=OptionalState.nop(),
+            registry_name=OptionalState.nop(),
+            project=TriState.nop(),
+            username=TriState.update("user"),
+            password=TriState.nop(),
+            ssl_verify=TriState.nop(),
+            is_global=TriState.nop(),
+            extra=TriState.nop(),
+            allowed_groups=TriState.update(
+                AllowedGroupsModel(add=[], remove=["00000000-0000-0000-0000-000000000000"])
             ),
-            pk_value=sample_registry.id,
         )
 
         # Then - Should raise error for non-existent group
@@ -1164,12 +1172,13 @@ class TestContainerRegistryRepository:
             await repository.modify_registry(updater)
 
     @pytest.fixture
-    async def updater_spec_with_two_duplicate_two_new_allowed_groups(
+    async def updater_with_two_duplicate_two_new_allowed_groups(
         self, registry_with_partial_groups: _RegistryWithPartialGroups
-    ) -> ContainerRegistryUpdaterSpec:
-        """UpdaterSpec that attempts to add duplicate allowed_groups."""
+    ) -> ContainerRegistryUpdater:
+        """Updater that attempts to add duplicate allowed_groups."""
         group_ids = registry_with_partial_groups.all_group_ids
-        return ContainerRegistryUpdaterSpec(
+        return ContainerRegistryUpdater(
+            registry_id=ContainerRegistryID(registry_with_partial_groups.registry.id),
             url=OptionalState.nop(),
             type=OptionalState.nop(),
             registry_name=OptionalState.nop(),
@@ -1196,18 +1205,13 @@ class TestContainerRegistryRepository:
         self,
         repository: ContainerRegistryRepository,
         registry_with_partial_groups: _RegistryWithPartialGroups,
-        updater_spec_with_two_duplicate_two_new_allowed_groups: ContainerRegistryUpdaterSpec,
+        updater_with_two_duplicate_two_new_allowed_groups: ContainerRegistryUpdater,
     ) -> None:
         """Test adding duplicate allowed_groups raises ContainerRegistryGroupsAlreadyAssociated error"""
         # When - Try to add 2 duplicate, 2 new groups
         # Then - Should raise error for duplicate groups
         with pytest.raises(ContainerRegistryGroupsAlreadyAssociated):
-            await repository.modify_registry(
-                Updater(
-                    spec=updater_spec_with_two_duplicate_two_new_allowed_groups,
-                    pk_value=registry_with_partial_groups.registry.id,
-                )
-            )
+            await repository.modify_registry(updater_with_two_duplicate_two_new_allowed_groups)
 
     async def test_modify_registry_set_is_global_clears_allowed_groups(
         self,
@@ -1221,11 +1225,9 @@ class TestContainerRegistryRepository:
 
         # When - Set is_global to True
         result = await repository.modify_registry(
-            Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    is_global=TriState.update(True),
-                ),
-                pk_value=registry_id,
+            ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_id),
+                is_global=TriState.update(True),
             )
         )
 
@@ -1256,11 +1258,11 @@ class TestContainerRegistryRepository:
     ) -> None:
         """Test successful registry deletion"""
         # Given: A pre-created test registry
-        registry_id = test_registry.id
+        registry_id = ContainerRegistryID(test_registry.id)
         registry_name = test_registry.registry_name
 
         # When: Delete the registry
-        purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=registry_id))
+        purger = ContainerRegistryPurger(registry_id=registry_id)
         result = await repository.delete_registry(purger)
 
         # Then: Returns deleted registry data
@@ -1269,7 +1271,7 @@ class TestContainerRegistryRepository:
 
         # And: Registry no longer exists
         with pytest.raises(ContainerRegistryNotFound):
-            purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=registry_id))
+            purger = ContainerRegistryPurger(registry_id=registry_id)
             await repository.delete_registry(purger)
 
     async def test_delete_registry_not_found(
@@ -1278,11 +1280,11 @@ class TestContainerRegistryRepository:
     ) -> None:
         """Test deletion of non-existent registry raises error"""
         # Given: Non-existent registry ID
-        non_existent_id = uuid.uuid4()
+        non_existent_id = ContainerRegistryID(uuid.uuid4())
 
         # When/Then: Raises ContainerRegistryNotFound
         with pytest.raises(ContainerRegistryNotFound):
-            purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=non_existent_id))
+            purger = ContainerRegistryPurger(registry_id=non_existent_id)
             await repository.delete_registry(purger)
 
     async def test_delete_registry_returns_data_before_deletion(
@@ -1295,7 +1297,7 @@ class TestContainerRegistryRepository:
         registry = test_registry_with_custom_props
 
         # When: Delete the registry
-        purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=registry.id))
+        purger = ContainerRegistryPurger(registry_id=ContainerRegistryID(registry.id))
         result = await repository.delete_registry(purger)
 
         # Then: Returns all registry data with correct properties
@@ -1321,7 +1323,7 @@ class TestSearchContainerRegistries:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -1329,7 +1331,7 @@ class TestSearchContainerRegistries:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
@@ -1353,7 +1355,9 @@ class TestSearchContainerRegistries:
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
-        return ContainerRegistryRepository(db=db_with_cleanup)
+        return ContainerRegistryRepository(
+            db=db_with_cleanup, ops_provider=ContainerRegistryOpsProvider(db_with_cleanup)
+        )
 
     @pytest.fixture
     async def sample_registries(
@@ -1370,7 +1374,7 @@ class TestSearchContainerRegistries:
         async with db_with_cleanup.begin_session() as session:
             for reg_type, reg_name, project in configs:
                 row = ContainerRegistryRow(
-                    id=uuid.uuid4(),
+                    id=ContainerRegistryID(uuid.uuid4()),
                     url=f"https://{reg_name}.example.com",
                     registry_name=reg_name,
                     type=reg_type,

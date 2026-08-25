@@ -18,18 +18,20 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import AccessKey, PreemptionMode, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import create_pending_session_with_kernels
 
@@ -74,10 +76,10 @@ async def set_preemption_mode(
     async def _set(mode: PreemptionMode) -> None:
         async with db_with_cleanup.begin_session() as db_sess:
             await db_sess.execute(
-                sa.update(ScalingGroupRow)
-                .where(ScalingGroupRow.id == test_scaling_group_id)
+                sa.update(ResourceGroupRow)
+                .where(ResourceGroupRow.id == test_scaling_group_id)
                 .values(
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         pending_timeout=timedelta(hours=1),
                         config={},
@@ -96,7 +98,7 @@ class TestMarkSessionsPreempted:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -109,9 +111,9 @@ class TestMarkSessionsPreempted:
             db_with_cleanup,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -120,9 +122,9 @@ class TestMarkSessionsPreempted:
             assign_agents=True,
         )
 
-        preempted = await ScheduleDBSource(db_with_cleanup).mark_sessions_status(
-            [session_id], SessionStatus.PREEMPTED, _REASON
-        )
+        preempted = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).mark_sessions_status([session_id], SessionStatus.PREEMPTED, _REASON)
 
         assert preempted == [session_id]
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.PREEMPTED
@@ -136,7 +138,7 @@ class TestMarkSessionsPreempted:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -151,9 +153,9 @@ class TestMarkSessionsPreempted:
             db_with_cleanup,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -161,9 +163,9 @@ class TestMarkSessionsPreempted:
             kernel_status=KernelStatus.TERMINATED,
         )
 
-        preempted = await ScheduleDBSource(db_with_cleanup).mark_sessions_status(
-            [session_id], SessionStatus.PREEMPTED, _REASON
-        )
+        preempted = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).mark_sessions_status([session_id], SessionStatus.PREEMPTED, _REASON)
 
         assert preempted == []
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.TERMINATED
@@ -177,7 +179,7 @@ class TestMarkSessionsRescheduling:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -190,9 +192,9 @@ class TestMarkSessionsRescheduling:
             db_with_cleanup,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -201,9 +203,9 @@ class TestMarkSessionsRescheduling:
             assign_agents=True,
         )
 
-        marked = await ScheduleDBSource(db_with_cleanup).mark_sessions_status(
-            [session_id], SessionStatus.RESCHEDULING, _REASON
-        )
+        marked = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).mark_sessions_status([session_id], SessionStatus.RESCHEDULING, _REASON)
 
         assert marked == [session_id]
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.RESCHEDULING
@@ -221,7 +223,7 @@ class TestTerminatePreemptedVictim:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -236,9 +238,9 @@ class TestTerminatePreemptedVictim:
             db_with_cleanup,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -247,9 +249,9 @@ class TestTerminatePreemptedVictim:
             assign_agents=True,
         )
 
-        result = await ScheduleDBSource(db_with_cleanup).mark_sessions_terminating(
-            [session_id], _REASON
-        )
+        result = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).mark_sessions_terminating([session_id], _REASON)
 
         assert result.terminating_sessions == [session_id]
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -276,7 +278,7 @@ class TestRequeueSessionsToPending:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -292,9 +294,9 @@ class TestRequeueSessionsToPending:
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
             job_priority=7,
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -305,7 +307,7 @@ class TestRequeueSessionsToPending:
         # Kernel termination freed the allocations before the requeue runs.
         await _free_allocations(db_with_cleanup, session_id)
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         reset = await db_source.reset_kernels_to_pending_for_sessions([session_id], _REASON)
         requeued = await db_source.mark_sessions_status(
             [session_id], SessionStatus.PENDING, _REASON
@@ -340,7 +342,7 @@ class TestRequeueSessionsToPending:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -356,9 +358,9 @@ class TestRequeueSessionsToPending:
             db_with_cleanup,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -368,9 +370,9 @@ class TestRequeueSessionsToPending:
         )
         await _free_allocations(db_with_cleanup, session_id)
 
-        await ScheduleDBSource(db_with_cleanup).reset_kernels_to_pending_for_sessions(
-            [session_id], _REASON
-        )
+        await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).reset_kernels_to_pending_for_sessions([session_id], _REASON)
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             allocations = (
@@ -398,7 +400,7 @@ class TestRequeueSessionsToPending:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -412,9 +414,9 @@ class TestRequeueSessionsToPending:
             db_with_cleanup,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -422,9 +424,9 @@ class TestRequeueSessionsToPending:
             kernel_status=KernelStatus.CANCELLED,
         )
 
-        requeued = await ScheduleDBSource(db_with_cleanup).mark_sessions_status(
-            [session_id], SessionStatus.PENDING, _REASON
-        )
+        requeued = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).mark_sessions_status([session_id], SessionStatus.PENDING, _REASON)
 
         assert requeued == []
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.CANCELLED
@@ -440,9 +442,9 @@ class TestGetResourceGroupPreemptionMode:
     ) -> None:
         await set_preemption_mode(PreemptionMode.RESCHEDULE)
 
-        mode = await ScheduleDBSource(db_with_cleanup).get_resource_group_preemption_mode(
-            test_scaling_group_id
-        )
+        mode = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).get_resource_group_preemption_mode(test_scaling_group_id)
 
         assert mode == PreemptionMode.RESCHEDULE
 
@@ -453,8 +455,8 @@ class TestGetResourceGroupPreemptionMode:
         test_scaling_group_name: str,
     ) -> None:
         """A group that never configured preemption reports the default mode."""
-        mode = await ScheduleDBSource(db_with_cleanup).get_resource_group_preemption_mode(
-            test_scaling_group_id
-        )
+        mode = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).get_resource_group_preemption_mode(test_scaling_group_id)
 
         assert mode == PreemptionMode.TERMINATE

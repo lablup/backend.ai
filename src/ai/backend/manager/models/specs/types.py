@@ -1,0 +1,82 @@
+"""Shared declarations of the v2 lineage: the checks write specs carry, and the
+result shapes the ops execution answers with."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.exception import BackendAIError
+from ai.backend.manager.models.clauses import QueryCondition
+
+if TYPE_CHECKING:
+    from ai.backend.manager.errors.repository import RepositoryIntegrityError
+
+
+@dataclass(frozen=True)
+class ConflictCheck:
+    """Defines a conflict check for destructive-operation validation.
+
+    The inverse of ExistenceCheck: validates that no row matching the condition
+    exists before executing a destructive operation (e.g. purge).
+    Multiple checks are combined into a single query for efficiency.
+    """
+
+    condition: QueryCondition
+    """Condition selecting conflicting rows (e.g., lambda: UserRow.domain_name == name)."""
+
+    error: BackendAIError
+    """The error to raise if any conflicting row exists."""
+
+
+@dataclass(frozen=True)
+class IntegrityErrorCheck:
+    """Defines an integrity error check for declarative error matching.
+
+    Used to match parsed integrity errors against expected constraint violations
+    and raise domain-specific errors.
+    """
+
+    violation_type: type[RepositoryIntegrityError]
+    """The integrity error subclass to match (e.g., UniqueConstraintViolationError)."""
+
+    error: BackendAIError
+    """The domain error to raise when matched."""
+
+    constraint_name: str | None = None
+    """Optional constraint name filter. If None, matches any constraint of the given type."""
+
+
+@dataclass
+class BulkResultWithFailures[TData]:
+    """What a bulk write did to each entity the caller named.
+
+    Named as the atomic bulk results are, minus a spec name it cannot carry — one type
+    serves both the updater and the purger — leaving the part a caller has to know:
+    some of these may have failed while the rest went through.
+
+    Keyed by entity rather than positional: the bulk shape answers per entity, and an
+    answer attached to the wrong one is worse than no answer.
+
+    Ordering is per group, not the caller's. A caller that needs its own order re-reads
+    these by the ids it passed in.
+
+    Names its fields as the other bulk results do, so a caller reading ``successes`` and
+    ``errors`` off this reads them the same way off ``BulkUpdaterResult``.
+    """
+
+    successes: dict[EntityIdentifier, TData]
+    errors: dict[EntityIdentifier, Exception]
+
+
+@dataclass
+class EntityWithFieldsResult[TData, TFieldData]:
+    """An entity and the field rows created under it in the same transaction.
+
+    A dataclass rather than a pair: the two halves are not interchangeable, and a
+    caller reading positionally would eventually read them the wrong way round.
+    """
+
+    data: TData
+    fields: list[TFieldData]

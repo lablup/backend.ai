@@ -1,122 +1,99 @@
-from typing import override
+from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
-from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
-
-from .actions import (
-    CreateChannelAction,
-    CreateChannelActionResult,
-    CreateRuleAction,
-    CreateRuleActionResult,
-    DeleteChannelAction,
-    DeleteChannelActionResult,
-    DeleteRuleAction,
-    DeleteRuleActionResult,
-    GetChannelAction,
-    GetChannelActionResult,
-    GetRuleAction,
-    GetRuleActionResult,
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+)
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
+from ai.backend.manager.data.notification.types import (
+    NotificationChannelData,
+    NotificationRuleData,
+)
+from ai.backend.manager.services.notification.actions.create_channel import CreateChannelAction
+from ai.backend.manager.services.notification.actions.create_rule import CreateRuleAction
+from ai.backend.manager.services.notification.actions.get_channel import GetChannelAction
+from ai.backend.manager.services.notification.actions.get_rule import GetRuleAction
+from ai.backend.manager.services.notification.actions.list_channels import SearchChannelsAction
+from ai.backend.manager.services.notification.actions.list_rules import SearchRulesAction
+from ai.backend.manager.services.notification.actions.process_notification import (
     ProcessNotificationAction,
     ProcessNotificationActionResult,
-    SearchChannelsAction,
-    SearchChannelsActionResult,
-    SearchRulesAction,
-    SearchRulesActionResult,
-    UpdateChannelAction,
-    UpdateChannelActionResult,
-    UpdateRuleAction,
-    UpdateRuleActionResult,
+)
+from ai.backend.manager.services.notification.actions.purge_channel import PurgeChannelAction
+from ai.backend.manager.services.notification.actions.purge_rule import PurgeRuleAction
+from ai.backend.manager.services.notification.actions.update_channel import UpdateChannelAction
+from ai.backend.manager.services.notification.actions.update_rule import UpdateRuleAction
+from ai.backend.manager.services.notification.actions.validate_channel import (
     ValidateChannelAction,
     ValidateChannelActionResult,
+)
+from ai.backend.manager.services.notification.actions.validate_rule import (
     ValidateRuleAction,
     ValidateRuleActionResult,
 )
-from .service import NotificationService
+from ai.backend.manager.services.notification.service import NotificationService
 
 
-class NotificationProcessors(AbstractProcessorPackage):
-    """Processor package for notification operations."""
+class NotificationProcessors:
+    """Both catalogs run against ops; only dispatch and the two validations keep a service."""
 
-    # Scope actions (operate on GLOBAL scope)
-    create_channel: ScopeActionProcessor[CreateChannelAction, CreateChannelActionResult]
-    search_channels: ScopeActionProcessor[SearchChannelsAction, SearchChannelsActionResult]
-
-    # Single-entity actions (operate on specific notification channels)
-    get_channel: SingleEntityActionProcessor[GetChannelAction, GetChannelActionResult]
-    update_channel: SingleEntityActionProcessor[UpdateChannelAction, UpdateChannelActionResult]
-    delete_channel: SingleEntityActionProcessor[DeleteChannelAction, DeleteChannelActionResult]
+    create_channel: GlobalActionProcessor[
+        CreateChannelAction, CreatedEntityOpsResult[NotificationChannelData]
+    ]
+    update_channel: SingleEntityActionProcessor[
+        UpdateChannelAction, EntityOpsResult[NotificationChannelData]
+    ]
+    purge_channel: SingleEntityActionProcessor[
+        PurgeChannelAction, EntityOpsResult[NotificationChannelData]
+    ]
+    get_channel: SingleEntityActionProcessor[
+        GetChannelAction, EntityOpsResult[NotificationChannelData]
+    ]
+    search_channels: GlobalActionProcessor[
+        SearchChannelsAction, BatchOpsResult[NotificationChannelData]
+    ]
+    create_rule: GlobalActionProcessor[
+        CreateRuleAction, CreatedEntityOpsResult[NotificationRuleData]
+    ]
+    update_rule: SingleEntityActionProcessor[
+        UpdateRuleAction, EntityOpsResult[NotificationRuleData]
+    ]
+    purge_rule: SingleEntityActionProcessor[PurgeRuleAction, EntityOpsResult[NotificationRuleData]]
+    get_rule: SingleEntityActionProcessor[GetRuleAction, EntityOpsResult[NotificationRuleData]]
+    search_rules: GlobalActionProcessor[SearchRulesAction, BatchOpsResult[NotificationRuleData]]
     validate_channel: SingleEntityActionProcessor[
         ValidateChannelAction, ValidateChannelActionResult
     ]
-
-    # Internal/system actions (no RBAC)
-    create_rule: ActionProcessor[CreateRuleAction, CreateRuleActionResult]
-    search_rules: ActionProcessor[SearchRulesAction, SearchRulesActionResult]
-    get_rule: ActionProcessor[GetRuleAction, GetRuleActionResult]
-    update_rule: ActionProcessor[UpdateRuleAction, UpdateRuleActionResult]
-    delete_rule: ActionProcessor[DeleteRuleAction, DeleteRuleActionResult]
-    validate_rule: ActionProcessor[ValidateRuleAction, ValidateRuleActionResult]
-
-    process_notification: ActionProcessor[
+    validate_rule: SingleEntityActionProcessor[ValidateRuleAction, ValidateRuleActionResult]
+    process_notification: GlobalActionProcessor[
         ProcessNotificationAction, ProcessNotificationActionResult
     ]
 
     def __init__(
         self,
+        channel_group: ProcessorGroup[NotificationChannelData],
+        rule_group: ProcessorGroup[NotificationRuleData],
         service: NotificationService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
-        # Scope actions with RBAC validators
-        self.create_channel = ScopeActionProcessor(
-            service.create_channel, action_monitors, validators=[validators.rbac.scope]
+        self.create_channel = channel_group.global_create_ops(CreateChannelAction)
+        self.update_channel = channel_group.single_update_ops(UpdateChannelAction)
+        self.purge_channel = channel_group.entity_purge_ops(PurgeChannelAction)
+        self.get_channel = channel_group.single_get_ops(GetChannelAction)
+        self.search_channels = channel_group.global_search_ops(SearchChannelsAction)
+        self.create_rule = rule_group.global_create_ops(CreateRuleAction)
+        self.update_rule = rule_group.single_update_ops(UpdateRuleAction)
+        self.purge_rule = rule_group.entity_purge_ops(PurgeRuleAction)
+        self.get_rule = rule_group.single_get_ops(GetRuleAction)
+        self.search_rules = rule_group.global_search_ops(SearchRulesAction)
+        self.validate_channel = channel_group.single_entity(
+            ValidateChannelAction, service.validate_channel
         )
-        self.search_channels = ScopeActionProcessor(
-            service.search_channels, action_monitors, validators=[validators.rbac.scope]
+        self.validate_rule = rule_group.single_entity(ValidateRuleAction, service.validate_rule)
+        self.process_notification = rule_group.global_scope(
+            ProcessNotificationAction, service.process_notification
         )
-
-        # Single-entity actions with RBAC validators
-        self.get_channel = SingleEntityActionProcessor(
-            service.get_channel, action_monitors, validators=[validators.rbac.single_entity]
-        )
-        self.update_channel = SingleEntityActionProcessor(
-            service.update_channel, action_monitors, validators=[validators.rbac.single_entity]
-        )
-        self.delete_channel = SingleEntityActionProcessor(
-            service.delete_channel, action_monitors, validators=[validators.rbac.single_entity]
-        )
-        self.validate_channel = SingleEntityActionProcessor(
-            service.validate_channel, action_monitors, validators=[validators.rbac.single_entity]
-        )
-
-        # Internal/system actions (no RBAC validators)
-        self.create_rule = ActionProcessor(service.create_rule, action_monitors)
-        self.search_rules = ActionProcessor(service.search_rules, action_monitors)
-        self.get_rule = ActionProcessor(service.get_rule, action_monitors)
-        self.update_rule = ActionProcessor(service.update_rule, action_monitors)
-        self.delete_rule = ActionProcessor(service.delete_rule, action_monitors)
-        self.validate_rule = ActionProcessor(service.validate_rule, action_monitors)
-
-        self.process_notification = ActionProcessor(service.process_notification, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateChannelAction.spec(),
-            SearchChannelsAction.spec(),
-            GetChannelAction.spec(),
-            UpdateChannelAction.spec(),
-            DeleteChannelAction.spec(),
-            ValidateChannelAction.spec(),
-            CreateRuleAction.spec(),
-            SearchRulesAction.spec(),
-            GetRuleAction.spec(),
-            UpdateRuleAction.spec(),
-            DeleteRuleAction.spec(),
-            ValidateRuleAction.spec(),
-            ProcessNotificationAction.spec(),
-        ]

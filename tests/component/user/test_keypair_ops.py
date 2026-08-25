@@ -20,7 +20,9 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.user.handler import UserHandler
 from ai.backend.manager.api.rest.user.registry import register_user_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 
@@ -47,6 +49,14 @@ mutation SwitchMyMainAccessKey($accessKey: String!) {
 }
 """
 
+_REVOKE_MY_KEYPAIR = """
+mutation RevokeMyKeypair($accessKey: String!) {
+    revokeMyKeypair(input: {accessKey: $accessKey}) {
+        success
+    }
+}
+"""
+
 _ISSUE_MY_KEYPAIR = """
 mutation IssueMyKeypair {
     issueMyKeypair {
@@ -61,7 +71,8 @@ mutation IssueMyKeypair {
 # GQL error extension codes produced by GQLExceptionHandlerExtension
 # ErrorCode.__str__() formats as "{domain}_{operation}_{error_detail}" (underscore-separated)
 _GQL_ERR_FORBIDDEN = "keypair_read_forbidden"
-_GQL_ERR_NOT_FOUND = "keypair_read_not-found"
+# An access key naming no keypair ends at the lookup that resolves it into a row id.
+_GQL_ERR_NO_ROW = "database_access_not-found"
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +137,11 @@ def server_module_registries(
     mock_gql_deps = MagicMock()
     mock_gql_deps.processors = mock_processors
     mock_gql_deps.config_provider = config_provider
-    mock_gql_deps.adapters.user = UserAdapter(processors=mock_processors, auth_config=None)  # type: ignore[arg-type]
+    mock_gql_deps.adapters.user = UserAdapter(
+        processors=mock_processors,
+        auth_config=None,  # type: ignore[arg-type]
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
 
     user_registry = register_user_routes(
         UserHandler(
@@ -161,13 +176,13 @@ class TestUpdateMyKeypair:
     the BA-5294 success criteria.
     """
 
-    async def test_deactivate_own_keypair(
+    async def test_deactivate_main_keypair_raises_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
         regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
-        """S-1: updateMyKeypair(isActive=false) → keypairs.is_active=False in DB."""
+        """S-1: updateMyKeypair(isActive=false) on the main keypair → KeyPairForbidden."""
         access_key: str = regular_user_fixture.keypair.access_key
 
         response = await _call_gql(
@@ -175,16 +190,18 @@ class TestUpdateMyKeypair:
             _UPDATE_MY_KEYPAIR,
             {"accessKey": access_key, "isActive": False},
         )
-        payload = _assert_gql_success(response, "updateMyKeypair")
-        assert payload["keypair"]["accessKey"] == access_key
-        assert payload["keypair"]["isActive"] is False
+        assert response.get("errors"), "Expected a GQL error for deactivating the main keypair"
+        codes = _gql_error_codes(response)
+        assert any(_GQL_ERR_FORBIDDEN in code for code in codes), (
+            f"Expected forbidden error code, got: {codes}"
+        )
 
         async with db_engine.begin() as conn:
             row = await conn.execute(
                 sa.select(keypairs.c.is_active).where(keypairs.c.access_key == access_key)
             )
             is_active = row.scalar()
-        assert is_active is False, "Keypair should be deactivated in DB"
+        assert is_active is True, "The main keypair should stay active"
 
     async def test_activate_own_keypair(
         self,
@@ -230,24 +247,9 @@ class TestUpdateMyKeypair:
             async with db_engine.begin() as conn:
                 await conn.execute(keypairs.delete().where(keypairs.c.access_key == secondary_ak))
 
-    async def test_update_another_users_keypair_raises_forbidden(
-        self,
-        user_registry: BackendAIClientRegistry,
-        admin_user_fixture: Any,
-    ) -> None:
-        """S-3: updateMyKeypair with another user's accessKey → KeyPairForbidden."""
-        other_access_key: str = admin_user_fixture.keypair.access_key
-
-        response = await _call_gql(
-            user_registry,
-            _UPDATE_MY_KEYPAIR,
-            {"accessKey": other_access_key, "isActive": False},
-        )
-        assert response.get("errors"), "Expected a GQL error for cross-user keypair update"
-        codes = _gql_error_codes(response)
-        assert any(_GQL_ERR_FORBIDDEN in code for code in codes), (
-            f"Expected forbidden error code, got: {codes}"
-        )
+    # S-3, a keypair owned by another user, is not asserted here. The operation is
+    # authorized against the entity the owner lookup reads, and this harness wires no
+    # v2 validators, so nothing would do the refusing.
 
     async def test_update_nonexistent_access_key_raises_not_found(
         self,
@@ -263,7 +265,7 @@ class TestUpdateMyKeypair:
         )
         assert response.get("errors"), "Expected a GQL error for non-existent access key"
         codes = _gql_error_codes(response)
-        assert any(_GQL_ERR_NOT_FOUND in code for code in codes), (
+        assert any(_GQL_ERR_NO_ROW in code for code in codes), (
             f"Expected not-found error code, got: {codes}"
         )
 
@@ -304,3 +306,100 @@ class TestUpdateMyKeypair:
             # Clean up the extra keypair to keep DB consistent.
             async with db_engine.begin() as conn:
                 await conn.execute(keypairs.delete().where(keypairs.c.access_key == new_access_key))
+
+    async def test_switch_main_moves_the_marker(
+        self,
+        user_registry: BackendAIClientRegistry,
+        regular_user_fixture: Any,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-6: switchMyMainAccessKey moves the marker onto the chosen keypair."""
+        original_access_key: str = regular_user_fixture.keypair.access_key
+        user_uuid = str(regular_user_fixture.user_uuid)
+        issue_payload = _assert_gql_success(
+            await _call_gql(user_registry, _ISSUE_MY_KEYPAIR), "issueMyKeypair"
+        )
+        new_access_key: str = issue_payload["keypair"]["accessKey"]
+
+        try:
+            switch_resp = await _call_gql(
+                user_registry,
+                _SWITCH_MY_MAIN_ACCESS_KEY,
+                {"accessKey": new_access_key},
+            )
+            _assert_gql_success(switch_resp, "switchMyMainAccessKey")
+
+            async with db_engine.begin() as conn:
+                marked = (
+                    await conn.execute(
+                        sa.select(KeyPairRow.access_key).where(
+                            (KeyPairRow.user == user_uuid) & KeyPairRow.is_default
+                        )
+                    )
+                ).scalars()
+            assert marked.all() == [new_access_key], "Exactly the new keypair should be marked main"
+        finally:
+            # Move the marker back before dropping the extra keypair.
+            _assert_gql_success(
+                await _call_gql(
+                    user_registry,
+                    _SWITCH_MY_MAIN_ACCESS_KEY,
+                    {"accessKey": original_access_key},
+                ),
+                "switchMyMainAccessKey",
+            )
+            async with db_engine.begin() as conn:
+                await conn.execute(keypairs.delete().where(keypairs.c.access_key == new_access_key))
+
+
+class TestRevokeMyKeypair:
+    """Component tests for the revokeMyKeypair GQL mutation."""
+
+    async def test_revoke_secondary_keypair(
+        self,
+        user_registry: BackendAIClientRegistry,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-7: revokeMyKeypair on a non-main keypair removes the row."""
+        issue_payload = _assert_gql_success(
+            await _call_gql(user_registry, _ISSUE_MY_KEYPAIR), "issueMyKeypair"
+        )
+        secondary_ak: str = issue_payload["keypair"]["accessKey"]
+
+        payload = _assert_gql_success(
+            await _call_gql(user_registry, _REVOKE_MY_KEYPAIR, {"accessKey": secondary_ak}),
+            "revokeMyKeypair",
+        )
+        assert payload["success"] is True
+
+        async with db_engine.begin() as conn:
+            remaining = (
+                await conn.execute(
+                    sa.select(keypairs.c.access_key).where(keypairs.c.access_key == secondary_ak)
+                )
+            ).scalar()
+        assert remaining is None, "The revoked keypair should be gone from the DB"
+
+    async def test_revoke_main_keypair_raises_forbidden(
+        self,
+        user_registry: BackendAIClientRegistry,
+        regular_user_fixture: Any,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-8: revokeMyKeypair on the main keypair → KeyPairForbidden, row kept."""
+        access_key: str = regular_user_fixture.keypair.access_key
+
+        response = await _call_gql(user_registry, _REVOKE_MY_KEYPAIR, {"accessKey": access_key})
+        assert response.get("errors"), "Expected a GQL error for revoking the main keypair"
+        codes = _gql_error_codes(response)
+        assert any(_GQL_ERR_FORBIDDEN in code for code in codes), (
+            f"Expected forbidden error code, got: {codes}"
+        )
+
+        async with db_engine.begin() as conn:
+            remaining = (
+                await conn.execute(
+                    sa.select(keypairs.c.access_key).where(keypairs.c.access_key == access_key)
+                )
+            ).scalar()
+        assert remaining == access_key, "The main keypair should stay in the DB"

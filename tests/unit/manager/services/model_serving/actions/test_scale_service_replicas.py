@@ -8,9 +8,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.errors.service import (
     ModelServiceNotFound,
 )
@@ -19,9 +20,6 @@ from ai.backend.manager.repositories.model_serving.repository import ModelServin
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
-)
-from ai.backend.manager.services.model_serving.processors.auto_scaling import (
-    ModelServingAutoScalingProcessors,
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.testutils.scenario import ScenarioBase
@@ -37,6 +35,7 @@ class TestScaleServiceReplicas:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)
@@ -61,19 +60,6 @@ class TestScaleServiceReplicas:
     ) -> AutoScalingService:
         return AutoScalingService(
             repository=mock_repositories.repository,
-        )
-
-    @pytest.fixture
-    def auto_scaling_processors(
-        self,
-        mock_action_monitor: MagicMock,
-        auto_scaling_service: AutoScalingService,
-        mock_action_validators: ActionValidators,
-    ) -> ModelServingAutoScalingProcessors:
-        return ModelServingAutoScalingProcessors(
-            service=auto_scaling_service,
-            action_monitors=[mock_action_monitor],
-            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -131,7 +117,7 @@ class TestScaleServiceReplicas:
                 "scale up",
                 ScaleServiceReplicasAction(
                     max_session_count_per_model_session=100,
-                    service_id=uuid.UUID("99999999-9999-9999-9999-999999999999"),
+                    deployment_id=DeploymentID(uuid.UUID("99999999-9999-9999-9999-999999999999")),
                     to=5,
                 ),
                 ScaleServiceReplicasActionResult(
@@ -143,7 +129,7 @@ class TestScaleServiceReplicas:
                 "scale down",
                 ScaleServiceReplicasAction(
                     max_session_count_per_model_session=100,
-                    service_id=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                    deployment_id=DeploymentID(uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
                     to=1,
                 ),
                 ScaleServiceReplicasActionResult(
@@ -155,7 +141,7 @@ class TestScaleServiceReplicas:
                 "zero scale",
                 ScaleServiceReplicasAction(
                     max_session_count_per_model_session=100,
-                    service_id=uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                    deployment_id=DeploymentID(uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")),
                     to=0,
                 ),
                 ScaleServiceReplicasActionResult(
@@ -167,7 +153,7 @@ class TestScaleServiceReplicas:
                 "non-existent service",
                 ScaleServiceReplicasAction(
                     max_session_count_per_model_session=100,
-                    service_id=uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+                    deployment_id=DeploymentID(uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")),
                     to=5,
                 ),
                 ModelServiceNotFound,
@@ -176,7 +162,7 @@ class TestScaleServiceReplicas:
                 "update operation failed",
                 ScaleServiceReplicasAction(
                     max_session_count_per_model_session=100,
-                    service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
+                    deployment_id=DeploymentID(uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")),
                     to=3,
                 ),
                 ModelServiceNotFound,
@@ -185,9 +171,9 @@ class TestScaleServiceReplicas:
     )
     async def test_scale_service_replicas(
         self,
+        auto_scaling_service: AutoScalingService,
         scenario: ScenarioBase[ScaleServiceReplicasAction, ScaleServiceReplicasActionResult],
         user_data: UserData,
-        auto_scaling_processors: ModelServingAutoScalingProcessors,
         mock_check_user_access_scale: AsyncMock,
         mock_get_endpoint_by_id_scale: AsyncMock,
         mock_get_endpoint_access_validation_data_scale: AsyncMock,
@@ -205,7 +191,7 @@ class TestScaleServiceReplicas:
             )
             mock_get_endpoint_access_validation_data_scale.return_value = mock_validation_data
             mock_endpoint = MagicMock(
-                id=action.service_id,
+                id=action.deployment_id,
                 routings=[MagicMock() for _ in range(expected.current_route_count)],
             )
             mock_get_endpoint_by_id_scale.return_value = mock_endpoint
@@ -223,7 +209,7 @@ class TestScaleServiceReplicas:
             )
             mock_get_endpoint_access_validation_data_scale.return_value = mock_validation_data
             mock_endpoint = MagicMock(
-                id=action.service_id,
+                id=action.deployment_id,
                 routings=[MagicMock() for _ in range(2)],
             )
             mock_get_endpoint_by_id_scale.return_value = mock_endpoint
@@ -232,6 +218,6 @@ class TestScaleServiceReplicas:
         async def scale_service_replicas(
             action: ScaleServiceReplicasAction,
         ) -> ScaleServiceReplicasActionResult:
-            return await auto_scaling_processors.scale_service_replicas.wait_for_complete(action)
+            return await auto_scaling_service.scale_service_replicas(action)
 
         await scenario.test(scale_service_replicas)

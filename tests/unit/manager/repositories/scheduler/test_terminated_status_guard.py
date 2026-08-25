@@ -16,14 +16,16 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import create_pending_session_with_kernels, seed_agent_resources
 
@@ -72,7 +74,7 @@ class TestTerminatedStatusGuard:
 
     @pytest.fixture
     def db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ScheduleDBSource:
-        return ScheduleDBSource(db_with_cleanup)
+        return ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
     async def _create_kernels(
         self,
@@ -81,7 +83,7 @@ class TestTerminatedStatusGuard:
         domain_id: DomainID,
         domain_name: str,
         resource_group_id: ResourceGroupID,
-        scaling_group_name: str,
+        resource_group_name: str,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
@@ -94,7 +96,7 @@ class TestTerminatedStatusGuard:
             domain_id=domain_id,
             domain_name=domain_name,
             resource_group_id=resource_group_id,
-            scaling_group_name=scaling_group_name,
+            resource_group_name=resource_group_name,
             group_id=group_id,
             user_uuid=user_uuid,
             access_key=access_key,
@@ -109,7 +111,7 @@ class TestTerminatedStatusGuard:
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ScheduleDBSource,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -121,9 +123,9 @@ class TestTerminatedStatusGuard:
         _, kernel_ids = await self._create_kernels(
             db_with_cleanup,
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -157,7 +159,7 @@ class TestTerminatedStatusGuard:
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ScheduleDBSource,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -170,9 +172,9 @@ class TestTerminatedStatusGuard:
         _, kernel_ids = await self._create_kernels(
             db_with_cleanup,
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -197,7 +199,7 @@ class TestTerminatedStatusGuard:
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ScheduleDBSource,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -210,9 +212,9 @@ class TestTerminatedStatusGuard:
         _, kernel_ids = await self._create_kernels(
             db_with_cleanup,
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -233,7 +235,7 @@ class TestTerminatedStatusGuard:
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ScheduleDBSource,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -245,9 +247,9 @@ class TestTerminatedStatusGuard:
         _, kernel_ids = await self._create_kernels(
             db_with_cleanup,
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,

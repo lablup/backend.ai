@@ -1,109 +1,114 @@
-from typing import override
+from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.data.entity.role_permission_preset import (
+    ROLE_PERMISSION_PRESET_FIELD_TYPE,
+)
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_processor import (
+    PartialBulkFieldActionProcessor,
+)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityWithFieldsOpsResult,
+    EntityOpsResult,
+    FieldsOpsResult,
+    ScopedFieldsOpsResult,
+)
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.role_preset.types import (
+    RolePermissionPresetData,
+    RolePresetData,
+)
 from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
     BulkAddRolePermissionPresetsAction,
-    BulkAddRolePermissionPresetsActionResult,
 )
 from ai.backend.manager.services.role_preset.actions.bulk_purge import (
     BulkPurgeRolePresetsAction,
-    BulkPurgeRolePresetsActionResult,
 )
 from ai.backend.manager.services.role_preset.actions.bulk_remove_permissions import (
     BulkRemoveRolePermissionPresetsAction,
-    BulkRemoveRolePermissionPresetsActionResult,
 )
-from ai.backend.manager.services.role_preset.actions.create import (
-    CreateRolePresetAction,
-    CreateRolePresetActionResult,
-)
+from ai.backend.manager.services.role_preset.actions.create import CreateRolePresetAction
 from ai.backend.manager.services.role_preset.actions.delete import (
     BulkDeleteRolePresetsAction,
-    BulkDeleteRolePresetsActionResult,
 )
-from ai.backend.manager.services.role_preset.actions.get import (
-    GetRolePresetAction,
-    GetRolePresetActionResult,
+from ai.backend.manager.services.role_preset.actions.get import GetRolePresetAction
+from ai.backend.manager.services.role_preset.actions.lookup_permission_owner import (
+    LookupBulkRolePermissionPresetOwnerAction,
+    LookupRolePermissionPresetOwnerAction,
 )
-from ai.backend.manager.services.role_preset.actions.purge import (
-    PurgeRolePresetAction,
-    PurgeRolePresetActionResult,
-)
+from ai.backend.manager.services.role_preset.actions.purge import PurgeRolePresetAction
 from ai.backend.manager.services.role_preset.actions.restore import (
     BulkRestoreRolePresetsAction,
-    BulkRestoreRolePresetsActionResult,
 )
-from ai.backend.manager.services.role_preset.actions.search import (
-    SearchRolePresetsAction,
-    SearchRolePresetsActionResult,
-)
+from ai.backend.manager.services.role_preset.actions.search import SearchRolePresetsAction
 from ai.backend.manager.services.role_preset.actions.search_permission_presets import (
     SearchRolePermissionPresetsAction,
-    SearchRolePermissionPresetsActionResult,
 )
-from ai.backend.manager.services.role_preset.actions.update import (
-    UpdateRolePresetAction,
-    UpdateRolePresetActionResult,
-)
+from ai.backend.manager.services.role_preset.actions.update import UpdateRolePresetAction
 from ai.backend.manager.services.role_preset.service import RolePresetService
 
 
-class RolePresetProcessors(AbstractProcessorPackage):
-    create: ActionProcessor[CreateRolePresetAction, CreateRolePresetActionResult]
-    get: ActionProcessor[GetRolePresetAction, GetRolePresetActionResult]
-    search: ActionProcessor[SearchRolePresetsAction, SearchRolePresetsActionResult]
-    search_permission_presets: ActionProcessor[
-        SearchRolePermissionPresetsAction, SearchRolePermissionPresetsActionResult
+class RolePresetProcessors:
+    """The two template-settling writes go through the service; the rest run straight
+    against ops.
+
+    One group: the preset is the entity, and its permission entries are field rows of
+    it, wired through the field group the preset's group hands out.
+    """
+
+    create: GlobalActionProcessor[
+        CreateRolePresetAction,
+        CreatedEntityWithFieldsOpsResult[RolePresetData, RolePermissionPresetData],
     ]
-    update: ActionProcessor[UpdateRolePresetAction, UpdateRolePresetActionResult]
-    bulk_delete: ActionProcessor[BulkDeleteRolePresetsAction, BulkDeleteRolePresetsActionResult]
-    bulk_restore: ActionProcessor[BulkRestoreRolePresetsAction, BulkRestoreRolePresetsActionResult]
-    purge: ActionProcessor[PurgeRolePresetAction, PurgeRolePresetActionResult]
-    bulk_purge: ActionProcessor[BulkPurgeRolePresetsAction, BulkPurgeRolePresetsActionResult]
-    bulk_add_permissions: ActionProcessor[
-        BulkAddRolePermissionPresetsAction, BulkAddRolePermissionPresetsActionResult
+    get: SingleEntityActionProcessor[GetRolePresetAction, EntityOpsResult[RolePresetData]]
+    search: GlobalActionProcessor[SearchRolePresetsAction, BatchOpsResult[RolePresetData]]
+    update: SingleEntityActionProcessor[UpdateRolePresetAction, EntityOpsResult[RolePresetData]]
+    bulk_delete: PartialBulkActionProcessor[BulkDeleteRolePresetsAction, RolePresetData]
+    bulk_restore: PartialBulkActionProcessor[BulkRestoreRolePresetsAction, RolePresetData]
+    purge: SingleEntityActionProcessor[PurgeRolePresetAction, EntityOpsResult[RolePresetData]]
+    bulk_purge: PartialBulkActionProcessor[BulkPurgeRolePresetsAction, RolePresetData]
+
+    # Permission entries: field rows of a preset, answered for by the preset owning them
+    search_permission_presets: ScopeActionProcessor[
+        SearchRolePermissionPresetsAction, ScopedFieldsOpsResult[RolePermissionPresetData]
     ]
-    bulk_remove_permissions: ActionProcessor[
-        BulkRemoveRolePermissionPresetsAction, BulkRemoveRolePermissionPresetsActionResult
+    bulk_add_permissions: SingleEntityActionProcessor[
+        BulkAddRolePermissionPresetsAction, FieldsOpsResult[RolePermissionPresetData]
+    ]
+    bulk_remove_permissions: PartialBulkFieldActionProcessor[
+        BulkRemoveRolePermissionPresetsAction, RolePermissionPresetData
     ]
 
     def __init__(
         self,
+        preset_group: ProcessorGroup[RolePresetData],
         service: RolePresetService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.get = ActionProcessor(service.get, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
-        self.search_permission_presets = ActionProcessor(
-            service.search_permission_presets, action_monitors
-        )
-        self.update = ActionProcessor(service.update, action_monitors)
-        self.bulk_delete = ActionProcessor(service.bulk_delete, action_monitors)
-        self.bulk_restore = ActionProcessor(service.bulk_restore, action_monitors)
-        self.purge = ActionProcessor(service.purge, action_monitors)
-        self.bulk_purge = ActionProcessor(service.bulk_purge, action_monitors)
-        self.bulk_add_permissions = ActionProcessor(service.bulk_add_permissions, action_monitors)
-        self.bulk_remove_permissions = ActionProcessor(
-            service.bulk_remove_permissions, action_monitors
-        )
+        self.create = preset_group.global_scope(CreateRolePresetAction, service.create)
+        self.get = preset_group.single_get_ops(GetRolePresetAction)
+        self.search = preset_group.global_search_ops(SearchRolePresetsAction)
+        self.update = preset_group.single_entity(UpdateRolePresetAction, service.update)
+        self.bulk_delete = preset_group.partial_bulk_delete_ops(BulkDeleteRolePresetsAction)
+        self.bulk_restore = preset_group.partial_bulk_restore_ops(BulkRestoreRolePresetsAction)
+        self.purge = preset_group.entity_purge_ops(PurgeRolePresetAction)
+        self.bulk_purge = preset_group.global_partial_bulk_purge_ops(BulkPurgeRolePresetsAction)
 
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateRolePresetAction.spec(),
-            GetRolePresetAction.spec(),
-            SearchRolePresetsAction.spec(),
-            SearchRolePermissionPresetsAction.spec(),
-            UpdateRolePresetAction.spec(),
-            BulkDeleteRolePresetsAction.spec(),
-            BulkRestoreRolePresetsAction.spec(),
-            PurgeRolePresetAction.spec(),
-            BulkPurgeRolePresetsAction.spec(),
-            BulkAddRolePermissionPresetsAction.spec(),
-            BulkRemoveRolePermissionPresetsAction.spec(),
-        ]
+        permissions: LookupFieldGroup[RolePermissionPresetData] = preset_group.field_group(
+            FieldGroupMeta(ROLE_PERMISSION_PRESET_FIELD_TYPE),
+            RolePermissionPresetData,
+            LookupRolePermissionPresetOwnerAction,
+            LookupBulkRolePermissionPresetOwnerAction,
+        )
+        self.search_permission_presets = permissions.search_ops(SearchRolePermissionPresetsAction)
+        self.bulk_add_permissions = permissions.atomic_create_ops(
+            BulkAddRolePermissionPresetsAction
+        )
+        self.bulk_remove_permissions = permissions.partial_bulk_purge_ops(
+            BulkRemoveRolePermissionPresetsAction
+        )

@@ -733,13 +733,13 @@ class AgentRPCServer(aobject):
                 # produce KernelTerminatedEvent
                 await agent.anycast_and_broadcast_event(
                     KernelTerminatedAnycastEvent(
-                        kid,
-                        sid,
+                        kernel_id=kid,
+                        session_id=sid,
                         reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
                     ),
                     KernelTerminatedBroadcastEvent(
-                        kid,
-                        sid,
+                        kernel_id=kid,
+                        session_id=sid,
                         reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
                     ),
                 )

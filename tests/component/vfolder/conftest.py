@@ -4,13 +4,14 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder_invitation import VFOLDER_INVITATION_ENTITY_TYPE
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
@@ -28,8 +29,8 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderUsageMode,
 )
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -42,6 +43,7 @@ from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
     VFolderInvitationState,
     VFolderMountPermission,
@@ -63,8 +65,10 @@ from ai.backend.manager.models.vfolder import (
     vfolder_permissions,
     vfolders,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
 from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
@@ -74,7 +78,6 @@ from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 _VFOLDER_SERVER_SUBAPP_MODULES = (_auth_api,)
@@ -116,9 +119,14 @@ def vfolder_processors(
     storage_manager: StorageSessionManager,
     background_task_manager: BackgroundTaskManager,
     valkey_clients: ValkeyClients,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderService(
         config_provider=config_provider,
         etcd=async_etcd,
@@ -128,14 +136,7 @@ def vfolder_processors(
         user_repository=user_repository,
         valkey_stat_client=valkey_clients.stat,
     )
-    return VFolderProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
-    )
+    return VFolderProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
@@ -143,44 +144,42 @@ def vfolder_file_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
     storage_manager: StorageSessionManager,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderFileProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderFileService(
         config_provider=config_provider,
         storage_manager=storage_manager,
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
-    return VFolderFileProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
-    )
+    return VFolderFileProcessors(processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
 def vfolder_invite_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderInviteProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderInviteService(
         config_provider=config_provider,
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
     return VFolderInviteProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
+        processor_registry.group(GroupMeta(VFOLDER_INVITATION_ENTITY_TYPE)), service
     )
 
 
@@ -188,21 +187,21 @@ def vfolder_invite_processors(
 def vfolder_sharing_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
+    processor_registry: ProcessorRegistry[Any],
 ) -> VFolderSharingProcessors:
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine)
+    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderSharingService(
         config_provider=config_provider,
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
     )
     return VFolderSharingProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
+        processor_registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), service
     )
 
 

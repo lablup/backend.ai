@@ -6,16 +6,17 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin, UpdatedAtMixin
 
 
-class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class IdleCheckerRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "idle_checkers"
     __table_args__ = (
         sa.CheckConstraint(
@@ -64,7 +65,7 @@ class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         )
 
 
-class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "idle_checker_bindings"
     __table_args__ = (
         sa.ForeignKeyConstraint(
@@ -106,7 +107,7 @@ class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):  # type: ignore[mis
         )
 
 
-class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
+class SessionIdleCheckRow(UpdatedAtMixin, Base):
     __tablename__ = "session_idle_checks"
     __table_args__ = (
         sa.ForeignKeyConstraint(
@@ -126,10 +127,20 @@ class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
             "idle_checker_id",
             name="pk_session_idle_checks",
         ),
+        sa.ForeignKeyConstraint(
+            ["manually_triggered_by"],
+            ["users.uuid"],
+            name="fk_session_idle_checks_manually_triggered_by",
+            ondelete="SET NULL",
+        ),
         sa.Index(
             "ix_session_idle_checks_expire_at_not_null",
             "expire_at",
             postgresql_where=sa.text("expire_at IS NOT NULL"),
+        ),
+        sa.CheckConstraint(
+            "manually_triggered_by IS NULL OR is_manual",
+            name="manual_trigger",
         ),
     )
 
@@ -144,3 +155,13 @@ class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
         "last_status", StrEnumType(IdleCheckPhase), nullable=False
     )
     last_message: Mapped[str] = mapped_column("last_message", sa.Text, nullable=False)
+    is_manual: Mapped[bool] = mapped_column(
+        "is_manual",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
+    manually_triggered_by: Mapped[UserID | None] = mapped_column(
+        "manually_triggered_by", GUID(UserID), nullable=True, default=None
+    )

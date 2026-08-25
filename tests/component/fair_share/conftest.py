@@ -3,63 +3,99 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
-from unittest.mock import MagicMock
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.fair_share import (
+    DOMAIN_FAIR_SHARE_ENTITY_TYPE,
+    PROJECT_FAIR_SHARE_ENTITY_TYPE,
+    USER_FAIR_SHARE_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE, ResourceGroupID
+from ai.backend.common.data.entity.usage_bucket import (
+    DOMAIN_USAGE_BUCKET_FIELD_TYPE,
+    PROJECT_USAGE_BUCKET_FIELD_TYPE,
+    USER_USAGE_BUCKET_FIELD_TYPE,
+)
 from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.common.identifier.resource_group import ResourceGroupName
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    FieldGroupMeta,
+    GroupMeta,
+)
 from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.scaling_group import sgroups_for_groups
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.resource_group import sgroups_for_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
-from ai.backend.manager.repositories.resource_usage_history.repository import (
-    ResourceUsageHistoryRepository,
-)
-from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.fair_share.service import FairShareService
+from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
-from ai.backend.manager.services.resource_usage.service import ResourceUsageService
-from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
-from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture()
-def fair_share_processors(database_engine: ExtendedAsyncSAEngine) -> FairShareProcessors:
-    repo = FairShareRepository(database_engine)
-    service = FairShareService(repo)
+def fair_share_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> FairShareProcessors:
+    service = FairShareService(FairShareRepository(database_engine))
+    fair_share_groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return FairShareProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        fair_share_groups.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)),
+        fair_share_groups.group(GroupMeta(PROJECT_FAIR_SHARE_ENTITY_TYPE)),
+        fair_share_groups.group(GroupMeta(USER_FAIR_SHARE_ENTITY_TYPE)),
+        service,
     )
 
 
 @pytest.fixture()
-def resource_usage_processors(database_engine: ExtendedAsyncSAEngine) -> ResourceUsageProcessors:
-    repo = ResourceUsageHistoryRepository(database_engine)
-    service = ResourceUsageService(repo)
+def resource_usage_processors(
+    processor_registry: ProcessorRegistry[Any],
+) -> ResourceUsageProcessors:
     return ResourceUsageProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        processor_registry.dangling_field_group(
+            FieldGroupMeta(DOMAIN_USAGE_BUCKET_FIELD_TYPE), DomainUsageBucketData
+        ),
+        processor_registry.dangling_field_group(
+            FieldGroupMeta(PROJECT_USAGE_BUCKET_FIELD_TYPE), ProjectUsageBucketData
+        ),
+        processor_registry.dangling_field_group(
+            FieldGroupMeta(USER_USAGE_BUCKET_FIELD_TYPE), UserUsageBucketData
+        ),
     )
 
 
 @pytest.fixture()
-def scaling_group_processors(database_engine: ExtendedAsyncSAEngine) -> ScalingGroupProcessors:
-    repo = ScalingGroupRepository(database_engine)
-    service = ScalingGroupService(repo, appproxy_client_pool=None)
-    return ScalingGroupProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+def resource_group_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> ResourceGroupProcessors:
+    service = ResourceGroupService(
+        ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
+    )
+    return ResourceGroupProcessors(
+        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
     )
 
 
@@ -68,7 +104,7 @@ def server_module_registries(
     route_deps: RouteDeps,
     fair_share_processors: FairShareProcessors,
     resource_usage_processors: ResourceUsageProcessors,
-    scaling_group_processors: ScalingGroupProcessors,
+    resource_group_processors: ResourceGroupProcessors,
 ) -> list[RouteRegistry]:
     """Load only the modules required for fair-share-domain tests."""
     return [
@@ -76,7 +112,7 @@ def server_module_registries(
             FairShareAPIHandler(
                 fair_share=fair_share_processors,
                 resource_usage=resource_usage_processors,
-                scaling_group=scaling_group_processors,
+                resource_group=resource_group_processors,
             ),
             route_deps,
         ),
@@ -88,14 +124,14 @@ async def group_fixture(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
-    scaling_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a test group with scaling-group association for fair-share tests."""
     group_id = uuid.uuid4()
     group_name = f"group-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=group_id,
                 name=group_name,
                 description=f"Test group {group_name}",
@@ -130,7 +166,7 @@ async def group_fixture(
         )
         await conn.execute(
             sa.insert(sgroups_for_groups).values(
-                scaling_group=scaling_group_name,
+                resource_group_id=resource_group_id,
                 group=group_id,
             )
         )
@@ -145,4 +181,6 @@ async def group_fixture(
                 VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == group_id)
+        )

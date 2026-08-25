@@ -13,4 +13,6 @@ class ContainerRegistryRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        return cls(repository=ContainerRegistryRepository(args.db))
+        return cls(
+            repository=ContainerRegistryRepository(args.db, args.container_registry_ops_provider)
+        )

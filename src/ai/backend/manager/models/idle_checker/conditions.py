@@ -6,6 +6,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
@@ -13,7 +14,6 @@ from ai.backend.common.data.filter_specs import (
 )
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -332,5 +332,12 @@ class SessionIdleCheckConditions:
     def by_status_not_equals(status: IdleCheckPhase) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return SessionIdleCheckRow.last_status != status
+
+        return inner
+
+    @staticmethod
+    def by_statuses(statuses: Collection[IdleCheckPhase]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionIdleCheckRow.last_status.in_(statuses)
 
         return inner

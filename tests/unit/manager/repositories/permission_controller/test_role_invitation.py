@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     CreateRoleInvitationByEmailAction,
@@ -21,17 +22,18 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.group.row import AssocGroupUserRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project.row import AssocGroupUserRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -40,7 +42,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -49,6 +50,7 @@ from ai.backend.manager.repositories.permission_controller.db_source.db_source i
     PermissionDBSource,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 # ── shared fixtures ──────────────────────────────────────────────
 
@@ -71,7 +73,7 @@ async def db(
         database_connection,
         [
             DomainRow,
-            ScalingGroupRow,
+            ResourceGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
@@ -79,7 +81,7 @@ async def db(
             UserRoleRow,
             UserRow,
             KeyPairRow,
-            GroupRow,
+            ProjectRow,
             AssocGroupUserRow,
             AssociationScopesEntitiesRow,
             ContainerRegistryRow,
@@ -99,11 +101,15 @@ async def db(
 
 
 @pytest.fixture
-async def domain_name(db: ExtendedAsyncSAEngine) -> str:
+async def domain_fixture(
+    db: ExtendedAsyncSAEngine,
+) -> DomainFixtureData:
+    domain_id = DomainID(uuid.uuid4())
     name = f"dom-{uuid.uuid4().hex[:8]}"
     async with db.begin_session() as s:
         s.add(
             DomainRow(
+                id=domain_id,
                 name=name,
                 description="",
                 is_active=True,
@@ -115,7 +121,7 @@ async def domain_name(db: ExtendedAsyncSAEngine) -> str:
             )
         )
         await s.commit()
-    return name
+    return DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
 
 @pytest.fixture
@@ -137,7 +143,7 @@ async def user_policy(db: ExtendedAsyncSAEngine) -> str:
 
 async def _add_user(
     db: ExtendedAsyncSAEngine,
-    domain_name: str,
+    domain_fixture: DomainFixtureData,
     policy: str,
     pw: PasswordInfo,
     email: str,
@@ -155,9 +161,10 @@ async def _add_user(
                 description="",
                 status=UserStatus.ACTIVE,
                 status_info="",
-                domain_name=domain_name,
+                domain_name=domain_fixture.domain_name,
                 role=UserRole.USER,
                 resource_policy=policy,
+                domain_id=domain_fixture.domain_id,
             )
         )
         await s.commit()
@@ -167,11 +174,11 @@ async def _add_user(
 @pytest.fixture
 async def inviter(
     db: ExtendedAsyncSAEngine,
-    domain_name: str,
+    domain_fixture: DomainFixtureData,
     user_policy: str,
     password_info: PasswordInfo,
 ) -> uuid.UUID:
-    return await _add_user(db, domain_name, user_policy, password_info, "inviter@test.io")
+    return await _add_user(db, domain_fixture, user_policy, password_info, "inviter@test.io")
 
 
 @pytest.fixture
@@ -182,12 +189,12 @@ def invitee_email() -> str:
 @pytest.fixture
 async def invitee(
     db: ExtendedAsyncSAEngine,
-    domain_name: str,
+    domain_fixture: DomainFixtureData,
     user_policy: str,
     password_info: PasswordInfo,
     invitee_email: str,
 ) -> uuid.UUID:
-    return await _add_user(db, domain_name, user_policy, password_info, invitee_email)
+    return await _add_user(db, domain_fixture, user_policy, password_info, invitee_email)
 
 
 @pytest.fixture

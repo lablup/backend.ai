@@ -48,6 +48,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
 from ai.backend.manager.models.minilang.ordering import (
     OrderDirection,
+    OrderingColumn,
     OrderingItem,
     QueryOrderParser,
 )
@@ -628,7 +629,7 @@ def privileged_mutation(
         async def wrapped(
             cls: type, root: Any, info: graphene.ResolveInfo, *args: Any, **kwargs: Any
         ) -> Any:
-            from ai.backend.manager.models.group import groups  # , association_groups_users
+            from ai.backend.manager.models.project import groups  # , association_groups_users
             from ai.backend.manager.models.user import UserRole
 
             ctx: GraphQueryContext = info.context
@@ -838,7 +839,7 @@ def set_if_set(
 
 def orm_set_if_set(
     src: object,
-    target: MutableMapping[str, Any],
+    target: object,
     name: str,
     *,
     clean_func: Callable[[Any], Any] | None = None,
@@ -972,9 +973,7 @@ def _apply_ordering(
             id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
 
             def set_ordering(
-                col: sa.Column[Any]
-                | InstrumentedAttribute[Any]
-                | sa.sql.elements.KeyedColumnElement[Any],
+                col: OrderingColumn,
                 direction: OrderDirection,
             ) -> Any:
                 return col.asc() if direction == OrderDirection.ASC else col.desc()
@@ -985,9 +984,7 @@ def _apply_ordering(
 
             # Reverse ordering direction for backward pagination
             def set_ordering(
-                col: sa.Column[Any]
-                | InstrumentedAttribute[Any]
-                | sa.sql.elements.KeyedColumnElement[Any],
+                col: OrderingColumn,
                 direction: OrderDirection,
             ) -> Any:
                 return col.desc() if direction == OrderDirection.ASC else col.asc()
@@ -1039,9 +1036,7 @@ def _apply_cursor_pagination(
         cursor_row_id = cursor_row_id_str
 
     def subq_to_condition(
-        column_to_be_compared: sa.Column[Any]
-        | InstrumentedAttribute[Any]
-        | sa.sql.elements.KeyedColumnElement[Any],
+        column_to_be_compared: OrderingColumn,
         subquery: ScalarSelect[Any],
         direction: OrderDirection,
     ) -> WhereClauseType:

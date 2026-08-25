@@ -12,8 +12,8 @@ from datetime import datetime
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -24,28 +24,31 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -69,13 +72,13 @@ class TestSessionSearchInProject:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 AgentRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
                 UserRow,
-                GroupRow,
+                ProjectRow,
                 KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -92,7 +95,7 @@ class TestSessionSearchInProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> SessionRepository:
-        return SessionRepository(db_with_cleanup)
+        return SessionRepository(db_with_cleanup, DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def test_data(
@@ -125,7 +128,7 @@ class TestSessionSearchInProject:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name="default",
                     is_active=True,
@@ -133,7 +136,7 @@ class TestSessionSearchInProject:
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             db_sess.add(
@@ -183,17 +186,16 @@ class TestSessionSearchInProject:
                     resource_policy="default",
                     allowed_client_ip=None,
                     totp_key=None,
-                    main_access_key=None,
+                    domain_id=test_domain_id,
                 )
             )
             await db_sess.flush()
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="test@example.com",
                     user=user_id,
                     access_key=access_key,
-                    secret_key="test-secret",
+                    secret_key=SecretValue("test-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -207,7 +209,7 @@ class TestSessionSearchInProject:
                 (project_b_id, "project-b"),
             ]:
                 db_sess.add(
-                    GroupRow(
+                    ProjectRow(
                         id=gid,
                         name=gname,
                         domain_name=domain_name,
@@ -251,8 +253,6 @@ class TestSessionSearchInProject:
                         starts_at=None,
                         startup_command=None,
                         callback_url=None,
-                        occupying_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-                        requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                         vfolder_mounts=[],
                         environ=None,
                         bootstrap_script=None,
@@ -299,8 +299,6 @@ class TestSessionSearchInProject:
                         created_at=now,
                         terminated_at=None,
                         starts_at=None,
-                        occupied_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-                        requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
                         occupied_shares={},
                         environ=None,
                         vfolder_mounts=[],
@@ -327,7 +325,7 @@ class TestSessionSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns only sessions belonging to the specified project."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_a_id"])
+        scope = ProjectSessionOperationScope(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -347,7 +345,7 @@ class TestSessionSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project for project_b returns only its session, not project_a's."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_b_id"])
+        scope = ProjectSessionOperationScope(project_id=test_data["project_b_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -366,7 +364,7 @@ class TestSessionSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns correct pagination fields."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_a_id"])
+        scope = ProjectSessionOperationScope(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],

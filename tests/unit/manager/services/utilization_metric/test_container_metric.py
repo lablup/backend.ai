@@ -35,11 +35,17 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     MetricType,
 )
+from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.clients.prometheus.types import ValueType
 from ai.backend.manager.repositories.metric.repository import MetricRepository
-from ai.backend.manager.services.metric.actions.container import (
-    ContainerMetricAction,
+from ai.backend.manager.services.metric.actions.search_container_metrics import (
+    PublicSearchContainerMetricsAction,
 )
+
+
+@pytest.fixture
+def renderer() -> PromQLTemplateRenderer:
+    return PromQLTemplateRenderer()
 
 
 def _make_query_range_response(
@@ -73,6 +79,7 @@ def _make_metric_repository(
     return MetricRepository(
         db=MagicMock(),
         prometheus_client=mock_prometheus_client,
+        default_timewindow=timewindow,
     )
 
 
@@ -580,7 +587,7 @@ class TestContainerMetricDataTypes:
     """Test data types used in container metric service."""
 
     async def test_container_metric_action_fields(self) -> None:
-        action = ContainerMetricAction(
+        action = PublicSearchContainerMetricsAction(
             metric_name="container_cpu_percent",
             labels=ContainerMetricOptionalLabel(
                 value_type=ValueType.CURRENT,
@@ -807,11 +814,13 @@ class TestBuiltinQueryProvider:
         ],
         ids=lambda c: c.id,
     )
-    async def test_build_query_renders_expected_promql(self, case: BuiltinQueryTestCase) -> None:
+    async def test_build_query_renders_expected_promql(
+        self, renderer: PromQLTemplateRenderer, case: BuiltinQueryTestCase
+    ) -> None:
         query_builder = ContainerMetricQueryBuilder(case.timewindow)
 
         query = query_builder.get_container_metric_query(case.metric_name, case.labels)
-        rendered_query = query.render()
+        rendered_query = renderer.render(query)
 
         assert rendered_query == case.expected_query
 
@@ -826,17 +835,19 @@ class TestContainerLiveStatQueries:
         return query_builder.get_container_live_stat_queries([kernel_id])
 
     def test_instant_query_fetches_live_stat_fields(
-        self, queries: ContainerLiveStatQueries
+        self, renderer: PromQLTemplateRenderer, queries: ContainerLiveStatQueries
     ) -> None:
-        rendered = queries.instant.render()
+        rendered = renderer.render(queries.instant)
 
         assert "backendai_container_utilization" in rendered
         assert "sum by (container_metric_name,kernel_id,value_type)" in rendered
         assert 'value_type=~"current|capacity"' in rendered
         assert "pct" not in rendered
 
-    def test_max_query_reads_current_series(self, queries: ContainerLiveStatQueries) -> None:
-        rendered = queries.max.render()
+    def test_max_query_reads_current_series(
+        self, renderer: PromQLTemplateRenderer, queries: ContainerLiveStatQueries
+    ) -> None:
+        rendered = renderer.render(queries.max)
 
         assert "label_replace" not in rendered
         assert "max_over_time" in rendered
@@ -845,8 +856,10 @@ class TestContainerLiveStatQueries:
         assert "rate(" not in rendered
         assert "backendai_container_utilization" in rendered
 
-    def test_rate_max_query_reads_rate_series(self, queries: ContainerLiveStatQueries) -> None:
-        rendered = queries.rate_max.render()
+    def test_rate_max_query_reads_rate_series(
+        self, renderer: PromQLTemplateRenderer, queries: ContainerLiveStatQueries
+    ) -> None:
+        rendered = renderer.render(queries.rate_max)
 
         assert "label_replace" not in rendered
         assert "max_over_time" in rendered
@@ -855,8 +868,10 @@ class TestContainerLiveStatQueries:
         assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in rendered
         assert 'value_type="current"' in rendered
 
-    def test_avg_query_reads_current_series(self, queries: ContainerLiveStatQueries) -> None:
-        rendered = queries.avg.render()
+    def test_avg_query_reads_current_series(
+        self, renderer: PromQLTemplateRenderer, queries: ContainerLiveStatQueries
+    ) -> None:
+        rendered = renderer.render(queries.avg)
 
         assert "label_replace" not in rendered
         assert "avg_over_time" in rendered
@@ -865,8 +880,10 @@ class TestContainerLiveStatQueries:
         assert "rate(" not in rendered
         assert "backendai_container_utilization" in rendered
 
-    def test_rate_avg_query_reads_rate_series(self, queries: ContainerLiveStatQueries) -> None:
-        rendered = queries.rate_avg.render()
+    def test_rate_avg_query_reads_rate_series(
+        self, renderer: PromQLTemplateRenderer, queries: ContainerLiveStatQueries
+    ) -> None:
+        rendered = renderer.render(queries.rate_avg)
 
         assert "label_replace" not in rendered
         assert "avg_over_time" in rendered

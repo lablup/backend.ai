@@ -9,15 +9,15 @@ from typing import cast
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     IdleCheckPhase,
 )
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.idle_checker.types import (
@@ -34,26 +34,27 @@ from ai.backend.manager.errors.idle_checker import (
 )
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
-from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
     BatchUpdater,
     BulkCreator,
+    BulkUpserter,
     Creator,
-    NoPagination,
-    OffsetPagination,
     Purger,
     Querier,
     Updater,
@@ -65,7 +66,7 @@ from ai.backend.manager.repositories.idle_checker.creators import (
     SessionIdleCheckCreatorSpec,
 )
 from ai.backend.manager.repositories.idle_checker.purgers import (
-    SessionIdleCheckBatchPurgerSpec,
+    SessionIdleCheckSyncPurgerSpec,
 )
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
@@ -77,15 +78,22 @@ from ai.backend.manager.repositories.idle_checker.types import (
     InitialGracePeriodBatchData,
     InitialGracePeriodCheckData,
     SessionIdleCheckAssignmentData,
+    SessionIdleCheckBatchResult,
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.idle_checker.updaters import (
     SessionIdleCheckJudgmentBatchUpdaterSpec,
     SessionIdleCheckPhaseBatchUpdaterSpec,
 )
+from ai.backend.manager.repositories.idle_checker.upserters import (
+    SessionIdleCheckExcludeUpserterSpec,
+    SessionIdleCheckIncludeUpserterSpec,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 _ASSIGNMENT_DELETE_BATCH_SIZE = 1000
+
+
 _IDLE_CHECK_UPDATE_BATCH_SIZE = 1000
 
 
@@ -138,17 +146,20 @@ class IdleCheckerDBSource:
                     result = await w.batch_query_in_global(sa.select(DomainRow), querier)
                     scope_exists = bool(result.rows)
                 case ScopeType.PROJECT:
-                    row = await w.query(Querier(row_class=GroupRow, pk_value=spec.scope_id))
+                    row = await w.query(Querier(row_class=ProjectRow, pk_value=spec.scope_id))
                     scope_exists = row is not None
                 case ScopeType.RESOURCE_GROUP:
                     querier = BatchQuerier(
                         pagination=OffsetPagination(limit=1),
                         conditions=[
-                            ScalingGroupConditions.by_ids([ResourceGroupID(spec.scope_id)])
+                            ResourceGroupConditions.by_ids([ResourceGroupID(spec.scope_id)])
                         ],
                     )
-                    result = await w.batch_query_in_global(sa.select(ScalingGroupRow), querier)
+                    result = await w.batch_query_in_global(sa.select(ResourceGroupRow), querier)
                     scope_exists = bool(result.rows)
+                case ScopeType.USER:
+                    user_row = await w.query(Querier(row_class=UserRow, pk_value=spec.scope_id))
+                    scope_exists = user_row is not None
                 case _:
                     scope_exists = False
             if not scope_exists:
@@ -197,7 +208,7 @@ class IdleCheckerDBSource:
     async def scoped_search_assignments(
         self,
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> SearchResult[IdleCheckerAssignmentData]:
         """Search bindings whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
         async with self._ops.read_ops() as r:
@@ -353,6 +364,10 @@ class IdleCheckerDBSource:
                 IdleCheckerBindingRow.scope_type == ScopeType.DOMAIN.value,
                 IdleCheckerBindingRow.scope_id == SessionRow.domain_id,
             ),
+            sa.and_(
+                IdleCheckerBindingRow.scope_type == ScopeType.USER.value,
+                IdleCheckerBindingRow.scope_id == SessionRow.user_uuid,
+            ),
         )
         desired_query = (
             sa.select(
@@ -422,7 +437,7 @@ class IdleCheckerDBSource:
                 for pair_batch in batched(pairs_to_delete, _ASSIGNMENT_DELETE_BATCH_SIZE):
                     await w.batch_purge(
                         BatchPurger(
-                            spec=SessionIdleCheckBatchPurgerSpec(pair_batch),
+                            spec=SessionIdleCheckSyncPurgerSpec(pair_batch),
                             batch_size=_ASSIGNMENT_DELETE_BATCH_SIZE,
                         )
                     )
@@ -447,6 +462,72 @@ class IdleCheckerDBSource:
                     )
                 )
 
+    async def batch_exclude_session_idle_checks(
+        self,
+        upserter: BulkUpserter[SessionIdleCheckRow],
+    ) -> SessionIdleCheckBatchResult:
+        """Apply the pre-assembled exclusion upserts, one savepoint-isolated upsert per row.
+
+        Session and checker existence are enforced per row by the foreign keys (the
+        spec maps the violations to SessionNotFound / IdleCheckerNotFound), so a
+        failing row lands in ``failed`` with its reason instead of failing the batch.
+        """
+        async with self._ops.write_ops() as w:
+            result = await w.bulk_upsert_partial(
+                upserter,
+                index_elements=["session_id", "idle_checker_id"],
+            )
+            success: list[SessionIdleCheckPair] = []
+            for row in result.successes:
+                success.append(
+                    SessionIdleCheckPair(
+                        session_id=row.session_id,
+                        checker_id=row.idle_checker_id,
+                    )
+                )
+            errors: dict[SessionIdleCheckPair, Exception] = {}
+            for error in result.errors:
+                spec = cast(SessionIdleCheckExcludeUpserterSpec, error.spec)
+                pair = SessionIdleCheckPair(
+                    session_id=SessionId(spec.session_id),
+                    checker_id=spec.checker_id,
+                )
+                errors[pair] = error.exception
+            return SessionIdleCheckBatchResult(success=success, errors=errors)
+
+    async def batch_include_session_idle_checks(
+        self,
+        upserter: BulkUpserter[SessionIdleCheckRow],
+    ) -> SessionIdleCheckBatchResult:
+        """Apply the pre-assembled inclusion upserts, one savepoint-isolated upsert per row.
+
+        Session and checker existence are enforced per row by the foreign keys (the
+        spec maps the violations to SessionNotFound / IdleCheckerNotFound), so a
+        failing row lands in ``failed`` with its reason instead of failing the batch.
+        """
+        async with self._ops.write_ops() as w:
+            result = await w.bulk_upsert_partial(
+                upserter,
+                index_elements=["session_id", "idle_checker_id"],
+            )
+            success: list[SessionIdleCheckPair] = []
+            for row in result.successes:
+                success.append(
+                    SessionIdleCheckPair(
+                        session_id=row.session_id,
+                        checker_id=row.idle_checker_id,
+                    )
+                )
+            errors: dict[SessionIdleCheckPair, Exception] = {}
+            for error in result.errors:
+                spec = cast(SessionIdleCheckIncludeUpserterSpec, error.spec)
+                pair = SessionIdleCheckPair(
+                    session_id=SessionId(spec.session_id),
+                    checker_id=spec.checker_id,
+                )
+                errors[pair] = error.exception
+            return SessionIdleCheckBatchResult(success=success, errors=errors)
+
     async def batch_apply_session_idle_check_judgments(
         self,
         judgments: Sequence[IdleJudgmentData],
@@ -459,9 +540,11 @@ class IdleCheckerDBSource:
                         spec=SessionIdleCheckJudgmentBatchUpdaterSpec(judgments),
                         conditions=[
                             SessionIdleCheckConditions.by_pairs(pairs),
-                            SessionIdleCheckConditions.by_status_not_equals(
-                                IdleCheckPhase.IDLE_EXPIRED
-                            ),
+                            SessionIdleCheckConditions.by_statuses((
+                                IdleCheckPhase.READY_TO_CHECK,
+                                IdleCheckPhase.ACTIVE,
+                                IdleCheckPhase.IDLE,
+                            )),
                         ],
                     )
                 )

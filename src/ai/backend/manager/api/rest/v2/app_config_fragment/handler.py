@@ -7,6 +7,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     BulkPurgeAppConfigFragmentInput,
@@ -18,7 +19,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentsByNamesPayload,
 )
-from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import AppConfigFragmentIdPathParam
 
@@ -94,7 +94,10 @@ class V2AppConfigFragmentHandler:
         self,
         body: BodyParam[ScopedUpsertAppConfigFragmentsInput],
     ) -> APIResponse:
-        """Upsert many fragments at one scope, all-or-nothing (auth, RBAC-authorized)."""
+        """Upsert many fragments at one scope, with per-item partial success (auth, RBAC).
+
+        Not in effect yet: still all-or-nothing.
+        """
         result = await self._adapter.scoped_upsert_app_config_fragments(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -102,6 +105,10 @@ class V2AppConfigFragmentHandler:
         self,
         body: BodyParam[MyUpsertAppConfigFragmentsInput],
     ) -> APIResponse:
-        """Upsert many fragments at the caller's own user scope, all-or-nothing (auth)."""
+        """Upsert many fragments at the caller's own user scope, with per-item partial
+        success (auth).
+
+        Not in effect yet: still all-or-nothing.
+        """
         result = await self._adapter.my_upsert_app_config_fragments(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

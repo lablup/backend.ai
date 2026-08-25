@@ -21,6 +21,7 @@ from typing import (
     Final,
 )
 from urllib.parse import urlparse
+from uuid import UUID
 
 import aiohttp
 import aiotools
@@ -32,6 +33,7 @@ from aiotools import apartial
 
 from ai.backend.common.api_handlers import PathParam, QueryParam
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.stream.request import SessionNamePath, StreamProxyRequest
 from ai.backend.common.dto.manager.stream.response import StreamAppItem
 from ai.backend.common.exception import BackendAIError, UnreachableError
@@ -46,6 +48,7 @@ from ai.backend.manager.errors.kernel import InvalidStreamMode
 from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
 from ai.backend.manager.errors.service import AppServiceStartFailed
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
 from ai.backend.manager.services.session.actions.resolve_session_name import (
     ResolveSessionNameAction,
 )
@@ -115,6 +118,17 @@ class StreamHandler:
         self.config_provider = config_provider
         self.error_monitor = error_monitor
 
+    async def _resolve_session_id(self, session_name: str, user_id: UUID) -> SessionId:
+        """The session the name stands for, within its owner.
+
+        Every stream operation acts on one session, and an action names it by id; the
+        request names it the way a person does.
+        """
+        result = await self._session.lookup.run(
+            LookupSessionAction(user_uuid=user_id, name=session_name)
+        )
+        return SessionId(result.entity_id())
+
     async def _resolve_session_name(self, session_name_or_id: str) -> str:
         """Normalize a streaming path reference (name or UUID) to its canonical name.
 
@@ -127,8 +141,8 @@ class StreamHandler:
             session_id = SessionId(uuid.UUID(session_name_or_id))
         except (ValueError, TypeError):
             return session_name_or_id
-        result = await self._session.resolve_session_name.wait_for_complete(
-            ResolveSessionNameAction(session_id=session_id)
+        result = await self._session.resolve_session_name.run(
+            ResolveSessionNameAction(session_id=SessionID(session_id))
         )
         return result.session_name
 
@@ -147,8 +161,9 @@ class StreamHandler:
         session_name_or_id = path.parsed.session_name
         session_name = await self._resolve_session_name(session_name_or_id)
         api_version = request["api_version"]
-        result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, user_uuid=user_id),
+        session_id = await self._resolve_session_id(session_name, user_id)
+        result = await self._stream.get_streaming_session.run(
+            GetStreamingSessionAction(session_id=session_id),
         )
         log.info("STREAM_PTY(s:{0})", session_name)
         stream_key = result.kernel_id
@@ -222,10 +237,9 @@ class StreamHandler:
                             run_id = secrets.token_hex(8)
                             if data["type"] == "resize":
                                 code = f"%resize {data['rows']} {data['cols']}"
-                                await self._stream.execute_in_stream.wait_for_complete(
+                                await self._stream.execute_in_stream.run(
                                     ExecuteInStreamAction(
-                                        session_name=session_name,
-                                        user_uuid=user_id,
+                                        session_id=session_id,
                                         api_version=api_version,
                                         run_id=run_id,
                                         mode="query",
@@ -235,10 +249,9 @@ class StreamHandler:
                                     ),
                                 )
                             elif data["type"] == "ping":
-                                await self._stream.execute_in_stream.wait_for_complete(
+                                await self._stream.execute_in_stream.run(
                                     ExecuteInStreamAction(
-                                        session_name=session_name,
-                                        user_uuid=user_id,
+                                        session_id=session_id,
                                         api_version=api_version,
                                         run_id=run_id,
                                         mode="query",
@@ -250,10 +263,9 @@ class StreamHandler:
                             elif data["type"] == "restart":
                                 log.debug("stream_stdin: restart requested")
                                 if not socks[0].closed:
-                                    await self._stream.restart_in_stream.wait_for_complete(
+                                    await self._stream.restart_in_stream.run(
                                         RestartInStreamAction(
-                                            session_name=session_name,
-                                            user_uuid=user_id,
+                                            session_id=session_id,
                                         ),
                                     )
                                     socks[0].close()
@@ -344,8 +356,9 @@ class StreamHandler:
         session_name = await self._resolve_session_name(session_name_or_id)
         api_version = request["api_version"]
         log.info("STREAM_EXECUTE(s:{0})", session_name)
-        session_result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, user_uuid=user_id),
+        session_id = await self._resolve_session_id(session_name, user_id)
+        session_result = await self._stream.get_streaming_session.run(
+            GetStreamingSessionAction(session_id=session_id),
         )
         stream_key = session_result.kernel_id
 
@@ -373,10 +386,9 @@ class StreamHandler:
             opts = params.get("options", None) or {}
 
             while True:
-                exec_result = await self._stream.execute_in_stream.wait_for_complete(
+                exec_result = await self._stream.execute_in_stream.run(
                     ExecuteInStreamAction(
-                        session_name=session_name,
-                        user_uuid=user_id,
+                        session_id=session_id,
                         api_version=api_version,
                         run_id=run_id,
                         mode=mode,
@@ -388,10 +400,9 @@ class StreamHandler:
                 raw_result = exec_result.result
                 if ws.closed:
                     log.debug("STREAM_EXECUTE: client disconnected (interrupted)")  # type: ignore[unreachable]
-                    await self._stream.interrupt_in_stream.wait_for_complete(
+                    await self._stream.interrupt_in_stream.run(
                         InterruptInStreamAction(
-                            session_name=session_name,
-                            user_uuid=user_id,
+                            session_id=session_id,
                         ),
                     )
                     break
@@ -461,8 +472,9 @@ class StreamHandler:
         myself = asyncio.current_task()
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
-        session_result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, user_uuid=user_id),
+        session_id = await self._resolve_session_id(session_name, user_id)
+        session_result = await self._stream.get_streaming_session.run(
+            GetStreamingSessionAction(session_id=session_id),
         )
         kernel_id = session_result.kernel_id
         session_id = session_result.session_id
@@ -543,7 +555,7 @@ class StreamHandler:
         async def add_conn_track() -> None:
             async with app_ctx.conn_tracker_lock:
                 app_ctx.active_connection_counts[session_id] += 1
-                await self._stream.track_connection.wait_for_complete(
+                await self._stream.track_connection.run(
                     TrackConnectionAction(
                         kernel_id=kernel_id,
                         session_id=session_id,
@@ -557,7 +569,7 @@ class StreamHandler:
                 app_ctx.active_connection_counts[session_id] -= 1
                 if app_ctx.active_connection_counts[session_id] <= 0:
                     del app_ctx.active_connection_counts[session_id]
-                await self._stream.untrack_connection.wait_for_complete(
+                await self._stream.untrack_connection.run(
                     UntrackConnectionAction(
                         kernel_id=kernel_id,
                         session_id=session_id,
@@ -575,10 +587,9 @@ class StreamHandler:
             if params.envs is not None:
                 opts["envs"] = load_json(params.envs)
 
-            start_result = await self._stream.start_service_in_stream.wait_for_complete(
+            start_result = await self._stream.start_service_in_stream.run(
                 StartServiceInStreamAction(
-                    session_name=session_name,
-                    user_uuid=user_id,
+                    session_id=session_id,
                     service=service,
                     opts=opts,
                 ),
@@ -622,8 +633,9 @@ class StreamHandler:
         user_id = _require_current_user_id()
         session_name_or_id = path.parsed.session_name
         session_name = await self._resolve_session_name(session_name_or_id)
-        result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, user_uuid=user_id),
+        session_id = await self._resolve_session_id(session_name, user_id)
+        result = await self._stream.get_streaming_session.run(
+            GetStreamingSessionAction(session_id=session_id),
         )
         service_ports: list[dict[str, Any]] = result.service_ports
         if not service_ports:
@@ -680,7 +692,7 @@ async def stream_conn_tracker_gc(
             active_session_ids = list(app_ctx.active_connection_counts.keys())
             if active_session_ids:
                 try:
-                    await stream_processors.gc_stale_connections.wait_for_complete(
+                    await stream_processors.gc_stale_connections.run(
                         GCStaleConnectionsAction(active_session_ids=active_session_ids),
                     )
                 except Exception:

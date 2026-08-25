@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, override
+from typing import override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.base import (
@@ -15,25 +15,12 @@ from ai.backend.manager.models.base import (
     Base,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.association_artifacts_storages import (
-        AssociationArtifactsStorageRow,
-    )
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("VFSStorageRow",)
 
 
-def _get_vfs_storage_association_artifact_join_cond() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.association_artifacts_storages import (
-        AssociationArtifactsStorageRow,
-    )
-
-    return VFSStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
-
-
-class VFSStorageRow(Base):  # type: ignore[misc]
+class VFSStorageRow(Base):
     """
     Represents a VFS storage configuration.
     This model is used to store the details of VFS storage backends
@@ -42,21 +29,12 @@ class VFSStorageRow(Base):  # type: ignore[misc]
 
     __tablename__ = "vfs_storages"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[VFSStorageID] = mapped_column(
+        "id", GUID(VFSStorageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String, index=True, unique=True, nullable=False)
     host: Mapped[str] = mapped_column("host", sa.String, nullable=False)
     base_path: Mapped[str] = mapped_column("base_path", sa.String, nullable=False)
-
-    association_artifacts_storages_rows: Mapped[list[AssociationArtifactsStorageRow]] = (
-        relationship(
-            "AssociationArtifactsStorageRow",
-            back_populates="vfs_storage_row",
-            primaryjoin=_get_vfs_storage_association_artifact_join_cond,
-            overlaps="association_artifacts_storages_rows,object_storage_row",
-        )
-    )
 
     @override
     def __str__(self) -> str:

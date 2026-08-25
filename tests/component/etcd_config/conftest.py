@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from typing import Any
 
 import pytest
 
+from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.etcd.handler import EtcdHandler
 from ai.backend.manager.api.rest.etcd.registry import register_etcd_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -17,6 +20,9 @@ from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
 from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
+from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
+    ContainerRegistryOpsProvider,
+)
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
@@ -26,11 +32,14 @@ from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 @pytest.fixture()
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(database_engine)
+    repo = ContainerRegistryRepository(
+        database_engine, ContainerRegistryOpsProvider(database_engine)
+    )
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        processor_registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), service
     )
 
 
@@ -40,6 +49,7 @@ def etcd_config_processors(
     config_provider: ManagerConfigProvider,
     async_etcd: AsyncEtcd,
     valkey_clients: ValkeyClients,
+    processor_registry: ProcessorRegistry[Any],
 ) -> EtcdConfigProcessors:
     repo = EtcdConfigRepository(database_engine)
     service = EtcdConfigService(
@@ -49,7 +59,7 @@ def etcd_config_processors(
         valkey_stat=valkey_clients.stat,
     )
     return EtcdConfigProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        processor_registry.group(GroupMeta(ETCD_CONFIG_ENTITY_TYPE)), service
     )
 
 

@@ -5,13 +5,13 @@ from datetime import datetime, timedelta
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.manager.data.retention.types import RetentionCategory, RetentionPolicyData
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RetentionPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class RetentionPolicyRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "retention_policies"
     __table_args__ = (sa.UniqueConstraint("category", name="uq_retention_policies_category"),)
 

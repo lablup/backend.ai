@@ -30,11 +30,13 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
+from ai.backend.manager.actions.v2 import validators as v2_validators
 from ai.backend.manager.actions.v2.bulk.monitor.audit_log import BulkActionAuditLogMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.prometheus import BulkActionPrometheusMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.reporter import BulkActionReporterMonitor
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
-    VirtualScopeBulkActionRBACValidator,
+    VirtualScopeAtomicBulkActionRBACValidator,
+    VirtualScopePartialBulkActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.global_scope.monitor.audit_log import (
     GlobalActionAuditLogMonitor,
@@ -44,6 +46,9 @@ from ai.backend.manager.actions.v2.global_scope.monitor.prometheus import (
 )
 from ai.backend.manager.actions.v2.global_scope.monitor.reporter import (
     GlobalActionReporterMonitor,
+)
+from ai.backend.manager.actions.v2.lookup.bulk_monitor.audit_log import (
+    BulkLookupActionAuditLogMonitor,
 )
 from ai.backend.manager.actions.v2.lookup.monitor.audit_log import LookupActionAuditLogMonitor
 from ai.backend.manager.actions.v2.lookup.monitor.prometheus import (
@@ -88,6 +93,7 @@ from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
 from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCleanupEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
@@ -98,8 +104,10 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.reporters.base import AbstractReporter
 from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
 from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.service.container_registry.harbor import (
     AbstractPerProjectContainerRegistryQuotaService,
 )
@@ -152,6 +160,7 @@ class ProcessingInput:
     repositories: Repositories
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     event_producer: EventProducer
 
     # Processors creation (ServiceArgs additional)
@@ -266,36 +275,68 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         reporter_hub = ReporterHub(ReporterHubArgs(reporters=action_reporters))
         reporter_monitor = ReporterMonitor(reporter_hub)
         prometheus_monitor = PrometheusMonitor()
-        audit_log_repository = setup_input.repositories.audit_log.repository
+        audit_log_repository: OpsRepository[AuditLogData] = OpsRepository(
+            setup_input.repositories.v2_ops_provider
+        )
         audit_log_policy = AuditLogPolicy(
             setup_input.config_provider.config.audit_log.record_read_operations
         )
-        audit_log_monitor = AuditLogMonitor(audit_log_repository, audit_log_policy)
+        client_ip_masking_repository = setup_input.repositories.client_ip_masking.repository
+        audit_log_monitor = AuditLogMonitor(
+            audit_log_repository, audit_log_policy, client_ip_masking_repository
+        )
         action_monitors = ActionMonitors(
             legacy=[reporter_monitor, prometheus_monitor, audit_log_monitor],
             single_entity=[
                 SingleEntityActionReporterMonitor(reporter_hub),
                 SingleEntityActionPrometheusMonitor(),
-                SingleEntityActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+                SingleEntityActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
             ],
             bulk=[
                 BulkActionReporterMonitor(reporter_hub),
                 BulkActionPrometheusMonitor(),
-                BulkActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+                BulkActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
             ],
             scope=[
                 ScopeActionReporterMonitor(reporter_hub),
                 ScopeActionPrometheusMonitor(),
-                ScopeActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+                ScopeActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
             ],
             global_scope=[
                 GlobalActionReporterMonitor(reporter_hub),
                 GlobalActionPrometheusMonitor(),
-                GlobalActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+                GlobalActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
             ],
             lookup=[
                 LookupActionPrometheusMonitor(),
-                LookupActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+                LookupActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
+            bulk_lookup=[
+                BulkLookupActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
             ],
         )
 
@@ -328,6 +369,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             appproxy_client_pool=setup_input.appproxy_client_pool,
             prometheus_client=setup_input.prometheus_client,
             ssh_key_validator=ssh_key_validator,
+            key_provider_pool=setup_input.key_provider_pool,
             registry_quota_service=setup_input.registry_quota_service,
         )
 
@@ -351,7 +393,10 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             single_entity=VirtualScopeSingleEntityActionRBACValidator(
                 permission_controller_repository, config_provider
             ),
-            bulk=VirtualScopeBulkActionRBACValidator(
+            partial_bulk=VirtualScopePartialBulkActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
+            atomic_bulk=VirtualScopeAtomicBulkActionRBACValidator(
                 permission_controller_repository, config_provider
             ),
         )
@@ -367,6 +412,12 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                     rbac=rbac_validators,
                     legacy_rbac=legacy_rbac_validators,
                     virtual_scope_rbac=virtual_scope_rbac_validators,
+                ),
+                v2_validators=v2_validators.ActionValidators(
+                    single_entity=[virtual_scope_rbac_validators.single_entity],
+                    partial_bulk=[virtual_scope_rbac_validators.partial_bulk],
+                    atomic_bulk=[virtual_scope_rbac_validators.atomic_bulk],
+                    scope=[virtual_scope_rbac_validators.scope],
                 ),
             ),
         )

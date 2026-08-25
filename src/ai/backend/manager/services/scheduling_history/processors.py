@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-from typing import override
-
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.data.session.types import SessionData
 
 from .actions import (
     GlobalSearchReplicaGroupHistoryAction,
     GlobalSearchReplicaGroupHistoryActionResult,
-    ResolveKernelSessionAction,
-    ResolveKernelSessionActionResult,
     ScopedSearchReplicaGroupHistoryAction,
     ScopedSearchReplicaGroupHistoryActionResult,
     SearchDeploymentHistoryAction,
@@ -36,103 +31,80 @@ from .actions import (
 from .service import SchedulingHistoryService
 
 
-class SchedulingHistoryProcessors(AbstractProcessorPackage):
+class SchedulingHistoryProcessors:
     """Processor package for scheduling history operations."""
 
     # Admin processors
-    search_session_history: ActionProcessor[
+    search_session_history: GlobalActionProcessor[
         SearchSessionHistoryAction, SearchSessionHistoryActionResult
     ]
     search_kernel_history: GlobalActionProcessor[
         SearchKernelHistoryAction, SearchKernelHistoryActionResult
     ]
-    search_deployment_history: ActionProcessor[
+    search_deployment_history: GlobalActionProcessor[
         SearchDeploymentHistoryAction, SearchDeploymentHistoryActionResult
     ]
     global_search_replica_group_history: GlobalActionProcessor[
         GlobalSearchReplicaGroupHistoryAction, GlobalSearchReplicaGroupHistoryActionResult
     ]
-    search_route_history: ActionProcessor[SearchRouteHistoryAction, SearchRouteHistoryActionResult]
+    search_route_history: GlobalActionProcessor[
+        SearchRouteHistoryAction, SearchRouteHistoryActionResult
+    ]
 
     # Scoped processors (added in 26.2.0)
-    search_session_scoped_history: ActionProcessor[
+    search_session_scoped_history: ScopeActionProcessor[
         SearchSessionScopedHistoryAction, SearchSessionScopedHistoryActionResult
-    ]
-    resolve_kernel_session: ActionProcessor[
-        ResolveKernelSessionAction, ResolveKernelSessionActionResult
     ]
     search_kernel_scoped_history: ScopeActionProcessor[
         SearchKernelScopedHistoryAction, SearchKernelScopedHistoryActionResult
     ]
-    search_deployment_scoped_history: ActionProcessor[
+    search_deployment_scoped_history: ScopeActionProcessor[
         SearchDeploymentScopedHistoryAction, SearchDeploymentScopedHistoryActionResult
     ]
     scoped_search_replica_group_history: ScopeActionProcessor[
         ScopedSearchReplicaGroupHistoryAction, ScopedSearchReplicaGroupHistoryActionResult
     ]
-    search_route_scoped_history: ActionProcessor[
+    search_route_scoped_history: GlobalActionProcessor[
         SearchRouteScopedHistoryAction, SearchRouteScopedHistoryActionResult
     ]
 
     def __init__(
         self,
+        session: ProcessorGroup[SessionData],
+        deployment: ProcessorGroup[ModelDeploymentData],
+        replica_group: ProcessorGroup[ModelDeploymentData],
         service: SchedulingHistoryService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
         # Admin processors
-        self.search_session_history = ActionProcessor(
-            service.search_session_history, action_monitors
+        self.search_session_history = session.global_scope(
+            SearchSessionHistoryAction, service.search_session_history
         )
-        self.search_kernel_history = GlobalActionProcessor(
-            service.search_kernel_history, action_monitors
+        self.search_kernel_history = session.global_scope(
+            SearchKernelHistoryAction, service.search_kernel_history
         )
-        self.search_deployment_history = ActionProcessor(
-            service.search_deployment_history, action_monitors
+        self.search_deployment_history = deployment.global_scope(
+            SearchDeploymentHistoryAction, service.search_deployment_history
         )
-        self.global_search_replica_group_history = GlobalActionProcessor(
-            service.global_search_replica_group_history, action_monitors
+        self.global_search_replica_group_history = replica_group.global_scope(
+            GlobalSearchReplicaGroupHistoryAction, service.global_search_replica_group_history
         )
-        self.search_route_history = ActionProcessor(service.search_route_history, action_monitors)
+        self.search_route_history = deployment.global_scope(
+            SearchRouteHistoryAction, service.search_route_history
+        )
 
         # Scoped processors (added in 26.2.0)
-        self.search_session_scoped_history = ActionProcessor(
-            service.search_session_scoped_history, action_monitors
+        self.search_session_scoped_history = session.scope(
+            SearchSessionScopedHistoryAction, service.search_session_scoped_history
         )
-        self.resolve_kernel_session = ActionProcessor(
-            service.resolve_kernel_session, action_monitors
+        self.search_kernel_scoped_history = session.scope(
+            SearchKernelScopedHistoryAction, service.search_kernel_scoped_history
         )
-        self.search_kernel_scoped_history = ScopeActionProcessor(
-            service.search_kernel_scoped_history,
-            monitors=action_monitors,
-            validators=[validators.rbac.scope],
+        self.search_deployment_scoped_history = deployment.scope(
+            SearchDeploymentScopedHistoryAction, service.search_deployment_scoped_history
         )
-        self.search_deployment_scoped_history = ActionProcessor(
-            service.search_deployment_scoped_history, action_monitors
+        self.scoped_search_replica_group_history = replica_group.scope(
+            ScopedSearchReplicaGroupHistoryAction, service.scoped_search_replica_group_history
         )
-        self.scoped_search_replica_group_history = ScopeActionProcessor(
-            service.scoped_search_replica_group_history,
-            monitors=action_monitors,
-            validators=[validators.rbac.scope],
+        self.search_route_scoped_history = deployment.global_scope(
+            SearchRouteScopedHistoryAction, service.search_route_scoped_history
         )
-        self.search_route_scoped_history = ActionProcessor(
-            service.search_route_scoped_history, action_monitors
-        )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            # Admin actions
-            SearchSessionHistoryAction.spec(),
-            SearchKernelHistoryAction.spec(),
-            SearchDeploymentHistoryAction.spec(),
-            GlobalSearchReplicaGroupHistoryAction.spec(),
-            SearchRouteHistoryAction.spec(),
-            # Scoped actions (added in 26.2.0)
-            SearchSessionScopedHistoryAction.spec(),
-            ResolveKernelSessionAction.spec(),
-            SearchKernelScopedHistoryAction.spec(),
-            SearchDeploymentScopedHistoryAction.spec(),
-            ScopedSearchReplicaGroupHistoryAction.spec(),
-            SearchRouteScopedHistoryAction.spec(),
-        ]

@@ -6,6 +6,8 @@ into Processor actions and converts the action results back into v2 DTOs.
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.permission.types import (
     OperationType,
     RBACElementType,
@@ -20,7 +22,6 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     SearchRolePermissionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
-    BulkAddRolePermissionPresetFailureInfo,
     BulkAddRolePermissionPresetsPayload,
     BulkRemoveRolePermissionPresetsPayload,
     BulkRolePermissionPresetFailureInfo,
@@ -52,7 +53,6 @@ from ai.backend.common.dto.manager.v2.role_preset.response import (
     UpdateRolePresetPayload,
 )
 from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField
-from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.role_preset.types import (
@@ -60,8 +60,12 @@ from ai.backend.manager.data.role_preset.types import (
     RolePresetData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.rbac_models.role_permission_preset.conditions import (
     RolePermissionPresetConditions,
+)
+from ai.backend.manager.models.rbac_models.role_permission_preset.creators import (
+    RolePermissionPresetCreator,
 )
 from ai.backend.manager.models.rbac_models.role_permission_preset.orders import (
     RolePermissionPresetOrders,
@@ -70,23 +74,14 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.conditions import RolePresetConditions
+from ai.backend.manager.models.rbac_models.role_preset.creators import RolePresetCreator
 from ai.backend.manager.models.rbac_models.role_preset.orders import RolePresetOrders
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.repositories.base import (
-    BulkCreator,
-    combine_conditions_or,
-    negate_conditions,
+from ai.backend.manager.models.rbac_models.role_preset.searchers import (
+    RolePermissionPresetSearcher,
+    RolePresetSearcher,
 )
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.role_preset.creators import (
-    RolePermissionPresetCreatorSpec,
-    RolePermissionPresetDependentCreatorSpec,
-    RolePresetCreatorSpec,
-)
-from ai.backend.manager.repositories.role_preset.updaters import (
-    RolePresetDeletedFlagUpdaterSpec,
-    RolePresetUpdaterSpec,
-)
+from ai.backend.manager.models.rbac_models.role_preset.updaters import RolePresetUpdater
 from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
     BulkAddRolePermissionPresetsAction,
 )
@@ -133,32 +128,32 @@ class RolePresetAdapter(BaseAdapter):
 
     async def create(self, input: CreateRolePresetInput) -> CreateRolePresetPayload:
         """Create a new role preset."""
-        creator_spec = RolePresetCreatorSpec(
+        creator = RolePresetCreator(
             name=input.name,
             scope_type=RBACElementType(input.scope_type.value).to_scope_type(),
             auto_assign=input.auto_assign,
         )
-        permission_creator_specs = [
-            RolePermissionPresetDependentCreatorSpec(
+        permission_creators = [
+            RolePermissionPresetCreator(
                 entity_type=RBACElementType(entry.entity_type.value).to_entity_type(),
                 operation=OperationType(entry.operation.value),
             )
             for entry in input.permissions
         ]
-        result = await self._processors.role_preset.create.wait_for_complete(
+        result = await self._processors.role_preset.create.run(
             CreateRolePresetAction(
-                creator_spec=creator_spec,
-                permission_creator_specs=permission_creator_specs,
+                creator=creator,
+                permission_creators=permission_creators,
             )
         )
-        return CreateRolePresetPayload(role_preset=self._data_to_node(result.preset))
+        return CreateRolePresetPayload(role_preset=self._data_to_node(result.data))
 
     async def get(self, role_preset_id: RolePresetID) -> RolePresetNode:
         """Get a single role preset by ID."""
-        result = await self._processors.role_preset.get.wait_for_complete(
+        result = await self._processors.role_preset.get.run(
             GetRolePresetAction(preset_id=role_preset_id)
         )
-        return self._data_to_node(result.preset)
+        return self._data_to_node(result.data)
 
     async def search(self, input: SearchRolePresetsInput) -> SearchRolePresetsPayload:
         """Search role presets with filtering and pagination."""
@@ -169,8 +164,9 @@ class RolePresetAdapter(BaseAdapter):
         base_conditions: list[QueryCondition] = []
         if input.filter is None or input.filter.deleted is None:
             base_conditions.append(RolePresetConditions.by_deleted(False))
-        querier = self._build_querier(
-            conditions=conditions,
+        searcher = self._build_searcher(
+            RolePresetSearcher,
+            conditions=[*base_conditions, *conditions],
             orders=orders,
             pagination_spec=_role_preset_pagination_spec(),
             first=input.first,
@@ -179,10 +175,9 @@ class RolePresetAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=base_conditions,
         )
-        result = await self._processors.role_preset.search.wait_for_complete(
-            SearchRolePresetsAction(querier=querier)
+        result = await self._processors.role_preset.search.run(
+            SearchRolePresetsAction(searcher=searcher)
         )
         return SearchRolePresetsPayload(
             items=[self._data_to_node(d) for d in result.items],
@@ -193,7 +188,8 @@ class RolePresetAdapter(BaseAdapter):
 
     async def update(self, input: UpdateRolePresetInput) -> UpdateRolePresetPayload:
         """Update an existing role preset's metadata."""
-        spec = RolePresetUpdaterSpec(
+        updater = RolePresetUpdater(
+            preset_id=input.role_preset_id,
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
@@ -203,11 +199,10 @@ class RolePresetAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        updater: Updater[RolePresetRow] = Updater(spec=spec, pk_value=input.role_preset_id)
-        result = await self._processors.role_preset.update.wait_for_complete(
+        result = await self._processors.role_preset.update.run(
             UpdateRolePresetAction(updater=updater)
         )
-        return UpdateRolePresetPayload(role_preset=self._data_to_node(result.preset))
+        return UpdateRolePresetPayload(role_preset=self._data_to_node(result.data))
 
     async def update_from_body(
         self, role_preset_id: RolePresetID, body: UpdateRolePresetBody
@@ -227,21 +222,19 @@ class RolePresetAdapter(BaseAdapter):
 
     async def bulk_delete(self, input: BulkDeleteRolePresetsInput) -> BulkDeleteRolePresetsPayload:
         """Bulk-soft-delete role presets."""
-        updaters: list[Updater[RolePresetRow]] = [
-            Updater(spec=RolePresetDeletedFlagUpdaterSpec(deleted=True), pk_value=preset_id)
-            for preset_id in input.role_preset_ids
-        ]
-        result = await self._processors.role_preset.bulk_delete.wait_for_complete(
-            BulkDeleteRolePresetsAction(updaters=updaters)
+        result = await self._processors.role_preset.bulk_delete.run(
+            BulkDeleteRolePresetsAction(ids=input.role_preset_ids)
         )
         return BulkDeleteRolePresetsPayload(
-            items=[self._data_to_node(d) for d in result.successes],
+            items=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
             failed=[
                 BulkRolePresetFailureInfo(
-                    role_preset_id=input.role_preset_ids[f.index],
-                    message=str(f.exception),
+                    role_preset_id=RolePresetID(item.entity_id), message=str(item.error)
                 )
-                for f in result.failures
+                for item in result.items
+                if item.error is not None
             ],
         )
 
@@ -249,38 +242,37 @@ class RolePresetAdapter(BaseAdapter):
         self, input: BulkRestoreRolePresetsInput
     ) -> BulkRestoreRolePresetsPayload:
         """Bulk-restore soft-deleted role presets."""
-        updaters: list[Updater[RolePresetRow]] = [
-            Updater(spec=RolePresetDeletedFlagUpdaterSpec(deleted=False), pk_value=preset_id)
-            for preset_id in input.role_preset_ids
-        ]
-        result = await self._processors.role_preset.bulk_restore.wait_for_complete(
-            BulkRestoreRolePresetsAction(updaters=updaters)
+        result = await self._processors.role_preset.bulk_restore.run(
+            BulkRestoreRolePresetsAction(ids=input.role_preset_ids)
         )
         return BulkRestoreRolePresetsPayload(
-            items=[self._data_to_node(d) for d in result.successes],
+            items=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
             failed=[
                 BulkRolePresetFailureInfo(
-                    role_preset_id=input.role_preset_ids[f.index],
-                    message=str(f.exception),
+                    role_preset_id=RolePresetID(item.entity_id), message=str(item.error)
                 )
-                for f in result.failures
+                for item in result.items
+                if item.error is not None
             ],
         )
 
     async def bulk_purge(self, input: BulkPurgeRolePresetsInput) -> BulkPurgeRolePresetsPayload:
         """Bulk-hard-delete role presets."""
-        result = await self._processors.role_preset.bulk_purge.wait_for_complete(
+        result = await self._processors.role_preset.bulk_purge.run(
             BulkPurgeRolePresetsAction(ids=input.role_preset_ids)
         )
-        purge_result = result.result
         return BulkPurgeRolePresetsPayload(
-            items=[self._data_to_node(d) for d in purge_result.successes],
+            items=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
             failed=[
                 BulkRolePresetFailureInfo(
-                    role_preset_id=input.role_preset_ids[f.index],
-                    message=str(f.exception),
+                    role_preset_id=RolePresetID(item.entity_id), message=str(item.error)
                 )
-                for f in purge_result.failures
+                for item in result.items
+                if item.error is not None
             ],
         )
 
@@ -291,16 +283,13 @@ class RolePresetAdapter(BaseAdapter):
     ) -> SearchRolePermissionPresetsPayload:
         """Search the permission entries belonging to a single role preset.
 
-        Backs the ``permission_presets`` field resolver on ``RolePresetGQL``. The
-        parent preset id is always enforced as a base condition, so caller-supplied
-        filters can only narrow within that preset, never widen across presets.
+        Backs the ``permission_presets`` field resolver on ``RolePresetGQL``. The action
+        names the preset, so a caller-supplied filter can only narrow within it.
         """
         conditions = self._convert_permission_filter(input.filter) if input.filter else []
         orders = self._convert_permission_orders(input.order) if input.order else []
-        base_conditions: list[QueryCondition] = [
-            RolePermissionPresetConditions.by_role_preset_id_equals(role_preset_id)
-        ]
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            RolePermissionPresetSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_role_permission_preset_pagination_spec(),
@@ -310,10 +299,9 @@ class RolePresetAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=base_conditions,
         )
-        result = await self._processors.role_preset.search_permission_presets.wait_for_complete(
-            SearchRolePermissionPresetsAction(querier=querier)
+        result = await self._processors.role_preset.search_permission_presets.run(
+            SearchRolePermissionPresetsAction(preset_id=role_preset_id, searcher=searcher)
         )
         return SearchRolePermissionPresetsPayload(
             items=[self._permission_data_to_node(d) for d in result.items],
@@ -328,46 +316,37 @@ class RolePresetAdapter(BaseAdapter):
         input: BulkAddRolePermissionPresetsInput,
     ) -> BulkAddRolePermissionPresetsPayload:
         """Bulk-add permission entries to an existing role preset."""
-        bulk_creator: BulkCreator[RolePermissionPresetRow] = BulkCreator(
-            specs=[
-                RolePermissionPresetCreatorSpec(
-                    role_preset_id=role_preset_id,
-                    entity_type=RBACElementType(entry.entity_type.value).to_entity_type(),
-                    operation=OperationType(entry.operation.value),
-                )
-                for entry in input.permissions
-            ]
+        creators = [
+            RolePermissionPresetCreator(
+                entity_type=RBACElementType(entry.entity_type.value).to_entity_type(),
+                operation=OperationType(entry.operation.value),
+            )
+            for entry in input.permissions
+        ]
+        result = await self._processors.role_preset.bulk_add_permissions.run(
+            BulkAddRolePermissionPresetsAction(preset_id=role_preset_id, creators=creators)
         )
-        result = await self._processors.role_preset.bulk_add_permissions.wait_for_complete(
-            BulkAddRolePermissionPresetsAction(bulk_creator=bulk_creator)
-        )
+        # The write is atomic: every entry landed, or the run raised and nothing did.
         return BulkAddRolePermissionPresetsPayload(
-            items=[self._permission_data_to_node(d) for d in result.successes],
-            failed=[
-                BulkAddRolePermissionPresetFailureInfo(
-                    entity_type=input.permissions[f.index].entity_type,
-                    operation=input.permissions[f.index].operation,
-                    message=str(f.exception),
-                )
-                for f in result.failures
-            ],
+            items=[self._permission_data_to_node(d) for d in result.items],
+            failed=[],
         )
 
     async def bulk_remove_permissions(
         self, input: BulkRemoveRolePermissionPresetsInput
     ) -> BulkRemoveRolePermissionPresetsPayload:
         """Bulk-remove permission entries from a role preset."""
-        result = await self._processors.role_preset.bulk_remove_permissions.wait_for_complete(
+        result = await self._processors.role_preset.bulk_remove_permissions.run(
             BulkRemoveRolePermissionPresetsAction(ids=input.permission_preset_ids)
         )
         return BulkRemoveRolePermissionPresetsPayload(
-            items=[self._permission_data_to_node(d) for d in result.successes],
+            items=[self._permission_data_to_node(d) for d in result.successes.values()],
             failed=[
                 BulkRolePermissionPresetFailureInfo(
-                    permission_preset_id=input.permission_preset_ids[f.index],
-                    message=str(f.exception),
+                    permission_preset_id=RolePermissionPresetID(permission_id),
+                    message=str(exception),
                 )
-                for f in result.failures
+                for permission_id, exception in result.errors.items()
             ],
         )
 

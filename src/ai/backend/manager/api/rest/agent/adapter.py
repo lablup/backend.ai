@@ -16,8 +16,9 @@ from ai.backend.common.dto.manager.agent import (
 )
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = ("AgentAdapter",)
@@ -33,10 +34,10 @@ class AgentAdapter(BaseFilterAdapter):
             id=str(agent.id),
             status=agent.status.name,
             region=agent.region,
-            resource_group=agent.scaling_group,
+            resource_group=agent.resource_group,
             schedulable=agent.schedulable,
             available_slots=dict(agent.available_slots.to_json()),
-            occupied_slots=dict(agent.cached_occupied_slots.to_json()),
+            occupied_slots=dict(agent.occupied_slots.to_json()),
             addr=agent.addr,
             architecture=agent.architecture,
             version=agent.version,

@@ -7,9 +7,11 @@ from functools import lru_cache
 from typing import cast
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    MetricLabel,
     NetworkTimeoutSpec,
     SessionLifetimeSpec,
     UtilizationSpec,
@@ -42,23 +44,17 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
     IdleCheckerOrderField,
     IdleCheckerTypeDTO,
 )
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import MetricLabelEntryInfo
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerConditions
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Creator,
-    NoPagination,
-    Purger,
-    Updater,
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger, Updater
 from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerCreatorSpec
 from ai.backend.manager.repositories.idle_checker.purgers import IdleCheckerPurgerSpec
 from ai.backend.manager.repositories.idle_checker.updaters import IdleCheckerUpdaterSpec
@@ -231,6 +227,11 @@ class IdleCheckerAdapter(BaseAdapter):
                         threshold=UtilizationThresholdInfo(
                             preset_id=utilization.threshold.preset_id,
                             threshold=utilization.threshold.threshold,
+                            filter_labels=[
+                                MetricLabelEntryInfo(key=label.key, value=label.value)
+                                for label in utilization.threshold.filter_labels
+                            ],
+                            group_labels=utilization.threshold.group_labels,
                         ),
                     ),
                 )
@@ -261,6 +262,11 @@ class IdleCheckerAdapter(BaseAdapter):
                 threshold=UtilizationThresholdEntry(
                     preset_id=utilization.threshold.preset_id,
                     threshold=utilization.threshold.threshold,
+                    filter_labels=[
+                        MetricLabel(key=entry.key, value=entry.value)
+                        for entry in utilization.threshold.filter_labels
+                    ],
+                    group_labels=utilization.threshold.group_labels,
                 ),
             ),
         )

@@ -8,16 +8,22 @@ managers and never touch the engine, raw sessions, or raw SQLAlchemy statements.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 
-from ai.backend.manager.errors.repository import EmptySearchScopeError
+from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, FieldData
+from ai.backend.manager.errors.repository import (
+    EmptyOperationScopeError,
+    EntityNotFoundError,
+)
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs import creator as specs_creator
+from ai.backend.manager.models.specs import updater as specs_updater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchPurger,
@@ -31,9 +37,20 @@ from ai.backend.manager.repositories.base import (
     BulkCreatorResultWithFailures,
     BulkPurgerResultWithFailures,
     BulkUpdaterResult,
+    BulkUpserter,
+    BulkUpserterError,
+    BulkUpserterResult,
+    BulkUpserterResultWithFailures,
     Creator,
     CreatorResult,
+    DataBatchPurger,
+    DataBatchUpdater,
+    DataCreator,
+    DataPurger,
+    DataUpdater,
+    DataUpserter,
     DependentCreatorSpec,
+    LegacyBulkResultWithFailures,
     NextValuePolicy,
     Purger,
     PurgerResult,
@@ -53,6 +70,7 @@ from ai.backend.manager.repositories.base import (
     execute_bulk_dependent_creator,
     execute_bulk_purger_partial,
     execute_bulk_updater_partial,
+    execute_bulk_upserter,
     execute_creator,
     execute_dependent_creator,
     execute_next_value_creator,
@@ -61,6 +79,11 @@ from ai.backend.manager.repositories.base import (
     execute_updater,
     execute_upserter,
 )
+from ai.backend.manager.repositories.base.integrity import (
+    match_integrity_error,
+    parse_integrity_error,
+)
+from ai.backend.manager.repositories.base.purger import validate_conflict_checks
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     RBACEntityCreatorResult,
@@ -71,6 +94,7 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityPurgerResult,
     execute_rbac_entity_purger,
 )
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -118,7 +142,7 @@ class ReadOps:
         self,
         query: sa.sql.Select[Any],
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> BatchQuerierResult[Row[Any]]:
         """Run a filtered/ordered/paginated query restricted to the given scopes.
 
@@ -126,7 +150,7 @@ class ReadOps:
         unscoped global scan. Use :meth:`batch_query_in_global` for that, explicitly.
         """
         if not scopes:
-            raise EmptySearchScopeError(
+            raise EmptyOperationScopeError(
                 "batch_query_with_scopes requires at least one scope; "
                 "use batch_query_in_global for an explicit unscoped global query."
             )
@@ -134,7 +158,7 @@ class ReadOps:
 
     async def search_with_scopes[TRow: Base, TData](
         self,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
         searcher: Searcher[TRow, TData],
     ) -> SearcherResult[TData]:
         """Run a searcher restricted to the given scopes and return converted data.
@@ -143,7 +167,7 @@ class ReadOps:
         own SELECT and row conversion, so no ORM row is returned to the caller.
         """
         if not scopes:
-            raise EmptySearchScopeError(
+            raise EmptyOperationScopeError(
                 "search_with_scopes requires at least one scope; "
                 "use search_in_global for an explicit unscoped global search."
             )
@@ -165,11 +189,12 @@ class ReadOps:
     async def _search[TRow: Base, TData](
         self,
         searcher: Searcher[TRow, TData],
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> SearcherResult[TData]:
         result = await execute_batch_querier(self._sess, searcher.build_select(), searcher, scopes)
         return SearcherResult(
-            items=[searcher.to_data(row) for row in result.rows],
+            # build_select selects a single entity, so the row's first element is TRow.
+            items=[searcher.to_data(row[0]) for row in result.rows],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -182,6 +207,154 @@ class WriteOps(ReadOps):
     async def create[TRow: Base](self, creator: Creator[TRow]) -> CreatorResult[TRow]:
         """Insert a single row."""
         return await execute_creator(self._sess, creator)
+
+    async def create_data[TRow: Base, TData](self, creator: DataCreator[TRow, TData]) -> TData:
+        """Insert a single row and return it as its ``data/`` type."""
+        result = await execute_creator(self._sess, Creator(spec=creator))
+        return creator.to_data(result.row)
+
+    async def update_data[TRow: Base, TData](
+        self, updater: specs_updater.DataUpdater[TRow, TData]
+    ) -> TData | None:
+        """Update a single row by the id the spec names, returning its ``data/`` type.
+
+        For the transition: a caller whose transaction still runs legacy specs beside
+        this one reaches the v2 update here.
+        """
+        return await V2WriteOps(self._sess).update_data(updater)
+
+    async def purge_data[TRow: Base, TData](self, purger: DataPurger[TRow, TData]) -> TData | None:
+        """Delete a single row by primary key and return it as its ``data/`` type."""
+        result = await execute_purger(self._sess, Purger(spec=purger))
+        if result is None:
+            return None
+        return purger.to_data(result.row)
+
+    async def bulk_create_data[TRow: Base, TData](
+        self, creators: Sequence[DataCreator[TRow, TData]]
+    ) -> list[TData]:
+        """Insert several rows atomically, returning them as their ``data/`` type.
+
+        Takes a sequence of the same spec ``create_data`` takes rather than a spec of
+        its own: a bulk create is N of them, and each already knows how its row converts.
+        """
+        if not creators:
+            return []
+        result = await execute_bulk_creator(self._sess, BulkCreator(specs=list(creators)))
+        return [creator.to_data(row) for creator, row in zip(creators, result.rows, strict=True)]
+
+    async def bulk_update_data[TRow: Base, TData](
+        self, updaters: Mapping[EntityID, DataUpdater[TRow, TData]]
+    ) -> LegacyBulkResultWithFailures[TData]:
+        """Update each named entity independently, reporting per entity.
+
+        Each row is written inside its own savepoint, so one failure rolls back only
+        itself and leaves the rest committed — the partial-failure behaviour the bulk
+        shape reports on.
+
+        Runs the loop here rather than through ``execute_bulk_updater_partial`` because
+        that function drops a missing primary key silently: it counts as neither a
+        success nor an error, which leaves the successes list impossible to attribute
+        back to the entities that produced it. The caller named these entities, so a
+        missing one is an answer it is owed, not a gap.
+        """
+        successes: dict[EntityID, TData] = {}
+        errors: dict[EntityID, Exception] = {}
+        for entity_id, updater in updaters.items():
+            try:
+                async with self._sess.begin_nested():
+                    result = await execute_updater(
+                        self._sess, Updater(spec=updater, pk_value=updater.target_id_value())
+                    )
+                    if result is None:
+                        raise EntityNotFoundError(
+                            f"{updater.row_class.__name__} {updater.target_id_value()} not found"
+                        )
+                    successes[entity_id] = updater.to_data(result.row)
+            except Exception as e:
+                errors[entity_id] = e
+        return LegacyBulkResultWithFailures(successes=successes, errors=errors)
+
+    async def bulk_purge_data[TRow: Base, TData](
+        self, purgers: Mapping[EntityID, DataPurger[TRow, TData]]
+    ) -> LegacyBulkResultWithFailures[TData]:
+        """Delete each named entity independently, reporting per entity.
+
+        Same savepoint isolation and the same reason for the explicit loop as
+        :meth:`bulk_update_data`.
+        """
+        successes: dict[EntityID, TData] = {}
+        errors: dict[EntityID, Exception] = {}
+        for entity_id, purger in purgers.items():
+            try:
+                async with self._sess.begin_nested():
+                    result = await execute_purger(self._sess, Purger(spec=purger))
+                    if result is None:
+                        raise EntityNotFoundError(
+                            f"{purger.row_class().__name__} {purger.pk_value()} not found"
+                        )
+                    successes[entity_id] = purger.to_data(result.row)
+            except Exception as e:
+                errors[entity_id] = e
+        return LegacyBulkResultWithFailures(successes=successes, errors=errors)
+
+    async def batch_update_data[TRow: Base, TData](
+        self, updater: DataBatchUpdater[TRow, TData]
+    ) -> list[TData]:
+        """Update every row matching the spec's conditions, returning what was written.
+
+        Converting counterpart of :meth:`batch_update`, which reports a row count. The
+        rows come back through RETURNING because a scope-shaped run has to name the
+        entities it touched, and a count cannot.
+        """
+        row_class = updater.row_class
+        table = row_class.__table__
+        stmt = sa.update(table).values(updater.build_values())
+        for condition in updater.conditions():
+            stmt = stmt.where(condition())
+        stmt = stmt.returning(*table.columns)
+        try:
+            result = await self._sess.execute(stmt)
+        except sa.exc.IntegrityError as e:
+            parsed = parse_integrity_error(e)
+            match_integrity_error(parsed, updater.integrity_error_checks)
+        return [updater.to_data(row_class(**dict(r._mapping))) for r in result.fetchall()]
+
+    async def batch_purge_data[TRow: Base, TData](
+        self, purger: DataBatchPurger[TRow, TData], batch_size: int = 1000
+    ) -> list[TData]:
+        """Delete every row the spec's subquery selects, returning what was removed.
+
+        Converting counterpart of :meth:`batch_purge`, deleting in chunks the same way
+        so one call cannot hold a long transaction open. Every chunk's rows are
+        accumulated, so the caller sees each entity the run removed rather than a count.
+        """
+        base_subquery = purger.build_subquery()
+        entity = base_subquery.column_descriptions[0]["entity"]
+        table = sa.inspect(entity).local_table
+        pk_columns = list(table.primary_key.columns)
+        row_class = cast(type[TRow], entity)
+
+        await validate_conflict_checks(self._sess, purger.conflict_checks())
+
+        removed: list[TData] = []
+        while True:
+            sub = purger.build_subquery().subquery()
+            pk_subquery = sa.select(*[sub.c[pk.key] for pk in pk_columns]).limit(batch_size)
+            stmt = (
+                sa.delete(table)
+                .where(sa.tuple_(*pk_columns).in_(pk_subquery))
+                .returning(*table.columns)
+            )
+            try:
+                result = await self._sess.execute(stmt)
+            except sa.exc.IntegrityError as e:
+                raise parse_integrity_error(e) from e
+            rows = result.fetchall()
+            removed.extend(purger.to_data(row_class(**dict(r._mapping))) for r in rows)
+            if len(rows) < batch_size:
+                break
+        return removed
 
     async def bulk_create[TRow: Base](self, bulk: BulkCreator[TRow]) -> BulkCreatorResult[TRow]:
         """Insert multiple rows atomically (all-or-nothing)."""
@@ -254,6 +427,70 @@ class WriteOps(ReadOps):
     ) -> UpserterResult[TRow]:
         """Insert or update a single row on conflict."""
         return await execute_upserter(self._sess, upserter, index_elements=index_elements)
+
+    async def bulk_upsert[TRow: Base](
+        self,
+        bulk_upserter: BulkUpserter[TRow],
+        index_elements: list[str],
+    ) -> BulkUpserterResult:
+        """Insert or update multiple rows on conflict in a single statement."""
+        return await execute_bulk_upserter(self._sess, bulk_upserter, index_elements=index_elements)
+
+    async def bulk_upsert_partial[TRow: Base](
+        self,
+        bulk_upserter: BulkUpserter[TRow],
+        index_elements: list[str],
+    ) -> BulkUpserterResultWithFailures[TRow]:
+        """Insert or update each row independently; one row's failure leaves the rest applied.
+
+        Each spec runs in its own savepoint (begin_nested), so a failing row rolls
+        back alone while the rest go through. Order is preserved in successes.
+        """
+        successes: list[TRow] = []
+        errors: list[BulkUpserterError[TRow]] = []
+        for index, spec in enumerate(bulk_upserter.specs):
+            try:
+                async with self._sess.begin_nested():
+                    result = await execute_upserter(
+                        self._sess, Upserter(spec=spec), index_elements=index_elements
+                    )
+                    successes.append(result.row)
+            except sa.exc.IntegrityError as e:
+                parsed = parse_integrity_error(e)
+                try:
+                    match_integrity_error(parsed, spec.integrity_error_checks)
+                except Exception as mapped:
+                    errors.append(BulkUpserterError(spec=spec, exception=mapped, index=index))
+            except Exception as e:
+                errors.append(BulkUpserterError(spec=spec, exception=e, index=index))
+        return BulkUpserterResultWithFailures(successes=successes, errors=errors)
+
+    async def upsert_data[TRow: Base, TData](self, upserter: DataUpserter[TRow, TData]) -> TData:
+        """Insert or update a single row on conflict, returning its ``data/`` type."""
+        result = await execute_upserter(
+            self._sess, Upserter(spec=upserter), index_elements=upserter.index_elements()
+        )
+        return upserter.to_data(result.row)
+
+    async def create_entity[TRow: Base, TData](
+        self, creator: specs_creator.EntityCreator[TRow, TData]
+    ) -> TData:
+        """Insert an entity row and provision it in the RBAC graph, on this session.
+
+        For the transition: a caller whose transaction still runs legacy specs
+        beside this one reaches the v2 entity write here.
+        """
+        return await V2WriteOps(self._sess).create_entity(creator)
+
+    async def create_field[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+        self, owner_id: TOwnerID, creator: specs_creator.FieldCreator[TOwnerID, TRow, TData]
+    ) -> TData:
+        """Insert a field row under its owner, on this session.
+
+        For the transition: a caller whose transaction still runs legacy specs
+        beside this one reaches the v2 field write here.
+        """
+        return await V2WriteOps(self._sess).create_field(owner_id, creator)
 
     async def create_rbac_entity[TRow: Base](
         self, creator: RBACEntityCreator[TRow]

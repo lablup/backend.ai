@@ -12,6 +12,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotInfo,
@@ -22,8 +23,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.types import PreemptionOrder
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 
 __all__ = (
     "AdminSearchResourceGroupsPayload",
@@ -32,7 +32,7 @@ __all__ = (
     "AllowedResourceGroupsPayload",
     "CreateResourceGroupPayload",
     "DeleteResourceGroupPayload",
-    "FairShareScalingGroupSpecInfo",
+    "FairShareResourceGroupSpecInfo",
     "PreemptionConfigInfo",
     "ReplaceResourceGroupDefaultDeploymentOptionsPayload",
     "ReplaceResourceGroupDefaultSessionOptionsPayload",
@@ -131,6 +131,12 @@ class PreemptionConfigInfo(BaseResponseModel):
         description=(
             "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
         )
+    )
+    victim_scope: PreemptionVictimScope = Field(
+        default=PreemptionVictimScope.USER,
+        description=(
+            "Scope preemption victims are drawn from (user/project/domain/resource-group)."
+        ),
     )
 
 
@@ -266,7 +272,7 @@ class ReplaceResourceGroupDefaultSessionOptionsPayload(BaseResponseModel):
     )
 
 
-class FairShareScalingGroupSpecInfo(BaseResponseModel):
+class FairShareResourceGroupSpecInfo(BaseResponseModel):
     """Fair share configuration for a resource group."""
 
     half_life_days: int = Field(description="Half-life for exponential decay in days")

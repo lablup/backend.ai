@@ -27,19 +27,14 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.condition_utils import combine_conditions_and, combine_conditions_or
 from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    NoPagination,
-    combine_conditions_and,
-    combine_conditions_or,
-)
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater
+from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
+from ai.backend.manager.models.scheduling_history.creators import RouteHistoryCreator
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
-from ai.backend.manager.repositories.scheduling_history.creators import RouteHistoryCreatorSpec
+from ai.backend.manager.repositories.deployment.types import RouteHistoryToCreate
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.handlers import (
     AppProxySyncRouteHandler,
@@ -85,11 +80,11 @@ class RouteTaskSpec:
 
     def create_if_needed_event(self) -> DoRouteLifecycleIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoRouteLifecycleIfNeededEvent(self.lifecycle_type.value)
+        return DoRouteLifecycleIfNeededEvent(lifecycle_type=self.lifecycle_type.value)
 
     def create_process_event(self) -> DoRouteLifecycleEvent:
         """Create event for forced processing."""
-        return DoRouteLifecycleEvent(self.lifecycle_type.value)
+        return DoRouteLifecycleEvent(lifecycle_type=self.lifecycle_type.value)
 
     @property
     def short_task_name(self) -> str:
@@ -328,39 +323,38 @@ class RouteCoordinator:
         from_status = target.lifecycle[0] if target.lifecycle else None
 
         # Collect all batch updaters and history specs
-        batch_updaters: list[BatchUpdater[RoutingRow]] = []
-        all_history_specs: list[RouteHistoryCreatorSpec] = []
+        batch_updaters: list[ReplicaBatchUpdater] = []
+        all_history_specs: list[RouteHistoryToCreate] = []
 
         # Handle success transitions
         if transitions.success is not None and result.successes:
             route_ids = [r.route_id for r in result.successes]
             to_status = transitions.success.status or from_status
             success_history_specs = [
-                RouteHistoryCreatorSpec(
-                    route_id=r.route_id,
+                RouteHistoryToCreate(
                     deployment_id=r.deployment_id,
-                    category=handler_category,
-                    phase=handler_name,
-                    result=SchedulingResult.SUCCESS,
-                    message=f"{handler_name} completed successfully",
-                    from_status=from_status,
-                    to_status=to_status,
-                    from_sub_status=r.sub_status,
-                    to_sub_status=transitions.success.sub_status,
-                    sub_steps=extract_sub_steps_for_entity(r.route_id, records),
+                    creator=RouteHistoryCreator(
+                        route_id=r.route_id,
+                        category=handler_category,
+                        phase=handler_name,
+                        result=SchedulingResult.SUCCESS,
+                        message=f"{handler_name} completed successfully",
+                        from_status=from_status,
+                        to_status=to_status,
+                        from_sub_status=r.sub_status,
+                        to_sub_status=transitions.success.sub_status,
+                        sub_steps=extract_sub_steps_for_entity(r.route_id, records),
+                    ),
                 )
                 for r in result.successes
             ]
-            updater_spec = RouteBatchUpdaterSpec(
-                status=OptionalState.from_nullable(transitions.success.status),
-                health_status=OptionalState.from_nullable(transitions.success.health_status),
-                sub_status=TriState.from_nullable(transitions.success.sub_status),
-                traffic_status=OptionalState.from_nullable(transitions.success.traffic_status),
-            )
             batch_updaters.append(
-                BatchUpdater(
-                    spec=updater_spec,
-                    conditions=[RouteConditions.by_ids(route_ids)],
+                ReplicaBatchUpdater(
+                    replica_ids=route_ids,
+                    status=OptionalState.from_nullable(transitions.success.status),
+                    health_status=OptionalState.from_nullable(transitions.success.health_status),
+                    sub_status=TriState.from_nullable(transitions.success.sub_status),
+                    traffic_status=OptionalState.from_nullable(transitions.success.traffic_status),
                 )
             )
             all_history_specs.extend(success_history_specs)
@@ -370,35 +364,31 @@ class RouteCoordinator:
             route_ids = [e.route_info.route_id for e in result.errors]
             to_status = transitions.failure.status or from_status
             failure_history_specs = [
-                RouteHistoryCreatorSpec(
-                    route_id=e.route_info.route_id,
+                RouteHistoryToCreate(
                     deployment_id=e.route_info.deployment_id,
-                    category=handler_category,
-                    phase=handler_name,
-                    result=SchedulingResult.FAILURE,
-                    message=e.reason,
-                    from_status=from_status,
-                    to_status=to_status,
-                    from_sub_status=e.route_info.sub_status,
-                    to_sub_status=transitions.failure.sub_status,
-                    error_code=e.error_code,
-                    sub_steps=extract_sub_steps_for_entity(e.route_info.route_id, records),
+                    creator=RouteHistoryCreator(
+                        route_id=e.route_info.route_id,
+                        category=handler_category,
+                        phase=handler_name,
+                        result=SchedulingResult.FAILURE,
+                        message=e.reason,
+                        from_status=from_status,
+                        to_status=to_status,
+                        from_sub_status=e.route_info.sub_status,
+                        to_sub_status=transitions.failure.sub_status,
+                        error_code=e.error_code,
+                        sub_steps=extract_sub_steps_for_entity(e.route_info.route_id, records),
+                    ),
                 )
                 for e in result.errors
             ]
             batch_updaters.append(
-                BatchUpdater(
-                    spec=RouteBatchUpdaterSpec(
-                        status=OptionalState.from_nullable(transitions.failure.status),
-                        health_status=OptionalState.from_nullable(
-                            transitions.failure.health_status
-                        ),
-                        sub_status=TriState.from_nullable(transitions.failure.sub_status),
-                        traffic_status=OptionalState.from_nullable(
-                            transitions.failure.traffic_status
-                        ),
-                    ),
-                    conditions=[RouteConditions.by_ids(route_ids)],
+                ReplicaBatchUpdater(
+                    replica_ids=route_ids,
+                    status=OptionalState.from_nullable(transitions.failure.status),
+                    health_status=OptionalState.from_nullable(transitions.failure.health_status),
+                    sub_status=TriState.from_nullable(transitions.failure.sub_status),
+                    traffic_status=OptionalState.from_nullable(transitions.failure.traffic_status),
                 )
             )
             all_history_specs.extend(failure_history_specs)
@@ -408,32 +398,30 @@ class RouteCoordinator:
             route_ids = [r.route_id for r in result.stale]
             to_status = transitions.stale.status or from_status
             stale_history_specs = [
-                RouteHistoryCreatorSpec(
-                    route_id=r.route_id,
+                RouteHistoryToCreate(
                     deployment_id=r.deployment_id,
-                    category=handler_category,
-                    phase=handler_name,
-                    result=SchedulingResult.SUCCESS,
-                    message=f"{handler_name} marked route as stale",
-                    from_status=from_status,
-                    to_status=to_status,
-                    from_sub_status=r.sub_status,
-                    to_sub_status=transitions.stale.sub_status,
-                    sub_steps=extract_sub_steps_for_entity(r.route_id, records),
+                    creator=RouteHistoryCreator(
+                        route_id=r.route_id,
+                        category=handler_category,
+                        phase=handler_name,
+                        result=SchedulingResult.SUCCESS,
+                        message=f"{handler_name} marked route as stale",
+                        from_status=from_status,
+                        to_status=to_status,
+                        from_sub_status=r.sub_status,
+                        to_sub_status=transitions.stale.sub_status,
+                        sub_steps=extract_sub_steps_for_entity(r.route_id, records),
+                    ),
                 )
                 for r in result.stale
             ]
             batch_updaters.append(
-                BatchUpdater(
-                    spec=RouteBatchUpdaterSpec(
-                        status=OptionalState.from_nullable(transitions.stale.status),
-                        health_status=OptionalState.from_nullable(transitions.stale.health_status),
-                        sub_status=TriState.from_nullable(transitions.stale.sub_status),
-                        traffic_status=OptionalState.from_nullable(
-                            transitions.stale.traffic_status
-                        ),
-                    ),
-                    conditions=[RouteConditions.by_ids(route_ids)],
+                ReplicaBatchUpdater(
+                    replica_ids=route_ids,
+                    status=OptionalState.from_nullable(transitions.stale.status),
+                    health_status=OptionalState.from_nullable(transitions.stale.health_status),
+                    sub_status=TriState.from_nullable(transitions.stale.sub_status),
+                    traffic_status=OptionalState.from_nullable(transitions.stale.traffic_status),
                 )
             )
             all_history_specs.extend(stale_history_specs)
@@ -441,7 +429,7 @@ class RouteCoordinator:
         # Execute all updates in a single transaction
         if batch_updaters:
             await self._deployment_repository.update_route_status_bulk_with_history(
-                batch_updaters, BulkCreator(specs=all_history_specs)
+                batch_updaters, all_history_specs
             )
 
     async def process_if_needed(self, lifecycle_type: RouteLifecycleType) -> None:

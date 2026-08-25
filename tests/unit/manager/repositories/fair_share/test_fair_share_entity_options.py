@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share.conditions import (
     DomainFairShareConditions,
@@ -17,7 +17,7 @@ from ai.backend.manager.models.fair_share.orders import (
     ProjectFairShareOrders,
     UserFairShareOrders,
 )
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.user import UserRow
 
 
@@ -106,22 +106,22 @@ class TestProjectFairShareEntityOrders:
     def test_by_project_name_ascending(self) -> None:
         order = ProjectFairShareOrders.by_project_name(ascending=True)
         assert isinstance(order, sa.sql.expression.UnaryExpression)
-        assert str(order) == str(GroupRow.name.asc())
+        assert str(order) == str(ProjectRow.name.asc())
 
     def test_by_project_name_descending(self) -> None:
         order = ProjectFairShareOrders.by_project_name(ascending=False)
         assert isinstance(order, sa.sql.expression.UnaryExpression)
-        assert str(order) == str(GroupRow.name.desc())
+        assert str(order) == str(ProjectRow.name.desc())
 
     def test_by_project_is_active_ascending(self) -> None:
         order = ProjectFairShareOrders.by_project_is_active(ascending=True)
         assert isinstance(order, sa.sql.expression.UnaryExpression)
-        assert str(order) == str(GroupRow.is_active.asc())
+        assert str(order) == str(ProjectRow.is_active.asc())
 
     def test_by_project_is_active_descending(self) -> None:
         order = ProjectFairShareOrders.by_project_is_active(ascending=False)
         assert isinstance(order, sa.sql.expression.UnaryExpression)
-        assert str(order) == str(GroupRow.is_active.desc())
+        assert str(order) == str(ProjectRow.is_active.desc())
 
 
 class TestUserFairShareEntityConditions:

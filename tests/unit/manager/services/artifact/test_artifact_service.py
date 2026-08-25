@@ -6,6 +6,7 @@ Only artifact-related tests. Revision tests are in artifact_revision/test_artifa
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
@@ -14,6 +15,9 @@ import pytest
 from aiohttp.client_exceptions import ClientConnectorError
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -33,12 +37,14 @@ from ai.backend.manager.errors.artifact_registry import (
     ReservoirConnectionError,
 )
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact.searchers import (
+    ArtifactSearcher,
+    ArtifactWithRevisionsSearcher,
+)
+from ai.backend.manager.models.artifact.updaters import ArtifactUpdater
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
-from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
@@ -160,7 +166,7 @@ class TestArtifactService:
         now = datetime.now(UTC)
         registry_id = uuid4()
         return ArtifactData(
-            id=uuid4(),
+            id=ArtifactID(uuid4()),
             name="microsoft/DialoGPT-medium",
             type=ArtifactType.MODEL,
             description="A conversational AI model by Microsoft",
@@ -196,7 +202,7 @@ class TestArtifactService:
         mock_artifact_repository: MagicMock,
         sample_artifact_data: ArtifactData,
     ) -> None:
-        """Test searching artifacts with querier"""
+        """Test searching artifacts"""
         mock_artifact_repository.search_artifacts = AsyncMock(
             return_value=ArtifactListResult(
                 items=[sample_artifact_data],
@@ -206,19 +212,19 @@ class TestArtifactService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactsAction(querier=querier)
+        action = SearchArtifactsAction(searcher=searcher)
         result = await artifact_service.search(action)
 
         assert result.data == [sample_artifact_data]
         assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
-        mock_artifact_repository.search_artifacts.assert_called_once_with(querier=querier)
+        mock_artifact_repository.search_artifacts.assert_called_once_with(searcher=searcher)
 
     async def test_search_artifacts_empty_result(
         self,
@@ -235,12 +241,12 @@ class TestArtifactService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactsAction(querier=querier)
+        action = SearchArtifactsAction(searcher=searcher)
         result = await artifact_service.search(action)
 
         assert result.data == []
@@ -262,12 +268,12 @@ class TestArtifactService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactsAction(querier=querier)
+        action = SearchArtifactsAction(searcher=searcher)
         result = await artifact_service.search(action)
 
         assert result.total_count == 25
@@ -281,12 +287,9 @@ class TestArtifactService:
         sample_artifact_data: ArtifactData,
     ) -> None:
         """Test updating an artifact"""
-        updater_spec = ArtifactUpdaterSpec(
+        updater = ArtifactUpdater(
+            artifact_id=sample_artifact_data.id,
             description=TriState.update("Updated description"),
-        )
-        updater = Updater[ArtifactRow](
-            spec=updater_spec,
-            pk_value=sample_artifact_data.id,
         )
         updated_artifact = ArtifactData(
             id=sample_artifact_data.id,
@@ -305,7 +308,7 @@ class TestArtifactService:
         )
         mock_artifact_repository.update_artifact = AsyncMock(return_value=updated_artifact)
 
-        action = UpdateArtifactAction(updater=updater)
+        action = UpdateArtifactAction(artifact_id=ArtifactID(uuid.uuid4()), updater=updater)
         result = await artifact_service.update(action)
 
         assert result.result.description == "Updated description"
@@ -392,18 +395,18 @@ class TestUpsertArtifactsAction:
     def _make_artifact_with_revisions(
         self,
         *,
-        artifact_id: None | object = None,
-        registry_id: None | object = None,
+        artifact_id: ArtifactID | None = None,
+        registry_id: UUID | None = None,
         name: str = "test-model",
         num_revisions: int = 1,
     ) -> ArtifactDataWithRevisions:
         now = datetime.now(UTC)
-        _artifact_id = artifact_id if artifact_id is not None else uuid4()
+        _artifact_id = artifact_id if artifact_id is not None else ArtifactID(uuid4())
         _registry_id = registry_id if registry_id is not None else uuid4()
         revisions = [
             ArtifactRevisionData(
-                id=uuid4(),
-                artifact_id=_artifact_id,  # type: ignore[arg-type]
+                id=ArtifactRevisionID(uuid4()),
+                artifact_id=_artifact_id,
                 version=f"v{i + 1}",
                 readme=None,
                 size=1000 * (i + 1),
@@ -417,12 +420,12 @@ class TestUpsertArtifactsAction:
             for i in range(num_revisions)
         ]
         return ArtifactDataWithRevisions(
-            id=_artifact_id,  # type: ignore[arg-type]
+            id=_artifact_id,
             name=name,
             type=ArtifactType.MODEL,
             description=None,
-            registry_id=_registry_id,  # type: ignore[arg-type]
-            source_registry_id=_registry_id,  # type: ignore[arg-type]
+            registry_id=_registry_id,
+            source_registry_id=_registry_id,
             registry_type=ArtifactRegistryType.HUGGINGFACE,
             source_registry_type=ArtifactRegistryType.HUGGINGFACE,
             availability=ArtifactAvailability.ALIVE,
@@ -605,7 +608,7 @@ class TestScanArtifactsAction:
     @pytest.fixture
     def hf_registry_meta(self, registry_id: UUID) -> ArtifactRegistryData:
         return ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="huggingface-default",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -670,7 +673,7 @@ class TestScanArtifactsAction:
         now = datetime.now(UTC)
         expected_result = [
             ArtifactDataWithRevisions(
-                id=uuid4(),
+                id=ArtifactID(uuid4()),
                 name="model-1",
                 type=ArtifactType.MODEL,
                 description=None,
@@ -718,7 +721,7 @@ class TestScanArtifactsAction:
         """Reservoir timeout raises ReservoirConnectionError (MAX_RETRIES=3)"""
         reservoir_registry_id = uuid4()
         reservoir_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=reservoir_registry_id,
             name="reservoir-default",
             type=ArtifactRegistryType.RESERVOIR,
@@ -865,7 +868,7 @@ class TestDelegateScanArtifactsAction:
         target_registry_id = uuid4()
 
         hf_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=target_registry_id,
             name="hf-default",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -878,7 +881,7 @@ class TestDelegateScanArtifactsAction:
         artifact_id = uuid4()
         scan_result_artifacts = [
             ArtifactDataWithRevisions(
-                id=artifact_id,
+                id=ArtifactID(artifact_id),
                 name="test-model",
                 type=ArtifactType.MODEL,
                 description=None,
@@ -893,8 +896,8 @@ class TestDelegateScanArtifactsAction:
                 extra=None,
                 revisions=[
                     ArtifactRevisionData(
-                        id=revision_id,
-                        artifact_id=artifact_id,
+                        id=ArtifactRevisionID(revision_id),
+                        artifact_id=ArtifactID(artifact_id),
                         version="v1",
                         readme="# Test README",
                         size=1000,
@@ -1051,7 +1054,7 @@ class TestRetrieveModelAction:
         now = datetime.now(UTC)
         registry_id = uuid4()
         hf_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="hf-registry",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -1073,7 +1076,7 @@ class TestRetrieveModelAction:
         mock_storage_manager.get_manager_facing_client = MagicMock(return_value=mock_storage_client)
 
         expected = ArtifactDataWithRevisions(
-            id=uuid4(),
+            id=ArtifactID(uuid4()),
             name="gpt2",
             type=ArtifactType.MODEL,
             description=None,
@@ -1107,7 +1110,7 @@ class TestRetrieveModelAction:
         """Reservoir raises NotImplementedError"""
         registry_id = uuid4()
         reservoir_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="reservoir-reg",
             type=ArtifactRegistryType.RESERVOIR,
@@ -1133,7 +1136,7 @@ class TestRetrieveModelAction:
 
         registry_id = uuid4()
         hf_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="hf-reg",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -1214,7 +1217,7 @@ class TestRetrieveModelsAction:
         now = datetime.now(UTC)
         registry_id = uuid4()
         hf_meta = ArtifactRegistryData(
-            id=uuid4(),
+            id=ArtifactRegistryID(uuid4()),
             registry_id=registry_id,
             name="hf-registry",
             type=ArtifactRegistryType.HUGGINGFACE,
@@ -1240,7 +1243,7 @@ class TestRetrieveModelsAction:
 
         expected = [
             ArtifactDataWithRevisions(
-                id=uuid4(),
+                id=ArtifactID(uuid4()),
                 name=f"model-{i}",
                 type=ArtifactType.MODEL,
                 description=None,
@@ -1302,8 +1305,8 @@ class TestGetArtifactRevisionsAction:
         artifact_id = uuid4()
         revisions = [
             ArtifactRevisionData(
-                id=uuid4(),
-                artifact_id=artifact_id,
+                id=ArtifactRevisionID(uuid4()),
+                artifact_id=ArtifactID(artifact_id),
                 version=f"v{i}",
                 readme=None,
                 size=1000 * i,
@@ -1318,7 +1321,7 @@ class TestGetArtifactRevisionsAction:
         ]
         mock_artifact_repository.list_artifact_revisions = AsyncMock(return_value=revisions)
 
-        action = GetArtifactRevisionsAction(artifact_id=artifact_id)
+        action = GetArtifactRevisionsAction(artifact_id=ArtifactID(artifact_id))
         result = await artifact_service.get_revisions(action)
 
         assert len(result.revisions) == 3
@@ -1332,7 +1335,7 @@ class TestGetArtifactRevisionsAction:
         """No revisions returns empty list"""
         mock_artifact_repository.list_artifact_revisions = AsyncMock(return_value=[])
 
-        action = GetArtifactRevisionsAction(artifact_id=uuid4())
+        action = GetArtifactRevisionsAction(artifact_id=ArtifactID(uuid4()))
         result = await artifact_service.get_revisions(action)
 
         assert result.revisions == []
@@ -1363,11 +1366,11 @@ class TestSearchArtifactsWithRevisionsAction:
         artifact_service: ArtifactService,
         mock_artifact_repository: MagicMock,
     ) -> None:
-        """BatchQuerier cursor-based pagination sets has_next_page/has_previous_page"""
+        """Cursor-based pagination sets has_next_page/has_previous_page"""
         now = datetime.now(UTC)
         rid = uuid4()
         item = ArtifactDataWithRevisions(
-            id=uuid4(),
+            id=ArtifactID(uuid4()),
             name="test-model",
             type=ArtifactType.MODEL,
             description=None,
@@ -1391,12 +1394,12 @@ class TestSearchArtifactsWithRevisionsAction:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactWithRevisionsSearcher(
             pagination=OffsetPagination(limit=1, offset=5),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactsWithRevisionsAction(querier=querier)
+        action = SearchArtifactsWithRevisionsAction(searcher=searcher)
         result = await artifact_service.search_with_revisions(action)
 
         assert result.has_next_page is True
@@ -1419,12 +1422,12 @@ class TestSearchArtifactsWithRevisionsAction:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = ArtifactWithRevisionsSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchArtifactsWithRevisionsAction(querier=querier)
+        action = SearchArtifactsWithRevisionsAction(searcher=searcher)
         result = await artifact_service.search_with_revisions(action)
 
         assert result.data == []

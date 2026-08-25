@@ -21,18 +21,15 @@ from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.service_catalog.conditions import ServiceCatalogConditions
 from ai.backend.manager.models.service_catalog.orders import (
     DEFAULT_FORWARD_ORDER,
     TIEBREAKER_ORDER,
     resolve_order,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
 )
@@ -55,29 +52,27 @@ class ServiceCatalogAdapter(BaseAdapter):
         Returns:
             Pydantic payload with items and pagination info.
         """
-        querier = self.build_querier(input)
+        searcher = self.build_searcher(input)
 
-        action_result = (
-            await self._processors.service_catalog.search_service_catalogs.wait_for_complete(
-                SearchServiceCatalogsAction(querier=querier)
-            )
+        action_result = await self._processors.service_catalog.global_search_service_catalogs.run(
+            SearchServiceCatalogsAction(searcher=searcher)
         )
 
         return AdminSearchServiceCatalogsPayload(
-            items=[self._data_to_dto(item) for item in action_result.data],
+            items=[self._data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
 
-    def build_querier(self, input: AdminSearchServiceCatalogsInput) -> BatchQuerier:
-        """Build a BatchQuerier from the search input DTO."""
+    def build_searcher(self, input: AdminSearchServiceCatalogsInput) -> ServiceCatalogSearcher:
+        """Build the search spec from the search input DTO."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else [DEFAULT_FORWARD_ORDER]
         orders.append(TIEBREAKER_ORDER)
         pagination = self._build_pagination(input)
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return ServiceCatalogSearcher(pagination=pagination, conditions=conditions, orders=orders)
 
     def _convert_filter(self, filter: ServiceCatalogFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

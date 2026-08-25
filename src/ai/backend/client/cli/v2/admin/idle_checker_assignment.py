@@ -42,11 +42,11 @@ def idle_checker_assignment() -> None:
 )
 def create(scope_type: str, scope_id: uuid.UUID, idle_checker_id: uuid.UUID, enabled: bool) -> None:
     """Bind a global idle checker to a scope."""
+    from ai.backend.common.data.entity.idle_checker import IdleCheckerID
     from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
         CreateIdleCheckerAssignmentInput,
         IdleCheckerScopeRefDTO,
     )
-    from ai.backend.common.identifier.idle_checker import IdleCheckerID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

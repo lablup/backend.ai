@@ -1,58 +1,62 @@
 from __future__ import annotations
 
-from typing import override
+from typing import Any
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
-
-from .actions.fetch_status import FetchManagerStatusAction, FetchManagerStatusActionResult
-from .actions.get_announcement import GetAnnouncementAction, GetAnnouncementActionResult
-from .actions.get_db_cxn_status import GetDbCxnStatusAction, GetDbCxnStatusActionResult
-from .actions.perform_scheduler_ops import (
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.services.manager_admin.actions.fetch_status import (
+    FetchManagerStatusAction,
+    FetchManagerStatusActionResult,
+)
+from ai.backend.manager.services.manager_admin.actions.get_announcement import (
+    GetAnnouncementAction,
+    GetAnnouncementActionResult,
+)
+from ai.backend.manager.services.manager_admin.actions.get_db_cxn_status import (
+    GetDbCxnStatusAction,
+    GetDbCxnStatusActionResult,
+)
+from ai.backend.manager.services.manager_admin.actions.perform_scheduler_ops import (
     PerformSchedulerOpsAction,
     PerformSchedulerOpsActionResult,
 )
-from .actions.update_announcement import UpdateAnnouncementAction, UpdateAnnouncementActionResult
-from .actions.update_status import UpdateManagerStatusAction, UpdateManagerStatusActionResult
-from .service import ManagerAdminService
+from ai.backend.manager.services.manager_admin.actions.update_announcement import (
+    UpdateAnnouncementAction,
+    UpdateAnnouncementActionResult,
+)
+from ai.backend.manager.services.manager_admin.actions.update_status import (
+    UpdateManagerStatusAction,
+    UpdateManagerStatusActionResult,
+)
+from ai.backend.manager.services.manager_admin.service import ManagerAdminService
 
-__all__ = ("ManagerAdminProcessors",)
 
+class ManagerAdminProcessors:
+    """The manager's own state — its status, its announcement, its scheduler.
 
-class ManagerAdminProcessors(AbstractProcessorPackage):
-    """Processor package for manager admin operations."""
+    None of it belongs to an entity and all of it reaches etcd or the scheduler, so every
+    operation is global and the service stays.
+    """
 
-    fetch_status: ActionProcessor[FetchManagerStatusAction, FetchManagerStatusActionResult]
-    update_status: ActionProcessor[UpdateManagerStatusAction, UpdateManagerStatusActionResult]
-    get_announcement: ActionProcessor[GetAnnouncementAction, GetAnnouncementActionResult]
-    update_announcement: ActionProcessor[UpdateAnnouncementAction, UpdateAnnouncementActionResult]
-    perform_scheduler_ops: ActionProcessor[
+    fetch_status: GlobalActionProcessor[FetchManagerStatusAction, FetchManagerStatusActionResult]
+    update_status: GlobalActionProcessor[UpdateManagerStatusAction, UpdateManagerStatusActionResult]
+    get_announcement: GlobalActionProcessor[GetAnnouncementAction, GetAnnouncementActionResult]
+    update_announcement: GlobalActionProcessor[
+        UpdateAnnouncementAction, UpdateAnnouncementActionResult
+    ]
+    perform_scheduler_ops: GlobalActionProcessor[
         PerformSchedulerOpsAction, PerformSchedulerOpsActionResult
     ]
-    get_db_cxn_status: ActionProcessor[GetDbCxnStatusAction, GetDbCxnStatusActionResult]
+    get_db_cxn_status: GlobalActionProcessor[GetDbCxnStatusAction, GetDbCxnStatusActionResult]
 
-    def __init__(
-        self,
-        service: ManagerAdminService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.fetch_status = ActionProcessor(service.fetch_status, action_monitors)
-        self.update_status = ActionProcessor(service.update_status, action_monitors)
-        self.get_announcement = ActionProcessor(service.get_announcement, action_monitors)
-        self.update_announcement = ActionProcessor(service.update_announcement, action_monitors)
-        self.perform_scheduler_ops = ActionProcessor(service.perform_scheduler_ops, action_monitors)
-        self.get_db_cxn_status = ActionProcessor(service.get_db_cxn_status, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            FetchManagerStatusAction.spec(),
-            UpdateManagerStatusAction.spec(),
-            GetAnnouncementAction.spec(),
-            UpdateAnnouncementAction.spec(),
-            PerformSchedulerOpsAction.spec(),
-            GetDbCxnStatusAction.spec(),
-        ]
+    def __init__(self, group: ProcessorGroup[Any], service: ManagerAdminService) -> None:
+        self.fetch_status = group.global_scope(FetchManagerStatusAction, service.fetch_status)
+        self.update_status = group.global_scope(UpdateManagerStatusAction, service.update_status)
+        self.get_announcement = group.global_scope(GetAnnouncementAction, service.get_announcement)
+        self.update_announcement = group.global_scope(
+            UpdateAnnouncementAction, service.update_announcement
+        )
+        self.perform_scheduler_ops = group.global_scope(
+            PerformSchedulerOpsAction, service.perform_scheduler_ops
+        )
+        self.get_db_cxn_status = group.global_scope(GetDbCxnStatusAction, service.get_db_cxn_status)

@@ -15,11 +15,17 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
     PurgeUserRequest,
     UserStatus,
+)
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    GroupMeta,
 )
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
@@ -34,13 +40,16 @@ from ai.backend.manager.api.rest.v2.user.handler import V2UserHandler
 from ai.backend.manager.api.rest.v2.user.registry import register_v2_user_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.group import association_groups_users
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.project import association_groups_users
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
@@ -69,8 +78,13 @@ def user_processors(
     storage_manager: StorageSessionManager,
     agent_registry: AgentRegistry,
     valkey_clients: Any,
+    processor_registry: ProcessorRegistry[Any],
 ) -> UserProcessors:
-    user_repository = UserRepository(database_engine)
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = UserService(
         storage_manager=storage_manager,
         valkey_stat_client=valkey_clients.stat,
@@ -79,18 +93,20 @@ def user_processors(
         scheduling_controller=AsyncMock(),
     )
     return UserProcessors(
-        user_service=service, action_monitors=[], validators=_create_mock_validators()
+        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        service,
     )
 
 
 @pytest.fixture()
 def domain_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> DomainProcessors:
-    service = DomainService(repository=DomainRepository(database_engine))
-    return DomainProcessors(
-        service=service, action_monitors=[], validators=_create_mock_validators()
+    service = DomainService(
+        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
     )
+    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
 
 
 @pytest.fixture()
@@ -122,7 +138,15 @@ def server_module_registries(
     # v2 user routes (/v2/users) — exercises the api/adapters/user adapter shared with GQL.
     processors = MagicMock(spec=Processors)
     processors.user = user_processors
-    v2_handler = V2UserHandler(adapter=UserAdapter(processors, auth_config=MagicMock()))
+    v2_handler = V2UserHandler(
+        adapter=UserAdapter(
+            processors,
+            auth_config=MagicMock(),
+            key_provider_pool=KeyProviderPool(
+                providers=[], write_provider_type=KeyProviderType.PLAIN
+            ),
+        )
+    )
     v2_registry = RouteRegistry.create("v2", route_deps.cors_options)
     v2_registry.add_subregistry(register_v2_user_routes(v2_handler, route_deps))
 

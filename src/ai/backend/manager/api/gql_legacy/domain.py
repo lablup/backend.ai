@@ -18,6 +18,8 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.exception import (
     DomainNotFound,
 )
@@ -28,35 +30,37 @@ from ai.backend.manager.data.domain.types import (
 )
 from ai.backend.manager.data.permission.permission_defs import (
     DomainPermission,
-    ScalingGroupPermission,
+    ResourceGroupPermission,
 )
 from ai.backend.manager.models.domain import DomainRow, domains, get_permission_ctx
+from ai.backend.manager.models.domain.creators import DomainCreator
+from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater, DomainUpdater
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.scaling_group import get_scaling_groups
+from ai.backend.manager.models.resource_group import get_resource_groups
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
-from ai.backend.manager.repositories.domain.updaters import DomainNodeUpdaterSpec, DomainUpdaterSpec
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeAction,
     CreateDomainNodeActionResult,
 )
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
-from ai.backend.manager.services.domain.actions.modify_domain import ModifyDomainAction
-from ai.backend.manager.services.domain.actions.modify_domain_node import (
-    ModifyDomainNodeAction,
-    ModifyDomainNodeActionResult,
-)
+from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
+from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
+from ai.backend.manager.services.domain.actions.update_domain_node import (
+    UpdateDomainNodeAction,
+    UpdateDomainNodeActionResult,
+)
+from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -127,7 +131,7 @@ _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
     "name": ("name", None),
     "is_active": ("is_active", None),
     "created_at": ("created_at", dtparse),
-    "modified_at": ("modified_at", dtparse),
+    "modified_at": ("updated_at", dtparse),
 }
 
 _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -136,7 +140,7 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
     "name": ("name", None),
     "is_active": ("is_active", None),
     "created_at": ("created_at", None),
-    "modified_at": ("modified_at", None),
+    "modified_at": ("updated_at", None),
 }
 
 
@@ -172,7 +176,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             description=obj.description,
             is_active=obj.is_active,
             created_at=obj.created_at,
-            modified_at=obj.modified_at,
+            modified_at=obj.updated_at,
             total_resource_slots=obj.total_resource_slots,
             allowed_vfolder_hosts=(
                 obj.allowed_vfolder_hosts.to_json() if obj.allowed_vfolder_hosts else None
@@ -194,7 +198,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             description=obj.description,
             is_active=obj.is_active,
             created_at=obj.created_at,
-            modified_at=obj.modified_at,
+            modified_at=obj.updated_at,
             total_resource_slots=obj.total_resource_slots,
             allowed_vfolder_hosts=(
                 obj.allowed_vfolder_hosts.to_json() if obj.allowed_vfolder_hosts else None
@@ -212,7 +216,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             description=dto.description,
             is_active=dto.is_active,
             created_at=dto.created_at,
-            modified_at=dto.modified_at,
+            modified_at=dto.updated_at,
             total_resource_slots=dto.total_resource_slots,
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=dto.allowed_docker_registries,
@@ -344,14 +348,27 @@ class DomainConnection(Connection):
         description = "Added in 24.12.0"
 
 
+async def _resolve_sgroup_ids(
+    graph_ctx: GraphQueryContext,
+    sgroup_names: Iterable[str],
+) -> list[ResourceGroupID]:
+    resolved: list[ResourceGroupID] = []
+    for name in sgroup_names:
+        result = await graph_ctx.processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(name))
+        )
+        resolved.append(result.entity_id())
+    return resolved
+
+
 async def _ensure_sgroup_permission(
     graph_ctx: GraphQueryContext, sgroup_names: Iterable[str], *, db_session: AsyncSession
 ) -> None:
     user = graph_ctx.user
     client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
-    sgroup_models = await get_scaling_groups(
+    sgroup_models = await get_resource_groups(
         SystemScope(),
-        ScalingGroupPermission.ASSOCIATE_WITH_SCOPES,
+        ResourceGroupPermission.ASSOCIATE_WITH_SCOPES,
         sgroup_names,
         db_session=db_session,
         ctx=client_ctx,
@@ -380,13 +397,17 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
 
     scaling_groups = graphene.List(lambda: graphene.String, required=False)
 
-    def to_action(self, user_info: UserInfo) -> CreateDomainNodeAction:
+    def to_action(
+        self,
+        user_info: UserInfo,
+        scaling_group_ids: list[ResourceGroupID] | None,
+    ) -> CreateDomainNodeAction:
         def value_or_none(value: Any) -> Any:
             return value if value is not graphql.Undefined else None
 
         return CreateDomainNodeAction(
-            creator=Creator(
-                spec=DomainCreatorSpec(
+            creator=(
+                DomainCreator(
                     name=self.name,
                     description=value_or_none(self.description),
                     is_active=value_or_none(self.is_active),
@@ -402,7 +423,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
                 )
             ),
             user_info=user_info,
-            scaling_groups=value_or_none(self.scaling_groups),
+            resource_group_ids=scaling_group_ids,
         )
 
 
@@ -435,9 +456,13 @@ class CreateDomainNode(graphene.Mutation):  # type: ignore[misc]
             domain_name=graph_ctx.user["domain_name"],
         )
 
+        scaling_group_ids: list[ResourceGroupID] | None = None
+        if input.scaling_groups is not graphql.Undefined and input.scaling_groups is not None:
+            scaling_group_ids = await _resolve_sgroup_ids(graph_ctx, input.scaling_groups)
+
         res: CreateDomainNodeActionResult = (
-            await graph_ctx.processors.domain.create_domain_node.wait_for_complete(
-                input.to_action(user_info)
+            await graph_ctx.processors.domain.create_domain_node.run(
+                input.to_action(user_info, scaling_group_ids)
             )
         )
 
@@ -469,8 +494,16 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
             return converter(field_value)
         return field_value
 
-    def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
-        spec = DomainNodeUpdaterSpec(
+    def to_action(
+        self,
+        name: str,
+        domain_id: DomainID,
+        user_info: UserInfo,
+        sgroup_ids_to_add: set[ResourceGroupID] | None,
+        sgroup_ids_to_remove: set[ResourceGroupID] | None,
+    ) -> UpdateDomainNodeAction:
+        updater = DomainUpdater(
+            domain_id=domain_id,
             description=TriState[str].from_graphql(
                 self.description,
             ),
@@ -493,15 +526,11 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
                 self.dotfiles,
             ),
         )
-        return ModifyDomainNodeAction(
+        return UpdateDomainNodeAction(
             user_info=user_info,
-            updater=Updater(spec=spec, pk_value=name),
-            sgroups_to_add=set(self.sgroups_to_add)
-            if self.sgroups_to_add is not Undefined
-            else None,
-            sgroups_to_remove=set(self.sgroups_to_remove)
-            if self.sgroups_to_remove is not Undefined
-            else None,
+            updater=updater,
+            sgroup_ids_to_add=sgroup_ids_to_add,
+            sgroup_ids_to_remove=sgroup_ids_to_remove,
         )
 
 
@@ -532,9 +561,27 @@ class ModifyDomainNode(graphene.Mutation):  # type: ignore[misc]
             role=graph_ctx.user["role"],
             domain_name=graph_ctx.user["domain_name"],
         )
-        res: ModifyDomainNodeActionResult = (
-            await graph_ctx.processors.domain.modify_domain_node.wait_for_complete(
-                input.to_action(name=domain_name, user_info=user_info)
+        target = await graph_ctx.processors.domain.lookup.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
+        sgroup_ids_to_add: set[ResourceGroupID] | None = None
+        if input.sgroups_to_add is not Undefined and input.sgroups_to_add is not None:
+            sgroup_ids_to_add = set(await _resolve_sgroup_ids(graph_ctx, input.sgroups_to_add))
+        sgroup_ids_to_remove: set[ResourceGroupID] | None = None
+        if input.sgroups_to_remove is not Undefined and input.sgroups_to_remove is not None:
+            sgroup_ids_to_remove = set(
+                await _resolve_sgroup_ids(graph_ctx, input.sgroups_to_remove)
+            )
+
+        res: UpdateDomainNodeActionResult = (
+            await graph_ctx.processors.domain.update_domain_node.run(
+                input.to_action(
+                    name=domain_name,
+                    domain_id=target.entity_id(),
+                    user_info=user_info,
+                    sgroup_ids_to_add=sgroup_ids_to_add,
+                    sgroup_ids_to_remove=sgroup_ids_to_remove,
+                )
             )
         )
 
@@ -571,7 +618,7 @@ class Domain(graphene.ObjectType):  # type: ignore[misc]
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             total_resource_slots=(
                 row.total_resource_slots.to_json() if row.total_resource_slots is not None else {}
             ),
@@ -587,7 +634,7 @@ class Domain(graphene.ObjectType):  # type: ignore[misc]
             description=dto.description,
             is_active=dto.is_active,
             created_at=dto.created_at,
-            modified_at=dto.modified_at,
+            modified_at=dto.updated_at,
             total_resource_slots=dto.total_resource_slots.to_json()
             if dto.total_resource_slots
             else {},
@@ -645,13 +692,13 @@ class DomainInput(graphene.InputObjectType):  # type: ignore[misc]
     )
     integration_id = graphene.String(required=False, default_value=None)
 
-    def to_action(self, domain_name: str, user_info: UserInfo) -> CreateDomainAction:
+    def to_action(self, domain_name: str) -> CreateDomainAction:
         def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
         return CreateDomainAction(
-            creator=Creator(
-                spec=DomainCreatorSpec(
+            creator=(
+                DomainCreator(
                     name=domain_name,
                     description=value_or_none(self.description),
                     is_active=value_or_none(self.is_active),
@@ -661,7 +708,6 @@ class DomainInput(graphene.InputObjectType):  # type: ignore[misc]
                     integration_name=value_or_none(self.integration_id),
                 )
             ),
-            user_info=user_info,
         )
 
 
@@ -683,9 +729,10 @@ class ModifyDomainInput(graphene.InputObjectType):  # type: ignore[misc]
             return converter(field_value)
         return field_value
 
-    def to_action(self, domain_name: str, user_info: UserInfo) -> ModifyDomainAction:
-        spec = DomainUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
+    def to_action(self, domain_name: str, domain_id: DomainID) -> UpdateDomainAction:
+        updater = DomainUpdater(
+            domain_id=domain_id,
+            new_name=OptionalState[str].from_graphql(self.name),
             description=TriState[str].from_graphql(
                 self.description,
             ),
@@ -705,10 +752,7 @@ class ModifyDomainInput(graphene.InputObjectType):  # type: ignore[misc]
             ),
             integration_name=TriState[str].from_graphql(self.integration_id),
         )
-        return ModifyDomainAction(
-            user_info=user_info,
-            updater=Updater(spec=spec, pk_value=domain_name),
-        )
+        return UpdateDomainAction(updater=updater)
 
 
 class CreateDomain(graphene.Mutation):  # type: ignore[misc]
@@ -732,18 +776,20 @@ class CreateDomain(graphene.Mutation):  # type: ignore[misc]
     ) -> CreateDomain:
         ctx: GraphQueryContext = info.context
 
-        user_info: UserInfo = UserInfo(
-            id=ctx.user["uuid"],
-            role=ctx.user["role"],
-            domain_name=ctx.user["domain_name"],
+        res = await ctx.processors.domain.create_domain.run(props.to_action(name))
+        domain_data = res.data
+        await ctx.processors.project.create_project.run(
+            CreateProjectAction(
+                domain_id=domain_data.id,
+                creator=ProjectCreator.model_store(
+                    domain_id=domain_data.id, domain_name=domain_data.name
+                ),
+            )
         )
-
-        action: CreateDomainAction = props.to_action(name, user_info)
-        res = await ctx.processors.domain.create_domain.wait_for_complete(action)
         return cls(
             ok=True,
             msg="domain creation succeed",
-            domain=Domain.from_data(res.domain_data),
+            domain=Domain.from_data(domain_data),
         )
 
 
@@ -768,18 +814,13 @@ class ModifyDomain(graphene.Mutation):  # type: ignore[misc]
     ) -> ModifyDomain:
         ctx: GraphQueryContext = info.context
 
-        user_info: UserInfo = UserInfo(
-            id=ctx.user["uuid"],
-            role=ctx.user["role"],
-            domain_name=ctx.user["domain_name"],
-        )
-
-        action = props.to_action(name, user_info)
-        res = await ctx.processors.domain.modify_domain.wait_for_complete(action)
+        target = await ctx.processors.domain.lookup.run(LookupDomainAction(name=DomainName(name)))
+        action = props.to_action(name, target.entity_id())
+        res = await ctx.processors.domain.update_domain.run(action)
         return cls(
             ok=True,
             msg="domain modification succeed",
-            domain=Domain.from_data(res.domain_data),
+            domain=Domain.from_data(res.data),
         )
 
 
@@ -800,15 +841,13 @@ class DeleteDomain(graphene.Mutation):  # type: ignore[misc]
     async def mutate(cls, root: Any, info: graphene.ResolveInfo, name: str) -> DeleteDomain:
         ctx: GraphQueryContext = info.context
 
-        user_info: UserInfo = UserInfo(
-            id=ctx.user["uuid"],
-            role=ctx.user["role"],
-            domain_name=ctx.user["domain_name"],
+        target = await ctx.processors.domain.lookup.run(LookupDomainAction(name=DomainName(name)))
+        await ctx.processors.domain.delete_domain.run(
+            DeleteDomainAction(
+                updater=DomainSoftDeleteUpdater(domain_id=target.entity_id()),
+            )
         )
-
-        action = DeleteDomainAction(name, user_info)
-        await ctx.processors.domain.delete_domain.wait_for_complete(action)
-        return cls(ok=True, msg=f"domain {action.name} deleted successfully")
+        return cls(ok=True, msg=f"domain {name} deleted successfully")
 
 
 class PurgeDomain(graphene.Mutation):  # type: ignore[misc]
@@ -831,12 +870,8 @@ class PurgeDomain(graphene.Mutation):  # type: ignore[misc]
     async def mutate(cls, root: Any, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
         ctx: GraphQueryContext = info.context
 
-        user_info: UserInfo = UserInfo(
-            id=ctx.user["uuid"],
-            role=ctx.user["role"],
-            domain_name=ctx.user["domain_name"],
+        target = await ctx.processors.domain.lookup.run(LookupDomainAction(name=DomainName(name)))
+        await ctx.processors.domain.purge_domain.run(
+            PurgeDomainAction(domain_id=target.entity_id(), name=name)
         )
-
-        action = PurgeDomainAction(name, user_info)
-        await ctx.processors.domain.purge_domain.wait_for_complete(action)
         return cls(ok=True, msg=f"domain {name} purged successfully")

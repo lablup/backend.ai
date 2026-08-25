@@ -13,15 +13,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.model_serving.request import (
     NewServiceRequestModel,
 )
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
-    ResolveAccessKeyScopeResult,
+    PublicResolveAccessKeyScopeResult,
 )
 from ai.backend.manager.services.model_serving.actions.validate_model_service import (
     ValidateModelServiceAction,
@@ -81,13 +81,13 @@ class TestRunValidationUsesKeypairResourcePolicy:
 
     @pytest.fixture
     def mock_auth(self, keypair_resource_policy: dict[str, Any]) -> MagicMock:
-        scope_result = ResolveAccessKeyScopeResult(
+        scope_result = PublicResolveAccessKeyScopeResult(
             requester_access_key=AccessKey("TESTACCESSKEY01"),
             owner_access_key=AccessKey("TESTACCESSKEY01"),
         )
         mock = MagicMock()
-        mock.resolve_access_key_scope = MagicMock()
-        mock.resolve_access_key_scope.wait_for_complete = AsyncMock(return_value=scope_result)
+        mock.public_resolve_access_key_scope = MagicMock()
+        mock.public_resolve_access_key_scope.run = AsyncMock(return_value=scope_result)
         return mock
 
     @pytest.fixture
@@ -112,13 +112,13 @@ class TestRunValidationUsesKeypairResourcePolicy:
                 owner_role=UserRole.USER,
                 group_id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
                 resource_policy=action.keypair_resource_policy,
-                scaling_group="default",
+                resource_group="default",
                 extra_mounts=[],
             )
 
         mock = MagicMock()
         mock.validate_model_service = MagicMock()
-        mock.validate_model_service.wait_for_complete = AsyncMock(side_effect=_capture)
+        mock.validate_model_service.run = AsyncMock(side_effect=_capture)
         return mock
 
     @pytest.fixture

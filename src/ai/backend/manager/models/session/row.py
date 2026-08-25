@@ -10,7 +10,6 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Self,
     override,
 )
 from uuid import UUID
@@ -18,7 +17,6 @@ from uuid import UUID
 import aiotools
 import sqlalchemy as sa
 import yarl
-from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -35,16 +33,20 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_dependency import SessionDependencyID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -58,6 +60,7 @@ from ai.backend.manager.data.session.types import (
     MountSpec,
     ResourceSpec,
     SessionData,
+    SessionEntityData,
     SessionExecution,
     SessionIdentity,
     SessionInfo,
@@ -82,16 +85,16 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     PydanticColumn,
-    ResourceSlotColumn,
     SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.network import NetworkRow, NetworkType
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -104,8 +107,6 @@ from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -117,9 +118,6 @@ from ai.backend.manager.models.utils import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.keypair import KeyPairRow
-    from ai.backend.manager.models.scaling_group import ScalingGroupRow
     from ai.backend.manager.models.user import UserRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -354,19 +352,13 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 
 
 # Defined for avoiding circular import
-def _get_keypair_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.keypair import KeyPairRow
-
-    return KeyPairRow.access_key == foreign(SessionRow.access_key)
-
-
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(SessionRow.user_uuid)
 
 
-class SessionRow(Base):  # type: ignore[misc]
+class SessionRow(CreatedAtMixin, Base):
     __tablename__ = "sessions"
     id: Mapped[SessionId] = mapped_column(
         "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -465,11 +457,6 @@ class SessionRow(Base):  # type: ignore[misc]
     scaling_group_name: Mapped[str] = mapped_column(
         "scaling_group_name", sa.ForeignKey("scaling_groups.name"), index=True, nullable=False
     )
-    scaling_group: Mapped[ScalingGroupRow] = relationship(
-        "ScalingGroupRow",
-        back_populates="sessions",
-        foreign_keys=[scaling_group_name],
-    )
     target_sgroup_names: Mapped[list[str] | None] = mapped_column(
         "target_sgroup_names",
         sa.ARRAY(sa.String(length=64)),
@@ -487,32 +474,20 @@ class SessionRow(Base):  # type: ignore[misc]
         index=True,
         nullable=False,
     )
-    domain: Mapped[DomainRow] = relationship(
-        "DomainRow",
-        back_populates="sessions",
-        foreign_keys=[domain_name],
+    group_id: Mapped[ProjectID] = mapped_column(
+        "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
-    group_id: Mapped[UUID] = mapped_column(
-        "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
-    )
-    group: Mapped[GroupRow] = relationship("GroupRow", back_populates="sessions")
-    user_uuid: Mapped[UUID] = mapped_column(
-        "user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
+    group: Mapped[ProjectRow] = relationship("ProjectRow")
+    user_uuid: Mapped[UserID] = mapped_column(
+        "user_uuid", GUID(UserID), server_default=sa.text("uuid_generate_v4()"), nullable=False
     )
     user: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
-        back_populates="sessions",
         foreign_keys=[user_uuid],
     )
 
     access_key: Mapped[str | None] = mapped_column("access_key", sa.String(length=20))
-    access_key_row: Mapped[KeyPairRow | None] = relationship(
-        "KeyPairRow",
-        primaryjoin=_get_keypair_row_join_condition,
-        back_populates="sessions",
-        foreign_keys=[access_key],
-    )
 
     # `images` stores canonical image name strings for historical audit.
     images: Mapped[list[str] | None] = mapped_column("images", sa.ARRAY(sa.String), nullable=True)
@@ -520,17 +495,6 @@ class SessionRow(Base):  # type: ignore[misc]
     image_ids: Mapped[list[UUID] | None] = mapped_column("image_ids", sa.ARRAY(GUID), nullable=True)
     tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
 
-    # Resource occupation
-    # DEPRECATED (Phase 3, BA-4308): No longer written to.
-    # Resource allocations are now tracked by the normalized
-    # resource_allocations / agent_resources tables.
-    # Retained for historical audit; will be dropped in a future major version.
-    occupying_slots: Mapped[ResourceSlot] = mapped_column(
-        "occupying_slots", ResourceSlotColumn(), nullable=False
-    )
-    requested_slots: Mapped[ResourceSlot] = mapped_column(
-        "requested_slots", ResourceSlotColumn(), nullable=False
-    )
     vfolder_mounts: Mapped[list[VFolderMount] | None] = mapped_column(
         "vfolder_mounts", StructuredJSONObjectListColumn(VFolderMount), nullable=True
     )
@@ -550,9 +514,6 @@ class SessionRow(Base):  # type: ignore[misc]
     batch_timeout: Mapped[int | None] = mapped_column(
         "batch_timeout", sa.BigInteger(), nullable=True
     )  # Used to set timeout of batch sessions
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True
-    )
     terminated_at: Mapped[datetime | None] = mapped_column(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
@@ -656,9 +617,9 @@ class SessionRow(Base):  # type: ignore[misc]
     # nullable cycle with routings.session -> sessions.id; `use_alter` lets
     # create_all() order the two tables, and the routing/session_row relationship
     # below pins `foreign_keys` so SQLAlchemy can disambiguate the two FK paths.
-    replica_id: Mapped[UUID | None] = mapped_column(
+    replica_id: Mapped[ReplicaID | None] = mapped_column(
         "replica_id",
-        GUID,
+        GUID(ReplicaID),
         sa.ForeignKey(
             "routings.id",
             ondelete="SET NULL",
@@ -668,12 +629,9 @@ class SessionRow(Base):  # type: ignore[misc]
         nullable=True,
     )
 
-    routing: Mapped[list[RoutingRow]] = relationship(
-        "RoutingRow", back_populates="session_row", foreign_keys="RoutingRow.session"
-    )
-
     __table_args__ = (
         # indexing
+        sa.Index("ix_sessions_created_at", "created_at"),
         sa.Index(
             "ix_sessions_updated_order",
             sa.func.greatest(
@@ -721,7 +679,7 @@ class SessionRow(Base):  # type: ignore[misc]
             cluster_mode=session_data.cluster_mode,
             cluster_size=session_data.cluster_size,
             agent_ids=session_data.agent_ids,
-            scaling_group_name=session_data.scaling_group_name,
+            scaling_group_name=session_data.resource_group_name,
             target_sgroup_names=session_data.target_sgroup_names,
             domain_name=session_data.domain_name,
             group_id=session_data.group_id,
@@ -730,8 +688,6 @@ class SessionRow(Base):  # type: ignore[misc]
             images=session_data.images,
             image_ids=session_data.image_ids,
             tag=session_data.tag,
-            occupying_slots=session_data.occupying_slots,
-            requested_slots=session_data.requested_slots,
             vfolder_mounts=vfolder_mounts,
             environ=session_data.environ,
             bootstrap_script=session_data.bootstrap_script,
@@ -768,7 +724,7 @@ class SessionRow(Base):  # type: ignore[misc]
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
             agent_ids=self.agent_ids,
-            scaling_group_name=self.scaling_group_name,
+            resource_group_name=self.scaling_group_name,
             target_sgroup_names=self.target_sgroup_names,
             domain_name=self.domain_name,
             group_id=self.group_id,
@@ -777,8 +733,6 @@ class SessionRow(Base):  # type: ignore[misc]
             images=self.images,
             image_ids=self.image_ids,
             tag=self.tag,
-            occupying_slots=self.occupying_slots,
-            requested_slots=self.requested_slots,
             vfolder_mounts=[mount.to_dataclass() for mount in self.vfolder_mounts]
             if self.vfolder_mounts
             else None,
@@ -787,7 +741,7 @@ class SessionRow(Base):  # type: ignore[misc]
             use_host_network=self.use_host_network,
             timeout=self.timeout,
             batch_timeout=self.batch_timeout,
-            created_at=self.created_at or datetime.now(tzutc()),
+            created_at=self.created_at,
             terminated_at=self.terminated_at,
             starts_at=self.starts_at,
             status=self.status,
@@ -805,6 +759,56 @@ class SessionRow(Base):  # type: ignore[misc]
             if self.main_kernel.service_ports
             else None,
             owner=owner if owner is not None else None,
+            replica_id=self.replica_id,
+        )
+
+    def to_entity_data(self) -> SessionEntityData:
+        """This row as its own value; reads no other table."""
+        return SessionEntityData(
+            id=SessionID(self.id),
+            creation_id=self.creation_id,
+            name=self.name,
+            session_type=self.session_type,
+            priority=self.priority,
+            is_preemptible=self.is_preemptible,
+            job_priority=self.job_priority,
+            cluster_mode=self.cluster_mode,
+            cluster_size=self.cluster_size,
+            options=self.options,
+            agent_ids=self.agent_ids,
+            designated_agent_ids=self.designated_agent_ids,
+            session_group_id=self.session_group_id,
+            resource_group_id=self.resource_group_id,
+            resource_group_name=self.scaling_group_name,
+            target_sgroup_names=self.target_sgroup_names,
+            domain_name=self.domain_name,
+            domain_id=self.domain_id,
+            group_id=self.group_id,
+            user_uuid=self.user_uuid,
+            access_key=AccessKey(self.access_key) if self.access_key is not None else None,
+            images=self.images,
+            image_ids=self.image_ids,
+            tag=self.tag,
+            vfolder_mounts=self.vfolder_mounts,
+            environ=self.environ,
+            bootstrap_script=self.bootstrap_script,
+            use_host_network=self.use_host_network,
+            timeout=self.timeout,
+            batch_timeout=self.batch_timeout,
+            terminated_at=self.terminated_at,
+            starts_at=self.starts_at,
+            requested_starts_at=self.requested_starts_at,
+            status=self.status,
+            status_info=self.status_info,
+            status_data=self.status_data,
+            status_history=self.status_history,
+            callback_url=self.callback_url,
+            startup_command=self.startup_command,
+            result=self.result,
+            num_queries=self.num_queries,
+            last_stat=self.last_stat,
+            network_type=self.network_type,
+            network_id=self.network_id,
             replica_id=self.replica_id,
         )
 
@@ -831,9 +835,7 @@ class SessionRow(Base):  # type: ignore[misc]
             resource=ResourceSpec(
                 cluster_mode=self.cluster_mode,
                 cluster_size=self.cluster_size,
-                occupying_slots=self.occupying_slots,
-                requested_slots=self.requested_slots,
-                scaling_group_name=self.scaling_group_name,
+                resource_group_name=self.scaling_group_name,
                 target_sgroup_names=self.target_sgroup_names,
                 agent_ids=self.agent_ids,
             ),
@@ -928,7 +930,7 @@ class SessionRow(Base):  # type: ignore[misc]
         options: Iterable[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> list[Self]:
+    ) -> list[SessionRow]:
         stmt = sa.select(SessionRow)
         for cond in conditions:
             stmt = cond(stmt)
@@ -941,7 +943,7 @@ class SessionRow(Base):  # type: ignore[misc]
         async with db.connect() as db_conn:
             return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
 
-    def delegate_ownership(self, user_uuid: UUID, access_key: AccessKey) -> None:
+    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
         for kernel_row in self.kernels:
@@ -1255,18 +1257,25 @@ def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition
     return _by_raw_filter
 
 
-class SessionDependencyRow(Base):  # type: ignore[misc]
+class SessionDependencyRow(Base):
     __tablename__ = "session_dependencies"
-    session_id: Mapped[UUID] = mapped_column(
+    id: Mapped[SessionDependencyID] = mapped_column(
+        "id",
+        GUID(SessionDependencyID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
+    session_id: Mapped[SessionID] = mapped_column(
         "session_id",
-        GUID,
+        GUID(SessionID),
         sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    depends_on: Mapped[UUID] = mapped_column(
+    depends_on: Mapped[SessionID] = mapped_column(
         "depends_on",
-        GUID,
+        GUID(SessionID),
         sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
@@ -1512,9 +1521,9 @@ class ComputeSessionPermissionContextBuilder(
         result = ComputeSessionPermissionContext()
 
         _project_stmt = (
-            sa.select(GroupRow)
-            .where(GroupRow.domain_name == domain_name)
-            .options(load_only(GroupRow.id))
+            sa.select(ProjectRow)
+            .where(ProjectRow.domain_name == domain_name)
+            .options(load_only(ProjectRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):
             _row = row
@@ -1585,49 +1594,3 @@ async def get_permission_ctx(
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ComputeSessionPermissionContextBuilder(db_session)
         return await builder.build(ctx, target_scope, requested_permission)
-
-
-async def batch_populate_session_occupied_slots(
-    db_session: SASession,
-    session_rows: Sequence[SessionRow],
-) -> None:
-    """Batch-compute occupied slots from the normalized resource_allocations table
-    and populate each SessionRow's occupying_slots attribute in-place.
-
-    This replaces the deprecated JSONB column read with a live computation
-    from the resource_allocations table (Phase 3, BA-4308).
-    """
-    if not session_rows:
-        return
-    session_ids = [row.id for row in session_rows]
-    ra = ResourceAllocationRow.__table__
-    kernels = KernelRow.__table__
-    effective = sa.func.coalesce(ra.c.used, ra.c.requested)
-    stmt = (
-        sa.select(
-            kernels.c.session_id,
-            ra.c.slot_name,
-            sa.func.sum(effective).label("total"),
-        )
-        .select_from(ra.join(kernels, ra.c.kernel_id == kernels.c.id))
-        .where(
-            kernels.c.session_id.in_(session_ids),
-            ra.c.free_at.is_(None),
-        )
-        .group_by(kernels.c.session_id, ra.c.slot_name)
-    )
-    rows = (await db_session.execute(stmt)).all()
-    slots_map: dict[SessionId, ResourceSlot] = {}
-    for r in rows:
-        sid = SessionId(r.session_id)
-        if sid not in slots_map:
-            slots_map[sid] = ResourceSlot()
-        slots_map[sid][r.slot_name] = r.total
-    for session_row in session_rows:
-        # Use set_committed_value to avoid marking the attribute as dirty
-        # in readonly sessions.
-        sa.orm.attributes.set_committed_value(
-            session_row,
-            "occupying_slots",
-            slots_map.get(SessionId(session_row.id), ResourceSlot()),
-        )

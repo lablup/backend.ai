@@ -51,9 +51,16 @@ from pydantic import (
     ValidationError,
     field_validator,
 )
-from pydantic_core import ErrorDetails
+from pydantic_core import ErrorDetails, core_schema
 from redis.asyncio import Redis
 
+# Deprecated re-export: new code should import ``ImageID`` from
+# ``ai.backend.common.data.entity.image``. This line lets existing
+# ``from ai.backend.common.types import ImageID`` sites keep working and
+# will be removed once call sites are migrated.
+from .data.entity.image import ImageID
+from .data.entity.resource_slot import ResourceSlotName
+from .data.entity.vfolder import VFolderUUID
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import (
     BackendAIError,
@@ -63,14 +70,6 @@ from .exception import (
     InvalidResourceSlotQuantity,
     UnknownResourceSlotType,
 )
-
-# Deprecated re-export: new code should import ``ImageID`` from
-# ``ai.backend.common.identifier.image``. This line lets existing
-# ``from ai.backend.common.types import ImageID`` sites keep working and
-# will be removed once call sites are migrated.
-from .identifier.image import ImageID
-from .identifier.resource_slot import ResourceSlotName
-from .identifier.vfolder import VFolderUUID
 from .models.minilang.mount import MountPointParser
 
 __all__ = (
@@ -131,6 +130,7 @@ __all__ = (
     "MovingStatValue",
     "PreemptionMode",
     "PreemptionOrder",
+    "PreemptionVictimScope",
     "PromMetric",
     "PromMetricGroup",
     "PromMetricPrimitive",
@@ -407,6 +407,7 @@ ContainerId = NewType("ContainerId", str)
 RuleId = NewType("RuleId", UUID)
 SessionId = NewType("SessionId", UUID)
 KernelId = NewType("KernelId", UUID)
+ArchName = NewType("ArchName", str)
 ImageAlias = NewType("ImageAlias", str)
 Subdomain = NewType("Subdomain", str)
 
@@ -1498,7 +1499,6 @@ class QuotaScopeID:
         handler: Any,
     ) -> Any:
         """Provide Pydantic core schema for QuotaScopeID serialization/deserialization."""
-        from pydantic_core import core_schema
 
         def validate_quota_scope_id(v: Any) -> QuotaScopeID:
             if isinstance(v, QuotaScopeID):
@@ -1563,7 +1563,6 @@ class VFolderID:
         handler: Any,
     ) -> Any:
         """Provide Pydantic core schema for VFolderID serialization/deserialization."""
-        from pydantic_core import core_schema
 
         def validate_vfolder_id(v: Any) -> VFolderID:
             if isinstance(v, VFolderID):
@@ -2272,6 +2271,20 @@ class PreemptionOrder(enum.StrEnum):
     NEWEST = "newest"
     FEWEST_SESSIONS = "fewest-sessions"
     SMALLEST_RESOURCES = "smallest-resources"
+
+
+class PreemptionVictimScope(enum.StrEnum):
+    """Which sessions may become preemption victims for a pending session.
+
+    USER limits victims to the pending session's own sessions;
+    PROJECT/DOMAIN widen to sessions of the same project/domain;
+    RESOURCE_GROUP allows any session in the resource group.
+    """
+
+    USER = "user"
+    PROJECT = "project"
+    DOMAIN = "domain"
+    RESOURCE_GROUP = "resource-group"
 
 
 class SchedulerStatus(TypedDict):

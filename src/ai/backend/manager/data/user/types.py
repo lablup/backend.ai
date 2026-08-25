@@ -7,11 +7,11 @@ from datetime import datetime
 from typing import Any, Self, override
 from uuid import UUID
 
-from sqlalchemy.engine import Row
-
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
@@ -32,6 +32,8 @@ class UserStatus(enum.StrEnum):
     INACTIVE = "inactive"
     DELETED = "deleted"
     BEFORE_VERIFICATION = "before-verification"
+    PURGING = "purging"
+    PURGE_ERROR = "purge-error"
 
     @override
     @classmethod
@@ -49,14 +51,22 @@ class UserStatus(enum.StrEnum):
                 return cls.DELETED
             case "BEFORE-VERIFICATION" | "BEFORE_VERIFICATION":
                 return cls.BEFORE_VERIFICATION
+            case "PURGING":
+                return cls.PURGING
+            case "PURGE-ERROR" | "PURGE_ERROR":
+                return cls.PURGE_ERROR
         return None
+
+    @classmethod
+    def purge_in_progress(cls) -> frozenset[UserStatus]:
+        """Statuses a purge is working through. Writes are refused while in one."""
+        return frozenset({cls.PURGING, cls.PURGE_ERROR})
 
 
 @dataclass
 class UserInfoContext:
     uuid: UUID
     email: str
-    main_access_key: AccessKey
 
 
 @dataclass(frozen=True)
@@ -70,12 +80,12 @@ class SessionOwnerContext:
 
 
 @dataclass
-class UserData:
+class UserData(EntityData):
     id: UUID = field(compare=False)
     uuid: UUID = field(compare=False)  # legacy
-    username: str | None
+    username: str
     email: str
-    need_password_change: bool | None
+    need_password_change: bool
     full_name: str | None
     description: str | None
     is_active: bool  # legacy
@@ -83,14 +93,14 @@ class UserData:
     status_info: str | None
     created_at: datetime | None = field(compare=False)
     modified_at: datetime | None = field(compare=False)
-    domain_name: str | None
-    role: UserRole | None
+    domain_name: str
+    domain_id: DomainID
+    role: UserRole
     resource_policy: str
     allowed_client_ip: list[str] | None
-    totp_activated: bool | None
+    totp_activated: bool
     totp_activated_at: datetime | None = field(compare=False)
     sudo_session_enabled: bool
-    main_access_key: str | None = field(compare=False)
     container_uid: int | None = field(compare=False)
     container_main_gid: int | None = field(compare=False)
     container_gids: list[int] | None = field(compare=False)
@@ -114,7 +124,7 @@ class UserData:
         return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
     @classmethod
-    def from_row(cls, row: Row[Any]) -> Self:
+    def from_row(cls, row: Any) -> Self:
         """
         Deprecated: Use `UserRow.to_data()` method instead.
         """
@@ -130,8 +140,9 @@ class UserData:
             status=row.status,
             status_info=row.status_info,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             domain_name=row.domain_name,
+            domain_id=row.domain_id,
             role=row.role,
             resource_policy=row.resource_policy,
             allowed_client_ip=[str(ip) for ip in row.allowed_client_ip]
@@ -140,12 +151,15 @@ class UserData:
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
-            main_access_key=row.main_access_key,
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
             integration_name=row.integration_id,  # DB column is integration_id
         )
+
+    @override
+    def entity_id(self) -> UserID:
+        return UserID(self.id)
 
 
 @dataclass

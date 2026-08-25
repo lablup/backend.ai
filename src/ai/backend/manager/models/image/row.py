@@ -31,6 +31,8 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import true
 
+from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
@@ -62,10 +64,8 @@ from ai.backend.manager.data.image.types import (
     Resources,
 )
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
-from ai.backend.manager.data.permission.types import EntityType
-from ai.backend.manager.data.permission.types import ScopeType as PermissionScopeType
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
-from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.image import ImageNotFound, ImagePurgeInProgress
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -73,7 +73,8 @@ from ai.backend.manager.models.base import (
     StructuredJSONColumn,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -85,10 +86,8 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -152,12 +151,13 @@ def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[An
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
 
 
-class ImageRow(Base):  # type: ignore[misc]
+class ImageRow(CreatedAtMixin, Base):
     __tablename__ = "images"
     __table_args__ = (
         sa.UniqueConstraint(
             "registry", "project", "name", "tag", "architecture", name="uq_image_identifier"
         ),
+        sa.Index("ix_images_created_at", "created_at"),
     )
 
     id: Mapped[ImageID] = mapped_column(
@@ -166,15 +166,12 @@ class ImageRow(Base):  # type: ignore[misc]
     name: Mapped[str] = mapped_column("name", sa.String, nullable=False, index=True)
     project: Mapped[str | None] = mapped_column("project", sa.String, nullable=True)
     image: Mapped[str] = mapped_column("image", sa.String, nullable=False, index=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        index=True,
-        nullable=True,
-    )
     tag: Mapped[str | None] = mapped_column("tag", sa.TEXT, nullable=True)
-    registry: Mapped[str] = mapped_column("registry", sa.String, nullable=False, index=True)
+    # The column name shadows DeclarativeBase.registry; harmless at runtime since
+    # SQLAlchemy resolves the mapper registry at Base-class creation time.
+    registry: Mapped[str] = mapped_column(  # type: ignore[assignment,misc]
+        "registry", sa.String, nullable=False, index=True
+    )
     registry_id: Mapped[UUID] = mapped_column(
         "registry_id",
         GUID,
@@ -228,7 +225,6 @@ class ImageRow(Base):  # type: ignore[misc]
     # sessions = relationship("SessionRow", back_populates="image_row")
     registry_row = relationship(
         "ContainerRegistryRow",
-        back_populates="image_rows",
         primaryjoin=_get_container_registry_join_condition,
     )
 
@@ -298,7 +294,7 @@ class ImageRow(Base):  # type: ignore[misc]
         filter_by_statuses: list[ImageStatus] | None = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> Self:
+    ) -> ImageRow:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         query = (
@@ -326,7 +322,7 @@ class ImageRow(Base):  # type: ignore[misc]
         filter_by_statuses: list[ImageStatus] | None = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> Self:
+    ) -> ImageRow:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(
@@ -359,7 +355,7 @@ class ImageRow(Base):  # type: ignore[misc]
         load_aliases: bool = False,
         filter_by_statuses: list[ImageStatus] | None = None,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> Self:
+    ) -> ImageRow:
         """
         Loads a image row that corresponds to the given ImageRef object.
 
@@ -391,7 +387,7 @@ class ImageRow(Base):  # type: ignore[misc]
 
     @classmethod
     def from_dataclass(cls, image_data: ImageData) -> Self:
-        image_row = ImageRow(
+        image_row = cls(
             name=image_data.name,
             project=image_data.project,
             image=image_data.image,
@@ -409,12 +405,13 @@ class ImageRow(Base):  # type: ignore[misc]
             status=image_data.status,
         )
         image_row.id = image_data.id
-        image_row.created_at = image_data.created_at
+        if image_data.created_at is not None:
+            image_row.created_at = image_data.created_at
         return image_row
 
     @classmethod
     def from_dataclass_with_details(cls, image_data: ImageDataWithDetails) -> Self:
-        image_row = ImageRow(
+        image_row = cls(
             name=image_data.name,
             project=image_data.project,
             image=image_data.name,
@@ -450,7 +447,7 @@ class ImageRow(Base):  # type: ignore[misc]
         filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> Self:
+    ) -> ImageRow:
         """
         Resolves a matching row in the image table from image references and/or aliases.
         If candidate element is `ImageRef`, this method will try to resolve image with matching
@@ -506,7 +503,7 @@ class ImageRow(Base):  # type: ignore[misc]
                     filter_by_statuses=filter_by_statuses,
                     loading_options=loading_options,
                 ):
-                    result: Self = row
+                    result: ImageRow = row
                     return result
             except UnknownImageReference:
                 continue
@@ -517,7 +514,7 @@ class ImageRow(Base):  # type: ignore[misc]
         cls,
         session: AsyncSession,
         image_identifier: ImageIdentifier,
-    ) -> Self:
+    ) -> ImageRow:
         """
         Lookup ImageRow by ImageIdentifier, also trying canonical as alias.
 
@@ -545,7 +542,7 @@ class ImageRow(Base):  # type: ignore[misc]
         image_id: UUID,
         filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = False,
-    ) -> Self | None:
+    ) -> ImageRow | None:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(ImageRow.id == image_id)
@@ -563,7 +560,7 @@ class ImageRow(Base):  # type: ignore[misc]
         session: AsyncSession,
         filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = False,
-    ) -> list[Self]:
+    ) -> list[ImageRow]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow)
@@ -706,8 +703,19 @@ class ImageRow(Base):  # type: ignore[misc]
         return parsed_image_info
 
     async def mark_as_deleted(self, db_session: AsyncSession) -> None:
+        self._reject_while_purging()
         self.status = ImageStatus.DELETED
         await db_session.flush()
+
+    async def mark_as_alive(self, db_session: AsyncSession) -> None:
+        self._reject_while_purging()
+        self.status = ImageStatus.ALIVE
+        await db_session.flush()
+
+    def _reject_while_purging(self) -> None:
+        """Refuse a status write while a purge is working through this image."""
+        if self.status in ImageStatus.purge_in_progress():
+            raise ImagePurgeInProgress(f"Image is being purged: {self.id}")
 
     def set_resource_limit(
         self,
@@ -843,10 +851,10 @@ async def bulk_get_image_configs(
     return result
 
 
-class ImageAliasRow(Base):  # type: ignore[misc]
+class ImageAliasRow(Base):
     __tablename__ = "image_aliases"
-    id: Mapped[UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ImageID] = mapped_column(
+        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     alias: Mapped[str | None] = mapped_column("alias", sa.String, unique=True, index=True)
     image_id: Mapped[ImageID] = mapped_column(
@@ -860,7 +868,7 @@ class ImageAliasRow(Base):  # type: ignore[misc]
         session: AsyncSession,
         alias: str,
         target: ImageRow,
-    ) -> Self:
+    ) -> ImageAliasRow:
         existing_alias: ImageRow | None = await session.scalar(
             sa.select(ImageAliasRow)
             .where(ImageAliasRow.alias == alias)
@@ -882,7 +890,7 @@ class ImageAliasRow(Base):  # type: ignore[misc]
         return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
 
     def to_dataclass(self) -> ImageAliasData:
-        return ImageAliasData(id=self.id, alias=self.alias or "")
+        return ImageAliasData(id=ImageAliasID(self.id), alias=self.alias or "")
 
 
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
@@ -1178,17 +1186,8 @@ class ImagePermissionContextBuilder(
         _ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
-        project_ids_stmt = (
-            sa.select(GroupRow.id)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
-            .where(
-                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
-                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                AssociationScopesEntitiesRow.entity_id == str(scope.user_id),
-            )
+        project_ids_stmt = sa.select(ProjectRow.id).where(
+            user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, scope.user_id)
         )
         project_ids = await self.db_session.scalars(project_ids_stmt)
 
@@ -1199,19 +1198,19 @@ class ImagePermissionContextBuilder(
         _ctx: ClientContext,
         scope: DomainScope,
     ) -> list[ProjectScope]:
-        from ai.backend.manager.models.group import GroupRow
+        from ai.backend.manager.models.project import ProjectRow
 
-        stmt = sa.select(GroupRow.id).where(GroupRow.domain_name == scope.domain_name)
+        stmt = sa.select(ProjectRow.id).where(ProjectRow.domain_name == scope.domain_name)
         project_ids = await self.db_session.scalars(stmt)
         return [ProjectScope(project_id=proj_id) for proj_id in project_ids]
 
     async def _verify_project_scope_and_calculate_permission(
         self, ctx: ClientContext, scope: ProjectScope
     ) -> frozenset[ImagePermission]:
-        from ai.backend.manager.models.group import GroupRow
+        from ai.backend.manager.models.project import ProjectRow
 
-        group_query_stmt = sa.select(GroupRow).where(GroupRow.id == scope.project_id)
-        group_row = cast(GroupRow | None, await self.db_session.scalar(group_query_stmt))
+        group_query_stmt = sa.select(ProjectRow).where(ProjectRow.id == scope.project_id)
+        group_row = cast(ProjectRow | None, await self.db_session.scalar(group_query_stmt))
         if group_row is None:
             raise InvalidScope(f"Project not found (project_id: {scope.project_id})")
 

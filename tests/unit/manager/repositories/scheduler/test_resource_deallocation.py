@@ -17,9 +17,9 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -38,16 +38,17 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import (
     AssociationScopesEntitiesRow,
     EntityFieldRow,
     RoleRow,
     UserRoleRow,
 )
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -55,13 +56,15 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestForceTerminateResourceDeallocation:
@@ -77,7 +80,7 @@ class TestForceTerminateResourceDeallocation:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -85,7 +88,7 @@ class TestForceTerminateResourceDeallocation:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
@@ -111,11 +114,11 @@ class TestForceTerminateResourceDeallocation:
         return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -129,7 +132,7 @@ class TestForceTerminateResourceDeallocation:
                 )
             )
             await db_sess.flush()
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -140,12 +143,12 @@ class TestForceTerminateResourceDeallocation:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         pending_timeout=timedelta(hours=1),
                         config={},
@@ -223,7 +226,7 @@ class TestForceTerminateResourceDeallocation:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         user_uuid = uuid.uuid4()
@@ -235,8 +238,9 @@ class TestForceTerminateResourceDeallocation:
                     username=f"test-user-{uuid.uuid4().hex[:8]}",
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_policy=test_user_resource_policy_name,
+                    domain_id=test_domain.domain_id,
                 )
             )
             await db_sess.flush()
@@ -253,9 +257,8 @@ class TestForceTerminateResourceDeallocation:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 KeyPairRow(
-                    user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=test_keypair_resource_policy_name,
@@ -271,18 +274,18 @@ class TestForceTerminateResourceDeallocation:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     description="Test group",
                     is_active=True,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     resource_policy=test_resource_policy_name,
@@ -307,8 +310,6 @@ class TestForceTerminateResourceDeallocation:
                     region="local",
                     scaling_group=test_scaling_group_name,
                     resource_group_id=test_scaling_group_id,
-                    available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                    occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
                     version="1.0.0",
                     architecture="x86_64",
@@ -338,7 +339,7 @@ class TestForceTerminateResourceDeallocation:
         domain_id: DomainID,
         domain_name: str,
         resource_group_id: ResourceGroupID,
-        scaling_group_name: str,
+        resource_group_name: str,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
@@ -360,11 +361,10 @@ class TestForceTerminateResourceDeallocation:
                     domain_name=domain_name,
                     group_id=group_id,
                     resource_group_id=resource_group_id,
-                    scaling_group_name=scaling_group_name,
+                    scaling_group_name=resource_group_name,
                     status=session_status,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
                     created_at=datetime.now(tzutc()),
                     images=["python:3.8"],
                     vfolder_mounts=[],
@@ -380,7 +380,7 @@ class TestForceTerminateResourceDeallocation:
                     session_id=session_id,
                     agent=agent_id,
                     agent_addr="127.0.0.1:6001" if agent_id else None,
-                    scaling_group=scaling_group_name,
+                    scaling_group=resource_group_name,
                     resource_group_id=resource_group_id,
                     cluster_idx=0,
                     cluster_role="main",
@@ -391,8 +391,6 @@ class TestForceTerminateResourceDeallocation:
                     container_id=f"container-{uuid.uuid4().hex[:8]}",
                     status=kernel_status,
                     status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,
@@ -469,7 +467,7 @@ class TestForceTerminateResourceDeallocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -479,16 +477,16 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """Force-terminate sets free_at on allocations and decrements agent_resources.used."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
             session_status=SessionStatus.RUNNING,
             kernel_status=KernelStatus.RUNNING,
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -541,7 +539,7 @@ class TestForceTerminateResourceDeallocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -550,16 +548,16 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """When agent_id is NULL (offline agent), free_at is still set on allocations."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
             session_status=SessionStatus.RUNNING,
             kernel_status=KernelStatus.RUNNING,
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -591,7 +589,7 @@ class TestForceTerminateResourceDeallocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -601,16 +599,16 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """Forced termination must also apply to sessions already in TERMINATING."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
             session_status=SessionStatus.TERMINATING,
             kernel_status=KernelStatus.TERMINATING,
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -657,7 +655,7 @@ class TestBulkTerminateResourceDeallocation:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -665,7 +663,7 @@ class TestBulkTerminateResourceDeallocation:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
@@ -691,11 +689,11 @@ class TestBulkTerminateResourceDeallocation:
         return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -709,7 +707,7 @@ class TestBulkTerminateResourceDeallocation:
                 )
             )
             await db_sess.flush()
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -720,12 +718,12 @@ class TestBulkTerminateResourceDeallocation:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         pending_timeout=timedelta(hours=1),
                         config={},
@@ -803,7 +801,7 @@ class TestBulkTerminateResourceDeallocation:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         user_uuid = uuid.uuid4()
@@ -815,8 +813,9 @@ class TestBulkTerminateResourceDeallocation:
                     username=f"test-user-{uuid.uuid4().hex[:8]}",
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_policy=test_user_resource_policy_name,
+                    domain_id=test_domain.domain_id,
                 )
             )
             await db_sess.flush()
@@ -833,9 +832,8 @@ class TestBulkTerminateResourceDeallocation:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 KeyPairRow(
-                    user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=test_keypair_resource_policy_name,
@@ -851,18 +849,18 @@ class TestBulkTerminateResourceDeallocation:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     description="Test group",
                     is_active=True,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     resource_policy=test_resource_policy_name,
@@ -887,8 +885,6 @@ class TestBulkTerminateResourceDeallocation:
                     region="local",
                     scaling_group=test_scaling_group_name,
                     resource_group_id=test_scaling_group_id,
-                    available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                    occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
                     version="1.0.0",
                     architecture="x86_64",
@@ -916,7 +912,7 @@ class TestBulkTerminateResourceDeallocation:
         domain_id: DomainID,
         domain_name: str,
         resource_group_id: ResourceGroupID,
-        scaling_group_name: str,
+        resource_group_name: str,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
@@ -938,11 +934,10 @@ class TestBulkTerminateResourceDeallocation:
                     domain_name=domain_name,
                     group_id=group_id,
                     resource_group_id=resource_group_id,
-                    scaling_group_name=scaling_group_name,
+                    scaling_group_name=resource_group_name,
                     status=SessionStatus.RUNNING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
                     created_at=datetime.now(tzutc()),
                     images=["python:3.8"],
                     vfolder_mounts=[],
@@ -958,7 +953,7 @@ class TestBulkTerminateResourceDeallocation:
                     session_id=session_id,
                     agent=agent_id,
                     agent_addr="127.0.0.1:6001",
-                    scaling_group=scaling_group_name,
+                    scaling_group=resource_group_name,
                     resource_group_id=resource_group_id,
                     cluster_idx=0,
                     cluster_role="main",
@@ -969,8 +964,6 @@ class TestBulkTerminateResourceDeallocation:
                     container_id=f"container-{uuid.uuid4().hex[:8]}",
                     status=kernel_status,
                     status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,
@@ -1043,7 +1036,7 @@ class TestBulkTerminateResourceDeallocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -1053,15 +1046,15 @@ class TestBulkTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """update_kernels_to_terminated sets free_at and decrements agent_resources.used."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         _, kernel_id = await self._create_kernel_with_resources(
             db_with_cleanup,
             kernel_status=KernelStatus.RUNNING,
             domain_id=test_domain_id,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             resource_group_id=test_scaling_group_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -1114,7 +1107,7 @@ class TestNegativeValueGuard:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -1122,7 +1115,7 @@ class TestNegativeValueGuard:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
@@ -1148,11 +1141,11 @@ class TestNegativeValueGuard:
         return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -1166,7 +1159,7 @@ class TestNegativeValueGuard:
                 )
             )
             await db_sess.flush()
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -1177,12 +1170,12 @@ class TestNegativeValueGuard:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=test_scaling_group_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         pending_timeout=timedelta(hours=1),
                         config={},
@@ -1260,7 +1253,7 @@ class TestNegativeValueGuard:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         user_uuid = uuid.uuid4()
@@ -1272,8 +1265,9 @@ class TestNegativeValueGuard:
                     username=f"test-user-{uuid.uuid4().hex[:8]}",
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_policy=test_user_resource_policy_name,
+                    domain_id=test_domain.domain_id,
                 )
             )
             await db_sess.flush()
@@ -1290,9 +1284,8 @@ class TestNegativeValueGuard:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 KeyPairRow(
-                    user_id=f"test-user-{uuid.uuid4().hex[:8]}@test.com",
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=test_keypair_resource_policy_name,
@@ -1308,18 +1301,18 @@ class TestNegativeValueGuard:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     description="Test group",
                     is_active=True,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     resource_policy=test_resource_policy_name,
@@ -1344,8 +1337,6 @@ class TestNegativeValueGuard:
                     region="local",
                     scaling_group=test_scaling_group_name,
                     resource_group_id=test_scaling_group_id,
-                    available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                    occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
                     version="1.0.0",
                     architecture="x86_64",
@@ -1369,7 +1360,7 @@ class TestNegativeValueGuard:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
@@ -1379,7 +1370,7 @@ class TestNegativeValueGuard:
         resource_slot_types: None,
     ) -> None:
         """Calling update_kernel_status_terminated twice doesn't produce negative used values."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
         cpu_used = Decimal("2")
@@ -1392,14 +1383,13 @@ class TestNegativeValueGuard:
                     name=f"test-session-{uuid.uuid4().hex[:8]}",
                     session_type=SessionTypes.INTERACTIVE,
                     domain_id=test_domain_id,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     group_id=test_group_id,
                     resource_group_id=test_scaling_group_id,
                     scaling_group_name=test_scaling_group_name,
                     status=SessionStatus.RUNNING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
                     created_at=datetime.now(tzutc()),
                     images=["python:3.8"],
                     vfolder_mounts=[],
@@ -1426,9 +1416,7 @@ class TestNegativeValueGuard:
                     container_id=f"container-{uuid.uuid4().hex[:8]}",
                     status=KernelStatus.RUNNING,
                     status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
                     access_key=test_access_key,

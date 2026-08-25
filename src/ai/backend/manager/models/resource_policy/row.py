@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.types import (
     DefaultForUnspecified,
@@ -19,16 +23,13 @@ from ai.backend.manager.data.resource.types import (
     UserResourcePolicyData,
 )
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
     EnumType,
     ResourceSlotColumn,
     VFolderHostPermissionColumn,
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.keypair import KeyPairRow
-    from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 __all__: Sequence[str] = (
     "DefaultForUnspecified",
@@ -41,7 +42,7 @@ __all__: Sequence[str] = (
 )
 
 
-class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
+class KeyPairResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "keypair_resource_policies"
     # A cap outside the requestable priority range is unsatisfiable: a
     # negative one would reject every session create for the keypair.
@@ -50,11 +51,25 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
             f"max_priority >= {SESSION_PRIORITY_MIN} AND max_priority <= {SESSION_PRIORITY_MAX}",
             name="max_priority_within_session_priority_range",
         ),
+        # Partial unique index: at most one policy may be the default.
+        sa.Index(
+            "uq_keypair_resource_policies_is_default",
+            "is_default",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
     )
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    uuid: Mapped[KeyPairResourcePolicyUUID] = mapped_column(
+        "uuid",
+        GUID(KeyPairResourcePolicyUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, nullable=False, server_default=sa.false()
     )
     default_for_unspecified: Mapped[DefaultForUnspecified] = mapped_column(
         "default_for_unspecified",
@@ -95,14 +110,11 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
     # TODO: implement with a many-to-many association table
     # allowed_scaling_groups: Mapped[list[str]] = mapped_column(sa.Array(sa.String), nullable=False)
 
-    keypairs: Mapped[list[KeyPairRow]] = relationship(
-        "KeyPairRow", back_populates="resource_policy_row"
-    )
-
     def to_dataclass(
         self,
     ) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
+            uuid=self.uuid,
             name=self.name,
             created_at=self.created_at,
             default_for_unspecified=self.default_for_unspecified,
@@ -124,12 +136,16 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
 keypair_resource_policies = KeyPairResourcePolicyRow.__table__
 
 
-class UserResourcePolicyRow(Base):  # type: ignore[misc]
+class UserResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "user_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    uuid: Mapped[UserResourcePolicyUUID] = mapped_column(
+        "uuid",
+        GUID(UserResourcePolicyUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     max_vfolder_count: Mapped[int] = mapped_column(
         "max_vfolder_count", sa.Integer(), nullable=False
@@ -146,8 +162,6 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
     max_concurrent_logins: Mapped[int | None] = mapped_column(
         "max_concurrent_logins", sa.Integer(), nullable=True, default=None
     )
-
-    users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="resource_policy_row")
 
     def __init__(
         self,
@@ -178,6 +192,7 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
 
     def to_dataclass(self) -> UserResourcePolicyData:
         return UserResourcePolicyData(
+            uuid=self.uuid,
             name=self.name,
             created_at=self.created_at,
             max_vfolder_count=self.max_vfolder_count,
@@ -193,12 +208,16 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
 user_resource_policies = UserResourcePolicyRow.__table__
 
 
-class ProjectResourcePolicyRow(Base):  # type: ignore[misc]
+class ProjectResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "project_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+    uuid: Mapped[ProjectResourcePolicyUUID] = mapped_column(
+        "uuid",
+        GUID(ProjectResourcePolicyUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     max_vfolder_count: Mapped[int] = mapped_column(
         "max_vfolder_count", sa.Integer(), nullable=False
@@ -208,10 +227,6 @@ class ProjectResourcePolicyRow(Base):  # type: ignore[misc]
     )
     max_network_count: Mapped[int] = mapped_column(
         "max_network_count", sa.Integer(), nullable=False
-    )
-
-    projects: Mapped[list[GroupRow]] = relationship(
-        "GroupRow", back_populates="resource_policy_row"
     )
 
     def __init__(
@@ -237,6 +252,7 @@ class ProjectResourcePolicyRow(Base):  # type: ignore[misc]
 
     def to_dataclass(self) -> ProjectResourcePolicyData:
         return ProjectResourcePolicyData(
+            uuid=self.uuid,
             name=self.name,
             created_at=self.created_at,
             max_vfolder_count=self.max_vfolder_count,

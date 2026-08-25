@@ -22,13 +22,14 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -53,8 +54,8 @@ from ai.backend.manager.data.kernel.types import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.agent import AgentRow
-    from ai.backend.manager.models.group import GroupRow
     from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.project import ProjectRow
     from ai.backend.manager.models.session import SessionRow
     from ai.backend.manager.models.user import UserRow
 
@@ -64,12 +65,12 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     KernelIDColumnType,
-    ResourceSlotColumn,
     SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -137,7 +138,7 @@ def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
-class KernelRow(Base):  # type: ignore[misc]
+class KernelRow(CreatedAtMixin, Base):
     __tablename__ = "kernels"
 
     # The Backend.AI-side UUID for each kernel
@@ -216,10 +217,10 @@ class KernelRow(Base):  # type: ignore[misc]
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
-    group_id: Mapped[uuid.UUID] = mapped_column(
-        "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
+    group_id: Mapped[ProjectID] = mapped_column(
+        "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
-    user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False)
+    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False)
     access_key: Mapped[str | None] = mapped_column(
         "access_key", sa.String(length=20), nullable=True
     )
@@ -236,21 +237,15 @@ class KernelRow(Base):  # type: ignore[misc]
     architecture: Mapped[str | None] = mapped_column(
         "architecture", sa.String(length=32), default="x86_64", nullable=True
     )
-    registry: Mapped[str | None] = mapped_column("registry", sa.String(length=512), nullable=True)
+    # The column name shadows DeclarativeBase.registry; harmless at runtime since
+    # SQLAlchemy resolves the mapper registry at Base-class creation time.
+    registry: Mapped[str | None] = mapped_column(  # type: ignore[assignment,misc]
+        "registry", sa.String(length=512), nullable=True
+    )
     tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
     # Resource occupation
     container_id: Mapped[str | None] = mapped_column(
         "container_id", sa.String(length=64), nullable=True
-    )
-    # DEPRECATED (Phase 3, BA-4308): No longer the source of truth.
-    # Kernel resource allocations are now tracked by the normalized
-    # resource_allocations table.  Retained for historical audit.
-    occupied_slots: Mapped[ResourceSlot] = mapped_column(
-        "occupied_slots", ResourceSlotColumn(), nullable=False
-    )
-    # DEPRECATED (Phase 3, BA-4308): See resource_allocations table.
-    requested_slots: Mapped[ResourceSlot] = mapped_column(
-        "requested_slots", ResourceSlotColumn(), nullable=False
     )
     occupied_shares: Mapped[dict[str, Any]] = mapped_column(
         "occupied_shares", pgsql.JSONB(), nullable=False, default={}
@@ -297,13 +292,6 @@ class KernelRow(Base):  # type: ignore[misc]
         "use_host_network", sa.Boolean(), default=False, nullable=False
     )
     # Lifecycle
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        index=True,
-        nullable=True,
-    )
     terminated_at: Mapped[datetime | None] = mapped_column(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
@@ -409,6 +397,7 @@ class KernelRow(Base):  # type: ignore[misc]
 
     __table_args__ = (
         # indexing
+        sa.Index("ix_kernels_created_at", "created_at"),
         sa.Index("ix_kernels_sess_id_role", "session_id", "cluster_role", unique=False),
         sa.Index("ix_kernels_status_role", "status", "cluster_role"),
         sa.Index(
@@ -436,12 +425,11 @@ class KernelRow(Base):  # type: ignore[misc]
         "ImageRow",
         foreign_keys="KernelRow.image_id",
     )
-    agent_row: Mapped[AgentRow | None] = relationship("AgentRow", back_populates="kernels")
-    group_row: Mapped[GroupRow] = relationship("GroupRow", back_populates="kernels")
+    agent_row: Mapped[AgentRow | None] = relationship("AgentRow")
+    group_row: Mapped[ProjectRow] = relationship("ProjectRow")
     user_row: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
-        back_populates="kernels",
         foreign_keys="KernelRow.user_uuid",
     )
 
@@ -503,7 +491,7 @@ class KernelRow(Base):  # type: ignore[misc]
 
         return await execute_with_retry(_query)
 
-    def delegate_ownership(self, user_uuid: uuid.UUID, access_key: AccessKey) -> None:
+    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
 
@@ -556,13 +544,11 @@ class KernelRow(Base):  # type: ignore[misc]
                 cluster_hostname=self.cluster_hostname,
             ),
             resource=ResourceInfo(
-                scaling_group=self.scaling_group,
+                resource_group=self.scaling_group,
                 resource_group_id=self.resource_group_id,
                 agent=self.agent,
                 agent_addr=self.agent_addr,
                 container_id=self.container_id,
-                occupied_slots=self.occupied_slots,
-                requested_slots=self.requested_slots,
                 occupied_shares=self.occupied_shares,
                 attached_devices=self.attached_devices or {},
                 resource_opts=self.resource_opts or {},

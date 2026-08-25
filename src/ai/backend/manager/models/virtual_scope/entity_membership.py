@@ -3,11 +3,10 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.permission.virtual_scope import EntityMembershipData
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -16,7 +15,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class EntityMembershipRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class EntityMembershipRow(CreatedAtMixin, Base):
     __tablename__ = "entity_memberships"
     __table_args__ = (
         sa.Index(

@@ -2,18 +2,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import (
-    TYPE_CHECKING,
-)
 
 import sqlalchemy as sa
 from sqlalchemy.orm import (
     Mapped,
-    foreign,
     mapped_column,
-    relationship,
 )
 
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
@@ -23,59 +20,31 @@ from ai.backend.manager.models.base import (
     Base,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.user import UserRow
 
-    from .role import RoleRow
-
-
-def _get_role_row_join_condition() -> sa.ColumnElement[bool]:
-    from .role import RoleRow
-
-    return RoleRow.id == foreign(UserRoleRow.role_id)
-
-
-def _get_user_row_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.user import UserRow
-
-    return UserRow.uuid == foreign(UserRoleRow.user_id)
-
-
-class UserRoleRow(Base):  # type: ignore[misc]
+class UserRoleRow(Base):
     __tablename__ = "user_roles"
     __table_args__ = (sa.UniqueConstraint("user_id", "role_id", name="uq_user_id_role_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    user_id: Mapped[UserID] = mapped_column(
         "user_id",
-        GUID,
+        GUID(UserID),
         sa.ForeignKey("users.uuid", ondelete="CASCADE"),
         nullable=False,
     )
-    role_id: Mapped[uuid.UUID] = mapped_column(
+    role_id: Mapped[RoleID] = mapped_column(
         "role_id",
-        GUID,
+        GUID(RoleID),
         sa.ForeignKey("roles.id", ondelete="CASCADE"),
         nullable=False,
     )
-    granted_by: Mapped[uuid.UUID | None] = mapped_column(
-        "granted_by", GUID, nullable=True
+    granted_by: Mapped[UserID | None] = mapped_column(
+        "granted_by", GUID(UserID), nullable=True
     )  # Null if granted by system
     granted_at: Mapped[datetime] = mapped_column(
         "granted_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    )
-
-    role_row: Mapped[RoleRow | None] = relationship(
-        "RoleRow",
-        back_populates="mapped_user_role_rows",
-        primaryjoin=_get_role_row_join_condition,
-    )
-    user_row: Mapped[UserRow | None] = relationship(
-        "UserRow",
-        back_populates="role_assignments",
-        primaryjoin=_get_user_row_join_condition,
     )
 
     def to_data(self) -> UserRoleAssignmentData:

@@ -42,6 +42,8 @@ def build_v2_routes(
     from .artifact_registry.registry import register_v2_artifact_registry_routes
     from .audit_log.handler import V2AuditLogHandler
     from .audit_log.registry import register_v2_audit_log_routes
+    from .client_ip_masking.handler import V2ClientIPMaskingHandler
+    from .client_ip_masking.registry import register_v2_client_ip_masking_routes
     from .container_registry.handler import V2ContainerRegistryHandler
     from .container_registry.registry import register_v2_container_registry_routes
     from .deployment.handler import V2DeploymentHandler
@@ -52,6 +54,8 @@ def build_v2_routes(
     )
     from .domain.handler import V2DomainHandler
     from .domain.registry import register_v2_domain_routes
+    from .entity_invitation.handler import V2EntityInvitationHandler
+    from .entity_invitation.registry import register_v2_entity_invitation_routes
     from .fair_share.handler import V2FairShareHandler
     from .fair_share.registry import register_v2_fair_share_routes
     from .huggingface_registry.handler import V2HuggingFaceRegistryHandler
@@ -156,11 +160,13 @@ def build_v2_routes(
     image_handler = V2ImageHandler(adapter=adapters.image)
     keypair_handler = V2KeypairHandler(adapter=adapters.user)
     login_client_type_handler = V2LoginClientTypeHandler(adapter=adapters.login_client_type)
+    client_ip_masking_handler = V2ClientIPMaskingHandler(adapter=adapters.client_ip_masking)
     login_history_handler = V2LoginHistoryHandler(adapter=adapters.login_history)
     login_session_handler = V2LoginSessionHandler(adapter=adapters.login_session)
     notification_handler = V2NotificationHandler(adapter=adapters.notification)
     object_storage_handler = V2ObjectStorageHandler(adapter=adapters.object_storage)
     project_handler = V2ProjectHandler(adapter=adapters.project)
+    entity_invitation_handler = V2EntityInvitationHandler(adapter=adapters.entity_invitation)
     role_invitation_handler = V2RoleInvitationHandler(adapter=adapters.rbac)
     role_preset_handler = V2RolePresetHandler(adapter=adapters.role_preset)
     prometheus_query_preset_handler = V2PrometheusQueryPresetHandler(
@@ -239,11 +245,17 @@ def build_v2_routes(
     v2_reg.add_subregistry(
         register_v2_login_client_type_routes(login_client_type_handler, route_deps)
     )
+    v2_reg.add_subregistry(
+        register_v2_client_ip_masking_routes(client_ip_masking_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_login_history_routes(login_history_handler, route_deps))
     v2_reg.add_subregistry(register_v2_login_session_routes(login_session_handler, route_deps))
     v2_reg.add_subregistry(register_v2_notification_routes(notification_handler, route_deps))
     v2_reg.add_subregistry(register_v2_object_storage_routes(object_storage_handler, route_deps))
     v2_reg.add_subregistry(register_v2_project_routes(project_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_entity_invitation_routes(entity_invitation_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_role_invitation_routes(role_invitation_handler, route_deps))
     v2_reg.add_subregistry(register_v2_role_preset_routes(role_preset_handler, route_deps))
     v2_reg.add_subregistry(

@@ -14,14 +14,15 @@ from dataclasses import dataclass
 import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     OrderDirection,
     ReplicaGroupHistoryOrderField,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -35,9 +36,9 @@ from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
@@ -45,6 +46,7 @@ from ai.backend.manager.models.replica_group_history.conditions import (
     ReplicaGroupHistoryConditions,
 )
 from ai.backend.manager.models.replica_group_history.orders import resolve_replica_group_order
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -52,15 +54,15 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.scheduling_history.scopes import (
+    DeploymentReplicaGroupHistoryOperationScope,
+)
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
-from ai.backend.manager.repositories.scheduling_history.types import (
-    DeploymentReplicaGroupHistorySearchScope,
-)
 from ai.backend.testutils.db import with_tables
 
 
@@ -107,7 +109,7 @@ class TestReplicaGroupHistoryRepository:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 ResourcePresetRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
@@ -116,7 +118,7 @@ class TestReplicaGroupHistoryRepository:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 EndpointRow,
                 ReplicaGroupRow,
                 ReplicaGroupHistoryRow,
@@ -147,6 +149,7 @@ class TestReplicaGroupHistoryRepository:
         project, scaling group and user the endpoint points at.
         """
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
         project_policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
@@ -165,6 +168,7 @@ class TestReplicaGroupHistoryRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -174,14 +178,14 @@ class TestReplicaGroupHistoryRepository:
                 )
             )
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=sgroup_name,
                     description="Test scaling group",
                     is_active=True,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             db_sess.add(
@@ -213,6 +217,7 @@ class TestReplicaGroupHistoryRepository:
                         rounds=100_000,
                         salt_size=32,
                     ),
+                    domain_id=domain_id,
                     need_password_change=False,
                     status=UserStatus.ACTIVE,
                     status_info="active",
@@ -222,7 +227,7 @@ class TestReplicaGroupHistoryRepository:
                 )
             )
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
@@ -461,7 +466,7 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             querier,
-            [DeploymentReplicaGroupHistorySearchScope(deployment_id=seed.deployment_id)],
+            [DeploymentReplicaGroupHistoryOperationScope(deployment_id=seed.deployment_id)],
         )
 
         assert result.total_count == seed.deployment_count
@@ -484,7 +489,7 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             querier,
-            [DeploymentReplicaGroupHistorySearchScope(deployment_id=seed.deployment_id)],
+            [DeploymentReplicaGroupHistoryOperationScope(deployment_id=seed.deployment_id)],
         )
 
         # Bounded by the deployment and narrowed by the category condition (only the
@@ -519,7 +524,7 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             querier,
-            [DeploymentReplicaGroupHistorySearchScope(deployment_id=seed.deployment_id)],
+            [DeploymentReplicaGroupHistoryOperationScope(deployment_id=seed.deployment_id)],
         )
 
         assert result.total_count == seed.target_count
@@ -544,7 +549,7 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             querier,
-            [DeploymentReplicaGroupHistorySearchScope(deployment_id=seed.deployment_id)],
+            [DeploymentReplicaGroupHistoryOperationScope(deployment_id=seed.deployment_id)],
         )
 
         returned_attempts = [item.attempts for item in result.items]
@@ -567,7 +572,7 @@ class TestReplicaGroupHistoryRepository:
             await scheduling_history_repository.scoped_search_replica_group_history(
                 querier,
                 [
-                    DeploymentReplicaGroupHistorySearchScope(
+                    DeploymentReplicaGroupHistoryOperationScope(
                         deployment_id=DeploymentID(uuid.uuid4())
                     )
                 ],

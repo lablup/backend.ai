@@ -6,12 +6,13 @@ from typing import override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
 from ai.backend.manager.models.base import GUID, Base
 
 __all__ = ("AuditLogScopeRow",)
 
 
-class AuditLogScopeRow(Base):  # type: ignore[misc]
+class AuditLogScopeRow(Base):
     """A scope the audited entity belongs to.
 
     An entity can sit in several scopes at once, so scopes live here rather than as
@@ -26,12 +27,12 @@ class AuditLogScopeRow(Base):  # type: ignore[misc]
         sa.Index("ix_audit_log_scopes_scope", "scope_type", "scope_id"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[AuditLogScopeID] = mapped_column(
+        "id", GUID(AuditLogScopeID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    audit_log_id: Mapped[uuid.UUID] = mapped_column(
+    audit_log_id: Mapped[AuditLogID] = mapped_column(
         "audit_log_id",
-        GUID,
+        GUID(AuditLogID),
         sa.ForeignKey("audit_logs.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -41,7 +42,7 @@ class AuditLogScopeRow(Base):  # type: ignore[misc]
 
     def __init__(
         self,
-        audit_log_id: uuid.UUID,
+        audit_log_id: AuditLogID,
         scope_type: str,
         scope_id: str | uuid.UUID,
     ) -> None:

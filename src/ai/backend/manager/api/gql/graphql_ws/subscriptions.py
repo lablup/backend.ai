@@ -48,8 +48,8 @@ class SubscriptionExecutor:
         deps = self._gql_deps
         return StrawberryGQLContext(
             config_provider=deps.config_provider,
-            event_hub=deps.processors.events.event_hub,
-            event_fetcher=deps.processors.events.event_fetcher,
+            event_hub=deps.processors.event_hub,
+            event_fetcher=deps.processors.event_fetcher,
             gql_adapter=deps.strawberry_gql_adapter,
             data_loaders=DataLoaders(deps.adapters),
             metric_observer=deps.metric_observer,

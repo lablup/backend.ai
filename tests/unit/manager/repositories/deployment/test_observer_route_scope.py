@@ -19,8 +19,9 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
@@ -39,13 +40,14 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -54,27 +56,28 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
     RouteObservationResult,
     RouteObserver,
 )
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
-from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db import TableOrORM, with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 # Tables `RoutingRow` transitively requires for its FK constraints to be
 # created. We do NOT populate most of these — only the rows the routes
 # themselves need (one domain, scaling group, two policies, one user,
 # one project, one endpoint).
-_REQUIRED_TABLES = [
+_REQUIRED_TABLES: list[TableOrORM] = [
     DomainRow,
-    ScalingGroupRow,
+    ResourceGroupRow,
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
@@ -82,7 +85,7 @@ _REQUIRED_TABLES = [
     UserRoleRow,
     UserRow,
     KeyPairRow,
-    GroupRow,
+    ProjectRow,
     ContainerRegistryRow,
     ImageRow,
     VFolderRow,
@@ -146,22 +149,33 @@ class TestObserverCycleRouteScope:
         return uuid.uuid4().hex[:8]
 
     @pytest.fixture
-    async def domain(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
+    async def domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        suffix: str,
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         name = f"d-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=name, total_resource_slots=ResourceSlot()))
-        return name
+            db_sess.add(
+                DomainRow(
+                    id=domain_id,
+                    name=name,
+                    total_resource_slots=ResourceSlot(),
+                )
+            )
+        return DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
     @pytest.fixture
-    async def scaling_group(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
+    async def resource_group(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
         name = f"sg-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
         return name
@@ -204,7 +218,7 @@ class TestObserverCycleRouteScope:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain: str,
+        domain: DomainFixtureData,
         user_resource_policy: str,
     ) -> UUID:
         user_id = uuid.uuid4()
@@ -220,10 +234,11 @@ class TestObserverCycleRouteScope:
                         rounds=1,
                         salt_size=16,
                     ),
-                    domain_name=domain,
+                    domain_name=domain.domain_name,
                     resource_policy=user_resource_policy,
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
+                    domain_id=domain.domain_id,
                 )
             )
         return user_id
@@ -233,16 +248,16 @@ class TestObserverCycleRouteScope:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain: str,
+        domain: DomainFixtureData,
         project_resource_policy: str,
     ) -> UUID:
         project_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"g-{suffix}",
-                    domain_name=domain,
+                    domain_name=domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_resource_policy,
                 )
@@ -258,8 +273,8 @@ class TestObserverCycleRouteScope:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain: str,
-        scaling_group: str,
+        domain: DomainFixtureData,
+        resource_group: str,
         user: UUID,
         project: UUID,
         revision_id: UUID,
@@ -272,9 +287,9 @@ class TestObserverCycleRouteScope:
                     name=f"ep-{suffix}",
                     created_user=user,
                     session_owner=user,
-                    domain=domain,
+                    domain=domain.domain_name,
                     project=project,
-                    resource_group=scaling_group,
+                    resource_group=resource_group,
                     lifecycle_stage=EndpointLifecycle.CREATED,
                     replicas=4,
                 )
@@ -284,14 +299,14 @@ class TestObserverCycleRouteScope:
     @pytest.fixture
     def environment(
         self,
-        domain: str,
+        domain: DomainFixtureData,
         user: UUID,
         project: UUID,
         endpoint: DeploymentID,
         revision_id: UUID,
     ) -> _Environment:
         return _Environment(
-            domain=domain,
+            domain=domain.domain_name,
             user_id=user,
             project_id=project,
             endpoint_id=endpoint,
@@ -373,6 +388,7 @@ class TestObserverCycleRouteScope:
     ) -> RouteCoordinator:
         repository = DeploymentRepository(
             db=db_with_cleanup,
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=AsyncMock(),
             valkey_stat=AsyncMock(),
             valkey_live=AsyncMock(),

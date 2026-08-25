@@ -8,7 +8,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, override
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,

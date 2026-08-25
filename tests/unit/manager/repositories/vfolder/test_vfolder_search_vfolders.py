@@ -10,8 +10,9 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
-from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -19,19 +20,21 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -52,7 +55,7 @@ class TestVfolderSearchVfolders:
                 KeyPairResourcePolicyRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -73,6 +76,7 @@ class TestVfolderSearchVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create two projects with vfolders: project_a has 2 vfolders, project_b has 1."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_id = uuid.uuid4()
         project_a_id = uuid.uuid4()
@@ -84,6 +88,7 @@ class TestVfolderSearchVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -135,16 +140,16 @@ class TestVfolderSearchVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="test@example.com",
                     user=user_id,
                     access_key="TESTKEY00000000",
-                    secret_key="test-secret",
+                    secret_key=SecretValue("test-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -158,7 +163,7 @@ class TestVfolderSearchVfolders:
                 (project_b_id, "project-b"),
             ]:
                 db_sess.add(
-                    GroupRow(
+                    ProjectRow(
                         id=gid,
                         name=gname,
                         domain_name=domain_name,
@@ -215,6 +220,7 @@ class TestVfolderSearchVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create domain, user, keypair, and project rows but NO vfolders."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_id = uuid.uuid4()
         project_a_id = uuid.uuid4()
@@ -222,6 +228,7 @@ class TestVfolderSearchVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -273,16 +280,16 @@ class TestVfolderSearchVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
 
             db_sess.add(
                 KeyPairRow(
-                    user_id="test@example.com",
                     user=user_id,
                     access_key="TESTKEY00000000",
-                    secret_key="test-secret",
+                    secret_key=SecretValue("test-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -292,7 +299,7 @@ class TestVfolderSearchVfolders:
             await db_sess.flush()
 
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=project_a_id,
                     name="project-a",
                     domain_name=domain_name,

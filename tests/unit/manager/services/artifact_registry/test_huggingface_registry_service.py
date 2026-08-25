@@ -14,8 +14,11 @@ from ai.backend.manager.data.huggingface_registry.types import (
     HuggingFaceRegistryData,
     HuggingFaceRegistryListResult,
 )
+from ai.backend.manager.models.huggingface_registry.searchers import (
+    HuggingFaceRegistrySearcher,
+)
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
@@ -62,7 +65,7 @@ class TestHuggingFaceRegistryService:
         mock_huggingface_repository: MagicMock,
         sample_huggingface_data: HuggingFaceRegistryData,
     ) -> None:
-        """Test searching HuggingFace registries with querier"""
+        """Test searching HuggingFace registries"""
         mock_huggingface_repository.search_registries = AsyncMock(
             return_value=HuggingFaceRegistryListResult(
                 items=[sample_huggingface_data],
@@ -72,19 +75,19 @@ class TestHuggingFaceRegistryService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchHuggingFaceRegistriesAction(querier=querier)
+        action = SearchHuggingFaceRegistriesAction(searcher=searcher)
         result = await artifact_registry_service.search_huggingface_registries(action)
 
         assert result.registries == [sample_huggingface_data]
         assert result.total_count == 1
         assert result.has_next_page is False
         assert result.has_previous_page is False
-        mock_huggingface_repository.search_registries.assert_called_once_with(querier=querier)
+        mock_huggingface_repository.search_registries.assert_called_once_with(searcher=searcher)
 
     async def test_search_huggingface_registries_empty_result(
         self,
@@ -101,12 +104,12 @@ class TestHuggingFaceRegistryService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
-        action = SearchHuggingFaceRegistriesAction(querier=querier)
+        action = SearchHuggingFaceRegistriesAction(searcher=searcher)
         result = await artifact_registry_service.search_huggingface_registries(action)
 
         assert result.registries == []
@@ -128,12 +131,12 @@ class TestHuggingFaceRegistryService:
             )
         )
 
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
-        action = SearchHuggingFaceRegistriesAction(querier=querier)
+        action = SearchHuggingFaceRegistriesAction(searcher=searcher)
         result = await artifact_registry_service.search_huggingface_registries(action)
 
         assert result.total_count == 25

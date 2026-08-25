@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import AliasChoices, ConfigDict, Field, field_validator
+from pydantic import field_validator
 
 from ai.backend.common.auth import PublicKey
-from ai.backend.common.types import BackendAISchema, DeviceName, ResourceSlot, SlotName, SlotTypes
-
-
-class ImageOpts(BackendAISchema):
-    compression: str
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.types import (
+    BackendAISchema,
+    DeviceName,
+    ResourceSlotEntry,
+    SlotName,
+    SlotTypes,
+)
 
 
 class AgentInfo(BackendAISchema):
@@ -19,30 +22,19 @@ class AgentInfo(BackendAISchema):
     addr: str
     public_key: PublicKey | None
     public_host: str
-    available_resource_slots: ResourceSlot
-    slot_key_and_units: dict[SlotName, SlotTypes]
+    available_resource_slots: list[ResourceSlotEntry]
+    slot_key_and_units: dict[ResourceSlotName, SlotTypes]
     version: str
     compute_plugins: dict[DeviceName, dict[str, Any]]
-    images: bytes
     architecture: str
     auto_terminate_abusing_kernel: bool
-    images_opts: ImageOpts = Field(
-        default_factory=lambda: ImageOpts(compression="zlib"),
-        validation_alias=AliasChoices("images.opts", "images_opts", "imagesOpts"),
-    )
-
-    # Pydantic model configuration
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("slot_key_and_units", mode="before")
     @classmethod
     def normalize_slot_keys(
         cls, value: dict[str | SlotName, SlotTypes]
-    ) -> dict[SlotName, SlotTypes]:
-        """Convert string keys to SlotName instances for backward compatibility with older agent versions."""
+    ) -> dict[ResourceSlotName, SlotTypes]:
+        """Accept `SlotName` keys from older agent versions, which sent the legacy form."""
         if not isinstance(value, dict):
             raise ValueError("slot_key_and_units must be a dictionary")
-        normalized = {}
-        for key, val in value.items():
-            normalized[SlotName(key)] = val
-        return normalized
+        return {ResourceSlotName(str(key)): val for key, val in value.items()}

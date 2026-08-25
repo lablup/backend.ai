@@ -1,4 +1,7 @@
-"""Updater for repository update operations."""
+"""Updater for repository update operations.
+
+Deprecated: declare new update specs in ``models/specs/updater.py``.
+"""
 
 from __future__ import annotations
 
@@ -14,9 +17,10 @@ from sqlalchemy.engine import CursorResult
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.specs import updater as specs_updater
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 from .integrity import match_integrity_error, parse_integrity_error
-from .types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -26,6 +30,9 @@ TRow = TypeVar("TRow", bound=Base)
 
 class UpdaterSpec[TRow: Base](ABC):
     """Abstract base class defining values to update for single-row updates.
+
+    Deprecated: use ``DataUpdater`` / ``GuardedDataUpdater`` in
+    ``models/specs/updater.py``.
 
     Implementations specify what to update by providing:
     - row_class property for target table and PK detection
@@ -72,8 +79,21 @@ class UpdaterSpec[TRow: Base](ABC):
             setattr(row, column, value)
 
 
+class DataUpdater[TRow: Base, TData](
+    UpdaterSpec[TRow], specs_updater.DataUpdater[TRow, TData], ABC
+):
+    """Legacy-compatible view of the v2 update spec.
+
+    The declaration lives in ``models/specs/updater.py``; this adds the legacy
+    ``UpdaterSpec`` contract on top, so existing executors and domain specs keep
+    working during the transition.
+    """
+
+
 class BatchUpdaterSpec[TRow: Base](ABC):
     """Abstract base class defining values to update for batch updates.
+
+    Deprecated: use ``DataBatchUpdater`` in ``models/specs/updater.py``.
 
     Implementations specify what to update by providing:
     - row_class property for target table access
@@ -103,6 +123,12 @@ class BatchUpdaterSpec[TRow: Base](ABC):
         Default returns empty sequence (no checks, fallback behavior).
         """
         return ()
+
+
+class DataBatchUpdater[TRow: Base, TData](
+    BatchUpdaterSpec[TRow], specs_updater.DataBatchUpdater[TRow, TData], ABC
+):
+    """Legacy-compatible view of the v2 batch update spec; see :class:`DataUpdater`."""
 
 
 @dataclass

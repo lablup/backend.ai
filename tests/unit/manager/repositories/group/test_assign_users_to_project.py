@@ -1,4 +1,4 @@
-"""Tests for GroupDBSource.assign_users_to_project()"""
+"""Tests for ProjectDBSource.assign_users_to_project()"""
 
 from __future__ import annotations
 
@@ -8,26 +8,29 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -35,7 +38,6 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -43,13 +45,16 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
-from ai.backend.manager.repositories.group.db_source import GroupDBSource
-from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.project.db_source import ProjectDBSource
+from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 class TestAssignUsersToProject:
-    """Tests for GroupDBSource.assign_users_to_project"""
+    """Tests for ProjectDBSource.assign_users_to_project"""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -70,7 +75,7 @@ class TestAssignUsersToProject:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -78,7 +83,7 @@ class TestAssignUsersToProject:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -92,6 +97,7 @@ class TestAssignUsersToProject:
                 ResourcePresetRow,
                 VirtualScopeRow,
                 ScopeBindingRow,
+                EntityLabelRow,
                 EntityMembershipRow,
             ],
         ):
@@ -101,11 +107,13 @@ class TestAssignUsersToProject:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -117,17 +125,19 @@ class TestAssignUsersToProject:
                 )
             )
             await session.commit()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def other_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> str:
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"other-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Other domain",
                     is_active=True,
@@ -164,7 +174,7 @@ class TestAssignUsersToProject:
     async def test_project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
     ) -> ProjectID:
         project_id = ProjectID(uuid.uuid4())
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -178,12 +188,12 @@ class TestAssignUsersToProject:
                 )
             )
             session.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     description="Test project",
                     is_active=True,
-                    domain_name=test_domain,
+                    domain_name=test_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,
@@ -209,6 +219,9 @@ class TestAssignUsersToProject:
     ) -> UserID:
         user_uuid = UserID(uuid.uuid4())
         async with db.begin_session() as session:
+            domain_id = (
+                await session.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
             session.add(
                 UserRow(
                     uuid=user_uuid,
@@ -223,8 +236,10 @@ class TestAssignUsersToProject:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=policy_name,
+                    domain_id=domain_id,
                 )
             )
+            await VirtualScopeSeeder().seed_user_scope(session, user_uuid)
             await session.commit()
         return user_uuid
 
@@ -232,24 +247,24 @@ class TestAssignUsersToProject:
     async def same_domain_user_1(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> UserID:
         return await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.domain_name, user_resource_policy, test_password_info
         )
 
     @pytest.fixture
     async def same_domain_user_2(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> UserID:
         return await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.domain_name, user_resource_policy, test_password_info
         )
 
     @pytest.fixture
@@ -284,15 +299,15 @@ class TestAssignUsersToProject:
     def group_db_source(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> GroupDBSource:
-        return GroupDBSource(db=db_with_cleanup)
+    ) -> ProjectDBSource:
+        return ProjectDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
 
     # --- Test cases ---
 
     async def test_assign_users_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -320,7 +335,7 @@ class TestAssignUsersToProject:
 
     async def test_assign_empty_list_returns_empty(
         self,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
     ) -> None:
@@ -331,7 +346,7 @@ class TestAssignUsersToProject:
     async def test_assign_filters_already_assigned_users(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -362,7 +377,7 @@ class TestAssignUsersToProject:
 
     async def test_assign_filters_cross_domain_users(
         self,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -378,7 +393,7 @@ class TestAssignUsersToProject:
 
     async def test_assign_filters_nonexistent_users(
         self,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
     ) -> None:
@@ -389,7 +404,7 @@ class TestAssignUsersToProject:
 
     async def test_assign_all_invalid_returns_empty(
         self,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         cross_domain_user: UserID,
@@ -405,7 +420,7 @@ class TestAssignUsersToProject:
     async def test_assign_creates_user_role_rows(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -428,7 +443,7 @@ class TestAssignUsersToProject:
     async def test_assign_creates_scope_entity_rows(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         test_project: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -448,9 +463,55 @@ class TestAssignUsersToProject:
             ).all()
             assert len(rows) == 1
 
+    async def test_assign_does_not_bind_project_into_user_scope(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: ProjectDBSource,
+        test_project: ProjectID,
+        test_role: uuid.UUID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """Assigned users become members of the project's virtual scope, and the project
+        is not bound into theirs — project-scoped permissions must not reach the entities
+        a member owns."""
+        await group_db_source.assign_users_to_project(test_project, [same_domain_user_1], test_role)
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            user_vs_id = await session.scalar(
+                sa.select(VirtualScopeRow.id).where(
+                    VirtualScopeRow.scope_type == ScopeType.USER.value,
+                    VirtualScopeRow.scope_id == same_domain_user_1,
+                )
+            )
+            project_vs_id = await session.scalar(
+                sa.select(VirtualScopeRow.id).where(
+                    VirtualScopeRow.scope_type == ScopeType.PROJECT.value,
+                    VirtualScopeRow.scope_id == test_project,
+                )
+            )
+            bindings_into_user_scope = (
+                await session.scalars(
+                    sa.select(ScopeBindingRow.scope_id).where(
+                        ScopeBindingRow.virtual_scope_id == user_vs_id,
+                        ScopeBindingRow.scope_id == test_project,
+                    )
+                )
+            ).all()
+            memberships_in_project_scope = (
+                await session.scalars(
+                    sa.select(EntityMembershipRow.entity_id).where(
+                        EntityMembershipRow.virtual_scope_id == project_vs_id,
+                        EntityMembershipRow.entity_id == same_domain_user_1,
+                    )
+                )
+            ).all()
+
+        assert list(bindings_into_user_scope) == []
+        assert list(memberships_in_project_scope) == [same_domain_user_1]
+
 
 class TestUnassignUsersFromProject:
-    """Tests for GroupDBSource.unassign_users_from_project"""
+    """Tests for ProjectDBSource.unassign_users_from_project"""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -470,7 +531,7 @@ class TestUnassignUsersFromProject:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -478,7 +539,7 @@ class TestUnassignUsersFromProject:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AssociationScopesEntitiesRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -501,11 +562,13 @@ class TestUnassignUsersFromProject:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -517,7 +580,7 @@ class TestUnassignUsersFromProject:
                 )
             )
             await session.commit()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def user_resource_policy(
@@ -542,7 +605,7 @@ class TestUnassignUsersFromProject:
     async def test_project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
     ) -> ProjectID:
         project_id = ProjectID(uuid.uuid4())
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -556,12 +619,12 @@ class TestUnassignUsersFromProject:
                 )
             )
             session.add(
-                GroupRow(
+                ProjectRow(
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     description="Test project",
                     is_active=True,
-                    domain_name=test_domain,
+                    domain_name=test_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,
@@ -587,6 +650,9 @@ class TestUnassignUsersFromProject:
     ) -> UserID:
         user_uuid = UserID(uuid.uuid4())
         async with db.begin_session() as session:
+            domain_id = (
+                await session.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
             session.add(
                 UserRow(
                     uuid=user_uuid,
@@ -601,8 +667,10 @@ class TestUnassignUsersFromProject:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=policy_name,
+                    domain_id=domain_id,
                 )
             )
+            await VirtualScopeSeeder().seed_user_scope(session, user_uuid)
             await session.commit()
         return user_uuid
 
@@ -610,24 +678,24 @@ class TestUnassignUsersFromProject:
     async def same_domain_user_1(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> UserID:
         return await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.domain_name, user_resource_policy, test_password_info
         )
 
     @pytest.fixture
     async def same_domain_user_2(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> UserID:
         return await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.domain_name, user_resource_policy, test_password_info
         )
 
     @pytest.fixture
@@ -670,15 +738,15 @@ class TestUnassignUsersFromProject:
     def group_db_source(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> GroupDBSource:
-        return GroupDBSource(db=db_with_cleanup)
+    ) -> ProjectDBSource:
+        return ProjectDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
 
     # --- Test cases ---
 
     async def test_unassign_returns_unassigned_users(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         project_with_role_registered: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -696,7 +764,7 @@ class TestUnassignUsersFromProject:
     async def test_unassign_deletes_scope_entity_rows(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         project_with_role_registered: ProjectID,
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
@@ -722,7 +790,7 @@ class TestUnassignUsersFromProject:
 
     async def test_unassign_nonexistent_user_reports_failure(
         self,
-        group_db_source: GroupDBSource,
+        group_db_source: ProjectDBSource,
         project_with_role_registered: ProjectID,
     ) -> None:
         """Non-existent user UUID is reported as failure."""

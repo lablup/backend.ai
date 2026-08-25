@@ -1,4 +1,7 @@
-"""Creator for repository insert operations."""
+"""Creator for repository insert operations.
+
+Deprecated: declare new insert specs in ``models/specs/creator.py``.
+"""
 
 from __future__ import annotations
 
@@ -11,9 +14,9 @@ import sqlalchemy as sa
 
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 from .integrity import match_integrity_error, parse_integrity_error
-from .types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -24,6 +27,9 @@ TRow = TypeVar("TRow", bound=Base)
 
 class CreatorSpec[TRow: Base](ABC):
     """Abstract base class defining a row to insert.
+
+    Deprecated: use ``GlobalEntityCreator`` / ``EntityCreator`` /
+    ``RoleManagedEntityCreator`` / ``FieldCreator`` in ``models/specs/creator.py``.
 
     Implementations specify what to create by providing:
     - A build_row() method that returns the ORM instance to insert
@@ -48,8 +54,39 @@ class CreatorSpec[TRow: Base](ABC):
         raise NotImplementedError
 
 
+class DataCreator[TRow: Base, TData](CreatorSpec[TRow], ABC):
+    """A creator spec that also says how the inserted row becomes data.
+
+    Deprecated with :class:`CreatorSpec`; the v2 roots already carry ``to_data``.
+
+    ``CreatorSpec`` stops at building the row, which leaves every caller converting it
+    by hand. Adding ``to_data`` here lets the ops layer return the ``data/`` type
+    directly, the way :class:`~ai.backend.manager.repositories.base.searcher.Searcher`
+    already does for batch reads.
+
+    Example:
+        class UserCreator(DataCreator[UserRow, UserData]):
+            def build_row(self) -> UserRow:
+                return UserRow(name=self._name)
+
+            def to_data(self, row: UserRow) -> UserData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            user = await w.create_data(UserCreator("Alice"))
+    """
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the inserted row into its ``data/`` type."""
+        raise NotImplementedError
+
+
 class DependentCreatorSpec[TDependency, TRow: Base](ABC):
     """Abstract base class defining a row whose construction depends on a resolved value.
+
+    Deprecated: use ``FieldCreator`` / ``NestedFieldCreator`` in
+    ``models/specs/creator.py`` — both build under the owner's settled id.
 
     Unlike CreatorSpec, ``build_row`` receives a dependency value (e.g. a parent row's
     generated id) that is only known at execution time. The caller (repository) builds

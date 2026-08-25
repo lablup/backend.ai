@@ -21,4 +21,5 @@ class KeypairOrderField(StrEnum):
     LAST_USED = "last_used"
     ACCESS_KEY = "access_key"
     IS_ACTIVE = "is_active"
+    IS_DEFAULT = "is_default"
     RESOURCE_POLICY = "resource_policy"

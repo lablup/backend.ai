@@ -18,7 +18,12 @@ from ai.backend.common.exception import (
 
 
 class RepositoryError(BackendAIError):
-    """Base class for repository layer errors."""
+    """Base class for repository layer errors.
+
+    Carries no ``web.HTTP*`` mixin on purpose — a status here would precede every
+    subclass's own mixin in the MRO. Each concrete error mixes in the status it
+    answers with; never raise this base directly.
+    """
 
     error_type = "https://api.backend.ai/probs/repository-error"
     error_title = "Repository operation failed."
@@ -32,7 +37,7 @@ class RepositoryError(BackendAIError):
         )
 
 
-class UpsertEmptyResultError(RepositoryError):
+class UpsertEmptyResultError(RepositoryError, web.HTTPInternalServerError):
     """Raised when upsert operation returns no rows."""
 
     error_type = "https://api.backend.ai/probs/upsert-empty-result"
@@ -47,7 +52,7 @@ class UpsertEmptyResultError(RepositoryError):
         )
 
 
-class UnsupportedCompositePrimaryKeyError(RepositoryError):
+class UnsupportedCompositePrimaryKeyError(RepositoryError, web.HTTPInternalServerError):
     """Raised when an operation requires a single-column primary key but the table has a composite key."""
 
     error_type = "https://api.backend.ai/probs/unsupported-composite-pk"
@@ -62,7 +67,7 @@ class UnsupportedCompositePrimaryKeyError(RepositoryError):
         )
 
 
-class EmptySearchScopeError(RepositoryError, web.HTTPBadRequest):
+class EmptyOperationScopeError(RepositoryError, web.HTTPBadRequest):
     """Raised when a scoped search is requested with no search scopes.
 
     A scoped query must carry at least one scope; an empty scope list would silently
@@ -70,8 +75,8 @@ class EmptySearchScopeError(RepositoryError, web.HTTPBadRequest):
     genuinely need an unscoped query must use the explicit global query path instead.
     """
 
-    error_type = "https://api.backend.ai/probs/empty-search-scope"
-    error_title = "Search scope must not be empty."
+    error_type = "https://api.backend.ai/probs/empty-operation-scope"
+    error_title = "Operation scope must not be empty."
 
     @override
     def error_code(self) -> ErrorCode:
@@ -79,6 +84,46 @@ class EmptySearchScopeError(RepositoryError, web.HTTPBadRequest):
             domain=ErrorDomain.DATABASE,
             operation=ErrorOperation.LIST,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class EntityNotFoundError(RepositoryError, web.HTTPNotFound):
+    """Raised when an ops-backed operation names a row that does not exist.
+
+    The generic repository has no domain to name a more specific error from, so the
+    entity type travels in the message instead. A domain that wants its own error
+    keeps a hand-written repository method.
+    """
+
+    error_type = "https://api.backend.ai/probs/entity-not-found"
+    error_title = "Entity not found."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class AmbiguousEntityKeyError(RepositoryError, web.HTTPConflict):
+    """Raised when a lookup key matches more than one row.
+
+    The key a lookup resolves is expected to be unique. Matching several rows means
+    either the conditions are wrong or the constraint that should enforce it is
+    missing, and answering with an arbitrary one of them would hide both.
+    """
+
+    error_type = "https://api.backend.ai/probs/ambiguous-entity-key"
+    error_title = "Lookup key matched more than one entity."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 
@@ -200,5 +245,24 @@ class ExclusionViolationError(RepositoryIntegrityError):
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
             operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class EntityWriteRefusedError(RepositoryError, web.HTTPConflict):
+    """Raised when a guarded write names an existing row whose guard declined it.
+
+    Kept apart from :class:`EntityNotFoundError` so a caller can tell a row that is
+    gone from a row that is there and refusing.
+    """
+
+    error_type = "https://api.backend.ai/probs/entity-write-refused"
+    error_title = "Entity refused the write."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.CONFLICT,
         )

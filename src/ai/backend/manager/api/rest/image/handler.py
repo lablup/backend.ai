@@ -55,9 +55,7 @@ class ImageHandler:
         """Search images with filters, orders, and pagination."""
         log.info("SEARCH (ak:{})", ctx.access_key)
         querier = self._adapter.build_querier(body.parsed)
-        action_result = await self._image.search_images.wait_for_complete(
-            SearchImagesAction(querier=querier)
-        )
+        action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
         resp = SearchImagesResponse(
             items=[self._adapter.convert_to_dto(img) for img in action_result.data],
             pagination=PaginationInfo(
@@ -75,7 +73,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Get a single image by ID."""
         log.info("GET (ak:{}, image_id:{})", ctx.access_key, path.parsed.image_id)
-        action_result = await self._image.get_image_by_id.wait_for_complete(
+        action_result = await self._image.get_image_by_id.run(
             GetImageByIdAction(image_id=ImageID(path.parsed.image_id), image_status=None)
         )
         resp = GetImageResponse(
@@ -92,7 +90,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Rescan an image from the registry."""
         log.info("RESCAN (ak:{})", ctx.access_key)
-        action_result = await self._image.scan_image.wait_for_complete(
+        action_result = await self._image.scan_image.run(
             ScanImageAction(canonical=body.parsed.canonical, architecture=body.parsed.architecture)
         )
         resp = RescanImagesResponse(
@@ -108,7 +106,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Create an image alias."""
         log.info("ALIAS (ak:{})", ctx.access_key)
-        action_result = await self._image.alias_image_by_id.wait_for_complete(
+        action_result = await self._image.alias_image_by_id.run(
             AliasImageByIdAction(
                 image_id=ImageID(body.parsed.image_id),
                 alias=body.parsed.alias,
@@ -128,7 +126,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Remove an image alias."""
         log.info("DEALIAS (ak:{})", ctx.access_key)
-        action_result = await self._image.dealias_image.wait_for_complete(
+        action_result = await self._image.dealias_image.run(
             DealiasImageAction(alias=body.parsed.alias)
         )
         resp = AliasImageResponse(
@@ -145,7 +143,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Forget (soft-delete) an image."""
         log.info("FORGET (ak:{})", ctx.access_key)
-        action_result = await self._image.forget_image_by_id.wait_for_complete(
+        action_result = await self._image.forget_image_by_id.run(
             ForgetImageByIdAction(image_id=ImageID(body.parsed.image_id))
         )
         resp = ForgetImageResponse(
@@ -160,7 +158,7 @@ class ImageHandler:
     ) -> APIResponse:
         """Purge (hard-delete) an image."""
         log.info("PURGE (ak:{})", ctx.access_key)
-        action_result = await self._image.purge_image_by_id.wait_for_complete(
+        action_result = await self._image.purge_image_by_id.run(
             PurgeImageByIdAction(image_id=ImageID(body.parsed.image_id))
         )
         resp = PurgeImageResponse(

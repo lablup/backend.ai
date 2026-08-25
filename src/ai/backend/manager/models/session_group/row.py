@@ -5,11 +5,12 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.session_group import SessionGroupID
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.session_group.types import (
+    SessionGroupData,
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
@@ -19,7 +20,7 @@ from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 __all__ = ("SessionGroupRow",)
 
 
-class SessionGroupRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class SessionGroupRow(CreatedAtMixin, Base):
     """
     A set of sessions sharing a common concern, holding their placement policy.
 
@@ -76,3 +77,15 @@ class SessionGroupRow(CreatedAtMixin, Base):  # type: ignore[misc]
         sa.DateTime(timezone=True),
         nullable=True,
     )
+
+    def to_data(self) -> SessionGroupData:
+        return SessionGroupData(
+            id=SessionGroupID(self.id),
+            domain_id=self.domain_id,
+            project_id=self.project_id,
+            owner_user_id=self.owner_user_id,
+            placement_direction=self.placement_direction,
+            placement_enforcement=self.placement_enforcement,
+            created_at=self.created_at,
+            deleted_at=self.deleted_at,
+        )

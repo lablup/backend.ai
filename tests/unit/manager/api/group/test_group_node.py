@@ -21,10 +21,10 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
+from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.api.gql_legacy.group import CreateGroup, GroupNode
-from ai.backend.manager.data.group.types import GroupData, ProjectType
+from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.group.actions.create_group import CreateGroupActionResult
 
 
 class TestCreateGroupMutation:
@@ -45,9 +45,9 @@ class TestCreateGroupMutation:
     """
 
     @pytest.fixture
-    def group_data_response(self) -> GroupData:
-        """GroupData returned from CreateGroup action."""
-        return GroupData(
+    def group_data_response(self) -> ProjectData:
+        """ProjectData returned from CreateGroup action."""
+        return ProjectData(
             id=uuid4(),
             name="test-group",
             description="Test group",
@@ -67,18 +67,16 @@ class TestCreateGroupMutation:
         )
 
     @pytest.fixture
-    def mock_graph_ctx(self, group_data_response: GroupData) -> MagicMock:
+    def mock_graph_ctx(self, group_data_response: ProjectData) -> MagicMock:
         """GraphQueryContext mock with processors and user context."""
 
         ctx = MagicMock()
-        ctx.processors.group.create_group.wait_for_complete = AsyncMock(
-            return_value=CreateGroupActionResult(data=group_data_response, _domain_name="default")
+        ctx.processors.project.create_project.run = AsyncMock(
+            return_value=CreatedEntityOpsResult(data=group_data_response)
         )
         domain_data = MagicMock()
         domain_data.id = uuid4()
-        ctx.processors.domain.get_domain.wait_for_complete = AsyncMock(
-            return_value=MagicMock(data=domain_data)
-        )
+        ctx.processors.domain.lookup.run = AsyncMock(return_value=MagicMock(data=domain_data))
         # Required for privileged_mutation decorator
         ctx.user = {
             "role": UserRole.SUPERADMIN,
@@ -187,7 +185,7 @@ class TestGroupNodeQuery:
 
     @pytest.fixture
     def mock_group_row(self) -> MagicMock:
-        """GroupRow mock with VFolderHostPermissionMap (contains sets).
+        """ProjectRow mock with VFolderHostPermissionMap (contains sets).
 
         This simulates what VFolderHostPermissionColumn.process_result_value() returns
         when loading data from the database.
@@ -198,7 +196,7 @@ class TestGroupNodeQuery:
         row.description = "Test group"
         row.is_active = True
         row.created_at = datetime.now(tz=UTC)
-        row.modified_at = datetime.now(tz=UTC)
+        row.updated_at = datetime.now(tz=UTC)
         row.domain_name = "default"
         row.total_resource_slots = ResourceSlot({})
         # VFolderHostPermissionColumn.process_result_value() returns VFolderHostPermissionMap

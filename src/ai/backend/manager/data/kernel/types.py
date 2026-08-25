@@ -8,12 +8,12 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.common.types import (
     CIStrEnum,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -232,13 +232,11 @@ class UserPermission:
 
 @dataclass
 class ResourceInfo:
-    scaling_group: str
+    resource_group: str
     resource_group_id: ResourceGroupID
     agent: str | None
     agent_addr: str | None
     container_id: str | None
-    occupied_slots: ResourceSlot
-    requested_slots: ResourceSlot
     occupied_shares: dict[str, Any]
     attached_devices: dict[str, Any]
     resource_opts: dict[str, Any]
@@ -304,7 +302,7 @@ class Metadata:
 
 
 @dataclass
-class KernelInfo:
+class KernelInfo(FieldData):
     id: KernelId
     session: RelatedSessionInfo
     user_permission: UserPermission
@@ -342,7 +340,7 @@ class KernelSchedulingPhase(StrEnum):
 
 
 @dataclass
-class KernelSchedulingHistoryData:
+class KernelSchedulingHistoryData(FieldData):
     """Domain model for kernel scheduling history."""
 
     id: KernelSchedulingHistoryID

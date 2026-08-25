@@ -12,6 +12,10 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
@@ -21,39 +25,20 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.object_storage.types import (
     ObjectStorageData,
-    ObjectStorageListResult,
 )
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.errors.artifact import ArtifactNotApproved, ArtifactReadonly
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.object_storage import ObjectStorageOperationNotSupported
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
-from ai.backend.manager.services.object_storage.actions.create import (
-    CreateObjectStorageAction,
-)
-from ai.backend.manager.services.object_storage.actions.delete import (
-    DeleteObjectStorageAction,
-)
-from ai.backend.manager.services.object_storage.actions.get import (
-    GetObjectStorageAction,
-)
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
 from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
     GetUploadPresignedURLAction,
-)
-from ai.backend.manager.services.object_storage.actions.list import (
-    ListObjectStorageAction,
-)
-from ai.backend.manager.services.object_storage.actions.search import (
-    SearchObjectStoragesAction,
-)
-from ai.backend.manager.services.object_storage.actions.update import (
-    UpdateObjectStorageAction,
 )
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
 
@@ -64,6 +49,11 @@ class TestObjectStorageService:
     @pytest.fixture
     def mock_artifact_repository(self) -> MagicMock:
         return MagicMock(spec=ArtifactRepository)
+
+    @pytest.fixture
+    def mock_revision_ops(self) -> MagicMock:
+        """Create mocked OpsRepository for artifact revisions"""
+        return MagicMock(spec=OpsRepository)
 
     @pytest.fixture
     def mock_object_storage_repository(self) -> MagicMock:
@@ -85,6 +75,7 @@ class TestObjectStorageService:
     def object_storage_service(
         self,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_storage_manager: MagicMock,
@@ -92,6 +83,7 @@ class TestObjectStorageService:
     ) -> ObjectStorageService:
         return ObjectStorageService(
             artifact_repository=mock_artifact_repository,
+            revision_ops=mock_revision_ops,
             object_storage_repository=mock_object_storage_repository,
             storage_namespace_repository=mock_storage_namespace_repository,
             storage_manager=mock_storage_manager,
@@ -101,7 +93,7 @@ class TestObjectStorageService:
     @pytest.fixture
     def sample_object_storage_data(self) -> ObjectStorageData:
         return ObjectStorageData(
-            id=uuid4(),
+            id=ObjectStorageID(uuid4()),
             name="test-object-storage",
             host="storage-proxy-1",
             access_key="test-access-key",
@@ -113,7 +105,7 @@ class TestObjectStorageService:
     @pytest.fixture
     def sample_artifact_data(self) -> ArtifactData:
         return ArtifactData(
-            id=uuid4(),
+            id=ArtifactID(uuid4()),
             name="test-artifact",
             type=ArtifactType.MODEL,
             description="test artifact",
@@ -131,7 +123,7 @@ class TestObjectStorageService:
     @pytest.fixture
     def sample_revision_data(self, sample_artifact_data: ArtifactData) -> ArtifactRevisionData:
         return ArtifactRevisionData(
-            id=uuid4(),
+            id=ArtifactRevisionID(uuid4()),
             artifact_id=sample_artifact_data.id,
             version="1.0.0",
             readme=None,
@@ -149,7 +141,7 @@ class TestObjectStorageService:
         self, sample_object_storage_data: ObjectStorageData
     ) -> StorageNamespaceData:
         return StorageNamespaceData(
-            id=uuid4(),
+            id=StorageNamespaceID(uuid4()),
             storage_id=sample_object_storage_data.id,
             namespace="test-bucket",
         )
@@ -158,189 +150,13 @@ class TestObjectStorageService:
     # Tests - CreateObjectStorageAction
     # =========================================================================
 
-    async def test_create_object_storage(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-        sample_object_storage_data: ObjectStorageData,
-    ) -> None:
-        mock_object_storage_repository.create = AsyncMock(return_value=sample_object_storage_data)
-        creator = MagicMock()
-        action = CreateObjectStorageAction(creator=creator)
-
-        result = await object_storage_service.create(action)
-
-        assert result.result == sample_object_storage_data
-        assert result.result.id == sample_object_storage_data.id
-        mock_object_storage_repository.create.assert_called_once_with(creator)
-
-    # =========================================================================
-    # Tests - GetObjectStorageAction
-    # =========================================================================
-
-    async def test_get_object_storage(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-        sample_object_storage_data: ObjectStorageData,
-    ) -> None:
-        storage_id = sample_object_storage_data.id
-        mock_object_storage_repository.get_by_id = AsyncMock(
-            return_value=sample_object_storage_data
-        )
-        action = GetObjectStorageAction(storage_id=storage_id)
-
-        result = await object_storage_service.get(action)
-
-        assert result.result == sample_object_storage_data
-        assert result.result.name == "test-object-storage"
-        assert result.result.host == "storage-proxy-1"
-        assert result.result.endpoint == "https://s3.example.com"
-        mock_object_storage_repository.get_by_id.assert_called_once_with(storage_id)
-
-    async def test_get_object_storage_not_found(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-    ) -> None:
-        non_existent_id = uuid4()
-        mock_object_storage_repository.get_by_id = AsyncMock(
-            side_effect=Exception("Object storage not found")
-        )
-        action = GetObjectStorageAction(storage_id=non_existent_id)
-
-        with pytest.raises(Exception, match="Object storage not found"):
-            await object_storage_service.get(action)
-
-    # =========================================================================
-    # Tests - ListObjectStorageAction
-    # =========================================================================
-
-    async def test_list_object_storages(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-        sample_object_storage_data: ObjectStorageData,
-    ) -> None:
-        second_storage = ObjectStorageData(
-            id=uuid4(),
-            name="second-storage",
-            host="storage-proxy-2",
-            access_key="key2",
-            secret_key="secret2",
-            endpoint="https://s3-2.example.com",
-            region="us-west-2",
-        )
-        mock_object_storage_repository.list_object_storages = AsyncMock(
-            return_value=[sample_object_storage_data, second_storage]
-        )
-        action = ListObjectStorageAction()
-
-        result = await object_storage_service.list(action)
-
-        assert len(result.data) == 2
-        assert result.data[0] == sample_object_storage_data
-        assert result.data[1] == second_storage
-        mock_object_storage_repository.list_object_storages.assert_called_once()
-
-    async def test_list_object_storages_empty(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-    ) -> None:
-        mock_object_storage_repository.list_object_storages = AsyncMock(return_value=[])
-        action = ListObjectStorageAction()
-
-        result = await object_storage_service.list(action)
-
-        assert result.data == []
-
-    # =========================================================================
-    # Tests - UpdateObjectStorageAction
-    # =========================================================================
-
-    async def test_update_object_storage(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-    ) -> None:
-        updated_data = ObjectStorageData(
-            id=uuid4(),
-            name="updated-storage",
-            host="new-host",
-            access_key="new-key",
-            secret_key="new-secret",
-            endpoint="https://new-endpoint.com",
-            region="eu-west-1",
-        )
-        mock_object_storage_repository.update = AsyncMock(return_value=updated_data)
-        updater = MagicMock()
-        updater.pk_value = updated_data.id
-        action = UpdateObjectStorageAction(updater=updater)
-
-        result = await object_storage_service.update(action)
-
-        assert result.result == updated_data
-        assert result.result.name == "updated-storage"
-        mock_object_storage_repository.update.assert_called_once_with(updater)
-
-    async def test_update_object_storage_not_found(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-    ) -> None:
-        mock_object_storage_repository.update = AsyncMock(
-            side_effect=Exception("Object storage not found")
-        )
-        updater = MagicMock()
-        updater.pk_value = uuid4()
-        action = UpdateObjectStorageAction(updater=updater)
-
-        with pytest.raises(Exception, match="Object storage not found"):
-            await object_storage_service.update(action)
-
-    # =========================================================================
-    # Tests - DeleteObjectStorageAction
-    # =========================================================================
-
-    async def test_delete_object_storage(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-    ) -> None:
-        storage_id = uuid4()
-        mock_object_storage_repository.delete = AsyncMock(return_value=storage_id)
-        action = DeleteObjectStorageAction(storage_id=storage_id)
-
-        result = await object_storage_service.delete(action)
-
-        assert result.deleted_storage_id == storage_id
-        mock_object_storage_repository.delete.assert_called_once_with(storage_id)
-
-    async def test_delete_object_storage_not_found(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-    ) -> None:
-        non_existent_id = uuid4()
-        mock_object_storage_repository.delete = AsyncMock(
-            side_effect=Exception("Object storage not found")
-        )
-        action = DeleteObjectStorageAction(storage_id=non_existent_id)
-
-        with pytest.raises(Exception, match="Object storage not found"):
-            await object_storage_service.delete(action)
-
-    # =========================================================================
-    # Tests - GetDownloadPresignedURLAction
-    # =========================================================================
-
     async def test_get_download_presigned_url_available_artifact(
         self,
         object_storage_service: ObjectStorageService,
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_storage_manager: MagicMock,
         mock_config_provider: MagicMock,
         sample_object_storage_data: ObjectStorageData,
@@ -360,9 +176,7 @@ class TestObjectStorageService:
         mock_storage_namespace_repository.get_by_storage_and_namespace = AsyncMock(
             return_value=sample_namespace_data
         )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_revision_data
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=sample_revision_data)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact_data)
 
         mock_client = MagicMock()
@@ -372,7 +186,7 @@ class TestObjectStorageService:
         mock_storage_manager.get_manager_facing_client.return_value = mock_client
 
         action = GetDownloadPresignedURLAction(
-            artifact_revision_id=sample_revision_data.id,
+            artifact_revision_id=ArtifactRevisionID(sample_revision_data.id),
             key="model.bin",
         )
         result = await object_storage_service.get_presigned_download_url(action)
@@ -386,6 +200,7 @@ class TestObjectStorageService:
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_config_provider: MagicMock,
         sample_object_storage_data: ObjectStorageData,
         sample_artifact_data: ArtifactData,
@@ -398,7 +213,7 @@ class TestObjectStorageService:
         mock_config_provider.config.reservoir = reservoir_config
 
         not_available_revision = ArtifactRevisionData(
-            id=uuid4(),
+            id=ArtifactRevisionID(uuid4()),
             artifact_id=sample_artifact_data.id,
             version="1.0.0",
             readme=None,
@@ -417,13 +232,11 @@ class TestObjectStorageService:
         mock_storage_namespace_repository.get_by_storage_and_namespace = AsyncMock(
             return_value=sample_namespace_data
         )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=not_available_revision
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=not_available_revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact_data)
 
         action = GetDownloadPresignedURLAction(
-            artifact_revision_id=not_available_revision.id,
+            artifact_revision_id=ArtifactRevisionID(not_available_revision.id),
             key="model.bin",
         )
 
@@ -438,7 +251,7 @@ class TestObjectStorageService:
         mock_config_provider.config.reservoir = None
 
         action = GetDownloadPresignedURLAction(
-            artifact_revision_id=uuid4(),
+            artifact_revision_id=ArtifactRevisionID(uuid4()),
             key="model.bin",
         )
 
@@ -455,7 +268,7 @@ class TestObjectStorageService:
         mock_config_provider.config.reservoir = reservoir_config
 
         action = GetDownloadPresignedURLAction(
-            artifact_revision_id=uuid4(),
+            artifact_revision_id=ArtifactRevisionID(uuid4()),
             key="model.bin",
         )
 
@@ -472,6 +285,7 @@ class TestObjectStorageService:
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_storage_manager: MagicMock,
         mock_config_provider: MagicMock,
         sample_object_storage_data: ObjectStorageData,
@@ -491,9 +305,7 @@ class TestObjectStorageService:
         mock_storage_namespace_repository.get_by_storage_and_namespace = AsyncMock(
             return_value=sample_namespace_data
         )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_revision_data
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=sample_revision_data)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact_data)
 
         mock_client = MagicMock()
@@ -504,7 +316,7 @@ class TestObjectStorageService:
         mock_storage_manager.get_manager_facing_client.return_value = mock_client
 
         action = GetUploadPresignedURLAction(
-            artifact_revision_id=sample_revision_data.id,
+            artifact_revision_id=ArtifactRevisionID(sample_revision_data.id),
             key="model.bin",
         )
         result = await object_storage_service.get_presigned_upload_url(action)
@@ -521,7 +333,7 @@ class TestObjectStorageService:
         mock_config_provider.config.reservoir = None
 
         action = GetUploadPresignedURLAction(
-            artifact_revision_id=uuid4(),
+            artifact_revision_id=ArtifactRevisionID(uuid4()),
             key="model.bin",
         )
 
@@ -534,6 +346,7 @@ class TestObjectStorageService:
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_config_provider: MagicMock,
         sample_object_storage_data: ObjectStorageData,
         sample_revision_data: ArtifactRevisionData,
@@ -567,13 +380,11 @@ class TestObjectStorageService:
         mock_storage_namespace_repository.get_by_storage_and_namespace = AsyncMock(
             return_value=sample_namespace_data
         )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_revision_data
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=sample_revision_data)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=readonly_artifact)
 
         action = GetUploadPresignedURLAction(
-            artifact_revision_id=sample_revision_data.id,
+            artifact_revision_id=ArtifactRevisionID(sample_revision_data.id),
             key="model.bin",
         )
 
@@ -583,84 +394,3 @@ class TestObjectStorageService:
     # =========================================================================
     # Tests - Search Object Storages
     # =========================================================================
-
-    async def test_search_object_storages(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-        sample_object_storage_data: ObjectStorageData,
-    ) -> None:
-        mock_object_storage_repository.search = AsyncMock(
-            return_value=ObjectStorageListResult(
-                items=[sample_object_storage_data],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchObjectStoragesAction(querier=querier)
-        result = await object_storage_service.search(action)
-
-        assert result.storages == [sample_object_storage_data]
-        assert result.total_count == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-        mock_object_storage_repository.search.assert_called_once_with(querier=querier)
-
-    async def test_search_object_storages_empty_result(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-    ) -> None:
-        mock_object_storage_repository.search = AsyncMock(
-            return_value=ObjectStorageListResult(
-                items=[],
-                total_count=0,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchObjectStoragesAction(querier=querier)
-        result = await object_storage_service.search(action)
-
-        assert result.storages == []
-        assert result.total_count == 0
-
-    async def test_search_object_storages_with_pagination(
-        self,
-        object_storage_service: ObjectStorageService,
-        mock_object_storage_repository: MagicMock,
-        sample_object_storage_data: ObjectStorageData,
-    ) -> None:
-        mock_object_storage_repository.search = AsyncMock(
-            return_value=ObjectStorageListResult(
-                items=[sample_object_storage_data],
-                total_count=25,
-                has_next_page=True,
-                has_previous_page=True,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=10),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchObjectStoragesAction(querier=querier)
-        result = await object_storage_service.search(action)
-
-        assert result.total_count == 25
-        assert result.has_next_page is True
-        assert result.has_previous_page is True

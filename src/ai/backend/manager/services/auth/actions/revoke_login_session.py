@@ -2,44 +2,58 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.login_session import LoginSessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthAction
+from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
+from ai.backend.manager.services.auth.actions.lookup_login_session_owner import (
+    LookupLoginSessionOwnerAction,
+)
 
 
-@dataclass
-class AdminRevokeLoginSessionAction(AuthAction):
+@dataclass(frozen=True)
+class GlobalRevokeLoginSessionAction(AuthGlobalAction):
+    """Revoke any login session, without reading who owns it."""
+
     session_id: UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.session_id)
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
 
-
-@dataclass
-class MyRevokeLoginSessionAction(AuthAction):
-    session_id: UUID
-    user_id: UUID
-
     @override
-    def entity_id(self) -> str | None:
-        return str(self.session_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_revoke_login_session"
+
+
+@dataclass(frozen=True)
+class RevokeLoginSessionAction(BaseSingleFieldAction[LoginSessionID, UserID]):
+    """Revoke one login session, answered for by the user it belongs to.
+
+    The owner lookup reads that user, so who may revoke the session is decided the way
+    every field operation decides it rather than by comparing ids in the service.
+    """
+
+    session_id: LoginSessionID
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.UPDATE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "revoke_login_session"
+
+    @override
+    def to_owner_lookup_action(self) -> LookupLoginSessionOwnerAction:
+        return LookupLoginSessionOwnerAction(session_id=self.session_id)
 
 
-@dataclass
-class RevokeLoginSessionActionResult(BaseActionResult):
+@dataclass(frozen=True)
+class RevokeLoginSessionActionResult:
     success: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

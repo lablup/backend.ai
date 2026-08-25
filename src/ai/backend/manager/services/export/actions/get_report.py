@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.base.export import ReportDef
 
@@ -20,20 +19,17 @@ class GetReportAction(ExportAction):
 
     @override
     @classmethod
+    def action_name(cls) -> str:
+        return "get_report"
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
-    @override
-    def entity_id(self) -> str | None:
-        return self.report_key
-
 
 @dataclass
-class GetReportActionResult(BaseActionResult):
+class GetReportActionResult:
     """Result of getting an export report."""
 
     report: ReportDef
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

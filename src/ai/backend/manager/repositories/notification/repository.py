@@ -15,18 +15,13 @@ from ai.backend.common.resilience import (
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
-    NotificationChannelListResult,
     NotificationRuleData,
-    NotificationRuleListResult,
 )
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 
 from .db_source import NotificationDBSource
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 __all__ = ("NotificationRepository",)
@@ -49,7 +44,11 @@ notification_repository_resilience = Resilience(
 
 
 class NotificationRepository:
-    """Repository for notification-related data access."""
+    """Reads the dispatch path needs.
+
+    Notification writes run through the generic ops repository, so only what the
+    dispatch and validation services read is left here.
+    """
 
     _db_source: NotificationDBSource
 
@@ -61,53 +60,11 @@ class NotificationRepository:
         self,
         rule_type: NotificationRuleType,
         enabled_only: bool = True,
-    ) -> list[NotificationRuleData]:
+    ) -> list[MatchingNotificationRuleData]:
         """
         Retrieves all notification rules that match the given rule type.
         """
         return await self._db_source.get_matching_rules(rule_type, enabled_only)
-
-    @notification_repository_resilience.apply()
-    async def create_channel(
-        self,
-        creator: RBACEntityCreator[NotificationChannelRow],
-    ) -> NotificationChannelData:
-        """Creates a new notification channel."""
-        return await self._db_source.create_channel(creator)
-
-    @notification_repository_resilience.apply()
-    async def update_channel(
-        self,
-        updater: Updater[NotificationChannelRow],
-    ) -> NotificationChannelData:
-        """Updates an existing notification channel."""
-        return await self._db_source.update_channel(updater=updater)
-
-    @notification_repository_resilience.apply()
-    async def delete_channel(self, channel_id: UUID) -> bool:
-        """Deletes a notification channel."""
-        return await self._db_source.delete_channel(channel_id)
-
-    @notification_repository_resilience.apply()
-    async def create_rule(
-        self,
-        creator: RBACEntityCreator[NotificationRuleRow],
-    ) -> NotificationRuleData:
-        """Creates a new notification rule."""
-        return await self._db_source.create_rule(creator)
-
-    @notification_repository_resilience.apply()
-    async def update_rule(
-        self,
-        updater: Updater[NotificationRuleRow],
-    ) -> NotificationRuleData:
-        """Updates an existing notification rule."""
-        return await self._db_source.update_rule(updater=updater)
-
-    @notification_repository_resilience.apply()
-    async def delete_rule(self, rule_id: UUID) -> bool:
-        """Deletes a notification rule."""
-        return await self._db_source.delete_rule(rule_id)
 
     @notification_repository_resilience.apply()
     async def get_channel_by_id(self, channel_id: UUID) -> NotificationChannelData:
@@ -118,19 +75,3 @@ class NotificationRepository:
     async def get_rule_by_id(self, rule_id: UUID) -> NotificationRuleData:
         """Retrieves a notification rule by ID."""
         return await self._db_source.get_rule_by_id(rule_id)
-
-    @notification_repository_resilience.apply()
-    async def search_channels(
-        self,
-        querier: BatchQuerier,
-    ) -> NotificationChannelListResult:
-        """Searches notification channels with total count."""
-        return await self._db_source.search_channels(querier=querier)
-
-    @notification_repository_resilience.apply()
-    async def search_rules(
-        self,
-        querier: BatchQuerier,
-    ) -> NotificationRuleListResult:
-        """Searches notification rules with total count."""
-        return await self._db_source.search_rules(querier=querier)

@@ -344,7 +344,7 @@ class ArtifactService:
 
     async def search(self, action: SearchArtifactsAction) -> SearchArtifactsActionResult:
         result = await self._artifact_repository.search_artifacts(
-            querier=action.querier,
+            searcher=action.searcher,
         )
         return SearchArtifactsActionResult(
             data=result.items,
@@ -356,9 +356,9 @@ class ArtifactService:
     async def search_with_revisions(
         self, action: SearchArtifactsWithRevisionsAction
     ) -> SearchArtifactsWithRevisionsActionResult:
-        """Search artifacts with their revisions using BatchQuerier pattern."""
+        """Search artifacts with their revisions."""
         result = await self._artifact_repository.search_artifacts_with_revisions(
-            querier=action.querier,
+            searcher=action.searcher,
         )
         return SearchArtifactsWithRevisionsActionResult(
             data=result.items,
@@ -539,7 +539,7 @@ class ArtifactService:
                     f"Failed to scan artifacts from remote reservoir: {e}"
                 ) from e
 
-            readme_data = {
+            readme_data: dict[uuid.UUID, ArtifactRevisionReadme] = {
                 rev.id: ArtifactRevisionReadme(readme=rev.readme)
                 for artifact in scan_result.result
                 for rev in artifact.revisions

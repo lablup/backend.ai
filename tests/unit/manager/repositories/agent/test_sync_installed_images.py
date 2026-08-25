@@ -13,6 +13,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.types import AgentId, ImageID, ValkeyTarget
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -25,12 +26,13 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -39,12 +41,12 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -161,7 +163,7 @@ class TestSyncInstalledImagesIntegration:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -169,7 +171,7 @@ class TestSyncInstalledImagesIntegration:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 ImageAliasRow,
@@ -206,6 +208,7 @@ class TestSyncInstalledImagesIntegration:
             valkey_live=valkey_live_client,
             valkey_stat=valkey_stat_client,
             config_provider=config_provider,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
         )
 
     @asynccontextmanager
@@ -221,7 +224,7 @@ class TestSyncInstalledImagesIntegration:
         async with db_with_cleanup.begin_session() as db_session:
             # Create container registry first
             registry = ContainerRegistryRow(
-                id=registry_id,
+                id=ContainerRegistryID(registry_id),
                 url="https://cr.backend.ai",
                 registry_name="test-registry",
                 type=ContainerRegistryType.HARBOR2,

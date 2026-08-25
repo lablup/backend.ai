@@ -117,7 +117,7 @@ class TemplateService:
 
     async def get_task_template(self, action: GetTaskTemplateAction) -> GetTaskTemplateActionResult:
         """Get a single task template by ID."""
-        row = await self._repository.get_task_template(action.template_id)
+        row = await self._repository.get_task_template(str(action.template_id))
         if row is None:
             raise TaskTemplateNotFound
         raw_template = row["template"]
@@ -135,7 +135,7 @@ class TemplateService:
         self, action: UpdateTaskTemplateAction
     ) -> UpdateTaskTemplateActionResult:
         """Validate and update an existing task template."""
-        exists = await self._repository.task_template_exists(action.template_id)
+        exists = await self._repository.task_template_exists(str(action.template_id))
         if not exists:
             raise TaskTemplateNotFound
 
@@ -162,7 +162,7 @@ class TemplateService:
                 item_input.user_uuid if item_input.user_uuid is not None else default_user_uuid
             )
             rowcount = await self._repository.update_task_template(
-                action.template_id, group_id, user_uuid, name, template_data
+                str(action.template_id), group_id, user_uuid, name, template_data
             )
             if rowcount != 1:
                 raise DBOperationFailed(f"Failed to update session template: {action.template_id}")
@@ -172,11 +172,11 @@ class TemplateService:
         self, action: DeleteTaskTemplateAction
     ) -> DeleteTaskTemplateActionResult:
         """Soft-delete a task template."""
-        exists = await self._repository.task_template_exists(action.template_id)
+        exists = await self._repository.task_template_exists(str(action.template_id))
         if not exists:
             raise TaskTemplateNotFound
         rowcount = await self._repository.soft_delete_template(
-            action.template_id, TemplateType.TASK
+            str(action.template_id), TemplateType.TASK
         )
         if rowcount != 1:
             raise DBOperationFailed(f"Failed to delete session template: {action.template_id}")
@@ -230,7 +230,7 @@ class TemplateService:
         self, action: GetClusterTemplateAction
     ) -> GetClusterTemplateActionResult:
         """Get a single cluster template by ID."""
-        template = await self._repository.get_cluster_template(action.template_id)
+        template = await self._repository.get_cluster_template(str(action.template_id))
         if template is None:
             raise TaskTemplateNotFound
         return GetClusterTemplateActionResult(template=template)
@@ -239,13 +239,13 @@ class TemplateService:
         self, action: UpdateClusterTemplateAction
     ) -> UpdateClusterTemplateActionResult:
         """Validate and update an existing cluster template."""
-        exists = await self._repository.cluster_template_exists(action.template_id)
+        exists = await self._repository.cluster_template_exists(str(action.template_id))
         if not exists:
             raise TaskTemplateNotFound
         template_data = check_cluster_template(action.template_data)
         name = template_data["metadata"]["name"]
         rowcount = await self._repository.update_cluster_template(
-            action.template_id, template_data, name
+            str(action.template_id), template_data, name
         )
         if rowcount != 1:
             raise DBOperationFailed(f"Failed to update cluster template: {action.template_id}")
@@ -255,11 +255,11 @@ class TemplateService:
         self, action: DeleteClusterTemplateAction
     ) -> DeleteClusterTemplateActionResult:
         """Soft-delete a cluster template."""
-        exists = await self._repository.cluster_template_exists(action.template_id)
+        exists = await self._repository.cluster_template_exists(str(action.template_id))
         if not exists:
             raise TaskTemplateNotFound
         rowcount = await self._repository.soft_delete_template(
-            action.template_id, TemplateType.CLUSTER
+            str(action.template_id), TemplateType.CLUSTER
         )
         if rowcount != 1:
             raise DBOperationFailed(f"Failed to delete cluster template: {action.template_id}")

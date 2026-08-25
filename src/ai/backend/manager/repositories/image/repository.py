@@ -29,17 +29,16 @@ from ai.backend.manager.data.image.types import (
 )
 from ai.backend.manager.models.image import (
     ImageIdentifier,
-    ImageRow,
 )
-from ai.backend.manager.models.image.row import ImageAliasRow
+from ai.backend.manager.models.image.creators import ImageAliasCreator
+from ai.backend.manager.models.image.updaters import ImageUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.image.stateful_source.stateful_source import (
     ImageStatefulSource,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 image_repository_resilience = Resilience(
     policies=[
@@ -65,11 +64,12 @@ class ImageRepository:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        ops_provider: V2DBOpsProvider,
         valkey_image: ValkeyImageClient,
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._db = db
-        self._db_source = ImageDBSource(db)
+        self._db_source = ImageDBSource(db, ops_provider)
         self._stateful_source = ImageStatefulSource(valkey_image)
         self._config_provider = config_provider
 
@@ -225,6 +225,16 @@ class ImageRepository:
         return await self._db_source.mark_image_deleted_by_id(image_id)
 
     @image_repository_resilience.apply()
+    async def restore_image_by_id(
+        self,
+        image_id: UUID,
+    ) -> ImageData:
+        """
+        Marks a soft-deleted image as alive again by its ID.
+        """
+        return await self._db_source.mark_image_alive_by_id(image_id)
+
+    @image_repository_resilience.apply()
     async def fetch_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
         """
         Fetches an image from database by ID.
@@ -244,7 +254,7 @@ class ImageRepository:
     @image_repository_resilience.apply()
     async def add_image_alias(
         self, alias: str, image_canonical: str, architecture: str
-    ) -> tuple[UUID, ImageAliasData]:
+    ) -> tuple[ImageID, ImageAliasData]:
         """
         Deprecated. Use add_image_alias_by_id instead.
         """
@@ -279,7 +289,7 @@ class ImageRepository:
         return image_data
 
     @image_repository_resilience.apply()
-    async def update_image_properties(self, updater: Updater[ImageRow]) -> ImageData:
+    async def update_image_properties(self, updater: ImageUpdater) -> ImageData:
         return await self._db_source.modify_image_properties(updater)
 
     @image_repository_resilience.apply()
@@ -293,12 +303,12 @@ class ImageRepository:
 
     @image_repository_resilience.apply()
     async def add_image_alias_by_id(
-        self, creator: RBACEntityCreator[ImageAliasRow]
+        self, image_id: ImageID, creator: ImageAliasCreator
     ) -> ImageAliasData:
         """
-        Creates an image alias using the RBACEntityCreator pattern.
+        Creates an alias of the image the id names.
         """
-        return await self._db_source.insert_image_alias_by_id(creator)
+        return await self._db_source.insert_image_alias_by_id(image_id, creator)
 
     @image_repository_resilience.apply()
     async def clear_image_resource_limits_by_id(self, image_id: UUID) -> ImageData:

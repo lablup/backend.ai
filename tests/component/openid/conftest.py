@@ -30,6 +30,7 @@ from authlib.jose import JsonWebKey  # pants: no-infer-dep
 from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
@@ -43,13 +44,14 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.config.unified import DatabaseConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.group import association_groups_users, groups
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.project import association_groups_users, groups
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
     ProjectResourcePolicyRow,
@@ -67,6 +69,7 @@ from ai.backend.manager.plugin.openid.hook import OIDCHookPlugin
 from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
 from ai.backend.manager.plugin.openid.webapp import OIDCWebAppPlugin
 from ai.backend.manager.repositories.db.engine import connect_database
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     postgres_container,
     redis_container,
@@ -410,7 +413,14 @@ async def seed_data(
     Yields the database_engine for convenience.
     """
     async with database_engine.begin_session() as sess:
-        sess.add(DomainRow(name="default", total_resource_slots=ResourceSlot({})))
+        domain_id = DomainID(uuid.uuid4())
+        sess.add(
+            DomainRow(
+                id=domain_id,
+                name="default",
+                total_resource_slots=ResourceSlot({}),
+            )
+        )
         sess.add(
             UserResourcePolicyRow(
                 name="default",
@@ -432,6 +442,7 @@ async def seed_data(
         await conn.execute(
             keypair_resource_policies.insert().values(
                 name="default",
+                is_default=True,
                 default_for_unspecified=DefaultForUnspecified.LIMITED,
                 total_resource_slots=ResourceSlot({}),
                 max_session_lifetime=0,
@@ -444,7 +455,7 @@ async def seed_data(
                 allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             )
         )
-        project = GroupRow(
+        project = ProjectRow(
             name="default",
             domain_name="default",
             total_resource_slots=ResourceSlot({}),
@@ -552,6 +563,9 @@ def mock_root_app(
     return {
         "_db": seed_data,  # seed_data yields database_engine
         "_config_provider": mock_config_provider,
+        "_key_provider_pool": KeyProviderPool(
+            providers=[], write_provider_type=KeyProviderType.PLAIN
+        ),
     }
 
 
@@ -607,6 +621,9 @@ def insert_user(seed_data: ExtendedAsyncSAEngine) -> Callable[..., Any]:
                     domain_name="default",
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == "default")
+                    .scalar_subquery(),
                 )
             )
         return user_uuid

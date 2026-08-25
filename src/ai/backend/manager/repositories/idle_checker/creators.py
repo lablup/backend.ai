@@ -5,9 +5,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.errors.idle_checker import (
     IdleCheckerAssignmentAlreadyExists,
@@ -22,8 +22,8 @@ from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base import CreatorSpec
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 
 
@@ -94,4 +94,6 @@ class SessionIdleCheckCreatorSpec(CreatorSpec[SessionIdleCheckRow]):
             expire_at=None,
             last_status=IdleCheckPhase.NOT_CHECKED,
             last_message="Not checked yet.",
+            is_manual=False,
+            manually_triggered_by=None,
         )

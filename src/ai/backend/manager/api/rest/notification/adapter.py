@@ -6,8 +6,10 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
-from uuid import UUID
-
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.common.data.notification.types import (
     EmailSpec,
     NotificationChannelType,
@@ -36,7 +38,6 @@ from ai.backend.manager.data.notification import (
 )
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.notification.conditions import (
     NotificationChannelConditions,
     NotificationRuleConditions,
@@ -45,13 +46,16 @@ from ai.backend.manager.models.notification.orders import (
     NotificationChannelOrders,
     NotificationRuleOrders,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.notification.updaters import (
-    NotificationChannelUpdaterSpec,
-    NotificationRuleUpdaterSpec,
+from ai.backend.manager.models.notification.searchers import (
+    NotificationChannelSearcher,
+    NotificationRuleSearcher,
 )
+from ai.backend.manager.models.notification.updaters import (
+    NotificationChannelUpdater,
+    NotificationRuleUpdater,
+)
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.types import OptionalState, TriState
 
 __all__ = (
@@ -98,8 +102,8 @@ class NotificationChannelAdapter(BaseFilterAdapter):
         )
 
     def build_updater(
-        self, request: UpdateNotificationChannelRequest, channel_id: UUID
-    ) -> Updater[NotificationChannelRow]:
+        self, request: UpdateNotificationChannelRequest, channel_id: NotificationChannelID
+    ) -> NotificationChannelUpdater:
         """Convert update request to updater."""
 
         name = OptionalState[str].nop()
@@ -121,29 +125,33 @@ class NotificationChannelAdapter(BaseFilterAdapter):
         if request.enabled is not None:
             enabled = OptionalState.update(request.enabled)
 
-        updater_spec = NotificationChannelUpdaterSpec(
+        return NotificationChannelUpdater(
+            channel_id=channel_id,
             name=name,
             description=description,
             spec=spec,
             enabled=enabled,
         )
-        return Updater(spec=updater_spec, pk_value=channel_id)
 
-    def build_querier(self, request: SearchNotificationChannelsRequest) -> BatchQuerier:
+    def build_searcher(
+        self, request: SearchNotificationChannelsRequest
+    ) -> NotificationChannelSearcher:
         """
-        Build a BatchQuerier for notification channels from search request.
+        Build the searcher for notification channels from a search request.
 
         Args:
             request: Search request containing filter, order, and pagination
 
         Returns:
-            BatchQuerier object with converted conditions, orders, and pagination
+            Searcher carrying the converted conditions, orders, and pagination
         """
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
         pagination = self._build_pagination(request.limit, request.offset)
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return NotificationChannelSearcher(
+            pagination=pagination, conditions=conditions, orders=orders
+        )
 
     def _convert_filter(self, filter: NotificationChannelFilter) -> list[QueryCondition]:
         """Convert channel filter to list of query conditions."""
@@ -202,7 +210,7 @@ class NotificationRuleAdapter(BaseFilterAdapter):
             name=data.name,
             description=data.description,
             rule_type=data.rule_type,
-            channel=self._channel_adapter.convert_to_dto(data.channel),
+            channel_id=data.channel_id,
             message_template=data.message_template,
             enabled=data.enabled,
             created_at=data.created_at,
@@ -211,8 +219,8 @@ class NotificationRuleAdapter(BaseFilterAdapter):
         )
 
     def build_updater(
-        self, request: UpdateNotificationRuleRequest, rule_id: UUID
-    ) -> Updater[NotificationRuleRow]:
+        self, request: UpdateNotificationRuleRequest, rule_id: NotificationRuleID
+    ) -> NotificationRuleUpdater:
         """Convert update request to updater."""
         name = OptionalState[str].nop()
         description = TriState[str].nop()
@@ -228,29 +236,29 @@ class NotificationRuleAdapter(BaseFilterAdapter):
         if request.enabled is not None:
             enabled = OptionalState.update(request.enabled)
 
-        spec = NotificationRuleUpdaterSpec(
+        return NotificationRuleUpdater(
+            rule_id=rule_id,
             name=name,
             description=description,
             message_template=message_template,
             enabled=enabled,
         )
-        return Updater(spec=spec, pk_value=rule_id)
 
-    def build_querier(self, request: SearchNotificationRulesRequest) -> BatchQuerier:
+    def build_searcher(self, request: SearchNotificationRulesRequest) -> NotificationRuleSearcher:
         """
-        Build a BatchQuerier for notification rules from search request.
+        Build the searcher for notification rules from a search request.
 
         Args:
             request: Search request containing filter, order, and pagination
 
         Returns:
-            BatchQuerier object with converted conditions, orders, and pagination
+            Searcher carrying the converted conditions, orders, and pagination
         """
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
         pagination = self._build_pagination(request.limit, request.offset)
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return NotificationRuleSearcher(pagination=pagination, conditions=conditions, orders=orders)
 
     def _convert_filter(self, filter: NotificationRuleFilter) -> list[QueryCondition]:
         """Convert rule filter to list of query conditions."""

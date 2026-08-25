@@ -1,15 +1,16 @@
 """
 Tests for user API adapter classes.
-Tests conversion from DTO objects to repository Querier objects,
+Tests conversion from DTO objects to repository searcher objects,
 updater building, and data-to-DTO conversion.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import cast
-from uuid import UUID, uuid4
+from uuid import uuid4
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.user import (
@@ -23,39 +24,39 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.rest.user.adapter import UserAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.repositories.base import OffsetPagination
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 
 
-class TestUserAdapterQuerier:
-    """Test cases for UserAdapter.build_querier"""
+class TestUserAdapterSearcher:
+    """Test cases for the filter and order translation of UserAdapter."""
 
     def test_empty_querier(self) -> None:
-        """Test building querier with no filters, orders, and default limit"""
+        """Build a searcher with no filters, no orders, and the default limit."""
         request = SearchUsersRequest()
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 0
-        assert len(querier.orders) == 0
-        assert querier.pagination is not None
-        assert isinstance(querier.pagination, OffsetPagination)
-        assert querier.pagination.limit == 50
-        assert querier.pagination.offset == 0
+        assert len(searcher.conditions) == 0
+        assert len(searcher.orders) == 0
+        assert searcher.pagination is not None
+        assert isinstance(searcher.pagination, OffsetPagination)
+        assert searcher.pagination.limit == 50
+        assert searcher.pagination.offset == 0
 
     def test_uuid_equals_filter(self) -> None:
         """Test UUID equals filter"""
         user_uuid = uuid4()
         request = SearchUsersRequest(filter=UserFilter(uuid=UUIDFilter(equals=user_uuid)))
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_uuid_in_filter(self) -> None:
@@ -63,10 +64,10 @@ class TestUserAdapterQuerier:
         uuids = [uuid4(), uuid4(), uuid4()]
         request = SearchUsersRequest(filter=UserFilter(uuid=UUIDFilter(in_=uuids)))
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_email_equals_filter(self) -> None:
@@ -75,60 +76,60 @@ class TestUserAdapterQuerier:
             filter=UserFilter(email=StringFilter(equals="user@example.com"))
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_email_contains_filter(self) -> None:
         """Test email contains filter (case-sensitive)"""
         request = SearchUsersRequest(filter=UserFilter(email=StringFilter(contains="example")))
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_email_contains_case_insensitive_filter(self) -> None:
         """Test email contains filter (case-insensitive)"""
         request = SearchUsersRequest(filter=UserFilter(email=StringFilter(i_contains="EXAMPLE")))
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_username_equals_filter(self) -> None:
         """Test username equals filter"""
         request = SearchUsersRequest(filter=UserFilter(username=StringFilter(equals="testuser")))
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_username_contains_filter(self) -> None:
         """Test username contains filter"""
         request = SearchUsersRequest(filter=UserFilter(username=StringFilter(contains="test")))
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_domain_name_equals_filter(self) -> None:
         """Test domain_name equals filter"""
         request = SearchUsersRequest(filter=UserFilter(domain_name=StringFilter(equals="default")))
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_integration_name_equals_filter(self) -> None:
@@ -137,10 +138,10 @@ class TestUserAdapterQuerier:
             filter=UserFilter(integration_name=StringFilter(equals="ext-abc"))
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_integration_name_contains_filter(self) -> None:
@@ -149,10 +150,10 @@ class TestUserAdapterQuerier:
             filter=UserFilter(integration_name=StringFilter(contains="ext"))
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_status_filter(self) -> None:
@@ -161,20 +162,20 @@ class TestUserAdapterQuerier:
             filter=UserFilter(status=[UserStatusDTO.ACTIVE, UserStatusDTO.INACTIVE])
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_role_filter(self) -> None:
         """Test role filter with list of roles"""
         request = SearchUsersRequest(filter=UserFilter(role=[UserRoleDTO.ADMIN, UserRoleDTO.USER]))
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 1
-        condition_result = querier.conditions[0]()
+        assert len(searcher.conditions) == 1
+        condition_result = searcher.conditions[0]()
         assert condition_result is not None
 
     def test_multiple_filters_combined(self) -> None:
@@ -187,10 +188,10 @@ class TestUserAdapterQuerier:
             )
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 3
-        for condition in querier.conditions:
+        assert len(searcher.conditions) == 3
+        for condition in searcher.conditions:
             assert condition() is not None
 
     def test_order_by_created_at_asc(self) -> None:
@@ -199,10 +200,10 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.CREATED_AT, direction=OrderDirection.ASC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_order_by_created_at_desc(self) -> None:
         """Test ordering by created_at descending"""
@@ -210,10 +211,10 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.CREATED_AT, direction=OrderDirection.DESC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_order_by_modified_at_asc(self) -> None:
         """Test ordering by modified_at ascending"""
@@ -221,10 +222,10 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.MODIFIED_AT, direction=OrderDirection.ASC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_order_by_modified_at_desc(self) -> None:
         """Test ordering by modified_at descending"""
@@ -232,10 +233,10 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.MODIFIED_AT, direction=OrderDirection.DESC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_order_by_username_asc(self) -> None:
         """Test ordering by username ascending"""
@@ -243,10 +244,10 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.USERNAME, direction=OrderDirection.ASC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_order_by_username_desc(self) -> None:
         """Test ordering by username descending"""
@@ -254,10 +255,10 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.USERNAME, direction=OrderDirection.DESC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_order_by_email_asc(self) -> None:
         """Test ordering by email ascending"""
@@ -265,10 +266,10 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.EMAIL, direction=OrderDirection.ASC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_order_by_email_desc(self) -> None:
         """Test ordering by email descending"""
@@ -276,10 +277,10 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.EMAIL, direction=OrderDirection.DESC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_order_by_status_asc(self) -> None:
         """Test ordering by status ascending"""
@@ -287,10 +288,10 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.STATUS, direction=OrderDirection.ASC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_order_by_status_desc(self) -> None:
         """Test ordering by status descending"""
@@ -298,10 +299,10 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.STATUS, direction=OrderDirection.DESC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_order_by_domain_name_asc(self) -> None:
         """Test ordering by domain_name ascending"""
@@ -309,10 +310,10 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.DOMAIN_NAME, direction=OrderDirection.ASC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_order_by_domain_name_desc(self) -> None:
         """Test ordering by domain_name descending"""
@@ -320,21 +321,21 @@ class TestUserAdapterQuerier:
             order=[UserOrder(field=UserOrderField.DOMAIN_NAME, direction=OrderDirection.DESC)]
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.orders) == 1
-        assert querier.orders[0] is not None
+        assert len(searcher.orders) == 1
+        assert searcher.orders[0] is not None
 
     def test_pagination(self) -> None:
         """Test pagination parameters"""
         request = SearchUsersRequest(limit=10, offset=5)
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert querier.pagination is not None
-        assert isinstance(querier.pagination, OffsetPagination)
-        assert querier.pagination.limit == 10
-        assert querier.pagination.offset == 5
+        assert searcher.pagination is not None
+        assert isinstance(searcher.pagination, OffsetPagination)
+        assert searcher.pagination.limit == 10
+        assert searcher.pagination.offset == 5
 
     def test_filter_order_pagination_combined(self) -> None:
         """Test filter, order, and pagination all combined"""
@@ -351,14 +352,14 @@ class TestUserAdapterQuerier:
             offset=10,
         )
         adapter = UserAdapter()
-        querier = adapter.build_querier(request)
+        searcher = adapter.build_searcher(request)
 
-        assert len(querier.conditions) == 2
-        assert len(querier.orders) == 2
-        assert querier.pagination is not None
-        assert isinstance(querier.pagination, OffsetPagination)
-        assert querier.pagination.limit == 20
-        assert querier.pagination.offset == 10
+        assert len(searcher.conditions) == 2
+        assert len(searcher.orders) == 2
+        assert searcher.pagination is not None
+        assert isinstance(searcher.pagination, OffsetPagination)
+        assert searcher.pagination.limit == 20
+        assert searcher.pagination.offset == 10
 
 
 class TestUserAdapterUpdater:
@@ -386,8 +387,7 @@ class TestUserAdapterUpdater:
         )
 
         adapter = UserAdapter()
-        updater = adapter.build_updater(request, email="old@example.com")
-        spec = cast(UserUpdaterSpec, updater.spec)
+        spec = adapter.build_updater(request, user_id=UserID(uuid4()))
 
         assert spec.username.value() == "newuser"
         assert spec.need_password_change.value() is True
@@ -400,13 +400,10 @@ class TestUserAdapterUpdater:
         assert spec.totp_activated.value() is True
         assert spec.resource_policy.value() == "default"
         assert spec.sudo_session_enabled.value() is True
-        assert spec.main_access_key.value() == "AKIAIOSFODNN7EXAMPLE"
         assert spec.container_uid.value() == 1000
         assert spec.container_main_gid.value() == 1000
         assert spec.container_gids.value() == [1000, 1001]
         assert spec.group_ids.value() == ["group-1", "group-2"]
-        # pk_value is dummy UUID(int=0) since email-based lookup is used
-        assert updater.pk_value == UUID(int=0)
 
     def test_build_updater_partial_fields(self) -> None:
         """Test building updater with only some fields set"""
@@ -416,8 +413,7 @@ class TestUserAdapterUpdater:
         )
 
         adapter = UserAdapter()
-        updater = adapter.build_updater(request, email="user@example.com")
-        spec = cast(UserUpdaterSpec, updater.spec)
+        spec = adapter.build_updater(request, user_id=UserID(uuid4()))
 
         assert spec.username.value() == "updated-name"
         assert spec.status.value() == UserStatus.INACTIVE
@@ -432,7 +428,6 @@ class TestUserAdapterUpdater:
         assert spec.totp_activated.optional_value() is None
         assert spec.resource_policy.optional_value() is None
         assert spec.sudo_session_enabled.optional_value() is None
-        assert spec.main_access_key.optional_value() is None
         assert spec.container_uid.optional_value() is None
         assert spec.container_main_gid.optional_value() is None
         assert spec.container_gids.optional_value() is None
@@ -451,10 +446,7 @@ class TestUserAdapterUpdater:
         )
 
         adapter = UserAdapter()
-        updater = adapter.build_updater(
-            request, email="user@example.com", password_info=password_info
-        )
-        spec = cast(UserUpdaterSpec, updater.spec)
+        spec = adapter.build_updater(request, user_id=UserID(uuid4()), password_info=password_info)
 
         assert spec.username.value() == "updated-name"
         assert spec.password.value() == password_info
@@ -482,20 +474,20 @@ class TestUserAdapterConversion:
             created_at=now,
             modified_at=now,
             domain_name="default",
+            domain_id=DomainID(uuid4()),
             role=DataUserRole.USER,
             resource_policy="default",
             allowed_client_ip=["10.0.0.1"],
             totp_activated=True,
             totp_activated_at=now,
             sudo_session_enabled=False,
-            main_access_key="AKIAIOSFODNN7EXAMPLE",
             container_uid=1000,
             container_main_gid=1000,
             container_gids=[1000, 1001],
         )
 
         adapter = UserAdapter()
-        dto = adapter.convert_to_dto(user_data)
+        dto = adapter.convert_to_dto(user_data, AccessKey("AKIAIOSFODNN7EXAMPLE"))
 
         assert isinstance(dto, UserDTO)
         assert dto.id == user_id
@@ -520,15 +512,15 @@ class TestUserAdapterConversion:
         assert dto.container_gids == [1000, 1001]
 
     def test_convert_to_dto_with_nulls(self) -> None:
-        """Test converting UserData with optional fields as None"""
+        """Test converting UserData with every optional field as None"""
         user_id = uuid4()
 
         user_data = UserData(
             id=user_id,
             uuid=user_id,
-            username=None,
+            username="minimal",
             email="minimal@example.com",
-            need_password_change=None,
+            need_password_change=False,
             full_name=None,
             description=None,
             is_active=True,
@@ -536,38 +528,38 @@ class TestUserAdapterConversion:
             status_info=None,
             created_at=None,
             modified_at=None,
-            domain_name=None,
-            role=None,
+            domain_name="default",
+            domain_id=DomainID(uuid4()),
+            role=DataUserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,
-            totp_activated=None,
+            totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key=None,
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
         )
 
         adapter = UserAdapter()
-        dto = adapter.convert_to_dto(user_data)
+        dto = adapter.convert_to_dto(user_data, None)
 
         assert isinstance(dto, UserDTO)
         assert dto.id == user_id
-        assert dto.username is None
+        assert dto.username == "minimal"
         assert dto.email == "minimal@example.com"
-        assert dto.need_password_change is None
+        assert dto.need_password_change is False
         assert dto.full_name is None
         assert dto.description is None
         assert dto.status == UserStatusDTO.ACTIVE
         assert dto.status_info is None
         assert dto.created_at is None
         assert dto.modified_at is None
-        assert dto.domain_name is None
-        assert dto.role is None
+        assert dto.domain_name == "default"
+        assert dto.role == UserRoleDTO.USER
         assert dto.resource_policy == "default"
         assert dto.allowed_client_ip is None
-        assert dto.totp_activated is None
+        assert dto.totp_activated is False
         assert dto.sudo_session_enabled is False
         assert dto.main_access_key is None
         assert dto.container_uid is None

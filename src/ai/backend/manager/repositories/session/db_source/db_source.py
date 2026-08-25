@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -38,33 +38,33 @@ from ai.backend.manager.errors.kernel import (
     TooManySessionsMatched,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.resource_group import resource_groups
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
     TERMINAL_SESSION_STATUSES,
     KernelLoadingStrategy,
     SessionDependencyRow,
     SessionRow,
-    batch_populate_session_occupied_slots,
 )
-from ai.backend.manager.models.session_template import session_templates
+from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
+from ai.backend.manager.models.session.updaters import SessionUpdater
+from ai.backend.manager.models.session_template import SessionTemplateRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 from ai.backend.manager.utils import query_userinfo
 
 
@@ -72,9 +72,9 @@ class SessionDBSource:
     _db: ExtendedAsyncSAEngine
     _ops: DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: DBOpsProvider) -> None:
         self._db = db
-        self._ops = DBOpsProvider(db)
+        self._ops = ops_provider
 
     async def resolve_session_id(
         self,
@@ -141,11 +141,12 @@ class SessionDBSource:
                 sa.select(UserRow)
                 .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
                 .where(SessionRow.id == session_id)
+                .options(joinedload(UserRow.default_keypair))
             )
             user = await db_sess.scalar(query)
             if user is None:
                 raise SessionNotFound(f"Session with id {session_id} not found")
-            return UserData.from_row(user)
+            return user.to_data()
 
     async def get_session_validated(
         self,
@@ -184,10 +185,10 @@ class SessionDBSource:
     ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(session_templates.c.template)
-                .select_from(session_templates)
+                sa.select(SessionTemplateRow.template)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id) & session_templates.c.is_active,
+                    (SessionTemplateRow.id == template_id) & SessionTemplateRow.is_active,
                 )
             )
             return await conn.scalar(query)
@@ -198,10 +199,10 @@ class SessionDBSource:
     ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(session_templates)
-                .select_from(session_templates)
+                sa.select(SessionTemplateRow.__table__)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id) & session_templates.c.is_active,
+                    (SessionTemplateRow.id == template_id) & SessionTemplateRow.is_active,
                 )
             )
             result = await conn.execute(query)
@@ -344,15 +345,15 @@ class SessionDBSource:
             )
             return await conn.scalar(query)
 
-    async def get_scaling_group_wsproxy_addr(
+    async def get_resource_group_wsproxy_addr(
         self,
-        scaling_group_name: str,
+        resource_group_name: str,
     ) -> str | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(scaling_groups.c.wsproxy_addr)
-                .select_from(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_name)
+                sa.select(resource_groups.c.wsproxy_addr)
+                .select_from(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
             )
             result = await conn.execute(query)
             sgroup = result.first()
@@ -372,12 +373,12 @@ class SessionDBSource:
             )
             return cast(SessionRow | None, await db_session.scalar(stmt))
 
-    async def modify_session(
+    async def update_session(
         self,
-        updater: Updater[SessionRow],
+        updater: SessionUpdater,
         session_name: str | None = None,
     ) -> SessionRow | None:
-        session_id = updater.pk_value
+        session_id = updater.session_id
 
         async with self._db.begin_session() as db_session:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
@@ -400,9 +401,8 @@ class SessionDBSource:
                         f"Duplicate session name. Session(id:{sess.id}) already has the name"
                     )
 
-            # Use execute_updater to apply changes
-            result = await execute_updater(db_session, updater)
-            if result is None:
+            updated = await V2WriteOps(db_session).update_data(updater)
+            if updated is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name:
@@ -623,7 +623,6 @@ class SessionDBSource:
             )
 
             session_rows = [row.SessionRow for row in result.rows]
-            await batch_populate_session_occupied_slots(db_sess, session_rows)
             items = [row.to_dataclass() for row in session_rows]
 
             return SessionListResult(
@@ -636,13 +635,13 @@ class SessionDBSource:
     async def search_in_project(
         self,
         querier: BatchQuerier,
-        scope: ProjectSessionSearchScope,
+        scope: ProjectSessionOperationScope,
     ) -> SessionListResult:
         """Search sessions scoped to a project.
 
         Args:
             querier: BatchQuerier for filtering, ordering, and pagination
-            scope: ProjectSessionSearchScope that filters by project and validates existence
+            scope: ProjectSessionOperationScope that filters by project and validates existence
 
         Returns:
             SessionListResult with items, total count, and pagination info
@@ -658,7 +657,6 @@ class SessionDBSource:
             )
 
             session_rows = [row.SessionRow for row in result.rows]
-            await batch_populate_session_occupied_slots(db_sess, session_rows)
             items = [row.to_dataclass() for row in session_rows]
 
             return SessionListResult(

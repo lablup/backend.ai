@@ -7,6 +7,8 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
+from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
@@ -19,6 +21,10 @@ from ai.backend.client.v2.exceptions import (
     PermissionDeniedError,
 )
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsRequest,
     SearchComputeSessionsResponse,
@@ -32,8 +38,11 @@ from ai.backend.common.dto.manager.session.response import (
     GetStatusHistoryResponse,
     MatchSessionsResponse,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import SessionTypes
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    GroupMeta,
+)
 from ai.backend.manager.api.rest.compute_sessions.handler import ComputeSessionsHandler
 from ai.backend.manager.api.rest.compute_sessions.registry import (
     register_compute_sessions_routes,
@@ -53,7 +62,9 @@ from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
+from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
+from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -68,6 +79,7 @@ def server_module_registries(
     session_processors: SessionProcessors,
     agent_processors_mock: AgentProcessors,
     vfolder_processors_mock: VFolderProcessors,
+    processor_registry: ProcessorRegistry[Any],
 ) -> list[RouteRegistry]:
     """Extended module registries including session and compute-sessions routes.
 
@@ -77,6 +89,13 @@ def server_module_registries(
     return [
         register_session_routes(
             SessionHandler(
+                project=ProjectProcessors(
+                    processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), AsyncMock()
+                ),
+                user=UserProcessors(
+                    processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+                    AsyncMock(),
+                ),
                 auth=auth_processors,
                 session=session_processors,
                 agent=agent_processors_mock,
@@ -98,8 +117,8 @@ async def system_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING SYSTEM session with an agent row for direct access info tests.
 
@@ -111,7 +130,7 @@ async def system_session_seed(
     """
     unique = secrets.token_hex(4)
     agent_id = f"test-agent-{unique}"
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-system-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -135,10 +154,8 @@ async def system_session_seed(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                scaling_group=scaling_group_name,
-                resource_group_id=scaling_group_id,
-                available_slots=ResourceSlot(),
-                occupied_slots=ResourceSlot(),
+                scaling_group=resource_group_name,
+                resource_group_id=resource_group_id,
                 addr="tcp://127.0.0.1:6001",
                 public_host="127.0.0.1",
                 version="1.0.0",
@@ -159,13 +176,11 @@ async def system_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group_name=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -185,12 +200,10 @@ async def system_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -225,8 +238,8 @@ async def system_session_no_agent_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING SYSTEM session without an agent row.
 
@@ -234,7 +247,7 @@ async def system_session_no_agent_seed(
     Used for F-BIZ-2: Direct access with agent_row=None raises KernelNotReady (HTTP 400).
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-sysnoagent-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -258,13 +271,11 @@ async def system_session_no_agent_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group_name=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -284,12 +295,10 @@ async def system_session_no_agent_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -320,8 +329,8 @@ async def second_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
     session_seed: SessionSeedData,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a second INTERACTIVE session alongside session_seed.
@@ -331,7 +340,7 @@ async def second_session_seed(
     when multiple sessions exist with similar names.
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"{session_seed.session_name}-alt-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -355,13 +364,11 @@ async def second_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group_name=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -381,12 +388,10 @@ async def second_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -419,7 +424,7 @@ class TestSessionStatusHistory:
         session_seed: SessionSeedData,
     ) -> None:
         """S-5: Status history retrieval returns dict with PENDING/RUNNING timestamps."""
-        result = await admin_registry.session.get_status_history(session_seed.session_name)
+        result = await admin_registry.session.get_status_history(session_seed.session_id)
         assert isinstance(result, GetStatusHistoryResponse)
         assert isinstance(result.root, dict)
         assert "PENDING" in result.root
@@ -431,7 +436,7 @@ class TestSessionStatusHistory:
     ) -> None:
         """F-BIZ-1: Nonexistent session raises NotFoundError (HTTP 404)."""
         with pytest.raises(NotFoundError):
-            await admin_registry.session.get_status_history("nonexistent-session-xyz-99999")
+            await admin_registry.session.get_status_history(SessionID(uuid4()))
 
 
 class TestSessionInfo:
@@ -443,7 +448,7 @@ class TestSessionInfo:
         session_seed: SessionSeedData,
     ) -> None:
         """S-7: Session info returns LegacySessionInfo with status=RUNNING, domainName."""
-        result = await admin_registry.session.get_info(session_seed.session_name)
+        result = await admin_registry.session.get_info(session_seed.session_id)
         assert isinstance(result, GetSessionInfoResponse)
         assert result.root["status"] == "RUNNING"
         assert "domainName" in result.root
@@ -461,7 +466,7 @@ class TestSessionInfo:
         results in SessionNotFound (HTTP 404).
         """
         with pytest.raises(NotFoundError):
-            await user_registry.session.get_info(session_seed.session_name)
+            await user_registry.session.get_info(session_seed.session_id)
 
 
 class TestSessionDirectAccessInfo:
@@ -477,7 +482,7 @@ class TestSessionDirectAccessInfo:
         Non-SYSTEM sessions (INTERACTIVE, BATCH) are not in PRIVATE_SESSION_TYPES,
         so direct access info returns an empty response dict without any agent calls.
         """
-        result = await admin_registry.session.get_direct_access_info(session_seed.session_name)
+        result = await admin_registry.session.get_direct_access_info(session_seed.session_id)
         assert isinstance(result, GetDirectAccessInfoResponse)
         assert result.root == {}
 
@@ -487,9 +492,7 @@ class TestSessionDirectAccessInfo:
         system_session_seed: SessionSeedData,
     ) -> None:
         """S-9: SYSTEM session direct access info returns sshd/sftpd ports."""
-        result = await admin_registry.session.get_direct_access_info(
-            system_session_seed.session_name
-        )
+        result = await admin_registry.session.get_direct_access_info(system_session_seed.session_id)
         assert isinstance(result, GetDirectAccessInfoResponse)
         assert "sshd_ports" in result.root
         assert "public_host" in result.root
@@ -508,7 +511,7 @@ class TestSessionDirectAccessInfo:
         """
         with pytest.raises(InvalidRequestError):
             await admin_registry.session.get_direct_access_info(
-                system_session_no_agent_seed.session_name
+                system_session_no_agent_seed.session_id
             )
 
 

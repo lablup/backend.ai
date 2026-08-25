@@ -1,11 +1,11 @@
 """
 Tests for ``IdleCheckerHost.do_idle_check()`` against a real database.
 
-The idle policy is resolved through ``users.main_access_key`` — a real foreign
-key — instead of the kernel's own ``access_key``, which a keypair deletion can
-leave orphaned. A kernel whose policy cannot be resolved, or whose checker
-raises, must not stop the remaining kernels of the same cycle from being
-checked.
+The idle policy is resolved through the user's default keypair — the one marked
+``keypairs.is_default`` — instead of the kernel's own ``access_key``, which a
+keypair deletion can leave orphaned. A kernel whose policy cannot be resolved,
+or whose checker raises, must not stop the remaining kernels of the same cycle
+from being checked.
 """
 
 from __future__ import annotations
@@ -19,16 +19,15 @@ from typing import Any, ClassVar, override
 from unittest.mock import MagicMock
 
 import pytest
-import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
     AccessKey,
@@ -52,32 +51,46 @@ from ai.backend.manager.idle import (
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.resource_slot import (
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
-from ai.backend.testutils.db import with_tables
+from ai.backend.manager.secret.types import SecretValue
+from ai.backend.testutils.db import TableOrORM, with_tables
 
 IDLE_LOGGER_NAME = "ai.backend.manager.idle"
 
-_IDLE_ROWS = [
+_IDLE_ROWS: list[TableOrORM] = [
     DomainRow,
-    ScalingGroupRow,
+    ResourceGroupRow,
     UserResourcePolicyRow,
     ProjectResourcePolicyRow,
     KeyPairResourcePolicyRow,
@@ -85,13 +98,24 @@ _IDLE_ROWS = [
     UserRoleRow,
     UserRow,
     KeyPairRow,
-    GroupRow,
+    ProjectRow,
     AssociationScopesEntitiesRow,
-    AgentRow,
     ContainerRegistryRow,
     ImageRow,
+    VFolderRow,
+    EndpointRow,
+    DeploymentPolicyRow,
+    DeploymentAutoScalingPolicyRow,
+    RuntimeVariantRow,
+    DeploymentRevisionPresetRow,
+    DeploymentRevisionRow,
     SessionRow,
+    AgentRow,
     KernelRow,
+    ResourceSlotTypeRow,
+    ResourceAllocationRow,
+    ReplicaGroupRow,
+    RoutingRow,
 ]
 
 
@@ -188,17 +212,17 @@ class TestDoIdleCheck:
         return domain_id, name
 
     @pytest.fixture
-    async def scaling_group(self, db: ExtendedAsyncSAEngine) -> tuple[ResourceGroupID, str]:
+    async def resource_group(self, db: ExtendedAsyncSAEngine) -> tuple[ResourceGroupID, str]:
         sg_id = ResourceGroupID(uuid.uuid4())
         name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=sg_id,
                     name=name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(
+                    scheduler_opts=ResourceGroupOpts(
                         allowed_session_types=[],
                         config={},
                     ),
@@ -225,7 +249,7 @@ class TestDoIdleCheck:
             )
             await db_sess.flush()
             db_sess.add(
-                GroupRow(
+                ProjectRow(
                     id=gid,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
@@ -282,10 +306,11 @@ class TestDoIdleCheck:
         db: ExtendedAsyncSAEngine,
         *,
         domain_name: str,
+        domain_id: DomainID,
         user_resource_policy_name: str,
-        main_keypair_idle_timeout: int | None,
+        default_keypair_idle_timeout: int | None,
     ) -> tuple[uuid.UUID, AccessKey | None]:
-        """Create a user; ``None`` idle timeout leaves ``main_access_key`` unset."""
+        """Create a user; ``None`` idle timeout leaves the user without a default keypair."""
         user_uuid = uuid.uuid4()
         async with db.begin_session() as db_sess:
             db_sess.add(
@@ -297,20 +322,15 @@ class TestDoIdleCheck:
                     status=UserStatus.ACTIVE,
                     domain_name=domain_name,
                     resource_policy=user_resource_policy_name,
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
-        if main_keypair_idle_timeout is None:
+        if default_keypair_idle_timeout is None:
             return user_uuid, None
         access_key = await self._create_keypair(
-            db, user_uuid=user_uuid, idle_timeout=main_keypair_idle_timeout
+            db, user_uuid=user_uuid, idle_timeout=default_keypair_idle_timeout, is_default=True
         )
-        async with db.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.update(UserRow)
-                .where(UserRow.uuid == user_uuid)
-                .values(main_access_key=access_key)
-            )
         return user_uuid, access_key
 
     async def _create_keypair(
@@ -319,6 +339,7 @@ class TestDoIdleCheck:
         *,
         user_uuid: uuid.UUID,
         idle_timeout: int,
+        is_default: bool = False,
     ) -> AccessKey:
         policy_name = await self._create_keypair_policy(db, idle_timeout)
         access_key = AccessKey(f"AKTEST{uuid.uuid4().hex[:14]}")
@@ -326,11 +347,11 @@ class TestDoIdleCheck:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex[:38]}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex[:38]}")),
                     user=user_uuid,
-                    user_id=str(user_uuid),
                     is_active=True,
                     is_admin=False,
+                    is_default=is_default,
                     resource_policy=policy_name,
                 )
             )
@@ -342,17 +363,16 @@ class TestDoIdleCheck:
         db: ExtendedAsyncSAEngine,
         *,
         domain: tuple[DomainID, str],
-        scaling_group: tuple[ResourceGroupID, str],
+        resource_group: tuple[ResourceGroupID, str],
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
     ) -> KernelId:
         domain_id, domain_name = domain
-        sg_id, sg_name = scaling_group
+        sg_id, sg_name = resource_group
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
         now = datetime.now(tzutc())
-        slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("2048")})
         async with db.begin_session() as db_sess:
             db_sess.add(
                 SessionRow(
@@ -369,7 +389,6 @@ class TestDoIdleCheck:
                     status=SessionStatus.RUNNING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=slots,
                     created_at=now,
                     starts_at=now,
                     images=["python:3.8"],
@@ -394,8 +413,6 @@ class TestDoIdleCheck:
                     status=KernelStatus.RUNNING,
                     status_changed=now,
                     session_type=SessionTypes.INTERACTIVE,
-                    occupied_slots=slots,
-                    requested_slots=slots,
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,
@@ -427,27 +444,28 @@ class TestDoIdleCheck:
         host.add_checker(checker)
         return host
 
-    async def test_policy_resolved_via_main_access_key(
+    async def test_policy_resolved_via_default_keypair(
         self,
         db: ExtendedAsyncSAEngine,
         domain: tuple[DomainID, str],
-        scaling_group: tuple[ResourceGroupID, str],
+        resource_group: tuple[ResourceGroupID, str],
         group_id: uuid.UUID,
         user_resource_policy_name: str,
     ) -> None:
-        """A kernel created with a secondary keypair uses the main keypair's policy."""
-        user_uuid, main_access_key = await self._create_user(
+        """A kernel created with a secondary keypair uses the default keypair's policy."""
+        user_uuid, default_access_key = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
-            main_keypair_idle_timeout=600,
+            default_keypair_idle_timeout=600,
         )
-        assert main_access_key is not None
+        assert default_access_key is not None
         secondary_access_key = await self._create_keypair(db, user_uuid=user_uuid, idle_timeout=30)
         kernel_id = await self._create_running_kernel(
             db,
             domain=domain,
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             group_id=group_id,
             user_uuid=user_uuid,
             access_key=secondary_access_key,
@@ -463,7 +481,7 @@ class TestDoIdleCheck:
         self,
         db: ExtendedAsyncSAEngine,
         domain: tuple[DomainID, str],
-        scaling_group: tuple[ResourceGroupID, str],
+        resource_group: tuple[ResourceGroupID, str],
         group_id: uuid.UUID,
         user_resource_policy_name: str,
     ) -> None:
@@ -471,13 +489,14 @@ class TestDoIdleCheck:
         user_uuid, _ = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
-            main_keypair_idle_timeout=600,
+            default_keypair_idle_timeout=600,
         )
         kernel_id = await self._create_running_kernel(
             db,
             domain=domain,
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             group_id=group_id,
             user_uuid=user_uuid,
             access_key=AccessKey(f"AKDELETED{uuid.uuid4().hex[:11]}"),
@@ -493,24 +512,26 @@ class TestDoIdleCheck:
         self,
         db: ExtendedAsyncSAEngine,
         domain: tuple[DomainID, str],
-        scaling_group: tuple[ResourceGroupID, str],
+        resource_group: tuple[ResourceGroupID, str],
         group_id: uuid.UUID,
         user_resource_policy_name: str,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """A user without a main access key never blocks the rest of the cycle,
+        """A user without a default access key never blocks the rest of the cycle,
         and its missing policy is warned about only once."""
         policyless_uuid, _ = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
-            main_keypair_idle_timeout=None,
+            default_keypair_idle_timeout=None,
         )
         normal_uuid, normal_access_key = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
-            main_keypair_idle_timeout=600,
+            default_keypair_idle_timeout=600,
         )
         assert normal_access_key is not None
         orphan_access_key = AccessKey(f"AKDELETED{uuid.uuid4().hex[:11]}")
@@ -518,7 +539,7 @@ class TestDoIdleCheck:
             await self._create_running_kernel(
                 db,
                 domain=domain,
-                scaling_group=scaling_group,
+                resource_group=resource_group,
                 group_id=group_id,
                 user_uuid=policyless_uuid,
                 access_key=orphan_access_key,
@@ -527,7 +548,7 @@ class TestDoIdleCheck:
             await self._create_running_kernel(
                 db,
                 domain=domain,
-                scaling_group=scaling_group,
+                resource_group=resource_group,
                 group_id=group_id,
                 user_uuid=normal_uuid,
                 access_key=normal_access_key,
@@ -551,7 +572,7 @@ class TestDoIdleCheck:
         self,
         db: ExtendedAsyncSAEngine,
         domain: tuple[DomainID, str],
-        scaling_group: tuple[ResourceGroupID, str],
+        resource_group: tuple[ResourceGroupID, str],
         group_id: uuid.UUID,
         user_resource_policy_name: str,
     ) -> None:
@@ -559,15 +580,16 @@ class TestDoIdleCheck:
         user_uuid, access_key = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
-            main_keypair_idle_timeout=600,
+            default_keypair_idle_timeout=600,
         )
         assert access_key is not None
         kernel_ids = [
             await self._create_running_kernel(
                 db,
                 domain=domain,
-                scaling_group=scaling_group,
+                resource_group=resource_group,
                 group_id=group_id,
                 user_uuid=user_uuid,
                 access_key=access_key,

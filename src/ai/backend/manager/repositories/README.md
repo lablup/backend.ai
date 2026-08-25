@@ -650,7 +650,7 @@ before query execution.
 
 ```python
 @dataclass(frozen=True)
-class UserFairShareSearchScope:
+class UserFairShareOperationScope:
     """Required scope for user fair share search.
 
     These parameters are validated before query execution.
@@ -665,7 +665,7 @@ class FairShareRepository:
     # User API - scope first, then querier
     async def search_user_fair_shares(
         self,
-        scope: UserFairShareSearchScope,  # Required, validated
+        scope: UserFairShareOperationScope,  # Required, validated
         querier: BatchQuerier,            # Optional filters, pagination
     ) -> UserFairShareSearchResult:
         """Search user fair shares within the specified scope."""
@@ -679,7 +679,7 @@ class FairShareRepository:
     async def _validate_user_search_scope(
         self,
         db_sess: SASession,
-        scope: UserFairShareSearchScope,
+        scope: UserFairShareOperationScope,
     ) -> None:
         """Validate scope entities exist. Raise error if not found."""
         # Validate resource_group exists
@@ -895,10 +895,10 @@ class SessionRepository:
 
     def __init__(
         self,
-        db: ExtendedAsyncSAEngine,
+        ops_provider: DBOpsProvider,
         redis: RedisConnectionInfo,
     ) -> None:
-        self._db_source = SessionDBSource(db)
+        self._db_source = SessionDBSource(ops_provider)
         self._cache_source = SessionCacheSource(redis)
 
     async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
@@ -1048,7 +1048,7 @@ class TestSessionRepository:
         database_engine: ExtendedAsyncSAEngine,
     ) -> SessionDBSource:
         """Fixture dedicated to this test class"""
-        return SessionDBSource(database_engine)
+        return SessionDBSource(DBOpsProvider(database_engine))
 
     @pytest.fixture
     async def session_repository(

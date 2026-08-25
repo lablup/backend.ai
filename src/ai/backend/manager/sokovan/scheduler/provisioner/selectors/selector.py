@@ -14,9 +14,9 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from decimal import Decimal
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
@@ -29,7 +29,7 @@ from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.recorder.recorder import TransitionRecorder
 from ai.backend.manager.views.sokovan.agent import AgentInfo, AgentLimit
-from ai.backend.manager.views.sokovan.snapshot import PreemptionCandidate, UserVictimCandidates
+from ai.backend.manager.views.sokovan.snapshot import PreemptionCandidate, ScopeVictimCandidates
 from ai.backend.manager.views.sokovan.workload import (
     ResourceRequest,
     SessionGroupPolicy,
@@ -99,7 +99,7 @@ class AgentSelectionCriteria:
     job_priority: int
     # The owner's preemption victim candidates (None disables the
     # preemption path, e.g. the fitting check)
-    victim_candidates: UserVictimCandidates | None
+    victim_candidates: ScopeVictimCandidates | None
     # Placement policy of the session's group (None means unconstrained)
     session_group: SessionGroupPolicy | None
 
@@ -108,7 +108,7 @@ class AgentSelectionCriteria:
         cls,
         workload: SessionWorkload,
         plan: PlacementPlan,
-        victim_candidates: UserVictimCandidates | None,
+        victim_candidates: ScopeVictimCandidates | None,
     ) -> AgentSelectionCriteria:
         """Project a session workload (and its grouped plan) into criteria."""
         return cls(
@@ -457,7 +457,7 @@ class AgentSelector:
         strategy: AgentSelectionStrategy,
         trackers: Sequence[AgentStateTracker],
         candidates: Sequence[AgentStateTracker],
-        victims: UserVictimCandidates,
+        victims: ScopeVictimCandidates,
         criteria: AgentSelectionCriteria,
         resource_req: ResourceRequirements,
         limit: AgentLimit,
@@ -532,7 +532,7 @@ class AgentSelector:
         self,
         criteria: AgentSelectionCriteria,
         claimed_victims: Sequence[PreemptionCandidate],
-    ) -> UserVictimCandidates | None:
+    ) -> ScopeVictimCandidates | None:
         """The owner's victims this session may still reclaim (strictly
         lower job_priority, not already claimed), or None when the
         preemption path does not apply."""
@@ -547,7 +547,7 @@ class AgentSelector:
         ]
         if not reclaimable:
             return None
-        return UserVictimCandidates(candidates=reclaimable)
+        return ScopeVictimCandidates(candidates=reclaimable)
 
     def _reset_reclaims(
         self,

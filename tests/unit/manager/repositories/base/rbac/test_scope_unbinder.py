@@ -21,13 +21,13 @@ from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     RBACScopeEntityUnbinder,
     RBACUnbinderResult,
     execute_rbac_scope_entity_unbinder,
 )
-from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class ScopeUnbinderMappingRow(Base):  # type: ignore[misc]
+class ScopeUnbinderMappingRow(Base):
     """N:N mapping row for scope unbinder testing."""
 
     __tablename__ = "test_scope_unbinder_mapping"
@@ -135,7 +135,7 @@ class UnbinderSeedContext:
 async def create_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
-    async with with_tables(database_connection, UNBINDER_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, UNBINDER_TABLES):
         yield
 
 

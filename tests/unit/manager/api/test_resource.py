@@ -62,7 +62,7 @@ def handler(mock_processors: MagicMock) -> ResourceHandler:
     return ResourceHandler(
         resource_preset=mock_processors.resource_preset,
         agent=mock_processors.agent,
-        group=mock_processors.group,
+        project=mock_processors.project,
         user=mock_processors.user,
         container_registry=mock_processors.container_registry,
     )
@@ -155,13 +155,11 @@ class TestWatcherAgentStart:
         expected_data = {"started": True}
         mock_result = MagicMock()
         mock_result.data = expected_data
-        mock_processors.agent.watcher_agent_start.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.agent.watcher_agent_start.run = AsyncMock(return_value=mock_result)
 
         response = await handler.watcher_agent_start(body, superadmin_context)
 
-        call_args = mock_processors.agent.watcher_agent_start.wait_for_complete.call_args
+        call_args = mock_processors.agent.watcher_agent_start.run.call_args
         action = call_args[0][0]
         assert action.agent_id == "agent-001"
         assert response.status_code == HTTPStatus.OK
@@ -183,13 +181,11 @@ class TestWatcherAgentStop:
         expected_data = {"stopped": True}
         mock_result = MagicMock()
         mock_result.data = expected_data
-        mock_processors.agent.watcher_agent_stop.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.agent.watcher_agent_stop.run = AsyncMock(return_value=mock_result)
 
         response = await handler.watcher_agent_stop(body, superadmin_context)
 
-        call_args = mock_processors.agent.watcher_agent_stop.wait_for_complete.call_args
+        call_args = mock_processors.agent.watcher_agent_stop.run.call_args
         action = call_args[0][0]
         assert action.agent_id == "agent-001"
         assert response.status_code == HTTPStatus.OK
@@ -211,13 +207,11 @@ class TestWatcherAgentRestart:
         expected_data = {"restarted": True}
         mock_result = MagicMock()
         mock_result.data = expected_data
-        mock_processors.agent.watcher_agent_restart.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.agent.watcher_agent_restart.run = AsyncMock(return_value=mock_result)
 
         response = await handler.watcher_agent_restart(body, superadmin_context)
 
-        call_args = mock_processors.agent.watcher_agent_restart.wait_for_complete.call_args
+        call_args = mock_processors.agent.watcher_agent_restart.run.call_args
         action = call_args[0][0]
         assert action.agent_id == "agent-001"
         assert response.status_code == HTTPStatus.OK
@@ -241,13 +235,11 @@ class TestUsagePerPeriod:
         })
         mock_result = MagicMock()
         mock_result.result = []
-        mock_processors.group.usage_per_period.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.project.usage_per_period.run = AsyncMock(return_value=mock_result)
 
         await handler.usage_per_period(query, superadmin_context)
 
-        call_args = mock_processors.group.usage_per_period.wait_for_complete.call_args
+        call_args = mock_processors.project.usage_per_period.run.call_args
         action = call_args[0][0]
         assert action.project_id is None
 
@@ -269,8 +261,8 @@ class TestCheckPresets:
         mock_result.group_limits = slot_quantities
         mock_result.group_using = slot_quantities
         mock_result.group_remaining = slot_quantities
-        mock_result.scaling_group_remaining = slot_quantities
-        mock_result.scaling_groups = {
+        mock_result.resource_group_remaining = slot_quantities
+        mock_result.resource_groups = {
             "sg-test": {
                 ResourceSlotState.OCCUPIED: slot_quantities,
                 ResourceSlotState.AVAILABLE: slot_quantities,
@@ -303,20 +295,18 @@ class TestCheckPresets:
         mock_req.__getitem__ = lambda _, key: storage[key]
         req_ctx = RequestCtx(request=mock_req)
         mock_result, _ = self._create_mock_result()
-        mock_processors.resource_preset.check_presets.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.resource_preset.check_presets.run = AsyncMock(return_value=mock_result)
 
         response = await handler.check_presets(body, user_context, req_ctx)
 
-        call_args = mock_processors.resource_preset.check_presets.wait_for_complete.call_args
+        call_args = mock_processors.resource_preset.check_presets.run.call_args
         action = call_args[0][0]
         assert action.access_key == "AKTEST"
         assert action.resource_policy == "default"
         assert action.domain_name == "default"
         assert action.user_id == user_uuid
         assert action.group == "test-group"
-        assert action.scaling_group == "sg-test"
+        assert action.resource_group == "sg-test"
         assert response.status_code == HTTPStatus.OK
         response_body = response.to_json
         assert response_body is not None
@@ -356,9 +346,7 @@ class TestCheckPresets:
         mock_req.__getitem__ = lambda _, key: storage[key]
         req_ctx = RequestCtx(request=mock_req)
         mock_result, _ = self._create_mock_result()
-        mock_processors.resource_preset.check_presets.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.resource_preset.check_presets.run = AsyncMock(return_value=mock_result)
 
         response = await handler.check_presets(body, user_context, req_ctx)
 

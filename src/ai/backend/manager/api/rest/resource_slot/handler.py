@@ -17,8 +17,9 @@ from ai.backend.common.dto.manager.resource_slot.response import (
     SearchResourceSlotTypesResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
-    GetResourceSlotTypeAction,
+from ai.backend.manager.services.resource_slot.actions.get import GetResourceSlotTypeAction
+from ai.backend.manager.services.resource_slot.actions.lookup import (
+    LookupResourceSlotTypeAction,
 )
 from ai.backend.manager.services.resource_slot.actions.search_resource_slot_types import (
     SearchResourceSlotTypesAction,
@@ -46,10 +47,10 @@ class ResourceSlotHandler:
         """Search resource slot types with filters, orders, and pagination."""
         log.info("SEARCH_RESOURCE_SLOT_TYPES")
 
-        querier = self._adapter.build_querier(body.parsed)
+        searcher = self._adapter.build_searcher(body.parsed)
 
-        action_result = await self._resource_slot.search_resource_slot_types.wait_for_complete(
-            SearchResourceSlotTypesAction(querier=querier)
+        action_result = await self._resource_slot.public_search_resource_slot_types.run(
+            SearchResourceSlotTypesAction(searcher=searcher)
         )
 
         resp = SearchResourceSlotTypesResponse(
@@ -70,11 +71,14 @@ class ResourceSlotHandler:
         slot_name = path.parsed.slot_name
         log.info("GET_RESOURCE_SLOT_TYPE (slot_name:{})", slot_name)
 
-        action_result = await self._resource_slot.get_resource_slot_type.wait_for_complete(
-            GetResourceSlotTypeAction(slot_name=slot_name)
+        resolved = await self._resource_slot.public_lookup_resource_slot_type.run(
+            LookupResourceSlotTypeAction(slot_name=slot_name)
+        )
+        action_result = await self._resource_slot.public_get_resource_slot_type.run(
+            GetResourceSlotTypeAction(slot_type_id=resolved.entity_id())
         )
 
         resp = GetResourceSlotTypeResponse(
-            item=self._adapter.convert_to_dto(action_result.item),
+            item=self._adapter.convert_to_dto(action_result.data),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

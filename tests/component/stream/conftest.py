@@ -13,11 +13,13 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.common.types import SessionTypes
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.stream.handler import StreamHandler
@@ -30,8 +32,13 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.stream.repository import StreamRepository
+from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
+from ai.backend.manager.services.session.actions.resolve_session_name import (
+    ResolveSessionNameAction,
+)
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
@@ -54,7 +61,7 @@ class UserFixtureData:
 
 @dataclass
 class SessionSeedData:
-    session_id: SessionId
+    session_id: SessionID
     session_name: str
     kernel_id: uuid.UUID
     access_key: str
@@ -66,6 +73,7 @@ def stream_processors(
     database_engine: ExtendedAsyncSAEngine,
     valkey_clients: ValkeyClients,
     async_etcd: AsyncEtcd,
+    processor_registry: ProcessorRegistry[Any],
 ) -> StreamProcessors:
     """Real StreamProcessors with real StreamService and StreamRepository."""
     repo = StreamRepository(database_engine)
@@ -75,18 +83,21 @@ def stream_processors(
         valkey_live=valkey_clients.live,
         etcd=async_etcd,
     )
-    return StreamProcessors(service=service, action_monitors=[])
+    return StreamProcessors(processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
-async def session_processors(database_engine: ExtendedAsyncSAEngine) -> Any:
+async def session_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> Any:
     """Minimal real resolver for the stream handler.
 
     Only ``resolve_session_name`` is wired to the real DB (via a real
     ``SessionRepository``); that is all the stream handler uses to normalize a
     UUID-shaped path reference to its canonical session name.
     """
-    repo = SessionRepository(database_engine)
+    repo = SessionRepository(database_engine, DBOpsProvider(database_engine))
     service = SessionService(
         SessionServiceArgs(
             agent_registry=AsyncMock(),
@@ -103,7 +114,11 @@ async def session_processors(database_engine: ExtendedAsyncSAEngine) -> Any:
         )
     )
     processors = MagicMock()
-    processors.resolve_session_name = ActionProcessor(service.resolve_session_name, [])
+    group = processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE))
+    processors.resolve_session_name = group.single_entity(
+        ResolveSessionNameAction, service.resolve_session_name
+    )
+    processors.lookup = group.public_lookup_ops(LookupSessionAction)
     return processors
 
 
@@ -138,12 +153,12 @@ async def session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session + kernel with service_ports in the database."""
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-stream-ws-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -167,13 +182,11 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group_name=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -193,12 +206,10 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                scaling_group=resource_group_name,
+                resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,

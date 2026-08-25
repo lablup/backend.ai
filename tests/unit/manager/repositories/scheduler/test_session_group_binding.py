@@ -7,11 +7,11 @@ from datetime import datetime
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
 from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.options import (
@@ -27,7 +27,7 @@ from ai.backend.manager.data.session.spec import (
     SessionScope,
     SessionSpec,
 )
-from ai.backend.manager.repositories.scheduler.creators import SessionRowFromSpec
+from ai.backend.manager.models.session.creators import SessionCreator
 
 
 def _spec(session_group_id: SessionGroupID | None) -> SessionSpec:
@@ -72,7 +72,7 @@ class TestSessionGroupBinding:
     def test_grouped_session_carries_the_group(self, enqueue_time: datetime) -> None:
         # A route session inherits its replica group's SessionGroup.
         group_id = SessionGroupID(uuid.uuid4())
-        row = SessionRowFromSpec(
+        row = SessionCreator(
             spec=_spec(group_id), image_infos={}, enqueue_time=enqueue_time
         ).build_row()
 
@@ -81,7 +81,7 @@ class TestSessionGroupBinding:
     def test_ungrouped_session_stays_null(self, enqueue_time: datetime) -> None:
         # Ordinary sessions never join a group — NULL means "no placement
         # constraint" and the RG strategy alone decides placement.
-        row = SessionRowFromSpec(
+        row = SessionCreator(
             spec=_spec(None), image_infos={}, enqueue_time=enqueue_time
         ).build_row()
 

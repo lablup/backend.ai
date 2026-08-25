@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
@@ -47,18 +48,15 @@ from ai.backend.manager.models.rbac_models.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.specs.pagination import CursorForwardPagination, OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    CursorForwardPagination,
-    OffsetPagination,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -66,7 +64,7 @@ from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
     AgentRow,
-    ScalingGroupForDomainRow,
+    ResourceGroupForDomainRow,
     ImageRow,
 )
 
@@ -210,6 +208,7 @@ class TestSearchRoles:
 
         Returns ``(assigned_user_id, unassigned_user_id, created_roles)``.
         """
+        domain_id = DomainID(uuid.uuid4())
         assigned_user_id = uuid.uuid4()
         unassigned_user_id = uuid.uuid4()
 
@@ -225,6 +224,7 @@ class TestSearchRoles:
         async with db_with_rbac_tables.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="domain for by_assigned_user_id test",
                     is_active=True,
@@ -260,6 +260,7 @@ class TestSearchRoles:
                         domain_name=domain_name,
                         role=UserRole.USER,
                         resource_policy=policy_name,
+                        domain_id=domain_id,
                     )
                 )
             await db_sess.flush()

@@ -17,14 +17,16 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, AgentId, KernelId, ResourceSlot, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import (
     create_pending_session_with_kernels,
@@ -100,7 +102,7 @@ class TestPrereservationLifecycle:
     async def pending_session(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_domain_id: DomainID,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
@@ -112,9 +114,9 @@ class TestPrereservationLifecycle:
     ) -> tuple[SessionId, list[KernelId], str]:
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             domain_id=test_domain_id,
-            scaling_group_name=test_scaling_group_name,
+            resource_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -132,7 +134,7 @@ class TestPrereservationLifecycle:
         kernel_ids: list[KernelId],
         agent_id: str,
     ) -> list[SessionId]:
-        db_source = ScheduleDBSource(db)
+        db_source = ScheduleDBSource(db, ReconcileOpsProvider(db))
         allocations = make_session_allocations(
             session_id=session_id,
             kernel_assignments=[(kernel_id, agent_id) for kernel_id in kernel_ids],
@@ -206,7 +208,7 @@ class TestPrereservationLifecycle:
             mem_used=Decimal("4096"),
         )
         await self._reserve(db_with_cleanup, session_id, kernel_ids, agent_id)
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         # Victims still hold too much: used 3 + hold 2 > capacity 4
         admitted = await db_source.admit_prereserved_kernels([session_id])
@@ -243,7 +245,7 @@ class TestPrereservationLifecycle:
             mem_capacity=Decimal("4096"),
         )
         await self._reserve(db_with_cleanup, session_id, kernel_ids, agent_id)
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         admitted = await db_source.admit_prereserved_kernels([session_id])
         assert admitted == kernel_ids
 
@@ -287,7 +289,7 @@ class TestPrereservationLifecycle:
             mem_used=Decimal("4096"),
         )
         await self._reserve(db_with_cleanup, session_id, kernel_ids, agent_id)
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         async with db_with_cleanup.begin_session_read_committed() as db_sess:
             now = await db_source._get_db_now_in_session(db_sess)

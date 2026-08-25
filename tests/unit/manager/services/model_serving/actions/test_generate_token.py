@@ -12,11 +12,12 @@ from aioresponses import aioresponses
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.endpoint.types import EndpointStatus
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import EndpointTokenData
@@ -26,9 +27,6 @@ from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVa
 from ai.backend.manager.services.model_serving.actions.generate_token import (
     GenerateTokenAction,
     GenerateTokenActionResult,
-)
-from ai.backend.manager.services.model_serving.processors.model_serving import (
-    ModelServingProcessors,
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -46,6 +44,7 @@ class TestGenerateToken:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)
@@ -102,7 +101,7 @@ class TestGenerateToken:
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
         mock = MagicMock()
-        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        mock.get_default_architecture_from_resource_group = AsyncMock(return_value=None)
         return mock
 
     @pytest.fixture
@@ -164,19 +163,6 @@ class TestGenerateToken:
         )
 
     @pytest.fixture
-    def model_serving_processors(
-        self,
-        mock_action_monitor: MagicMock,
-        model_serving_service: ModelServingService,
-        mock_action_validators: ActionValidators,
-    ) -> ModelServingProcessors:
-        return ModelServingProcessors(
-            service=model_serving_service,
-            action_monitors=[mock_action_monitor],
-            validators=mock_action_validators,
-        )
-
-    @pytest.fixture
     def mock_check_user_access_token(self, mocker: Any, model_serving_service: Any) -> AsyncMock:
         mock = cast(
             AsyncMock,
@@ -230,7 +216,7 @@ class TestGenerateToken:
             AsyncMock,
             mocker.patch.object(
                 mock_repositories.repository,
-                "get_scaling_group_info",
+                "get_resource_group_info",
                 new_callable=AsyncMock,
             ),
         )
@@ -241,7 +227,7 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "regular token generation",
                 GenerateTokenAction(
-                    service_id=uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
+                    deployment_id=DeploymentID(uuid.UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")),
                     duration=None,
                     valid_until=None,
                     expires_at=int(datetime.now(tz=UTC).timestamp()) + 86400,
@@ -261,7 +247,7 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "unlimited token",
                 GenerateTokenAction(
-                    service_id=uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
+                    deployment_id=DeploymentID(uuid.UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")),
                     duration=None,
                     valid_until=None,
                     expires_at=0,  # No expiry
@@ -281,7 +267,7 @@ class TestGenerateToken:
             ScenarioBase.success(
                 "limited scope token",
                 GenerateTokenAction(
-                    service_id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
+                    deployment_id=DeploymentID(uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff")),
                     duration=None,
                     valid_until=None,
                     expires_at=int(datetime.now(tz=UTC).timestamp()) + 3600,
@@ -302,9 +288,9 @@ class TestGenerateToken:
     )
     async def test_generate_token(
         self,
+        model_serving_service: ModelServingService,
         scenario: ScenarioBase[GenerateTokenAction, GenerateTokenActionResult],
         user_data: UserData,
-        model_serving_processors: ModelServingProcessors,
         mock_check_user_access_token: AsyncMock,
         mock_get_endpoint_by_id_token: AsyncMock,
         mock_get_endpoint_access_validation_data_token: AsyncMock,
@@ -325,7 +311,7 @@ class TestGenerateToken:
         mock_get_endpoint_access_validation_data_token.return_value = mock_validation_data
 
         mock_endpoint = MagicMock(
-            id=action.service_id,
+            id=action.deployment_id,
             status=EndpointStatus.READY,
             session_owner_id=expected.data.session_owner,
             domain=expected.data.domain,
@@ -356,13 +342,13 @@ class TestGenerateToken:
         with aioresponses() as mock_http:
             # HTTP response mock setup
             expected_url = (
-                f"{mock_scaling_group.wsproxy_addr}/v2/endpoints/{action.service_id}/token"
+                f"{mock_scaling_group.wsproxy_addr}/v2/endpoints/{action.deployment_id}/token"
             )
             mock_http.post(expected_url, payload={"token": expected.data.token}, status=200)
 
             with patch("uuid.uuid4", return_value=expected.data.id):
 
                 async def generate_token(action: GenerateTokenAction) -> GenerateTokenActionResult:
-                    return await model_serving_processors.generate_token.wait_for_complete(action)
+                    return await model_serving_service.generate_token(action)
 
                 await scenario.test(generate_token)

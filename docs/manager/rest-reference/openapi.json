@@ -7449,16 +7449,32 @@
       "PresetModelConfigInput": {
         "properties": {
           "name": {
-            "description": "Name of the model.",
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Name of the model. Optional; defaults to the runtime variant baseline's model name at revision resolution.",
+            "title": "Name"
           },
           "model_path": {
-            "description": "Path to the model file.",
-            "minLength": 1,
-            "title": "Model Path",
-            "type": "string"
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Path to the model file. Optional; defaults to the model mount destination at revision resolution.",
+            "title": "Model Path"
           },
           "service": {
             "$ref": "#/components/schemas/PresetModelServiceConfigInput",
@@ -7478,8 +7494,6 @@
           }
         },
         "required": [
-          "name",
-          "model_path",
           "service"
         ],
         "title": "PresetModelConfigInput",
@@ -7789,10 +7803,18 @@
             "title": "Shell"
           },
           "port": {
-            "description": "Port number for the model service. Must be greater than 1.",
-            "exclusiveMinimum": 1,
-            "title": "Port",
-            "type": "integer"
+            "anyOf": [
+              {
+                "exclusiveMinimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Port number for the model service. Must be greater than 1. Optional; defaults to the runtime variant baseline's port at revision resolution.",
+            "title": "Port"
           },
           "health_check": {
             "anyOf": [
@@ -7807,9 +7829,6 @@
             "description": "Health check configuration for the model service."
           }
         },
-        "required": [
-          "port"
-        ],
         "title": "PresetModelServiceConfigInput",
         "type": "object"
       },
@@ -7857,7 +7876,7 @@
               }
             ],
             "default": null,
-            "description": "Model definition configuration. Optional, but when provided it must be fully populated (non-empty models, each with name/model_path/service)."
+            "description": "Model definition configuration. Optional; each model requires a service block, while name/model_path may be omitted to inherit merge-chain defaults."
           },
           "resource_slots": {
             "anyOf": [
@@ -8011,393 +8030,6 @@
         "title": "CreateDeploymentRevisionPresetInput",
         "type": "object"
       },
-      "ModelConfig": {
-        "additionalProperties": true,
-        "properties": {
-          "name": {
-            "description": "Name of the model.",
-            "examples": [
-              "my_model"
-            ],
-            "title": "Name",
-            "type": "string"
-          },
-          "model-path": {
-            "description": "Path to the model file.",
-            "examples": [
-              "/models/my_model"
-            ],
-            "title": "Model-Path",
-            "type": "string"
-          },
-          "service": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelServiceConfig"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Configuration for the model service."
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Metadata about the model."
-          }
-        },
-        "required": [
-          "name",
-          "model-path"
-        ],
-        "title": "ModelConfig",
-        "type": "object"
-      },
-      "ModelDefinition": {
-        "additionalProperties": true,
-        "properties": {
-          "models": {
-            "description": "List of models in the model definition.",
-            "items": {
-              "$ref": "#/components/schemas/ModelConfig"
-            },
-            "title": "Models",
-            "type": "array"
-          }
-        },
-        "title": "ModelDefinition",
-        "type": "object"
-      },
-      "ModelHealthCheck": {
-        "additionalProperties": true,
-        "properties": {
-          "enable": {
-            "default": false,
-            "description": "Whether the route should be health-checked. When false the route becomes active immediately and the remaining fields are ignored.",
-            "examples": [
-              false
-            ],
-            "title": "Enable",
-            "type": "boolean"
-          },
-          "interval": {
-            "default": 10.0,
-            "description": "Interval in seconds between health checks.",
-            "examples": [
-              10.0
-            ],
-            "title": "Interval",
-            "type": "number"
-          },
-          "path": {
-            "default": "/health",
-            "description": "Path to check for health status.",
-            "examples": [
-              "/health"
-            ],
-            "title": "Path",
-            "type": "string"
-          },
-          "max-retries": {
-            "default": 10,
-            "description": "Maximum number of retries for health check.",
-            "examples": [
-              10
-            ],
-            "title": "Max-Retries",
-            "type": "integer"
-          },
-          "max-wait-time": {
-            "default": 15.0,
-            "description": "Maximum time in seconds to wait for a health check response.",
-            "examples": [
-              15.0
-            ],
-            "title": "Max-Wait-Time",
-            "type": "number"
-          },
-          "expected-status-code": {
-            "default": 200,
-            "description": "Expected HTTP status code for a healthy response.",
-            "examples": [
-              200
-            ],
-            "exclusiveMinimum": 100,
-            "title": "Expected-Status-Code",
-            "type": "integer"
-          },
-          "initial-delay": {
-            "default": 60.0,
-            "description": "Grace period in seconds for a warming-up route to pass its first health check. Probing starts immediately; the route stays WARMING_UP until a probe passes (then it activates) or this period elapses without a passing probe (then it is terminated). This does not delay the first probe.",
-            "examples": [
-              60.0
-            ],
-            "minimum": 0,
-            "title": "Initial-Delay",
-            "type": "number"
-          }
-        },
-        "title": "ModelHealthCheck",
-        "type": "object"
-      },
-      "ModelMetadata": {
-        "additionalProperties": true,
-        "properties": {
-          "author": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "examples": [
-              "John Doe"
-            ],
-            "title": "Author"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Title"
-          },
-          "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Version"
-          },
-          "created": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Created"
-          },
-          "last_modified": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Last Modified"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Description"
-          },
-          "task": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Task"
-          },
-          "category": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Category"
-          },
-          "architecture": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Architecture"
-          },
-          "framework": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Framework"
-          },
-          "label": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Label"
-          },
-          "license": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "License"
-          },
-          "min-resource": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Minimum resource requirements for the model.",
-            "title": "Min-Resource"
-          }
-        },
-        "title": "ModelMetadata",
-        "type": "object"
-      },
-      "ModelServiceConfig": {
-        "additionalProperties": true,
-        "properties": {
-          "pre-start-actions": {
-            "description": "List of pre-start actions to execute before starting the model service.",
-            "items": {
-              "$ref": "#/components/schemas/PreStartAction"
-            },
-            "title": "Pre-Start-Actions",
-            "type": "array"
-          },
-          "start-command": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Command string to start the model service. ``{model_path}`` is replaced with the resolved ``model_path`` before launch. ``None`` falls back to the image's default CMD.",
-            "examples": [
-              "python service.py",
-              "vllm serve {model_path}"
-            ],
-            "title": "Start-Command"
-          },
-          "shell": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": "/bin/bash",
-            "description": "Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.",
-            "examples": [
-              "/bin/bash"
-            ],
-            "title": "Shell"
-          },
-          "port": {
-            "description": "Port number for the model service. Must be greater than 1.",
-            "examples": [
-              8080
-            ],
-            "exclusiveMinimum": 1,
-            "title": "Port",
-            "type": "integer"
-          },
-          "health-check": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelHealthCheck"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Health check configuration for the model service."
-          }
-        },
-        "required": [
-          "port"
-        ],
-        "title": "ModelServiceConfig",
-        "type": "object"
-      },
       "UpdateDeploymentRevisionPresetInput": {
         "properties": {
           "id": {
@@ -8480,7 +8112,7 @@
           "model_definition": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ModelDefinition"
+                "$ref": "#/components/schemas/PresetModelDefinitionInput"
               },
               {
                 "$ref": "#/components/schemas/Sentinel"
@@ -9092,6 +8724,21 @@
           "name"
         ],
         "title": "DeleteDomainInput",
+        "type": "object"
+      },
+      "RestoreDomainInput": {
+        "description": "Input for restoring a soft-deleted domain.",
+        "properties": {
+          "name": {
+            "description": "Name of the domain to restore.",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "RestoreDomainInput",
         "type": "object"
       },
       "PurgeDomainInput": {
@@ -10367,6 +10014,27 @@
         "title": "IdleCheckerSpecInputDTO",
         "type": "object"
       },
+      "MetricLabelEntry": {
+        "description": "A key-value label entry for executing a query definition.",
+        "properties": {
+          "key": {
+            "description": "Label key",
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "description": "Label value",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "MetricLabelEntry",
+        "type": "object"
+      },
       "NetworkTimeoutSpecInputDTO": {
         "properties": {
           "max_network_inactivity_seconds": {
@@ -10440,6 +10108,20 @@
               }
             ],
             "title": "Threshold"
+          },
+          "filter_labels": {
+            "items": {
+              "$ref": "#/components/schemas/MetricLabelEntry"
+            },
+            "title": "Filter Labels",
+            "type": "array"
+          },
+          "group_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Group Labels",
+            "type": "array"
           }
         },
         "required": [
@@ -10880,7 +10562,8 @@
         "enum": [
           "domain",
           "project",
-          "resource_group"
+          "resource_group",
+          "user"
         ],
         "title": "IdleCheckerScopeTypeDTO",
         "type": "string"
@@ -11950,6 +11633,22 @@
         "title": "ForgetImageInput",
         "type": "object"
       },
+      "RestoreImageInput": {
+        "description": "Input for restoring a forgotten (soft-deleted) image.",
+        "properties": {
+          "image_id": {
+            "description": "ID of the image to restore",
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_id"
+        ],
+        "title": "RestoreImageInput",
+        "type": "object"
+      },
       "PurgeImageInput": {
         "description": "Input for purging (hard-deleting) an image.",
         "properties": {
@@ -12212,6 +11911,19 @@
             "default": null,
             "title": "Is Admin"
           },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether the keypair is its owner's default one.",
+            "title": "Is Default"
+          },
           "access_key": {
             "anyOf": [
               {
@@ -12341,6 +12053,7 @@
           "last_used",
           "access_key",
           "is_active",
+          "is_default",
           "resource_policy"
         ],
         "title": "KeypairOrderField",
@@ -13075,6 +12788,255 @@
           }
         },
         "title": "UpdateLoginClientTypeInput",
+        "type": "object"
+      },
+      "ClientIPMaskingMode": {
+        "enum": [
+          "none",
+          "truncate",
+          "drop"
+        ],
+        "title": "ClientIPMaskingMode",
+        "type": "string"
+      },
+      "ClientIPMaskingPolicyFilter": {
+        "properties": {
+          "target_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClientIPMaskingTarget"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the governed target."
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClientIPMaskingMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by masking mode."
+          }
+        },
+        "title": "ClientIPMaskingPolicyFilter",
+        "type": "object"
+      },
+      "ClientIPMaskingPolicyOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ClientIPMaskingPolicyOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "ClientIPMaskingPolicyOrder",
+        "type": "object"
+      },
+      "ClientIPMaskingPolicyOrderField": {
+        "enum": [
+          "target_type",
+          "mode",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ClientIPMaskingPolicyOrderField",
+        "type": "string"
+      },
+      "ClientIPMaskingTarget": {
+        "description": "Which recorded client IP a policy row governs.\n\n``DEFAULT`` is the fallback the other targets inherit; it is a target value rather\nthan a column so a row exists for each and no row has to be singled out.",
+        "enum": [
+          "default",
+          "login_history",
+          "audit_logs"
+        ],
+        "title": "ClientIPMaskingTarget",
+        "type": "string"
+      },
+      "AdminSearchClientIPMaskingPoliciesInput": {
+        "description": "Read the masking set for every target.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClientIPMaskingPolicyFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ClientIPMaskingPolicyOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "title": "AdminSearchClientIPMaskingPoliciesInput",
+        "type": "object"
+      },
+      "AdminUpsertClientIPMaskingPolicyInput": {
+        "description": "Set the masking one target gets.",
+        "properties": {
+          "target_type": {
+            "$ref": "#/components/schemas/ClientIPMaskingTarget",
+            "description": "Which recorded client IP to govern"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ClientIPMaskingMode",
+            "description": "Masking applied before the address is stored"
+          },
+          "ipv4_prefix": {
+            "anyOf": [
+              {
+                "maximum": 32,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "IPv4 bits 'truncate' keeps; the rest are zeroed. Null takes the built-in width of 24.",
+            "title": "Ipv4 Prefix"
+          },
+          "ipv6_prefix": {
+            "anyOf": [
+              {
+                "maximum": 128,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "IPv6 bits 'truncate' keeps; the rest are zeroed. Null takes the built-in width of 48.",
+            "title": "Ipv6 Prefix"
+          }
+        },
+        "required": [
+          "target_type",
+          "mode"
+        ],
+        "title": "AdminUpsertClientIPMaskingPolicyInput",
+        "type": "object"
+      },
+      "AdminPurgeClientIPMaskingPolicyInput": {
+        "description": "Drop one target's policy so it falls back to the default.",
+        "properties": {
+          "id": {
+            "description": "Policy ID",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "AdminPurgeClientIPMaskingPolicyInput",
         "type": "object"
       },
       "LoginAttemptResult": {
@@ -15974,6 +15936,22 @@
         "title": "DeleteProjectInput",
         "type": "object"
       },
+      "RestoreProjectInput": {
+        "description": "Input for restoring a soft-deleted group.",
+        "properties": {
+          "group_id": {
+            "description": "UUID of the group to restore.",
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id"
+        ],
+        "title": "RestoreProjectInput",
+        "type": "object"
+      },
       "PurgeProjectInput": {
         "description": "Input for permanently purging a group and all associated data.",
         "properties": {
@@ -16033,6 +16011,363 @@
           "user_ids"
         ],
         "title": "UnassignUsersFromProjectInput",
+        "type": "object"
+      },
+      "EntityID": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "PermissionBitDTO": {
+        "description": "One bit of the permission mask.\n\nDistinct from :class:`OperationTypeDTO`, which names an action: this names what is\nheld. A cap is a set of these, and an empty set is no cap at all.",
+        "enum": [
+          "read",
+          "update",
+          "create",
+          "soft_delete",
+          "hard_delete"
+        ],
+        "title": "PermissionBitDTO",
+        "type": "string"
+      },
+      "CreateEntityInvitationInput": {
+        "description": "One offer of one entity to one address.\n\nThe cap is given as the permissions it holds rather than a bitmask; an empty list\nmeans no ceiling, so the invitee's own permissions stand unclipped.",
+        "properties": {
+          "target_entity_type": {
+            "description": "Type of the entity being offered",
+            "title": "Target Entity Type",
+            "type": "string"
+          },
+          "target_entity_id": {
+            "$ref": "#/components/schemas/EntityID",
+            "description": "Id of the entity being offered"
+          },
+          "invitee_email": {
+            "description": "Address the offer goes to",
+            "title": "Invitee Email",
+            "type": "string"
+          },
+          "permissions": {
+            "description": "Permissions the offer caps at; empty for no ceiling",
+            "items": {
+              "$ref": "#/components/schemas/PermissionBitDTO"
+            },
+            "title": "Permissions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "target_entity_type",
+          "target_entity_id",
+          "invitee_email"
+        ],
+        "title": "CreateEntityInvitationInput",
+        "type": "object"
+      },
+      "EntityInvitationFilter": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityInvitationStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "target_entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "invitee_email": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "EntityInvitationFilter",
+        "type": "object"
+      },
+      "EntityInvitationOrderBy": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/EntityInvitationOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "DESC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "EntityInvitationOrderBy",
+        "type": "object"
+      },
+      "EntityInvitationOrderField": {
+        "enum": [
+          "created_at",
+          "updated_at",
+          "status"
+        ],
+        "title": "EntityInvitationOrderField",
+        "type": "string"
+      },
+      "EntityInvitationScope": {
+        "description": "Scope for the scoped entity invitation query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty. Naming a user reads the invitations they were sent or sent themselves, which\nthe permission check on that user's scope is what allows.",
+        "properties": {
+          "invitee": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users the invitations are addressed to",
+            "title": "Invitee"
+          },
+          "inviter": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users who sent the invitations",
+            "title": "Inviter"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityInvitationTargetScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the invitations offer",
+            "title": "Target"
+          }
+        },
+        "title": "EntityInvitationScope",
+        "type": "object"
+      },
+      "EntityInvitationStatusDTO": {
+        "enum": [
+          "pending",
+          "accepted",
+          "rejected",
+          "canceled"
+        ],
+        "title": "EntityInvitationStatusDTO",
+        "type": "string"
+      },
+      "EntityInvitationStatusFilter": {
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityInvitationStatusDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityInvitationStatusDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "In"
+          }
+        },
+        "title": "EntityInvitationStatusFilter",
+        "type": "object"
+      },
+      "EntityInvitationTargetScope": {
+        "description": "One entity whose invitations are being read.\n\nIts own pair rather than the shared ``EntityTypeScope``: what an invitation offers\nis an open entity type, which that closed element enum cannot name.",
+        "properties": {
+          "entity_type": {
+            "description": "Type of the entity being offered",
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "entity_id": {
+            "$ref": "#/components/schemas/EntityID",
+            "description": "Id of the entity being offered"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id"
+        ],
+        "title": "EntityInvitationTargetScope",
+        "type": "object"
+      },
+      "UUIDScope": {
+        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
+        "properties": {
+          "value": {
+            "format": "uuid",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "UUIDScope",
+        "type": "object"
+      },
+      "ScopedSearchEntityInvitationsInput": {
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/EntityInvitationScope",
+            "description": "Scope (OR across all items)"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityInvitationFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityInvitationOrderBy"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchEntityInvitationsInput",
         "type": "object"
       },
       "CreateRoleInvitationInput": {
@@ -17462,7 +17797,7 @@
             "type": "string"
           },
           "query_template": {
-            "description": "PromQL template with placeholders",
+            "description": "PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})",
             "title": "Query Template",
             "type": "string"
           },
@@ -17800,7 +18135,7 @@
               }
             ],
             "default": null,
-            "description": "Updated PromQL template with placeholders",
+            "description": "Updated PromQL template with placeholders (${{labels}}, ${{window}}, ${{group_by}})",
             "title": "Query Template"
           },
           "time_window": {
@@ -17856,27 +18191,6 @@
           }
         },
         "title": "ExecuteQueryDefinitionOptionsInput",
-        "type": "object"
-      },
-      "MetricLabelEntry": {
-        "description": "A key-value label entry for executing a query definition.",
-        "properties": {
-          "key": {
-            "description": "Label key",
-            "title": "Key",
-            "type": "string"
-          },
-          "value": {
-            "description": "Label value",
-            "title": "Value",
-            "type": "string"
-          }
-        },
-        "required": [
-          "key",
-          "value"
-        ],
-        "title": "MetricLabelEntry",
         "type": "object"
       },
       "QueryTimeRangeInputDTO": {
@@ -20509,6 +20823,12 @@
             "default": null,
             "description": "Resource policy name to apply to this resource group.",
             "title": "Resource Policy"
+          },
+          "is_default": {
+            "default": false,
+            "description": "Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.",
+            "title": "Is Default",
+            "type": "boolean"
           }
         },
         "required": [
@@ -20562,6 +20882,19 @@
             "default": null,
             "description": "Whether the resource group is active. Leave null to keep existing value.",
             "title": "Is Active"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.",
+            "title": "Is Default"
           },
           "total_resource_slots": {
             "anyOf": [
@@ -20783,10 +21116,26 @@
             "minimum": 0.0,
             "title": "Preemption Min Runtime",
             "type": "number"
+          },
+          "victim_scope": {
+            "$ref": "#/components/schemas/PreemptionVictimScope",
+            "default": "user",
+            "description": "Scope preemption victims are drawn from (user/project/domain/resource-group). Default is user."
           }
         },
         "title": "PreemptionConfigInputDTO",
         "type": "object"
+      },
+      "PreemptionVictimScope": {
+        "description": "Which sessions may become preemption victims for a pending session.\n\nUSER limits victims to the pending session's own sessions;\nPROJECT/DOMAIN widen to sessions of the same project/domain;\nRESOURCE_GROUP allows any session in the resource group.",
+        "enum": [
+          "user",
+          "project",
+          "domain",
+          "resource-group"
+        ],
+        "title": "PreemptionVictimScope",
+        "type": "string"
       },
       "UpdateResourceGroupConfigInput": {
         "description": "Input for updating resource group configuration via GQL (all fields optional).",
@@ -20821,6 +21170,19 @@
             "default": null,
             "description": "Whether the resource group is public. Leave null to keep existing value.",
             "title": "Is Public"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.",
+            "title": "Is Default"
           },
           "description": {
             "anyOf": [
@@ -21059,7 +21421,7 @@
         "type": "string"
       },
       "KernelExecutionSpecInput": {
-        "description": "Per-kernel execution spec shared by all replicas of one group.\n\nEvery field is optional. The resolver fills gaps from\n`ScalingGroupRow.default_session_options.default_kernel_execution_spec`\nbefore a session is enqueued; any remaining gaps are surfaced as\nvalidation errors (e.g. an image must ultimately be resolved).",
+        "description": "Per-kernel execution spec shared by all replicas of one group.\n\nEvery field is optional. The resolver fills gaps from\n`ResourceGroupRow.default_session_options.default_kernel_execution_spec`\nbefore a session is enqueued; any remaining gaps are surfaced as\nvalidation errors (e.g. an image must ultimately be resolved).",
         "properties": {
           "image_id": {
             "anyOf": [
@@ -23466,6 +23828,237 @@
         "title": "AdminSearchResourceSlotTypesInput",
         "type": "object"
       },
+      "NumberFormatInput": {
+        "description": "Number format configuration supplied when writing a resource slot type.",
+        "properties": {
+          "binary": {
+            "default": false,
+            "description": "Whether to use binary (1024-based) or decimal (1000-based) prefixes.",
+            "title": "Binary",
+            "type": "boolean"
+          },
+          "round_length": {
+            "default": 0,
+            "description": "Number of decimal places to round to when displaying values.",
+            "title": "Round Length",
+            "type": "integer"
+          }
+        },
+        "title": "NumberFormatInput",
+        "type": "object"
+      },
+      "SlotTypes": {
+        "enum": [
+          "count",
+          "bytes",
+          "unique",
+          "unified"
+        ],
+        "title": "SlotTypes",
+        "type": "string"
+      },
+      "CreateResourceSlotTypeInput": {
+        "description": "Input for registering a new resource slot type.",
+        "properties": {
+          "slot_name": {
+            "description": "Unique slot name to register (e.g., 'cpu', 'mem', 'cuda.device').",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Slot Name",
+            "type": "string"
+          },
+          "slot_type": {
+            "$ref": "#/components/schemas/SlotTypes",
+            "description": "Category of the slot type. The scheduler reads this back as a `SlotTypes` member for every enabled slot, so a value outside the enum is rejected here rather than breaking the catalog."
+          },
+          "required": {
+            "default": false,
+            "description": "Whether a session request must name this slot.",
+            "title": "Required",
+            "type": "boolean"
+          },
+          "enabled": {
+            "default": true,
+            "description": "Whether the scheduler considers this slot when placing sessions.",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "display_name": {
+            "default": "",
+            "description": "Human-readable name.",
+            "maxLength": 128,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "description": "Longer description.",
+            "maxLength": 256,
+            "title": "Description",
+            "type": "string"
+          },
+          "display_unit": {
+            "default": "",
+            "description": "Unit label (e.g., 'GiB').",
+            "maxLength": 32,
+            "title": "Display Unit",
+            "type": "string"
+          },
+          "display_icon": {
+            "default": "",
+            "description": "Icon identifier for UIs.",
+            "maxLength": 64,
+            "title": "Display Icon",
+            "type": "string"
+          },
+          "number_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberFormatInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Number formatting rules. Defaults to decimal, no rounding."
+          },
+          "rank": {
+            "default": 0,
+            "description": "Display ordering rank. Lower values appear first.",
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slot_name",
+          "slot_type"
+        ],
+        "title": "CreateResourceSlotTypeInput",
+        "type": "object"
+      },
+      "UpdateResourceSlotTypeInput": {
+        "description": "Input for updating a resource slot type.\n\n``slot_name`` names the target and is not itself updatable; neither is\n``slot_type``. Every other field left unset stays unchanged.",
+        "properties": {
+          "slot_name": {
+            "description": "Slot name identifying the slot type to update.",
+            "title": "Slot Name",
+            "type": "string"
+          },
+          "required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether a session request must name this slot.",
+            "title": "Required"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether the scheduler considers this slot when placing sessions.",
+            "title": "Enabled"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Human-readable name.",
+            "title": "Display Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Longer description.",
+            "title": "Description"
+          },
+          "display_unit": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Unit label (e.g., 'GiB').",
+            "title": "Display Unit"
+          },
+          "display_icon": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Icon identifier for UIs.",
+            "title": "Display Icon"
+          },
+          "number_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberFormatInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Number formatting rules."
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Display ordering rank.",
+            "title": "Rank"
+          }
+        },
+        "required": [
+          "slot_name"
+        ],
+        "title": "UpdateResourceSlotTypeInput",
+        "type": "object"
+      },
       "AgentResourceFilter": {
         "description": "Filter conditions for agent resource search.",
         "properties": {
@@ -24911,7 +25504,7 @@
           },
           "value_type": {
             "$ref": "#/components/schemas/PresetValueType",
-            "description": "Value type: str, int, float, bool, flag."
+            "description": "Value type: str, int, float, bool, flag. 'flag' is only valid with preset_target 'args'."
           },
           "default_value": {
             "anyOf": [
@@ -25061,7 +25654,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted)."
           },
           "default_value": {
             "anyOf": [
@@ -26864,21 +27458,6 @@
           }
         },
         "title": "KernelHistoryScopeDTO",
-        "type": "object"
-      },
-      "UUIDScope": {
-        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
-        "properties": {
-          "value": {
-            "format": "uuid",
-            "title": "Value",
-            "type": "string"
-          }
-        },
-        "required": [
-          "value"
-        ],
-        "title": "UUIDScope",
         "type": "object"
       },
       "ScopedSearchKernelHistoriesInput": {
@@ -29410,6 +29989,65 @@
         "title": "TerminateSessionsInput",
         "type": "object"
       },
+      "SessionIdleCheckTargetInput": {
+        "description": "One (checker, session) pair targeted by an idle-check exclusion or inclusion.",
+        "properties": {
+          "checker_id": {
+            "description": "Added in 26.9.0. Idle checker UUID of the pair.",
+            "format": "uuid",
+            "title": "Checker Id",
+            "type": "string"
+          },
+          "session_id": {
+            "description": "Added in 26.9.0. Session UUID of the pair.",
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checker_id",
+          "session_id"
+        ],
+        "title": "SessionIdleCheckTargetInput",
+        "type": "object"
+      },
+      "ExcludeSessionIdleChecksInput": {
+        "description": "Input for excluding session pairs from idle checks.",
+        "properties": {
+          "targets": {
+            "description": "Added in 26.9.0. Checker-session pairs to exclude.",
+            "items": {
+              "$ref": "#/components/schemas/SessionIdleCheckTargetInput"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "targets"
+        ],
+        "title": "ExcludeSessionIdleChecksInput",
+        "type": "object"
+      },
+      "IncludeSessionIdleChecksInput": {
+        "description": "Input for including session pairs into idle checks.",
+        "properties": {
+          "targets": {
+            "description": "Added in 26.9.0. Checker-session pairs to include; checks start from the initial grace period.",
+            "items": {
+              "$ref": "#/components/schemas/SessionIdleCheckTargetInput"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "targets"
+        ],
+        "title": "IncludeSessionIdleChecksInput",
+        "type": "object"
+      },
       "StartSessionServiceInput": {
         "description": "Input for starting an app service within a session.",
         "properties": {
@@ -30429,7 +31067,7 @@
               }
             ],
             "default": 1,
-            "description": "Set the primary API access key. Set to null to clear.",
+            "description": "Set the primary API access key. It cannot be cleared; null is ignored.",
             "title": "Main Access Key"
           },
           "container_uid": {
@@ -30517,6 +31155,22 @@
           "user_id"
         ],
         "title": "DeleteUserInput",
+        "type": "object"
+      },
+      "RestoreUserInput": {
+        "description": "Input for restoring a soft-deleted user.",
+        "properties": {
+          "user_id": {
+            "description": "UUID of the user to restore.",
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "RestoreUserInput",
         "type": "object"
       },
       "VFolderFilter": {
@@ -32481,21 +33135,6 @@
         "title": "AuthorizeRequest",
         "type": "object"
       },
-      "LogoutRequest": {
-        "description": "Request to invalidate a login session.",
-        "properties": {
-          "session_token": {
-            "description": "The session token to invalidate",
-            "title": "Session Token",
-            "type": "string"
-          }
-        },
-        "required": [
-          "session_token"
-        ],
-        "title": "LogoutRequest",
-        "type": "object"
-      },
       "SignupRequest": {
         "description": "Request to sign up a new user. Created with INACTIVE status; requires separate activation.",
         "properties": {
@@ -32593,6 +33232,21 @@
           "new_password"
         ],
         "title": "UpdatePasswordNoAuthRequest",
+        "type": "object"
+      },
+      "LogoutRequest": {
+        "description": "Request to invalidate a login session.",
+        "properties": {
+          "session_token": {
+            "description": "The session token to invalidate",
+            "title": "Session Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_token"
+        ],
+        "title": "LogoutRequest",
         "type": "object"
       },
       "SignoutRequest": {
@@ -39668,6 +40322,183 @@
         "title": "ModelHealthCheckDraft",
         "type": "object"
       },
+      "ModelMetadata": {
+        "additionalProperties": true,
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "examples": [
+              "John Doe"
+            ],
+            "title": "Author"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Version"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Created"
+          },
+          "last_modified": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Modified"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Task"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Architecture"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Framework"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "License"
+          },
+          "min-resource": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Minimum resource requirements for the model.",
+            "title": "Min-Resource"
+          }
+        },
+        "title": "ModelMetadata",
+        "type": "object"
+      },
       "ModelServiceConfigDraft": {
         "additionalProperties": true,
         "properties": {
@@ -39713,6 +40544,7 @@
           "port": {
             "anyOf": [
               {
+                "exclusiveMinimum": 1,
                 "type": "integer"
               },
               {
@@ -41991,7 +42823,7 @@
           }
         },
         "parameters": [],
-        "description": "Upsert many fragments at one scope, all-or-nothing (auth, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Upsert many fragments at one scope, with per-item partial success (auth, RBAC).\n\nNot in effect yet: still all-or-nothing.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/my/by-names": {
@@ -42049,7 +42881,7 @@
           }
         },
         "parameters": [],
-        "description": "Upsert many fragments at the caller's own user scope, all-or-nothing (auth).\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Upsert many fragments at the caller's own user scope, with per-item partial\nsuccess (auth).\n\nNot in effect yet: still all-or-nothing.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/{fragment_id}": {
@@ -44338,6 +45170,35 @@
         "description": "Soft-delete a domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/domains/restore": {
+      "post": {
+        "operationId": "v2/domains.admin_restore",
+        "tags": [
+          "v2/domains"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreDomainInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore a soft-deleted domain (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/domains/purge": {
       "post": {
         "operationId": "v2/domains.admin_purge",
@@ -45229,6 +46090,35 @@
         "description": "Forget (soft-delete) an image.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/images/restore": {
+      "post": {
+        "operationId": "v2/images.admin_restore",
+        "tags": [
+          "v2/images"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreImageInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore a forgotten (soft-deleted) image.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/images/purge": {
       "post": {
         "operationId": "v2/images.admin_purge",
@@ -45855,6 +46745,93 @@
           }
         ],
         "description": "Delete a login client type (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/client-ip-masking-policies/search": {
+      "post": {
+        "operationId": "v2/client-ip-masking-policies.admin_search",
+        "tags": [
+          "v2/client-ip-masking-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchClientIPMaskingPoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Read the masking set for every target.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/client-ip-masking-policies/upsert": {
+      "post": {
+        "operationId": "v2/client-ip-masking-policies.admin_upsert",
+        "tags": [
+          "v2/client-ip-masking-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUpsertClientIPMaskingPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Set the masking one target gets.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/client-ip-masking-policies/purge": {
+      "post": {
+        "operationId": "v2/client-ip-masking-policies.admin_purge",
+        "tags": [
+          "v2/client-ip-masking-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPurgeClientIPMaskingPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Drop one target's policy so it falls back to the default.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/login-history/search": {
@@ -46726,6 +47703,35 @@
         "description": "Soft-delete a project (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/projects/restore": {
+      "post": {
+        "operationId": "v2/projects.admin_restore",
+        "tags": [
+          "v2/projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreProjectInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore a soft-deleted project (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/projects/purge": {
       "post": {
         "operationId": "v2/projects.admin_purge",
@@ -46829,6 +47835,178 @@
           }
         ],
         "description": "Unassign users from a project.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations": {
+      "post": {
+        "operationId": "v2/entity-invitations.create",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEntityInvitationInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Offer one entity to one address.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/{invitation_id}": {
+      "get": {
+        "operationId": "v2/entity-invitations.get",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Read one invitation from the side that offered it.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/entity-invitations.cancel",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Withdraw the offer before it was answered.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/{invitation_id}/accept": {
+      "post": {
+        "operationId": "v2/entity-invitations.accept",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Take what was offered.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/{invitation_id}/reject": {
+      "post": {
+        "operationId": "v2/entity-invitations.reject",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Turn down what was offered.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-invitations/scoped/search": {
+      "post": {
+        "operationId": "v2/entity-invitations.scoped_search",
+        "tags": [
+          "v2/entity-invitations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchEntityInvitationsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "The invitations the named sides reach.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/role-invitations": {
@@ -49968,7 +51146,101 @@
           }
         },
         "parameters": [],
-        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-slots/slot-types": {
+      "post": {
+        "operationId": "v2/resource-slots.admin_create_slot_type",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResourceSlotTypeInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Register a new resource slot type (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/resource-slots/slot-types/{slot_name}": {
+      "patch": {
+        "operationId": "v2/resource-slots.admin_update_slot_type",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResourceSlotTypeInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slot_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a resource slot type by slot name (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/resource-slots.admin_purge_slot_type",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slot_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Remove a resource slot type by slot name (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/resource-slots/agent-resources/search": {
@@ -51714,6 +52986,64 @@
         "description": "Terminate one or more sessions.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/sessions/exclude-idle-checks": {
+      "post": {
+        "operationId": "v2/sessions.exclude_idle_checks",
+        "tags": [
+          "v2/sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExcludeSessionIdleChecksInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Exclude checker-session pairs from idle checks.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/sessions/include-idle-checks": {
+      "post": {
+        "operationId": "v2/sessions.include_idle_checks",
+        "tags": [
+          "v2/sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncludeSessionIdleChecksInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Include checker-session pairs into idle checks.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/sessions/{session_id}/services/start": {
       "post": {
         "operationId": "v2/sessions.start_service",
@@ -52032,7 +53362,7 @@
         "description": "Retrieve a single user by UUID.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "patch": {
-        "operationId": "v2/users.modify_user",
+        "operationId": "v2/users.update_user",
         "tags": [
           "v2/users"
         ],
@@ -52124,6 +53454,35 @@
         },
         "parameters": [],
         "description": "Soft-delete a user (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/users/restore": {
+      "post": {
+        "operationId": "v2/users.restore_user",
+        "tags": [
+          "v2/users"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreUserInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Restore a soft-deleted user (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/users/domains/{domain_name}/search": {
@@ -53504,30 +54863,6 @@
         "description": ""
       }
     },
-    "/auth/logout": {
-      "post": {
-        "operationId": "auth.logout",
-        "tags": [
-          "auth"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LogoutRequest"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": ""
-      }
-    },
     "/auth/signup": {
       "post": {
         "operationId": "auth.signup",
@@ -53632,6 +54967,35 @@
             "TokenAuth": []
           }
         ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "auth.logout",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequest"
+              }
+            }
+          }
+        },
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
@@ -53911,6 +55275,30 @@
         ],
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/gql/strawberry/public": {
+      "post": {
+        "operationId": "admin.handle_gql_strawberry_public",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQLRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Execute a GraphQL query without credentials.\n\nServes the public schema, which holds only the fields that are safe to read anonymously;\nevery other field is absent from it and cannot be queried here. The full schema is at\n``POST /admin/gql/strawberry`` and requires authentication.\n"
       }
     },
     "/admin/domains": {
@@ -59407,7 +60795,7 @@
           }
         },
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/session/_/transit-status": {
@@ -60639,8 +62027,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "put": {
         "operationId": "manager.update_manager_status",
@@ -60681,8 +62074,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "post": {
         "operationId": "manager.update_announcement",
@@ -60723,8 +62121,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": ""
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/manager/scheduler/operation": {
@@ -61854,7 +63257,7 @@
           }
         },
         "parameters": [],
-        "description": "Generate a presigned URL for uploading artifact files.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Generate a presigned URL for uploading artifact files.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/presigned/download": {
@@ -61883,7 +63286,7 @@
           }
         },
         "parameters": [],
-        "description": "Generate a presigned URL for safely downloading artifact files.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Generate a presigned URL for safely downloading artifact files.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/buckets": {
@@ -61903,7 +63306,7 @@
           }
         ],
         "parameters": [],
-        "description": "Retrieve all storage namespaces (buckets) across all storage systems.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Retrieve all storage namespaces (buckets) across all storage systems.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/{storage_id}/buckets": {
@@ -61932,7 +63335,7 @@
             }
           }
         ],
-        "description": "Retrieve storage namespaces (buckets) for a specific storage system.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Retrieve storage namespaces (buckets) for a specific storage system.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/": {
@@ -61952,7 +63355,7 @@
           }
         ],
         "parameters": [],
-        "description": "List all configured object storage systems.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "List all configured object storage systems.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}/download": {
@@ -61990,7 +63393,7 @@
             }
           }
         ],
-        "description": "Download artifact directory from VFS storage via storage proxy streaming.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Download artifact directory from VFS storage via storage proxy streaming.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}/files": {
@@ -62028,7 +63431,7 @@
             }
           }
         ],
-        "description": "List files recursively in a VFS storage directory via storage proxy.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "List files recursively in a VFS storage directory via storage proxy.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}": {
@@ -62057,7 +63460,7 @@
             }
           }
         ],
-        "description": "Get VFS storage information by storage name.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Get VFS storage information by storage name.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/": {
@@ -62077,7 +63480,7 @@
           }
         ],
         "parameters": [],
-        "description": "List all VFS storages.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "List all VFS storages.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/notifications/channels": {
@@ -64378,7 +65781,7 @@
           }
         },
         "parameters": [],
-        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource-slot-types/{slot_name}": {
@@ -64407,7 +65810,7 @@
             }
           }
         ],
-        "description": "Get a single resource slot type by slot_name.\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "Get a single resource slot type by slot_name.\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/prometheus-query-definitions": {
@@ -64465,7 +65868,7 @@
           }
         },
         "parameters": [],
-        "description": "Search presets with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Search presets with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/resource/prometheus-query-definitions/{id}": {
@@ -64497,7 +65900,7 @@
         "description": "Get a preset by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "patch": {
-        "operationId": "resource/prometheus-query-definitions.modify_preset",
+        "operationId": "resource/prometheus-query-definitions.update_preset",
         "tags": [
           "resource/prometheus-query-definitions"
         ],

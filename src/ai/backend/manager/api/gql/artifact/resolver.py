@@ -7,6 +7,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactRevisionsInput,
@@ -591,7 +592,9 @@ async def scan_artifact_models(
 ) -> ScanArtifactModelsPayload | None:
     results = await info.context.adapters.artifact.retrieve_models(
         models=[m.to_pydantic() for m in input.models],
-        registry_id=input.registry_id,
+        registry_id=ArtifactRegistryID(input.registry_id)
+        if input.registry_id is not None
+        else None,
     )
 
     edges = []

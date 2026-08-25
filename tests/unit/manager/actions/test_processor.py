@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.contexts.user import with_triggered_user, with_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import ErrorCode
@@ -24,7 +25,10 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
-from ai.backend.manager.repositories.audit_log import AuditLogCreatorSpec
+from ai.backend.manager.models.audit_log.creators import LegacyAuditLogCreator
+from ai.backend.manager.repositories.client_ip_masking.repository import (
+    ClientIPMaskingRepository,
+)
 
 _MOCK_ACTION_TYPE: Final[str] = "test"
 _MOCK_OPERATION_TYPE: Final[str] = "create"
@@ -177,12 +181,18 @@ class TestAuditLogMonitorExclusionAtSetupTime:
     @pytest.fixture
     def mock_audit_log_repository(self) -> MagicMock:
         repo = MagicMock()
-        repo.create = AsyncMock(return_value=None)
+        repo.create_dangling_field = AsyncMock(return_value=None)
         return repo
 
     @pytest.fixture
     def audit_log_monitor(self, mock_audit_log_repository: MagicMock) -> AuditLogMonitor:
-        return AuditLogMonitor(repository=mock_audit_log_repository, policy=AuditLogPolicy([]))
+        masking_repository = AsyncMock(spec=ClientIPMaskingRepository)
+        masking_repository.mask.return_value = None
+        return AuditLogMonitor(
+            repository=mock_audit_log_repository,
+            policy=AuditLogPolicy([]),
+            client_ip_masking=masking_repository,
+        )
 
     @pytest.fixture
     def mock_action(self) -> MockAction:
@@ -203,7 +213,7 @@ class TestAuditLogMonitorExclusionAtSetupTime:
 
         await processor.wait_for_complete(mock_action)
 
-        mock_audit_log_repository.create.assert_not_called()
+        mock_audit_log_repository.create_dangling_field.assert_not_called()
 
 
 def _make_user(user_id: UUID, is_superadmin: bool = False) -> UserData:
@@ -214,6 +224,7 @@ def _make_user(user_id: UUID, is_superadmin: bool = False) -> UserData:
         is_superadmin=is_superadmin,
         role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid4()),
     )
 
 
@@ -224,12 +235,18 @@ class TestAuditLogMonitorActorIdentities:
     @pytest.fixture
     def mock_audit_log_repository(self) -> MagicMock:
         repo = MagicMock()
-        repo.create = AsyncMock(return_value=None)
+        repo.create_dangling_field = AsyncMock(return_value=None)
         return repo
 
     @pytest.fixture
     def audit_log_monitor(self, mock_audit_log_repository: MagicMock) -> AuditLogMonitor:
-        return AuditLogMonitor(repository=mock_audit_log_repository, policy=AuditLogPolicy([]))
+        masking_repository = AsyncMock(spec=ClientIPMaskingRepository)
+        masking_repository.mask.return_value = None
+        return AuditLogMonitor(
+            repository=mock_audit_log_repository,
+            policy=AuditLogPolicy([]),
+            client_ip_masking=masking_repository,
+        )
 
     def _result(self) -> ProcessResult:
         now = datetime.now(tz=UTC)
@@ -246,9 +263,11 @@ class TestAuditLogMonitorActorIdentities:
             ),
         )
 
-    def _recorded_spec(self, mock_audit_log_repository: MagicMock) -> AuditLogCreatorSpec:
-        mock_audit_log_repository.create.assert_called_once()
-        spec: AuditLogCreatorSpec = mock_audit_log_repository.create.call_args.args[0].spec
+    def _recorded_spec(self, mock_audit_log_repository: MagicMock) -> LegacyAuditLogCreator:
+        mock_audit_log_repository.create_dangling_field.assert_called_once()
+        spec: LegacyAuditLogCreator = (
+            mock_audit_log_repository.create_dangling_field.call_args.args[1]
+        )
         return spec
 
     async def test_normal_context_triggered_by_equals_acted_as(
@@ -265,6 +284,7 @@ class TestAuditLogMonitorActorIdentities:
         spec = self._recorded_spec(mock_audit_log_repository)
         assert spec.triggered_by == str(user.user_id)
         assert spec.acted_as == user.user_id
+        assert spec.action_name == "session:create"
 
     async def test_impersonation_records_both_identities(
         self,

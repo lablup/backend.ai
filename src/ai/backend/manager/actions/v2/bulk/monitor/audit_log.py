@@ -2,17 +2,22 @@ from __future__ import annotations
 
 from typing import override
 
+from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
-from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import BulkActionProcessResult
-from ai.backend.manager.repositories.audit_log.creators import BulkAuditLogCreatorSpec
-from ai.backend.manager.repositories.audit_log.repository import AuditLogRepository
-from ai.backend.manager.repositories.base import BulkCreator
+from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
+from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.client_ip.masking import ClientIPMaskingTarget
+from ai.backend.manager.models.audit_log.creators import BulkAuditLogCreator
+from ai.backend.manager.models.specs.creator import FieldToCreate
+from ai.backend.manager.repositories.client_ip_masking.repository import (
+    ClientIPMaskingRepository,
+)
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = ("BulkActionAuditLogMonitor",)
 
@@ -26,41 +31,50 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
     create rather than one round-trip per target.
     """
 
-    _repository: AuditLogRepository
+    _repository: OpsRepository[AuditLogData]
     _policy: AuditLogPolicy
+    _client_ip_masking: ClientIPMaskingRepository
 
-    def __init__(self, repository: AuditLogRepository, policy: AuditLogPolicy) -> None:
+    def __init__(
+        self,
+        repository: OpsRepository[AuditLogData],
+        policy: AuditLogPolicy,
+        client_ip_masking: ClientIPMaskingRepository,
+    ) -> None:
         self._repository = repository
         self._policy = policy
+        self._client_ip_masking = client_ip_masking
 
     @override
-    async def prepare(self, action: BaseBulkAction, meta: BaseActionTriggerMeta) -> None:
+    async def prepare(self, meta: BulkActionTriggerMeta) -> None:
         pass
 
     @override
-    async def done(self, action: BaseBulkAction, result: BulkActionProcessResult) -> None:
+    async def done(self, meta: BulkActionTriggerMeta, result: BulkActionProcessResult) -> None:
         trigger = triggered_user()
         acting = current_user()
-        meta = result.meta
+        client_ip = await self._client_ip_masking.mask(
+            ClientIPMaskingTarget.AUDIT_LOGS, current_client_ip()
+        )
         request_id = current_request_id() or BLANK_ID
-        spec = action.spec()
-        bulk_creator = BulkCreator(
-            specs=[
-                BulkAuditLogCreatorSpec(
-                    action_id=meta.action_id,
-                    entity_type=action.entity_type(),
-                    operation=action.operation_type(),
-                    created_at=meta.started_at,
+        creations = [
+            FieldToCreate(
+                owner_id=entity_result.entity_id,
+                creator=BulkAuditLogCreator(
+                    action_id=result.meta.action_id,
+                    operation=meta.operation_type,
+                    action_name=meta.action_name,
+                    created_at=result.meta.started_at,
                     description=entity_result.description,
                     status=entity_result.status,
-                    entity_id=entity_result.entity_id,
                     request_id=request_id,
                     triggered_by=str(trigger.user_id) if trigger else None,
                     acted_as=acting.user_id if acting else None,
-                    duration=meta.duration,
-                )
-                for entity_result in meta.entity_results
-                if self._policy.should_record(spec, entity_result.status)
-            ]
-        )
-        await self._repository.bulk_create(bulk_creator)
+                    duration=result.meta.duration,
+                    client_ip=client_ip,
+                ),
+            )
+            for entity_result in result.meta.entity_results
+            if self._policy.should_record(meta.operation_type, entity_result.status)
+        ]
+        await self._repository.atomic_create_fields(creations)

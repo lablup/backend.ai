@@ -9,13 +9,13 @@ from strawberry import ID, Info
 from strawberry.relay import PageInfo
 from strawberry.scalars import JSON
 
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AddRevisionOptions as AdapterAddRevisionOptions,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchRevisionsInput,
 )
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,

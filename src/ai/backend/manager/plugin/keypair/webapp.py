@@ -14,9 +14,10 @@ from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import BackendAISchema
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.errors.auth import AuthorizationFailed, InvalidAuthParameters
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT, KeyPairRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.webapp import WebappPlugin
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .utils import (
     STokenData,
@@ -49,20 +50,21 @@ async def login(request: web.Request) -> web.Response:
         raise InvalidAuthParameters("Invalid JSON data in request body.") from None
 
     db = cast(ExtendedAsyncSAEngine, root_app["_db"])
+    key_provider_pool = cast(KeyProviderPool, root_app["_key_provider_pool"])
     async with db.begin_readonly_session_read_committed() as db_session:
         query = sa.select(KeyPairRow.secret_key, KeyPairRow.is_active).where(
             KeyPairRow.access_key == json_data.access_key
         )
         keypair = (await db_session.execute(query)).first()
 
-    authenticated = (
-        keypair is not None
-        and keypair.secret_key is not None
-        and keypair.is_active
-        and secrets.compare_digest(
-            keypair.secret_key.encode("utf-8"), json_data.secret_key.encode("utf-8")
+    authenticated = False
+    if keypair is not None and keypair.secret_key is not None and keypair.is_active:
+        stored_secret_key = await key_provider_pool.decrypt(
+            keypair.secret_key, KEYPAIR_SECRET_KEY_CONTEXT
         )
-    )
+        authenticated = secrets.compare_digest(
+            stored_secret_key.encode("utf-8"), json_data.secret_key.encode("utf-8")
+        )
     if not authenticated:
         log.warning("login failed for access_key {}", json_data.access_key)
         raise AuthorizationFailed("Invalid credentials.")

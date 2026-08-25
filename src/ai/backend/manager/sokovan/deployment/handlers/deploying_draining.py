@@ -3,25 +3,23 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import override
 
-from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentLifecycleStatus,
     DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
     DeploymentTargetStatuses,
+    ReplicaGroupData,
     ReplicaGroupLifecycle,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.models.replica_group.updaters import ReplicaGroupDeployUpdater
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.deployment.updaters.replica_group import (
-    ReplicaGroupDeployUpdaterSpec,
-)
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionResult,
@@ -91,18 +89,15 @@ class DeployingDrainingHandler(DeploymentHandler):
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
         deployment_ids = [d.deployment_info.id for d in deployments]
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ReplicaGroupConditions.by_deployment_ids(deployment_ids)],
-        )
-        views = await self._replica_group_repository.search_deploy_scheduling_views(querier)
+        conditions = [ReplicaGroupConditions.by_deployment_ids(deployment_ids)]
+        views = await self._replica_group_repository.search_deploy_scheduling_views(conditions)
         groups_by_deployment: dict[DeploymentID, list[ReplicaGroupDeploySchedulingView]] = {}
         for view in views:
             groups_by_deployment.setdefault(view.deployment_id, []).append(view)
 
         successes: list[DeploymentWithHistory] = []
         skipped: list[DeploymentWithHistory] = []
-        group_updaters: list[Updater[ReplicaGroupRow]] = []
+        group_updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = []
         drained_deployment_ids: set[DeploymentID] = set()
         for deployment in deployments:
             info = deployment.deployment_info
@@ -116,11 +111,9 @@ class DeployingDrainingHandler(DeploymentHandler):
             for group in superseded:
                 if group.lifecycle is ReplicaGroupLifecycle.STABLE:
                     group_updaters.append(
-                        Updater(
-                            pk_value=group.group_id,
-                            spec=ReplicaGroupDeployUpdaterSpec(
-                                lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINING),
-                            ),
+                        ReplicaGroupDeployUpdater(
+                            replica_group_id=group.group_id,
+                            lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINING),
                         )
                     )
             pending = [

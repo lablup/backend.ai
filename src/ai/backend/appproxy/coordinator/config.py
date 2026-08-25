@@ -480,20 +480,6 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
 
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(default=False),
-        BackendAIConfigMeta(
-            description=(
-                "Enable the experimental Redis-based event dispatcher for real-time event "
-                "propagation between coordinator and workers. This feature is under development "
-                "and may have stability issues. Use with caution in production."
-            ),
-            added_version="25.9.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
-
     enable_traefik: Annotated[
         bool,
         Field(default=False),

@@ -3,8 +3,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
-from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
@@ -18,7 +18,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class RolePermissionPresetRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class RolePermissionPresetRow(CreatedAtMixin, Base):
     __tablename__ = "role_permission_presets"
     __table_args__ = (
         sa.UniqueConstraint(

@@ -16,8 +16,13 @@ from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
 from ai.backend.common.utils import nmget
 from ai.backend.manager.errors.auth import AuthorizationFailed, InvalidAuthParameters
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.keypair.row import (
+    KEYPAIR_SECRET_KEY_CONTEXT,
+    KeyPairRow,
+    keypairs,
+)
 from ai.backend.manager.models.user import UserStatus, users
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .utils import deserialize_stoken
 
@@ -120,6 +125,7 @@ class KeypairAuthHookPlugin(HookPlugin):
     ) -> Any:
         root_app = request.app["_root_app"]
         db = root_app["_db"]
+        key_provider_pool: KeyProviderPool = root_app["_key_provider_pool"]
         config_provider = root_app["_config_provider"]
         shared_config = await config_provider.legacy_etcd_config_loader.load()
         plugin_config = nmget(shared_config, "plugins.webapp.keypair_auth")
@@ -162,7 +168,11 @@ class KeypairAuthHookPlugin(HookPlugin):
                         "api_version": body.get("api_version"),
                     }
                     generated_token = await self.sign_token(
-                        sign_method, keypair.secret_key, sign_params
+                        sign_method,
+                        await key_provider_pool.decrypt(
+                            keypair.secret_key, KEYPAIR_SECRET_KEY_CONTEXT
+                        ),
+                        sign_params,
                     )
                     if generated_token != signature:
                         raise Reject("Invalid auth token")

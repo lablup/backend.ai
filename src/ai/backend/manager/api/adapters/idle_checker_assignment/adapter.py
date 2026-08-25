@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
@@ -26,19 +27,15 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
     IdleCheckerAssignmentOrderField,
     IdleCheckerScopeTypeDTO,
 )
-from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID
 from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerAssignmentOrders
-from ai.backend.manager.repositories.base import (
-    Updater,
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.repositories.base import Updater
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerAssignmentCreatorSpec
 from ai.backend.manager.repositories.idle_checker.purgers import IdleCheckerAssignmentPurgerSpec

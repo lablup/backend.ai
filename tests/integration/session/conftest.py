@@ -12,7 +12,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
@@ -33,7 +34,7 @@ class UserFixtureData:
 
 @dataclass
 class SessionSeedData:
-    session_id: SessionId
+    session_id: SessionID
     session_name: str
     kernel_id: uuid.UUID
     access_key: str
@@ -46,7 +47,7 @@ async def session_seed(
     domain_fixture: str,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    resource_group_fixture: str,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session + kernel directly in the database for integration tests.
 
@@ -55,7 +56,7 @@ async def session_seed(
     (server_factory) validates the complete middleware/auth chain.
     """
     unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
+    session_id = SessionID(uuid.uuid4())
     session_name = f"test-session-{unique}"
     kernel_id = uuid.uuid4()
     now = datetime.now(tzutc())
@@ -78,12 +79,10 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_fixture,
+                scaling_group_name=resource_group_fixture,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -103,11 +102,9 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_fixture,
+                scaling_group=resource_group_fixture,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,

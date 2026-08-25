@@ -42,11 +42,15 @@ from ai.backend.common.dto.manager.v2.user.response import (
     PurgeUsersPayload as PurgeUsersPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.user.response import (
+    RestoreUserPayload as RestoreUserPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
     UpdateMyAllowedClientIPPayload as UpdateMyAllowedClientIPPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.user.response import (
     UpdateUserPayload as UpdateUserPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -204,6 +208,20 @@ class DeleteUserPayloadGQL:
     """Payload for single user soft-delete."""
 
     success: bool = gql_field(description="Whether the deletion was successful.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for single user restore mutation.",
+    ),
+    model=RestoreUserPayloadDTO,
+    name="RestoreUserV2Payload",
+)
+class RestoreUserPayloadGQL:
+    """Payload for single user restore."""
+
+    success: bool = gql_field(description="Whether the restore was successful.")
 
 
 @gql_pydantic_type(

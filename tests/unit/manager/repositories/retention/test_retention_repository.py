@@ -8,7 +8,7 @@ advances across batches, and the per-tick budget defers the rest.
 
 ``sessions`` exercises the ordered kernels->sessions delete with the
 remaining-kernel / live-routing NOT EXISTS guards. The terminal-state filter is
-validated on the FK-free ``roles`` table via ``RetentionPurgerSpec`` directly;
+validated on the FK-free ``roles`` table via ``RetentionDrain`` directly;
 ``login`` and the invitation tables share that exact spec, so they are not
 duplicated here. deployments' specs are likewise exercised directly (its
 deployment_revisions FK chain makes a full sweep disproportionate); its
@@ -32,12 +32,15 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.events.types import EventDomain
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.types import OperationStatus
@@ -59,16 +62,17 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
-from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -83,7 +87,6 @@ from ai.backend.manager.models.resource_usage_history.row import (
 )
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.routing.row import RouteStatus, RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
     KernelSchedulingHistoryRow,
@@ -100,10 +103,9 @@ from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
-from ai.backend.manager.repositories.base import BatchPurger
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
+from ai.backend.manager.repositories.ops.v2.retention.write import RetentionDrain
 from ai.backend.manager.repositories.retention.db_source.db_source import RetentionDBSource
-from ai.backend.manager.repositories.retention.purgers import RetentionPurgerSpec
 from ai.backend.testutils.db import with_tables
 
 _NOW = datetime.now(UTC)
@@ -189,13 +191,13 @@ async def _seed_scope(engine: ExtendedAsyncSAEngine) -> _Scope:
             DomainRow(id=scope.domain_id, name=scope.domain_name, description=None, is_active=True)
         )
         sess.add(
-            ScalingGroupRow(
+            ResourceGroupRow(
                 name=scope.sgroup_name,
                 id=scope.sgroup_id,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
         )
         sess.add(
@@ -217,10 +219,11 @@ async def _seed_scope(engine: ExtendedAsyncSAEngine) -> _Scope:
                 domain_name=scope.domain_name,
                 role=UserRole.USER,
                 resource_policy=scope.user_policy_name,
+                domain_id=scope.domain_id,
             )
         )
         sess.add(
-            GroupRow(
+            ProjectRow(
                 id=scope.group_id,
                 name="retention-group",
                 description=None,
@@ -245,7 +248,7 @@ def _make_db_source(
     config_provider = MagicMock()
     config_provider.config.retention.batch_size = batch_size
     config_provider.config.retention.per_tick_budget = per_tick_budget
-    return RetentionDBSource(DBOpsProvider(engine), config_provider)
+    return RetentionDBSource(RetentionOpsProvider(engine), config_provider)
 
 
 async def _sweep_category(
@@ -304,6 +307,7 @@ class TestLogsRetention:
                 AuditLogRow(
                     entity_type="t",
                     operation="op",
+                    action_name="op_t",
                     action_id=uuid.uuid4(),
                     description="old",
                     created_at=_OLD,
@@ -498,17 +502,17 @@ class TestTerminalStateFilter:
                 RoleRow(name="active", status=RoleStatus.ACTIVE),
             ],
         )
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             RoleRow,
             RoleRow.deleted_at,
             _THRESHOLD,
             conditions=(RoleRow.status == RoleStatus.DELETED,),
         )
 
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 1
+        assert deleted_count == 1
         remaining = {name for (name,) in await self._role_names(db)}
         assert remaining == {"deleted-new", "active"}
 
@@ -533,10 +537,10 @@ class TestSessionsRetention:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -582,13 +586,13 @@ class TestSessionsRetention:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
@@ -610,10 +614,11 @@ class TestSessionsRetention:
                     domain_name=scope.domain_name,
                     role=UserRole.USER,
                     resource_policy=scope.user_policy_name,
+                    domain_id=scope.domain_id,
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -651,8 +656,6 @@ class TestSessionsRetention:
                     scaling_group_name=scope.sgroup_name,
                     resource_group_id=scope.sgroup_id,
                     user_uuid=scope.user_uuid,
-                    occupying_slots=ResourceSlot({}),
-                    requested_slots=ResourceSlot({}),
                     status=status,
                     status_info="",
                     target_sgroup_names=[],
@@ -681,8 +684,6 @@ class TestSessionsRetention:
                     user_uuid=scope.user_uuid,
                     scaling_group=scope.sgroup_name,
                     resource_group_id=scope.sgroup_id,
-                    occupied_slots=ResourceSlot({}),
-                    requested_slots=ResourceSlot({}),
                     occupied_shares={},
                     vfolder_mounts=[],
                     status=status,
@@ -914,8 +915,8 @@ class TestDeploymentsRetention:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
-                ScalingGroupRow,
-                GroupRow,
+                ResourceGroupRow,
+                ProjectRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 EndpointTokenRow,
@@ -941,17 +942,17 @@ class TestDeploymentsRetention:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -1009,26 +1010,25 @@ class TestDeploymentsRetention:
         async with db.begin_session() as sess:
             sess.add(
                 EndpointTokenRow(
-                    id=uuid.uuid4(),
+                    id=DeploymentTokenID(uuid.uuid4()),
                     token=f"tok-{uuid.uuid4()}",
                     endpoint=endpoint_id,
-                    session_owner=scope.user_uuid,
+                    session_owner=UserID(scope.user_uuid),
                     domain=scope.domain_name,
-                    project=scope.group_id,
+                    project=ProjectID(scope.group_id),
                     expires_at=expires_at,
                 )
             )
 
     async def _purge_endpoints(self, db: ExtendedAsyncSAEngine) -> int:
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             EndpointRow,
             EndpointRow.destroyed_at,
             _THRESHOLD,
             conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
-        return result.deleted_count
+        async with RetentionOpsProvider(db).write_ops() as w:
+            return await w.drain(spec, batch_size=100)
 
     async def test_destroyed_endpoint_past_boundary_cascades_children(
         self, db: ExtendedAsyncSAEngine, scope: _Scope
@@ -1066,11 +1066,11 @@ class TestDeploymentsRetention:
         # A never-expiring token (NULL expires_at) is preserved.
         await self._add_token(db, scope, endpoint_id=DeploymentID(uuid.uuid4()), expires_at=None)
 
-        spec = RetentionPurgerSpec(EndpointTokenRow, EndpointTokenRow.expires_at, _THRESHOLD)
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        spec = RetentionDrain(EndpointTokenRow, EndpointTokenRow.expires_at, _THRESHOLD)
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 1
+        assert deleted_count == 1
         assert await _count(db, EndpointTokenRow) == 2
 
     async def test_fk_less_child_deleted_by_destroyed_endpoint(
@@ -1088,7 +1088,7 @@ class TestDeploymentsRetention:
         await self._add_token(db, scope, endpoint_id=destroyed_id, expires_at=_NEW)
         await self._add_token(db, scope, endpoint_id=living_id, expires_at=_NEW)
 
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             EndpointTokenRow,
             EndpointRow.destroyed_at,
             _THRESHOLD,
@@ -1096,10 +1096,10 @@ class TestDeploymentsRetention:
             source_key=EndpointRow.id,
             source_conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 1  # only the destroyed endpoint's child
+        assert deleted_count == 1  # only the destroyed endpoint's child
         assert await _count(db, EndpointTokenRow) == 1  # the living endpoint's survives
 
 
@@ -1120,10 +1120,10 @@ class TestDeploymentsTerminalChildCleanup:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionRow,
                 EndpointRow,
                 ReplicaGroupRow,
@@ -1159,13 +1159,13 @@ class TestDeploymentsTerminalChildCleanup:
                 )
             )
             sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     name=scope.sgroup_name,
                     id=scope.sgroup_id,
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                 )
             )
             sess.add(
@@ -1187,10 +1187,11 @@ class TestDeploymentsTerminalChildCleanup:
                     domain_name=scope.domain_name,
                     role=UserRole.USER,
                     resource_policy=scope.user_policy_name,
+                    domain_id=scope.domain_id,
                 )
             )
             sess.add(
-                GroupRow(
+                ProjectRow(
                     id=scope.group_id,
                     name="retention-group",
                     description=None,
@@ -1288,16 +1289,16 @@ class TestDeploymentsTerminalChildCleanup:
             db, scope, endpoint_id, status=RouteStatus.TERMINATED, updated_at=_NEW
         )
 
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             RoutingRow,
             RoutingRow.updated_at,
             _THRESHOLD,
             conditions=(RoutingRow.status.in_(RouteStatus.terminal_statuses()),),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 2  # terminated + failed-to-start, both old
+        assert deleted_count == 2  # terminated + failed-to-start, both old
         assert await _count(db, RoutingRow) == 2  # running + recently-terminated
         assert await _count(db, EndpointRow) == 1  # the live endpoint is untouched
 
@@ -1320,16 +1321,16 @@ class TestDeploymentsTerminalChildCleanup:
             db, endpoint_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_NEW
         )
 
-        spec = RetentionPurgerSpec(
+        spec = RetentionDrain(
             ReplicaGroupRow,
             ReplicaGroupRow.updated_at,
             _THRESHOLD,
             conditions=(ReplicaGroupRow.lifecycle.in_(ReplicaGroupLifecycle.terminal_statuses()),),
         )
-        async with DBOpsProvider(db).write_ops() as w:
-            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+        async with RetentionOpsProvider(db).write_ops() as w:
+            deleted_count = await w.drain(spec, batch_size=100)
 
-        assert result.deleted_count == 2  # drained + failed, both old
+        assert deleted_count == 2  # drained + failed, both old
         assert await _count(db, ReplicaGroupRow) == 2  # stable + recently-drained
         assert await _count(db, EndpointRow) == 1  # the live endpoint is untouched
 
@@ -1357,10 +1358,10 @@ class TestDeploymentsSessionGroupCleanup:
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 SessionGroupRow,
                 SessionRow,
                 EndpointRow,
@@ -1460,8 +1461,6 @@ class TestDeploymentsSessionGroupCleanup:
                     scaling_group_name=scope.sgroup_name,
                     resource_group_id=scope.sgroup_id,
                     user_uuid=scope.user_uuid,
-                    occupying_slots=ResourceSlot({}),
-                    requested_slots=ResourceSlot({}),
                     status=SessionStatus.RUNNING,
                     status_info="",
                     target_sgroup_names=[],
@@ -1472,19 +1471,17 @@ class TestDeploymentsSessionGroupCleanup:
             )
         return session_id
 
-    def _deployment_specs(self) -> list[RetentionPurgerSpec[Base]]:
+    def _deployment_specs(self) -> list[RetentionDrain[Base]]:
         specs = RetentionDBSource._catalog(_THRESHOLD)[RetentionCategory.DEPLOYMENTS]
         return [spec for spec in specs if spec.row_class not in self._UNLOADED]
 
-    async def _drain(
-        self, db: ExtendedAsyncSAEngine, specs: Sequence[RetentionPurgerSpec[Base]]
-    ) -> int:
+    async def _drain(self, db: ExtendedAsyncSAEngine, specs: Sequence[RetentionDrain[Base]]) -> int:
         """Drain ``specs`` in order within one transaction, as the sweep does."""
         deleted = 0
-        async with DBOpsProvider(db).write_ops() as w:
+        async with RetentionOpsProvider(db).write_ops() as w:
             for spec in specs:
-                result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
-                deleted += result.deleted_count
+                deleted_count = await w.drain(spec, batch_size=100)
+                deleted += deleted_count
         return deleted
 
     async def test_group_of_terminal_replica_group_purged(

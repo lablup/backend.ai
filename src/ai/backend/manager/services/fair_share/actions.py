@@ -1,47 +1,76 @@
-"""Actions and results for Fair Share Service."""
+"""Actions and results for Fair Share Service.
+
+A fair share row keys on the pair (resource group, entity) and has no id of its own,
+so nothing here names an entity: every operation happens inside a resource group, and
+the reads that span resource groups are global.
+"""
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.common.data.entity.fair_share import (
+    DOMAIN_FAIR_SHARE_ENTITY_TYPE,
+    PROJECT_FAIR_SHARE_ENTITY_TYPE,
+    USER_FAIR_SHARE_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.resource_group import (
+    RESOURCE_GROUP_SCOPE_TYPE,
+    ResourceGroupID,
+)
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     ProjectFairShareData,
     UserFairShareData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.base import BatchQuerier, QueryPagination
-from ai.backend.manager.repositories.fair_share.types import (
-    DomainFairShareSearchScope,
-    ProjectFairShareSearchScope,
-    UserFairShareSearchScope,
+from ai.backend.manager.models.fair_share.scopes import (
+    DomainFairShareOperationScope,
+    ProjectFairShareOperationScope,
+    UserFairShareOperationScope,
 )
+from ai.backend.manager.models.specs.pagination import QueryPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 
-# Domain Fair Share
+
+@dataclass(frozen=True)
+class _FairShareScopeResult(BaseScopeActionResult):
+    """A fair share row is not an entity, so a run names none."""
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return ()
 
 
-@dataclass
-class DomainFairShareAction(BaseAction):
-    """Base action for domain fair share operations."""
+@dataclass(frozen=True)
+class DomainFairShareAction(BaseScopeAction):
+    """Base for a domain fair share operation, scoped to its resource group."""
+
+    resource_group_id: ResourceGroupID
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.DOMAIN_FAIR_SHARE
+        return DOMAIN_FAIR_SHARE_ENTITY_TYPE
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetDomainFairShareAction(DomainFairShareAction):
-    """Action to get a domain fair share record."""
+    """Read one domain's fair share weight."""
 
-    resource_group_id: ResourceGroupID
     domain_name: str
 
     @override
@@ -50,24 +79,19 @@ class GetDomainFairShareAction(DomainFairShareAction):
         return ActionOperationType.GET
 
     @override
-    def entity_id(self) -> str | None:
-        return f"{self.resource_group_id}:{self.domain_name}"
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_domain_fair_share"
 
 
-@dataclass
-class GetDomainFairShareActionResult(BaseActionResult):
-    """Result of getting a domain fair share record."""
-
+@dataclass(frozen=True)
+class GetDomainFairShareActionResult(_FairShareScopeResult):
     data: DomainFairShareData
 
-    @override
-    def entity_id(self) -> str | None:
-        return f"{self.data.resource_group}:{self.data.domain_name}"
 
-
-@dataclass
-class SearchDomainFairSharesAction(DomainFairShareAction):
-    """Action to search domain fair shares."""
+@dataclass(frozen=True)
+class GlobalSearchDomainFairSharesAction(BaseGlobalAction):
+    """Page through domain fair shares across every resource group."""
 
     pagination: QueryPagination
     conditions: list[QueryCondition]
@@ -75,35 +99,31 @@ class SearchDomainFairSharesAction(DomainFairShareAction):
 
     @override
     @classmethod
+    def entity_type(cls) -> EntityType:
+        return DOMAIN_FAIR_SHARE_ENTITY_TYPE
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_search_domain_fair_shares"
 
 
-@dataclass
-class SearchDomainFairSharesActionResult(BaseActionResult):
-    """Result of searching domain fair shares."""
-
+@dataclass(frozen=True)
+class GlobalSearchDomainFairSharesActionResult:
     items: list[DomainFairShareData]
     total_count: int
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
-
-@dataclass
+@dataclass(frozen=True)
 class SearchRGDomainFairSharesAction(DomainFairShareAction):
-    """Action to search domain fair shares within a resource group scope.
+    """Page through the domain fair shares of a resource group, defaults filled in."""
 
-    Returns all domains in the resource group, filling defaults for
-    entities without fair share records.
-    """
-
-    scope: DomainFairShareSearchScope
+    scope: DomainFairShareOperationScope
     querier: BatchQuerier
 
     @override
@@ -112,240 +132,22 @@ class SearchRGDomainFairSharesAction(DomainFairShareAction):
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.scope.resource_group_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_domain_fair_shares"
 
 
-@dataclass
-class SearchRGDomainFairSharesActionResult(BaseActionResult):
-    """Result of resource group domain fair share search."""
-
+@dataclass(frozen=True)
+class SearchRGDomainFairSharesActionResult(_FairShareScopeResult):
     items: list[DomainFairShareData]
     total_count: int
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
-
-# Project Fair Share
-
-
-@dataclass
-class ProjectFairShareAction(BaseAction):
-    """Base action for project fair share operations."""
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.PROJECT_FAIR_SHARE
-
-
-@dataclass
-class GetProjectFairShareAction(ProjectFairShareAction):
-    """Action to get a project fair share record."""
-
-    resource_group_id: ResourceGroupID
-    project_id: uuid.UUID
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
-
-    @override
-    def entity_id(self) -> str | None:
-        return f"{self.resource_group_id}:{self.project_id}"
-
-
-@dataclass
-class GetProjectFairShareActionResult(BaseActionResult):
-    """Result of getting a project fair share record."""
-
-    data: ProjectFairShareData
-
-    @override
-    def entity_id(self) -> str | None:
-        return f"{self.data.resource_group}:{self.data.project_id}"
-
-
-@dataclass
-class SearchProjectFairSharesAction(ProjectFairShareAction):
-    """Action to search project fair shares."""
-
-    pagination: QueryPagination
-    conditions: list[QueryCondition]
-    orders: list[QueryOrder]
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchProjectFairSharesActionResult(BaseActionResult):
-    """Result of searching project fair shares."""
-
-    items: list[ProjectFairShareData]
-    total_count: int
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchRGProjectFairSharesAction(ProjectFairShareAction):
-    """Action to search project fair shares within a resource group scope.
-
-    Returns all projects in the resource group, filling defaults for
-    entities without fair share records.
-    """
-
-    scope: ProjectFairShareSearchScope
-    querier: BatchQuerier
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.scope.resource_group_id)
-
-
-@dataclass
-class SearchRGProjectFairSharesActionResult(BaseActionResult):
-    """Result of resource group project fair share search."""
-
-    items: list[ProjectFairShareData]
-    total_count: int
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-# User Fair Share
-
-
-@dataclass
-class UserFairShareAction(BaseAction):
-    """Base action for user fair share operations."""
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.USER_FAIR_SHARE
-
-
-@dataclass
-class GetUserFairShareAction(UserFairShareAction):
-    """Action to get a user fair share record."""
-
-    resource_group_id: ResourceGroupID
-    project_id: uuid.UUID
-    user_uuid: uuid.UUID
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
-
-    @override
-    def entity_id(self) -> str | None:
-        return f"{self.resource_group_id}:{self.project_id}:{self.user_uuid}"
-
-
-@dataclass
-class GetUserFairShareActionResult(BaseActionResult):
-    """Result of getting a user fair share record."""
-
-    data: UserFairShareData
-
-    @override
-    def entity_id(self) -> str | None:
-        return f"{self.data.resource_group}:{self.data.user_uuid}:{self.data.project_id}"
-
-
-@dataclass
-class SearchUserFairSharesAction(UserFairShareAction):
-    """Action to search user fair shares."""
-
-    pagination: QueryPagination
-    conditions: list[QueryCondition]
-    orders: list[QueryOrder]
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchUserFairSharesActionResult(BaseActionResult):
-    """Result of searching user fair shares."""
-
-    items: list[UserFairShareData]
-    total_count: int
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchRGUserFairSharesAction(UserFairShareAction):
-    """Action to search user fair shares within a resource group scope.
-
-    Returns all users in the resource group, filling defaults for
-    entities without fair share records.
-    """
-
-    scope: UserFairShareSearchScope
-    querier: BatchQuerier
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.scope.resource_group_id)
-
-
-@dataclass
-class SearchRGUserFairSharesActionResult(BaseActionResult):
-    """Result of resource group user fair share search."""
-
-    items: list[UserFairShareData]
-    total_count: int
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-# Upsert Actions for Fair Share Weight
-
-
-@dataclass
+@dataclass(frozen=True)
 class UpsertDomainFairShareWeightAction(DomainFairShareAction):
-    """Action to upsert a domain fair share weight."""
+    """Write one domain's fair share weight."""
 
     resource_group: str
-    resource_group_id: ResourceGroupID
     domain_name: str
     weight: Decimal | None
 
@@ -355,101 +157,29 @@ class UpsertDomainFairShareWeightAction(DomainFairShareAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
-        return f"{self.resource_group_id}:{self.domain_name}"
+    @classmethod
+    def action_name(cls) -> str:
+        return "upsert_domain_fair_share_weight"
 
 
-@dataclass
-class UpsertDomainFairShareWeightActionResult(BaseActionResult):
-    """Result of upserting a domain fair share weight."""
-
+@dataclass(frozen=True)
+class UpsertDomainFairShareWeightActionResult(_FairShareScopeResult):
     data: DomainFairShareData
 
-    @override
-    def entity_id(self) -> str | None:
-        return f"{self.data.resource_group}:{self.data.domain_name}"
 
-
-@dataclass
-class UpsertProjectFairShareWeightAction(ProjectFairShareAction):
-    """Action to upsert a project fair share weight."""
-
-    resource_group: str
-    resource_group_id: ResourceGroupID
-    project_id: uuid.UUID
-    domain_name: str
-    weight: Decimal | None
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-    @override
-    def entity_id(self) -> str | None:
-        return f"{self.resource_group_id}:{self.project_id}"
-
-
-@dataclass
-class UpsertProjectFairShareWeightActionResult(BaseActionResult):
-    """Result of upserting a project fair share weight."""
-
-    data: ProjectFairShareData
-
-    @override
-    def entity_id(self) -> str | None:
-        return f"{self.data.resource_group}:{self.data.project_id}"
-
-
-@dataclass
-class UpsertUserFairShareWeightAction(UserFairShareAction):
-    """Action to upsert a user fair share weight."""
-
-    resource_group: str
-    resource_group_id: ResourceGroupID
-    project_id: uuid.UUID
-    user_uuid: uuid.UUID
-    domain_name: str
-    weight: Decimal | None
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-    @override
-    def entity_id(self) -> str | None:
-        return f"{self.resource_group_id}:{self.project_id}:{self.user_uuid}"
-
-
-@dataclass
-class UpsertUserFairShareWeightActionResult(BaseActionResult):
-    """Result of upserting a user fair share weight."""
-
-    data: UserFairShareData
-
-    @override
-    def entity_id(self) -> str | None:
-        return f"{self.data.resource_group}:{self.data.user_uuid}:{self.data.project_id}"
-
-
-# Bulk Upsert Actions for Fair Share Weight
-
-
-@dataclass
+@dataclass(frozen=True)
 class DomainWeightInput:
-    """Input for a single domain weight in bulk upsert."""
+    """One entry of a bulk weight write."""
 
     domain_name: str
     weight: Decimal | None
 
 
-@dataclass
+@dataclass(frozen=True)
 class BulkUpsertDomainFairShareWeightAction(DomainFairShareAction):
-    """Action to bulk upsert domain fair share weights."""
+    """Write several domain fair share weights in one resource group."""
 
     resource_group: str
-    resource_group_id: ResourceGroupID
     inputs: list[DomainWeightInput]
 
     @override
@@ -458,36 +188,147 @@ class BulkUpsertDomainFairShareWeightAction(DomainFairShareAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
-        return f"{self.resource_group_id}:[{len(self.inputs)} domains]"
+    @classmethod
+    def action_name(cls) -> str:
+        return "bulk_upsert_domain_fair_share_weights"
 
 
-@dataclass
-class BulkUpsertDomainFairShareWeightActionResult(BaseActionResult):
-    """Result of bulk upserting domain fair share weights."""
-
+@dataclass(frozen=True)
+class BulkUpsertDomainFairShareWeightActionResult(_FairShareScopeResult):
     upserted_count: int
 
+
+@dataclass(frozen=True)
+class ProjectFairShareAction(BaseScopeAction):
+    """Base for a project fair share operation, scoped to its resource group."""
+
+    resource_group_id: ResourceGroupID
+
     @override
-    def entity_id(self) -> str | None:
-        return f"[{self.upserted_count} domains]"
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return PROJECT_FAIR_SHARE_ENTITY_TYPE
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
 
 
-@dataclass
+@dataclass(frozen=True)
+class GetProjectFairShareAction(ProjectFairShareAction):
+    """Read one project's fair share weight."""
+
+    project_id: uuid.UUID
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_project_fair_share"
+
+
+@dataclass(frozen=True)
+class GetProjectFairShareActionResult(_FairShareScopeResult):
+    data: ProjectFairShareData
+
+
+@dataclass(frozen=True)
+class GlobalSearchProjectFairSharesAction(BaseGlobalAction):
+    """Page through project fair shares across every resource group."""
+
+    pagination: QueryPagination
+    conditions: list[QueryCondition]
+    orders: list[QueryOrder]
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return PROJECT_FAIR_SHARE_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_search_project_fair_shares"
+
+
+@dataclass(frozen=True)
+class GlobalSearchProjectFairSharesActionResult:
+    items: list[ProjectFairShareData]
+    total_count: int
+
+
+@dataclass(frozen=True)
+class SearchRGProjectFairSharesAction(ProjectFairShareAction):
+    """Page through the project fair shares of a resource group, defaults filled in."""
+
+    scope: ProjectFairShareOperationScope
+    querier: BatchQuerier
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_project_fair_shares"
+
+
+@dataclass(frozen=True)
+class SearchRGProjectFairSharesActionResult(_FairShareScopeResult):
+    items: list[ProjectFairShareData]
+    total_count: int
+
+
+@dataclass(frozen=True)
+class UpsertProjectFairShareWeightAction(ProjectFairShareAction):
+    """Write one project's fair share weight."""
+
+    resource_group: str
+    project_id: uuid.UUID
+    domain_name: str
+    weight: Decimal | None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "upsert_project_fair_share_weight"
+
+
+@dataclass(frozen=True)
+class UpsertProjectFairShareWeightActionResult(_FairShareScopeResult):
+    data: ProjectFairShareData
+
+
+@dataclass(frozen=True)
 class ProjectWeightInput:
-    """Input for a single project weight in bulk upsert."""
+    """One entry of a bulk weight write."""
 
     project_id: uuid.UUID
     domain_name: str
     weight: Decimal | None
 
 
-@dataclass
+@dataclass(frozen=True)
 class BulkUpsertProjectFairShareWeightAction(ProjectFairShareAction):
-    """Action to bulk upsert project fair share weights."""
+    """Write several project fair share weights in one resource group."""
 
     resource_group: str
-    resource_group_id: ResourceGroupID
     inputs: list[ProjectWeightInput]
 
     @override
@@ -496,24 +337,138 @@ class BulkUpsertProjectFairShareWeightAction(ProjectFairShareAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
-        return f"{self.resource_group_id}:[{len(self.inputs)} projects]"
+    @classmethod
+    def action_name(cls) -> str:
+        return "bulk_upsert_project_fair_share_weights"
 
 
-@dataclass
-class BulkUpsertProjectFairShareWeightActionResult(BaseActionResult):
-    """Result of bulk upserting project fair share weights."""
-
+@dataclass(frozen=True)
+class BulkUpsertProjectFairShareWeightActionResult(_FairShareScopeResult):
     upserted_count: int
 
+
+@dataclass(frozen=True)
+class UserFairShareAction(BaseScopeAction):
+    """Base for a user fair share operation, scoped to its resource group."""
+
+    resource_group_id: ResourceGroupID
+
     @override
-    def entity_id(self) -> str | None:
-        return f"[{self.upserted_count} projects]"
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return USER_FAIR_SHARE_ENTITY_TYPE
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
 
 
-@dataclass
+@dataclass(frozen=True)
+class GetUserFairShareAction(UserFairShareAction):
+    """Read one user's fair share weight."""
+
+    project_id: uuid.UUID
+    user_uuid: uuid.UUID
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_user_fair_share"
+
+
+@dataclass(frozen=True)
+class GetUserFairShareActionResult(_FairShareScopeResult):
+    data: UserFairShareData
+
+
+@dataclass(frozen=True)
+class GlobalSearchUserFairSharesAction(BaseGlobalAction):
+    """Page through user fair shares across every resource group."""
+
+    pagination: QueryPagination
+    conditions: list[QueryCondition]
+    orders: list[QueryOrder]
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return USER_FAIR_SHARE_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_search_user_fair_shares"
+
+
+@dataclass(frozen=True)
+class GlobalSearchUserFairSharesActionResult:
+    items: list[UserFairShareData]
+    total_count: int
+
+
+@dataclass(frozen=True)
+class SearchRGUserFairSharesAction(UserFairShareAction):
+    """Page through the user fair shares of a resource group, defaults filled in."""
+
+    scope: UserFairShareOperationScope
+    querier: BatchQuerier
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_user_fair_shares"
+
+
+@dataclass(frozen=True)
+class SearchRGUserFairSharesActionResult(_FairShareScopeResult):
+    items: list[UserFairShareData]
+    total_count: int
+
+
+@dataclass(frozen=True)
+class UpsertUserFairShareWeightAction(UserFairShareAction):
+    """Write one user's fair share weight."""
+
+    resource_group: str
+    project_id: uuid.UUID
+    user_uuid: uuid.UUID
+    domain_name: str
+    weight: Decimal | None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "upsert_user_fair_share_weight"
+
+
+@dataclass(frozen=True)
+class UpsertUserFairShareWeightActionResult(_FairShareScopeResult):
+    data: UserFairShareData
+
+
+@dataclass(frozen=True)
 class UserWeightInput:
-    """Input for a single user weight in bulk upsert."""
+    """One entry of a bulk weight write."""
 
     user_uuid: uuid.UUID
     project_id: uuid.UUID
@@ -521,12 +476,11 @@ class UserWeightInput:
     weight: Decimal | None
 
 
-@dataclass
+@dataclass(frozen=True)
 class BulkUpsertUserFairShareWeightAction(UserFairShareAction):
-    """Action to bulk upsert user fair share weights."""
+    """Write several user fair share weights in one resource group."""
 
     resource_group: str
-    resource_group_id: ResourceGroupID
     inputs: list[UserWeightInput]
 
     @override
@@ -535,16 +489,11 @@ class BulkUpsertUserFairShareWeightAction(UserFairShareAction):
         return ActionOperationType.UPDATE
 
     @override
-    def entity_id(self) -> str | None:
-        return f"{self.resource_group_id}:[{len(self.inputs)} users]"
+    @classmethod
+    def action_name(cls) -> str:
+        return "bulk_upsert_user_fair_share_weights"
 
 
-@dataclass
-class BulkUpsertUserFairShareWeightActionResult(BaseActionResult):
-    """Result of bulk upserting user fair share weights."""
-
+@dataclass(frozen=True)
+class BulkUpsertUserFairShareWeightActionResult(_FairShareScopeResult):
     upserted_count: int
-
-    @override
-    def entity_id(self) -> str | None:
-        return f"[{self.upserted_count} users]"

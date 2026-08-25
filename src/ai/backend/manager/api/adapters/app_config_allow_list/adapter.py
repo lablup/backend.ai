@@ -7,6 +7,7 @@ from functools import lru_cache
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.app_config.types import AppConfigScopeType as AppConfigScopeTypeDTO
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     AppConfigAllowListFilter,
     AppConfigAllowListOrder,
@@ -27,46 +28,48 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.app_config_allow_list.types import (
+from ai.backend.manager.data.app_config.types import (
     AppConfigAllowListData,
 )
 from ai.backend.manager.models.app_config_allow_list.conditions import (
     AppConfigAllowListConditions,
 )
+from ai.backend.manager.models.app_config_allow_list.creators import (
+    AppConfigAllowListCreator,
+)
 from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllowListOrders
+from ai.backend.manager.models.app_config_allow_list.purgers import (
+    AppConfigAllowListPurger,
+)
+from ai.backend.manager.models.app_config_allow_list.queriers import (
+    AppConfigAllowListQuerier,
+)
+from ai.backend.manager.models.app_config_allow_list.searchers import (
+    AppConfigAllowListSearcher,
+)
+from ai.backend.manager.models.app_config_allow_list.updaters import (
+    AppConfigAllowListUpdater,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.app_config_allow_list.creators import (
-    AppConfigAllowListCreatorSpec,
-)
-from ai.backend.manager.repositories.app_config_allow_list.purgers import (
-    AppConfigAllowListPurgerSpec,
-)
-from ai.backend.manager.repositories.app_config_allow_list.updaters import (
-    AppConfigAllowListUpdaterSpec,
-)
-from ai.backend.manager.repositories.base import (
-    Purger,
-    Updater,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.app_config_allow_list.actions.admin_search import (
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.services.app_config.actions.allow_list.admin_search import (
     AdminSearchAppConfigAllowListAction,
 )
-from ai.backend.manager.services.app_config_allow_list.actions.create import (
+from ai.backend.manager.services.app_config.actions.allow_list.bulk_get import (
+    BulkGetAppConfigAllowListsAction,
+)
+from ai.backend.manager.services.app_config.actions.allow_list.create import (
     CreateAppConfigAllowListAction,
 )
-from ai.backend.manager.services.app_config_allow_list.actions.get import (
+from ai.backend.manager.services.app_config.actions.allow_list.get import (
     GetAppConfigAllowListAction,
 )
-from ai.backend.manager.services.app_config_allow_list.actions.purge import (
+from ai.backend.manager.services.app_config.actions.allow_list.purge import (
     PurgeAppConfigAllowListAction,
 )
-from ai.backend.manager.services.app_config_allow_list.actions.update import (
+from ai.backend.manager.services.app_config.actions.allow_list.update import (
     UpdateAppConfigAllowListAction,
 )
 from ai.backend.manager.types import OptionalState
@@ -89,56 +92,57 @@ class AppConfigAllowListAdapter(BaseAdapter):
     async def admin_create(
         self, input: CreateAppConfigAllowListInput
     ) -> CreateAppConfigAllowListPayload:
-        creator = Creator(
-            spec=AppConfigAllowListCreatorSpec(
-                config_name=input.config_name,
-                scope_type=AppConfigScopeType(input.scope_type.value),
-                rank=input.rank,
-            )
+        creator = AppConfigAllowListCreator(
+            config_name=input.config_name,
+            scope_type=AppConfigScopeType(input.scope_type.value),
+            rank=input.rank,
         )
-        action_result = await self._processors.app_config_allow_list.create.wait_for_complete(
+        action_result = await self._processors.app_config.allow_list_global_create.run(
             CreateAppConfigAllowListAction(creator=creator)
         )
         return CreateAppConfigAllowListPayload(
-            app_config_allow_list=self._data_to_node(action_result.allow_list),
+            app_config_allow_list=self._data_to_node(action_result.data),
         )
 
     async def admin_get(self, allow_list_id: AppConfigAllowListID) -> AppConfigAllowListNode:
-        action_result = await self._processors.app_config_allow_list.get.wait_for_complete(
-            GetAppConfigAllowListAction(allow_list_id=allow_list_id)
+        action_result = await self._processors.app_config.allow_list_get.run(
+            GetAppConfigAllowListAction(
+                querier=AppConfigAllowListQuerier(allow_list_id=allow_list_id)
+            )
         )
-        return self._data_to_node(action_result.allow_list)
+        return self._data_to_node(action_result.data)
 
     async def batch_load_by_ids(
         self, ids: Sequence[AppConfigAllowListID]
-    ) -> list[AppConfigAllowListNode | None]:
-        """Batch load app config allow-list entries by id for DataLoader use.
+    ) -> list[AppConfigAllowListNode | Exception | None]:
+        """Batch load allow-list entries by id for DataLoader use.
 
-        Returns nodes in the same order as the input ids, with None for missing ones.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not ids:
             return []
-        querier = self._build_querier(
-            conditions=[AppConfigAllowListConditions.by_ids(list(ids))],
-            orders=[],
-            pagination_spec=_get_app_config_allow_list_pagination_spec(),
-            limit=len(ids),
+        entity_ids = [AppConfigAllowListID(value) for value in ids]
+        result = await self._processors.app_config.allow_list_bulk_get.run(
+            BulkGetAppConfigAllowListsAction(ids=entity_ids)
         )
-        action_result = await self._processors.app_config_allow_list.admin_search.wait_for_complete(
-            AdminSearchAppConfigAllowListAction(querier=querier)
-        )
-        node_map = {node.id: node for node in map(self._data_to_node, action_result.items)}
-        return [node_map.get(allow_list_id) for allow_list_id in ids]
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def admin_search(
         self, input: SearchAppConfigAllowListInput
     ) -> SearchAppConfigAllowListPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            AppConfigAllowListSearcher,
+            pagination_spec=_get_app_config_allow_list_pagination_spec(),
             conditions=conditions,
             orders=orders,
-            pagination_spec=_get_app_config_allow_list_pagination_spec(),
             first=input.first,
             after=input.after,
             last=input.last,
@@ -146,8 +150,8 @@ class AppConfigAllowListAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config_allow_list.admin_search.wait_for_complete(
-            AdminSearchAppConfigAllowListAction(querier=querier)
+        action_result = await self._processors.app_config.allow_list_global_search.run(
+            AdminSearchAppConfigAllowListAction(searcher=searcher)
         )
         return SearchAppConfigAllowListPayload(
             items=[self._data_to_node(item) for item in action_result.items],
@@ -159,33 +163,27 @@ class AppConfigAllowListAdapter(BaseAdapter):
     async def admin_update(
         self, input: UpdateAppConfigAllowListInput
     ) -> UpdateAppConfigAllowListPayload:
-        updater = Updater(
-            spec=AppConfigAllowListUpdaterSpec(
-                rank=(
-                    OptionalState.update(input.rank)
-                    if input.rank is not None
-                    else OptionalState.nop()
-                ),
+        updater = AppConfigAllowListUpdater(
+            allow_list_id=AppConfigAllowListID(input.id),
+            rank=(
+                OptionalState.update(input.rank) if input.rank is not None else OptionalState.nop()
             ),
-            pk_value=AppConfigAllowListID(input.id),
         )
-        action_result = await self._processors.app_config_allow_list.update.wait_for_complete(
+        action_result = await self._processors.app_config.allow_list_update.run(
             UpdateAppConfigAllowListAction(updater=updater)
         )
         return UpdateAppConfigAllowListPayload(
-            app_config_allow_list=self._data_to_node(action_result.allow_list),
+            app_config_allow_list=self._data_to_node(action_result.data),
         )
 
     async def admin_purge(
         self, input: PurgeAppConfigAllowListInput
     ) -> PurgeAppConfigAllowListPayload:
-        purger = Purger(
-            spec=AppConfigAllowListPurgerSpec(allow_list_id=AppConfigAllowListID(input.id))
-        )
-        action_result = await self._processors.app_config_allow_list.purge.wait_for_complete(
+        purger = AppConfigAllowListPurger(allow_list_id=AppConfigAllowListID(input.id))
+        action_result = await self._processors.app_config.allow_list_purge.run(
             PurgeAppConfigAllowListAction(purger=purger)
         )
-        return PurgeAppConfigAllowListPayload(id=action_result.allow_list.id)
+        return PurgeAppConfigAllowListPayload(id=action_result.data.id)
 
     @staticmethod
     def _data_to_node(data: AppConfigAllowListData) -> AppConfigAllowListNode:

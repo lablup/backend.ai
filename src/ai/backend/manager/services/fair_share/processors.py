@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import override
+from typing import Any
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 
 from .actions import (
     BulkUpsertDomainFairShareWeightAction,
@@ -22,18 +21,18 @@ from .actions import (
     GetProjectFairShareActionResult,
     GetUserFairShareAction,
     GetUserFairShareActionResult,
-    SearchDomainFairSharesAction,
-    SearchDomainFairSharesActionResult,
-    SearchProjectFairSharesAction,
-    SearchProjectFairSharesActionResult,
+    GlobalSearchDomainFairSharesAction,
+    GlobalSearchDomainFairSharesActionResult,
+    GlobalSearchProjectFairSharesAction,
+    GlobalSearchProjectFairSharesActionResult,
+    GlobalSearchUserFairSharesAction,
+    GlobalSearchUserFairSharesActionResult,
     SearchRGDomainFairSharesAction,
     SearchRGDomainFairSharesActionResult,
     SearchRGProjectFairSharesAction,
     SearchRGProjectFairSharesActionResult,
     SearchRGUserFairSharesAction,
     SearchRGUserFairSharesActionResult,
-    SearchUserFairSharesAction,
-    SearchUserFairSharesActionResult,
     UpsertDomainFairShareWeightAction,
     UpsertDomainFairShareWeightActionResult,
     UpsertProjectFairShareWeightAction,
@@ -46,138 +45,120 @@ from .service import FairShareService
 __all__ = ("FairShareProcessors",)
 
 
-class FairShareProcessors(AbstractProcessorPackage):
+class FairShareProcessors:
     """Processor package for fair share operations."""
 
     # Domain Fair Share
-    get_domain_fair_share: ActionProcessor[GetDomainFairShareAction, GetDomainFairShareActionResult]
-    search_domain_fair_shares: ActionProcessor[
-        SearchDomainFairSharesAction, SearchDomainFairSharesActionResult
+    get_domain_fair_share: ScopeActionProcessor[
+        GetDomainFairShareAction, GetDomainFairShareActionResult
     ]
-    search_rg_domain_fair_shares: ActionProcessor[
+    search_domain_fair_shares: GlobalActionProcessor[
+        GlobalSearchDomainFairSharesAction, GlobalSearchDomainFairSharesActionResult
+    ]
+    search_rg_domain_fair_shares: ScopeActionProcessor[
         SearchRGDomainFairSharesAction, SearchRGDomainFairSharesActionResult
     ]
 
     # Project Fair Share
-    get_project_fair_share: ActionProcessor[
+    get_project_fair_share: ScopeActionProcessor[
         GetProjectFairShareAction, GetProjectFairShareActionResult
     ]
-    search_project_fair_shares: ActionProcessor[
-        SearchProjectFairSharesAction, SearchProjectFairSharesActionResult
+    search_project_fair_shares: GlobalActionProcessor[
+        GlobalSearchProjectFairSharesAction, GlobalSearchProjectFairSharesActionResult
     ]
-    search_rg_project_fair_shares: ActionProcessor[
+    search_rg_project_fair_shares: ScopeActionProcessor[
         SearchRGProjectFairSharesAction, SearchRGProjectFairSharesActionResult
     ]
 
     # User Fair Share
-    get_user_fair_share: ActionProcessor[GetUserFairShareAction, GetUserFairShareActionResult]
-    search_user_fair_shares: ActionProcessor[
-        SearchUserFairSharesAction, SearchUserFairSharesActionResult
+    get_user_fair_share: ScopeActionProcessor[GetUserFairShareAction, GetUserFairShareActionResult]
+    search_user_fair_shares: GlobalActionProcessor[
+        GlobalSearchUserFairSharesAction, GlobalSearchUserFairSharesActionResult
     ]
-    search_rg_user_fair_shares: ActionProcessor[
+    search_rg_user_fair_shares: ScopeActionProcessor[
         SearchRGUserFairSharesAction, SearchRGUserFairSharesActionResult
     ]
 
     # Upsert Weight
-    upsert_domain_fair_share_weight: ActionProcessor[
+    upsert_domain_fair_share_weight: ScopeActionProcessor[
         UpsertDomainFairShareWeightAction, UpsertDomainFairShareWeightActionResult
     ]
-    upsert_project_fair_share_weight: ActionProcessor[
+    upsert_project_fair_share_weight: ScopeActionProcessor[
         UpsertProjectFairShareWeightAction, UpsertProjectFairShareWeightActionResult
     ]
-    upsert_user_fair_share_weight: ActionProcessor[
+    upsert_user_fair_share_weight: ScopeActionProcessor[
         UpsertUserFairShareWeightAction, UpsertUserFairShareWeightActionResult
     ]
 
     # Bulk Upsert Weight
-    bulk_upsert_domain_fair_share_weight: ActionProcessor[
+    bulk_upsert_domain_fair_share_weight: ScopeActionProcessor[
         BulkUpsertDomainFairShareWeightAction, BulkUpsertDomainFairShareWeightActionResult
     ]
-    bulk_upsert_project_fair_share_weight: ActionProcessor[
+    bulk_upsert_project_fair_share_weight: ScopeActionProcessor[
         BulkUpsertProjectFairShareWeightAction, BulkUpsertProjectFairShareWeightActionResult
     ]
-    bulk_upsert_user_fair_share_weight: ActionProcessor[
+    bulk_upsert_user_fair_share_weight: ScopeActionProcessor[
         BulkUpsertUserFairShareWeightAction, BulkUpsertUserFairShareWeightActionResult
     ]
 
     def __init__(
         self,
+        # A fair share is keyed by a resource group and a domain, project or user
+        # together, so no one entity's data type names these rows.
+        domain: ProcessorGroup[Any],
+        project: ProcessorGroup[Any],
+        user: ProcessorGroup[Any],
         service: FairShareService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
         # Domain Fair Share
-        self.get_domain_fair_share = ActionProcessor(service.get_domain_fair_share, action_monitors)
-        self.search_domain_fair_shares = ActionProcessor(
-            service.search_domain_fair_shares, action_monitors
+        self.get_domain_fair_share = domain.scope(
+            GetDomainFairShareAction, service.get_domain_fair_share
         )
-        self.search_rg_domain_fair_shares = ActionProcessor(
-            service.search_rg_domain_fair_shares, action_monitors
+        self.search_domain_fair_shares = domain.global_scope(
+            GlobalSearchDomainFairSharesAction, service.search_domain_fair_shares
+        )
+        self.search_rg_domain_fair_shares = domain.scope(
+            SearchRGDomainFairSharesAction, service.search_rg_domain_fair_shares
         )
 
         # Project Fair Share
-        self.get_project_fair_share = ActionProcessor(
-            service.get_project_fair_share, action_monitors
+        self.get_project_fair_share = project.scope(
+            GetProjectFairShareAction, service.get_project_fair_share
         )
-        self.search_project_fair_shares = ActionProcessor(
-            service.search_project_fair_shares, action_monitors
+        self.search_project_fair_shares = project.global_scope(
+            GlobalSearchProjectFairSharesAction, service.search_project_fair_shares
         )
-        self.search_rg_project_fair_shares = ActionProcessor(
-            service.search_rg_project_fair_shares, action_monitors
+        self.search_rg_project_fair_shares = project.scope(
+            SearchRGProjectFairSharesAction, service.search_rg_project_fair_shares
         )
 
         # User Fair Share
-        self.get_user_fair_share = ActionProcessor(service.get_user_fair_share, action_monitors)
-        self.search_user_fair_shares = ActionProcessor(
-            service.search_user_fair_shares, action_monitors
+        self.get_user_fair_share = user.scope(GetUserFairShareAction, service.get_user_fair_share)
+        self.search_user_fair_shares = user.global_scope(
+            GlobalSearchUserFairSharesAction, service.search_user_fair_shares
         )
-        self.search_rg_user_fair_shares = ActionProcessor(
-            service.search_rg_user_fair_shares, action_monitors
+        self.search_rg_user_fair_shares = user.scope(
+            SearchRGUserFairSharesAction, service.search_rg_user_fair_shares
         )
 
         # Upsert Weight
-        self.upsert_domain_fair_share_weight = ActionProcessor(
-            service.upsert_domain_fair_share_weight, action_monitors
+        self.upsert_domain_fair_share_weight = domain.scope(
+            UpsertDomainFairShareWeightAction, service.upsert_domain_fair_share_weight
         )
-        self.upsert_project_fair_share_weight = ActionProcessor(
-            service.upsert_project_fair_share_weight, action_monitors
+        self.upsert_project_fair_share_weight = project.scope(
+            UpsertProjectFairShareWeightAction, service.upsert_project_fair_share_weight
         )
-        self.upsert_user_fair_share_weight = ActionProcessor(
-            service.upsert_user_fair_share_weight, action_monitors
+        self.upsert_user_fair_share_weight = user.scope(
+            UpsertUserFairShareWeightAction, service.upsert_user_fair_share_weight
         )
 
         # Bulk Upsert Weight
-        self.bulk_upsert_domain_fair_share_weight = ActionProcessor(
-            service.bulk_upsert_domain_fair_share_weight, action_monitors
+        self.bulk_upsert_domain_fair_share_weight = domain.scope(
+            BulkUpsertDomainFairShareWeightAction, service.bulk_upsert_domain_fair_share_weight
         )
-        self.bulk_upsert_project_fair_share_weight = ActionProcessor(
-            service.bulk_upsert_project_fair_share_weight, action_monitors
+        self.bulk_upsert_project_fair_share_weight = project.scope(
+            BulkUpsertProjectFairShareWeightAction, service.bulk_upsert_project_fair_share_weight
         )
-        self.bulk_upsert_user_fair_share_weight = ActionProcessor(
-            service.bulk_upsert_user_fair_share_weight, action_monitors
+        self.bulk_upsert_user_fair_share_weight = user.scope(
+            BulkUpsertUserFairShareWeightAction, service.bulk_upsert_user_fair_share_weight
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            # Domain
-            GetDomainFairShareAction.spec(),
-            SearchDomainFairSharesAction.spec(),
-            SearchRGDomainFairSharesAction.spec(),
-            # Project
-            GetProjectFairShareAction.spec(),
-            SearchProjectFairSharesAction.spec(),
-            SearchRGProjectFairSharesAction.spec(),
-            # User
-            GetUserFairShareAction.spec(),
-            SearchUserFairSharesAction.spec(),
-            SearchRGUserFairSharesAction.spec(),
-            # Upsert Weight
-            UpsertDomainFairShareWeightAction.spec(),
-            UpsertProjectFairShareWeightAction.spec(),
-            UpsertUserFairShareWeightAction.spec(),
-            # Bulk Upsert Weight
-            BulkUpsertDomainFairShareWeightAction.spec(),
-            BulkUpsertProjectFairShareWeightAction.spec(),
-            BulkUpsertUserFairShareWeightAction.spec(),
-        ]

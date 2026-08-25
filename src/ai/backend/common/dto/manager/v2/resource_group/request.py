@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
 from ai.backend.common.dto.manager.v2.resource_group.types import (
@@ -18,7 +19,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderField,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.types import PreemptionVictimScope
 
 __all__ = (
     "AdminSearchResourceGroupsInput",
@@ -73,6 +74,13 @@ class CreateResourceGroupInput(BaseRequestModel):
         default=None,
         description="Resource policy name to apply to this resource group.",
     )
+    is_default: bool = Field(
+        default=False,
+        description=(
+            "Make this the default resource group. At most one resource group may hold the"
+            " flag, so this is rejected while another one holds it; clear that one first."
+        ),
+    )
 
     @field_validator("name", mode="before")
     @classmethod
@@ -98,6 +106,14 @@ class UpdateResourceGroupInput(BaseRequestModel):
     is_active: bool | None = Field(
         default=None,
         description="Whether the resource group is active. Leave null to keep existing value.",
+    )
+    is_default: bool | None = Field(
+        default=None,
+        description=(
+            "Whether this is the default resource group. At most one resource group may hold"
+            " the flag, so setting it to true is rejected while another one holds it; clear"
+            " that one first. Leave null to keep existing value."
+        ),
     )
     total_resource_slots: dict[str, Any] | Sentinel | None = Field(
         default=SENTINEL,
@@ -212,6 +228,13 @@ class PreemptionConfigInputDTO(BaseRequestModel):
             "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
         ),
     )
+    victim_scope: PreemptionVictimScope = Field(
+        default=PreemptionVictimScope.USER,
+        description=(
+            "Scope preemption victims are drawn from (user/project/domain/resource-group). "
+            "Default is user."
+        ),
+    )
 
 
 class UpdateResourceGroupFairShareSpecInput(BaseRequestModel):
@@ -251,6 +274,14 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
     is_public: bool | None = Field(
         default=None,
         description="Whether the resource group is public. Leave null to keep existing value.",
+    )
+    is_default: bool | None = Field(
+        default=None,
+        description=(
+            "Whether this is the default resource group. At most one resource group may hold"
+            " the flag, so setting it to true is rejected while another one holds it; clear"
+            " that one first. Leave null to keep existing value."
+        ),
     )
     description: str | None = Field(
         default=None,

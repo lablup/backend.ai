@@ -17,9 +17,10 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.models.keypair import (
+    KeyPairRow,
     keypairs,
-    prepare_new_keypair,
 )
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 
 from .session import ComputeSession
 
@@ -38,11 +39,15 @@ __all__ = (
     "UserInfo",
 )
 
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import agg_to_array
+from ai.backend.manager.services.user.actions.keypair_ops import AdminCreateKeypairAction
+from ai.backend.manager.services.user.actions.lookup import LookupUserAction
 
 from .base import (
     Item,
@@ -51,7 +56,6 @@ from .base import (
     batch_result,
     set_if_set,
     simple_db_mutate,
-    simple_db_mutate_returning_item,
 )
 
 
@@ -103,6 +107,9 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     secret_key = graphene.String()
     is_active = graphene.Boolean()
     is_admin = graphene.Boolean()
+    is_default = graphene.Boolean(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Whether this is the owner's default keypair."
+    )
     resource_policy = graphene.String()
     created_at = GQLDateTime()
     last_used = GQLDateTime()
@@ -130,6 +137,14 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         )
     )
 
+    async def resolve_secret_key(self, info: graphene.ResolveInfo) -> str | None:
+        """The stored secret key as plaintext; the column holds it encrypted once a
+        write provider is named."""
+        if self.secret_key is None:
+            return None
+        ctx: GraphQueryContext = info.context
+        return await ctx.key_provider_pool.decrypt(self.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
+
     async def resolve_user_info(
         self,
         info: graphene.ResolveInfo,
@@ -145,6 +160,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             secret_key=data.secret_key,
             is_active=data.is_active,
             is_admin=data.is_admin,
+            is_default=data.is_default,
             resource_policy=data.resource_policy_name,
             created_at=data.created_at,
             rate_limit=data.rate_limit,
@@ -160,12 +176,13 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     ) -> KeyPair:
         return cls(
             id=row.access_key,
-            user_id=row.user_id,
+            user_id=row._mapping.get("email"),
             full_name=row._mapping.get("full_name"),
             access_key=row.access_key,
             secret_key=row.secret_key,
             is_active=row.is_active,
             is_admin=row.is_admin,
+            is_default=row.is_default,
             resource_policy=row.resource_policy,
             created_at=row.created_at,
             rate_limit=row.rate_limit,
@@ -297,33 +314,22 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         is_active: bool | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
-        from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .outerjoin(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .outerjoin(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .outerjoin(ms, users.c.uuid == ms.c.user_id)
+            .outerjoin(groups, groups.c.id == ms.c.scope_id)
         )
         query = sa.select(sa.func.count()).group_by(keypairs.c.access_key).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if email is not None:
-            query = query.where(keypairs.c.user_id == email)
+            query = query.where(users.c.email == email)
         if is_active is not None:
             query = query.where(keypairs.c.is_active == is_active)
         if filter is not None:
@@ -346,27 +352,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[KeyPair]:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
-        from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .outerjoin(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .outerjoin(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .outerjoin(ms, users.c.uuid == ms.c.user_id)
+            .outerjoin(groups, groups.c.id == ms.c.scope_id)
         )
         query = (
             sa.select(
@@ -376,14 +371,14 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
                 agg_to_array(groups.c.name).label("groups_name"),
             )
             .select_from(j)
-            .group_by(keypairs, users.c.email, users.c.full_name)
+            .group_by(*keypairs.c, users.c.email, users.c.full_name)
             .limit(limit)
             .offset(offset)
         )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if email is not None:
-            query = query.where(keypairs.c.user_id == email)
+            query = query.where(users.c.email == email)
         if is_active is not None:
             query = query.where(keypairs.c.is_active == is_active)
         if filter is not None:
@@ -410,27 +405,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         is_active: bool | None = None,
     ) -> Sequence[Sequence[KeyPair | None]]:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
-        from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .join(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .join(ms, users.c.uuid == ms.c.user_id)
+            .join(groups, groups.c.id == ms.c.scope_id)
         )
         query = (
             sa.select(
@@ -440,8 +424,8 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
                 agg_to_array(groups.c.name).label("groups_name"),
             )
             .select_from(j)
-            .where(keypairs.c.user_id.in_(user_ids))
-            .group_by(keypairs, users.c.email, users.c.full_name)
+            .where(keypairs.c.user.in_(user_ids))
+            .group_by(*keypairs.c, users.c.email, users.c.full_name)
         )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
@@ -454,7 +438,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
                 query,
                 cls,
                 user_ids,
-                lambda row: row.user_id,
+                lambda row: row.user,
             )
 
     @classmethod
@@ -465,27 +449,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
     ) -> Sequence[KeyPair | None]:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
-        from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+        from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .join(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .join(ms, users.c.uuid == ms.c.user_id)
+            .join(groups, groups.c.id == ms.c.scope_id)
         )
         query = (
             sa.select(
@@ -496,7 +469,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             )
             .select_from(j)
             .where(keypairs.c.access_key.in_(access_keys))
-            .group_by(keypairs, users.c.email, users.c.full_name)
+            .group_by(*keypairs.c, users.c.email, users.c.full_name)
         )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
@@ -564,15 +537,15 @@ class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
         user_id: str,
         props: KeyPairInput,
     ) -> CreateKeyPair:
-        from ai.backend.manager.models.user.row import users
-
+        """``user_id`` is the owner's email, which the action names by uuid."""
         graph_ctx: GraphQueryContext = info.context
-        data = prepare_new_keypair(user_id, props.to_creator())
-        insert_query = sa.insert(keypairs).values(
-            **data,
-            user=sa.select(users.c.uuid).where(users.c.email == user_id).as_scalar(),
+        owner = await graph_ctx.processors.user.lookup.run(LookupUserAction(email=user_id))
+        result = await graph_ctx.processors.user.admin_create_keypair.run(
+            AdminCreateKeypairAction(user_id=UserID(owner.entity_id()), creator=props.to_creator())
         )
-        return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
+        keypair = KeyPair.from_data(result.generated_data.keypair)
+        keypair.user_id = user_id
+        return cls(ok=True, msg="success", keypair=keypair)
 
 
 class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]
@@ -601,6 +574,10 @@ class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]
         set_if_set(props, data, "rate_limit")
         # props.concurrency_limit is always ignored
         update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
+        if data.get("is_active") is False:
+            # An inactive default keypair locks its user out, so the marker is a
+            # precondition carried in the statement.
+            update_query = update_query.where(sa.not_(keypairs.c.is_default))
         return await simple_db_mutate(cls, ctx, update_query)
 
 
@@ -620,16 +597,20 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         access_key: AccessKey,
     ) -> DeleteKeyPair:
-        from ai.backend.manager.models.user.row import UserRow
-
         ctx: GraphQueryContext = info.context
         async with ctx.db.begin_readonly_session() as db_session:
-            user_query = (
-                sa.select(sa.func.count())
-                .select_from(UserRow)
-                .where(UserRow.main_access_key == access_key)
+            is_default = await db_session.scalar(
+                sa.select(KeyPairRow.is_default).where(KeyPairRow.access_key == access_key)
             )
-            if (await db_session.scalar(user_query) or 0) > 0:
-                return DeleteKeyPair(False, "the keypair is used as main access key by any user")
-        delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
+            if is_default:
+                return DeleteKeyPair(
+                    False, "the keypair is used as the default access key by a user"
+                )
+        # The marker is re-evaluated inside the DELETE, so a keypair that becomes the
+        # default after the read above is not removed.
+        delete_query = (
+            sa.delete(keypairs)
+            .where(keypairs.c.access_key == access_key)
+            .where(sa.not_(keypairs.c.is_default))
+        )
         return await simple_db_mutate(cls, ctx, delete_query)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.agent.request import (
     AdminSearchAgentsInput,
@@ -28,7 +29,6 @@ from ai.backend.common.dto.manager.v2.agent.types import (
     AgentStatusFilter,
     ConflictingSessionCleanupPolicyEnum,
 )
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -42,12 +42,9 @@ from ai.backend.manager.models.agent.orders import (
     resolve_order,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    NoPagination,
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -86,7 +83,7 @@ class AgentAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[AgentConditions.by_ids(agent_ids)],
         )
-        action_result = await self._processors.agent.search_agents.wait_for_complete(
+        action_result = await self._processors.agent.search_agents.run(
             SearchAgentsAction(querier=querier)
         )
         agent_map = {detail.agent.id: self._data_to_dto(detail) for detail in action_result.agents}
@@ -100,7 +97,7 @@ class AgentAdapter(BaseAdapter):
         """
         if not agent_ids:
             return []
-        action_result = await self._processors.agent.load_container_counts.wait_for_complete(
+        action_result = await self._processors.agent.load_container_counts.run(
             LoadContainerCountsAction(agent_ids=agent_ids)
         )
         return list(action_result.container_counts)
@@ -125,7 +122,7 @@ class AgentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.agent.search_agents.wait_for_complete(
+        action_result = await self._processors.agent.search_agents.run(
             SearchAgentsAction(querier=querier)
         )
         return AdminSearchAgentsPayload(
@@ -146,7 +143,7 @@ class AgentAdapter(BaseAdapter):
         if f.schedulable is not None:
             conditions.append(AgentConditions.by_schedulable(f.schedulable))
         if f.scaling_group is not None:
-            condition = self._convert_scaling_group_filter(f.scaling_group)
+            condition = self._convert_resource_group_filter(f.scaling_group)
             if condition is not None:
                 conditions.append(condition)
         if f.AND:
@@ -176,14 +173,14 @@ class AgentAdapter(BaseAdapter):
             in_factory=AgentConditions.by_id_in,
         )
 
-    def _convert_scaling_group_filter(self, sf: StringFilter) -> QueryCondition | None:
+    def _convert_resource_group_filter(self, sf: StringFilter) -> QueryCondition | None:
         return self.convert_string_filter(
             sf,
-            contains_factory=AgentConditions.by_scaling_group_contains,
-            equals_factory=AgentConditions.by_scaling_group_equals,
-            starts_with_factory=AgentConditions.by_scaling_group_starts_with,
-            ends_with_factory=AgentConditions.by_scaling_group_ends_with,
-            in_factory=AgentConditions.by_scaling_group_in,
+            contains_factory=AgentConditions.by_resource_group_contains,
+            equals_factory=AgentConditions.by_resource_group_equals,
+            starts_with_factory=AgentConditions.by_resource_group_starts_with,
+            ends_with_factory=AgentConditions.by_resource_group_ends_with,
+            in_factory=AgentConditions.by_resource_group_in,
         )
 
     @staticmethod
@@ -236,7 +233,7 @@ class AgentAdapter(BaseAdapter):
     ) -> UpdateAgentResourceGroupPayload:
         """Change an agent's resource group, cleaning up conflicting sessions per policy."""
         applied_policy = input.policy or ConflictingSessionCleanupPolicyEnum.TERMINATE
-        action_result = await self._processors.agent.update_resource_group.wait_for_complete(
+        action_result = await self._processors.agent.update_resource_group.run(
             UpdateAgentResourceGroupAction(
                 agent_id=input.agent_id,
                 resource_group_id=input.resource_group_id,
@@ -259,9 +256,7 @@ class AgentAdapter(BaseAdapter):
     async def get_total_resources(self) -> TotalResourceData:
         """Retrieve aggregate resource capacity/usage across all agents."""
         action_result: GetTotalResourcesActionResult = (
-            await self._processors.agent.get_total_resources.wait_for_complete(
-                GetTotalResourcesAction()
-            )
+            await self._processors.agent.get_total_resources.run(GetTotalResourcesAction())
         )
         return action_result.total_resources
 
@@ -273,8 +268,8 @@ class AgentAdapter(BaseAdapter):
             id=str(data.id),
             resource_info=AgentResourceInfo(
                 capacity=dict(data.available_slots.to_json()),
-                used=dict(data.actual_occupied_slots.to_json()),
-                free=dict((data.available_slots - data.actual_occupied_slots).to_json()),
+                used=dict(data.occupied_slots.to_json()),
+                free=dict((data.available_slots - data.occupied_slots).to_json()),
             ),
             status_info=AgentStatusInfo(
                 status=data.status.name,
@@ -305,6 +300,6 @@ class AgentAdapter(BaseAdapter):
                 region=data.region,
                 addr=data.addr,
             ),
-            scaling_group=data.scaling_group,
+            scaling_group=data.resource_group,
             permissions=[p.value for p in detail.permissions],
         )

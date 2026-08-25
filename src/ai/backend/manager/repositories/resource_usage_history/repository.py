@@ -8,7 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -19,22 +19,26 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    KernelUsageRecordData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
+from ai.backend.manager.models.resource_usage_history.scopes import (
+    DomainUsageBucketOperationScope,
+    ProjectUsageBucketOperationScope,
+    UserUsageBucketOperationScope,
+)
 from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator, Upserter
+from ai.backend.manager.repositories.resource_usage_history.types import (
+    DomainUsageBucketSearchResult,
+    KernelUsageRecordSearchResult,
+    ProjectUsageBucketSearchResult,
+    UserUsageBucketSearchResult,
+)
 
 from .db_source import ResourceUsageHistoryDBSource
-from .types import (
-    DomainUsageBucketData,
-    DomainUsageBucketSearchResult,
-    DomainUsageBucketSearchScope,
-    KernelUsageRecordData,
-    KernelUsageRecordSearchResult,
-    ProjectUsageBucketData,
-    ProjectUsageBucketSearchResult,
-    ProjectUsageBucketSearchScope,
-    UserUsageBucketData,
-    UserUsageBucketSearchResult,
-    UserUsageBucketSearchScope,
-)
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.fair_share import UsageBucketAggregationResult
@@ -186,7 +190,7 @@ class ResourceUsageHistoryRepository:
     async def search_domain_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: DomainUsageBucketSearchScope | None = None,
+        scope: DomainUsageBucketOperationScope | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
         return await self._db_source.search_domain_usage_buckets(querier, scope)
@@ -213,7 +217,7 @@ class ResourceUsageHistoryRepository:
     async def search_project_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: ProjectUsageBucketSearchScope | None = None,
+        scope: ProjectUsageBucketOperationScope | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
         return await self._db_source.search_project_usage_buckets(querier, scope)
@@ -240,7 +244,7 @@ class ResourceUsageHistoryRepository:
     async def search_user_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: UserUsageBucketSearchScope | None = None,
+        scope: UserUsageBucketOperationScope | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
         return await self._db_source.search_user_usage_buckets(querier, scope)

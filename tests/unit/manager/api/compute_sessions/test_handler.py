@@ -14,6 +14,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.compute_session import (
     ComputeSessionFilter,
     ComputeSessionOrder,
@@ -22,7 +24,6 @@ from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsRequest,
 )
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     ClusterMode,
     KernelId,
@@ -46,19 +47,32 @@ from ai.backend.manager.data.kernel.types import (
     RuntimeConfig,
     UserPermission,
 )
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
-from ai.backend.manager.repositories.base import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 
 # ========== Test Data Factories ==========
 
 
+def create_allocation(
+    requested: dict[str, Decimal] | None = None,
+    used: dict[str, Decimal] | None = None,
+) -> ResourceAllocationAggregate:
+    """Create the slot aggregate the adapter receives from resource_allocations."""
+    return ResourceAllocationAggregate(
+        requested=ResourceSlot(requested or {"cpu": Decimal("1")}),
+        used=ResourceSlot(used or {"cpu": Decimal("1")}),
+        allocated=ResourceSlot(used or {"cpu": Decimal("1")}),
+    )
+
+
 def create_session_data(
     session_id: UUID | None = None,
     name: str = "test-session",
     status: SessionStatus = SessionStatus.RUNNING,
-    scaling_group: str = "default",
+    resource_group: str = "default",
     images: list[str] | None = None,
 ) -> SessionData:
     """Create a SessionData for testing."""
@@ -73,8 +87,6 @@ def create_session_data(
         domain_name="default",
         group_id=uuid4(),
         user_uuid=uuid4(),
-        occupying_slots=ResourceSlot({"cpu": Decimal("2.0"), "mem": Decimal("4294967296")}),
-        requested_slots=ResourceSlot({"cpu": Decimal("4.0"), "mem": Decimal("8589934592")}),
         use_host_network=False,
         created_at=datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC),
         status=status,
@@ -94,7 +106,7 @@ def create_session_data(
         timeout=None,
         batch_timeout=None,
         terminated_at=None,
-        scaling_group_name=scaling_group,
+        resource_group_name=resource_group,
         starts_at=None,
         status_info=None,
         status_data=None,
@@ -160,13 +172,11 @@ def create_kernel_info(
             cluster_hostname="main",
         ),
         resource=ResourceInfo(
-            scaling_group="default",
+            resource_group="default",
             resource_group_id=ResourceGroupID(uuid4()),
             agent=agent,
             agent_addr=None,
             container_id=None,
-            occupied_slots=ResourceSlot({"cpu": Decimal("2.0")}),
-            requested_slots=ResourceSlot({"cpu": Decimal("4.0")}),
             occupied_shares={},
             attached_devices={},
             resource_opts={},
@@ -359,7 +369,7 @@ class TestComputeSessionsAdapter:
     def test_convert_session_to_dto_without_containers(self) -> None:
         """Convert session without containers should have empty containers list."""
         session = create_session_data()
-        dto = self.adapter.convert_session_to_dto(session, kernels=None)
+        dto = self.adapter.convert_session_to_dto(session, create_allocation(), kernels=None)
 
         assert dto.id == session.id
         assert dto.name == session.name
@@ -385,7 +395,7 @@ class TestComputeSessionsAdapter:
                 agent="agent-002",
             ),
         ]
-        dto = self.adapter.convert_session_to_dto(session, kernels=kernels)
+        dto = self.adapter.convert_session_to_dto(session, create_allocation(), kernels=kernels)
 
         assert len(dto.containers) == 2
         assert dto.containers[0].agent_id == "agent-001"
@@ -403,7 +413,7 @@ class TestComputeSessionsAdapter:
         session.terminated_at = datetime(2024, 6, 2, 12, 0, 0, tzinfo=UTC)
         session.starts_at = datetime(2024, 6, 1, 11, 0, 0, tzinfo=UTC)
 
-        dto = self.adapter.convert_session_to_dto(session)
+        dto = self.adapter.convert_session_to_dto(session, create_allocation())
 
         assert dto.name == "my-session"
         assert dto.status == "TERMINATED"
@@ -421,7 +431,7 @@ class TestComputeSessionsAdapter:
             SessionStatus.CANCELLED,
         ]:
             session = create_session_data(status=status)
-            dto = self.adapter.convert_session_to_dto(session)
+            dto = self.adapter.convert_session_to_dto(session, create_allocation())
             assert dto.status == status.value
 
 
@@ -505,12 +515,12 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Handler should call both search_sessions and search_kernels."""
         await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
+            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
         mock_processors.session.search_sessions.wait_for_complete.assert_called_once()
 
         await mock_processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=MagicMock(), user_id=uuid4())
+            SearchKernelsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
         mock_processors.session.search_kernels.wait_for_complete.assert_called_once()
 
@@ -525,7 +535,7 @@ class TestComputeSessionsHandler:
         )
 
         result = await processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
+            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
 
         assert result.data == []
@@ -539,10 +549,10 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Kernels should be correctly grouped by session ID."""
         session_result = await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
+            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
         kernel_result = await mock_processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=MagicMock(), user_id=uuid4())
+            SearchKernelsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
 
         adapter = ComputeSessionsAdapter()
@@ -550,7 +560,9 @@ class TestComputeSessionsHandler:
 
         # session-1 should have 2 kernels, session-2 should have 1
         items = [
-            adapter.convert_session_to_dto(session, kernels_by_session.get(session.id, []))
+            adapter.convert_session_to_dto(
+                session, create_allocation(), kernels_by_session.get(session.id, [])
+            )
             for session in session_result.data
         ]
 
@@ -564,7 +576,7 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Pagination info should reflect the session search result."""
         session_result = await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
+            SearchSessionsAction(querier=MagicMock(), user_id=UserID(uuid4()))
         )
 
         assert session_result.total_count == 2
@@ -578,7 +590,7 @@ class TestComputeSessionsHandler:
         ]
 
         adapter = ComputeSessionsAdapter()
-        dto = adapter.convert_session_to_dto(session, kernels=kernels)
+        dto = adapter.convert_session_to_dto(session, create_allocation(), kernels=kernels)
 
         assert len(dto.containers) == 5
         agents = {c.agent_id for c in dto.containers}
@@ -589,6 +601,6 @@ class TestComputeSessionsHandler:
         session = create_session_data()
 
         adapter = ComputeSessionsAdapter()
-        dto = adapter.convert_session_to_dto(session, kernels=[])
+        dto = adapter.convert_session_to_dto(session, create_allocation(), kernels=[])
 
         assert dto.containers == []

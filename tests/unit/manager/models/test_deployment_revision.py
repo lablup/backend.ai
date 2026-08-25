@@ -10,10 +10,12 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
     ClusterMode,
@@ -33,13 +35,14 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -52,7 +55,6 @@ from ai.backend.manager.models.resource_slot.row import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -87,7 +89,7 @@ class TestDeploymentRevisionRow:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -95,7 +97,7 @@ class TestDeploymentRevisionRow:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 AgentRow,
                 VFolderRow,
                 ContainerRegistryRow,
@@ -134,9 +136,11 @@ class TestDeploymentRevisionRow:
     ) -> AsyncGenerator[DomainRow, None]:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -191,6 +195,7 @@ class TestDeploymentRevisionRow:
                 status=UserStatus.ACTIVE,
                 status_info="active",
                 resource_policy=test_user_resource_policy.name,
+                domain_id=test_domain.id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -223,10 +228,10 @@ class TestDeploymentRevisionRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
         test_project_resource_policy: ProjectResourcePolicyRow,
-    ) -> AsyncGenerator[GroupRow, None]:
+    ) -> AsyncGenerator[ProjectRow, None]:
         """Create test group."""
         async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=uuid.uuid4(),
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
@@ -251,7 +256,7 @@ class TestDeploymentRevisionRow:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ContainerRegistryRow(
-                    id=registry_id,
+                    id=ContainerRegistryID(registry_id),
                     url="https://docker.io",
                     registry_name=f"reg-{uuid.uuid4().hex[:8]}",
                     type=ContainerRegistryType.DOCKER,
@@ -280,19 +285,19 @@ class TestDeploymentRevisionRow:
     async def test_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ScalingGroupRow, None]:
+    ) -> AsyncGenerator[ResourceGroupRow, None]:
         """Create test scaling group."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
+            sgroup = ResourceGroupRow(
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
             )
             db_sess.add(sgroup)
             await db_sess.flush()
@@ -309,7 +314,7 @@ class TestDeploymentRevisionRow:
             variant = RuntimeVariantRow(
                 name=f"test-variant-{uuid.uuid4().hex[:8]}",
                 description="Test runtime variant",
-                default_model_definition=ModelDefinitionDraft(),
+                default_model_definition=DefaultModelDefinition(),
             )
             db_sess.add(variant)
             await db_sess.flush()
@@ -320,10 +325,10 @@ class TestDeploymentRevisionRow:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainRow,
-        test_group: GroupRow,
+        test_group: ProjectRow,
         test_user: UserRow,
         test_image: ImageRow,
-        test_scaling_group: ScalingGroupRow,
+        test_scaling_group: ResourceGroupRow,
     ) -> AsyncGenerator[EndpointRow, None]:
         """Create test endpoint without an initial deployment revision."""
         async with db_with_cleanup.begin_session() as db_sess:

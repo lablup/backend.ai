@@ -17,6 +17,11 @@ grep -rn "class .*BackendAIError" src/ai/backend                  # all componen
 
 Subclass `BackendAIError` plus the matching aiohttp HTTP type, and implement `error_code()`:
 
+- A concrete exception **MUST inherit an HTTP status type (`web.HTTP*`) at definition
+  time** — there is no telling when it will surface externally, and a status-less
+  exception leaks out as a generic 500. Only domain bases that are never raised
+  directly stay mixin-less.
+
 ```python
 class UserNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/user-not-found"

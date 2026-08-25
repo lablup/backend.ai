@@ -18,6 +18,7 @@ from ai.backend.appproxy.coordinator.repositories.endpoint import (
     SyncedEndpoint,
 )
 from ai.backend.appproxy.coordinator.types import CircuitRouteUpdateItem
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     CreatedEndpointItem,
     CreateEndpointItem,
@@ -29,7 +30,6 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     UpdatedRoutesItem,
     UpdateRoutesItem,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:

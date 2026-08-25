@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.login_session import LoginSessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_session.request import (
     AdminRevokeLoginSessionInput,
     AdminSearchLoginSessionsInput,
@@ -30,19 +32,19 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.auth.login_session_types import LoginSessionData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.login_session.row import LoginSessionRow
+from ai.backend.manager.models.login_session.searchers import LoginSessionSearcher
 from ai.backend.manager.repositories.auth.options import LoginSessionConditions, LoginSessionOrders
-from ai.backend.manager.repositories.auth.types import MyLoginSessionSearchScope
-from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 from ai.backend.manager.services.auth.actions.revoke_login_session import (
-    AdminRevokeLoginSessionAction,
-    MyRevokeLoginSessionAction,
+    GlobalRevokeLoginSessionAction,
+    RevokeLoginSessionAction,
 )
 from ai.backend.manager.services.auth.actions.search_login_sessions import (
-    AdminSearchLoginSessionsAction,
+    GlobalSearchLoginSessionsAction,
     SearchLoginSessionsAction,
 )
-from ai.backend.manager.services.auth.actions.unblock_user import AdminUnblockUserAction
+from ai.backend.manager.services.auth.actions.unblock_user import GlobalUnblockUserAction
 
 _LOGIN_SESSION_PAGINATION_SPEC = PaginationSpec(
     forward_order=LoginSessionOrders.created_at(ascending=False),
@@ -62,7 +64,8 @@ class LoginSessionAdapter(BaseAdapter):
         """Search login sessions with admin scope (no scope restriction)."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            LoginSessionSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_LOGIN_SESSION_PAGINATION_SPEC,
@@ -73,14 +76,14 @@ class LoginSessionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.admin_search_login_sessions.wait_for_complete(
-            AdminSearchLoginSessionsAction(querier=querier)
+        action_result = await self._processors.auth.global_search_login_sessions.run(
+            GlobalSearchLoginSessionsAction(searcher=searcher)
         )
         return AdminSearchLoginSessionsPayload(
-            items=[self._data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
+            items=[self._data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
         )
 
     async def my_search(self, input: MySearchLoginSessionsInput) -> MySearchLoginSessionsPayload:
@@ -91,10 +94,10 @@ class LoginSessionAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = MyLoginSessionSearchScope(user_id=me.user_id)
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            LoginSessionSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_LOGIN_SESSION_PAGINATION_SPEC,
@@ -105,33 +108,27 @@ class LoginSessionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.auth.search_login_sessions.wait_for_complete(
-            SearchLoginSessionsAction(scope=scope, querier=querier)
+        action_result = await self._processors.auth.search_login_sessions.run(
+            SearchLoginSessionsAction(user_id=UserID(me.user_id), searcher=searcher)
         )
         return MySearchLoginSessionsPayload(
-            items=[self._data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
+            items=[self._data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
         )
 
     async def my_revoke(self, input: MyRevokeLoginSessionInput) -> RevokeLoginSessionPayload:
         """Revoke a login session owned by the current user."""
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
-        action_result = await self._processors.auth.my_revoke_login_session.wait_for_complete(
-            MyRevokeLoginSessionAction(
-                session_id=input.session_id,
-                user_id=me.user_id,
-            )
+        action_result = await self._processors.auth.revoke_login_session.run(
+            RevokeLoginSessionAction(session_id=LoginSessionID(input.session_id))
         )
         return RevokeLoginSessionPayload(success=action_result.success)
 
     async def admin_revoke(self, input: AdminRevokeLoginSessionInput) -> RevokeLoginSessionPayload:
         """Revoke any login session (admin, no ownership check)."""
-        action_result = await self._processors.auth.admin_revoke_login_session.wait_for_complete(
-            AdminRevokeLoginSessionAction(
+        action_result = await self._processors.auth.global_revoke_login_session.run(
+            GlobalRevokeLoginSessionAction(
                 session_id=input.session_id,
             )
         )
@@ -139,8 +136,8 @@ class LoginSessionAdapter(BaseAdapter):
 
     async def admin_unblock_user(self, input: AdminUnblockUserInput) -> UnblockUserPayload:
         """Clear the failed-login rate limit block for a user (admin only)."""
-        action_result = await self._processors.auth.admin_unblock_user.wait_for_complete(
-            AdminUnblockUserAction(username=input.username)
+        action_result = await self._processors.auth.global_unblock_user.run(
+            GlobalUnblockUserAction(username=input.username)
         )
         return UnblockUserPayload(success=action_result.success)
 

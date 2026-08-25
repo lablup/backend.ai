@@ -13,6 +13,8 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.dto.storage.request import GetVerificationResultReq
 from ai.backend.common.dto.storage.response import GetVerificationResultResponse
 from ai.backend.logging import BraceStyleAdapter
@@ -39,35 +41,37 @@ from ai.backend.manager.dto.response import (
     RejectArtifactRevisionResponse,
     UpdateArtifactResponse,
 )
+from ai.backend.manager.models.artifact.updaters import ArtifactUpdater
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
-from ai.backend.manager.services.artifact_revision.actions.approve import (
+from ai.backend.manager.services.artifact.revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.cancel_import import (
+from ai.backend.manager.services.artifact.revision.actions.cancel_import import (
     CancelImportAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+from ai.backend.manager.services.artifact.revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_download_progress import (
+from ai.backend.manager.services.artifact.revision.actions.get_download_progress import (
     GetDownloadProgressAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_readme import (
+from ai.backend.manager.services.artifact.revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.get_verification_result import (
+from ai.backend.manager.services.artifact.revision.actions.get_verification_result import (
     GetArtifactRevisionVerificationResultAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.import_revision import (
+from ai.backend.manager.services.artifact.revision.actions.import_revision import (
     ImportArtifactRevisionAction,
 )
-from ai.backend.manager.services.artifact_revision.actions.reject import (
+from ai.backend.manager.services.artifact.revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
+from ai.backend.manager.types import TriState
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.artifact.processors import ArtifactProcessors
-    from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
+    from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -103,9 +107,9 @@ class ArtifactHandler:
         # Process each artifact revision sequentially
         # TODO: Optimize with asyncio.gather() for parallel processing
         for artifact_revision_id in body.parsed.artifact_revision_ids:
-            action_result = await self._artifact_revision.cleanup.wait_for_complete(
+            action_result = await self._artifact_revision.cleanup.run(
                 CleanupArtifactRevisionAction(
-                    artifact_revision_id=artifact_revision_id,
+                    artifact_revision_id=ArtifactRevisionID(artifact_revision_id),
                 )
             )
             cleaned_revisions.append(action_result.result)
@@ -129,9 +133,9 @@ class ArtifactHandler:
         reverts its status back to SCANNED. The partially downloaded data is cleaned up.
         """
 
-        action_result = await self._artifact_revision.cancel_import.wait_for_complete(
+        action_result = await self._artifact_revision.cancel_import.run(
             CancelImportAction(
-                artifact_revision_id=body.parsed.artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(body.parsed.artifact_revision_id),
             )
         )
 
@@ -151,9 +155,9 @@ class ArtifactHandler:
         in environments with approval workflows for artifact deployment.
         """
 
-        action_result = await self._artifact_revision.approve.wait_for_complete(
+        action_result = await self._artifact_revision.approve.run(
             ApproveArtifactRevisionAction(
-                artifact_revision_id=path.parsed.artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(path.parsed.artifact_revision_id),
             )
         )
 
@@ -173,9 +177,9 @@ class ArtifactHandler:
         in environments with approval workflows for artifact deployment.
         """
 
-        action_result = await self._artifact_revision.reject.wait_for_complete(
+        action_result = await self._artifact_revision.reject.run(
             RejectArtifactRevisionAction(
-                artifact_revision_id=path.parsed.artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(path.parsed.artifact_revision_id),
             )
         )
 
@@ -207,9 +211,9 @@ class ArtifactHandler:
         for artifact_revision_id in body.parsed.artifact_revision_ids:
             # When using VFolderStorage (vfolder_id provided), store at root path
             storage_prefix = "/" if body.parsed.vfolder_id else None
-            action_result = await self._artifact_revision.import_revision.wait_for_complete(
+            action_result = await self._artifact_revision.import_revision.run(
                 ImportArtifactRevisionAction(
-                    artifact_revision_id=artifact_revision_id,
+                    artifact_revision_id=ArtifactRevisionID(artifact_revision_id),
                     vfolder_id=body.parsed.vfolder_id,
                     storage_prefix=storage_prefix,
                     force=force,
@@ -240,9 +244,14 @@ class ArtifactHandler:
         This operation does not affect the actual artifact files or revisions.
         """
 
-        action_result = await self._artifact.update.wait_for_complete(
+        action_result = await self._artifact.update.run(
             UpdateArtifactAction(
-                updater=body.parsed.to_updater(path.parsed.artifact_id),
+                artifact_id=ArtifactID(path.parsed.artifact_id),
+                updater=ArtifactUpdater(
+                    artifact_id=ArtifactID(path.parsed.artifact_id),
+                    readonly=TriState.from_nullable(body.parsed.readonly),
+                    description=TriState.from_nullable(body.parsed.description),
+                ),
             )
         )
 
@@ -262,9 +271,9 @@ class ArtifactHandler:
         which typically contains usage instructions and model information.
         """
 
-        action_result = await self._artifact_revision.get_readme.wait_for_complete(
+        action_result = await self._artifact_revision.get_readme.run(
             GetArtifactRevisionReadmeAction(
-                artifact_revision_id=path.parsed.artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(path.parsed.artifact_revision_id),
             )
         )
 
@@ -284,9 +293,9 @@ class ArtifactHandler:
         which contains results from all verifiers that have been run on the artifact.
         """
 
-        action_result = await self._artifact_revision.get_verification_result.wait_for_complete(
+        action_result = await self._artifact_revision.get_verification_result.run(
             GetArtifactRevisionVerificationResultAction(
-                artifact_revision_id=path.parsed.artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(path.parsed.artifact_revision_id),
             )
         )
 
@@ -307,9 +316,9 @@ class ArtifactHandler:
         Supports both local and remote download progress when delegation is enabled.
         """
 
-        action_result = await self._artifact_revision.get_download_progress.wait_for_complete(
+        action_result = await self._artifact_revision.get_download_progress.run(
             GetDownloadProgressAction(
-                artifact_revision_id=path.parsed.artifact_revision_id,
+                artifact_revision_id=ArtifactRevisionID(path.parsed.artifact_revision_id),
             )
         )
 

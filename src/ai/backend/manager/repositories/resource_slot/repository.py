@@ -20,7 +20,6 @@ from ai.backend.manager.data.resource_slot.types import (
     ReconciliationResult,
     ResourceAllocationSearchResult,
     ResourceOccupancy,
-    ResourceSlotTypeSearchResult,
 )
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
@@ -74,22 +73,7 @@ class ResourceSlotRepository:
         """List all registered resource slot types."""
         return await self._db_source.all_slot_types()
 
-    @resource_slot_repository_resilience.apply()
-    async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeRow:
-        """Get a specific resource slot type by name."""
-        return await self._db_source.get_slot_type(slot_name)
-
-    @resource_slot_repository_resilience.apply()
-    async def search_slot_types(self, querier: BatchQuerier) -> ResourceSlotTypeSearchResult:
-        """Paginated search across resource slot types."""
-        return await self._db_source.search_slot_types(querier)
-
     # ==================== agent_resources ====================
-
-    @resource_slot_repository_resilience.apply()
-    async def get_agent_resources(self, agent_id: str) -> list[AgentResourceRow]:
-        """Get all slot capacity/usage rows for a given agent."""
-        return await self._db_source.get_agent_resources(agent_id)
 
     @resource_slot_repository_resilience.apply()
     async def get_agent_resource_by_slot(self, agent_id: str, slot_name: str) -> AgentResourceRow:
@@ -101,11 +85,6 @@ class ResourceSlotRepository:
         return await self._db_source.search_agent_resources(querier)
 
     # ==================== resource_allocations ====================
-
-    @resource_slot_repository_resilience.apply()
-    async def get_kernel_allocations(self, kernel_id: uuid.UUID) -> list[ResourceAllocationRow]:
-        """Get all per-slot allocation rows for a given kernel."""
-        return await self._db_source.get_kernel_allocations(kernel_id)
 
     @resource_slot_repository_resilience.apply()
     async def get_kernel_allocation_by_slot(

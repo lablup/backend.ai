@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, Final
 
 import sqlalchemy as sa
@@ -11,16 +10,19 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship, selectinload
 
-from ai.backend.manager.data.network.types import NetworkType
+from ai.backend.common.data.entity.network import NetworkID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.manager.data.network.types import NetworkData, NetworkType
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     SlugType,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.group import GroupRow
+    from ai.backend.manager.models.project import ProjectRow
 
 __all__: Final[tuple[str, ...]] = (
     "NetworkRow",
@@ -29,9 +31,9 @@ __all__: Final[tuple[str, ...]] = (
 
 
 def _get_project_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.group import GroupRow
+    from ai.backend.manager.models.project import ProjectRow
 
-    return GroupRow.id == foreign(NetworkRow.project)
+    return ProjectRow.id == foreign(NetworkRow.project)
 
 
 def _get_domain_join_condition() -> sa.ColumnElement[bool]:
@@ -40,7 +42,7 @@ def _get_domain_join_condition() -> sa.ColumnElement[bool]:
     return DomainRow.name == foreign(NetworkRow.domain_name)
 
 
-class NetworkRow(Base):  # type: ignore[misc]
+class NetworkRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "networks"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -57,9 +59,9 @@ class NetworkRow(Base):  # type: ignore[misc]
         "options", pgsql.JSONB, nullable=False, default="{}", server_default="{}"
     )
 
-    project: Mapped[uuid.UUID] = mapped_column(
+    project: Mapped[ProjectID] = mapped_column(
         "project",
-        GUID,
+        GUID(ProjectID),
         nullable=False,
     )
     domain_name: Mapped[str] = mapped_column(
@@ -68,27 +70,12 @@ class NetworkRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.text("now()"),
-        nullable=True,
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.text("now()"),
-        nullable=True,
-    )
-
-    project_row: Mapped[GroupRow] = relationship(
-        "GroupRow",
-        back_populates="networks",
+    project_row: Mapped[ProjectRow] = relationship(
+        "ProjectRow",
         primaryjoin=_get_project_join_condition,
     )
     domain_row: Mapped[DomainRow] = relationship(
         "DomainRow",
-        back_populates="networks",
         primaryjoin=_get_domain_join_condition,
     )
 
@@ -98,7 +85,7 @@ class NetworkRow(Base):  # type: ignore[misc]
         ref_name: str,
         driver: str,
         domain: str,
-        project: uuid.UUID,
+        project: ProjectID,
         *,
         options: Mapping[str, Any] | None = None,
     ) -> None:
@@ -109,6 +96,19 @@ class NetworkRow(Base):  # type: ignore[misc]
         self.domain_name = domain
         self.project = project
         self.options = options or {}
+
+    def to_data(self) -> NetworkData:
+        return NetworkData(
+            id=NetworkID(self.id),
+            name=self.name,
+            ref_name=self.ref_name,
+            driver=self.driver,
+            project_id=self.project,
+            domain_name=self.domain_name,
+            options=self.options,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
     @classmethod
     async def get(

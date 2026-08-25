@@ -16,9 +16,14 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.permission.types import EntityType, OperationType, Permission, ScopeType
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -38,11 +43,12 @@ from ai.backend.manager.api.rest.v2.project.registry import register_v2_project_
 from ai.backend.manager.api.rest.v2.rbac.handler import V2RBACHandler
 from ai.backend.manager.api.rest.v2.rbac.registry import register_v2_rbac_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -53,14 +59,15 @@ from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
-from ai.backend.manager.repositories.group.repositories import GroupRepositories
-from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
-from ai.backend.manager.services.group.processors import GroupProcessors
-from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.repositories.project.repositories import ProjectRepositories
+from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_card.service import ModelCardService
 from ai.backend.manager.services.permission_contoller.processors import (
@@ -68,6 +75,10 @@ from ai.backend.manager.services.permission_contoller.processors import (
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.project.service import ProjectService
+from ai.backend.manager.services.user.processors import UserProcessors
+from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -95,15 +106,12 @@ def model_card_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: AsyncMock,
     config_provider: ManagerConfigProvider,
+    processor_registry: ProcessorRegistry[Any],
 ) -> ModelCardProcessors:
     """Real ModelCardProcessors with real RBAC enforcement."""
-    repo = ModelCardRepository(database_engine)
+    repo = ModelCardRepository(V2DBOpsProvider(database_engine))
     service = ModelCardService(repo, storage_manager)
-    return ModelCardProcessors(
-        service=service,
-        action_monitors=[],
-        validators=_build_validators(database_engine, config_provider),
-    )
+    return ModelCardProcessors(processor_registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
@@ -112,26 +120,24 @@ def group_processors(
     storage_manager: AsyncMock,
     config_provider: ManagerConfigProvider,
     valkey_clients: ValkeyClients,
-) -> GroupProcessors:
-    """Real GroupProcessors with real RBAC enforcement."""
-    repo = GroupRepository(
+    processor_registry: ProcessorRegistry[Any],
+) -> ProjectProcessors:
+    """Real ProjectProcessors with real RBAC enforcement."""
+    repo = ProjectRepository(
         database_engine,
+        V2DBOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
     )
-    repositories = GroupRepositories(repository=repo)
-    service = GroupService(
+    repositories = ProjectRepositories(repository=repo)
+    service = ProjectService(
         storage_manager=storage_manager,
         config_provider=config_provider,
         valkey_stat_client=valkey_clients.stat,
         group_repositories=repositories,
     )
-    return GroupProcessors(
-        group_service=service,
-        action_monitors=[],
-        validators=_build_validators(database_engine, config_provider),
-    )
+    return ProjectProcessors(processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), service)
 
 
 @pytest.fixture()
@@ -143,8 +149,12 @@ def permission_controller_processors(
 ) -> PermissionControllerProcessors:
     """Real PermissionControllerProcessors for role assign/revoke SDK calls."""
     perm_repo = PermissionControllerRepository(database_engine)
-    group_repo = GroupRepository(
-        database_engine, config_provider, valkey_clients.stat, storage_manager
+    group_repo = ProjectRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        config_provider,
+        valkey_clients.stat,
+        storage_manager,
     )
     service = PermissionControllerService(
         perm_repo, group_repository=group_repo, rbac_action_registry=[]
@@ -157,17 +167,39 @@ def permission_controller_processors(
 
 
 @pytest.fixture()
+def user_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> UserProcessors:
+    """The project adapter reads the key each user authorizes with; the rest is unused."""
+    service = UserService(
+        storage_manager=AsyncMock(),
+        valkey_stat_client=AsyncMock(),
+        agent_registry=AsyncMock(),
+        user_repository=UserRepository(
+            database_engine,
+            V2DBOpsProvider(database_engine),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        ),
+        scheduling_controller=AsyncMock(),
+    )
+    return UserProcessors(processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service)
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     model_card_processors: ModelCardProcessors,
-    group_processors: GroupProcessors,
+    group_processors: ProjectProcessors,
     permission_controller_processors: PermissionControllerProcessors,
+    user_processors: UserProcessors,
 ) -> list[RouteRegistry]:
     """Register v2 model-card, project, and RBAC routes for testing."""
     processors = MagicMock(spec=Processors)
     processors.model_card = model_card_processors
-    processors.group = group_processors
+    processors.project = group_processors
     processors.permission_controller = permission_controller_processors
+    processors.user = user_processors
 
     mc_handler = V2ModelCardHandler(adapter=ModelCardAdapter(processors))
     proj_handler = V2ProjectHandler(adapter=ProjectAdapter(processors))
@@ -195,7 +227,7 @@ async def model_store_project_fixture(
     project_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=project_id,
                 name=f"model-store-{secrets.token_hex(6)}",
                 description="Test MODEL_STORE project",
@@ -240,7 +272,9 @@ async def model_store_project_fixture(
                 VirtualScopeRow.__table__.c.scope_id == project_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
+        )
 
 
 @pytest.fixture()
@@ -253,7 +287,7 @@ async def second_project_fixture(
     project_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(GroupRow.__table__).values(
+            sa.insert(ProjectRow.__table__).values(
                 id=project_id,
                 name=f"model-store-b-{secrets.token_hex(6)}",
                 description="Second MODEL_STORE project",
@@ -298,7 +332,9 @@ async def second_project_fixture(
                 VirtualScopeRow.__table__.c.scope_id == project_id,
             )
         )
-        await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
+        await conn.execute(
+            ProjectRow.__table__.delete().where(ProjectRow.__table__.c.id == project_id)
+        )
 
 
 @pytest.fixture()

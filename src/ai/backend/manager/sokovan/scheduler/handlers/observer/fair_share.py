@@ -15,7 +15,8 @@ from collections.abc import Sequence
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, override
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.types import KernelId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.models.clauses import QueryCondition
@@ -145,8 +146,11 @@ class FairShareObserver(KernelObserver):
 
         # ===== Phase 1: Record usage =====
         # TODO: Remove resource_group name from spec once DB schema is updated
+        allocated_slots = await self._scheduler_repository.get_kernel_allocated_slots([
+            KernelId(kernel.id) for kernel in kernels
+        ])
         preparation_result = self._aggregator.prepare_kernel_usage_records(
-            kernels, resource_group_id, resource_group_name, now
+            kernels, allocated_slots, resource_group_id, resource_group_name, now
         )
 
         log.debug(

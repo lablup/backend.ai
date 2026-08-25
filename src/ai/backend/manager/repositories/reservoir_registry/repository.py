@@ -1,5 +1,7 @@
 import uuid
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -13,11 +15,17 @@ from ai.backend.manager.data.reservoir_registry.types import (
     ReservoirRegistryData,
     ReservoirRegistryListResult,
 )
-from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
+from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
+from ai.backend.manager.models.artifact_registries.creators import ArtifactRegistryMetaCreator
+from ai.backend.manager.models.artifact_registries.updaters import ArtifactRegistryMetaUpdater
+from ai.backend.manager.models.reservoir_registry.creators import ReservoirRegistryCreator
+from ai.backend.manager.models.reservoir_registry.purgers import ReservoirRegistryPurger
+from ai.backend.manager.models.reservoir_registry.searchers import ReservoirRegistrySearcher
+from ai.backend.manager.models.reservoir_registry.updaters import ReservoirRegistryUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
+    ArtifactRegistryOpsProvider,
+)
 from ai.backend.manager.repositories.reservoir_registry.db_source.db_source import ReservoirDBSource
 
 reservoir_registry_repository_resilience = Resilience(
@@ -41,9 +49,13 @@ class ReservoirRegistryRepository:
     """Repository layer that delegates to data source."""
 
     _db_source: ReservoirDBSource
+    _registry_ops: ArtifactRegistryOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self, db: ExtendedAsyncSAEngine, registry_ops_provider: ArtifactRegistryOpsProvider
+    ) -> None:
         self._db_source = ReservoirDBSource(db)
+        self._registry_ops = registry_ops_provider
 
     @reservoir_registry_repository_resilience.apply()
     async def get_reservoir_registry_data_by_id(
@@ -69,21 +81,49 @@ class ReservoirRegistryRepository:
 
     @reservoir_registry_repository_resilience.apply()
     async def create(
-        self, creator: Creator[ReservoirRegistryRow], meta: ArtifactRegistryCreatorMeta
+        self, creator: ReservoirRegistryCreator, meta: ArtifactRegistryCreatorMeta
     ) -> ReservoirRegistryData:
-        return await self._db_source.create(creator, meta)
+        """Register a Reservoir registry under the name given beside it."""
+        async with self._registry_ops.write_ops() as w:
+            return await w.create_registry(
+                creator,
+                ArtifactRegistryMetaCreator(name=meta.name, type=ArtifactRegistryType.RESERVOIR),
+            )
 
     @reservoir_registry_repository_resilience.apply()
     async def update(
         self,
-        updater: Updater[ReservoirRegistryRow],
+        updater: ReservoirRegistryUpdater,
         meta: ArtifactRegistryModifierMeta,
     ) -> ReservoirRegistryData:
-        return await self._db_source.update(updater, meta)
+        """Edit a Reservoir registry.
+
+        Raises ArtifactRegistryNotFoundError if the registry does not exist.
+        """
+        async with self._registry_ops.write_ops() as w:
+            data = await w.update_registry(
+                updater,
+                ArtifactRegistryMetaUpdater(registry_id=updater.registry_id, name=meta.name),
+            )
+            if data is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"Reservoir registry with ID {updater.registry_id} not found"
+                )
+            return data
 
     @reservoir_registry_repository_resilience.apply()
-    async def delete(self, reservoir_id: uuid.UUID) -> uuid.UUID:
-        return await self._db_source.delete(reservoir_id)
+    async def delete(self, reservoir_id: ArtifactRegistryID) -> uuid.UUID:
+        """Remove a Reservoir registry, the row naming it, and the node it was.
+
+        Raises ArtifactRegistryNotFoundError if the registry does not exist.
+        """
+        async with self._registry_ops.write_ops() as w:
+            deleted_id = await w.purge_registry(ReservoirRegistryPurger(registry_id=reservoir_id))
+            if deleted_id is None:
+                raise ArtifactRegistryNotFoundError(
+                    f"Reservoir registry with ID {reservoir_id} not found"
+                )
+            return deleted_id
 
     @reservoir_registry_repository_resilience.apply()
     async def list_reservoir_registries(self) -> list[ReservoirRegistryData]:
@@ -92,6 +132,13 @@ class ReservoirRegistryRepository:
     @reservoir_registry_repository_resilience.apply()
     async def search_registries(
         self,
-        querier: BatchQuerier,
+        searcher: ReservoirRegistrySearcher,
     ) -> ReservoirRegistryListResult:
-        return await self._db_source.search_registries(querier)
+        async with self._registry_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return ReservoirRegistryListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

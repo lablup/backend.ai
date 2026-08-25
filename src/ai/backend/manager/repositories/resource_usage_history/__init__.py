@@ -1,5 +1,18 @@
 """Resource Usage History repository package."""
 
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    KernelUsageRecordData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
+from ai.backend.manager.repositories.resource_usage_history.types import (
+    DomainUsageBucketSearchResult,
+    KernelUsageRecordSearchResult,
+    ProjectUsageBucketSearchResult,
+    UserUsageBucketSearchResult,
+)
+
 from .creators import (
     DomainUsageBucketCreatorSpec,
     KernelUsageRecordCreatorSpec,
@@ -18,19 +31,6 @@ from .options import (
 )
 from .repositories import ResourceUsageHistoryRepositories
 from .repository import ResourceUsageHistoryRepository
-from .types import (
-    DomainUsageBucketData,
-    DomainUsageBucketSearchResult,
-    DomainUsageBucketSearchScope,
-    KernelUsageRecordData,
-    KernelUsageRecordSearchResult,
-    ProjectUsageBucketData,
-    ProjectUsageBucketSearchResult,
-    ProjectUsageBucketSearchScope,
-    UserUsageBucketData,
-    UserUsageBucketSearchResult,
-    UserUsageBucketSearchScope,
-)
 from .upserters import (
     DomainUsageBucketUpserterSpec,
     ProjectUsageBucketUpserterSpec,
@@ -51,10 +51,6 @@ __all__ = (
     "DomainUsageBucketSearchResult",
     "ProjectUsageBucketSearchResult",
     "UserUsageBucketSearchResult",
-    # Search scope types
-    "DomainUsageBucketSearchScope",
-    "ProjectUsageBucketSearchScope",
-    "UserUsageBucketSearchScope",
     # Creator specs
     "KernelUsageRecordCreatorSpec",
     "DomainUsageBucketCreatorSpec",

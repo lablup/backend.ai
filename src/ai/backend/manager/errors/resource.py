@@ -31,6 +31,36 @@ class DomainNotFound(ObjectNotFound):
         )
 
 
+class DomainPurgeInProgress(BackendAIError, web.HTTPConflict):
+    """Raised when a write names a domain a purge is working through."""
+
+    error_type = "https://api.backend.ai/probs/domain-purge-in-progress"
+    error_title = "Domain is being purged."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class ProjectPurgeInProgress(BackendAIError, web.HTTPConflict):
+    """Raised when a write names a project a purge is working through."""
+
+    error_type = "https://api.backend.ai/probs/project-purge-in-progress"
+    error_title = "Project is being purged."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class ProjectHasActiveKernelsError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/project-has-active-kernels"
     error_title = "Project has active kernels."
@@ -70,7 +100,7 @@ class ProjectHasActiveEndpointsError(BackendAIError, web.HTTPConflict):
         )
 
 
-class ScalingGroupNotFound(ObjectNotFound):
+class ResourceGroupNotFound(ObjectNotFound):
     object_name = "scaling group"
 
     @override
@@ -98,7 +128,20 @@ class UnresolvableResourceGroup(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class ScalingGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEntity):
+class DefaultResourceGroupAlreadyExists(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/default-scaling-group-already-exists"
+    error_title = "Another resource group is already the default."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class ResourceGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEntity):
     error_type = "https://api.backend.ai/probs/scaling-group-session-type-not-allowed"
     error_title = "Scaling group does not allow this session type."
 
@@ -111,7 +154,7 @@ class ScalingGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEnt
         )
 
 
-class ScalingGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
+class ResourceGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/scaling-group-deletion-failure"
     error_title = "Failed to delete scaling group."
 
@@ -204,7 +247,7 @@ class DomainDataProcessingError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class ScalingGroupProxyTargetNotFound(ObjectNotFound):
+class ResourceGroupProxyTargetNotFound(ObjectNotFound):
     object_name = "scaling group proxy target"
 
     @override
@@ -509,7 +552,7 @@ class InvalidPresetQuery(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class NoAvailableScalingGroup(BackendAIError, web.HTTPBadRequest):
+class NoAvailableResourceGroup(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/no-available-scaling-group"
     error_title = "No scaling groups available for this session."
 

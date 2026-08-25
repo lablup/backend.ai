@@ -21,6 +21,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
 from ai.backend.manager.repositories.db.engine import connect_database
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .context import CLIContext, redis_ctx
 
@@ -33,9 +34,9 @@ def _register_image_cli_orm_cluster() -> None:
     from ai.backend.manager.models.rbac_models.association_scopes_entities import (
         AssociationScopesEntitiesRow,
     )
-    from ai.backend.manager.models.scaling_group.row import ScalingGroupForProjectRow
+    from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
 
-    _ = (AgentRow, AssociationScopesEntitiesRow, ScalingGroupForProjectRow)
+    _ = (AgentRow, AssociationScopesEntitiesRow, ResourceGroupForProjectRow)
 
 
 async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) -> None:
@@ -211,7 +212,9 @@ async def rescan_images(
         connect_database(bootstrap_config.db) as db,
     ):
         try:
-            result = await ImageDBSource(db).rescan_images(registry_or_image, project)
+            result = await ImageDBSource(db, V2DBOpsProvider(db)).rescan_images(
+                registry_or_image, project
+            )
             for error in result.errors:
                 log.error(f"Failed to scan registries: {error}")
         except Exception as e:

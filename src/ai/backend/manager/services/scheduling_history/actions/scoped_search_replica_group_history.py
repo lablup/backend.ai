@@ -1,28 +1,33 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
-from ai.backend.manager.actions.action.types import SearchableActionTarget
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment.types import ReplicaGroupHistoryData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.scopes import SearchScope
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.scheduling_history.types import (
-    DeploymentReplicaGroupHistorySearchScope,
+from ai.backend.common.data.entity.deployment import (
+    DEPLOYMENT_ENTITY_TYPE,
+    DEPLOYMENT_SCOPE_TYPE,
+    DeploymentID,
 )
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
+from ai.backend.manager.actions.v2.scope.target import SearchableScopeTarget
+from ai.backend.manager.data.deployment.types import ReplicaGroupHistoryData
+from ai.backend.manager.models.scheduling_history.scopes import (
+    DeploymentReplicaGroupHistoryOperationScope,
+)
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.repositories.base import BatchQuerier
 
 
 @dataclass(frozen=True)
-class ReplicaGroupHistoryTarget(SearchableActionTarget):
+class ReplicaGroupHistoryTarget(SearchableScopeTarget):
     """One scope item of a replica-group scheduling-history search.
 
     Each variant carries only the id its own dimension is keyed by and derives
-    both the row filter and the RBAC element ref from it.
+    both the row filter and the scope it is answered for from it.
     """
 
 
@@ -33,15 +38,12 @@ class DeploymentReplicaGroupHistoryTarget(ReplicaGroupHistoryTarget):
     deployment_id: DeploymentID
 
     @override
-    def to_search_scope(self) -> SearchScope:
-        return DeploymentReplicaGroupHistorySearchScope(deployment_id=self.deployment_id)
+    def to_search_scope(self) -> OperationScope:
+        return DeploymentReplicaGroupHistoryOperationScope(deployment_id=self.deployment_id)
 
     @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.MODEL_DEPLOYMENT,
-            element_id=str(self.deployment_id),
-        )
+    def to_scope_ref(self) -> ScopeRef:
+        return ScopeRef(scope_type=DEPLOYMENT_SCOPE_TYPE, scope_id=self.deployment_id)
 
 
 @dataclass
@@ -55,44 +57,35 @@ class ScopedSearchReplicaGroupHistoryAction(BaseScopeAction):
     querier: BatchQuerier
 
     @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (self.target.to_scope_ref(),)
+
+    @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.MODEL_DEPLOYMENT
+        return DEPLOYMENT_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "scoped_search_replica_group_history"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
-    @override
-    def scope_type(self) -> ScopeType:
-        # The deployment is the only scope replica-group history is searched under: a
-        # replica group is not an RBAC scope of its own.
-        return ScopeType.MODEL_DEPLOYMENT
-
-    @override
-    def scope_id(self) -> str:
-        return self.target.to_rbac_element_ref().element_id
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return self.target.to_rbac_element_ref()
-
 
 @dataclass
 class ScopedSearchReplicaGroupHistoryActionResult(BaseScopeActionResult):
     """Result of searching replica-group scheduling history under one scope item."""
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return ()
 
     items: list[ReplicaGroupHistoryData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
     target: ReplicaGroupHistoryTarget
-
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.MODEL_DEPLOYMENT
-
-    @override
-    def scope_id(self) -> str:
-        return self.target.to_rbac_element_ref().element_id

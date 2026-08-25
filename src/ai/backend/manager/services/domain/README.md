@@ -70,20 +70,10 @@ Domain nodes provide extended functionality:
 ### Creating a Domain
 
 ```python
-from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
-from ai.backend.manager.services.domain.types import DomainCreator, UserInfo
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.common.types import ResourceSlot
 
-# Create user info
-user_info = UserInfo(
-    id=uuid.uuid4(),
-    role=UserRole.SUPERADMIN,
-    domain_name="default"
-)
-
-# Create domain action
 action = CreateDomainAction(
     creator=DomainCreator(
         name="development",
@@ -92,14 +82,16 @@ action = CreateDomainAction(
         total_resource_slots=ResourceSlot({"cpu": 100, "mem": "200g", "cuda.device": 4}),
         allowed_vfolder_hosts={"local": ["rw"], "shared": ["ro"]},
         allowed_docker_registries=["registry.example.com", "docker.io"],
-        integration_id="dev-integration"
+        integration_name="dev-integration",
     ),
-    user_info=user_info
 )
 
-# Execute
-result = await domain_service.create_domain(action)
+result = await processors.domain.create_domain.run(action)
 ```
+
+The action wires straight to the generic role-managed create, so the domain row and its
+preset roles are all it writes. The model-store project is created by the caller as a
+separate `CreateProjectAction`.
 
 ### Modifying a Domain
 
@@ -202,7 +194,7 @@ Uses `DomainRow` from the models layer with the following key fields:
 - **name**: Unique domain identifier (primary key)
 - **description**: Optional domain description
 - **is_active**: Domain activation status
-- **created_at/modified_at**: Timestamp tracking
+- **created_at/updated_at**: Timestamp tracking
 - **total_resource_slots**: Available compute resources
 - **allowed_vfolder_hosts**: Virtual folder host permissions
 - **allowed_docker_registries**: Permitted Docker registries
@@ -214,8 +206,8 @@ Uses `DomainRow` from the models layer with the following key fields:
 The service follows the action-based pattern with comprehensive operations:
 
 1. **CreateDomainAction** (src/ai/backend/manager/services/domain/actions/create_domain.py)
-   - Uses `DomainCreator` for input validation
-   - Returns `CreateDomainActionResult` with domain data and status
+   - Carries `DomainCreator`; wired to the generic role-managed create
+   - Returns `CreatedEntityOpsResult[DomainData]`
 
 2. **ModifyDomainAction** (src/ai/backend/manager/services/domain/actions/modify_domain.py)
    - Accepts `DomainModifier` for partial updates

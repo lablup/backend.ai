@@ -10,9 +10,9 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 
 from .types import SubStepResultInfo
 

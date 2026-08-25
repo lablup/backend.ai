@@ -7,9 +7,9 @@ from typing import Any
 
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -27,12 +27,13 @@ from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
+from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.db_source import SessionDBSource
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 
 session_repository_resilience = Resilience(
     policies=[
@@ -52,8 +53,8 @@ session_repository_resilience = Resilience(
 class SessionRepository:
     _db_source: SessionDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = SessionDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: DBOpsProvider) -> None:
+        self._db_source = SessionDBSource(db, ops_provider)
 
     @session_repository_resilience.apply()
     async def get_session_name(self, session_id: SessionId) -> str:
@@ -184,11 +185,11 @@ class SessionRepository:
         return await self._db_source.get_group_name_by_domain_and_id(domain_name, group_id)
 
     @session_repository_resilience.apply()
-    async def get_scaling_group_wsproxy_addr(
+    async def get_resource_group_wsproxy_addr(
         self,
-        scaling_group_name: str,
+        resource_group_name: str,
     ) -> str | None:
-        return await self._db_source.get_scaling_group_wsproxy_addr(scaling_group_name)
+        return await self._db_source.get_resource_group_wsproxy_addr(resource_group_name)
 
     @session_repository_resilience.apply()
     async def get_session_by_id(
@@ -198,12 +199,12 @@ class SessionRepository:
         return await self._db_source.get_session_by_id(session_id)
 
     @session_repository_resilience.apply()
-    async def modify_session(
+    async def update_session(
         self,
-        updater: Updater[SessionRow],
+        updater: SessionUpdater,
         session_name: str | None = None,
     ) -> SessionRow | None:
-        return await self._db_source.modify_session(updater, session_name)
+        return await self._db_source.update_session(updater, session_name)
 
     @session_repository_resilience.apply()
     async def query_userinfo(
@@ -298,13 +299,13 @@ class SessionRepository:
     async def search_in_project(
         self,
         querier: BatchQuerier,
-        scope: ProjectSessionSearchScope,
+        scope: ProjectSessionOperationScope,
     ) -> SessionListResult:
         """Search sessions scoped to a project.
 
         Args:
             querier: BatchQuerier for filtering, ordering, and pagination
-            scope: ProjectSessionSearchScope that filters by project and validates existence
+            scope: ProjectSessionOperationScope that filters by project and validates existence
 
         Returns:
             SessionListResult with items, total count, and pagination info

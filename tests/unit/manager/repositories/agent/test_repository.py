@@ -23,18 +23,19 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.exception import AgentNotFound
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     DeviceName,
     ResourceSlot,
+    ResourceSlotEntry,
     SessionId,
     SessionResult,
     SessionTypes,
-    SlotName,
     SlotTypes,
     ValkeyTarget,
 )
@@ -43,8 +44,9 @@ from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert, AgentStatu
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions
-from ai.backend.manager.errors.resource import ScalingGroupNotFound, UnresolvableResourceGroup
+from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -52,12 +54,13 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -67,20 +70,21 @@ from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
 from ai.backend.manager.repositories.agent.repository import AgentRepository
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
 @dataclass
-class ScalingGroupFixtureData:
+class ResourceGroupFixtureData:
     """Data from scaling_group fixture"""
 
     name: str
@@ -92,7 +96,7 @@ class AgentFixtureData:
     """Data from agent fixtures (alive_agent, lost_agent)"""
 
     agent_id: AgentId
-    scaling_group: str
+    resource_group: str
 
 
 class TestAgentRepositoryDB:
@@ -109,7 +113,7 @@ class TestAgentRepositoryDB:
             [
                 # FK dependency order: parents before children
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -117,7 +121,7 @@ class TestAgentRepositoryDB:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -151,19 +155,19 @@ class TestAgentRepositoryDB:
             yield database_connection
 
     @pytest.fixture
-    def sample_agent_info(self, scaling_group: ScalingGroupFixtureData) -> AgentInfo:
+    def sample_agent_info(self, resource_group: ResourceGroupFixtureData) -> AgentInfo:
         """Create sample agent info for testing"""
         return AgentInfo(
             ip="192.168.1.100",
             version="24.12.0",
-            scaling_group=scaling_group.name,
-            available_resource_slots=ResourceSlot({
-                SlotName("cpu"): "8",
-                SlotName("mem"): "32768",
-            }),
+            scaling_group=resource_group.name,
+            available_resource_slots=[
+                ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="8"),
+                ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity="32768"),
+            ],
             slot_key_and_units={
-                SlotName("cpu"): SlotTypes.COUNT,
-                SlotName("mem"): SlotTypes.BYTES,
+                ResourceSlotName("cpu"): SlotTypes.COUNT,
+                ResourceSlotName("mem"): SlotTypes.BYTES,
             },
             compute_plugins={
                 DeviceName("cpu"): {"brand": "Intel", "model": "Core i7"},
@@ -171,36 +175,36 @@ class TestAgentRepositoryDB:
             addr="tcp://192.168.1.100:6001",
             public_key=PublicKey(b"test-public-key"),
             public_host="192.168.1.100",
-            images=b"\x82\xc4\x00\x00",
             region="us-west-1",
             architecture="x86_64",
             auto_terminate_abusing_kernel=False,
         )
 
     @pytest.fixture
-    def sample_agent_info_with_new_slots(self, scaling_group: ScalingGroupFixtureData) -> AgentInfo:
+    def sample_agent_info_with_new_slots(
+        self, resource_group: ResourceGroupFixtureData
+    ) -> AgentInfo:
         """Create sample agent info with additional slot types for testing resource slot updates"""
         return AgentInfo(
             ip="192.168.1.101",
             version="24.12.0",
-            scaling_group=scaling_group.name,
-            available_resource_slots=ResourceSlot({
-                SlotName("cpu"): "8",
-                SlotName("mem"): "32768",
-                SlotName("cuda.shares"): "4",
-                SlotName("rocm.device"): "2",
-            }),
+            scaling_group=resource_group.name,
+            available_resource_slots=[
+                ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="8"),
+                ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity="32768"),
+                ResourceSlotEntry(resource_type=ResourceSlotName("cuda.shares"), quantity="4"),
+                ResourceSlotEntry(resource_type=ResourceSlotName("rocm.device"), quantity="2"),
+            ],
             slot_key_and_units={
-                SlotName("cpu"): SlotTypes.COUNT,
-                SlotName("mem"): SlotTypes.BYTES,
-                SlotName("cuda.shares"): SlotTypes.COUNT,
-                SlotName("rocm.device"): SlotTypes.COUNT,
+                ResourceSlotName("cpu"): SlotTypes.COUNT,
+                ResourceSlotName("mem"): SlotTypes.BYTES,
+                ResourceSlotName("cuda.shares"): SlotTypes.COUNT,
+                ResourceSlotName("rocm.device"): SlotTypes.COUNT,
             },
             compute_plugins={DeviceName("cpu"): {}},
             addr="tcp://192.168.1.101:6001",
             public_key=PublicKey(b"test-public-key-2"),
             public_host="192.168.1.101",
-            images=b"\x82\xc4\x00\x00",
             region="us-east-1",
             architecture="x86_64",
             auto_terminate_abusing_kernel=False,
@@ -247,19 +251,20 @@ class TestAgentRepositoryDB:
             valkey_live=mock_valkey_live,
             valkey_stat=mock_valkey_stat,
             config_provider=mock_config_provider,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
         )
 
     @pytest.fixture
-    async def scaling_group(
+    async def resource_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ScalingGroupFixtureData, None]:
+    ) -> AsyncGenerator[ResourceGroupFixtureData, None]:
         """Create default scaling group in database"""
         name = str(uuid4())
-        scaling_group_id = ResourceGroupID(uuid4())
+        resource_group_id = ResourceGroupID(uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
-            scaling_group = ScalingGroupRow(
-                id=scaling_group_id,
+            resource_group = ResourceGroupRow(
+                id=resource_group_id,
                 name=name,
                 description="Test scaling group",
                 is_active=True,
@@ -267,17 +272,17 @@ class TestAgentRepositoryDB:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
                 use_host_network=False,
             )
-            db_sess.add(scaling_group)
-        yield ScalingGroupFixtureData(name=name, id=scaling_group_id)
+            db_sess.add(resource_group)
+        yield ResourceGroupFixtureData(name=name, id=resource_group_id)
 
     @pytest.fixture
     async def alive_agent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
     ) -> AsyncGenerator[AgentFixtureData, None]:
         """Create an alive agent in database"""
         agent_id = AgentId(str(uuid4()))
@@ -287,10 +292,8 @@ class TestAgentRepositoryDB:
                 status=AgentStatus.ALIVE,
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
-                scaling_group=scaling_group.name,
-                resource_group_id=scaling_group.id,
-                available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
-                occupied_slots=ResourceSlot({}),
+                scaling_group=resource_group.name,
+                resource_group_id=resource_group.id,
                 addr="tcp://192.168.1.100:6001",
                 first_contact=datetime.now(tzutc()),
                 lost_at=None,
@@ -303,13 +306,13 @@ class TestAgentRepositoryDB:
                 auto_terminate_abusing_kernel=False,
             )
             db_sess.add(agent)
-        yield AgentFixtureData(agent_id=agent_id, scaling_group=scaling_group.name)
+        yield AgentFixtureData(agent_id=agent_id, resource_group=resource_group.name)
 
     @pytest.fixture
     async def lost_agent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
     ) -> AsyncGenerator[AgentFixtureData, None]:
         """Create a lost agent in database"""
         agent_id = AgentId(str(uuid4()))
@@ -319,10 +322,8 @@ class TestAgentRepositoryDB:
                 status=AgentStatus.LOST,
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
-                scaling_group=scaling_group.name,
-                resource_group_id=scaling_group.id,
-                available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
-                occupied_slots=ResourceSlot({}),
+                scaling_group=resource_group.name,
+                resource_group_id=resource_group.id,
                 addr="tcp://192.168.1.100:6001",
                 first_contact=datetime.now(tzutc()),
                 lost_at=datetime.now(tzutc()),
@@ -335,7 +336,61 @@ class TestAgentRepositoryDB:
                 auto_terminate_abusing_kernel=False,
             )
             db_sess.add(agent)
-        yield AgentFixtureData(agent_id=agent_id, scaling_group=scaling_group.name)
+        yield AgentFixtureData(agent_id=agent_id, resource_group=resource_group.name)
+
+    # ==================== mark_agent_exit tests ====================
+
+    async def test_mark_agent_exit_records_the_exit_of_a_live_agent(
+        self,
+        agent_repository: AgentRepository,
+        alive_agent: AgentFixtureData,
+    ) -> None:
+        agent_uuid = await agent_repository.lookup_uuid(alive_agent.agent_id)
+        assert agent_uuid is not None
+        now = datetime.now(tzutc())
+
+        written = await agent_repository.mark_agent_exit(
+            AgentExitStatusUpdater(
+                agent_uuid=agent_uuid,
+                status=AgentStatus.LOST,
+                status_changed=now,
+                lost_at=OptionalState.update(now),
+            )
+        )
+
+        assert written == alive_agent.agent_id
+        data = await agent_repository.get_by_id(alive_agent.agent_id)
+        assert data.status == AgentStatus.LOST
+        assert data.lost_at is not None
+
+    async def test_mark_agent_exit_leaves_an_already_terminal_agent_alone(
+        self,
+        agent_repository: AgentRepository,
+        lost_agent: AgentFixtureData,
+    ) -> None:
+        agent_uuid = await agent_repository.lookup_uuid(lost_agent.agent_id)
+        assert agent_uuid is not None
+        before = await agent_repository.get_by_id(lost_agent.agent_id)
+
+        written = await agent_repository.mark_agent_exit(
+            AgentExitStatusUpdater(
+                agent_uuid=agent_uuid,
+                status=AgentStatus.TERMINATED,
+                status_changed=datetime.now(tzutc()),
+                lost_at=OptionalState.update(datetime.now(tzutc())),
+            )
+        )
+
+        assert written is None
+        after = await agent_repository.get_by_id(lost_agent.agent_id)
+        assert after.status == AgentStatus.LOST
+        assert after.lost_at == before.lost_at
+
+    async def test_lookup_uuid_answers_none_for_an_unknown_agent(
+        self,
+        agent_repository: AgentRepository,
+    ) -> None:
+        assert await agent_repository.lookup_uuid(AgentId(str(uuid4()))) is None
 
     # ==================== get_by_id tests ====================
 
@@ -349,7 +404,7 @@ class TestAgentRepositoryDB:
 
         assert result.id == alive_agent.agent_id
         assert result.status == AgentStatus.ALIVE
-        assert result.scaling_group == alive_agent.scaling_group
+        assert result.resource_group == alive_agent.resource_group
 
     async def test_get_by_id_nonexistent_agent(
         self,
@@ -366,7 +421,7 @@ class TestAgentRepositoryDB:
         agent_repository: AgentRepository,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
     ) -> None:
         """Test sync_agent_heartbeat creates a new agent"""
         agent_id = AgentId("agent-new")
@@ -387,7 +442,7 @@ class TestAgentRepositoryDB:
             resource_group_id = await db_sess.scalar(
                 sa.select(AgentRow.resource_group_id).where(AgentRow.id == agent_id)
             )
-        assert resource_group_id == scaling_group.id
+        assert resource_group_id == resource_group.id
 
     async def test_sync_agent_heartbeat_existing_agent_alive(
         self,
@@ -429,7 +484,7 @@ class TestAgentRepositoryDB:
         self,
         agent_repository: AgentRepository,
         alive_agent: AgentFixtureData,
-        scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -439,7 +494,7 @@ class TestAgentRepositoryDB:
         new_sgroup_id = ResourceGroupID(uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=new_sgroup_id,
                     name=new_sgroup_name,
                     description="Second scaling group",
@@ -448,7 +503,7 @@ class TestAgentRepositoryDB:
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                     use_host_network=False,
                 )
             )
@@ -469,8 +524,8 @@ class TestAgentRepositoryDB:
                     )
                 )
             ).one()
-        assert row.scaling_group == scaling_group.name
-        assert row.resource_group_id == scaling_group.id
+        assert row.scaling_group == resource_group.name
+        assert row.resource_group_id == resource_group.id
 
     async def test_sync_agent_heartbeat_unresolvable_group_no_default(
         self,
@@ -483,19 +538,18 @@ class TestAgentRepositoryDB:
             ip="192.168.1.100",
             version="24.12.0",
             scaling_group="nonexistent-scaling-group",
-            available_resource_slots=ResourceSlot({
-                SlotName("cpu"): "8",
-                SlotName("mem"): "32768",
-            }),
+            available_resource_slots=[
+                ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="8"),
+                ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity="32768"),
+            ],
             slot_key_and_units={
-                SlotName("cpu"): SlotTypes.COUNT,
-                SlotName("mem"): SlotTypes.BYTES,
+                ResourceSlotName("cpu"): SlotTypes.COUNT,
+                ResourceSlotName("mem"): SlotTypes.BYTES,
             },
             compute_plugins={DeviceName("cpu"): {}},
             addr="tcp://192.168.1.100:6001",
             public_key=PublicKey(b"test-public-key"),
             public_host="192.168.1.100",
-            images=b"\x82\xc4\x00\x00",
             region="us-west-1",
             architecture="x86_64",
             auto_terminate_abusing_kernel=False,
@@ -539,14 +593,14 @@ class TestAgentRepositoryDB:
     async def default_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ScalingGroupFixtureData, None]:
+    ) -> AsyncGenerator[ResourceGroupFixtureData, None]:
         """Create a scaling group marked as the default (is_default=True)."""
         name = str(uuid4())
-        scaling_group_id = ResourceGroupID(uuid4())
+        resource_group_id = ResourceGroupID(uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
-                    id=scaling_group_id,
+                ResourceGroupRow(
+                    id=resource_group_id,
                     name=name,
                     description="Default scaling group",
                     is_active=True,
@@ -555,16 +609,16 @@ class TestAgentRepositoryDB:
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                     use_host_network=False,
                 )
             )
-        yield ScalingGroupFixtureData(name=name, id=scaling_group_id)
+        yield ResourceGroupFixtureData(name=name, id=resource_group_id)
 
     async def test_upsert_new_agent_inserts_with_resolved_group(
         self,
         agent_db_source: AgentDBSource,
-        scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -589,20 +643,20 @@ class TestAgentRepositoryDB:
                 )
             ).one()
         assert row.status == AgentStatus.ALIVE
-        assert row.scaling_group == scaling_group.name
-        assert row.resource_group_id == scaling_group.id
+        assert row.scaling_group == resource_group.name
+        assert row.resource_group_id == resource_group.id
 
     async def test_upsert_new_agent_prefers_named_group_over_default(
         self,
         agent_db_source: AgentDBSource,
-        scaling_group: ScalingGroupFixtureData,
-        default_scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
+        default_scaling_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """With a default group present, a resolvable reported name still wins over the default."""
         agent_id = AgentId("upsert-new-named-over-default")
-        # sample_agent_info reports scaling_group.name, which exists and is not the default.
+        # sample_agent_info reports resource_group.name, which exists and is not the default.
         upsert_data = AgentHeartbeatUpsert.from_agent_info(
             agent_id=agent_id,
             agent_info=sample_agent_info,
@@ -619,14 +673,14 @@ class TestAgentRepositoryDB:
                     )
                 )
             ).one()
-        assert row.scaling_group == scaling_group.name
-        assert row.resource_group_id == scaling_group.id
+        assert row.scaling_group == resource_group.name
+        assert row.resource_group_id == resource_group.id
         assert row.resource_group_id != default_scaling_group.id
 
     async def test_upsert_new_agent_unresolvable_name_falls_back_to_default(
         self,
         agent_db_source: AgentDBSource,
-        default_scaling_group: ScalingGroupFixtureData,
+        default_scaling_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -655,7 +709,7 @@ class TestAgentRepositoryDB:
     async def test_upsert_new_agent_empty_name_uses_default(
         self,
         agent_db_source: AgentDBSource,
-        default_scaling_group: ScalingGroupFixtureData,
+        default_scaling_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -679,7 +733,7 @@ class TestAgentRepositoryDB:
     async def test_upsert_new_agent_null_name_uses_default(
         self,
         agent_db_source: AgentDBSource,
-        default_scaling_group: ScalingGroupFixtureData,
+        default_scaling_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -703,7 +757,7 @@ class TestAgentRepositoryDB:
     async def test_upsert_new_agent_null_name_no_default_raises(
         self,
         agent_db_source: AgentDBSource,
-        scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -726,7 +780,7 @@ class TestAgentRepositoryDB:
     async def test_upsert_new_agent_unresolvable_name_no_default_raises(
         self,
         agent_db_source: AgentDBSource,
-        scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -750,7 +804,7 @@ class TestAgentRepositoryDB:
         self,
         agent_db_source: AgentDBSource,
         alive_agent: AgentFixtureData,
-        scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -759,7 +813,7 @@ class TestAgentRepositoryDB:
         other_id = ResourceGroupID(uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=other_id,
                     name=other_name,
                     description="Another scaling group",
@@ -768,7 +822,7 @@ class TestAgentRepositoryDB:
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                     use_host_network=False,
                 )
             )
@@ -790,14 +844,14 @@ class TestAgentRepositoryDB:
                     )
                 )
             ).one()
-        assert row.scaling_group == scaling_group.name
-        assert row.resource_group_id == scaling_group.id
+        assert row.scaling_group == resource_group.name
+        assert row.resource_group_id == resource_group.id
 
     async def test_upsert_revived_agent_keeps_group(
         self,
         agent_db_source: AgentDBSource,
         lost_agent: AgentFixtureData,
-        scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -820,15 +874,15 @@ class TestAgentRepositoryDB:
                 )
             ).one()
         assert row.status == AgentStatus.ALIVE
-        assert row.scaling_group == scaling_group.name
-        assert row.resource_group_id == scaling_group.id
+        assert row.scaling_group == resource_group.name
+        assert row.resource_group_id == resource_group.id
 
     async def test_upsert_existing_agent_unresolvable_report_keeps_group(
         self,
         agent_db_source: AgentDBSource,
         alive_agent: AgentFixtureData,
-        scaling_group: ScalingGroupFixtureData,
-        default_scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
+        default_scaling_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -850,14 +904,14 @@ class TestAgentRepositoryDB:
                     )
                 )
             ).one()
-        assert row.scaling_group == scaling_group.name
-        assert row.resource_group_id == scaling_group.id
+        assert row.scaling_group == resource_group.name
+        assert row.resource_group_id == resource_group.id
 
     async def test_upsert_existing_agent_unresolvable_report_no_default_still_updates(
         self,
         agent_db_source: AgentDBSource,
         alive_agent: AgentFixtureData,
-        scaling_group: ScalingGroupFixtureData,
+        resource_group: ResourceGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
@@ -889,8 +943,8 @@ class TestAgentRepositoryDB:
             ).one()
         assert row.status == AgentStatus.ALIVE
         assert row.addr == new_addr  # the heartbeat update actually ran
-        assert row.scaling_group == scaling_group.name  # group unchanged
-        assert row.resource_group_id == scaling_group.id
+        assert row.scaling_group == resource_group.name  # group unchanged
+        assert row.resource_group_id == resource_group.id
 
 
 class TestAgentRepositoryCache:
@@ -994,6 +1048,7 @@ class TestAgentRepositoryCache:
             valkey_live=valkey_live_client,
             valkey_stat=valkey_stat_client,
             config_provider=mock_config_provider,
+            v2_ops_provider=V2DBOpsProvider(mock_database_engine),
         )
         yield repo
 
@@ -1044,7 +1099,7 @@ class TestAgentDBSourceKernelFiltering:
             database_connection,
             [
                 DomainRow,
-                ScalingGroupRow,
+                ResourceGroupRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
@@ -1052,7 +1107,7 @@ class TestAgentDBSourceKernelFiltering:
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
-                GroupRow,
+                ProjectRow,
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
@@ -1131,7 +1186,7 @@ class TestAgentDBSourceKernelFiltering:
         """Create default group"""
         group_id = uuid4()
         async with db_with_tables.begin_session() as db_sess:
-            group = GroupRow(
+            group = ProjectRow(
                 id=group_id,
                 name="default-group",
                 domain_name=test_domain,
@@ -1143,7 +1198,7 @@ class TestAgentDBSourceKernelFiltering:
         yield (str(group_id), test_domain)
 
     @pytest.fixture
-    async def scaling_group(
+    async def resource_group(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
         test_scaling_group_id: ResourceGroupID,
@@ -1151,7 +1206,7 @@ class TestAgentDBSourceKernelFiltering:
         """Create default scaling group"""
         name = str(uuid4())
         async with db_with_tables.begin_session() as db_sess:
-            scaling_group = ScalingGroupRow(
+            resource_group = ResourceGroupRow(
                 id=test_scaling_group_id,
                 name=name,
                 description="Test scaling group",
@@ -1160,10 +1215,10 @@ class TestAgentDBSourceKernelFiltering:
                 driver="static",
                 driver_opts={},
                 scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
+                scheduler_opts=ResourceGroupOpts(),
                 use_host_network=False,
             )
-            db_sess.add(scaling_group)
+            db_sess.add(resource_group)
         yield name
 
     @pytest.fixture
@@ -1173,7 +1228,7 @@ class TestAgentDBSourceKernelFiltering:
         db_with_tables: ExtendedAsyncSAEngine,
         test_group: tuple[str, str],
         test_domain_id: DomainID,
-        scaling_group: str,
+        resource_group: str,
         test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[KernelFilteringTestCase, None]:
         """Create ONE agent with kernels based on the test case from indirect parametrization"""
@@ -1195,10 +1250,8 @@ class TestAgentDBSourceKernelFiltering:
                 status=AgentStatus.ALIVE,
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
-                scaling_group=scaling_group,
+                scaling_group=resource_group,
                 resource_group_id=test_scaling_group_id,
-                available_slots=ResourceSlot({SlotName("cpu"): 16.0}),
-                occupied_slots=ResourceSlot({}),
                 addr=f"tcp://{random_ip}:6001",
                 first_contact=datetime.now(tzutc()),
                 lost_at=None,
@@ -1234,11 +1287,10 @@ class TestAgentDBSourceKernelFiltering:
                 domain_name=domain_name,
                 group_id=UUID(group_id_str),
                 resource_group_id=test_scaling_group_id,
-                scaling_group_name=scaling_group,
+                scaling_group_name=resource_group,
                 status=SessionStatus.RUNNING,
                 status_info="test",
                 cluster_mode=ClusterMode.SINGLE_NODE,
-                requested_slots=ResourceSlot({SlotName("cpu"): 16.0}),
                 created_at=datetime.now(tzutc()),
                 images=["python:3.11"],
                 vfolder_mounts=[],
@@ -1261,7 +1313,7 @@ class TestAgentDBSourceKernelFiltering:
                     session_id=session_id,
                     agent=actual_agent_id,
                     agent_addr=f"{random_ip}:6001",
-                    scaling_group=scaling_group,
+                    scaling_group=resource_group,
                     resource_group_id=test_scaling_group_id,
                     cluster_idx=i,
                     cluster_role="main",
@@ -1271,8 +1323,6 @@ class TestAgentDBSourceKernelFiltering:
                     registry="docker.io",
                     container_id=f"container-{uuid4().hex[:8]}",
                     status=status,
-                    occupied_slots=ResourceSlot({"cpu": Decimal(str(test_case.cpu_per_kernel))}),
-                    requested_slots=ResourceSlot({"cpu": Decimal(str(test_case.cpu_per_kernel))}),
                     domain_name=domain_name,
                     group_id=UUID(group_id_str),
                     user_uuid=uuid4(),
@@ -1300,7 +1350,7 @@ class TestAgentDBSourceKernelFiltering:
                     session_id=session_id,
                     agent=actual_agent_id,
                     agent_addr=f"{random_ip}:6001",
-                    scaling_group=scaling_group,
+                    scaling_group=resource_group,
                     resource_group_id=test_scaling_group_id,
                     cluster_idx=test_case.occupied_kernel_count + i,
                     cluster_role="main",
@@ -1310,8 +1360,6 @@ class TestAgentDBSourceKernelFiltering:
                     registry="docker.io",
                     container_id=f"container-{uuid4().hex[:8]}",
                     status=status,
-                    occupied_slots=ResourceSlot({"cpu": Decimal(str(test_case.cpu_per_kernel))}),
-                    requested_slots=ResourceSlot({"cpu": Decimal(str(test_case.cpu_per_kernel))}),
                     domain_name=domain_name,
                     group_id=UUID(group_id_str),
                     user_uuid=uuid4(),
@@ -1399,7 +1447,7 @@ class TestAgentDBSourceKernelFiltering:
         agent_detail = result.items[0]
 
         # Validate actual_occupied_slots reflects only resource-occupied kernels
-        actual_cpu = agent_detail.agent.actual_occupied_slots.get("cpu", 0)
+        actual_cpu = agent_detail.agent.occupied_slots.get("cpu", 0)
         assert Decimal(str(actual_cpu)) == agent_with_kernels.expected_actual_occupied_cpu
 
     # ==================== update_resource_group tests ====================
@@ -1408,8 +1456,8 @@ class TestAgentDBSourceKernelFiltering:
         self,
         db: ExtendedAsyncSAEngine,
         agent_id: AgentId,
-        scaling_group_name: str,
-        scaling_group_id: ResourceGroupID,
+        resource_group_name: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         async with db.begin_session() as db_sess:
             db_sess.add(
@@ -1418,10 +1466,8 @@ class TestAgentDBSourceKernelFiltering:
                     status=AgentStatus.ALIVE,
                     status_changed=datetime.now(tzutc()),
                     region="us-west-1",
-                    scaling_group=scaling_group_name,
-                    resource_group_id=scaling_group_id,
-                    available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
-                    occupied_slots=ResourceSlot({}),
+                    scaling_group=resource_group_name,
+                    resource_group_id=resource_group_id,
                     addr="tcp://192.168.1.100:6001",
                     first_contact=datetime.now(tzutc()),
                     lost_at=None,
@@ -1440,7 +1486,7 @@ class TestAgentDBSourceKernelFiltering:
         group_id = ResourceGroupID(uuid4())
         async with db.begin_session() as db_sess:
             db_sess.add(
-                ScalingGroupRow(
+                ResourceGroupRow(
                     id=group_id,
                     name=name,
                     description="Target scaling group",
@@ -1449,7 +1495,7 @@ class TestAgentDBSourceKernelFiltering:
                     driver="static",
                     driver_opts={},
                     scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+                    scheduler_opts=ResourceGroupOpts(),
                     use_host_network=False,
                 )
             )
@@ -1459,8 +1505,8 @@ class TestAgentDBSourceKernelFiltering:
         self,
         db: ExtendedAsyncSAEngine,
         agent_id: AgentId,
-        scaling_group_name: str,
-        scaling_group_id: ResourceGroupID,
+        resource_group_name: str,
+        resource_group_id: ResourceGroupID,
         domain_id: DomainID,
         domain_name: str,
         group_id: UUID,
@@ -1475,12 +1521,11 @@ class TestAgentDBSourceKernelFiltering:
                     domain_id=domain_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    resource_group_id=scaling_group_id,
-                    scaling_group_name=scaling_group_name,
+                    resource_group_id=resource_group_id,
+                    scaling_group_name=resource_group_name,
                     status=SessionStatus.RUNNING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=ResourceSlot({SlotName("cpu"): 1.0}),
                     created_at=datetime.now(tzutc()),
                     images=["python:3.11"],
                     vfolder_mounts=[],
@@ -1495,8 +1540,8 @@ class TestAgentDBSourceKernelFiltering:
                     session_id=session_id,
                     agent=agent_id,
                     agent_addr="192.168.1.100:6001",
-                    scaling_group=scaling_group_name,
-                    resource_group_id=scaling_group_id,
+                    scaling_group=resource_group_name,
+                    resource_group_id=resource_group_id,
                     cluster_idx=0,
                     cluster_role="main",
                     cluster_hostname=f"main-{uuid4().hex[:6]}",
@@ -1505,8 +1550,6 @@ class TestAgentDBSourceKernelFiltering:
                     registry="docker.io",
                     container_id=f"container-{uuid4().hex[:8]}",
                     status=KernelStatus.RUNNING,
-                    occupied_slots=ResourceSlot({"cpu": Decimal("1")}),
-                    requested_slots=ResourceSlot({"cpu": Decimal("1")}),
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=uuid4(),
@@ -1540,11 +1583,11 @@ class TestAgentDBSourceKernelFiltering:
         self,
         db_source: AgentDBSource,
         db_with_tables: ExtendedAsyncSAEngine,
-        scaling_group: str,
+        resource_group: str,
         test_scaling_group_id: ResourceGroupID,
     ) -> None:
         agent_id = AgentId(str(uuid4()))
-        await self._seed_agent(db_with_tables, agent_id, scaling_group, test_scaling_group_id)
+        await self._seed_agent(db_with_tables, agent_id, resource_group, test_scaling_group_id)
         target_name, target_id = await self._seed_target_group(db_with_tables)
 
         # When there are no active kernels, the group is committed and nothing is returned
@@ -1558,7 +1601,7 @@ class TestAgentDBSourceKernelFiltering:
         self,
         db_source: AgentDBSource,
         db_with_tables: ExtendedAsyncSAEngine,
-        scaling_group: str,
+        resource_group: str,
         test_scaling_group_id: ResourceGroupID,
         test_domain: str,
         test_domain_id: DomainID,
@@ -1566,12 +1609,12 @@ class TestAgentDBSourceKernelFiltering:
     ) -> None:
         group_id_str, domain_name = test_group
         agent_id = AgentId(str(uuid4()))
-        await self._seed_agent(db_with_tables, agent_id, scaling_group, test_scaling_group_id)
+        await self._seed_agent(db_with_tables, agent_id, resource_group, test_scaling_group_id)
         target_name, target_id = await self._seed_target_group(db_with_tables)
         session_id = await self._seed_running_kernel(
             db_with_tables,
             agent_id,
-            scaling_group,
+            resource_group,
             test_scaling_group_id,
             test_domain_id,
             domain_name,
@@ -1582,7 +1625,7 @@ class TestAgentDBSourceKernelFiltering:
         with pytest.raises(AgentHasConflictingSessions):
             await db_source.update_resource_group(agent_id, target_id, force=False)
         assert await self._agent_group(db_with_tables, agent_id) == (
-            scaling_group,
+            resource_group,
             test_scaling_group_id,
         )
 
@@ -1605,16 +1648,16 @@ class TestAgentDBSourceKernelFiltering:
         self,
         db_source: AgentDBSource,
         db_with_tables: ExtendedAsyncSAEngine,
-        scaling_group: str,
+        resource_group: str,
         test_scaling_group_id: ResourceGroupID,
     ) -> None:
         agent_id = AgentId(str(uuid4()))
-        await self._seed_agent(db_with_tables, agent_id, scaling_group, test_scaling_group_id)
+        await self._seed_agent(db_with_tables, agent_id, resource_group, test_scaling_group_id)
 
         # An unknown resource group id is rejected before touching the agent
-        with pytest.raises(ScalingGroupNotFound):
+        with pytest.raises(ResourceGroupNotFound):
             await db_source.update_resource_group(agent_id, ResourceGroupID(uuid4()), force=False)
         assert await self._agent_group(db_with_tables, agent_id) == (
-            scaling_group,
+            resource_group,
             test_scaling_group_id,
         )

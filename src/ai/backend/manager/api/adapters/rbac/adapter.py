@@ -194,6 +194,7 @@ from ai.backend.manager.data.permission.types import RoleSource as InternalRoleS
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData, RoleInvitationState
 from ai.backend.manager.errors.permission import ReplaceRolePermissionRoleIdMismatch
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -212,21 +213,20 @@ from ai.backend.manager.models.rbac_models.orders import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.role_invitation.conditions import (
     RoleInvitationConditions,
     RoleInvitationOrders,
 )
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    BulkCreator,
-    NoPagination,
-    OffsetPagination,
-    Purger,
-    combine_conditions_or,
-    negate_conditions,
+from ai.backend.manager.models.role_invitation.scopes import (
+    InviteeOperationScope,
+    InviterOperationScope,
+    RoleInvitationOperationScope,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Purger
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import (
@@ -238,15 +238,9 @@ from ai.backend.manager.repositories.permission_controller.purgers import (
     PermissionPurgerSpec,
     RolePurgerSpec,
 )
-from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
 from ai.backend.manager.repositories.permission_controller.updaters import (
     PermissionUpdaterSpec,
     RoleUpdaterSpec,
-)
-from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeSearchScope,
-    InviterSearchScope,
-    RoleInvitationSearchScope,
 )
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.bulk_add_role_permissions import (
@@ -757,7 +751,7 @@ class RBACAdapter(BaseAdapter):
 
     async def search_roles_in_scope(
         self,
-        scope: ScopedRoleSearchScope,
+        scope: ScopedRoleOperationScope,
         input: SearchRolesInput,
     ) -> SearchResult[RoleNode]:
         """Search roles registered in a given scope."""
@@ -2118,7 +2112,7 @@ class RBACAdapter(BaseAdapter):
             SearchMyRoleInvitationsAction(
                 user_id=me.user_id,
                 querier=querier,
-                scope=InviteeSearchScope(invitee_user_id=me.user_id),
+                scope=InviteeOperationScope(invitee_user_id=me.user_id),
             )
         )
         raw = action_result.result
@@ -2155,7 +2149,7 @@ class RBACAdapter(BaseAdapter):
             SearchMySentRoleInvitationsAction(
                 user_id=me.user_id,
                 querier=querier,
-                scope=InviterSearchScope(inviter_user_id=me.user_id),
+                scope=InviterOperationScope(inviter_user_id=me.user_id),
             )
         )
         raw = action_result.result
@@ -2190,7 +2184,7 @@ class RBACAdapter(BaseAdapter):
             SearchRoleInvitationsByRoleAction(
                 role_id=role_id,
                 querier=querier,
-                scope=RoleInvitationSearchScope(role_id=role_id),
+                scope=RoleInvitationOperationScope(role_id=role_id),
             )
         )
         raw = action_result.result

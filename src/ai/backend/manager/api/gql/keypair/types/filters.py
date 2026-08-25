@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
 from ai.backend.common.dto.manager.v2.keypair.request import (
     KeypairOrderBy as KeypairOrderByDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -42,6 +43,13 @@ class KeypairFilterGQL(PydanticInputMixin[KeypairFilterDTO]):
 
     is_active: bool | None = None
     is_admin: bool | None = None
+    is_default: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter keypairs by whether they are their owner's default one.",
+        ),
+        default=None,
+    )
     access_key: StringFilter | None = None
     resource_policy: StringFilter | None = None
     user_id: UUIDFilter | None = gql_added_field(
@@ -66,7 +74,8 @@ class KeypairFilterGQL(PydanticInputMixin[KeypairFilterDTO]):
             "CREATED_AT: Order by creation timestamp. "
             "LAST_USED: Order by last used timestamp. "
             "ACCESS_KEY: Order by access key alphabetically. "
-            "IS_ACTIVE: Order by active status."
+            "IS_ACTIVE: Order by active status. "
+            "IS_DEFAULT: Order by whether the keypair is its owner's default one."
         ),
     ),
     name="KeypairOrderField",
@@ -76,6 +85,7 @@ class KeypairOrderFieldGQL(StrEnum):
     LAST_USED = "last_used"
     ACCESS_KEY = "access_key"
     IS_ACTIVE = "is_active"
+    IS_DEFAULT = "is_default"
     RESOURCE_POLICY = "resource_policy"
 
 

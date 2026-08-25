@@ -6,10 +6,12 @@ and AgentDetailData to AgentDTO.
 
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.dto.manager.agent.request import (
     AgentFilter,
     AgentOrder,
@@ -26,7 +28,7 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.api.rest.agent.adapter import AgentAdapter
 from ai.backend.manager.data.agent.types import AgentData, AgentDetailData, AgentStatus
-from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 
 
 class TestAgentAdapterBuildQuerier:
@@ -312,7 +314,7 @@ class TestAgentAdapterConvertToDTO:
         agent_id: AgentId | None = None,
         status: AgentStatus = AgentStatus.ALIVE,
         region: str = "us-east-1",
-        scaling_group: str = "default",
+        resource_group: str = "default",
         schedulable: bool = True,
         available_slots: ResourceSlot | None = None,
         occupied_slots: ResourceSlot | None = None,
@@ -327,15 +329,15 @@ class TestAgentAdapterConvertToDTO:
         if occupied_slots is None:
             occupied_slots = ResourceSlot()
         agent = AgentData(
+            uuid=AgentUUID(uuid.uuid4()),
             id=agent_id,
             status=status,
             status_changed=None,
             region=region,
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             schedulable=schedulable,
             available_slots=available_slots,
-            cached_occupied_slots=occupied_slots,
-            actual_occupied_slots=ResourceSlot(),
+            occupied_slots=occupied_slots,
             addr=addr,
             public_host=None,
             first_contact=None,
