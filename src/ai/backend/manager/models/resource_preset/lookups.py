@@ -14,7 +14,8 @@ from ai.backend.manager.models.specs.lookup import DataLookup
 
 @dataclass
 class ResourcePresetNameLookup(DataLookup[ResourcePresetRow, ResourcePresetID]):
-    """Reads the preset a name refers to, within a resource group or outside one."""
+    """Reads the preset a name refers to, within a resource group, or across all of them
+    when none is given."""
 
     name: str
     resource_group_name: str | None = None
@@ -25,12 +26,12 @@ class ResourcePresetNameLookup(DataLookup[ResourcePresetRow, ResourcePresetID]):
 
     @override
     def conditions(self) -> Sequence[QueryCondition]:
-        return [
-            lambda: ResourcePresetRow.name == self.name,
-            lambda: ResourcePresetRow.scaling_group_name.is_(None)
-            if self.resource_group_name is None
-            else ResourcePresetRow.scaling_group_name == self.resource_group_name,
-        ]
+        conditions: list[QueryCondition] = [lambda: ResourcePresetRow.name == self.name]
+        if self.resource_group_name is not None:
+            conditions.append(
+                lambda: ResourcePresetRow.scaling_group_name == self.resource_group_name
+            )
+        return conditions
 
     @override
     def to_entity_id(self, row: ResourcePresetRow) -> ResourcePresetID:
