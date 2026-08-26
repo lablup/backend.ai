@@ -49151,6 +49151,73 @@
         "description": "Search scoped permissions with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/rbac/permissions/my/search": {
+      "post": {
+        "operationId": "v2/rbac.my_search_permissions",
+        "tags": [
+          "v2/rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchPermissionsGQLInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the permissions the current user holds.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/rbac/permissions/users/{user_id}/search": {
+      "post": {
+        "operationId": "v2/rbac.user_search_permissions",
+        "tags": [
+          "v2/rbac"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchPermissionsGQLInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Search the permissions one user holds.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/rbac/permissions/delete": {
       "post": {
         "operationId": "v2/rbac.delete_permission",
