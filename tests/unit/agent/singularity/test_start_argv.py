@@ -233,3 +233,34 @@ class TestCommand:
 
         assert argv[-2:] == ["/opt/kernel/entrypoint.sh", "--debug"]
         assert argv[:2] == [runtime._binary, "exec"]
+
+
+class TestGpuAllocationReachesNvccli:
+    """``--nvccli`` builds its nvidia-container-cli call from **apptainer's own** environment.
+
+    The shared rootless base strips ``NVIDIA_*`` from the runtime's process environment -- correct
+    for enroot, whose hook reads the container's env file. Passing the allocation only through
+    ``--env`` therefore injects nothing: measured, the container came up with `/dev/nvidiactl` and
+    no `/dev/nvidia0`, `nvidia-smi` said "No devices were found" and `cuInit` returned 100.
+    """
+
+    def test_launch_env_carries_the_allocation(self, runtime: SingularityRuntime) -> None:
+        env = runtime._launch_env({"gpus": ["0"]})
+        assert env["NVIDIA_VISIBLE_DEVICES"] == "0"
+        assert env["NVIDIA_DRIVER_CAPABILITIES"] == "compute,utility"
+
+    def test_launch_env_is_empty_without_gpus(self, runtime: SingularityRuntime) -> None:
+        # A CPU kernel must not get a stray NVIDIA_* in the runtime env: with --nvccli absent it
+        # would do nothing, and with it present it would hand devices to a session that asked for
+        # none.
+        assert runtime._launch_env({}) == {}
+        assert runtime._launch_env({"gpus": []}) == {}
+
+    def test_capabilities_are_never_all(self, runtime: SingularityRuntime, gate_dir: Path) -> None:
+        # apptainer validates this value and aborts the launch on anything it does not know:
+        # `FATAL: container creation failed: unknown NVIDIA_DRIVER_CAPABILITIES value: all`.
+        # nvidia-container-cli and the enroot hook do accept "all", which is why it is easy to
+        # write here and only fails on this backend.
+        assert "all" not in runtime._launch_env({"gpus": ["0"]})["NVIDIA_DRIVER_CAPABILITIES"]
+        env = _env_of(_argv(runtime, gate_dir, gpus=["0"]))
+        assert env.get("NVIDIA_DRIVER_CAPABILITIES") != "all"

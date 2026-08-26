@@ -104,6 +104,14 @@ def _copy_entry(src: Path, dst: Path) -> None:
     _clone_metadata(src, dst)
 
 
+# Not "all": apptainer validates this against its own capability list and aborts the whole launch
+# on anything it does not recognise -- measured, `NVIDIA_DRIVER_CAPABILITIES=all` yields
+# `FATAL: container creation failed: unknown NVIDIA_DRIVER_CAPABILITIES value: all`. (The enroot
+# hook, and nvidia-container-cli directly, do accept "all".) These two are what a compute kernel
+# needs: the CUDA driver, and the nvidia-smi/NVML tooling that reports on it.
+NVIDIA_CAPABILITIES: Final = "compute,utility"
+
+
 class SingularityRuntime(RootlessOciRuntime):
     backend_name: ClassVar[str] = "singularity"
 
@@ -127,6 +135,26 @@ class SingularityRuntime(RootlessOciRuntime):
 
     def _tmp_path(self) -> Path:
         return self._cache_path / "tmp"
+
+    @override
+    def _launch_env(self, spec: Mapping[str, Any]) -> dict[str, str]:
+        """The GPU allocation, in **apptainer's own** environment.
+
+        ``--nvccli`` hands the injection to nvidia-container-cli, and apptainer builds that call
+        from the variables in its *own* process environment -- not from the ``--env`` values, which
+        only land inside the container where nvccli never looks. The shared `_process_env` strips
+        ``NVIDIA_*`` (right for enroot, whose hook reads the container's env file), so without this
+        the runtime is launched with no allocation at all: measured, the container then comes up
+        with `/dev/nvidiactl` and nothing else, `nvidia-smi` reports "No devices were found", and
+        `cuInit` returns 100 (CUDA_ERROR_NO_DEVICE) -- a GPU session that silently has no GPU.
+        """
+        gpus = [str(g) for g in (spec.get("gpus") or [])]
+        if not gpus:
+            return {}
+        return {
+            "NVIDIA_VISIBLE_DEVICES": ",".join(gpus),
+            "NVIDIA_DRIVER_CAPABILITIES": NVIDIA_CAPABILITIES,
+        }
 
     @override
     def _runtime_env(self) -> dict[str, str]:
@@ -537,7 +565,7 @@ class SingularityRuntime(RootlessOciRuntime):
         env = {str(k): str(v) for k, v in (spec.get("env") or {}).items()}
         if gpus:
             env["NVIDIA_VISIBLE_DEVICES"] = ",".join(gpus)
-            env.setdefault("NVIDIA_DRIVER_CAPABILITIES", "all")
+            env.setdefault("NVIDIA_DRIVER_CAPABILITIES", NVIDIA_CAPABILITIES)
         else:
             # No sentinel: apptainer rejects enroot's `void`/`none` outright ("unknown device"), so
             # "no GPU" is expressed by omitting --nvccli above. Drop the variable so nothing

@@ -302,6 +302,16 @@ class RootlessOciRuntime(OciRuntime):
         inherited = {k: v for k, v in os.environ.items() if not k.startswith("NVIDIA_")}
         return {**inherited, **self._runtime_env()}
 
+    def _launch_env(self, spec: Mapping[str, Any]) -> dict[str, str]:
+        """The environment for *launching one container*, on top of ``_process_env``.
+
+        A backend whose GPU injection is driven by the **runtime's own** environment rather than by
+        the container's needs this seam: `_process_env` deliberately strips ``NVIDIA_*``, which is
+        right for a hook that reads the container's env file and wrong for one that reads the
+        runtime process's. Empty by default.
+        """
+        return {}
+
     def _uid_drop_prefix(self) -> list[str]:
         # Run the runtime **as the kernel uid**, not as the (root) agent — as an argv prefix
         # (`setpriv`) rather than the subprocess user=/group= kwargs, which uvloop (this agent's
@@ -371,7 +381,7 @@ class RootlessOciRuntime(OciRuntime):
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=log_fd,
                 stderr=log_fd,
-                env=self._process_env(),
+                env={**self._process_env(), **self._launch_env(spec)},
             )
         finally:
             os.close(log_fd)
