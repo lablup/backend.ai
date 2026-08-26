@@ -79,6 +79,7 @@ pants lint --changed-since=origin/{base_branch}
    - **Title**: Conventional commit style with JIRA key as scope
      - Format: `type(BA-XXXX): description`
      - Example: `fix(BA-1234): resolve session cleanup race condition`
+     - Fixing code introduced earlier in this same, still-unreleased cycle? Use `chore`, not `fix` — see backport table below and `changes/README.md` § Same-release fixes
    - **Body**: Use this template:
 
    ```markdown
@@ -105,6 +106,7 @@ pants lint --changed-since=origin/{base_branch}
    | `fix:` PR that must NOT be backported | Add `Backport: none` to the PR body |
    | Non-`fix:` PR that stays on `main` | Nothing |
    | A target realized only after the merge | Comment `/backport <version>` on the merged PR |
+   | PR fixes code introduced earlier in this same, still-unreleased cycle (never shipped on a maintained release branch) | Use `chore:`, not `fix:` — see `changes/README.md` § Same-release fixes |
 
    - Valid versions are exactly the entries of `.github/maintained-versions.yml` — read that file
      rather than guessing. A trailer naming anything else fails the backport job and backports
@@ -124,6 +126,7 @@ pants lint --changed-since=origin/{base_branch}
    - Map from PR content:
      - New functionality → `feature`
      - Bug fix → `fix`
+     - Fix to code introduced earlier in this same, still-unreleased cycle → `misc`, not `fix` (see `changes/README.md` § Same-release fixes; PR title uses `chore`, not `fix`)
      - Performance/refactoring → `enhance`
      - Breaking API change → `breaking`
      - Test-only change → `test`
