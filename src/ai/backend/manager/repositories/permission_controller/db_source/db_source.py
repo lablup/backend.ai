@@ -74,7 +74,6 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -675,26 +674,12 @@ class PermissionDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_permissions(
-        self,
-        querier: BatchQuerier,
-        scope: PermissionOperationScope | None = None,
-    ) -> PermissionListResult:
-        """Searches permissions with pagination and filtering."""
+    async def batch_load_permissions(self, querier: BatchQuerier) -> PermissionListResult:
+        """Load the permission rows a GQL node field names."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(PermissionRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scopes=[scope] if scope is not None else (),
-            )
-
-            items = [row.PermissionRow.to_data() for row in result.rows]
-
+            result = await execute_batch_querier(db_sess, sa.select(PermissionRow), querier)
             return PermissionListResult(
-                items=items,
+                items=[row.PermissionRow.to_data() for row in result.rows],
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,

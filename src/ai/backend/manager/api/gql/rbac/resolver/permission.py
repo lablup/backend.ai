@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.scope_entity_combinations import (
     VALID_SCOPE_ENTITY_COMBINATIONS,
 )
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY, build_operation_description
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -75,6 +79,104 @@ async def admin_permissions(
             limit=limit,
             offset=offset,
         )
+    )
+    edges = [
+        PermissionEdge(
+            node=PermissionGQL.from_pydantic(item),
+            cursor=encode_cursor(str(item.id)),
+        )
+        for item in result.items
+    ]
+    return PermissionConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="List the permissions the current user holds.",
+    )
+)  # type: ignore[misc]
+async def my_permissions(
+    info: Info[StrawberryGQLContext],
+    filter: PermissionFilter | None = None,
+    order_by: list[PermissionOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> PermissionConnection | None:
+    result = await info.context.adapters.rbac.my_search_permissions(
+        AdminSearchPermissionsGQLInput(
+            filter=filter.to_pydantic() if filter is not None else None,
+            order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    edges = [
+        PermissionEdge(
+            node=PermissionGQL.from_pydantic(item),
+            cursor=encode_cursor(str(item.id)),
+        )
+        for item in result.items
+    ]
+    return PermissionConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="List the permissions one user holds.",
+    )
+)  # type: ignore[misc]
+async def user_permissions(
+    info: Info[StrawberryGQLContext],
+    user_id: UUID,
+    filter: PermissionFilter | None = None,
+    order_by: list[PermissionOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> PermissionConnection | None:
+    result = await info.context.adapters.rbac.user_search_permissions(
+        UserID(user_id),
+        AdminSearchPermissionsGQLInput(
+            filter=filter.to_pydantic() if filter is not None else None,
+            order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
     )
     edges = [
         PermissionEdge(

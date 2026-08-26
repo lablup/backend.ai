@@ -44,6 +44,11 @@ def role() -> None:
     """My role commands."""
 
 
+@my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.permission:permission")
+def permission() -> None:
+    """My permission commands."""
+
+
 @my.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.my.login_history:login_history",

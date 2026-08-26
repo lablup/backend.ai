@@ -7,6 +7,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BaseRootResponseModel, BodyParam, PathParam
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
@@ -36,7 +37,11 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     SearchRoleAssignmentsPayload,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, RoleIdPathParam
+from ai.backend.manager.api.rest.v2.path_params import (
+    ProjectIdPathParam,
+    RoleIdPathParam,
+    UserIdPathParam,
+)
 from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 
 if TYPE_CHECKING:
@@ -150,6 +155,37 @@ class V2RBACHandler:
     ) -> APIResponse:
         """Search scoped permissions with filters, orders, and pagination."""
         result = await self._adapter.admin_search_permissions_gql(body.parsed)
+        payload = AdminSearchPermissionsPayload(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def my_search_permissions(
+        self,
+        body: BodyParam[AdminSearchPermissionsGQLInput],
+    ) -> APIResponse:
+        """Search the permissions the current user holds."""
+        result = await self._adapter.my_search_permissions(body.parsed)
+        payload = AdminSearchPermissionsPayload(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def user_search_permissions(
+        self,
+        path: PathParam[UserIdPathParam],
+        body: BodyParam[AdminSearchPermissionsGQLInput],
+    ) -> APIResponse:
+        """Search the permissions one user holds."""
+        result = await self._adapter.user_search_permissions(
+            UserID(path.parsed.user_id), body.parsed
+        )
         payload = AdminSearchPermissionsPayload(
             items=result.items,
             total_count=result.total_count,

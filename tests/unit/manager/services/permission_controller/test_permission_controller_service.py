@@ -78,7 +78,7 @@ from ai.backend.manager.services.permission_contoller.actions.search_entities im
     SearchEntitiesAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
-    SearchPermissionsAction,
+    BatchLoadPermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import SearchRolesAction
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
@@ -770,11 +770,11 @@ class TestDeletePermission:
         assert result.data.id == perm_data.id
 
 
-class TestSearchPermissions:
+class TestBatchLoadPermissions:
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
         repository = MagicMock()
-        repository.search_permissions = AsyncMock()
+        repository.batch_load_permissions = AsyncMock()
         return repository
 
     @pytest.fixture
@@ -787,7 +787,7 @@ class TestSearchPermissions:
             rbac_action_registry=[],
         )
 
-    async def test_search_permissions_delegates_querier(
+    async def test_batch_load_permissions_delegates_querier(
         self,
         service: PermissionControllerService,
         mock_repository: MagicMock,
@@ -808,16 +808,16 @@ class TestSearchPermissions:
             has_next_page=False,
             has_previous_page=False,
         )
-        mock_repository.search_permissions.return_value = mock_result
+        mock_repository.batch_load_permissions.return_value = mock_result
 
         querier = _make_querier()
-        action = SearchPermissionsAction(querier=querier)
-        result = await service.search_permissions(action)
+        action = BatchLoadPermissionsAction(querier=querier)
+        result = await service.batch_load_permissions(action)
 
-        mock_repository.search_permissions.assert_called_once_with(querier)
+        mock_repository.batch_load_permissions.assert_called_once_with(querier)
         assert result.result.total_count == 1
 
-    async def test_search_permissions_pagination(
+    async def test_batch_load_permissions_pagination(
         self,
         service: PermissionControllerService,
         mock_repository: MagicMock,
@@ -828,10 +828,10 @@ class TestSearchPermissions:
             has_next_page=True,
             has_previous_page=True,
         )
-        mock_repository.search_permissions.return_value = mock_result
+        mock_repository.batch_load_permissions.return_value = mock_result
 
-        action = SearchPermissionsAction(querier=_make_querier(limit=10, offset=20))
-        result = await service.search_permissions(action)
+        action = BatchLoadPermissionsAction(querier=_make_querier(limit=10, offset=20))
+        result = await service.batch_load_permissions(action)
 
         assert result.result.has_next_page is True
         assert result.result.has_previous_page is True

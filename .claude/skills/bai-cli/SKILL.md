@@ -78,10 +78,11 @@ Check options with `--help`.
 ### Access Control & Auth
 
 - **entity-type**: user(list)
-- **rbac**: sub assignment(assign, revoke, search), entity(search), permission(search),
+- **rbac**: sub assignment(assign, revoke, search), entity(search), permission(search, search-user),
   invitation(create, accept, reject, cancel, my-search, my-sent-search, role-search),
   role(create, get, search, update, delete, project-search, add-permission, remove-permission, replace-permission)
 - **role**: my(search)
+- **permission**: my(search)
 - **role-preset**: admin(create, get, search, update, delete, purge, restore, permission-add, permission-remove, permission-search)
 - **invitation**: admin(search)
 - **keypair**: admin(create, get, search, update, delete · sub ssh: register, get, delete) · my(issue, revoke, search, update, switch-main)

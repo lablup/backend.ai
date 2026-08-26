@@ -95,8 +95,8 @@ from ai.backend.manager.services.permission_contoller.actions.search_entities im
     SearchEntitiesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
-    SearchPermissionsAction,
-    SearchPermissionsActionResult,
+    BatchLoadPermissionsAction,
+    BatchLoadPermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
@@ -293,12 +293,12 @@ class PermissionControllerService:
             _scope_id=action.scope.scope_id,
         )
 
-    async def search_permissions(
-        self, action: SearchPermissionsAction
-    ) -> SearchPermissionsActionResult:
-        """Search scoped permissions with pagination and filtering."""
-        result = await self._repository.search_permissions(action.querier)
-        return SearchPermissionsActionResult(result=result)
+    async def batch_load_permissions(
+        self, action: BatchLoadPermissionsAction
+    ) -> BatchLoadPermissionsActionResult:
+        """Load the permission rows a GQL node field names."""
+        result = await self._repository.batch_load_permissions(action.querier)
+        return BatchLoadPermissionsActionResult(result=result)
 
     async def search_users_assigned_to_role(
         self, action: SearchUsersAssignedToRoleAction

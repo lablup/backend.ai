@@ -78,6 +78,18 @@ def register_v2_rbac_routes(
         middlewares=[superadmin_required],
     )
     registry.add(
+        "POST",
+        "/permissions/my/search",
+        handler.my_search_permissions,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/permissions/users/{user_id}/search",
+        handler.user_search_permissions,
+        middlewares=[auth_required],
+    )
+    registry.add(
         "PATCH",
         "/permissions",
         handler.update_permission,

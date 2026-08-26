@@ -35,6 +35,7 @@ from ai.backend.common.data.entity.notification import (
     NOTIFICATION_RULE_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.permission import PERMISSION_FIELD_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.prometheus_query_preset import (
     PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
@@ -83,6 +84,7 @@ from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
+from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
@@ -725,7 +727,10 @@ def create_processors(
             services.object_storage,
         ),
         permission_controller=PermissionControllerProcessors(
-            services.permission_controller, action_monitors, validators
+            services.permission_controller,
+            action_monitors,
+            validators,
+            rbac_groups.dangling_field_group(FieldGroupMeta(PERMISSION_FIELD_TYPE), PermissionData),
         ),
         vfs_storage=VFSStorageProcessors(
             artifact_groups.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), services.vfs_storage

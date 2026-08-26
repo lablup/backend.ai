@@ -1,7 +1,12 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
+from ai.backend.manager.actions.registry.field import FieldGroup
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, ScopedFieldsOpsResult
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.data.permission.permission import PermissionData
 
 from .actions import (
     AssignRoleAction,
@@ -62,8 +67,10 @@ from .actions.search_entities import (
     SearchEntitiesActionResult,
 )
 from .actions.search_permissions import (
-    SearchPermissionsAction,
-    SearchPermissionsActionResult,
+    BatchLoadPermissionsAction,
+    BatchLoadPermissionsActionResult,
+    GlobalSearchPermissionsAction,
+    SearchPermissionsByUserAction,
 )
 from .actions.search_scopes import (
     SearchScopesAction,
@@ -116,7 +123,15 @@ class PermissionControllerProcessors:
     search_element_associations: ActionProcessor[
         SearchElementAssociationsAction, SearchElementAssociationsActionResult
     ]
-    search_permissions: ActionProcessor[SearchPermissionsAction, SearchPermissionsActionResult]
+    batch_load_permissions: ActionProcessor[
+        BatchLoadPermissionsAction, BatchLoadPermissionsActionResult
+    ]
+    global_search_permissions: GlobalActionProcessor[
+        GlobalSearchPermissionsAction, BatchOpsResult[PermissionData]
+    ]
+    search_permissions_by_user: BulkActionProcessor[
+        SearchPermissionsByUserAction, ScopedFieldsOpsResult[PermissionData]
+    ]
     create_permission: ActionProcessor[CreatePermissionAction, CreatePermissionActionResult]
     update_permission: ActionProcessor[UpdatePermissionAction, UpdatePermissionActionResult]
     delete_permission: ActionProcessor[DeletePermissionAction, DeletePermissionActionResult]
@@ -126,6 +141,7 @@ class PermissionControllerProcessors:
         service: PermissionControllerService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
+        permission_group: FieldGroup[PermissionData],
     ) -> None:
         self.create_role = ActionProcessor(service.create_role, action_monitors)
         self.update_role = ActionProcessor(service.update_role, action_monitors)
@@ -164,7 +180,15 @@ class PermissionControllerProcessors:
         self.search_element_associations = ActionProcessor(
             service.search_element_associations, action_monitors
         )
-        self.search_permissions = ActionProcessor(service.search_permissions, action_monitors)
+        self.batch_load_permissions = ActionProcessor(
+            service.batch_load_permissions, action_monitors
+        )
+        self.global_search_permissions = permission_group.global_search_ops(
+            GlobalSearchPermissionsAction
+        )
+        self.search_permissions_by_user = permission_group.atomic_bulk_scoped_search_ops(
+            SearchPermissionsByUserAction
+        )
         self.create_permission = ActionProcessor(service.create_permission, action_monitors)
         self.update_permission = ActionProcessor(service.update_permission, action_monitors)
         self.delete_permission = ActionProcessor(service.delete_permission, action_monitors)

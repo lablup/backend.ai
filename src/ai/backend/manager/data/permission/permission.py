@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityType, FieldData, ScopeType
 from ai.backend.manager.data.common.types import SearchResult
 
 from .types import OperationType, Permission
@@ -21,7 +21,7 @@ class PermissionCreator:
 
 
 @dataclass
-class PermissionData:
+class PermissionData(FieldData):
     id: uuid.UUID
     role_id: uuid.UUID
     scope_type: EntityType

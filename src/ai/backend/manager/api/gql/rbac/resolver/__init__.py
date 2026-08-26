@@ -9,9 +9,11 @@ from .permission import (
     admin_permissions,
     admin_replace_role_permissions,
     admin_update_permission,
+    my_permissions,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
+    user_permissions,
 )
 from .role import (
     admin_assign_role,
@@ -32,6 +34,8 @@ from .role import (
 __all__ = [
     # Permission queries
     "admin_permissions",
+    "my_permissions",
+    "user_permissions",
     "rbac_entity_operation_combinations",
     "rbac_permission_matrix",
     "rbac_scope_entity_combinations",

@@ -50,7 +50,6 @@ from ai.backend.manager.data.permission.virtual_scope import (
     ScopePermissionCheckKey,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -322,13 +321,9 @@ class PermissionControllerRepository:
         return await self._db_source.search_roles_in_scope(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
-    async def search_permissions(
-        self,
-        querier: BatchQuerier,
-        scope: PermissionOperationScope | None = None,
-    ) -> PermissionListResult:
-        """Searches permissions with pagination and filtering."""
-        return await self._db_source.search_permissions(querier=querier, scope=scope)
+    async def batch_load_permissions(self, querier: BatchQuerier) -> PermissionListResult:
+        """Load the permission rows a GQL node field names."""
+        return await self._db_source.batch_load_permissions(querier)
 
     @permission_controller_repository_resilience.apply()
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:
