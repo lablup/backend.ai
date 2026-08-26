@@ -11,6 +11,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.manager.api.rest.middleware import auth as auth_module
 from ai.backend.manager.api.rest.middleware.auth import (
+    FORWARDED_PREFIX_HEADER,
     FORWARDED_URL_HEADER,
     TRUSTED_PROXY_NETWORKS_KEY,
     extract_client_ip,
@@ -24,6 +25,7 @@ SECRET_KEY = "fake-secret-key"
 DEFAULT_HOST = "10.214.150.180:8081"
 DEFAULT_PATH = "/admin/gql"
 FORWARDED_URL = "https://example.invalid/proxied/admin/gql"
+FORWARDED_PREFIX = "/bai"
 TRUSTED_PROXY = "10.0.0.1"
 UNTRUSTED_PEER = "203.0.113.7"
 
@@ -33,6 +35,7 @@ def _make_request(
     host: str = DEFAULT_HOST,
     raw_path: str = DEFAULT_PATH,
     forwarded_url: str | None = None,
+    forwarded_prefix: str | None = None,
     forwarded_for: str | None = None,
     peer: str | None = TRUSTED_PROXY,
     trusted_proxies: list[str] | None = None,
@@ -42,6 +45,8 @@ def _make_request(
     headers = {"X-BackendAI-Version": "v8.20240915"}
     if forwarded_url is not None:
         headers[FORWARDED_URL_HEADER] = forwarded_url
+    if forwarded_prefix is not None:
+        headers[FORWARDED_PREFIX_HEADER] = forwarded_prefix
     if forwarded_for is not None:
         headers["X-Forwarded-For"] = forwarded_for
 
@@ -69,6 +74,7 @@ def _make_request(
 @pytest.fixture(autouse=True)
 def reset_deprecation_warning() -> None:
     auth_module._warn_forwarded_url_without_trusted_proxies.cache_clear()
+    auth_module._warn_forwarded_url_path_deprecated.cache_clear()
 
 
 def test_parse_trusted_proxy_networks_accepts_bare_addresses_cidrs_and_wildcards() -> None:
@@ -186,6 +192,68 @@ async def test_no_warning_when_forwarded_url_is_absent(
     assert not [
         record for record in caplog.records if "manager.trusted-proxies" in record.getMessage()
     ]
+
+
+class TestSignRequestForwardedPrefix:
+    @pytest.mark.parametrize(
+        ("peer", "expected_path"),
+        [
+            pytest.param(
+                TRUSTED_PROXY, FORWARDED_PREFIX + DEFAULT_PATH, id="honored_from_trusted_peer"
+            ),
+            pytest.param(UNTRUSTED_PEER, DEFAULT_PATH, id="ignored_from_untrusted_peer"),
+        ],
+    )
+    async def test_is_honored_based_on_trust(self, peer: str, expected_path: str) -> None:
+        prefixed = _make_request(
+            forwarded_prefix=FORWARDED_PREFIX, peer=peer, trusted_proxies=["10.0.0.0/8"]
+        )
+        literal = _make_request(raw_path=expected_path, peer=peer, trusted_proxies=["10.0.0.0/8"])
+
+        assert await sign_request(SIGN_METHOD, prefixed, SECRET_KEY) == await sign_request(
+            SIGN_METHOD, literal, SECRET_KEY
+        )
+
+    @pytest.mark.parametrize(
+        ("raw_prefix", "expected_path"),
+        [
+            pytest.param(
+                FORWARDED_PREFIX + "/",
+                FORWARDED_PREFIX + DEFAULT_PATH,
+                id="trailing_slash_stripped",
+            ),
+            pytest.param("", DEFAULT_PATH, id="empty_prefix_is_no_prefix"),
+        ],
+    )
+    async def test_normalizes_prefix_value(self, raw_prefix: str, expected_path: str) -> None:
+        given = _make_request(
+            forwarded_prefix=raw_prefix, peer=TRUSTED_PROXY, trusted_proxies=["10.0.0.0/8"]
+        )
+        literal = _make_request(
+            raw_path=expected_path, peer=TRUSTED_PROXY, trusted_proxies=["10.0.0.0/8"]
+        )
+
+        assert await sign_request(SIGN_METHOD, given, SECRET_KEY) == await sign_request(
+            SIGN_METHOD, literal, SECRET_KEY
+        )
+
+    async def test_takes_priority_over_forwarded_url_path(self) -> None:
+        both = _make_request(
+            forwarded_prefix=FORWARDED_PREFIX,
+            forwarded_url=FORWARDED_URL,
+            peer=TRUSTED_PROXY,
+            trusted_proxies=["10.0.0.0/8"],
+        )
+        upstream_host_with_prefixed_path = _make_request(
+            host="example.invalid",
+            raw_path=FORWARDED_PREFIX + DEFAULT_PATH,
+            peer=TRUSTED_PROXY,
+            trusted_proxies=["10.0.0.0/8"],
+        )
+
+        assert await sign_request(SIGN_METHOD, both, SECRET_KEY) == await sign_request(
+            SIGN_METHOD, upstream_host_with_prefixed_path, SECRET_KEY
+        )
 
 
 class TestExtractClientIP:
