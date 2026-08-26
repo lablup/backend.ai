@@ -6,10 +6,9 @@ this class. Which spec goes with which operation: ``../KNOWLEDGE.md``.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import (
     EntityData,
     EntityIdentifier,
@@ -17,7 +16,6 @@ from ai.backend.common.data.entity.types import (
     FieldIdentifier,
     RuntimeEntityID,
 )
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.repository import EntityNotFoundError, EntityWriteRefusedError
 from ai.backend.manager.models.scopes import OperationScope
@@ -47,11 +45,6 @@ from ai.backend.manager.models.specs.querier import (
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
-)
-from ai.backend.manager.models.specs.relation import (
-    RelationCreator,
-    RelationLifecycleUpdater,
-    RelationPurger,
 )
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.models.specs.types import BulkResultWithFailures, EntityWithFieldsResult
@@ -468,85 +461,6 @@ class OpsRepository[TData]:
         """Update every matching row across the table; caller holds the authority."""
         async with self._ops.write_ops() as w:
             return await w.batch_update_in_global(updater)
-
-    async def create_relation(self, left: Any, right: Any, creator: RelationCreator[Any]) -> bool:
-        """Link the two entities; ``False`` when the pair was already linked."""
-        async with self._ops.write_ops() as w:
-            return await w.create_relation(left, right, creator)
-
-    async def delete_relation(
-        self, left: Any, right: Any, updater: RelationLifecycleUpdater[Any]
-    ) -> bool:
-        """Switch the pair's relation off; ``False`` when there was none to switch."""
-        async with self._ops.write_ops() as w:
-            return await w.delete_relation(left, right, updater)
-
-    async def restore_relation(
-        self, left: Any, right: Any, updater: RelationLifecycleUpdater[Any]
-    ) -> bool:
-        """Switch the pair's relation back on; ``False`` when there was none."""
-        async with self._ops.write_ops() as w:
-            return await w.restore_relation(left, right, updater)
-
-    async def purge_relation(self, left: Any, right: Any, purger: RelationPurger[Any]) -> bool:
-        """Remove the pair's relation; ``False`` when there was none to remove."""
-        async with self._ops.write_ops() as w:
-            return await w.purge_relation(left, right, purger)
-
-    async def grant_roles(
-        self, user_id: UserID, role_ids: Collection[RoleID], granted_by: UserID | None = None
-    ) -> None:
-        """Give the user every named role, skipping the ones already held."""
-        async with self._ops.write_ops() as w:
-            await w.grant_roles(user_id, role_ids, granted_by)
-
-    async def revoke_roles(self, user_id: UserID, role_ids: Collection[RoleID]) -> None:
-        """Take the named roles back from the user."""
-        async with self._ops.write_ops() as w:
-            await w.revoke_roles(user_id, role_ids)
-
-    async def enroll_in_organization(
-        self,
-        organization: Any,
-        user_id: UserID,
-        creator: RelationCreator[Any],
-        role_ids: Collection[RoleID] | None = None,
-        granted_by: UserID | None = None,
-    ) -> bool:
-        """Put the user in the organization and give them its roles.
-
-        Two tables in one transaction, so it is a method here rather than a spec handed
-        to ops. ``role_ids`` names what to give; ``None`` gives the organization's
-        auto-assign roles, which is what a join with no role named means. Naming a role
-        the organization does not hold is the caller's to reject — this writes what it
-        is given.
-        """
-        async with self._ops.write_ops() as w:
-            linked = await w.create_relation(organization, user_id, creator)
-            granted = (
-                list(role_ids)
-                if role_ids is not None
-                else list(await w.auto_assign_role_ids_in(organization))
-            )
-            await w.grant_roles(user_id, granted, granted_by)
-            return linked
-
-    async def withdraw_from_organization(
-        self,
-        organization: Any,
-        user_id: UserID,
-        purger: RelationPurger[Any],
-    ) -> bool:
-        """Take the user out of the organization and back its roles out with them.
-
-        Every role enrolled in the organization goes, with nothing recording which of
-        them the join gave: a role may only be named from the organization's own, so one
-        held by a non-member is not a state that arises.
-        """
-        async with self._ops.write_ops() as w:
-            enrolled = await w.role_ids_enrolled_in(organization)
-            await w.revoke_roles(user_id, enrolled)
-            return await w.purge_relation(organization, user_id, purger)
 
     async def batch_purge_entities_in_scopes(
         self, scopes: Sequence[OperationScope], purger: EntityBatchPurger[Any, TData]

@@ -97,6 +97,25 @@ class NotEnoughPermission(BackendAIError, web.HTTPForbidden):
         )
 
 
+class RoleNotEnrolledInScope(BackendAIError, web.HTTPBadRequest):
+    """A role named for a membership does not belong to the organization.
+
+    Refused rather than skipped: attaching a role the organization does not hold would
+    make membership a path for granting unrelated permission.
+    """
+
+    error_type = "https://api.backend.ai/probs/role-not-enrolled-in-scope"
+    error_title = "The role does not belong to this organization."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class PermissionNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/permission-not-found"
     error_title = "The permission does not exist."

@@ -13,6 +13,7 @@ from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
     ContainerRegistryOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.rbac.provider import V2RBACOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
 from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
@@ -81,6 +82,7 @@ class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
                 db=setup_input.db,
                 ops_provider=DBOpsProvider(setup_input.db),
                 v2_ops_provider=V2DBOpsProvider(setup_input.db),
+                rbac_v2_ops_provider=V2RBACOpsProvider(setup_input.db),
                 container_registry_ops_provider=ContainerRegistryOpsProvider(setup_input.db),
                 reconcile_ops_provider=ReconcileOpsProvider(setup_input.db),
                 artifact_registry_ops_provider=ArtifactRegistryOpsProvider(setup_input.db),

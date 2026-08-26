@@ -18,6 +18,7 @@ from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
     ContainerRegistryOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.rbac.provider import V2RBACOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
 from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
@@ -30,6 +31,7 @@ class RepositoryArgs:
     db: ExtendedAsyncSAEngine
     ops_provider: DBOpsProvider
     v2_ops_provider: V2DBOpsProvider
+    rbac_v2_ops_provider: V2RBACOpsProvider
     container_registry_ops_provider: ContainerRegistryOpsProvider
     reconcile_ops_provider: ReconcileOpsProvider
     artifact_registry_ops_provider: ArtifactRegistryOpsProvider

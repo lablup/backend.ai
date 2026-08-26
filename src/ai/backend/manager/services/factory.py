@@ -201,6 +201,7 @@ from ai.backend.manager.services.prometheus_query_preset.service import (
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
 )
+from ai.backend.manager.services.rbac.service import RBACService
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
@@ -430,6 +431,7 @@ def create_services(args: ServiceArgs) -> Services:
             storage_manager=args.storage_manager,
             config_provider=args.config_provider,
         ),
+        rbac=RBACService(repositories.rbac_v2),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
             group_repository=repositories.project.repository,

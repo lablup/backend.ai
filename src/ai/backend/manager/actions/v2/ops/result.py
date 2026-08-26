@@ -39,9 +39,6 @@ __all__ = (
     "EntitiesOpsResult",
     "BatchOpsResult",
     "ScopedBatchOpsResult",
-    "RelationOpsResult",
-    "OrganizationMembershipOpsResult",
-    "RoleAssignmentOpsResult",
 )
 
 
@@ -236,41 +233,3 @@ class ScopedBatchOpsResult[TData: EntityData](BatchOpsResult[TData], BaseScopeAc
         settle by returning less than the run knows.
         """
         return tuple(item.entity_id() for item in self.items)
-
-
-@dataclass
-class RelationOpsResult:
-    """Whether the call is what changed the relation.
-
-    Carries no relation: what a read answers with is the entities a relation reaches,
-    never the row between them, so there is nothing here for a caller to hold.
-    """
-
-    changed: bool
-
-
-@dataclass
-class OrganizationMembershipOpsResult(BaseScopeActionResult):
-    """A user put in an organization, or taken out of it.
-
-    Names the user: the membership row is not an entity, and the user is what the run
-    was about within the organization the scope targets already carry.
-    """
-
-    user: EntityIdentifier
-    changed: bool
-
-    @override
-    def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return (self.user,)
-
-
-@dataclass
-class RoleAssignmentOpsResult(BaseScopeActionResult):
-    """Roles given to a user, or taken back."""
-
-    user: EntityIdentifier
-
-    @override
-    def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return (self.user,)

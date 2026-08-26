@@ -46,6 +46,7 @@ from ai.backend.manager.repositories.project.repositories import ProjectReposito
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepositories,
 )
+from ai.backend.manager.repositories.rbac.repository import RBACRepository
 from ai.backend.manager.repositories.replica_group.repositories import ReplicaGroupRepositories
 from ai.backend.manager.repositories.reservoir_registry.repositories import (
     ReservoirRegistryRepositories,
@@ -86,6 +87,8 @@ class Repositories:
     agent: AgentRepositories
     ops_provider: DBOpsProvider
     v2_ops_provider: V2DBOpsProvider
+    #: Links between entities and the roles a user holds, wherever the spec was declared.
+    rbac_v2: RBACRepository
     auth: AuthRepositories
     container_registry: ContainerRegistryRepositories
     deployment: DeploymentRepositories
@@ -187,6 +190,7 @@ class Repositories:
             agent=agent_repositories,
             ops_provider=args.ops_provider,
             v2_ops_provider=args.v2_ops_provider,
+            rbac_v2=RBACRepository(args.rbac_v2_ops_provider),
             auth=auth_repositories,
             container_registry=container_registry_repositories,
             deployment=deployment_repositories,

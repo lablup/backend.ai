@@ -53,7 +53,20 @@
 - A primitive only one domain uses does NOT go on the general ops. Write ops extending
   `V2WriteOps` and a provider extending `V2DBOpsProvider` that overrides `write_ops()`,
   and inject that provider only into the repositories needing the primitive
-  (`ops/v2/reconciler/`, `ops/v2/container_registry/`, `ops/rbac/`).
+  (`ops/v2/reconciler/`, `ops/v2/container_registry/`, `ops/v2/rbac/`, `ops/rbac/`).
+- Count the repositories that hold a primitive, not the domains that benefit. Links
+  between entities are written from five domains' specs and still live off the general
+  ops, because one repository writes them all.
+- Primitives that have to run in one transaction belong on one ops class. Putting a user
+  in an organization writes a link and grants a role, so both are `ops/v2/rbac/` — split
+  across two providers they would be two transactions.
+- `RepositoryArgs` carries what a repository is built from — the engine and the
+  providers. Building one there and passing it in leaves `Repositories.create` with
+  nothing to create.
+- A check that guards a write runs on the ops the write was given, inside the same
+  method. A repository method that reads through one call and writes through another
+  puts two transactions where the guard needs one, so a public read that only exists to
+  feed such a check does not belong on the repository at all.
 - Separating into a repository is the default; internal operations may use db directly.
 - ops methods take only spec types (Querier/Creator/Updater/Upserter/Purger, `DependentCreatorSpec`).
   A single spec owns only a single table.
