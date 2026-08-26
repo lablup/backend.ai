@@ -1,6 +1,7 @@
 import logging
 
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    VALUE_TYPE_VALIDATORS,
     PresetTarget,
     PresetValueType,
 )
@@ -49,6 +50,17 @@ class RuntimeVariantPresetService:
             and effective_preset_target != PresetTarget.ARGS
         ):
             raise InvalidAPIParameters("value_type 'flag' is only valid with preset_target 'args'.")
+
+        if updater.default_value.is_update():
+            new_default_value = updater.default_value.value()
+            validator = VALUE_TYPE_VALIDATORS[effective_value_type]
+            try:
+                validator(new_default_value)
+            except (ValueError, TypeError) as e:
+                raise InvalidAPIParameters(
+                    f"default_value '{new_default_value}' is not a valid "
+                    f"{effective_value_type}: {e}"
+                ) from e
 
         data = await self._ops_repository.update(updater)
         return UpdateRuntimeVariantPresetActionResult(preset=data)

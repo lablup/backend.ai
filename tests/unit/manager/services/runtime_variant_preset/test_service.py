@@ -29,7 +29,7 @@ from ai.backend.manager.services.runtime_variant_preset.actions.update import (
 from ai.backend.manager.services.runtime_variant_preset.service import (
     RuntimeVariantPresetService,
 )
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 class TestRuntimeVariantPresetServiceUpdateValidation:
@@ -186,3 +186,106 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
 
         with pytest.raises(InvalidAPIParameters, match="flag"):
             await service.update(action)
+
+
+class TestRuntimeVariantPresetServiceUpdateDefaultValueValidation:
+    """Tests for value_type-aware default_value validation in service update."""
+
+    @pytest.fixture
+    def mock_repository(self) -> MagicMock:
+        return MagicMock(spec=RuntimeVariantPresetRepository)
+
+    @pytest.fixture
+    def mock_ops_repository(self) -> MagicMock:
+        return MagicMock(spec=OpsRepository)
+
+    @pytest.fixture
+    def service(
+        self, mock_repository: MagicMock, mock_ops_repository: MagicMock
+    ) -> RuntimeVariantPresetService:
+        return RuntimeVariantPresetService(
+            repository=mock_repository, ops_repository=mock_ops_repository
+        )
+
+    @pytest.fixture
+    def preset_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def int_preset(self, preset_id: uuid.UUID) -> RuntimeVariantPresetData:
+        """Existing preset with value_type=int."""
+        return RuntimeVariantPresetData(
+            id=RuntimeVariantPresetID(preset_id),
+            runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
+            name="test",
+            description=None,
+            rank=0,
+            preset_target=PresetTarget.ENV,
+            value_type=PresetValueType.INT,
+            default_value="1",
+            key="MY_VAR",
+            required=False,
+            category=None,
+            ui_type=None,
+            display_name=None,
+            ui_option=None,
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
+            updated_at=None,
+        )
+
+    async def test_default_value_is_rejected(
+        self,
+        service: RuntimeVariantPresetService,
+        mock_repository: MagicMock,
+        preset_id: uuid.UUID,
+        int_preset: RuntimeVariantPresetData,
+    ) -> None:
+        mock_repository.get_by_id = AsyncMock(return_value=int_preset)
+        updater = RuntimeVariantPresetUpdater(
+            preset_id=RuntimeVariantPresetID(preset_id),
+            default_value=TriState.update("abc"),
+        )
+        action = UpdateRuntimeVariantPresetAction(updater=updater)
+
+        with pytest.raises(InvalidAPIParameters, match="not a valid"):
+            await service.update(action)
+
+    async def test_effective_value_type_is_valid(
+        self,
+        service: RuntimeVariantPresetService,
+        mock_repository: MagicMock,
+        mock_ops_repository: MagicMock,
+        preset_id: uuid.UUID,
+        int_preset: RuntimeVariantPresetData,
+    ) -> None:
+        """default_value="abc" is invalid for the stored INT type but valid for the
+        incoming STR type — the effective (new) type must be used, not the stored one."""
+        updated_data = RuntimeVariantPresetData(
+            id=RuntimeVariantPresetID(preset_id),
+            runtime_variant_id=int_preset.runtime_variant_id,
+            name="test",
+            description=None,
+            rank=0,
+            preset_target=PresetTarget.ENV,
+            value_type=PresetValueType.STR,
+            default_value="abc",
+            key="MY_VAR",
+            required=False,
+            category=None,
+            ui_type=None,
+            display_name=None,
+            ui_option=None,
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
+            updated_at=datetime(2024, 1, 2, tzinfo=UTC),
+        )
+        mock_repository.get_by_id = AsyncMock(return_value=int_preset)
+        mock_ops_repository.update = AsyncMock(return_value=updated_data)
+        updater = RuntimeVariantPresetUpdater(
+            preset_id=RuntimeVariantPresetID(preset_id),
+            value_type=OptionalState.update(PresetValueType.STR),
+            default_value=TriState.update("abc"),
+        )
+        action = UpdateRuntimeVariantPresetAction(updater=updater)
+
+        result = await service.update(action)
+        assert result.preset.default_value == "abc"
