@@ -416,9 +416,9 @@ class PermissionDBSource:
                 perm_creator = Creator(
                     spec=PermissionCreatorSpec(
                         role_id=input_data.role_id,
-                        scope_type=RBACElementType(scoped_perm_input.scope_type.value),
+                        scope_type=scoped_perm_input.scope_type,
                         scope_id=scoped_perm_input.scope_id,
-                        entity_type=RBACElementType(scoped_perm_input.entity_type.value),
+                        entity_type=scoped_perm_input.entity_type,
                         operation=scoped_perm_input.operation,
                     )
                 )
@@ -1321,11 +1321,7 @@ class PermissionDBSource:
                         # scope_bindings.scope_id is a native UUID; permissions.scope_id
                         # stores its canonical string form. Cast to compare.
                         perm.c.scope_id == sa.cast(sb.c.scope_id, sa.String),
-                        # permissions.entity_type is an enum-backed column; bind the open
-                        # string type as a plain VARCHAR so unknown types match nothing
-                        # instead of failing enum coercion.
-                        perm.c.entity_type
-                        == sa.literal(group_key.subject_entity_type, sa.String()),
+                        perm.c.entity_type == group_key.subject_entity_type,
                     ),
                 )
                 .join(roles, roles.c.id == perm.c.role_id)

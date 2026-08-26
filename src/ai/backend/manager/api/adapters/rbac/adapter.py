@@ -11,6 +11,7 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
 from ai.backend.common.data.permission.types import RBACElementType
@@ -874,9 +875,9 @@ class RBACAdapter(BaseAdapter):
         creator: Creator[PermissionRow] = Creator(
             spec=PermissionCreatorSpec(
                 role_id=input.role_id,
-                scope_type=scope_type,
+                scope_type=ScopeType(EntityType(scope_type)),
                 scope_id=input.scope_id,
-                entity_type=RBACElementType(input.entity_type),
+                entity_type=EntityType(RBACElementType(input.entity_type)),
                 operation=InternalOperationType(input.operation),
             )
         )
@@ -893,7 +894,7 @@ class RBACAdapter(BaseAdapter):
             self._validate_scope_id(RBACElementType(input.scope_type), input.scope_id)
         spec = PermissionUpdaterSpec(
             scope_type=(
-                OptionalState.update(RBACElementType(input.scope_type))
+                OptionalState.update(ScopeType(EntityType(RBACElementType(input.scope_type))))
                 if input.scope_type is not None
                 else OptionalState.nop()
             ),
@@ -903,7 +904,7 @@ class RBACAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
             entity_type=(
-                OptionalState.update(RBACElementType(input.entity_type))
+                OptionalState.update(EntityType(RBACElementType(input.entity_type)))
                 if input.entity_type is not None
                 else OptionalState.nop()
             ),
@@ -1005,9 +1006,9 @@ class RBACAdapter(BaseAdapter):
             failed=[
                 BulkAddRolePermissionFailureInfo(
                     role_id=f.role_id,
-                    scope_type=f.scope_type.value,
+                    scope_type=f.scope_type,
                     scope_id=f.scope_id,
-                    entity_type=f.entity_type.value,
+                    entity_type=f.entity_type,
                     operation=f.operation.value,
                     message=f.message,
                 )
@@ -1063,9 +1064,9 @@ class RBACAdapter(BaseAdapter):
             failed=[
                 ReplaceRolePermissionFailureInfo(
                     role_id=f.role_id,
-                    scope_type=f.scope_type.value,
+                    scope_type=f.scope_type,
                     scope_id=f.scope_id,
-                    entity_type=f.entity_type.value,
+                    entity_type=f.entity_type,
                     operation=f.operation.value,
                     message=f.message,
                 )
@@ -1078,9 +1079,9 @@ class RBACAdapter(BaseAdapter):
         self._validate_scope_id(scope_type, entry.scope_id)
         return PermissionCreatorSpec(
             role_id=entry.role_id,
-            scope_type=scope_type,
+            scope_type=ScopeType(EntityType(scope_type)),
             scope_id=entry.scope_id,
-            entity_type=RBACElementType(entry.entity_type),
+            entity_type=EntityType(RBACElementType(entry.entity_type)),
             operation=InternalOperationType(entry.operation),
         )
 
@@ -1785,9 +1786,9 @@ class RBACAdapter(BaseAdapter):
         return PermissionNode(
             id=data.id,
             role_id=data.role_id,
-            scope_type=RBACElementTypeDTO(data.scope_type.to_element().value),
+            scope_type=RBACElementTypeDTO(data.scope_type),
             scope_id=data.scope_id,
-            entity_type=RBACElementTypeDTO(data.entity_type.to_element().value),
+            entity_type=RBACElementTypeDTO(data.entity_type),
             operation=OperationTypeDTO(data.operation.value),
             created_at=data.created_at,
         )

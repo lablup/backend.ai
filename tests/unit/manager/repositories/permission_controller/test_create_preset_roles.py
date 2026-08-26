@@ -203,11 +203,12 @@ class TestCreatePresetRoles:
                 )
             )
             for row in permission_rows:
-                assert row.scope_type == ScopeType.DOMAIN
+                assert row.scope_type == ScopeType.DOMAIN.value
                 assert row.scope_id == domain_id
-            assert {(row.entity_type, row.operation) for row in permission_rows} == set(
-                domain_preset.permissions
-            )
+            assert {(row.entity_type, row.operation) for row in permission_rows} == {
+                (entity_type.value, operation)
+                for entity_type, operation in domain_preset.permissions
+            }
 
     async def test_auto_assign_is_inherited_from_preset(
         self,
