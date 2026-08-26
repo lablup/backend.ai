@@ -122,7 +122,7 @@ Retention targets are grouped into **domain categories**; each category's cleanu
 | `logs` | `event_logs`, `audit_logs`, `error_logs` | `created_at` | 1yr | common-column mixin (group). `error_logs` deletes all rows past the boundary |
 | `login` | `login_history`, `login_sessions` | login_history `created_at`; login_sessions `invalidated_at` + `{INVALIDATED, REVOKED}` | 1yr | domain group, per-table spec |
 | `reconcile_history` | `session_scheduling_history`, `kernel_scheduling_history`, `deployment_history`, `route_history`, `replica_group_history` | `updated_at` (`attempts++` merge) | 1yr | common-column mixin (group) |
-| `roles_invitations` | `roles`, `role_invitations`, `vfolder_invitations` | roles `deleted_at`+`DELETED`; invitations terminal state + `updated_at`/`modified_at` (proxy) | 1yr | domain group (invitations unified), per-table spec |
+| `roles_invitations` | `roles`, `vfolder_invitations`, `entity_invitations` | roles `deleted_at`+`DELETED`; invitations terminal state + `updated_at`/`modified_at` (proxy) | 1yr | domain group (invitations unified), per-table spec |
 | `deployments` | `endpoints` (destroyed), `endpoint_tokens` (expired) | endpoints `DESTROYED`+`destroyed_at`; tokens `expires_at` | 1yr | domain group; endpoints bespoke, tokens simple |
 | `sessions` | `sessions` (+ `kernels`) | session/kernel `DEAD_*_STATUSES {TERMINATED, CANCELLED}` + `terminated_at` | 1yr | bespoke (ordered delete) |
 | `usage_records` | `kernel_usage_records` | `period_end` | **90d** | simple; raw records aggregated into buckets, so kept briefly |

@@ -150,7 +150,7 @@ class TestSearchPermissions:
 
         assert result.total_count == 2
         for item in result.items:
-            assert item.entity_type == EntityType.VFOLDER
+            assert item.entity_type == EntityType.VFOLDER.value
 
     async def test_search_permissions_ordered_by_entity_type(
         self,
@@ -166,4 +166,4 @@ class TestSearchPermissions:
         result = await repository.search_permissions(querier)
 
         entity_types = [item.entity_type for item in result.items]
-        assert entity_types == sorted(entity_types, key=lambda et: et.value)
+        assert entity_types == sorted(entity_types)
