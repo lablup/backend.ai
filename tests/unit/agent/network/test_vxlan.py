@@ -768,3 +768,123 @@ class TestOverlayReachProbe:
         await plugin.teardown_session_network("s1")
         assert task.cancelled() or task.cancelling()
         assert "s1" not in plugin._reach_tasks
+
+
+class TestXfrmStateVerb:
+    """`ip xfrm state update` on an absent SA is ESRCH, so it can never create one.
+
+    Measured on a live encrypted session: every call failed with "RTNETLINK answers: No such
+    process", `ip xfrm state count` stayed 0, and the overlay carried plaintext while the manager
+    had already taken 38 bytes off the MTU for ESP -- a session that reports encryption and has
+    none.
+    """
+
+    def test_states_are_added_not_updated(self) -> None:
+        cmds = xfrm_add_args("10.0.0.1", "10.0.0.2", 7, "ab" * 32)
+        states = [c for c in cmds if c[:3] == ["ip", "xfrm", "state"]]
+        assert len(states) == 2
+        for c in states:
+            assert c[3] == "add", c
+
+    def test_policies_stay_update(self) -> None:
+        # XFRM_MSG_UPDPOLICY does create when absent, so the policies need no add/EEXIST dance.
+        cmds = xfrm_add_args("10.0.0.1", "10.0.0.2", 7, "ab" * 32)
+        policies = [c for c in cmds if c[:3] == ["ip", "xfrm", "policy"]]
+        assert len(policies) == 2
+        for c in policies:
+            assert c[3] == "update", c
+
+    async def test_existing_sa_is_replayed_as_update(self) -> None:
+        # Kernel SAs outlive the agent, so a restart re-programs onto one that already exists;
+        # `add` is EEXIST there and must fall back rather than fail the session.
+        class FailAdd(Recorder):
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                await super().__call__(argv)
+                if list(argv[:4]) == ["ip", "xfrm", "state", "add"]:
+                    raise RuntimeError("RTNETLINK answers: File exists")
+
+        rec = FailAdd()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.add_peer("s1", _PEER)
+        verbs = [c[3] for c in rec.calls if c[:3] == ["ip", "xfrm", "state"]]
+        assert verbs.count("add") == 2 and verbs.count("update") == 2, verbs
+
+    async def test_a_non_state_failure_is_not_swallowed(self) -> None:
+        class FailPolicy(Recorder):
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                await super().__call__(argv)
+                if list(argv[:3]) == ["ip", "xfrm", "policy"]:
+                    raise RuntimeError("boom")
+
+        plugin = _plugin(FailPolicy())
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        with pytest.raises(RuntimeError, match="boom"):
+            await plugin.add_peer("s1", _PEER)
+
+
+class TestEncryptionTeardown:
+    """Teardown must unprogram ESP itself; the device delete does not take XFRM with it.
+
+    Measured: after a session, one node still held `SAD 2 / SPD 1+1` pointing at a dead peer pod
+    IP while the other was clean, and the next encrypted session on that VTEP pair saw 100% packet
+    loss until `ip xfrm state flush`. The SPI is derived from (vni, src, dst), so a reused VNI on
+    the same pair recomputes the SAME SPI with a DIFFERENT key -- a stale SA silently eats traffic.
+    """
+
+    @staticmethod
+    def _xfrm(rec: Recorder) -> list[list[str]]:
+        return [c for c in rec.calls if c[:2] == ["ip", "xfrm"]]
+
+    async def test_teardown_deletes_esp_for_a_peer_del_peer_never_saw(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")  # no del_peer: the peer vanished
+        deletes = [c for c in self._xfrm(rec) if c[3] == "delete" or c[3] == "del"]
+        assert deletes, "teardown left the SA/policy behind"
+        assert any(_PEER.vtep_ip in c for c in deletes)
+
+    async def test_teardown_is_quiet_for_a_plaintext_session(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_META, _SELF)  # no encryption_key
+        await plugin.add_peer("s1", _PEER)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert self._xfrm(rec) == []
+
+    async def test_del_peer_then_teardown_does_not_delete_twice(self) -> None:
+        # del_peer already cleaned this peer, so teardown has nothing left to do for it.
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        await plugin.del_peer("s1", _PEER)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert self._xfrm(rec) == []
+
+    async def test_a_delete_that_fails_does_not_stop_the_rest(self) -> None:
+        # A peer whose entries are already gone must not strand the next peer's.
+        class FlakyDelete(Recorder):
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                await super().__call__(argv)
+                if list(argv[:4]) == ["ip", "xfrm", "state", "delete"] and _PEER.vtep_ip in argv:
+                    raise RuntimeError("RTNETLINK answers: No such process")
+
+        other = Member(agent_id="a3", host_ip="10.0.0.3", vtep_ip="10.0.0.3")
+        rec = FlakyDelete()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        await plugin.add_peer("s1", other)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert any(other.vtep_ip in c for c in self._xfrm(rec))

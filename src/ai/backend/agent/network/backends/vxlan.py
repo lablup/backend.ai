@@ -155,15 +155,23 @@ def xfrm_add_args(
     self_vtep: str, peer_vtep: str, vni: int, key_hex: str, *, dstport: int = VXLAN_DSTPORT
 ) -> list[list[str]]:
     """The `ip xfrm` commands that encrypt this node↔peer VXLAN traffic: an out/in ESP SA pair plus
-    the out/in policy selecting the VXLAN UDP. Idempotent via `update`."""
+    the out/in policy selecting the VXLAN UDP.
+
+    The states use `add`, not `update`: `XFRM_MSG_UPDSA` looks the SA up first and returns ESRCH
+    when it is absent, so `update` alone never *creates* one -- measured, every call failed with
+    "RTNETLINK answers: No such process" and the overlay ran in clear text while still paying the
+    38-byte ESP MTU cost. `add` is EEXIST on an SA that survived an agent restart, which
+    `_run_xfrm` handles by replaying it as `update`. Policies keep `update`, which is a true
+    upsert (`XFRM_MSG_UPDPOLICY` creates when absent).
+    """
     key = _aead_key(key_hex)
     spi_out = f"{_esp_spi(vni, self_vtep, peer_vtep):#x}"
     spi_in = f"{_esp_spi(vni, peer_vtep, self_vtep):#x}"
     aead = ["aead", "rfc4106(gcm(aes))", key, str(_ICV_BITS)]
     return [
-        ["ip", "xfrm", "state", "update", "src", self_vtep, "dst", peer_vtep,
+        ["ip", "xfrm", "state", "add", "src", self_vtep, "dst", peer_vtep,
          "proto", "esp", "spi", spi_out, "mode", "transport", *aead],
-        ["ip", "xfrm", "state", "update", "src", peer_vtep, "dst", self_vtep,
+        ["ip", "xfrm", "state", "add", "src", peer_vtep, "dst", self_vtep,
          "proto", "esp", "spi", spi_in, "mode", "transport", *aead],
         ["ip", "xfrm", "policy", "update", "src", self_vtep, "dst", peer_vtep,
          "proto", "udp", "dport", str(dstport), "dir", "out",
@@ -357,6 +365,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     _local_subnets: LocalSubnetAllocator
     _mtu_probe: MtuProbe
     _reach_probe: ReachProbe
+    # Peers whose ESP SA/policy pair this node has programmed, per session. XFRM lives in the
+    # netns rather than on the device, so teardown has to unprogram it explicitly and cannot rely
+    # on `del_peer` having run for every peer first.
+    _encrypted_peers: dict[str, set[str]]
     # Per-session background reach probes, so teardown does not leave them running against a
     # bridge that is being deleted.
     _reach_tasks: dict[str, set[asyncio.Task[None]]]
@@ -380,6 +392,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._mtu_probe = mtu_probe or underlay_mtu
         self._reach_probe = reach_probe or arp_probe
         self._reach_tasks = {}
+        self._encrypted_peers = {}
         self._sessions = {}
         # This node's own VXLAN tunnel endpoint per session — the local `src` for every XFRM SA,
         # captured from `self_member` at setup/adopt because add_peer/del_peer only receive the peer.
@@ -534,12 +547,22 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     @override
     async def teardown_session_network(self, session_id: str) -> None:
         meta = self._sessions.pop(session_id, None)
-        self._self_vteps.pop(session_id, None)
+        self_vtep = self._self_vteps.pop(session_id, None)
+        peers = self._encrypted_peers.pop(session_id, set())
         for task in self._reach_tasks.pop(session_id, set()):
             task.cancel()
         await self._local_subnets.release(session_id)
         if meta is None or meta.vni is None:
             return
+        # XFRM lives in the netns, not on the device: deleting the vxlan link below leaves any SA
+        # and policy behind. `del_peer` cannot be relied on to have run for every peer first --
+        # a peer node can vanish, or teardown can win the race -- and a leftover SA is actively
+        # harmful rather than untidy: the SPI is derived from (vni, src, dst), so the next session
+        # that reuses the VNI on the same VTEP pair computes the SAME SPI with a DIFFERENT key and
+        # its traffic is dropped. Measured: one node kept `SAD 2 / SPD 1+1` pointing at a dead peer
+        # and the next encrypted session on that pair saw 100% loss until an `ip xfrm state flush`.
+        for peer_vtep in sorted(peers):
+            await self._unprogram_encryption(meta, session_id, peer_vtep, self_vtep)
         await self._del_forward_accept(meta.vni)
         # delete the overlay bridge/vxlan and the per-session LOCAL bridge; ignore missing
         devs = [bridge_dev(meta.vni), vxlan_dev(meta.vni), local_bridge_dev(meta.vni)]
@@ -573,25 +596,45 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         for args in xfrm_add_args(
             self_vtep, peer_vtep, meta.vni, meta.encryption_key, dstport=meta.vxlan_port
         ):
-            await self._runner(args)
+            await self._run_xfrm(args)
+        self._encrypted_peers.setdefault(session_id, set()).add(peer_vtep)
+
+    async def _unprogram_encryption(
+        self, meta: SessionNetMeta, session_id: str, peer_vtep: str, self_vtep: str | None
+    ) -> None:
+        """Remove this node↔peer ESP SA pair and policies. Best-effort and idempotent."""
+        if meta.encryption_key is None or meta.vni is None or self_vtep is None:
+            self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
+            return
+        for args in xfrm_del_args(self_vtep, peer_vtep, meta.vni, dstport=meta.vxlan_port):
+            try:
+                await self._runner(args)
+            except RuntimeError:
+                log.debug("xfrm entry already gone for peer {} in {}", peer_vtep, session_id)
+        self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
+
+    async def _run_xfrm(self, argv: Sequence[str]) -> None:
+        """Run one `ip xfrm` command, replaying a state `add` as `update` when it already exists.
+
+        Kernel SAs outlive the agent process, so a restart re-programs onto an existing one; `add`
+        is EEXIST there and `update` is the in-place replace. Only that one case is retried -- any
+        other failure is the caller's to see.
+        """
+        try:
+            await self._runner(argv)
+        except RuntimeError:
+            if list(argv[:4]) != ["ip", "xfrm", "state", "add"]:
+                raise
+            await self._runner(["ip", "xfrm", "state", "update", *argv[4:]])
 
     @override
     async def del_peer(self, session_id: str, peer: Member) -> None:
         meta = self._sessions.get(session_id)
         if meta is None or meta.vni is None or peer.vtep_ip is None:
             return
-        if meta.encryption_key is not None:
-            self_vtep = self._self_vteps.get(session_id)
-            if self_vtep is not None:
-                for args in xfrm_del_args(
-                    self_vtep, peer.vtep_ip, meta.vni, dstport=meta.vxlan_port
-                ):
-                    try:
-                        await self._runner(args)
-                    except RuntimeError:
-                        log.debug(
-                            "xfrm entry already gone for peer {} in {}", peer.vtep_ip, session_id
-                        )
+        await self._unprogram_encryption(
+            meta, session_id, peer.vtep_ip, self._self_vteps.get(session_id)
+        )
         try:
             await self._runner(fdb_del_args(meta.vni, peer.vtep_ip))
         except RuntimeError:
