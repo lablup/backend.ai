@@ -237,3 +237,39 @@ class TestStatModeSelection:
 
     def test_keeps_cgroup_when_explicitly_configured(self) -> None:
         assert self._agent()._resolve_stat_mode(self._config(StatModes.CGROUP)) is StatModes.CGROUP
+
+
+class TestContainerLogRoot:
+    """Where the log root lives, and why it is not a constant.
+
+    containerd opens every one of these paths, in its own mount namespace. A containerised agent
+    that reads them in its own gets a directory containerd never wrote to -- which is silent, not an
+    error: empty `session logs`, kernel logs that are never unlinked, and a distro probe that reads
+    nothing. Anchoring the root to var-base-path is what makes the two agree, because that directory
+    already has to: the log-writer launcher is written into it and containerd execs it by path.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _restore_root(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # set_container_log_root rebinds a module global; leaving it moved would follow every later
+        # test in this process.
+        monkeypatch.setattr(grpc_mod, "CONTAINER_LOG_ROOT", grpc_mod.CONTAINER_LOG_ROOT)
+
+    def test_defaults_to_the_path_that_was_hard_coded(self) -> None:
+        # A host agent with the usual var-base-path must land exactly where it did before, so the
+        # fix cannot move an existing deployment's logs.
+        assert grpc_mod.set_container_log_root(Path("/var/lib/backend.ai")) == Path(
+            "/var/lib/backend.ai/containerd-logs"
+        )
+
+    def test_follows_var_base_path(self) -> None:
+        grpc_mod.set_container_log_root(Path("/var/lib/bai-containerd"))
+        assert grpc_mod.container_log_path("c1") == Path(
+            "/var/lib/bai-containerd/containerd-logs/c1.log"
+        )
+
+    def test_the_reader_follows_the_writer(self, tmp_path: Path) -> None:
+        # The point of the anchor: whatever the root is set to, every consumer derives from it.
+        # Pinning them to each other here is what a path constant could not guarantee.
+        root = grpc_mod.set_container_log_root(tmp_path)
+        assert grpc_mod.container_log_path("c1").parent == root

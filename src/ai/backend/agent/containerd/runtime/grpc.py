@@ -29,7 +29,7 @@ import tempfile
 from collections.abc import AsyncIterator, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast, override
+from typing import Any, Final, cast, override
 from uuid import uuid4
 
 import grpc
@@ -78,8 +78,34 @@ from ai.backend.logging import BraceStyleAdapter
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_ADDRESS = "unix:///run/containerd/containerd.sock"
-# Host dir where each task's captured stdout+stderr is written (read back by get_logs).
-CONTAINER_LOG_ROOT = Path("/var/lib/backend.ai/containerd-logs")
+
+# Where each task's captured stdout+stderr is written, and read back from by get_logs.
+#
+# containerd resolves this path in ITS OWN mount namespace, not the agent's -- the shim opens the
+# file, or starts the log writer that does, so what it sees is the daemon's filesystem. An agent on
+# the host shares that filesystem and the distinction never comes up. A containerised agent does
+# not, and the divergence is entirely silent: measured on a fatPod deployment, `session logs` came
+# back empty for every containerd kernel, each kernel's log stayed on the node forever because the
+# unlink swept a directory containerd had never written to, and the distro probe read nothing and
+# reported the image as unavailable.
+#
+# So the root follows `agent.var-base-path` rather than being fixed here. That directory already has
+# to name the same place on both sides -- the log-writer launcher is written into it and containerd
+# execs it by path -- which makes it the one anchor both processes are known to agree on. With the
+# usual `var-base-path = /var/lib/backend.ai` it resolves to exactly the path hard-coded before.
+_LOG_ROOT_DIRNAME: Final = "containerd-logs"
+CONTAINER_LOG_ROOT = Path("/var/lib/backend.ai") / _LOG_ROOT_DIRNAME
+
+
+def set_container_log_root(var_base_path: Path) -> Path:
+    """Anchor the container log root under ``var_base_path`` and return it.
+
+    Called once during agent init, before any container exists, because every path derived from the
+    root is handed to containerd rather than opened by us.
+    """
+    global CONTAINER_LOG_ROOT
+    CONTAINER_LOG_ROOT = var_base_path / _LOG_ROOT_DIRNAME
+    return CONTAINER_LOG_ROOT
 
 
 def container_log_path(container_id: str) -> Path:

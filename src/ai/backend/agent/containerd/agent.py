@@ -165,7 +165,7 @@ from .oci import (
     translate_accelerator_args,
     translate_creation_config,
 )
-from .runtime.grpc import CONTAINER_LOG_ROOT, ContainerdGrpcRuntime, container_log_path
+from .runtime.grpc import ContainerdGrpcRuntime, container_log_path, set_container_log_root
 from .runtime.interface import OciRuntime, TaskEvent
 from .session_network import (
     ContainerdSessionNetwork,
@@ -1799,11 +1799,14 @@ class ContainerdAgent(
         # we own the write end exactly as dockerd's log driver does — which is what makes max-size /
         # max-file rotation possible at all. The writer is a child of the shim, so it lives with the
         # container and an agent restart cannot interrupt it.
-        launcher = write_logger_launcher(
-            self.local_config.agent.var_base_path / "containerd-log-writer"
-        )
+        # Both the launcher and the log root are resolved by containerd, not by us, so both are
+        # anchored to var-base-path -- the one directory the two processes are known to agree on.
+        # This must happen before any container is created: every log path is derived from the root.
+        var_base_path = self.local_config.agent.var_base_path
+        log_root = set_container_log_root(var_base_path)
+        launcher = write_logger_launcher(var_base_path / "containerd-log-writer")
         self._runtime.configure_logging(
-            launcher, CONTAINER_LOG_ROOT, int(self.local_config.container_logs.max_length)
+            launcher, log_root, int(self.local_config.container_logs.max_length)
         )
 
     @override
