@@ -18,6 +18,7 @@ from . import __version__
 class InstallModes(enum.StrEnum):
     DEVELOP = "DEVELOP"
     PACKAGE = "PACKAGE"
+    DOCKER = "DOCKER"
     MAINTAIN = "MAINTAIN"
     CONFIGURE = "CONFIGURE"
 
@@ -37,6 +38,7 @@ class ImageSource(enum.StrEnum):
 class InstallType(enum.StrEnum):
     SOURCE = "source"
     PACKAGE = "package"
+    DOCKER = "docker"
 
 
 class Platform(enum.StrEnum):

@@ -60,6 +60,12 @@ path the image's default command reads:
 | appproxy-coordinator | `/etc/backend.ai/proxy-coordinator.toml` | |
 | appproxy-worker | `/etc/backend.ai/proxy-worker.toml` | one container per worker: each needs its OWN toml with a unique `authority`, protocol (`http`/`tcp`), `api_bind_addr` port, and a non-overlapping `[proxy_worker.port_proxy] bind_port_range` (port-based frontends only) — and the compose port mappings must match |
 
+The `/etc/backend.ai/*` targets are what the images' **default commands** read.
+The DOCKER install mode (see the reference compose file below) instead keeps
+every config in the parity-mounted install directory and overrides each
+service's `command:` to point there — either layout works; pick one per
+deployment.
+
 Shared prerequisites:
 
 | Item | Used by | Why |
@@ -79,7 +85,7 @@ together they amount to root-equivalent control of the host.
 | Requirement | manager | agent | Why |
 |---|---|---|---|
 | `network_mode: host` | optional | ✅ | Agent: kernel↔agent ZMQ/service ports and agent RPC are advertised on host addresses; kernels spawned on the host network must reach them. Manager: convenience only — the bridge alternative works via the `announce-addr` / `announce-internal-addr` knobs |
-| `privileged: true` | — | ✅ | Agent: container/device management against the host daemon; sysfs reads for metrics. The manager does not need it — the Docker socket alone suffices for its (conditional) Docker use |
+| `privileged: true` | default | ✅ | Agent: container/device management against the host daemon; sysfs reads for metrics. The manager does not strictly need it — the Docker socket alone suffices for its (conditional) Docker use — but the DOCKER install mode's generated compose grants it by default; remove the flag for a least-privilege deployment |
 | `/var/run/docker.sock` bind mount | conditional | ✅ | DooD: containers are created by talking to the **host** Docker daemon. Manager: only when the `local` container registry is used |
 | `pid: host` | — | ✅ | Host PID namespace visibility: the agent inspects and signals kernel processes by host PID |
 | `cgroup: host` (host cgroup namespace) | — | ✅ | **Required, not optional** — see below |
@@ -110,15 +116,21 @@ the same absolute path on both sides. The paths are set by `agent.toml` —
 **every one of them must be an absolute path**, bind-mounted host↔container at
 the identical location:
 
-| Config knob (`agent.toml`) | Reference value | Used for |
-|---|---|---|
-| `[container] scratch-root` | `/var/lib/backend.ai/scratches` | Scratch roots of kernel containers |
-| `[agent] ipc-base-path` | `/tmp/backend.ai/ipc` (this document's chosen value; `configs/agent/sample.toml` ships `/var/run/backend.ai/ipc`) | Agent↔kernel IPC sockets |
-| `[agent] var-base-path` | `/var/lib/backend.ai` | Plugin state bind-mounted into kernels (e.g. accelerator hook caches) |
-| env `BACKENDAI_KRUNNER_SHARED` | `/var/lib/backend.ai/krunner` | Kernel-runner files: the image entrypoint copies them here so the host daemon can mount them into kernels. Covered automatically by the `/var/lib/backend.ai` parity mount; the entrypoint **refuses to start** without it — override the path via the `BACKENDAI_KRUNNER_SHARED` env var |
+The values below are the defaults the DOCKER install mode writes
+(`<install-dir>` is the install target directory); a hand-rolled deployment
+may choose any absolute paths as long as the parity rule holds.
 
-With the reference values, two parity mounts cover everything:
-`/var/lib/backend.ai` and `/tmp/backend.ai`.
+| Config knob (`agent.toml`) | DOCKER-mode default | Used for |
+|---|---|---|
+| `[container] scratch-root` | `<install-dir>/scratches` | Scratch roots of kernel containers |
+| `[agent] mount-path` | `<install-dir>/vfolder/local` | Vfolder tree whose subdirectories become kernel bind-mount sources |
+| `[agent] ipc-base-path` | `<install-dir>/ipc/agent` | Agent↔kernel IPC sockets |
+| `[agent] var-base-path` | `<install-dir>/var/agent` | Plugin state bind-mounted into kernels (e.g. accelerator hook caches) |
+| `[agent] image-commit-path` | `<install-dir>/tmp/backend.ai/commit` | Session image-commit tarballs written by the host daemon |
+| env `BACKENDAI_KRUNNER_SHARED` | `/var/lib/backend.ai/krunner` | Kernel-runner files: the image entrypoint copies them here so the host daemon can mount them into kernels. Mounted as its **own** bind mount (the Docker daemon creates the host directory on first start); the entrypoint **refuses to start** without it |
+
+With these defaults, two mounts cover everything: the `<install-dir>` parity
+mount and the fixed `/var/lib/backend.ai/krunner` krunner share.
 
 Vfolder roots (e.g. `/vfroot/local/volume1`) follow the same rule on the
 **storage-proxy**: mount each volume at the identical absolute path on host and
@@ -135,20 +147,48 @@ namespace is invisible to the host daemon — use `hostdir`.
 
 `docker-compose.monorepo.yml` at the repository root is a **partial, legacy
 example** — it uses different image names, includes no agent or storage-proxy,
-and runs on a bridge network. The fragment below is the authoritative
-reference for the two elevated services, verified against a live deployment.
-Replace `<version>` with a tag from the tagging scheme above. The `cgroup:`
-key requires Docker Compose v2.15+.
+and runs on a bridge network. The authoritative reference is the compose file
+the **DOCKER install mode** of `backend.ai-installer` generates at
+`<install-dir>/docker-compose.services.yml` (rendered from
+`src/ai/backend/install/configs/docker-compose.services.yml`). Its contract:
+
+- Every service runs on the host network, so the generated configs use the
+  same `127.0.0.1` addressing as a package-based install.
+- The install directory is bind-mounted into every container at the identical
+  absolute path, and each service's `command:` reads its config from there —
+  no `/etc/backend.ai` mounts.
+- `/etc/machine-id` is passed through read-only to the manager and agent so
+  anything deriving a stable host identity sees the host's, not the
+  container's.
+- All images are pinned to the installer's own version (the event-bus
+  version-skew rule above).
+- The compose project name is fixed (`backendai-services`) so the file never
+  shares a project with the halfstack file the installer places in the same
+  directory.
+- One-off management commands run via `docker compose run` on a dedicated
+  non-privileged `manager-cli` twin of the manager (no Docker socket, no
+  restart policy; its `cli` profile keeps `up -d` from starting it).
+- No agent-watcher container ships in this mode, and the app-proxy data plane
+  runs as an `appproxy-worker` / `appproxy-worker-tcp` pair.
+
+The fragment below reproduces the two elevated services. Replace `<version>`
+with a tag from the tagging scheme above and `<install-dir>` with the install
+target directory. The `cgroup:` key requires Docker Compose v2.15+.
 
 ```yaml
+name: backendai-services
 services:
   manager:
     image: lablup/backend.ai-manager:<version>
     network_mode: host    # optional — bridge works via the announce-addr knobs
+    privileged: true      # installer default; the socket alone suffices (see the matrix) — remove for least privilege
+    working_dir: <install-dir>
+    command: ["python", "-m", "ai.backend.manager.server", "--config", "<install-dir>/manager.toml"]
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock   # only when the `local` container registry is used
-      - ./manager.toml:/etc/backend.ai/manager.toml:ro
-      - ./fixtures:/app/fixtures    # read-write: the entrypoint writes the RPC keypair here
+      - /var/run/docker.sock:/var/run/docker.sock   # needed only when the `local` container registry is used
+      - /etc/machine-id:/etc/machine-id:ro
+      # parity mount: configs, fixtures/ (RPC keypair, written relative to working_dir), vfolder/
+      - <install-dir>:<install-dir>
     restart: unless-stopped
 
   agent:
@@ -157,20 +197,21 @@ services:
     privileged: true
     pid: host
     cgroup: host          # REQUIRED on cgroup v2 hosts; Docker defaults to private
-    deploy:               # GPU nodes only
-      resources:
+    deploy:               # GPU nodes only (the installer currently rejects --accelerator
+      resources:          # until the published images bundle the accelerator plugins)
         reservations:
           devices:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    working_dir: <install-dir>
+    command: ["python", "-m", "ai.backend.agent.server", "-f", "<install-dir>/agent.toml"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./agent.toml:/etc/backend.ai/agent.toml:ro
+      - /etc/machine-id:/etc/machine-id:ro
       # path-parity mounts: host path == container path
-      # (the krunner share /var/lib/backend.ai/krunner is covered by the /var/lib/backend.ai mount)
-      - /var/lib/backend.ai:/var/lib/backend.ai
-      - /tmp/backend.ai:/tmp/backend.ai
+      - <install-dir>:<install-dir>
+      - /var/lib/backend.ai/krunner:/var/lib/backend.ai/krunner   # created by the Docker daemon on first start
     restart: unless-stopped
 ```
 
