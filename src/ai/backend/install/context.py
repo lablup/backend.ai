@@ -828,10 +828,6 @@ class Context(metaclass=ABCMeta):
                     re.compile("^(# )?var-base-path = .*", flags=re.MULTILINE),
                     f'var-base-path = "{service.agent_var_base_path}"',
                 ),
-                (
-                    re.compile("(# )?mount_path = .*", flags=re.MULTILINE),
-                    f'"{self.install_info.base_path / service.vfolder_relpath}"',
-                ),
             ],
         )
         Path(self.install_info.service_config.agent_var_base_path).mkdir(
