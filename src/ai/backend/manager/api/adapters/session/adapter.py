@@ -301,19 +301,23 @@ class SessionAdapter(BaseAdapter):
                 bootstrap_script=input.bootstrap_script,
             )
 
+        resource_entries = []
+        for e in input.resource_entries:
+            if Decimal(e.quantity) == 0:
+                continue
+            resource_entries.append(
+                ResourceSlotEntry(
+                    resource_type=e.resource_type,
+                    quantity=e.quantity,
+                )
+            )
         action = EnqueueSessionAction(
             project_id=ProjectID(group_id),
             session_name=input.session_name,
             session_type=SessionTypes(input.session_type.value),
             image_id=input.image_id,
             resource=SessionResourceSpec(
-                entries=[
-                    ResourceSlotEntry(
-                        resource_type=e.resource_type,
-                        quantity=e.quantity,
-                    )
-                    for e in input.resource_entries
-                ],
+                entries=resource_entries,
                 resource_group=input.resource_group,
                 resource_group_id=input.resource_group_id,
                 shmem=input.resource_opts.shmem.expr
