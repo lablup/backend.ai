@@ -301,9 +301,17 @@ class SessionAdapter(BaseAdapter):
                 bootstrap_script=input.bootstrap_script,
             )
 
+        parsed_entries = []
+        for e in input.resource_entries:
+            parsed_entries.append(
+                DataResourceSlotEntry(
+                    resource_type=ResourceSlotName(e.resource_type), quantity=e.quantity
+                )
+            )
+        requested_slots = DataResourceSlotEntry.inputs_to_resource_slot(parsed_entries)
         resource_entries = []
         for e in input.resource_entries:
-            if Decimal(e.quantity) == 0:
+            if requested_slots.get(e.resource_type, Decimal(0)) == 0:
                 continue
             resource_entries.append(
                 ResourceSlotEntry(
