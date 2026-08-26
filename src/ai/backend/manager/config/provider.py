@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import pydantic
 from collections.abc import Awaitable, Callable
 from typing import Self
 
@@ -12,6 +13,15 @@ from .unified import ManagerUnifiedConfig
 SharedConfigChangeCallback = Callable[[ManagerUnifiedConfig], Awaitable[None]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+_PYDANTIC_HAS_BY_NAME = tuple(map(int, pydantic.VERSION.split(".")[:2])) >= (2, 11)
+
+
+def _validate_unified_config(raw_config):
+    if _PYDANTIC_HAS_BY_NAME:
+        return ManagerUnifiedConfig.model_validate(raw_config, by_name=True)
+    return ManagerUnifiedConfig.model_validate(raw_config)
 
 
 class ManagerConfigProvider:
@@ -43,7 +53,7 @@ class ManagerConfigProvider:
         legacy_etcd_config_loader: LegacyEtcdLoader,
     ) -> Self:
         raw_config = await loader.load()
-        config = ManagerUnifiedConfig.model_validate(raw_config, by_name=True)
+        config = _validate_unified_config(raw_config)
         return cls(loader, config, etcd_watcher, legacy_etcd_config_loader)
 
     @property
@@ -60,7 +70,7 @@ class ManagerConfigProvider:
     async def _run_watcher(self) -> None:
         async for event in self._etcd_watcher.watch():
             raw_config = await self._loader.load()
-            self._config = ManagerUnifiedConfig.model_validate(raw_config, by_name=True)
+            self._config = _validate_unified_config(raw_config)
             log.debug("config reloaded due to etcd event.")
 
     async def terminate(self) -> None:
