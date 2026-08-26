@@ -350,13 +350,13 @@ directly identify the superadmin's keypair, which makes every other action in th
 The `security` block additionally tells an attacker which accounts have no TOTP and which have
 `sudo_session_enabled`.
 
-### F2 — `assign_users_to_project` grants a role belonging to a different project, and writes no membership
+### F2 — `assign_users_to_project` grants a role belonging to a different project
 
 | | |
 |---|---|
 | Action | `assign_users_to_project` (single_entity / permission) |
 | Declared | UPDATE on the project named in the path. |
-| Happened | The `role_id` in the body is never checked against the project in the path. Assigning a user to project A while naming project B's member role grants B's role. Separately, the call writes no `association_groups_users` row at all, so the legacy membership table and the RBAC grants diverge. |
+| Happened | The `role_id` in the body is never checked against the project in the path. Assigning a user to project A while naming project B's member role grants B's role. |
 
 Reproduction:
 
@@ -367,7 +367,8 @@ Reproduction:
         {"user_ids":["<u>"],"role_id":"254fef91-2574-46f5-afc6-c9b18cfa340b"}   # 254fef91 = role_project_8e32dd28_member
 # → 200; the user now holds BOTH role_project_2de2b969_member and role_project_8e32dd28_member
 select r.name from user_roles ur join roles r on r.id=ur.role_id where ur.user_id='<u>';
-select g.name from association_groups_users agu join groups g on g.id=agu.group_id where agu.user_id='<u>';  -- (0 rows)
+select scope_type, scope_id, relation_type from association_scopes_entities where entity_id='<u>';
+-- project | 2de2b969-… | auto     ← membership is written here, not in association_groups_users
 ```
 
 Blast radius: anyone who holds UPDATE on any one project can grant a role scoped to any other project,
