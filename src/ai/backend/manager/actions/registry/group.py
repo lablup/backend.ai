@@ -131,10 +131,6 @@ from ai.backend.manager.actions.v2.ops.result import (
     LookupOpsResult,
     ScopedBatchOpsResult,
 )
-from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
-from ai.backend.manager.actions.v2.relation.monitor import RelationActionMonitor
-from ai.backend.manager.actions.v2.relation.processor import RelationActionProcessor
-from ai.backend.manager.actions.v2.relation.validator import RelationActionValidator
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -265,28 +261,6 @@ class ProcessorGroup[TData: EntityData]:
             func,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),
-        )
-
-    def relation[TAction: BaseRelationAction, TResult](
-        self,
-        action_cls: type[TAction],
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[RelationActionValidator] = (),
-        monitors: Sequence[RelationActionMonitor] = (),
-    ) -> RelationActionProcessor[TAction, TResult]:
-        """A link between two entities, or its removal.
-
-        Custom-backed like every other shape's plain factory: the domain declares the
-        action carrying its own spec and hands the function that runs it. There is no
-        generic implementation to plug in — a relation belongs to no single domain, so
-        no domain's spec can stand for the rest.
-        """
-        self._record(action_cls, ActionKind.RELATION, ActionGate.PERMISSION, ActionBacking.CUSTOM)
-        return RelationActionProcessor(
-            func,
-            monitors=(*self._deps.monitors.relation, *monitors),
-            validators=(*self._deps.validators.relation, *validators),
         )
 
     def scope[TAction: BaseScopeAction, TResult: BaseScopeActionResult](

@@ -14,8 +14,8 @@ class WiredEntityTypes:
     """Every entity type the processor wiring names, read once at startup.
 
     An entity type is declared where its operations are wired rather than in an enum,
-    so what a caller may name is whatever the wiring covers. `global` is wiring only
-    and names no entity, so it is left out.
+    so what a caller may name is whatever the wiring covers. Two kinds are left out:
+    `global`, which is wiring only, and a relation, which names no entity at all.
     """
 
     _types: frozenset[EntityType]
@@ -25,7 +25,7 @@ class WiredEntityTypes:
         self._types = frozenset(
             wiring.entity_type
             for wiring in registry.wired_processors()
-            if wiring.entity_type != GLOBAL_ENTITY_TYPE
+            if wiring.entity_type is not None and wiring.entity_type != GLOBAL_ENTITY_TYPE
         )
         self._sorted = tuple(sorted(self._types))
 

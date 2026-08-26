@@ -96,6 +96,7 @@ from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.lookup.bulk_base import BaseBulkLookupAction
+from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.validators import ActionValidators
@@ -158,6 +159,7 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
 )
+from ai.backend.manager.services.rbac.processors import RBACProcessors
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
@@ -194,6 +196,7 @@ _V2_ACTION_BASES: tuple[type[Any], ...] = (
     BaseSingleEntityAction,
     BaseBulkAction,
     BaseScopeAction,
+    BaseRelationAction,
     BaseGlobalAction,
     BaseLookupAction,
     BaseBulkLookupAction,
@@ -271,6 +274,12 @@ def test_every_defined_v2_action_is_wired() -> None:
     UserResourcePolicyProcessors(registry.group(GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE)))
     KeypairResourcePolicyProcessors(registry.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE)))
     RolePresetProcessors(registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)), MagicMock())
+    rbac_groups = registry.concern(ConcernMeta(Concern.RBAC))
+    RBACProcessors(
+        rbac_groups.relation_group(),
+        rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        MagicMock(),
+    )
     EntityInvitationProcessors(
         registry.group(GroupMeta(ENTITY_INVITATION_ENTITY_TYPE)), MagicMock()
     )

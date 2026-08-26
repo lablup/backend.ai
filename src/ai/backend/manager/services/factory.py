@@ -201,6 +201,7 @@ from ai.backend.manager.services.prometheus_query_preset.service import (
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
 )
+from ai.backend.manager.services.rbac.processors import RBACProcessors
 from ai.backend.manager.services.rbac.service import RBACService
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
@@ -656,6 +657,11 @@ def create_processors(
         ),
         retention_policy=RetentionPolicyProcessors(
             system_groups.group(GroupMeta(RETENTION_POLICY_ENTITY_TYPE))
+        ),
+        rbac=RBACProcessors(
+            rbac_groups.relation_group(),
+            rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+            services.rbac,
         ),
         role_preset=RolePresetProcessors(
             rbac_groups.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)), services.role_preset

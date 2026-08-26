@@ -43,7 +43,7 @@ class RBACRepository:
         organization: EntityIdentifier,
         user_id: UserID,
         role_ids: Collection[RoleID],
-        granted_by: UserID | None = None,
+        granted_by: UserID,
     ) -> None:
         """Give a member roles of that organization, leaving the membership alone.
 
@@ -70,8 +70,8 @@ class RBACRepository:
         organization: EntityIdentifier,
         user_id: UserID,
         creator: RelationCreator[Any],
+        granted_by: UserID,
         role_ids: Collection[RoleID] | None = None,
-        granted_by: UserID | None = None,
     ) -> bool:
         """Put the user in the organization and give them its roles.
 

@@ -4,28 +4,47 @@ One service: all three answer the same kind of question — who may put these tw
 together — and putting a user in an organization writes a link and grants a role in one
 transaction, so splitting them would split that transaction too.
 
-A link is generic in what it writes: a domain declares the spec that says which table and
-which columns, declares its own action carrying that spec, and hands the function that
-calls this. What is not generic is the permission, which is why the operation lives here
-rather than on a generic ops path.
+A link is generic in what it writes: the spec saying which table and which columns is a
+value on the action, so one wiring serves every relation. What is not generic is the
+permission, which is why the operation lives here rather than on a generic ops path.
 
 Design rationale: `proposals/BEP-1075-entity-relation-operations.md` and BEP-1076.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.models.specs.relation import (
-    RelationCreator,
-    RelationLifecycleUpdater,
-    RelationPurger,
-)
 from ai.backend.manager.repositories.rbac.repository import RBACRepository
+from ai.backend.manager.services.rbac.actions.create_relation import (
+    CreateRelationAction,
+    CreateRelationActionResult,
+)
+from ai.backend.manager.services.rbac.actions.delete_relation import (
+    DeleteRelationAction,
+    DeleteRelationActionResult,
+)
+from ai.backend.manager.services.rbac.actions.enroll import EnrollAction, EnrollActionResult
+from ai.backend.manager.services.rbac.actions.grant_roles import (
+    GrantRolesAction,
+    GrantRolesActionResult,
+)
+from ai.backend.manager.services.rbac.actions.purge_relation import (
+    PurgeRelationAction,
+    PurgeRelationActionResult,
+)
+from ai.backend.manager.services.rbac.actions.restore_relation import (
+    RestoreRelationAction,
+    RestoreRelationActionResult,
+)
+from ai.backend.manager.services.rbac.actions.revoke_roles import (
+    RevokeRolesAction,
+    RevokeRolesActionResult,
+)
+from ai.backend.manager.services.rbac.actions.withdraw import (
+    WithdrawAction,
+    WithdrawActionResult,
+)
 
 __all__ = ("RBACService",)
 
@@ -41,80 +60,55 @@ class RBACService:
     # -- links --------------------------------------------------------------------
 
     async def create_relation(
-        self, left: EntityIdentifier, right: EntityIdentifier, creator: RelationCreator[Any]
-    ) -> bool:
-        """Link the two entities; ``False`` when the pair was already linked."""
-        return await self._repository.create_relation(left, right, creator)
+        self, action: CreateRelationAction[Any]
+    ) -> CreateRelationActionResult:
+        created = await self._repository.create_relation(action.left, action.right, action.creator)
+        return CreateRelationActionResult(created=created)
 
     async def delete_relation(
-        self,
-        left: EntityIdentifier,
-        right: EntityIdentifier,
-        updater: RelationLifecycleUpdater[Any],
-    ) -> bool:
-        """Switch the pair's relation off; ``False`` when there was none to switch."""
-        return await self._repository.delete_relation(left, right, updater)
+        self, action: DeleteRelationAction[Any]
+    ) -> DeleteRelationActionResult:
+        deleted = await self._repository.delete_relation(action.left, action.right, action.updater)
+        return DeleteRelationActionResult(deleted=deleted)
 
     async def restore_relation(
-        self,
-        left: EntityIdentifier,
-        right: EntityIdentifier,
-        updater: RelationLifecycleUpdater[Any],
-    ) -> bool:
-        """Switch the pair's relation back on; ``False`` when there was none."""
-        return await self._repository.restore_relation(left, right, updater)
+        self, action: RestoreRelationAction[Any]
+    ) -> RestoreRelationActionResult:
+        restored = await self._repository.restore_relation(
+            action.left, action.right, action.updater
+        )
+        return RestoreRelationActionResult(restored=restored)
 
-    async def purge_relation(
-        self, left: EntityIdentifier, right: EntityIdentifier, purger: RelationPurger[Any]
-    ) -> bool:
-        """Remove the row linking the pair; ``False`` when there was none to remove."""
-        return await self._repository.purge_relation(left, right, purger)
+    async def purge_relation(self, action: PurgeRelationAction[Any]) -> PurgeRelationActionResult:
+        purged = await self._repository.purge_relation(action.left, action.right, action.purger)
+        return PurgeRelationActionResult(purged=purged)
 
     # -- membership ---------------------------------------------------------------
 
-    async def enroll(
-        self,
-        organization: EntityIdentifier,
-        user_id: UserID,
-        creator: RelationCreator[Any],
-        role_ids: Sequence[RoleID] | None = None,
-        granted_by: UserID | None = None,
-    ) -> bool:
-        """Put the user in the organization and give them its roles.
+    async def enroll(self, action: EnrollAction[Any]) -> EnrollActionResult:
+        enrolled = await self._repository.enroll(
+            action.organization,
+            action.user_id,
+            action.creator,
+            action.granted_by,
+            action.role_ids,
+        )
+        return EnrollActionResult(user_id=action.user_id, enrolled=enrolled)
 
-        ``role_ids`` names what to give; ``None`` gives the organization's auto-assign
-        roles. A named role the organization does not hold is refused, in the same
-        transaction that writes — membership must not become a path for attaching an
-        unrelated role.
-        """
-        return await self._repository.enroll(organization, user_id, creator, role_ids, granted_by)
-
-    async def withdraw(
-        self,
-        organization: EntityIdentifier,
-        user_id: UserID,
-        purger: RelationPurger[Any],
-    ) -> bool:
-        """Take the user out of the organization, and its roles with them."""
-        return await self._repository.withdraw(organization, user_id, purger)
+    async def withdraw(self, action: WithdrawAction[Any]) -> WithdrawActionResult:
+        withdrawn = await self._repository.withdraw(
+            action.organization, action.user_id, action.purger
+        )
+        return WithdrawActionResult(user_id=action.user_id, withdrawn=withdrawn)
 
     # -- roles --------------------------------------------------------------------
 
-    async def grant_roles(
-        self,
-        organization: EntityIdentifier,
-        user_id: UserID,
-        role_ids: Sequence[RoleID],
-        granted_by: UserID | None = None,
-    ) -> None:
-        """Give a member roles of that organization, without touching the membership."""
-        await self._repository.grant_roles(organization, user_id, role_ids, granted_by)
+    async def grant_roles(self, action: GrantRolesAction) -> GrantRolesActionResult:
+        await self._repository.grant_roles(
+            action.organization, action.user_id, action.role_ids, action.granted_by
+        )
+        return GrantRolesActionResult(user_id=action.user_id)
 
-    async def revoke_roles(
-        self,
-        organization: EntityIdentifier,
-        user_id: UserID,
-        role_ids: Sequence[RoleID],
-    ) -> None:
-        """Take roles of that organization back from a member."""
-        await self._repository.revoke_roles(organization, user_id, role_ids)
+    async def revoke_roles(self, action: RevokeRolesAction) -> RevokeRolesActionResult:
+        await self._repository.revoke_roles(action.organization, action.user_id, action.role_ids)
+        return RevokeRolesActionResult(user_id=action.user_id)

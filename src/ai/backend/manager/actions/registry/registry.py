@@ -10,6 +10,7 @@ from ai.backend.manager.actions.registry.field import FieldGroup, LookupFieldGro
 from ai.backend.manager.actions.registry.group import (
     ProcessorGroup,
 )
+from ai.backend.manager.actions.registry.relation import RelationGroup
 from ai.backend.manager.actions.registry.types import (
     ConcernMeta,
     FieldGroupMeta,
@@ -48,6 +49,14 @@ class ConcernGroups[TData: EntityData]:
 
     def group(self, meta: GroupMeta) -> ProcessorGroup[TData]:
         return ProcessorGroup(self._deps, self._records, self._concern, meta)
+
+    def relation_group(self) -> RelationGroup:
+        """The relation operations of this area.
+
+        Reached from here rather than an entity group: a relation is answered for by the
+        two scopes it names and by no entity type, so there is no group meta to fix.
+        """
+        return RelationGroup(self._deps, self._records, self._concern)
 
     def dangling_field_group[TFieldData: FieldData](
         self, meta: FieldGroupMeta, data_cls: type[TFieldData]

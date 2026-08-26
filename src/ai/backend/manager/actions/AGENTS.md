@@ -33,7 +33,13 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   With no type there is nothing to read at a scope, so the permission is asked of each
   named scope itself and every one of them has to permit the run.
 - Its audit row names no entity and no kind; the scopes go to `audit_log_scopes`, which
-  is why `audit_logs.entity_type` is nullable.
+  is why `audit_logs.entity_type` is nullable. The catalog records the wiring with no
+  entity type at all, which `GLOBAL_ENTITY_TYPE` does not stand for — that names an
+  operation over every entity, and a relation targets none.
+- It is wired through `ConcernGroups.relation_group()`, not through an entity group:
+  a group is answered for by an entity type and a relation is answered for by none.
+- Which relation a run was about is read off those scopes, so the spec is a value on
+  the action and one wiring per operation serves every relation.
 - Putting a user in an organization is the contained case, and it grants roles as a
   second write — see `proposals/BEP-1076-project-membership.md`.
 

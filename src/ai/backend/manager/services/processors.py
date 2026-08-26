@@ -200,6 +200,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.prometheus_query_preset_category.processors import (
         PrometheusQueryPresetCategoryProcessors,
     )
+    from ai.backend.manager.services.rbac.processors import RBACProcessors
     from ai.backend.manager.services.rbac.service import RBACService
     from ai.backend.manager.services.resource_group.processors import (
         ResourceGroupProcessors,
@@ -382,7 +383,8 @@ class Services:
     object_storage: ObjectStorageService
     permission_controller: PermissionControllerService
     #: Links between entities, organization membership, and the roles that come with
-    #: it. Nothing is wired to it yet; each domain reaches it as it migrates.
+    #: it. The relation and membership operations are wired by the domain declaring
+    #: the spec, as it migrates.
     rbac: RBACService
     vfs_storage: VFSStorageService
     artifact: ArtifactService
@@ -437,6 +439,7 @@ class Processors:
     resource_preset: ResourcePresetProcessors
     resource_slot: ResourceSlotProcessors
     retention_policy: RetentionPolicyProcessors
+    rbac: RBACProcessors
     role_preset: RolePresetProcessors
     entity_invitation: EntityInvitationProcessors
     runtime_variant: RuntimeVariantProcessors

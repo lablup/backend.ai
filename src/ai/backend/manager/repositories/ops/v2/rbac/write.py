@@ -49,7 +49,7 @@ class V2RBACWriteOps(V2WriteOps):
         self,
         user_id: UserID,
         role_ids: Collection[RoleID],
-        granted_by: UserID | None = None,
+        granted_by: UserID,
     ) -> None:
         """Give the user every named role, skipping the ones already held.
 
