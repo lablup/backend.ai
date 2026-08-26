@@ -144,6 +144,7 @@ BEP numbers start from 1000.
 | [1071](BEP-1071-keypair-user-resource-policy.md) | Keypair to User Resource Policy Merge | HyeokJin Kim | Draft |
 | [1072](BEP-1072-release-branching-and-backport.md) | Release Branch Isolation and Backport Automation | HyeokJin Kim | Draft |
 | [1073](BEP-1073-entity-labels.md) | Entity Labels | Sanghun Lee | Draft |
+| [1074](BEP-1074-container-secret-references.md) | Container Secret References | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure

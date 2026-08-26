@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
@@ -19,12 +20,16 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
-    EntityType,
+    EntityType as LegacyEntityType,
+)
+from ai.backend.manager.data.permission.types import (
     OperationType,
     Permission,
     RBACElementRef,
     RoleSource,
-    ScopeType,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as LegacyScopeType,
 )
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -75,7 +80,7 @@ class UserSystemRoleSpec:
     user_id: uuid.UUID
 
     def scope_id(self) -> ScopeId:
-        return ScopeId(scope_type=ScopeType.USER, scope_id=str(self.user_id))
+        return ScopeId(scope_type=LegacyScopeType.USER, scope_id=str(self.user_id))
 
     def role_name(self) -> str:
         return f"user-{str(self.user_id)[:8]}"
@@ -83,7 +88,7 @@ class UserSystemRoleSpec:
     def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
         resource_entity_permissions = {
             entity.to_element(): OperationType.owner_operations()
-            for entity in EntityType.owner_accessible_entity_types_in_user()
+            for entity in LegacyEntityType.owner_accessible_entity_types_in_user()
         }
         user_permissions = OperationType.owner_operations() - {OperationType.CREATE}
         return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
@@ -138,9 +143,9 @@ class RoleManager:
             for operation in operations:
                 creator = PermissionCreator(
                     role_id=role_id,
-                    scope_type=data.scope_id().scope_type,
+                    scope_type=ScopeType(EntityType(data.scope_id().scope_type)),
                     scope_id=data.scope_id().scope_id,
-                    entity_type=element_type.to_entity_type(),
+                    entity_type=EntityType(element_type),
                     operation=operation,
                     permission=Permission.from_operation(operation),
                 )
@@ -232,9 +237,9 @@ class RoleManager:
             PermissionRow.from_input(
                 PermissionCreator(
                     role_id=role_id,
-                    scope_type=scope_id.scope_type,
+                    scope_type=ScopeType(EntityType(scope_id.scope_type)),
                     scope_id=scope_id.scope_id,
-                    entity_type=preset_permission.entity_type,
+                    entity_type=EntityType(preset_permission.entity_type),
                     operation=preset_permission.operation,
                     permission=Permission.from_operation(preset_permission.operation),
                 )
@@ -253,7 +258,7 @@ class RoleManager:
         and assigns the auto_assign ones to the user, who is the sole member of its
         own user scope. Returns all created roles.
         """
-        scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=str(user_id))
+        scope_id = ScopeId(scope_type=LegacyScopeType.USER, scope_id=str(user_id))
         created_roles = await self.create_preset_roles(db_session, scope_id)
         for role in created_roles:
             if not role.auto_assign:
@@ -281,7 +286,7 @@ class RoleManager:
                 .where(
                     AssociationScopesEntitiesRow.scope_type == scope_id.scope_type,
                     AssociationScopesEntitiesRow.scope_id == scope_id.scope_id,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+                    AssociationScopesEntitiesRow.entity_type == LegacyEntityType.ROLE,
                     RoleRow.auto_assign.is_(True),
                     RoleRow.status == RoleStatus.ACTIVE,
                 )

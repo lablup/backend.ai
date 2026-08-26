@@ -6,6 +6,8 @@ key within that provider.
 """
 
 import enum
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import NewType
 
 # The id of one key encryption key within a provider. Provider-defined, so it may carry
@@ -26,3 +28,33 @@ class KeyProviderType(enum.StrEnum):
 
     PLAIN = "plain"
     CONFIG = "config"
+
+
+@dataclass(frozen=True)
+class SecretKeyCount:
+    """How many stored secrets of one column one provider's one key holds.
+
+    ``key_id`` is unset for legacy plaintext, which names no provider.
+    """
+
+    column: str
+    provider_type: KeyProviderType
+    key_id: SecretKeyId | None
+    count: int
+
+
+@dataclass(frozen=True)
+class SecretStatus:
+    """Every encrypted column, grouped by the key each stored secret sits on."""
+
+    write_provider_type: KeyProviderType
+    counts: Sequence[SecretKeyCount]
+
+
+@dataclass(frozen=True)
+class SecretReencryptProgress:
+    """What one re-encryption pass wrote, and what the columns hold afterwards."""
+
+    scanned: int
+    reencrypted: int
+    status: SecretStatus

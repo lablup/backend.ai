@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 
+from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.common.dto.manager.rbac import (
     CreatePermissionRequest,
     PermissionDTO,
@@ -43,9 +44,9 @@ class PermissionAdapter:
         creator = Creator(
             spec=PermissionCreatorSpec(
                 role_id=request.role_id,
-                scope_type=request.scope_type.to_element(),
+                scope_type=ScopeType(EntityType(request.scope_type)),
                 scope_id=request.scope_id,
-                entity_type=request.entity_type.to_element(),
+                entity_type=EntityType(request.entity_type),
                 operation=request.operation,
             )
         )

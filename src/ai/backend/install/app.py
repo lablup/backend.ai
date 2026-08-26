@@ -75,6 +75,7 @@ class DevSetup(Static):
     async def install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
         _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
+        failed = False
         ctx = DevContext(
             dist_info,
             install_variable,
@@ -100,13 +101,17 @@ class DevSetup(Static):
             await asyncio.sleep(1)
             raise
         except PrerequisiteError as e:
+            failed = True
             _log.write(Text.from_markup("[red]:warning: A prerequisite check has failed."))
             _log.write(e)
         except Exception as e:
+            failed = True
             _log.write(Text.from_markup("[red]:warning: Unexpected error!"))
             _log.write(e)
             _log.write(Traceback())
         finally:
+            if failed:
+                cast("InstallerApp", self.app).install_failed = True
             _log.write("")
             _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))
             if self._non_interactive:
@@ -139,31 +144,32 @@ class PackageSetup(Static):
     async def install(self, dist_info: DistInfo, install_variable: InstallVariable) -> None:
         _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
-        # prerequisites
-        if self._non_interactive:
-            if dist_info.target_path is None:
-                raise ValueError("Target path must be specified in non-interactive mode")
-        else:
-            if dist_info.target_path.exists():
-                input_box = InputDialog(
-                    f"The target path {dist_info.target_path} already exists. "
-                    "Please set a different target path below, or "
-                    "leave the box as blank to overwrite the folder.",
-                    str(dist_info.target_path),
-                    allow_cancel=False,
-                )
-                _log.mount(input_box)
-                value = await input_box.wait()
-                if value is None:
-                    raise ValueError("Target path input was cancelled")
-                dist_info.target_path = Path(value)
-        ctx = PackageContext(
-            dist_info,
-            install_variable,
-            cast(App[None], self.app),
-            non_interactive=self._non_interactive,
-        )
+        failed = False
         try:
+            # prerequisites
+            if self._non_interactive:
+                if dist_info.target_path is None:
+                    raise ValueError("Target path must be specified in non-interactive mode")
+            else:
+                if dist_info.target_path.exists():
+                    input_box = InputDialog(
+                        f"The target path {dist_info.target_path} already exists. "
+                        "Please set a different target path below, or "
+                        "leave the box as blank to overwrite the folder.",
+                        str(dist_info.target_path),
+                        allow_cancel=False,
+                    )
+                    _log.mount(input_box)
+                    value = await input_box.wait()
+                    if value is None:
+                        raise ValueError("Target path input was cancelled")
+                    dist_info.target_path = Path(value)
+            ctx = PackageContext(
+                dist_info,
+                install_variable,
+                cast(App[None], self.app),
+                non_interactive=self._non_interactive,
+            )
             await ctx.check_prerequisites()
             # install
             await ctx.install()
@@ -181,13 +187,17 @@ class PackageSetup(Static):
             await asyncio.sleep(1)
             raise
         except PrerequisiteError as e:
+            failed = True
             _log.write(Text.from_markup("[red]:warning: A prerequisite check has failed."))
             _log.write(e)
         except Exception as e:
+            failed = True
             _log.write(Text.from_markup("[red]:warning: Unexpected error!"))
             _log.write(e)
             _log.write(Traceback())
         finally:
+            if failed:
+                cast("InstallerApp", self.app).install_failed = True
             _log.write("")
             _log.write(Text.from_markup("[bright_cyan]All tasks finished. Press q/Q to exit."))
             if self._non_interactive:
@@ -706,9 +716,11 @@ class InstallerApp(App[None]):
     CSS_PATH = "app.tcss"
 
     _args: CliArgs
+    install_failed: bool
 
     def __init__(self, args: CliArgs | None = None) -> None:
         super().__init__()
+        self.install_failed = False
         if args is None:  # when run as textual dev mode
             args = CliArgs(
                 mode=None,
@@ -822,4 +834,7 @@ class InstallerApp(App[None]):
         if not had_cancelled_tasks:
             # Let the user shutdown twice if there were cancelled tasks,
             # so that the user could inspect what happened.
-            self.exit(return_code=exit_code, message=message)
+            self.exit(
+                return_code=exit_code or (1 if self.install_failed else 0),
+                message=message,
+            )

@@ -193,7 +193,6 @@ class ErrorDomain(enum.StrEnum):
     PROMETHEUS_QUERY_PRESET = "prometheus-query-preset"
     PROMETHEUS_QUERY_PRESET_CATEGORY = "prometheus-query-preset-category"
     RUNTIME_VARIANT = "runtime-variant"
-    ROLE_INVITATION = "role-invitation"
     ENTITY_INVITATION = "entity-invitation"
     RETENTION_POLICY = "retention-policy"
     SECRET = "secret"

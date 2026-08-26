@@ -855,9 +855,9 @@ class RBACWriteOps(WriteOps):
         permissions = [
             PermissionCreatorSpec(
                 role_id=row.id,
-                scope_type=self._scope_element_type(spec.scope),
+                scope_type=ScopeType(EntityType(self._scope_element_type(spec.scope))),
                 scope_id=str(spec.scope.scope_id),
-                entity_type=entity_type,
+                entity_type=EntityType(entity_type),
                 operation=operation,
             )
             for spec, row in zip(specs, roles.rows, strict=True)
