@@ -174,9 +174,9 @@ class TestGranterBasic:
             assert operations == {OperationType.READ, OperationType.UPDATE}
             for perm in perms:
                 assert perm.role_id == ctx.role_id
-                assert perm.scope_type == ScopeType.VFOLDER
+                assert perm.scope_type == ScopeType.VFOLDER.value
                 assert perm.scope_id == ctx.entity_id.entity_id
-                assert perm.entity_type == EntityType.VFOLDER
+                assert perm.entity_type == EntityType.VFOLDER.value
 
     async def test_granter_with_empty_role_ids(
         self,

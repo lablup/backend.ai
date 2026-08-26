@@ -57,7 +57,6 @@ if TYPE_CHECKING:
     from .domains_v2.resource_slot import V2ResourceSlotClient
     from .domains_v2.resource_usage import V2ResourceUsageClient
     from .domains_v2.retention_policy import V2RetentionPolicyClient
-    from .domains_v2.role_invitation import V2RoleInvitationClient
     from .domains_v2.role_preset import V2RolePresetClient
     from .domains_v2.runtime_variant import V2RuntimeVariantClient
     from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
@@ -284,12 +283,6 @@ class V2ClientRegistry:
         from .domains_v2.project import V2ProjectClient
 
         return V2ProjectClient(self._client)
-
-    @cached_property
-    def role_invitation(self) -> V2RoleInvitationClient:
-        from .domains_v2.role_invitation import V2RoleInvitationClient
-
-        return V2RoleInvitationClient(self._client)
 
     @cached_property
     def role_preset(self) -> V2RolePresetClient:

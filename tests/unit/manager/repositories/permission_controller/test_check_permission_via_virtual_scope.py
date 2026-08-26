@@ -16,6 +16,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE, RolePresetID
 from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -76,6 +77,8 @@ _ORM_CLUSTER = (
 )
 
 _TARGET_ENTITY_TYPE = EntityType("vfolder")
+# Wired, but not a member of the legacy RBAC enum the permissions table used to carry.
+_UNMAPPED_ENTITY_TYPE = ROLE_PRESET_ENTITY_TYPE
 
 
 @dataclass
@@ -463,6 +466,95 @@ class TestCheckPermissionViaVirtualScope:
             key, Permission.READ
         )
         assert result is False
+
+    async def _build_unmapped_chain(
+        self,
+        db: ExtendedAsyncSAEngine,
+        ids: VSChainFixture,
+    ) -> None:
+        """The chain of :meth:`_build_chain`, over an entity type the legacy enum
+        does not name."""
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                VirtualScopeRow(
+                    id=ids.virtual_scope_id,
+                    scope_type=ScopeType(EntityType("project")),
+                    scope_id=ids.owner_scope_id,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                ScopeBindingRow(
+                    virtual_scope_id=ids.virtual_scope_id,
+                    scope_type=ScopeType(EntityType("project")),
+                    scope_id=ids.bound_scope_id,
+                )
+            )
+            db_sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=ids.virtual_scope_id,
+                    entity_type=_UNMAPPED_ENTITY_TYPE,
+                    entity_id=ids.entity_id,
+                )
+            )
+            db_sess.add(
+                PermissionRow(
+                    role_id=ids.role_id,
+                    scope_type=ScopeType(EntityType("project")),
+                    scope_id=str(ids.bound_scope_id),
+                    entity_type=_UNMAPPED_ENTITY_TYPE,
+                    operation=OperationType.READ,
+                    permission=Permission.READ,
+                )
+            )
+            await db_sess.flush()
+
+    async def test_grant_over_unmapped_entity_type_resolves(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        db_source: PermissionDBSource,
+        fixture_ids: VSChainFixture,
+    ) -> None:
+        """A grant whose entity type the legacy enum does not name is authored and
+        resolves through the chain, instead of being unwritable and falling closed."""
+        await self._create_user_and_role(db_with_rbac_tables, fixture_ids, RoleStatus.ACTIVE)
+        await self._build_unmapped_chain(db_with_rbac_tables, fixture_ids)
+
+        key = EntityPermissionCheckKey(
+            user_id=fixture_ids.user_id,
+            entity=RolePresetID(fixture_ids.entity_id),
+        )
+        resolved = await db_source.resolve_effective_permissions_via_virtual_scope([key])
+        assert resolved[key] == Permission.READ
+
+    async def test_stored_unmapped_entity_type_reads_back(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        fixture_ids: VSChainFixture,
+    ) -> None:
+        """A stored entity type the legacy enum does not name survives an ORM read."""
+        await self._create_user_and_role(db_with_rbac_tables, fixture_ids, RoleStatus.ACTIVE)
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.text(
+                    "INSERT INTO permissions"
+                    " (role_id, scope_type, scope_id, entity_type, operation, permission)"
+                    " VALUES"
+                    " (:role_id, :scope_type, :scope_id, :entity_type, :operation, :permission)"
+                ),
+                {
+                    "role_id": fixture_ids.role_id,
+                    "scope_type": str(ScopeType(EntityType("project"))),
+                    "scope_id": str(fixture_ids.bound_scope_id),
+                    "entity_type": str(_UNMAPPED_ENTITY_TYPE),
+                    "operation": OperationType.READ.value,
+                    "permission": int(Permission.READ),
+                },
+            )
+
+        async with db_with_rbac_tables.begin_readonly_session() as db_sess:
+            row = (await db_sess.scalars(sa.select(PermissionRow))).one()
+        assert row.entity_type == _UNMAPPED_ENTITY_TYPE
 
 
 class TestScopeMemberEnrollmentCascade:

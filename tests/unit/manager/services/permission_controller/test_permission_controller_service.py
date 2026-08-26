@@ -12,14 +12,19 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.common.data.permission.types import (
-    EntityType,
+    EntityType as LegacyEntityType,
+)
+from ai.backend.common.data.permission.types import (
     OperationType,
     Permission,
     RBACElementType,
     RelationType,
     RoleSource,
-    ScopeType,
+)
+from ai.backend.common.data.permission.types import (
+    ScopeType as LegacyScopeType,
 )
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.action.rbac import RBACActionName
@@ -185,7 +190,7 @@ class TestCreateRole:
         mock_repository.create_role.return_value = role_data
 
         obj_perm = ObjectPermissionCreateInputBeforeRoleCreation(
-            entity_type=EntityType.USER,
+            entity_type=LegacyEntityType.USER,
             entity_id="user-1",
             operation=OperationType.READ,
             status=PermissionStatus.ACTIVE,
@@ -279,7 +284,7 @@ class TestGetRoleDetail:
         obj_perm = ObjectPermissionData(
             id=uuid.uuid4(),
             role_id=role_id,
-            object_id=ObjectId(entity_type=EntityType.USER, entity_id="user-1"),
+            object_id=ObjectId(entity_type=LegacyEntityType.USER, entity_id="user-1"),
             operation=OperationType.READ,
         )
         detail = _make_role_detail_data(role_id=role_id, object_permissions=[obj_perm])
@@ -684,9 +689,9 @@ class TestCreatePermission:
         perm_data = PermissionData(
             id=uuid.uuid4(),
             role_id=uuid.uuid4(),
-            scope_type=ScopeType.DOMAIN,
+            scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
             scope_id="test-domain",
-            entity_type=EntityType.USER,
+            entity_type=EntityType(LegacyEntityType.USER),
             operation=OperationType.READ,
             permission=Permission.READ,
             created_at=datetime.now(UTC),
@@ -698,7 +703,7 @@ class TestCreatePermission:
         result = await service.create_permission(action)
 
         mock_repository.create_permission.assert_called_once_with(creator)
-        assert result.data.scope_type == ScopeType.DOMAIN
+        assert result.data.scope_type == LegacyScopeType.DOMAIN.value
 
     async def test_create_permission_global_scope(
         self,
@@ -708,9 +713,9 @@ class TestCreatePermission:
         perm_data = PermissionData(
             id=uuid.uuid4(),
             role_id=uuid.uuid4(),
-            scope_type=ScopeType.GLOBAL,
+            scope_type=ScopeType(EntityType(LegacyScopeType.GLOBAL)),
             scope_id="global",
-            entity_type=EntityType.USER,
+            entity_type=EntityType(LegacyEntityType.USER),
             operation=OperationType.CREATE,
             permission=Permission.CREATE,
             created_at=datetime.now(UTC),
@@ -720,7 +725,7 @@ class TestCreatePermission:
         action = CreatePermissionAction(creator=MagicMock())
         result = await service.create_permission(action)
 
-        assert result.data.scope_type == ScopeType.GLOBAL
+        assert result.data.scope_type == LegacyScopeType.GLOBAL.value
 
 
 class TestDeletePermission:
@@ -748,9 +753,9 @@ class TestDeletePermission:
         perm_data = PermissionData(
             id=uuid.uuid4(),
             role_id=uuid.uuid4(),
-            scope_type=ScopeType.DOMAIN,
+            scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
             scope_id="test-domain",
-            entity_type=EntityType.USER,
+            entity_type=EntityType(LegacyEntityType.USER),
             operation=OperationType.READ,
             permission=Permission.READ,
             created_at=datetime.now(UTC),
@@ -790,9 +795,9 @@ class TestSearchPermissions:
         perm = PermissionData(
             id=uuid.uuid4(),
             role_id=uuid.uuid4(),
-            scope_type=ScopeType.DOMAIN,
+            scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
             scope_id="test-domain",
-            entity_type=EntityType.USER,
+            entity_type=EntityType(LegacyEntityType.USER),
             operation=OperationType.READ,
             permission=Permission.READ,
             created_at=datetime.now(UTC),
@@ -922,7 +927,7 @@ class TestSearchEntities:
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
-        entity_data = EntityData(entity_type=EntityType.USER, entity_id="user-1")
+        entity_data = EntityData(entity_type=LegacyEntityType.USER, entity_id="user-1")
         mock_result = SearchResult(
             items=[entity_data],
             total_count=1,
@@ -937,7 +942,7 @@ class TestSearchEntities:
 
         mock_repository.search_entities.assert_called_once_with(querier)
         assert result.result.total_count == 1
-        assert result.result.items[0].entity_type == EntityType.USER
+        assert result.result.items[0].entity_type == LegacyEntityType.USER
 
     async def test_search_entities_pagination(
         self,
@@ -983,8 +988,8 @@ class TestSearchElementAssociations:
     ) -> None:
         assoc = AssociationScopesEntitiesData(
             id=uuid.uuid4(),
-            scope_id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id="test-domain"),
-            object_id=ObjectId(entity_type=EntityType.USER, entity_id="user-1"),
+            scope_id=ScopeId(scope_type=LegacyScopeType.DOMAIN, scope_id="test-domain"),
+            object_id=ObjectId(entity_type=LegacyEntityType.USER, entity_id="user-1"),
             relation_type=RelationType.AUTO,
             permission_cap=Permission.full(),
             registered_at=datetime.now(tz=UTC),

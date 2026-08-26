@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import RBACElementType
@@ -63,18 +63,18 @@ class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
     """CreatorSpec for permissions."""
 
     role_id: uuid.UUID
-    scope_type: RBACElementType
+    scope_type: ScopeType
     scope_id: str
-    entity_type: RBACElementType
+    entity_type: EntityType
     operation: OperationType
 
     @override
     def build_row(self) -> PermissionRow:
         return PermissionRow(
             role_id=self.role_id,
-            scope_type=self.scope_type.to_scope_type(),
+            scope_type=self.scope_type,
             scope_id=self.scope_id,
-            entity_type=self.entity_type.to_entity_type(),
+            entity_type=self.entity_type,
             operation=self.operation,
             permission=Permission.from_operation(self.operation),
         )
