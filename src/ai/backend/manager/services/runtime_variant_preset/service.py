@@ -2,6 +2,7 @@ import logging
 from typing import cast
 
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    VALUE_TYPE_VALIDATORS,
     PresetTarget,
     PresetValueType,
 )
@@ -65,8 +66,23 @@ class RuntimeVariantPresetService:
         ):
             raise InvalidAPIParameters("value_type 'flag' is only valid with preset_target 'args'.")
 
+<<<<<<< HEAD
         action.updater.pk_value = action.id
         data = await self._repository.update(action.updater)
+=======
+        if updater.default_value.is_update():
+            new_default_value = updater.default_value.value()
+            validator = VALUE_TYPE_VALIDATORS[effective_value_type]
+            try:
+                validator(new_default_value)
+            except (ValueError, TypeError) as e:
+                raise InvalidAPIParameters(
+                    f"default_value '{new_default_value}' is not a valid "
+                    f"{effective_value_type}: {e}"
+                ) from e
+
+        data = await self._ops_repository.update(updater)
+>>>>>>> f1e76551 (fix(BA-7499): validate default_value against effective value_type on preset update (#13994))
         return UpdateRuntimeVariantPresetActionResult(preset=data)
 
     async def delete(

@@ -56,6 +56,36 @@ class TestCreateRuntimeVariantPresetInputFlagValidation:
         assert result.preset_target == PresetTarget.ENV
 
 
+class TestCreateRuntimeVariantPresetInputDefaultValueValidation:
+    """Regression tests for value_type-aware default_value validation on create."""
+
+    @pytest.mark.parametrize(
+        "default_value",
+        [pytest.param("42", id="valid"), pytest.param(None, id="omitted")],
+    )
+    def test_default_value_is_valid(self, default_value: str | None) -> None:
+        result = CreateRuntimeVariantPresetInput(
+            runtime_variant_id=uuid4(),
+            name="test-preset",
+            preset_target=PresetTarget.ENV,
+            key="MY_VAR",
+            value_type=PresetValueType.INT,
+            default_value=default_value,
+        )
+        assert result.default_value == default_value
+
+    def test_default_value_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="not a valid"):
+            CreateRuntimeVariantPresetInput(
+                runtime_variant_id=uuid4(),
+                name="test-preset",
+                preset_target=PresetTarget.ENV,
+                key="MY_VAR",
+                value_type=PresetValueType.INT,
+                default_value="abc",
+            )
+
+
 class TestUpdateRuntimeVariantPresetInputFlagValidation:
     """Tests for flag + preset_target validation on UpdateRuntimeVariantPresetInput."""
 
@@ -87,3 +117,35 @@ class TestUpdateRuntimeVariantPresetInputFlagValidation:
             preset_target=PresetTarget.ARGS,
         )
         assert result.value_type == PresetValueType.FLAG
+
+
+class TestUpdateRuntimeVariantPresetInputDefaultValueValidation:
+    """Tests for value_type-aware default_value validation on UpdateRuntimeVariantPresetInput."""
+
+    @pytest.fixture
+    def preset_id(self) -> UUID:
+        return uuid4()
+
+    def test_default_value_is_rejected(self, preset_id: UUID) -> None:
+        with pytest.raises(ValidationError, match="not a valid"):
+            UpdateRuntimeVariantPresetInput(
+                id=preset_id, value_type=PresetValueType.INT, default_value="abc"
+            )
+
+    @pytest.mark.parametrize(
+        ("value_type", "default_value"),
+        [
+            pytest.param(PresetValueType.INT, "42", id="matching"),
+            pytest.param(None, "abc", id="value_type_missing"),
+            pytest.param(PresetValueType.INT, None, id="default_value_missing"),
+        ],
+    )
+    def test_default_value_is_valid(
+        self, preset_id: UUID, value_type: PresetValueType | None, default_value: str | None
+    ) -> None:
+        """DTO can only statically validate when both fields are present in the same
+        request; a partial update is left to the service, which has DB state."""
+        result = UpdateRuntimeVariantPresetInput(
+            id=preset_id, value_type=value_type, default_value=default_value
+        )
+        assert result.id == preset_id
