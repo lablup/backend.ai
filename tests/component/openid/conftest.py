@@ -672,9 +672,11 @@ def make_stoken(plugin_config: dict[str, Any]) -> Callable[..., str]:
 
 
 @pytest.fixture
-def make_hook_request(seed_data: ExtendedAsyncSAEngine) -> Callable[..., MagicMock]:
+def make_hook_request(
+    seed_data: ExtendedAsyncSAEngine, auth_repository: AuthRepository
+) -> Callable[..., MagicMock]:
     """Callable(cookies) -> mock Request with _root_app wired to seed_data."""
-    root_app: dict[str, Any] = {"_db": seed_data}
+    root_app: dict[str, Any] = {"_db": seed_data, "_auth_repository": auth_repository}
 
     def _make(cookies: dict[str, str]) -> MagicMock:
         request = MagicMock()
