@@ -36,10 +36,8 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 | **실패** | `E-GATE` | 사용자가 자기 자원에 접근하지 못한다 | Q2 |
 | | `E-ARG` | 특정 인자 경로로는 제 일을 하지 못한다 — 다른 인자로는 성공한다 | Q1 |
 | | `E-EXEC` | 도달하지만 어떤 주체·입력으로도 성공하지 않는다 | Q1 |
-| | `E-BULK` | 벌크가 항목별로, 순서대로 답하지 않는다 | Q5 |
-| **경고** | `W-GATE` | superadmin 전용인지 알기 어렵다 — 라우트가 RBAC보다 먼저 superadmin을 요구한다 | Q2 |
-| | `W-LEAK` | 한 호출자가 없는 자원과 접근 권한이 없는 자원을 구별할 수 있다 | Q4 |
-| | `W-GUARD` | 게이트는 선언대로 만나지만 그것을 정당화하는 근거가 런타임에 없다 | Q2 |
+| | `E-BULK` | 응답이 실제 상태와 어긋나거나, 하지 않은 일을 성공으로 보고한다 | Q5 |
+| **경고** | `W-LEAK` | 한 호출자가 없는 자원과 접근 권한이 없는 자원을 구별할 수 있다 | Q4 |
 | | `W-AUDIT` | 감사 행이 카탈로그와 다르거나, 남아야 할 행이 없다 | Q3 |
 | | `W-UNREACH` | 배선은 있으나 그것을 고르는 클라이언트 경로가 없다 | Q1 |
 | **미실행** | `X` | 백엔드 부재 또는 공유 스택 보호 | — |
@@ -49,7 +47,7 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 | 규칙 | 근거 |
 |---|---|
 | `W-UNREACH`는 경고다 | API가 없다는 것이지 동작이 깨진 것이 아니다. 1부가 `W`(죽은 배선)로 이미 판정한 것과 같은 대상이다 |
-| `E-GATE`는 발견 내용으로만 올린다 | 사용자가 자기 자원에 접근하지 못한다고 **실증된** 18행만 `E-GATE`다. 나머지는 라우트가 superadmin을 요구한다는 사실까지만 확인됐으므로 경고에 둔다 |
+| `E-GATE`는 발견 내용으로만 올린다 | 사용자가 자기 자원에 접근하지 못한다고 **실증된** 18행만 `E-GATE`다. 라우트가 superadmin을 요구한다는 사실까지만 확인된 행은 판정하지 않는다 |
 | `global`/`permission`에서 비-admin이 403을 받는 것은 `성공`이다 | 2부 A절 — `GlobalActionProcessor`가 `SuperAdminActionValidator`를 고정한다. 선언된 게이트가 그대로 작동한 것이다 |
 | `E-EXEC`와 `W-UNREACH`를 나눈다 | 수정이 다르다. `W-UNREACH`는 배선을 잇거나 지우는 일이고, `E-EXEC`는 결함을 고치는 일이다 |
 | `W-LEAK`은 한 호출자 기준이다 | admin이 404를 받고 비-admin이 403을 받는 것은 게이트가 둘일 뿐 누출이 아니다 |
@@ -59,7 +57,7 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 응답이 **없는 자원**과 **있지만 내 것이 아닌 자원**을 다르게 답하면, 한 호출자가 그 차이만으로
 자기 것이 아닌 자원의 존재를 확인할 수 있다. id를 하나씩 넣어 보면 실재하는 id의 목록이 나온다.
 
-10행이 네 모양으로 나뉜다.
+11행이 다섯 모양으로 나뉜다.
 
 | 모양 | 무엇이 일어나는가 | 행 |
 |---|---|---:|
@@ -67,6 +65,7 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 | 거부 응답이 데이터를 싣는다 | 403 본문이 소유자 UUID를 담아, 막으면서 누구 것인지 알려 준다 | 2 |
 | 무인증 표면의 계정 열거 | `authorize`는 401 본문이 같아도 `traceback`이 미존재 계정과 오답 비밀번호를 가르고, `signup`은 응답이 기존 이메일과 신규 이메일로 갈린다 | 2 |
 | 목록은 막고 낱건은 준다 | `search_users_by_domain`은 자기 도메인 목록을 거부하는데 `get_user`가 같은 행을 한 건씩 내준다 | 1 |
+| 거부 목록에 miss가 섞인다 | `search_entity_labels`가 없는 라벨과 권한 없는 라벨을 같은 거부 목록에 담아 존재 여부가 드러난다 | 1 |
 
 앞의 두 모양 7행은 원인이 하나다 — **owner lookup이 게이트보다 먼저 돈다.** 액션 7개를 각각
 고치는 것이 아니라 순서를 뒤집는 한 번의 수정일 가능성이 높다.
@@ -80,9 +79,6 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 반면 `E-ARG`는 특정 인자 경로만 망가진 것이다. BA-7501이 원형 — resource preset을 id로는 찾고
 이름으로는 못 찾는다.
 
-`W-GUARD`는 1부의 `G`와 같은 뜻이다. 1부가 `G`로 판정한 harbor webhook이 3부에서도 같은 판정이라,
-두 문서를 오가는 독자가 같은 액션에서 같은 결론을 본다.
-
 `감사` 컬럼의 `행 없음 (성공 read — 정책상 정상)`은 `W-AUDIT`가 아니다. `AuditLogPolicy`는 모든
 변경과 모든 실패를 기록하고, 성공한 read는 opt-in된 경우만 기록한다. 이 배포에는 opt-in된 read가
 없다.
@@ -93,12 +89,12 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 |---|---:|
 | 카탈로그 행 (`session`·`deployment` 제외) | 506 |
 | 이 문서의 행 수 | 506 |
-| — 실패 | 39 |
-| — 경고 | 225 |
+| — 실패 | 37 |
+| — 경고 | 148 |
 | — 미실행 | 26 |
-| — 성공 | 216 |
+| — 성공 | 295 |
 
-위 수치는 카탈로그 경로 506행이다. 여기에 더해 레거시 GraphQL 경로 48행을 concern별 하위 섹션에 실었다 — 실패 8, 경고 20, 미실행 2, 성공 18. 이미 센 액션의 다른 경로이므로 총계에 더하지 않는다.
+위 수치는 카탈로그 경로 506행이다. 여기에 더해 레거시 GraphQL 경로 48행을 concern별 하위 섹션에 실었다 — 실패 3, 경고 22, 미실행 2, 성공 21. 이미 센 액션의 다른 경로이므로 총계에 더하지 않는다.
 
 행은 배타적으로 배정된다 — `E-`가 하나라도 붙으면 실패, 없이 `W-`만 붙으면 경고다.
 
@@ -110,57 +106,50 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 |---|---|---|---|---:|
 | 실패 | `E-GATE` | 사용자가 자기 자원에 접근하지 못한다 | Q2 | 18 |
 | 실패 | `E-EXEC` | 도달하지만 어떤 주체·입력으로도 성공하지 않는다 | Q1 | 11 |
-| 실패 | `E-BULK` | 벌크가 항목별로, 순서대로 답하지 않는다 | Q5 | 11 |
-| 경고 | `W-GATE` | superadmin 전용인지 알기 어렵다 — 라우트가 RBAC보다 먼저 superadmin을 요구한다 | Q2 | 117 |
-| 경고 | `W-LEAK` | 한 호출자가 없는 자원과 접근 권한이 없는 자원을 구별할 수 있다 | Q4 | 10 |
-| 경고 | `W-GUARD` | 게이트는 선언대로 만나지만 그것을 정당화하는 근거가 런타임에 없다 | Q2 | 3 |
+| 실패 | `E-BULK` | 응답이 실제 상태와 어긋나거나, 하지 않은 일을 성공으로 보고한다 | Q5 | 9 |
+| 경고 | `W-LEAK` | 한 호출자가 없는 자원과 접근 권한이 없는 자원을 구별할 수 있다 | Q4 | 11 |
 | 경고 | `W-AUDIT` | 감사 행이 카탈로그와 다르거나, 남아야 할 행이 없다 | Q3 | 115 |
 | 경고 | `W-UNREACH` | 배선은 있으나 그것을 고르는 클라이언트 경로가 없다 | Q1 | 32 |
 | 미실행 | `X` | 백엔드 부재 또는 공유 스택 보호 | — | 26 |
-| 성공 | — | 다섯 축 어디에도 걸리지 않음 | — | 216 |
+| 성공 | — | 다섯 축 어디에도 걸리지 않음 | — | 295 |
 
 한 행이 판정을 둘 이상 달 수 있어 판정별 합은 행 수보다 크다.
 
 | 복합 판정 | 건수 |
 |---|---:|
-| `W-GATE+W-AUDIT` | 34 |
-| `E-BULK+W-AUDIT` | 4 |
-| `E-BULK+W-GATE` | 3 |
+| `E-BULK+W-AUDIT` | 3 |
 | `E-EXEC+W-AUDIT` | 2 |
-| `E-EXEC+W-GATE` | 2 |
 | `E-GATE+W-AUDIT` | 2 |
+| `W-LEAK+W-AUDIT` | 2 |
 | `E-GATE+E-EXEC` | 1 |
 | `E-GATE+W-LEAK` | 1 |
-| `W-GUARD+W-AUDIT` | 1 |
-| `W-LEAK+W-AUDIT` | 1 |
-| `W-LEAK+W-GUARD+W-AUDIT` | 1 |
 
 ## concern별 행 수
 
 | concern | 실패 | 경고 | 미실행 | 성공 | 합계 |
 |---|---:|---:|---:|---:|---:|
-| [app_config](#app-config) | 1 | 6 | 0 | 14 | 21 |
-| [artifact_registry](#artifact-registry) | 2 | 43 | 5 | 21 | 71 |
+| [app_config](#app-config) | 1 | 5 | 0 | 15 | 21 |
+| [artifact_registry](#artifact-registry) | 2 | 20 | 5 | 44 | 71 |
 | [container_registry](#container-registry) | 3 | 16 | 7 | 13 | 39 |
-| [label](#label) | 1 | 3 | 0 | 1 | 5 |
-| [metric](#metric) | 0 | 4 | 0 | 10 | 14 |
-| [notification_center](#notification-center) | 0 | 10 | 1 | 2 | 13 |
-| [organization](#organization) | 13 | 51 | 0 | 35 | 99 |
+| [label](#label) | 0 | 4 | 0 | 1 | 5 |
+| [metric](#metric) | 0 | 2 | 0 | 12 | 14 |
+| [notification_center](#notification-center) | 0 | 2 | 1 | 10 | 13 |
+| [organization](#organization) | 12 | 48 | 0 | 39 | 99 |
 | [rbac](#rbac) | 4 | 12 | 0 | 3 | 19 |
-| [resource_group](#resource-group) | 4 | 25 | 7 | 41 | 77 |
+| [resource_group](#resource-group) | 4 | 7 | 7 | 59 | 77 |
 | [resource_policy](#resource-policy) | 2 | 15 | 0 | 3 | 20 |
-| [system](#system) | 0 | 14 | 1 | 30 | 45 |
-| [vfolder](#vfolder) | 5 | 21 | 5 | 39 | 70 |
+| [system](#system) | 0 | 8 | 1 | 36 | 45 |
+| [vfolder](#vfolder) | 5 | 4 | 5 | 56 | 70 |
 | [visibility](#visibility) | 4 | 5 | 0 | 4 | 13 |
-| **합계** | **39** | **225** | **26** | **216** | **506** |
+| **합계** | **37** | **148** | **26** | **295** | **506** |
 
 컬럼은 `backend.ai mgr ops list`의 것에서 각 섹션 제목이 대신하는 `concern`과 `backing`을 빼고, 실행 결과 넷(`경로`·`admin`·`비-admin`·`감사`)과 `판정`·`사유`를 더한 구성이다.
 
 ## app_config
 
-21행 — 실패 1, 경고 6, 미실행 0, 성공 14.
+21행 — 실패 1, 경고 5, 미실행 0, 성공 15.
 
-### app_config — 성공 외 (7행)
+### app_config — 성공 외 (6행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -169,13 +158,13 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 | `app_config_allow_list` | `get` | `bulk_get_app_config_allow_lists` | `bulk` | `permission` | 없음 | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 선택하는 필드 없음 — DataLoader만 배선, GraphQL `appConfigAllowList`는 create 페이로드뿐 |
 | `app_config_definition` | `get` | `bulk_get_app_config_definitions` | `bulk` | `permission` | 없음 | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 선택하는 필드 없음 — DataLoader만 배선, GraphQL `appConfigDefinition`은 create 페이로드뿐 |
 | `app_config` | `search` | `search_app_configs` | `scope` | `permission` | rest:POST /v2/app-config/my/get | ok | 403 role_create_forbidden | 행 없음 (성공 read — 정책상 정상) | `E-GATE` | 자기 스코프 거부 — 본인 user 스코프 READ가 superadmin 외 전원 거부 (F6) |
-| `app_config_fragment` | `search` | `search_app_config_fragments` | `scope` | `permission` | rest:POST /v2/app-config-fragments/scoped/by-names | ok | ok (타 사용자 스코프 포함) | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 스코프 미구속 — 호출자가 준 scope를 그대로 owner로 써 임의 사용자 스코프를 읽는다 (F1) |
 | `app_config_fragment` | `upsert` | `global_bulk_upsert_app_config_fragments` | `global` | `permission` | rest:POST /v2/app-config-fragments/scoped/bulk-upsert (public scope) | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global`, 카탈로그 선언과 다름 | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 선언 대신 `global`을 기록 (A의 F10) / public 스코프 쓰기 1회에 global·scope 두 행이 남는다 |
 
-### app_config — 성공 (14행)
+### app_config — 성공 (15행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `app_config_fragment` | `search` | `search_app_config_fragments` | `scope` | `permission` | rest:POST /v2/app-config-fragments/scoped/by-names | ok | ok (타 사용자 스코프 포함) | 행 없음 (성공 read — 정책상 정상) | `성공` | 스코프 미구속 — 호출자가 준 scope를 그대로 owner로 써 임의 사용자 스코프를 읽는다 (F1) |
 | `app_config_fragment` | `get` | `bulk_get_app_config_fragments` | `bulk` | `permission` | cli:app-config-fragment get / my app-config-fragment get | ok | ok | 행 없음 (성공 read — 정책상 정상) | `성공` | — |
 | `app_config_allow_list` | `get` | `get_app_config_allow_list` | `single_entity` | `permission` | cli:admin app-config-allow-list get | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트가 superadmin 전용 — `ActionGate`에 superadmin 값이 없어 카탈로그는 `permission`으로 적힌다. 게이트 자체는 의도대로 동작한다 |
 | `app_config_definition` | `get` | `get_app_config_definition` | `single_entity` | `permission` | cli:admin app-config-definition get | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트가 superadmin 전용 — `ActionGate`에 superadmin 값이 없어 카탈로그는 `permission`으로 적힌다. 게이트 자체는 의도대로 동작한다 |
@@ -193,67 +182,67 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 
 ## artifact_registry
 
-71행 — 실패 2, 경고 43, 미실행 5, 성공 21.
+71행 — 실패 2, 경고 20, 미실행 5, 성공 44.
 
-### artifact_registry — 성공 외 (50행)
+### artifact_registry — 성공 외 (27행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `artifact` | `create` | `delegate_import_artifact_revision_batch` | `global` | `permission` | `gql:delegateImportArtifacts` | 미실행 | 403 user_auth_forbidden | 해당 없음 | `X` | 백엔드 부재 — 위임 대상 reservoir 인스턴스가 없다 |
 | `artifact` | `create` | `delegate_scan_artifacts` | `global` | `permission` | `gql:delegateScanArtifacts` | 미실행 | 403 user_auth_forbidden | 해당 없음 | `X` | 백엔드 부재 — 위임 대상 reservoir 인스턴스가 없다 |
 | `artifact` | `delete` | `delete_artifacts` | `global` | `permission` | `cli:artifact delete` | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global` (카탈로그 `artifact`) | `E-BULK+W-AUDIT` | entity type 불일치 — 감사 `global`. 없는 id 두 개에 200 `{"artifacts": []}` + `status=success`, 항목별 응답 없음 (F9) |
-| `artifact` | `get` | `get_artifact` | `single_entity` | `permission` | `cli:artifact get` | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
 | `artifact` | `search` | `get_artifact_revisions` | `single_entity` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 배선됐지만 호출 안 됨 — 호출자가 없다 |
 | `artifact` | `lookup` | `lookup_artifact_revision_owner` | `lookup` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 직접 경로 없음 — revision 액션 내부에서만 실행된다 |
 | `artifact` | `lookup` | `lookup_bulk_artifact_revision_owner` | `lookup` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 도달 불가 owner lookup — 이 도메인은 bulk field 연산을 배선하지 않는다 |
 | `artifact` | `update` | `restore_artifacts` | `global` | `permission` | `cli:artifact restore` | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global` **and operation=update** (a DELETED->ALIVE transition`) | `E-BULK+W-AUDIT` | soft delete 역전이 — DELETED→ALIVE인데 감사 `operation=update`. entity type도 `global`. 항목별 응답 없음 (F9) |
 | `artifact` | `get` | `retrieve_models` | `global` | `permission` | `gql:scanArtifactModels` | ok | 403 user_auth_forbidden | 일치 | `W-AUDIT` | entity type 불일치 — 감사 `global` |
 | `artifact` | `create` | `scan_artifacts` | `global` | `permission` | `gql:scanArtifacts` | ok | 403 user_auth_forbidden | 일치 | `W-AUDIT` | 레지스트리 이름 결합 — 프록시 TOML에 없는 이름이면 불투명한 404. entity type도 `global` (F3) |
-| `artifact` | `update` | `update_artifact` | `single_entity` | `permission` | `cli:artifact update` | ok | 403 backendai_generic_forbidden | 일치 (`update_artifact \| artifact \| update \| single_entity`) | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
 | `artifact` | `update` | `upsert_artifacts` | `global` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 프로세서 우회 — 서비스가 자기 메서드를 직접 호출해 게이트·감사가 건너뛰어진다 (`artifact/service.py:334,651`) |
 | `artifact_registry` | `create` | `create_hugging_face_registry` | `global` | `permission` | `cli:huggingface-registry create` | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global` | `W-AUDIT` | entity type 불일치 — 카탈로그 `artifact_registry` / 감사 `global` |
 | `artifact_registry` | `create` | `create_reservoir_registry` | `global` | `permission` | `cli:reservoir-registry create` | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global` | `W-AUDIT` | entity type 불일치 — 같은 사유 |
-| `artifact_registry` | `delete` | `delete_hugging_face_registry` | `single_entity` | `permission` | `cli:huggingface-registry delete` | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
-| `artifact_registry` | `delete` | `delete_reservoir_registry` | `single_entity` | `permission` | `cli:reservoir-registry delete` | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
-| `artifact_registry` | `get` | `get_hugging_face_registry` | `single_entity` | `permission` | `cli:huggingface-registry get` | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
-| `artifact_registry` | `get` | `get_reservoir_registry` | `single_entity` | `permission` | `cli:reservoir-registry get` | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
 | `artifact_registry` | `search` | `list_hugging_face_registry` | `global` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 배선됐지만 호출 안 됨 — 라우트·CLI·GQL 어디에도 호출자가 없다 |
 | `artifact_registry` | `search` | `list_reservoir_registries` | `global` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 배선됐지만 호출 안 됨 — 같은 사유 |
 | `artifact_registry` | `lookup` | `lookup_artifact_registry` | `lookup` | `public` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 직접 경로 없음 — 다른 액션의 소유자 해석 단계에서만 실행된다 |
-| `artifact_registry` | `update` | `update_hugging_face_registry` | `single_entity` | `permission` | `cli:huggingface-registry update` | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
-| `artifact_registry` | `update` | `update_reservoir_registry` | `single_entity` | `permission` | `cli:reservoir-registry update` | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
-| `artifact_revision` | `update` | `approve_artifact_revision` | `single_entity` | `permission` | `cli:artifact revision approve` | 400 artifact_access_bad-request | 403 backendai_generic_forbidden | 일치 (entity_id가 revision이 아닌 소유 artifact) | `W-GATE` | 라우트 게이트 선점 — 같은 사유. 감사 `entity_id`는 revision이 아니라 소유 artifact를 가리킨다 |
 | `artifact_revision` | `create` | `associate_with_storage` | `single_entity` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 프로세서 우회 — 서비스가 직접 호출한다 (`revision/service.py:586`) |
-| `artifact_revision` | `update` | `cancel_import` | `single_entity` | `permission` | `cli:artifact revision cancel-import` | ok | 403 backendai_generic_forbidden | 일치 (entity_id가 소유 artifact) | `W-GATE` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다. 더해 상태 가드가 없어 어떤 상태든 SCANNED로 되돌리고, REJECTED 판정을 뒤집거나 AVAILABLE이면 파일을 고아로 남긴다 (F2) |
-| `artifact_revision` | `delete` | `cleanup_artifact_revision` | `single_entity` | `permission` | `cli:artifact revision cleanup` | ok | 403 backendai_generic_forbidden | 일치 (entity_id가 소유 artifact) | `W-GATE` | 라우트 게이트 선점 — 같은 사유. AVAILABLE에서만 동작해 `cancel_import` 뒤에는 회수 경로가 사라진다 (F2) |
 | `artifact_revision` | `delete` | `disassociate_with_storage` | `single_entity` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 프로세서 우회 — 서비스가 직접 호출한다 (`revision/service.py:676`) |
-| `artifact_revision` | `get` | `get_artifact_revision` | `single_entity` | `permission` | `cli:artifact revision get` | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
 | `artifact_revision` | `get` | `get_artifact_revision_readme` | `single_entity` | `permission` | `gql/rest (blocked upstream)` | 미실행 | 미실행 | 해당 없음 | `X` | 스키마 형태 불일치 — GQL 필드 형태를 맞추지 못해 구동하지 못했다 |
 | `artifact_revision` | `get` | `get_artifact_revision_verification_result` | `single_entity` | `permission` | `gql/rest (blocked upstream)` | 미실행 | 미실행 | 해당 없음 | `X` | 스키마 형태 불일치 — 같은 사유 |
-| `artifact_revision` | `get` | `get_download_presigned_url` | `single_entity` | `permission` | `gql:getPresignedDownloadUrl` | ok | 403 user_auth_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 게이트 선점 — 같은 사유. 서명 URL은 감사 행 없이 발급된다 |
 | `artifact_revision` | `get` | `get_download_progress` | `single_entity` | `permission` | `gql/rest (blocked upstream)` | 미실행 | 미실행 | 해당 없음 | `X` | 관측 시점 부재 — 진행 중인 import bgtask를 잡아야 한다 |
-| `artifact_revision` | `update` | `get_upload_presigned_url` | `single_entity` | `permission` | `gql:getPresignedUploadUrl` | 403 artifact_update_forbidden | 403 user_auth_forbidden | 일치 (status=error) | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
-| `artifact_revision` | `create` | `import_artifact_revision` | `single_entity` | `permission` | `gql:importArtifacts` | ok | 403 user_auth_forbidden | 일치 (entity_id가 소유 artifact) | `W-GATE` | 라우트 게이트 선점 — 같은 사유. bgtask 기반이며 `tasks { taskId }`로 반환된다 |
-| `artifact_revision` | `update` | `reject_artifact_revision` | `single_entity` | `permission` | `cli:artifact revision reject` | ok | 403 backendai_generic_forbidden | 일치 (entity_id가 소유 artifact) | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
 | `object_storage` | `create` | `create_object_storage` | `global` | `permission` | `cli:object-storage create` | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global` (카탈로그 `object_storage`) | `W-AUDIT` | entity type 불일치 — 카탈로그 `object_storage` / 감사 `global` |
-| `object_storage` | `get` | `get_object_storage` | `single_entity` | `permission` | `cli:object-storage get` | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
-| `object_storage` | `purge` | `purge_object_storage` | `single_entity` | `permission` | `cli:object-storage delete` | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
-| `object_storage` | `update` | `update_object_storage` | `single_entity` | `permission` | `cli:object-storage update` | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
 | `storage_namespace` | `lookup` | `lookup_storage_namespace` | `lookup` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 직접 경로 없음 — 같은 사유 |
 | `storage_namespace` | `create` | `register_storage_namespace` | `global` | `permission` | `cli:storage-namespace register` | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global` (카탈로그 `storage_namespace`) | `W-AUDIT` | entity type 불일치 — 카탈로그 `storage_namespace` / 감사 `global`. 존재하지 않는 `storage_id`도 그대로 받는다 (F14) |
-| `storage_namespace` | `purge` | `unregister_storage_namespace` | `single_entity` | `permission` | `cli:storage-namespace unregister` | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
 | `vfs_storage` | `create` | `create_vfs_storage` | `global` | `permission` | `cli:vfs-storage create` | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global` (카탈로그 `vfs_storage`) | `W-AUDIT` | entity type 불일치 — 카탈로그 `vfs_storage` / 감사 `global` |
-| `vfs_storage` | `get` | `get_vfs_storage` | `single_entity` | `permission` | `cli:vfs-storage get` | ok | 403 backendai_generic_forbidden | 일치 (entity_type `vfs_storage`) | `W-GATE` | 라우트 게이트 선점 — `superadmin_required`가 먼저 걸려 선언된 단일 엔티티 RBAC 검사가 실행되지 않는다 |
 | `vfs_storage` | `lookup` | `lookup_vfs_storage` | `lookup` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 직접 경로 없음 — 다른 액션의 소유자 해석 단계에서만 실행된다 |
-| `vfs_storage` | `purge` | `purge_vfs_storage` | `single_entity` | `permission` | `cli:vfs-storage delete` | 404 on | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
 | `vfs_storage` | `update` | `set_vfs_quota_scope` | `global` | `permission` | `rest-v1:POST /admin/quota-scopes/set and gql:set_quota_scope` | 200 both | 403 on | 불일치 — REST 경로는 entity_type이 `global`, 레거시 GQL 경로는 행 없음 | `W-AUDIT` | 프로세서 우회 — REST 경로는 행을 남기나 레거시 GQL `set_quota_scope`는 프로세서를 건너뛰어 행도 RBAC 검사도 없다 (F16.4) |
 | `vfs_storage` | `delete` | `unset_vfs_quota_scope` | `global` | `permission` | `rest-v1:POST /admin/quota-scopes/unset and gql:unset_quota_scope` | 200 both | 403 on | 불일치 — REST 경로는 entity_type이 `global`, 레거시 GQL 경로는 행 없음 | `W-AUDIT` | 프로세서 우회 — 같은 사유 (F16.4) |
-| `vfs_storage` | `update` | `update_vfs_storage` | `single_entity` | `permission` | `cli:vfs-storage update` | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
 
-### artifact_registry — 성공 (21행)
+### artifact_registry — 성공 (44행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `artifact` | `get` | `get_artifact` | `single_entity` | `permission` | `cli:artifact get` | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
+| `artifact` | `update` | `update_artifact` | `single_entity` | `permission` | `cli:artifact update` | ok | 403 backendai_generic_forbidden | 일치 (`update_artifact \| artifact \| update \| single_entity`) | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `artifact_registry` | `delete` | `delete_hugging_face_registry` | `single_entity` | `permission` | `cli:huggingface-registry delete` | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
+| `artifact_registry` | `delete` | `delete_reservoir_registry` | `single_entity` | `permission` | `cli:reservoir-registry delete` | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `artifact_registry` | `get` | `get_hugging_face_registry` | `single_entity` | `permission` | `cli:huggingface-registry get` | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `artifact_registry` | `get` | `get_reservoir_registry` | `single_entity` | `permission` | `cli:reservoir-registry get` | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `artifact_registry` | `update` | `update_hugging_face_registry` | `single_entity` | `permission` | `cli:huggingface-registry update` | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `artifact_registry` | `update` | `update_reservoir_registry` | `single_entity` | `permission` | `cli:reservoir-registry update` | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `artifact_revision` | `update` | `approve_artifact_revision` | `single_entity` | `permission` | `cli:artifact revision approve` | 400 artifact_access_bad-request | 403 backendai_generic_forbidden | 일치 (entity_id가 revision이 아닌 소유 artifact) | `성공` | 라우트 게이트 선점 — 같은 사유. 감사 `entity_id`는 revision이 아니라 소유 artifact를 가리킨다 |
+| `artifact_revision` | `update` | `cancel_import` | `single_entity` | `permission` | `cli:artifact revision cancel-import` | ok | 403 backendai_generic_forbidden | 일치 (entity_id가 소유 artifact) | `성공` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다. 더해 상태 가드가 없어 어떤 상태든 SCANNED로 되돌리고, REJECTED 판정을 뒤집거나 AVAILABLE이면 파일을 고아로 남긴다 (F2) |
+| `artifact_revision` | `delete` | `cleanup_artifact_revision` | `single_entity` | `permission` | `cli:artifact revision cleanup` | ok | 403 backendai_generic_forbidden | 일치 (entity_id가 소유 artifact) | `성공` | 라우트 게이트 선점 — 같은 사유. AVAILABLE에서만 동작해 `cancel_import` 뒤에는 회수 경로가 사라진다 (F2) |
+| `artifact_revision` | `get` | `get_artifact_revision` | `single_entity` | `permission` | `cli:artifact revision get` | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
+| `artifact_revision` | `get` | `get_download_presigned_url` | `single_entity` | `permission` | `gql:getPresignedDownloadUrl` | ok | 403 user_auth_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 게이트 선점 — 같은 사유. 서명 URL은 감사 행 없이 발급된다 |
+| `artifact_revision` | `update` | `get_upload_presigned_url` | `single_entity` | `permission` | `gql:getPresignedUploadUrl` | 403 artifact_update_forbidden | 403 user_auth_forbidden | 일치 (status=error) | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `artifact_revision` | `create` | `import_artifact_revision` | `single_entity` | `permission` | `gql:importArtifacts` | ok | 403 user_auth_forbidden | 일치 (entity_id가 소유 artifact) | `성공` | 라우트 게이트 선점 — 같은 사유. bgtask 기반이며 `tasks { taskId }`로 반환된다 |
+| `artifact_revision` | `update` | `reject_artifact_revision` | `single_entity` | `permission` | `cli:artifact revision reject` | ok | 403 backendai_generic_forbidden | 일치 (entity_id가 소유 artifact) | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `object_storage` | `get` | `get_object_storage` | `single_entity` | `permission` | `cli:object-storage get` | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
+| `object_storage` | `purge` | `purge_object_storage` | `single_entity` | `permission` | `cli:object-storage delete` | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `object_storage` | `update` | `update_object_storage` | `single_entity` | `permission` | `cli:object-storage update` | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `storage_namespace` | `purge` | `unregister_storage_namespace` | `single_entity` | `permission` | `cli:storage-namespace unregister` | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
+| `vfs_storage` | `get` | `get_vfs_storage` | `single_entity` | `permission` | `cli:vfs-storage get` | ok | 403 backendai_generic_forbidden | 일치 (entity_type `vfs_storage`) | `성공` | 라우트 게이트 선점 — `superadmin_required`가 먼저 걸려 선언된 단일 엔티티 RBAC 검사가 실행되지 않는다 |
+| `vfs_storage` | `purge` | `purge_vfs_storage` | `single_entity` | `permission` | `cli:vfs-storage delete` | 404 on | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `vfs_storage` | `update` | `update_vfs_storage` | `single_entity` | `permission` | `cli:vfs-storage update` | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 게이트 선점 — 같은 사유 |
 | `artifact` | `get` | `retrieve_model` | `global` | `permission` | `gql:scanArtifactModels (single-model input)` | ok | 403 user_auth_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | — |
 | `artifact` | `search` | `search_artifact_revisions` | `global` | `permission` | `gql:artifactRevisions` | ok | 403 user_auth_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | — |
 | `artifact` | `search` | `search_artifacts` | `global` | `permission` | `cli:admin artifact search` | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | — |
@@ -289,7 +278,7 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 | `container_registry` | `create` | `create_registry_quota` | `global` | `permission` | `gql_legacy (harbor quota mutations)` | 미실행 | 미실행 | 해당 없음 | `X` | 백엔드 부재 — Harbor 인스턴스가 없다 |
 | `container_registry` | `delete` | `delete_container_registry` | `global` | `permission` | `cli:admin container-registry delete` | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global` | `W-AUDIT` | entity type 불일치 — 같은 사유 |
 | `container_registry` | `delete` | `delete_registry_quota` | `global` | `permission` | `gql_legacy (harbor quota mutations)` | 미실행 | 미실행 | 해당 없음 | `X` | 백엔드 부재 — Harbor 인스턴스가 없다 |
-| `container_registry` | `update` | `handle_harbor_webhook` | `global` | `anonymous` | `rest-v1:POST /container-registries/webhook/harbor` | 500 backendai_generic_internal-error | 해당 없음 | 일치 (`handle_harbor_webhook\|global\|update\|global`, status=error) | `W-GUARD+W-AUDIT` | 게이트 근거 미흡 — `anonymous`를 정당화하는 것은 웹훅 시크릿 비교인데, 그 비교가 `extra.webhook_auth_header`가 있을 때만 실행된다(`service.py:214`). 이 배포의 네 레지스트리 모두 해당 값이 null이라 검사가 한 번도 돌지 않고, 무자격 호출자가 지정한 호스트로 매니저가 나간다. entity type도 `global` (F4) |
+| `container_registry` | `update` | `handle_harbor_webhook` | `global` | `anonymous` | `rest-v1:POST /container-registries/webhook/harbor` | 500 backendai_generic_internal-error | 해당 없음 | 일치 (`handle_harbor_webhook\|global\|update\|global`, status=error) | `W-AUDIT` | 무자격 호출자가 매니저를 움직인다 — `anonymous`를 정당화하는 것은 웹훅 시크릿 비교인데, 그 비교가 `extra.webhook_auth_header`가 있을 때만 실행된다(`service.py:214`). 이 배포의 네 레지스트리 모두 해당 값이 null이라 검사가 한 번도 돌지 않고, 무자격 호출자가 지정한 호스트로 매니저가 나간다. entity type도 `global` (F4) |
 | `container_registry` | `get` | `read_registry_quota` | `global` | `permission` | `gql_legacy (harbor quota mutations)` | 미실행 | 미실행 | 해당 없음 | `X` | 백엔드 부재 — Harbor 인스턴스가 없다 |
 | `container_registry` | `update` | `rescan_images` | `global` | `permission` | `gql_legacy:rescan_images / rest-v1:POST /container-registries/rescan` | ok | 200 ok:false | 불일치 — entity_type이 `global` (카탈로그 `container_registry`) | `W-AUDIT` | entity type 불일치 — 카탈로그 `container_registry` / 감사 `global`. 거부가 403이 아니라 200 본문의 `ok:false`로 온다. bgtask 기반 (F16.3) |
 | `container_registry` | `update` | `update_container_registry` | `global` | `permission` | `cli:admin container-registry update / gql:modify_container_registry` | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global` | `W-AUDIT` | entity type 불일치 — 같은 사유 |
@@ -303,7 +292,7 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 | `image` | `create` | `preload_image` | `global` | `permission` | `gql_legacy:preload_image` | 200 not-implemented | 200 not-implemented | 해당 없음 | `E-EXEC` | 실행 불능 — 뮤테이션 경로는 살아 있으나 어떤 입력에도 `Not implemented.`만 돌려준다 |
 | `image` | `purge` | `purge_image` | `global` | `permission` | `bgtask (image purge task)` | 미실행 | 해당 없음 | 해당 없음 | `X` | 직접 구동 불가 — 이미지 purge bgtask에서만 호출된다 |
 | `image` | `purge` | `purge_images` | `global` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 배선됐지만 호출 안 됨 — bgtask는 단수 `purge_image`를 쓴다 |
-| `image` | `restore` | `restore_image_by_id` | `single_entity` | `permission` | `rest:POST /v2/images/restore` | 404 image_read_not-found | 403 backendai_generic_forbidden | 일치 (`restore_image_by_id \| image \| restore`, status=error) | `E-EXEC+W-GATE` | 실행 불능 — `ImageRow.get`의 기본 상태 필터가 ALIVE라 복구 대상인 DELETED 이미지를 영영 찾지 못한다. 라우트 게이트 선점도 함께 (F8) |
+| `image` | `restore` | `restore_image_by_id` | `single_entity` | `permission` | `rest:POST /v2/images/restore` | 404 image_read_not-found | 403 backendai_generic_forbidden | 일치 (`restore_image_by_id \| image \| restore`, status=error) | `E-EXEC` | 실행 불능 — `ImageRow.get`의 기본 상태 필터가 ALIVE라 복구 대상인 DELETED 이미지를 영영 찾지 못한다. 라우트 게이트 선점도 함께 (F8) |
 | `image` | `create` | `scan_image` | `global` | `permission` | `gql_legacy (single-image scan)` | 미실행 | 403 | 해당 없음 | `X` | 외부 영향 회피 — 제3자 레지스트리로 나가는 스캔이라 구동하지 않았다 |
 | `image` | `update` | `set_image_resource_limit_by_id` | `global` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 배선됐지만 호출 안 됨 — 호출자가 없다 |
 | `image` | `delete` | `unload_image` | `global` | `permission` | `gql_legacy:unload_image` | 200 not-implemented | 200 not-implemented | 해당 없음 | `E-EXEC` | 실행 불능 — 같은 사유 |
@@ -331,7 +320,7 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 
 ## label
 
-5행 — 실패 1, 경고 3, 미실행 0, 성공 1.
+5행 — 실패 0, 경고 4, 미실행 0, 성공 1.
 
 ### label — 성공 외 (4행)
 
@@ -339,7 +328,7 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 |---|---|---|---|---|---|---|---|---|---|---|
 | `label` | `lookup` | `lookup_bulk_entity_label_owner` | `lookup` | `permission` | 없음 | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 도달 불가 owner lookup — bulk field 연산이 배선되지 않았다 (1부 `W`) |
 | `label` | `lookup` | `lookup_entity_label_owner` | `lookup` | `permission` | cli:entity-label purge (내부 lookup) | 404 database_access_not-found | 404 database_access_not-found | 일치 | `W-LEAK` | 게이트 전 실행 — F2의 구분 누출을 만드는 지점 (F2) |
-| `label` | `search` | `search_entity_labels` | `bulk` | `permission` | cli:entity-label search | ok | 403 role_create_forbidden | 행 없음 (성공 read — 정책상 정상) | `E-BULK` | atomic 처리 — 한 항목 거부로 전체 실패, miss가 거부 목록에 섞인다 (F3) |
+| `label` | `search` | `search_entity_labels` | `bulk` | `permission` | cli:entity-label search | ok | 403 role_create_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-LEAK` | 구분 누출 — 없는 라벨과 권한 없는 라벨이 같은 거부 목록에 섞여 존재 여부가 드러난다. 한 항목 거부로 전체가 실패하는 것 자체는 원자적 의미론이다 (F3) |
 | `label` | `update` | `purge_entity_label` | `single_entity` | `permission` | cli:entity-label purge | ok | 403 role_create_forbidden / 404 database_access_not-found | 일치 | `W-LEAK` | 게이트 전 owner lookup — 실재 라벨은 403, 없는 라벨은 404로 갈린다 (F2) |
 
 ### label — 성공 (1행)
@@ -350,21 +339,21 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 
 ## metric
 
-14행 — 실패 0, 경고 4, 미실행 0, 성공 10.
+14행 — 실패 0, 경고 2, 미실행 0, 성공 12.
 
-### metric — 성공 외 (4행)
+### metric — 성공 외 (2행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `prometheus_query_preset` | `create` | `create_prometheus_query_preset` | `global` | `permission` | cli:admin prometheus-query-definition create | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global`, 카탈로그 선언과 다름 | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 선언 대신 `global`을 기록 (A의 F10) |
 | `prometheus_query_preset_category` | `create` | `create_prometheus_query_preset_category` | `global` | `permission` | cli:admin prometheus-query-definition-category create | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global`, 카탈로그 선언과 다름 | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 선언 대신 `global`을 기록 (A의 F10) |
-| `prometheus_query_preset` | `get` | `execute_prometheus_query_preset` | `single_entity` | `permission` | cli:prometheus-query-definition execute | ok | 403 role_create_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 읽기와 실행 분리 — preset은 public으로 전문 공개, 실행은 monitor까지 거부 (F12) |
-| `prometheus_query_preset` | `search` | `public_search_container_metrics` | `global` | `public` | gql:user_utilization_metric | ok | ok (본인) / GraphQL Permission denied (타인) | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 액션 밖 검사 — gql_legacy 리졸버가 `RuntimeError`로 소유권을 검사한다 (F13) |
 
-### metric — 성공 (10행)
+### metric — 성공 (12행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `prometheus_query_preset` | `get` | `execute_prometheus_query_preset` | `single_entity` | `permission` | cli:prometheus-query-definition execute | ok | 403 role_create_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 읽기와 실행 분리 — preset은 public으로 전문 공개, 실행은 monitor까지 거부 (F12) |
+| `prometheus_query_preset` | `search` | `public_search_container_metrics` | `global` | `public` | gql:user_utilization_metric | ok | ok (본인) / GraphQL Permission denied (타인) | 행 없음 (성공 read — 정책상 정상) | `성공` | 액션 밖 검사 — gql_legacy 리졸버가 `RuntimeError`로 소유권을 검사한다 (F13) |
 | `prometheus_query_preset_category` | `get` | `public_bulk_get_prometheus_query_preset_categories` | `bulk` | `public` | gql:prometheusQueryPresets | ok | ok | 행 없음 (성공 read — 정책상 정상) | `성공` | 벌크 정상 — 위치대로, 중복 독립, null FK는 null (F16) |
 | `prometheus_query_preset` | `get` | `preview_prometheus_query_preset` | `global` | `permission` | cli:admin prometheus-query-definition preview | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | — |
 | `prometheus_query_preset` | `get` | `get_prometheus_query_preset` | `single_entity` | `public` | cli:prometheus-query-definition get | ok | ok | 행 없음 (성공 read — 정책상 정상) | `성공` | public — PromQL 템플릿 전문이 인증만 하면 읽힌다 |
@@ -378,36 +367,36 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 
 ## notification_center
 
-13행 — 실패 0, 경고 10, 미실행 1, 성공 2.
+13행 — 실패 0, 경고 2, 미실행 1, 성공 10.
 
-### notification_center — 성공 외 (11행)
+### notification_center — 성공 외 (3행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `notification_channel` | `create` | `create_notification_channel` | `global` | `permission` | rest:POST /v2/notifications/channels | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global`, 카탈로그 선언과 다름 | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 선언 대신 `global`을 기록 (A의 F10) |
 | `notification_rule` | `create` | `create_notification_rule` | `global` | `permission` | rest:POST /v2/notifications/rules | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global`, 카탈로그 선언과 다름 | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 선언 대신 `global`을 기록 (A의 F10) |
 | `notification_rule` | `create` | `process_notification` | `global` | `permission` | bgtask:event_dispatcher/notification | 미실행 | 미실행 | 해당 없음 | `X` | 미실행 — 이벤트 디스패처가 구동한다 |
-| `notification_channel` | `get` | `get_notification_channel` | `single_entity` | `permission` | rest:GET /v2/notifications/channels/{id} | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `notification_rule` | `get` | `get_notification_rule` | `single_entity` | `permission` | rest:GET /v2/notifications/rules/{id} | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `notification_channel` | `purge` | `purge_notification_channel` | `single_entity` | `permission` | cli:notification channel delete | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `notification_rule` | `purge` | `purge_notification_rule` | `single_entity` | `permission` | cli:notification rule delete | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `notification_channel` | `update` | `update_notification_channel` | `single_entity` | `permission` | rest:PATCH /v2/notifications/channels/{id} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `notification_channel` | `update` | `validate_notification_channel` | `single_entity` | `permission` | rest:POST /v2/notifications/channels/validate | 500 backendai_generic_internal-error | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 전달 실패를 500으로 보고 — 검증 결과가 아니라 서버 오류로 나온다 (F5) |
-| `notification_rule` | `update` | `update_notification_rule` | `single_entity` | `permission` | rest:PATCH /v2/notifications/rules/{id} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `notification_rule` | `update` | `validate_notification_rule` | `single_entity` | `permission` | rest:POST /v2/notifications/rules/validate | 400 backendai_parsing_invalid-parameters / 500 | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 전달 실패를 500으로 보고 — 완전한 이벤트 페이로드를 손으로 채워야 한다 (F5) |
 
-### notification_center — 성공 (2행)
+### notification_center — 성공 (10행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `notification_channel` | `get` | `get_notification_channel` | `single_entity` | `permission` | rest:GET /v2/notifications/channels/{id} | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `notification_rule` | `get` | `get_notification_rule` | `single_entity` | `permission` | rest:GET /v2/notifications/rules/{id} | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `notification_channel` | `purge` | `purge_notification_channel` | `single_entity` | `permission` | cli:notification channel delete | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `notification_rule` | `purge` | `purge_notification_rule` | `single_entity` | `permission` | cli:notification rule delete | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `notification_channel` | `update` | `update_notification_channel` | `single_entity` | `permission` | rest:PATCH /v2/notifications/channels/{id} | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `notification_channel` | `update` | `validate_notification_channel` | `single_entity` | `permission` | rest:POST /v2/notifications/channels/validate | 500 backendai_generic_internal-error | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 전달 실패를 500으로 보고 — 검증 결과가 아니라 서버 오류로 나온다 (F5) |
+| `notification_rule` | `update` | `update_notification_rule` | `single_entity` | `permission` | rest:PATCH /v2/notifications/rules/{id} | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `notification_rule` | `update` | `validate_notification_rule` | `single_entity` | `permission` | rest:POST /v2/notifications/rules/validate | 400 backendai_parsing_invalid-parameters / 500 | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 전달 실패를 500으로 보고 — 완전한 이벤트 페이로드를 손으로 채워야 한다 (F5) |
 | `notification_channel` | `search` | `search_notification_channels` | `global` | `permission` | cli:notification channel search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | — |
 | `notification_rule` | `search` | `search_notification_rules` | `global` | `permission` | cli:notification rule search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | — |
 
 ## organization
 
-99행 — 실패 13, 경고 51, 미실행 0, 성공 35.
+99행 — 실패 12, 경고 48, 미실행 0, 성공 39.
 
-### organization — 성공 외 (64행)
+### organization — 성공 외 (60행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -416,44 +405,41 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 | `auth` | `update` | `global_unblock_user` | `global` | `permission` | rest:POST /v2/login-sessions/unblock-user | ok | 403 backendai_generic_forbidden | 불일치 — 미존재 계정에 `success` 행 | `W-AUDIT` | 허위 성공 기록 — 없는 계정에도 200과 success 행 (F9, F10) |
 | `auth` | `update` | `update_password_no_auth` | `global` | `anonymous` | rest:POST /auth/update-password-no-auth | 400 backendai_generic_bad-request | 해당 없음 | 불일치 — 카탈로그 `auth` / 감사 `global` | `E-EXEC+W-AUDIT` | 설정으로 비활성 — 어떤 입력에도 `Unsupported function.`을 반환한다. 결함이 아니라 배포 설정 (F10) |
 | `domain` | `update` | `create_domain_dotfile` | `single_entity` | `permission` | rest-v1:POST /domain-config/dotfiles | ok | 403 role_create_forbidden | 일치 | `E-GATE` | 권한 부족 — 도메인 관리자가 자기 도메인에 UPDATE를 갖지 않는다 (F15) |
-| `domain` | `delete` | `delete_domain` | `single_entity` | `permission` | rest:POST /v2/domains/delete | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 선행해 RBAC 검사가 돌지 않고 거부 행도 없다 (F12) |
+| `domain` | `delete` | `delete_domain` | `single_entity` | `permission` | rest:POST /v2/domains/delete | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 선행해 RBAC 검사가 돌지 않고 거부 행도 없다 (F12) |
 | `domain` | `update` | `delete_domain_dotfile` | `single_entity` | `permission` | rest-v1:DELETE /domain-config/dotfiles | ok | 403 role_create_forbidden | 일치 | `E-GATE` | 권한 부족 — 도메인 관리자가 자기 도메인에 UPDATE를 갖지 않는다 (F15) |
 | `domain` | `create` | `global_create_domain` | `global` | `permission` | rest-v1:POST /admin/domains | ok | 403 backendai_generic_forbidden | 불일치 — 카탈로그 `domain` / 감사 `global` | `W-AUDIT` | entity type 불일치 — v1 라우트만 이 액션에 닿는다 (F10) |
 | `domain` | `create` | `global_create_domain_node` | `global` | `permission` | rest:POST /v2/domains | ok | 403 backendai_generic_forbidden | 불일치 — 카탈로그 `domain` / 감사 `global` | `W-AUDIT` | entity type 불일치 — `/v2/domains`는 `global_create_domain`이 아니라 이쪽에 닿는다 (F10) |
 | `domain` | `search` | `global_search_domains` | `global` | `permission` | rest:POST /v2/domains/search | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 거부 행 없음 — 미들웨어가 선점해 denied 행이 남지 않는다 (F12) |
 | `domain` | `lookup` | `lookup_domain` | `lookup` | `public` | 없음 (내부 호출: `/v2/domains/{name}`·`/v2/users/domains/{name}/…` 선행) | 404 database_access_not-found | 404 database_access_not-found | 일치 | `W-LEAK` | 구분 누출 — 권한 검사 이전에 404가 나 도메인 이름을 열거할 수 있다 (F13) |
-| `domain` | `restore` | `restore_domain` | `single_entity` | `permission` | rest:POST /v2/domains/restore | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 선행해 RBAC 검사가 돌지 않고 거부 행도 없다 (F12) |
-| `domain` | `search` | `search_rg_domains` | `global` | `public` | rest:GET /v2/resource-groups/{name}/allowed-domains | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-GATE+W-AUDIT` | 게이트 선점 — `public` 선언이나 라우트가 superadmin_required다 (F12) |
+| `domain` | `restore` | `restore_domain` | `single_entity` | `permission` | rest:POST /v2/domains/restore | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 선행해 RBAC 검사가 돌지 않고 거부 행도 없다 (F12) |
+| `domain` | `search` | `search_rg_domains` | `global` | `public` | rest:GET /v2/resource-groups/{name}/allowed-domains | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 게이트 선점 — `public` 선언이나 라우트가 superadmin_required다 (F12) |
 | `domain` | `update` | `update_domain_dotfile` | `single_entity` | `permission` | rest-v1:PATCH /domain-config/dotfiles | ok | 403 role_create_forbidden | 일치 | `E-GATE` | 권한 부족 — 도메인 관리자가 자기 도메인에 UPDATE를 갖지 않는다 (F15) |
-| `domain` | `update` | `update_domain_node` | `single_entity` | `permission` | rest:PATCH /v2/domains/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — `/v2/domains/{name}`은 `update_domain`이 아니라 이쪽에 닿는다 (F12) |
+| `domain` | `update` | `update_domain_node` | `single_entity` | `permission` | rest:PATCH /v2/domains/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — `/v2/domains/{name}`은 `update_domain`이 아니라 이쪽에 닿는다 (F12) |
 | `error_log` | `update` | `delete_error_log` | `single_entity` | `permission` | rest-v1:POST /logs/error/{log_id}/clear | 404 database_access_not-found | 403 role_create_forbidden (타인 소유) / 404 (미존재) | 일치 | `W-LEAK` | 구분 누출 — 타인 소유 로그는 403, 미존재는 404로 갈려 id를 열거할 수 있다 (F13) |
 | `error_log` | `search` | `global_search_error_logs` | `global` | `permission` | 없음 | 해당 없음 | 해당 없음 | 해당 없음 | `W-UNREACH` | 라우트 없음 — `GET /logs/error`는 언제나 scope 변종을 고른다 |
-| `keypair` | `get` | `get_default_keypairs` | `bulk` | `permission` | 없음 (내부 호출: adapters/user·project가 `main_access_key`를 채울 때) | ok | ok | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 권한 과다 — bulk 게이트가 타인의 `main_access_key` 노출을 막지 못한다 (F1) |
 | `keypair` | `get` | `get_keypair` | `single_entity` | `permission` | rest:GET /v2/keypairs/{access_key} | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `E-GATE+W-AUDIT` | 게이트 선점 — 소유자조차 자기 키페어를 못 읽는다 (F12) |
-| `keypair` | `update` | `purge_keypair` | `single_entity` | `permission` | rest:DELETE /v2/keypairs/{access_key} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `keypair` | `update` | `purge_keypair` | `single_entity` | `permission` | rest:DELETE /v2/keypairs/{access_key} | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
 | `login_history` | `search` | `global_search_login_history` | `global` | `permission` | rest:POST /v2/login-history/search | 500 backendai_generic_internal-error | 403 backendai_generic_forbidden | 행 없음 (결함) | `E-EXEC+W-AUDIT` | 응답 직렬화 실패 — `client_ip`가 `inet`인데 DTO는 `str`이라 통과한 주체도 500을 받는다 (F7, F12) |
 | `login_history` | `search` | `search_login_history` | `scope` | `permission` | rest:POST /v2/login-history/my/search | 500 backendai_generic_internal-error | 500 backendai_generic_internal-error | 행 없음 (성공 read — 정책상 정상) | `E-EXEC` | 응답 직렬화 실패 — 액션은 성공하고 `client_ip` 직렬화에서 죽어 누구도 결과를 못 받는다 (F7) |
 | `login_session` | `search` | `global_search_login_sessions` | `global` | `permission` | rest:POST /v2/login-sessions/search | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 거부 행 없음 — 미들웨어가 선점한다 (F12) |
 | `login_session` | `update` | `revoke_login_session` | `single_entity` | `permission` | rest:POST /v2/login-sessions/my/revoke | 404 database_access_not-found | 403 role_create_forbidden (타인 소유) / 404 (미존재) | 일치 | `W-LEAK` | 구분 누출 — 타인 소유 세션은 403, 미존재는 404로 갈려 세션 id를 열거할 수 있다 (F13) |
 | `project` | `update` | `assign_users_to_project` | `single_entity` | `permission` | rest:POST /v2/projects/{id}/users/assign | ok | 403 role_create_forbidden | 일치 | `E-BULK` | 벌크 응답 결함 — 미존재 user id는 응답에도 감사에도 안 나오고, 중복 하나가 전체를 409로 되돌린다 (F2, F14) |
-| `project` | `create` | `create_project` | `scope` | `permission` | rest:POST /v2/projects | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — `scope` 선언이나 superadmin_required라 도메인 관리자가 만들 수 없다 (F12) |
-| `project` | `delete` | `delete_project` | `single_entity` | `permission` | rest:POST /v2/projects/delete | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — 본문 키가 v1식 `group_id`다 (F12, F15) |
-| `project` | `get` | `get_project` | `single_entity` | `permission` | rest:GET /v2/projects/{id} | 404 database_access_not-found | 403 role_create_forbidden | 일치 | `W-GATE` | 권한 부족 — 소속 프로젝트에도 READ가 없다 (F5) |
+| `project` | `create` | `create_project` | `scope` | `permission` | rest:POST /v2/projects | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — `scope` 선언이나 superadmin_required라 도메인 관리자가 만들 수 없다 (F12) |
+| `project` | `delete` | `delete_project` | `single_entity` | `permission` | rest:POST /v2/projects/delete | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — 본문 키가 v1식 `group_id`다 (F12, F15) |
 | `project` | `search` | `global_search_project_usage_per_month` | `global` | `permission` | rest-v1:GET /resource/usage/month | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 거부 행 없음 — 미들웨어가 선점한다 (F12) |
 | `project` | `search` | `global_search_project_usage_per_period` | `global` | `permission` | rest-v1:GET /resource/usage/period | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 거부 행 없음 — 미들웨어가 선점한다 (F12) |
 | `project` | `search` | `global_search_projects` | `global` | `permission` | rest:POST /v2/projects/search | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 거부 행 없음 — 미들웨어가 선점한다 (F12) |
-| `project` | `purge` | `purge_project` | `single_entity` | `permission` | rest:POST /v2/projects/purge | 404 group_read_not-found | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — 같은 미존재 입력에 delete·restore와 다른 error_code를 낸다 (F12, F15) |
-| `project` | `restore` | `restore_project` | `single_entity` | `permission` | rest:POST /v2/projects/restore | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — 본문 키가 v1식 `group_id`다 (F12, F15) |
+| `project` | `purge` | `purge_project` | `single_entity` | `permission` | rest:POST /v2/projects/purge | 404 group_read_not-found | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — 같은 미존재 입력에 delete·restore와 다른 error_code를 낸다 (F12, F15) |
+| `project` | `restore` | `restore_project` | `single_entity` | `permission` | rest:POST /v2/projects/restore | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — 본문 키가 v1식 `group_id`다 (F12, F15) |
 | `project` | `search` | `search_projects_by_user` | `scope` | `permission` | gql:UserV2.projects | ok | 403 role_create_forbidden | 일치 | `E-GATE` | 권한 부족 — 자기 user 스코프에서 자기 프로젝트 목록을 못 읽는다 (F5) |
-| `project` | `update` | `update_project` | `single_entity` | `permission` | rest:PATCH /v2/projects/{id} | ok | 403 backendai_generic_forbidden | 불일치 — 500인 실행에 `success` 행 | `W-GATE+W-AUDIT` | 허위 성공 기록 — 미존재 id에 500이면서 감사는 success (F9, F12) |
-| `user` | `update` | `admin_create_keypair` | `single_entity` | `permission` | rest:POST /v2/keypairs | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
-| `user` | `update` | `admin_delete_ssh_keypair` | `single_entity` | `permission` | rest:DELETE /v2/keypairs/{access_key}/ssh | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
-| `user` | `get` | `admin_get_ssh_keypair` | `single_entity` | `permission` | rest:GET /v2/keypairs/{access_key}/ssh | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
-| `user` | `update` | `admin_register_ssh_keypair` | `single_entity` | `permission` | rest:POST /v2/keypairs/ssh | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
-| `user` | `create` | `create_user` | `scope` | `permission` | rest:POST /v2/users | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — 만들어진 계정에 `default`·`model-store` 멤버 롤이 자동 부여된다 (F1, F12) |
-| `user` | `delete` | `delete_user` | `single_entity` | `permission` | rest:POST /v2/users/delete | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
-| `user` | `get` | `get_user` | `single_entity` | `permission` | rest:GET /v2/users/{id} | ok | ok (같은 도메인) / 403 role_create_forbidden (타 도메인) | 일치 | `W-GATE` | 권한 과다 — 같은 도메인 사용자의 전체 레코드와 `main_access_key`가 평사용자에게 열린다 (F1) |
-| `user` | `create` | `global_create_users` | `global` | `permission` | gql:adminBulkCreateUsersV2 | ok | 403 backendai_generic_internal-error | 불일치 — 카탈로그 `user` / 감사 `global`, 일부 실패인데 `success` | `E-BULK+W-AUDIT` | 벌크 응답 결함 — 미존재 도메인 한 건이 배치 전체를 중단시킨다 (F17, F19) |
+| `project` | `update` | `update_project` | `single_entity` | `permission` | rest:PATCH /v2/projects/{id} | ok | 403 backendai_generic_forbidden | 불일치 — 500인 실행에 `success` 행 | `W-AUDIT` | 허위 성공 기록 — 미존재 id에 500이면서 감사는 success (F9, F12) |
+| `user` | `update` | `admin_create_keypair` | `single_entity` | `permission` | rest:POST /v2/keypairs | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `user` | `update` | `admin_delete_ssh_keypair` | `single_entity` | `permission` | rest:DELETE /v2/keypairs/{access_key}/ssh | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `user` | `get` | `admin_get_ssh_keypair` | `single_entity` | `permission` | rest:GET /v2/keypairs/{access_key}/ssh | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `user` | `update` | `admin_register_ssh_keypair` | `single_entity` | `permission` | rest:POST /v2/keypairs/ssh | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `user` | `create` | `create_user` | `scope` | `permission` | rest:POST /v2/users | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — 만들어진 계정에 `default`·`model-store` 멤버 롤이 자동 부여된다 (F1, F12) |
+| `user` | `delete` | `delete_user` | `single_entity` | `permission` | rest:POST /v2/users/delete | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `user` | `create` | `global_create_users` | `global` | `permission` | gql:adminBulkCreateUsersV2 | ok | 403 backendai_generic_internal-error | 불일치 — 카탈로그 `user` / 감사 `global`, 일부 실패인데 `success` | `W-AUDIT` | 미존재 도메인 한 건이 배치 전체를 중단시킨다 — 원자적 의미론으로 본다 (F17, F19) |
 | `user` | `get` | `global_get_user_month_stats` | `global` | `permission` | rest-v1:GET /resource/stats/admin/month | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 거부 행 없음 — 미들웨어가 선점한다 (F12) |
 | `user` | `purge` | `global_purge_users` | `global` | `permission` | gql:adminBulkPurgeUsersV2 | ok | 403 backendai_generic_internal-error | 불일치 — 카탈로그 `user` / 감사 `global`, 일부 실패인데 `success` | `E-BULK+W-AUDIT` | 벌크 응답 결함 — 성공은 개수만 오고 어떤 사용자가 지워졌는지 알 수 없다 (F18, F19) |
 | `user` | `search` | `global_search_keypairs` | `global` | `permission` | rest:POST /v2/keypairs/search | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 거부 행 없음 — 미들웨어가 선점한다 (F12) |
@@ -468,18 +454,21 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 | `user` | `lookup` | `lookup_login_history_owner` | `lookup` | `permission` | 없음 | 해당 없음 | 해당 없음 | 해당 없음 | `W-UNREACH` | 도달 불가 owner lookup — 이 도메인은 single field 연산을 배선하지 않는다 |
 | `user` | `lookup` | `lookup_login_session_owner` | `lookup` | `permission` | 없음 (내부 호출: `POST /v2/login-sessions/my/revoke` 선행) | 404 database_access_not-found | 403 role_create_forbidden (타인 소유) / 404 (미존재) | 일치 | `W-LEAK` | 구분 누출 — 한 호출자가 타인 소유 403과 미존재 404를 가른다. 403 본문이 소유자 UUID까지 준다 (F13) |
 | `user` | `lookup` | `lookup_user_by_access_key` | `lookup` | `permission` | 없음 | 해당 없음 | 해당 없음 | 해당 없음 | `W-UNREACH` | 배선됐지만 호출 안 됨 — 프로세서에만 등록되고 호출자가 없다 |
-| `user` | `restore` | `restore_user` | `single_entity` | `permission` | rest:POST /v2/users/restore | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `user` | `restore` | `restore_user` | `single_entity` | `permission` | rest:POST /v2/users/restore | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
 | `user` | `search` | `search_users_by_domain` | `scope` | `permission` | rest:POST /v2/users/domains/{domain_name}/search | ok | 403 role_create_forbidden | 일치 | `E-GATE+W-LEAK` | 권한 부족 — 자기 도메인 목록이 막히는데 `get_user`는 같은 행을 한 건씩 내준다 (F1, F13) |
-| `user` | `search` | `search_users_by_project` | `scope` | `permission` | rest:POST /v2/users/projects/{project_id}/search | ok | ok | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 권한 과다 — 프로젝트 구성원 전원의 `main_access_key`가 평사용자에게 열린다 (F1) |
 | `user` | `search` | `search_users_by_role` | `global` | `permission` | rest:POST /v2/users/roles/{role_id}/search | ok | 403 user_auth_forbidden | 불일치 — 카탈로그 `user` / 감사 `global` | `W-AUDIT` | entity type 불일치 — 게이트는 프로세서가 강제하고 거부 행도 남는다 (F10) |
-| `user` | `create` | `signup` | `global` | `anonymous` | rest:POST /auth/signup | ok | 해당 없음 | 불일치 — 카탈로그 `user` / 감사 `global` | `W-LEAK+W-GUARD+W-AUDIT` | 게이트 근거 미흡 — `anonymous`를 정당화하는 `PRE_SIGNUP` 훅이 등록돼 있지 않고 `success_if_no_hook=True`라 무조건 통과한다 (F4, F10, F20) |
+| `user` | `create` | `signup` | `global` | `anonymous` | rest:POST /auth/signup | ok | 해당 없음 | 불일치 — 카탈로그 `user` / 감사 `global` | `W-LEAK+W-AUDIT` | 계정 열거 — `anonymous`를 정당화하는 `PRE_SIGNUP` 훅이 등록돼 있지 않고 `success_if_no_hook=True`라 무조건 통과한다 (F4, F10, F20) |
 | `user` | `update` | `update_password` | `single_entity` | `permission` | rest:POST /auth/update-password | ok | 401 user_auth_unauthorized | 불일치 — 400으로 끝난 실행에 `success` 행 | `W-AUDIT` | 허위 성공 기록 — 새 비밀번호 불일치로 아무것도 안 바뀌었는데 success (F9) |
 | `user` | `update` | `update_user` | `single_entity` | `permission` | rest:PATCH /v2/users/{id} | ok | 403 backendai_generic_forbidden | 일치 | `E-GATE+W-AUDIT` | 게이트 선점 — 자기 레코드도 이 라우트로는 고칠 수 없다 (F12) |
 
-### organization — 성공 (35행)
+### organization — 성공 (39행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `keypair` | `get` | `get_default_keypairs` | `bulk` | `permission` | 없음 (내부 호출: adapters/user·project가 `main_access_key`를 채울 때) | ok | ok | 행 없음 (성공 read — 정책상 정상) | `성공` | 권한 과다 — bulk 게이트가 타인의 `main_access_key` 노출을 막지 못한다 (F1) |
+| `project` | `get` | `get_project` | `single_entity` | `permission` | rest:GET /v2/projects/{id} | 404 database_access_not-found | 403 role_create_forbidden | 일치 | `성공` | 권한 부족 — 소속 프로젝트에도 READ가 없다 (F5) |
+| `user` | `get` | `get_user` | `single_entity` | `permission` | rest:GET /v2/users/{id} | ok | ok (같은 도메인) / 403 role_create_forbidden (타 도메인) | 일치 | `성공` | 권한 과다 — 같은 도메인 사용자의 전체 레코드와 `main_access_key`가 평사용자에게 열린다 (F1) |
+| `user` | `search` | `search_users_by_project` | `scope` | `permission` | rest:POST /v2/users/projects/{project_id}/search | ok | ok | 행 없음 (성공 read — 정책상 정상) | `성공` | 권한 과다 — 프로젝트 구성원 전원의 `main_access_key`가 평사용자에게 열린다 (F1) |
 | `domain` | `purge` | `purge_domain` | `single_entity` | `permission` | rest-v1:POST /admin/domains/purge | 409 domain_purge_conflict | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트가 superadmin 전용 — `ActionGate`에 superadmin 값이 없어 카탈로그는 `permission`으로 적힌다. 게이트 자체는 의도대로 동작한다 |
 | `domain` | `update` | `update_domain` | `single_entity` | `permission` | rest-v1:PATCH /admin/domains/{name} | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트가 superadmin 전용 — `ActionGate`에 superadmin 값이 없어 카탈로그는 `permission`으로 적힌다. 게이트 자체는 의도대로 동작한다 |
 | `user` | `purge` | `purge_user` | `single_entity` | `permission` | rest-v1:POST /admin/users/purge | 404 user_read_not-found | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트가 superadmin 전용 — `ActionGate`에 superadmin 값이 없어 카탈로그는 `permission`으로 적힌다. 게이트 자체는 의도대로 동작한다 |
@@ -522,13 +511,13 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `domain` | `create` | `global_create_domain_node` | `global` | `permission` | gql_legacy:CreateDomainNode | ok | 200 `ok:false` | 불일치 — 거부에 행 없음 | `W-UNREACH+W-AUDIT` | 인자 발산 — `scaling_groups`로 리소스 그룹까지 붙이는데 REST `CreateDomainInput`에 그 필드가 없다 (LA1) |
-| `domain` | `update` | `update_domain_node` | `single_entity` | `permission` | gql_legacy:ModifyDomainNode | ok | 200 `ok:false` | 불일치 — 거부에 행 없음 | `W-UNREACH+W-AUDIT` | 인자 발산 — `sgroups_to_add`·`sgroups_to_remove`가 REST `UpdateDomainInput`에 없다 (LA1) |
+| `domain` | `create` | `global_create_domain_node` | `global` | `permission` | gql_legacy:CreateDomainNode | ok | 200 `ok:false` | 불일치 — 거부에 행 없음 | `W-AUDIT+W-UNREACH` | 인자 발산 — `scaling_groups`로 리소스 그룹까지 붙이는데 REST `CreateDomainInput`에 그 필드가 없다 (LA1) |
+| `domain` | `update` | `update_domain_node` | `single_entity` | `permission` | gql_legacy:ModifyDomainNode | ok | 200 `ok:false` | 불일치 — 거부에 행 없음 | `W-AUDIT+W-UNREACH` | 인자 발산 — `sgroups_to_add`·`sgroups_to_remove`가 REST `UpdateDomainInput`에 없다 (LA1) |
 | `domain` | `create` | `global_create_domain` | `global` | `permission` | gql_legacy:CreateDomain | ok | 200 `ok:false` | 불일치 — 거부에 행 없음 | `W-AUDIT` | v1 REST와 동일. 기본 프로젝트를 함께 만든다 — `POST /v2/domains`는 만들지 않는다 (LA2) |
 | `domain` | `update` | `update_domain` | `single_entity` | `permission` | gql_legacy:ModifyDomain | ok | 200 `ok:false` | 불일치 — 거부에 행 없음 | `W-AUDIT` | 거부 표현 발산 — v2는 403, 레거시는 200 `ok:false` |
 | `domain` | `delete` | `delete_domain` | `single_entity` | `permission` | gql_legacy:DeleteDomain | ok | 200 `ok:false` | 불일치 — 거부에 행 없음 | `W-AUDIT` | 거부 표현 발산 — 인자·액션·성공 행은 v2와 같다 |
 | `domain` | `purge` | `purge_domain` | `single_entity` | `permission` | gql_legacy:PurgeDomain | 409 `domain_purge_conflict` | 200 `ok:false` | 불일치 — 거부에 행 없음 | `W-AUDIT` | 거부 표현 발산 — 실패 행은 v2와 같다 |
-| `project` | `update` | `update_project` | `single_entity` | `permission` | gql_legacy:ModifyGroup | ok | 200 `ok:false` | 불일치 — 거부에 행 없음 | `W-UNREACH+W-AUDIT` | 인자 발산 — `user_update_mode`·`user_uuids`로 멤버십을 함께 고치는데 REST `UpdateProjectInput`에 없다 (LA3) |
+| `project` | `update` | `update_project` | `single_entity` | `permission` | gql_legacy:ModifyGroup | ok | 200 `ok:false` | 불일치 — 거부에 행 없음 | `W-AUDIT+W-UNREACH` | 인자 발산 — `user_update_mode`·`user_uuids`로 멤버십을 함께 고치는데 REST `UpdateProjectInput`에 없다 (LA3) |
 | `project` | `delete` | `delete_project` | `single_entity` | `permission` | gql_legacy:DeleteGroup | ok | 200 `ok:false` | 불일치 — 거부에 행 없음 | `W-AUDIT` | 거부 표현 발산 — `gid` UUID 주소지정까지 v2와 같다 |
 | `user` | `delete` | `delete_user` | `single_entity` | `permission` | gql_legacy:DeleteUser | ok | 200 `ok:false` | 불일치 — 미존재 이메일에 행 없음 | `W-AUDIT` | 기록 발산 — 리졸버가 액션 이전에 이메일을 풀다 실패해 행이 없다. v2는 `delete_user\|error`를 남긴다 |
 | `user` | `purge` | `purge_user` | `single_entity` | `permission` | gql_legacy:PurgeUser | ok | 200 `ok:false` | 불일치 — 미존재 이메일에 행 없음 | `W-AUDIT` | 기록 발산 — v2는 `purge_user\|error`를 남기고 레거시는 아무것도 남기지 않는다 |
@@ -549,20 +538,20 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 |---|---|---|---|---|---|---|---|---|---|---|
 | `entity_invitation` | `update` | `accept_entity_invitation` | `scope` | `permission` | rest:POST /v2/entity-invitations/{id}/accept · cli:entity-invitation accept | 404 entity-invitation_read_not-found | 403 role_create_forbidden | 일치 | `E-GATE+E-EXEC` | 누구도 완료 불가 — 초대 대상은 RBAC가 막고, RBAC를 우회하는 superadmin은 대상이 아니다 (F16) |
 | `entity_invitation` | `get` | `get_entity_invitation` | `single_entity` | `permission` | rest:GET /v2/entity-invitations/{id} · cli:entity-invitation get | ok | 403 role_create_forbidden | 일치 | `E-GATE` | 권한 부족 — 초대장에 적힌 당사자가 자기 초대장을 못 읽는다 (F16) |
-| `entity_invitation` | `update` | `reject_entity_invitation` | `scope` | `permission` | rest:POST /v2/entity-invitations/{id}/reject · cli:entity-invitation reject | 404 entity-invitation_read_not-found | 403 role_create_forbidden | 일치 | `E-EXEC+W-GATE` | 누구도 완료 불가 — accept와 같은 원인 (F16) |
+| `entity_invitation` | `update` | `reject_entity_invitation` | `scope` | `permission` | rest:POST /v2/entity-invitations/{id}/reject · cli:entity-invitation reject | 404 entity-invitation_read_not-found | 403 role_create_forbidden | 일치 | `E-EXEC` | 누구도 완료 불가 — accept와 같은 원인 (F16) |
 | `entity_invitation` | `search` | `search_entity_invitations` | `scope` | `permission` | rest:POST /v2/entity-invitations/scoped/search · cli:entity-invitation scoped-search | ok | 403 role_create_forbidden | 일치 | `E-GATE` | 권한 부족 — 자기 user 스코프에서 자기 앞으로 온 초대를 못 찾는다 (F16) |
-| `role_permission_preset` | `update` | `bulk_add_role_permission_presets` | `single_entity` | `permission` | rest:POST /v2/role-presets/{id}/permissions/add | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 상태·코드 불일치 — 미존재 preset에 409인데 error_code는 `database_generic_not-found`다 (F12, F15) |
-| `role_permission_preset` | `update` | `bulk_remove_role_permission_presets` | `bulk` | `permission` | rest:POST /v2/role-presets/permissions/remove | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — 벌크 응답은 항목별로 답하고 miss를 구분한다 (F12) |
-| `role_permission_preset` | `search` | `search_role_permission_presets` | `scope` | `permission` | rest:POST /v2/role-presets/{id}/permissions/search | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-GATE+W-AUDIT` | 상태 코드 오류 — 미존재 preset도 200에 빈 목록이라 없는 것과 빈 것이 구분되지 않는다 (F12, F15) |
-| `role_preset` | `delete` | `bulk_delete_role_presets` | `bulk` | `permission` | rest:POST /v2/role-presets/bulk-delete | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — 벌크 응답은 `items`·`failed`로 모든 id를 한 번씩 답한다 (F12) |
-| `role_preset` | `purge` | `bulk_purge_role_presets` | `bulk` | `permission` | rest:POST /v2/role-presets/bulk-purge | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — 벌크 응답은 `items`·`failed`로 모든 id를 한 번씩 답한다 (F12) |
-| `role_preset` | `restore` | `bulk_restore_role_presets` | `bulk` | `permission` | rest:POST /v2/role-presets/bulk-restore | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — 벌크 응답은 `items`·`failed`로 모든 id를 한 번씩 답한다 (F12) |
+| `role_permission_preset` | `update` | `bulk_add_role_permission_presets` | `single_entity` | `permission` | rest:POST /v2/role-presets/{id}/permissions/add | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 상태·코드 불일치 — 미존재 preset에 409인데 error_code는 `database_generic_not-found`다 (F12, F15) |
+| `role_permission_preset` | `update` | `bulk_remove_role_permission_presets` | `bulk` | `permission` | rest:POST /v2/role-presets/permissions/remove | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — 벌크 응답은 항목별로 답하고 miss를 구분한다 (F12) |
+| `role_permission_preset` | `search` | `search_role_permission_presets` | `scope` | `permission` | rest:POST /v2/role-presets/{id}/permissions/search | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 상태 코드 오류 — 미존재 preset도 200에 빈 목록이라 없는 것과 빈 것이 구분되지 않는다 (F12, F15) |
+| `role_preset` | `delete` | `bulk_delete_role_presets` | `bulk` | `permission` | rest:POST /v2/role-presets/bulk-delete | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — 벌크 응답은 `items`·`failed`로 모든 id를 한 번씩 답한다 (F12) |
+| `role_preset` | `purge` | `bulk_purge_role_presets` | `bulk` | `permission` | rest:POST /v2/role-presets/bulk-purge | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — 벌크 응답은 `items`·`failed`로 모든 id를 한 번씩 답한다 (F12) |
+| `role_preset` | `restore` | `bulk_restore_role_presets` | `bulk` | `permission` | rest:POST /v2/role-presets/bulk-restore | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — 벌크 응답은 `items`·`failed`로 모든 id를 한 번씩 답한다 (F12) |
 | `role_preset` | `create` | `create_role_preset` | `global` | `permission` | rest:POST /v2/role-presets | ok | 403 backendai_generic_forbidden | 불일치 — 카탈로그 `role_preset` / 감사 `global` | `W-AUDIT` | entity type 불일치 — 거부는 미들웨어가 선점해 행이 없다 (F10, F12) |
-| `role_preset` | `get` | `get_role_preset` | `single_entity` | `permission` | rest:GET /v2/role-presets/{id} | 404 database_access_not-found | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `role_preset` | `get` | `get_role_preset` | `single_entity` | `permission` | rest:GET /v2/role-presets/{id} | 404 database_access_not-found | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
 | `role_preset` | `lookup` | `lookup_role_permission_preset_owner` | `lookup` | `permission` | 없음 | 해당 없음 | 해당 없음 | 해당 없음 | `W-UNREACH` | 도달 불가 owner lookup — 이 도메인은 single field 연산을 배선하지 않는다 |
 | `role_preset` | `purge` | `purge_role_preset` | `single_entity` | `permission` | 없음 | 해당 없음 | 해당 없음 | 해당 없음 | `W-UNREACH` | 배선됐지만 호출 안 됨 — API는 `bulk_purge`만 호출한다 |
 | `role_preset` | `search` | `search_role_presets` | `global` | `permission` | rest:POST /v2/role-presets/search | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 거부 행 없음 — 미들웨어가 선점한다 (F12) |
-| `role_preset` | `update` | `update_role_preset` | `single_entity` | `permission` | rest:PATCH /v2/role-presets/{id} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `role_preset` | `update` | `update_role_preset` | `single_entity` | `permission` | rest:PATCH /v2/role-presets/{id} | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
 
 ### rbac — 성공 (3행)
 
@@ -574,9 +563,9 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 
 ## resource_group
 
-77행 — 실패 4, 경고 25, 미실행 7, 성공 41.
+77행 — 실패 4, 경고 7, 미실행 7, 성공 59.
 
-### resource_group — 성공 외 (36행)
+### resource_group — 성공 외 (18행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -584,43 +573,43 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 | `resource_preset` | `create` | `global_create_resource_preset` | `global` | `permission` | rest:POST /v2/resource-presets | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global`, 카탈로그 선언과 다름 | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 선언 대신 `global`을 기록 (A의 F10) |
 | `resource_group` | `delete` | `disassociate_resource_group_from_domains` | `single_entity` | `permission` | cli:admin resource-group allow-domains --remove | 미실행 | 미실행 | 해당 없음 | `X` | 미실행 — `default` 도메인 바인딩 훼손 우려 |
 | `resource_group` | `delete` | `disassociate_resource_group_from_projects` | `single_entity` | `permission` | cli:admin resource-group allow-projects --remove | 미실행 | 미실행 | 해당 없음 | `X` | 미실행 — `default` 프로젝트 바인딩 훼손 우려 |
-| `resource_preset` | `delete` | `delete_resource_preset` | `single_entity` | `permission` | rest:DELETE /v2/resource-presets/{id} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
 | `agent` | `get` | `global_load_agent_container_counts` | `global` | `public` | 없음 | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 선택하는 필드 없음 — `api/adapters/agent/adapter.py`만 부르고 이를 고르는 GraphQL 필드가 없다 |
 | `resource_group` | `get` | `global_get_wsproxy_version` | `global` | `public` | 없음 | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 클라이언트 경로 없음 — resource_group registry에 해당 경로가 없다 |
 | `resource_group` | `get` | `global_resolve_resource_group_ids` | `global` | `permission` | 없음 | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 내부 헬퍼 — 라우트가 없다 |
-| `domain_fair_share` | `get` | `get_domain_fair_share` | `scope` | `permission` | cli:fair-share domain get | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `project_fair_share` | `get` | `get_project_fair_share` | `scope` | `permission` | cli:fair-share project get | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `user_fair_share` | `get` | `get_user_fair_share` | `scope` | `permission` | cli:fair-share user get | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `agent` | `get` | `get_agent_resource_by_slot` | `single_entity` | `permission` | cli:resource-slot agent-resource search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `session` | `get` | `get_kernel_allocation_by_slot` | `single_entity` | `permission` | cli:resource-slot allocation search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `resource_preset` | `lookup` | `lookup_resource_preset` | `lookup` | `public` | rest:GET /v2/resource-presets/{id} (내부 lookup) | 404 resource-preset_read_not-found | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 선언은 public — 라우트가 superadmin으로 좁힌다 |
 | `session` | `lookup` | `lookup_kernel_owner` | `lookup` | `permission` | 내부 lookup | 미실행 | 미실행 | 해당 없음 | `X` | 미실행 — 세션 생성이 이 슬라이스 범위 밖 |
 | `resource_preset` | `search` | `global_list_resource_presets` | `global` | `public` | rest:GET /resource/presets | 500 backendai_generic_internal-error | 500 backendai_generic_internal-error | 행 없음 (성공 read — 정책상 정상) | `E-EXEC` | ContextVar 미설정 — `normalize_slots()`가 매니저에 없는 `current_resource_slots`를 폴백 없이 읽어 항상 500 (F7) |
-| `domain_fair_share` | `search` | `search_domain_fair_shares` | `scope` | `permission` | rest:POST /v2/fair-share/domains/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `domain_usage_bucket` | `search` | `search_domain_usage_buckets` | `scope` | `permission` | rest:POST /v2/resource-usage/domains/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `project_fair_share` | `search` | `search_project_fair_shares` | `scope` | `permission` | rest:POST /v2/fair-share/projects/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `project_usage_bucket` | `search` | `search_project_usage_buckets` | `scope` | `permission` | rest:POST /v2/resource-usage/projects/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
 | `resource_group` | `search` | `scoped_search_resource_groups` | `scope` | `permission` | 없음 | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 클라이언트 경로 없음 — registry에 `/search`(superadmin)만 있다 |
-| `user_fair_share` | `search` | `search_user_fair_shares` | `scope` | `permission` | rest:POST /v2/fair-share/users/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `user_usage_bucket` | `search` | `search_user_usage_buckets` | `scope` | `permission` | rest:POST /v2/resource-usage/users/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
 | `agent` | `update` | `global_restart_agent` | `global` | `permission` | rest:POST /resource/watcher/agent/restart | 미실행 | 미실행 | 해당 없음 | `X` | 미실행 — 공유 스택 불안정 우려 |
 | `agent` | `update` | `global_start_agent` | `global` | `permission` | rest:POST /resource/watcher/agent/start | 미실행 | 미실행 | 해당 없음 | `X` | 미실행 — 공유 스택 불안정 우려 |
 | `agent` | `update` | `global_stop_agent` | `global` | `permission` | rest:POST /resource/watcher/agent/stop | 미실행 | 미실행 | 해당 없음 | `X` | 미실행 — 공유 스택 불안정 우려 |
 | `agent` | `update` | `global_sync_agent_registry` | `global` | `permission` | rest:session handler (내부) | 미실행 | 미실행 | 해당 없음 | `X` | 미실행 — `api/rest/session/handler.py`가 세션 경로 안에서만 부른다 |
 | `agent` | `update` | `global_update_agent_resource_group` | `global` | `permission` | cli:admin agent update-resource-group | 404 agent_read_not-found | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global`, 카탈로그 선언과 다름 | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 선언 대신 `global`을 기록 (A의 F10) |
-| `domain_fair_share` | `update` | `bulk_upsert_domain_fair_share_weights` | `scope` | `permission` | rest:POST /v2/fair-share/domains/bulk-upsert | ok | 403 backendai_generic_forbidden | 일치 | `E-BULK+W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 항목별 응답 없음 — `upserted_count`만 반환, 없는 도메인도 성공으로 기록 (F3) |
-| `domain_fair_share` | `update` | `upsert_domain_fair_share_weight` | `scope` | `permission` | rest:POST /v2/fair-share/domains/upsert | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `project_fair_share` | `update` | `bulk_upsert_project_fair_share_weights` | `scope` | `permission` | rest:POST /v2/fair-share/projects/bulk-upsert | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `E-BULK+W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 항목별 응답 없음 — `upserted_count`만 반환 (F3) |
-| `project_fair_share` | `update` | `upsert_project_fair_share_weight` | `scope` | `permission` | rest:POST /v2/fair-share/projects/upsert | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `user_fair_share` | `update` | `bulk_upsert_user_fair_share_weights` | `scope` | `permission` | rest:POST /v2/fair-share/users/bulk-upsert | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `E-BULK+W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 항목별 응답 없음 — `upserted_count`만 반환 (F3) |
-| `user_fair_share` | `update` | `upsert_user_fair_share_weight` | `scope` | `permission` | rest:POST /v2/fair-share/users/upsert | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `resource_group` | `update` | `update_resource_group_fair_share_spec` | `single_entity` | `permission` | rest:PATCH /v2/resource-groups/{name}/fair-share-spec | 400 api_parsing_invalid-parameters | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `resource_preset` | `update` | `update_resource_preset` | `single_entity` | `permission` | rest:PATCH /v2/resource-presets/{id} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 경로·본문 id 중복 — 본문 `id`가 필수인데 무시된다 (F8) |
+| `domain_fair_share` | `update` | `bulk_upsert_domain_fair_share_weights` | `scope` | `permission` | rest:POST /v2/fair-share/domains/bulk-upsert | ok | 403 backendai_generic_forbidden | 일치 | `E-BULK` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 항목별 응답 없음 — `upserted_count`만 반환, 없는 도메인도 성공으로 기록 (F3) |
+| `project_fair_share` | `update` | `bulk_upsert_project_fair_share_weights` | `scope` | `permission` | rest:POST /v2/fair-share/projects/bulk-upsert | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `E-BULK` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 항목별 응답 없음 — `upserted_count`만 반환 (F3) |
+| `user_fair_share` | `update` | `bulk_upsert_user_fair_share_weights` | `scope` | `permission` | rest:POST /v2/fair-share/users/bulk-upsert | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `E-BULK` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 항목별 응답 없음 — `upserted_count`만 반환 (F3) |
 
-### resource_group — 성공 (41행)
+### resource_group — 성공 (59행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `resource_preset` | `delete` | `delete_resource_preset` | `single_entity` | `permission` | rest:DELETE /v2/resource-presets/{id} | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `domain_fair_share` | `get` | `get_domain_fair_share` | `scope` | `permission` | cli:fair-share domain get | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `project_fair_share` | `get` | `get_project_fair_share` | `scope` | `permission` | cli:fair-share project get | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `user_fair_share` | `get` | `get_user_fair_share` | `scope` | `permission` | cli:fair-share user get | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `agent` | `get` | `get_agent_resource_by_slot` | `single_entity` | `permission` | cli:resource-slot agent-resource search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `session` | `get` | `get_kernel_allocation_by_slot` | `single_entity` | `permission` | cli:resource-slot allocation search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `resource_preset` | `lookup` | `lookup_resource_preset` | `lookup` | `public` | rest:GET /v2/resource-presets/{id} (내부 lookup) | 404 resource-preset_read_not-found | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 선언은 public — 라우트가 superadmin으로 좁힌다 |
+| `domain_fair_share` | `search` | `search_domain_fair_shares` | `scope` | `permission` | rest:POST /v2/fair-share/domains/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `domain_usage_bucket` | `search` | `search_domain_usage_buckets` | `scope` | `permission` | rest:POST /v2/resource-usage/domains/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `project_fair_share` | `search` | `search_project_fair_shares` | `scope` | `permission` | rest:POST /v2/fair-share/projects/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `project_usage_bucket` | `search` | `search_project_usage_buckets` | `scope` | `permission` | rest:POST /v2/resource-usage/projects/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `user_fair_share` | `search` | `search_user_fair_shares` | `scope` | `permission` | rest:POST /v2/fair-share/users/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `user_usage_bucket` | `search` | `search_user_usage_buckets` | `scope` | `permission` | rest:POST /v2/resource-usage/users/search | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `domain_fair_share` | `update` | `upsert_domain_fair_share_weight` | `scope` | `permission` | rest:POST /v2/fair-share/domains/upsert | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `project_fair_share` | `update` | `upsert_project_fair_share_weight` | `scope` | `permission` | rest:POST /v2/fair-share/projects/upsert | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `user_fair_share` | `update` | `upsert_user_fair_share_weight` | `scope` | `permission` | rest:POST /v2/fair-share/users/upsert | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `resource_group` | `update` | `update_resource_group_fair_share_spec` | `single_entity` | `permission` | rest:PATCH /v2/resource-groups/{name}/fair-share-spec | 400 api_parsing_invalid-parameters | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `resource_preset` | `update` | `update_resource_preset` | `single_entity` | `permission` | rest:PATCH /v2/resource-presets/{id} | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 경로·본문 id 중복 — 본문 `id`가 필수인데 무시된다 (F8) |
 | `resource_group` | `create` | `associate_resource_group_with_domains` | `single_entity` | `permission` | cli:admin resource-group allow-domains --add | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트가 superadmin 전용 — `ActionGate`에 superadmin 값이 없어 카탈로그는 `permission`으로 적힌다. 게이트 자체는 의도대로 동작한다 |
 | `resource_group` | `create` | `associate_resource_group_with_projects` | `single_entity` | `permission` | cli:admin resource-group allow-projects --add | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트가 superadmin 전용 — `ActionGate`에 superadmin 값이 없어 카탈로그는 `permission`으로 적힌다. 게이트 자체는 의도대로 동작한다 |
 | `resource_group` | `create` | `associate_resource_group_with_keypairs` | `single_entity` | `permission` | gql_legacy:associate_scaling_group_with_keypair | ok | 200 `ok:false` "no permission" | 일치 | `성공` | REST v2 registry에는 keypair 경로가 없지만 레거시 뮤테이션이 이 액션에 도달한다 — 3부의 `W-UNREACH` 판정을 철회한다 (L4). 비-admin 거부가 403이 아니라 200 `ok:false`로 오는 것은 레거시 계층 공통 (B의 F11) |
@@ -677,17 +666,17 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 | `resource_group` | `update` | `update_resource_group` | `single_entity` | `permission` | gql_legacy:ModifyScalingGroup | ok | 200 `ok:false` "no permission" | 일치 | `성공` | v2 경로와 동일 — `update_resource_group \| resource_group \| update \| single_entity` |
 | `resource_group` | `purge` | `purge_resource_group` | `single_entity` | `permission` | gql_legacy:DeleteScalingGroup | ok | 200 `ok:false` "no permission" | 일치 (entity_type 개별 미확인) | `성공` | v2 경로와 동일 |
 | `resource_group` | `create` | `associate_resource_group_with_domains` | `single_entity` | `permission` | gql_legacy:AssociateScalingGroupWithDomain | ok | 200 `ok:false` "no permission" | 불일치 — entity_type이 `domain`, 카탈로그는 `resource_group` | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 아닌데도 어긋난다 (LC2) |
-| `resource_group` | `create` | `associate_resource_group_with_domains` | `single_entity` | `permission` | gql_legacy:AssociateScalingGroupsWithDomain | 404 database_access_not-found (혼합 배치) | 200 `ok:false` "no permission" | 행 없음 (결함) — lookup error 행만 남는다 | `E-BULK+W-AUDIT` | 벌크 응답 결함 — 잘못된 항목 하나로 전체가 atomic 실패, 항목별 응답이 없다 |
+| `resource_group` | `create` | `associate_resource_group_with_domains` | `single_entity` | `permission` | gql_legacy:AssociateScalingGroupsWithDomain | 404 database_access_not-found (혼합 배치) | 200 `ok:false` "no permission" | 행 없음 (결함) — lookup error 행만 남는다 | `W-AUDIT` | 잘못된 항목 하나로 전체가 실패한다 — 원자적 의미론으로 본다 |
 | `resource_group` | `delete` | `disassociate_resource_group_from_domains` | `single_entity` | `permission` | gql_legacy:DisassociateScalingGroupWithDomain | ok | 200 `ok:false` "no permission" | 불일치 — entity_type이 `domain` | `W-AUDIT` | 감사 entity type 불일치 (LC2) |
-| `resource_group` | `delete` | `disassociate_resource_group_from_domains` | `single_entity` | `permission` | gql_legacy:DisassociateScalingGroupsWithDomain | 404 database_access_not-found (혼합 배치) | 200 `ok:false` "no permission" | 행 없음 (결함) | `E-BULK+W-AUDIT` | 벌크 응답 결함 — atomic 실패, 유효 항목도 반영되지 않는다 |
+| `resource_group` | `delete` | `disassociate_resource_group_from_domains` | `single_entity` | `permission` | gql_legacy:DisassociateScalingGroupsWithDomain | 404 database_access_not-found (혼합 배치) | 200 `ok:false` "no permission" | 행 없음 (결함) | `W-AUDIT` | atomic 실패, 유효 항목도 반영되지 않는다 — 원자적 의미론으로 본다 |
 | `resource_group` | `delete` | `disassociate_resource_group_from_domains` | `single_entity` | `permission` | gql_legacy:DisassociateAllScalingGroupsWithDomain | 미실행 | 미실행 | 해당 없음 | `X` | 미실행 — 도메인의 모든 결합을 지운다. `default` 도메인에는 `default` 자원그룹 결합이 걸려 있고 버릴 도메인이 없다 |
 | `resource_group` | `create` | `associate_resource_group_with_projects` | `single_entity` | `permission` | gql_legacy:AssociateScalingGroupWithUserGroup | ok | 200 `ok:false` "no permission" | 불일치 — entity_type이 `project`, 카탈로그는 `resource_group` | `W-AUDIT` | 감사 entity type 불일치 (LC2) |
-| `resource_group` | `create` | `associate_resource_group_with_projects` | `single_entity` | `permission` | gql_legacy:AssociateScalingGroupsWithUserGroup | 404 database_access_not-found (혼합 배치) | 200 `ok:false` "no permission" | 행 없음 (결함) | `E-BULK+W-AUDIT` | 벌크 응답 결함 — atomic 실패 |
+| `resource_group` | `create` | `associate_resource_group_with_projects` | `single_entity` | `permission` | gql_legacy:AssociateScalingGroupsWithUserGroup | 404 database_access_not-found (혼합 배치) | 200 `ok:false` "no permission" | 행 없음 (결함) | `W-AUDIT` | atomic 실패 — 원자적 의미론으로 본다 |
 | `resource_group` | `delete` | `disassociate_resource_group_from_projects` | `single_entity` | `permission` | gql_legacy:DisassociateScalingGroupWithUserGroup | ok | 200 `ok:false` "no permission" | 불일치 — entity_type이 `project` | `W-AUDIT` | 감사 entity type 불일치 (LC2) |
-| `resource_group` | `delete` | `disassociate_resource_group_from_projects` | `single_entity` | `permission` | gql_legacy:DisassociateScalingGroupsWithUserGroup | 404 database_access_not-found (혼합 배치) | 200 `ok:false` "no permission" | 행 없음 (결함) | `E-BULK+W-AUDIT` | 벌크 응답 결함 — atomic 실패 |
+| `resource_group` | `delete` | `disassociate_resource_group_from_projects` | `single_entity` | `permission` | gql_legacy:DisassociateScalingGroupsWithUserGroup | 404 database_access_not-found (혼합 배치) | 200 `ok:false` "no permission" | 행 없음 (결함) | `W-AUDIT` | atomic 실패 — 원자적 의미론으로 본다 |
 | `resource_group` | `delete` | `disassociate_resource_group_from_projects` | `single_entity` | `permission` | gql_legacy:DisassociateAllScalingGroupsWithGroup | ok | 200 `ok:false` "no permission" | 불일치 — entity_type이 `project` | `W-AUDIT` | 감사 entity type 불일치 (LC2) / 빈 테이블에서 자기 결합만 추가·제거해 확인 |
 | `resource_group` | `create` | `associate_resource_group_with_keypairs` | `single_entity` | `permission` | gql_legacy:AssociateScalingGroupWithKeyPair | ok | 200 `ok:false` "no permission" | 일치 | `성공` | 3부는 이 액션을 `W-UNREACH`로 뒀으나 레거시 경로가 있다 |
-| `resource_group` | `create` | `associate_resource_group_with_keypairs` | `single_entity` | `permission` | gql_legacy:AssociateScalingGroupsWithKeyPair | 404 database_access_not-found (혼합 배치) | 200 `ok:false` "no permission" | 행 없음 (결함) | `E-BULK` | 벌크 응답 결함 — atomic 실패 |
+| `resource_group` | `create` | `associate_resource_group_with_keypairs` | `single_entity` | `permission` | gql_legacy:AssociateScalingGroupsWithKeyPair | 404 database_access_not-found (혼합 배치) | 200 `ok:false` "no permission" | 행 없음 (결함) | `성공` | atomic 실패 — 원자적 의미론으로 본다. 레거시 경로로 도달하고 감사 행도 남는다 |
 | `resource_group` | `delete` | `disassociate_resource_group_from_keypairs` | `single_entity` | `permission` | gql_legacy:DisassociateScalingGroupWithKeyPair | ok | 200 `ok:false` "no permission" | 일치 | `성공` | 3부는 이 액션을 `W-UNREACH`로 뒀으나 레거시 경로가 있다 |
 | `resource_group` | `delete` | `disassociate_resource_group_from_keypairs` | `single_entity` | `permission` | gql_legacy:DisassociateScalingGroupsWithKeyPair | ok — 없는 항목을 조용히 버리고 성공 보고 | 200 `ok:false` "no permission" | 일치 | `E-BULK` | 벌크 응답 결함 — 같은 계열 중 유일하게 부분 성공을 전체 성공으로 답한다 |
 | `agent` | `update` | `global_update_agent_resource_group` | `global` | `permission` | gql_legacy:ModifyAgent | ok | 200 `ok:false` "no permission" | 불일치 — entity_type이 `global` / `schedulable` 경로는 행 없음 (결함) | `W-AUDIT` | 인자 고정 — `policy=TERMINATE`·`force=False`를 하드코딩해 v2 CLI의 `--policy`·`--force`를 고를 수 없다  / `schedulable`만 넘기면 액션을 우회해 `agents`에 직접 쓴다 |
@@ -700,23 +689,23 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `keypair_resource_policy` | `get` | `get_keypair_resource_policy` | `single_entity` | `permission` | rest:GET /v2/resource-policies/keypair/{name} | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `keypair_resource_policy` | `get` | `get_keypair_resource_policy` | `single_entity` | `permission` | rest:GET /v2/resource-policies/keypair/{name} | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
 | `keypair_resource_policy` | `create` | `global_create_keypair_resource_policy` | `global` | `permission` | rest:POST /v2/resource-policies/keypair | ok | 403 backendai_generic_forbidden | 불일치 — 카탈로그 `keypair_resource_policy` / 감사 `global` | `W-AUDIT` | entity type 불일치 — 거부는 미들웨어가 선점해 행이 없다 (F10, F12) |
-| `keypair_resource_policy` | `purge` | `global_purge_keypair_resource_policy` | `single_entity` | `permission` | rest:DELETE /v2/resource-policies/keypair/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `keypair_resource_policy` | `purge` | `global_purge_keypair_resource_policy` | `single_entity` | `permission` | rest:DELETE /v2/resource-policies/keypair/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
 | `keypair_resource_policy` | `search` | `global_search_keypair_resource_policies` | `global` | `permission` | rest:POST /v2/resource-policies/keypair/search | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 거부 행 없음 — 미들웨어가 선점한다 (F12) |
 | `keypair_resource_policy` | `search` | `search_keypair_resource_policies` | `scope` | `permission` | rest:GET /v2/resource-policies/keypair/my | ok | 403 role_create_forbidden | 일치 | `E-GATE` | 권한 부족 — 정책 주인이 자기 정책을 못 읽는다 (F6) |
-| `keypair_resource_policy` | `update` | `update_keypair_resource_policy` | `single_entity` | `permission` | rest:PATCH /v2/resource-policies/keypair/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
-| `project_resource_policy` | `get` | `get_project_resource_policy` | `single_entity` | `permission` | rest:GET /v2/resource-policies/project/{name} | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `keypair_resource_policy` | `update` | `update_keypair_resource_policy` | `single_entity` | `permission` | rest:PATCH /v2/resource-policies/keypair/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `project_resource_policy` | `get` | `get_project_resource_policy` | `single_entity` | `permission` | rest:GET /v2/resource-policies/project/{name} | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
 | `project_resource_policy` | `create` | `global_create_project_resource_policy` | `global` | `permission` | rest:POST /v2/resource-policies/project | ok | 403 backendai_generic_forbidden | 불일치 — 카탈로그 `project_resource_policy` / 감사 `global` | `W-AUDIT` | entity type 불일치 — 거부는 미들웨어가 선점해 행이 없다 (F10, F12) |
-| `project_resource_policy` | `purge` | `global_purge_project_resource_policy` | `single_entity` | `permission` | rest:DELETE /v2/resource-policies/project/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `project_resource_policy` | `purge` | `global_purge_project_resource_policy` | `single_entity` | `permission` | rest:DELETE /v2/resource-policies/project/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
 | `project_resource_policy` | `search` | `global_search_project_resource_policies` | `global` | `permission` | rest:POST /v2/resource-policies/project/search | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 거부 행 없음 — 미들웨어가 선점한다 (F12) |
-| `project_resource_policy` | `update` | `update_project_resource_policy` | `single_entity` | `permission` | rest:PATCH /v2/resource-policies/project/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
-| `user_resource_policy` | `get` | `get_user_resource_policy` | `single_entity` | `permission` | rest:GET /v2/resource-policies/user/{name} | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `project_resource_policy` | `update` | `update_project_resource_policy` | `single_entity` | `permission` | rest:PATCH /v2/resource-policies/project/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `user_resource_policy` | `get` | `get_user_resource_policy` | `single_entity` | `permission` | rest:GET /v2/resource-policies/user/{name} | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
 | `user_resource_policy` | `create` | `global_create_user_resource_policy` | `global` | `permission` | rest:POST /v2/resource-policies/user | ok | 403 backendai_generic_forbidden | 불일치 — 카탈로그 `user_resource_policy` / 감사 `global` | `W-AUDIT` | entity type 불일치 — 거부는 미들웨어가 선점해 행이 없다 (F10, F12) |
-| `user_resource_policy` | `purge` | `global_purge_user_resource_policy` | `single_entity` | `permission` | rest:DELETE /v2/resource-policies/user/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `user_resource_policy` | `purge` | `global_purge_user_resource_policy` | `single_entity` | `permission` | rest:DELETE /v2/resource-policies/user/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
 | `user_resource_policy` | `search` | `global_search_user_resource_policies` | `global` | `permission` | rest:POST /v2/resource-policies/user/search | ok | 403 backendai_generic_forbidden | 행 없음 (결함) | `W-AUDIT` | 거부 행 없음 — 미들웨어가 선점한다 (F12) |
 | `user_resource_policy` | `search` | `search_user_resource_policies` | `scope` | `permission` | rest:GET /v2/resource-policies/user/my | ok | 403 role_create_forbidden | 일치 | `E-GATE` | 권한 부족 — 정책 주인이 자기 정책을 못 읽는다 (F6) |
-| `user_resource_policy` | `update` | `update_user_resource_policy` | `single_entity` | `permission` | rest:PATCH /v2/resource-policies/user/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE+W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
+| `user_resource_policy` | `update` | `update_user_resource_policy` | `single_entity` | `permission` | rest:PATCH /v2/resource-policies/user/{name} | ok | 403 backendai_generic_forbidden | 일치 | `W-AUDIT` | 게이트 선점 — superadmin_required가 RBAC를 선점한다 (F12) |
 
 ### resource_policy — 성공 (3행)
 
@@ -732,8 +721,8 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `keypair_resource_policy` | `lookup` | `lookup_keypair_resource_policy` | `lookup` | `permission` | gql_legacy:Query.keypair_resource_policy | ok | 403 `role_create_forbidden` + `denied` 행 | 일치 | `W-GATE` | 게이트 발산 — 레거시는 RBAC가 판단하고 거부 행을 남긴다. REST `/v2/resource-policies/keypair/{name}`은 미들웨어가 선점해 아무것도 남기지 않는다 |
-| `user_resource_policy` | `lookup` | `lookup_user_resource_policy` | `lookup` | `permission` | gql_legacy:Query.user_resource_policy | ok | 403 `role_create_forbidden` + `denied` 행 | 일치 | `W-GATE` | 게이트 발산 — 레거시 경로가 v2 경로보다 감사 가능하다 |
+| `keypair_resource_policy` | `lookup` | `lookup_keypair_resource_policy` | `lookup` | `permission` | gql_legacy:Query.keypair_resource_policy | ok | 403 `role_create_forbidden` + `denied` 행 | 일치 | `성공` | 게이트 발산 — 레거시는 RBAC가 판단하고 거부 행을 남긴다. REST `/v2/resource-policies/keypair/{name}`은 미들웨어가 선점해 아무것도 남기지 않는다 |
+| `user_resource_policy` | `lookup` | `lookup_user_resource_policy` | `lookup` | `permission` | gql_legacy:Query.user_resource_policy | ok | 403 `role_create_forbidden` + `denied` 행 | 일치 | `성공` | 게이트 발산 — 레거시 경로가 v2 경로보다 감사 가능하다 |
 | `keypair_resource_policy` | `create` | `global_create_keypair_resource_policy` | `global` | `permission` | gql_legacy:CreateKeyPairResourcePolicy | ok | 200 `ok:false` | 불일치 — entity_type `global` | `성공` | v2와 같은 액션·같은 기록. `max_quota_scope_size`를 정수로 받는 점만 DTO 표기가 다르다 |
 | `keypair_resource_policy` | `update` | `update_keypair_resource_policy` | `single_entity` | `permission` | gql_legacy:ModifyKeyPairResourcePolicy | ok | 200 `ok:false` | 일치 | `성공` | `lookup(name)` → `update(entity_id)`로 v2 경로와 인자가 같다 |
 | `keypair_resource_policy` | `purge` | `global_purge_keypair_resource_policy` | `single_entity` | `permission` | gql_legacy:DeleteKeyPairResourcePolicy | ok | 200 `ok:false` | 일치 | `성공` | — |
@@ -745,9 +734,9 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 
 ## system
 
-45행 — 실패 0, 경고 14, 미실행 1, 성공 30.
+45행 — 실패 0, 경고 8, 미실행 1, 성공 36.
 
-### system — 성공 외 (15행)
+### system — 성공 외 (9행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -757,20 +746,20 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 | `runtime_variant` | `create` | `create_runtime_variant` | `global` | `permission` | cli:admin runtime-variant create | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global`, 카탈로그 선언과 다름 | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 선언 대신 `global`을 기록 (A의 F10) |
 | `runtime_variant_preset` | `create` | `create_runtime_variant_preset` | `global` | `permission` | cli:admin runtime-variant-preset create | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global`, 카탈로그 선언과 다름 | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 선언 대신 `global`을 기록 (A의 F10) |
 | `resource_slot_type` | `get` | `get_resource_slot_type` | `single_entity` | `public` | 없음 | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 클라이언트 경로 없음 — resource-slots registry에 단건 GET이 없다 |
-| `retention_policy` | `get` | `get_retention_policy` | `single_entity` | `permission` | rest:GET /v2/retention-policies/{id} | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
 | `runtime_variant` | `lookup` | `lookup_runtime_variant` | `lookup` | `public` | 내부 lookup | 미실행 | 미실행 | 해당 없음 | `X` | 미실행 — 실행한 경로 어디에서도 lookup 행이 남지 않아 발화를 확인하지 못했다 |
-| `client_ip_masking_policy` | `purge` | `purge_client_ip_masking_policy` | `single_entity` | `permission` | rest:POST /v2/client-ip-masking-policies/purge | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
-| `resource_slot_type` | `purge` | `purge_resource_slot_type` | `single_entity` | `permission` | cli:resource-slot slot-type delete | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 전역 싱글턴 — 14종 복원 확인 |
-| `retention_policy` | `purge` | `delete_retention_policy` | `single_entity` | `permission` | rest:DELETE /v2/retention-policies/{id} | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / hard delete — 이후 purge가 404, purge와 구분되지 않는다 (F11) |
-| `retention_policy` | `purge` | `purge_retention_policy` | `single_entity` | `permission` | rest:POST /v2/retention-policies/{id}/purge | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / delete와 동일한 파괴 연산 — 선행 delete 후 도달 불가 (F11) |
 | `resource_slot_type` | `update` | `update_resource_slot_type` | `global` | `permission` | cli:resource-slot slot-type update | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global`, 카탈로그 선언과 다름 | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 선언 대신 `global`을 기록 (A의 F10) |
-| `retention_policy` | `update` | `update_retention_policy` | `single_entity` | `permission` | rest:PATCH /v2/retention-policies/{id} | ok | 403 backendai_generic_forbidden | 일치 | `W-GATE` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 경로·본문 id 중복 — 본문 `id`가 필수인데 무시된다 (F8) |
 | `client_ip_masking_policy` | `upsert` | `upsert_client_ip_masking_policy` | `global` | `permission` | rest:POST /v2/client-ip-masking-policies/upsert | ok | 403 backendai_generic_forbidden | 불일치 — entity_type이 `global`, 카탈로그 선언과 다름 | `W-AUDIT` | 감사 entity type 불일치 — `global` kind가 선언 대신 `global`을 기록 (A의 F10) / 전역 싱글턴 — 스냅샷 후 복원 완료 |
 
-### system — 성공 (30행)
+### system — 성공 (36행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `retention_policy` | `get` | `get_retention_policy` | `single_entity` | `permission` | rest:GET /v2/retention-policies/{id} | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `client_ip_masking_policy` | `purge` | `purge_client_ip_masking_policy` | `single_entity` | `permission` | rest:POST /v2/client-ip-masking-policies/purge | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) |
+| `resource_slot_type` | `purge` | `purge_resource_slot_type` | `single_entity` | `permission` | cli:resource-slot slot-type delete | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 전역 싱글턴 — 14종 복원 확인 |
+| `retention_policy` | `purge` | `delete_retention_policy` | `single_entity` | `permission` | rest:DELETE /v2/retention-policies/{id} | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / hard delete — 이후 purge가 404, purge와 구분되지 않는다 (F11) |
+| `retention_policy` | `purge` | `purge_retention_policy` | `single_entity` | `permission` | rest:POST /v2/retention-policies/{id}/purge | ok | 403 backendai_generic_forbidden | 일치 (entity_type 개별 미확인) | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / delete와 동일한 파괴 연산 — 선행 delete 후 도달 불가 (F11) |
+| `retention_policy` | `update` | `update_retention_policy` | `single_entity` | `permission` | rest:PATCH /v2/retention-policies/{id} | ok | 403 backendai_generic_forbidden | 일치 | `성공` | 라우트 선행 — `superadmin_required`가 RBAC validator보다 먼저 거부한다 (auth.py:917) / 경로·본문 id 중복 — 본문 `id`가 필수인데 무시된다 (F8) |
 | `etcd_config` | `delete` | `delete_etcd_config` | `global` | `permission` | rest:POST /config/delete | ok | 403 backendai_generic_forbidden | 일치 | `성공` | `ba7489c/` 프리픽스에만 기록 후 삭제 |
 | `runtime_variant` | `get` | `public_bulk_get_runtime_variants` | `bulk` | `public` | gql:runtimeVariantPresets | ok | ok | 행 없음 (성공 read — 정책상 정상) | `성공` | 벌크 정상 — 입력마다 위치대로, 중복 독립, 없는 id는 null (F16) |
 | `etcd_config` | `get` | `get_etcd_config` | `global` | `permission` | rest:POST /config/get | ok | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 없는 키는 404가 아니라 `result: null` |
@@ -804,48 +793,48 @@ processor lets through"). **그 액션을 실행하려면 통과해야 하는 �
 
 ## vfolder
 
-70행 — 실패 5, 경고 21, 미실행 5, 성공 39.
+70행 — 실패 5, 경고 4, 미실행 5, 성공 56.
 
-### vfolder — 성공 외 (31행)
+### vfolder — 성공 외 (14행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `vfolder` | `delete` | `vfolder bulk-delete` (어댑터 루프) | `single_entity` | `permission` | `cli:vfolder bulk-delete` | 해당 없음 | 403 role_create_forbidden | 일치 (처리된 항목만 행 생성) | `E-BULK` | 배치 붕괴 — 4개 입력에 403 하나. 항목별 응답이 없고, 그런데도 허용된 항목은 soft delete까지 진행된다 (F9) |
 | `vfolder` | `purge` | `vfolder bulk-purge` (어댑터 루프) | `single_entity` | `permission` | `cli:vfolder bulk-purge` | 해당 없음 | ok (항목별 실패는 본문 안) | 일치 (처리된 항목만 행 생성) | `E-BULK` | 위치 대응 상실 — `purged_count`와 `failed[]`만 주어 입력 위치를 되짚을 수 없고 중복이 두 번 세어진다 (F9) |
-| `vfolder` | `update` | `change_vfolder_ownership` | `single_entity` | `permission` | `rest-v1:POST /folders/_/change-ownership` | 400 api_parsing_invalid-parameters | 403 backendai_generic_forbidden | 행 없음 (요청 파싱 단계에서 거부 — 액션 미실행) | `W-GATE` | 라우트 게이트 선점 — `superadmin_required`가 선언된 단일 엔티티 게이트를 대체한다 |
 | `vfolder` | `get` | `create_vfolder_archive_download_session` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/request-download-archive` | 400 api_parsing_invalid-parameters | 403 role_create_forbidden | 해당 없음 | `X` | 요청 모델 불일치 — 검증 단계를 통과하지 못했다 |
-| `vfolder` | `create` | `create_vfolder_upload_session` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/request-upload` | ok | 403 role_create_forbidden | 일치 | `W-GATE` | v1/v2 불일치 — v1은 CREATE, v2는 UPDATE를 요구한다 (F10) |
-| `vfolder` | `update` | `create_vfolder_upload_session_v2` | `single_entity` | `permission` | `rest:POST /v2/vfolders/{id}/upload-session` | ok | 403 role_create_forbidden | 일치 | `W-GATE` | v1/v2 불일치 — v2는 UPDATE, v1은 CREATE를 요구한다 (F10) |
-| `vfolder` | `delete` | `delete_vfolder_files` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/delete-files` | ok | 403 role_create_forbidden | 일치 | `W-GATE` | v1/v2 불일치 — v1은 SOFT_DELETE, v2는 UPDATE를 요구한다 (F10) |
-| `vfolder` | `update` | `delete_vfolder_files_v2` | `single_entity` | `permission` | `cli:vfolder rm` | 404 on | 403 role_create_forbidden | 일치 | `W-GATE` | v1/v2 불일치 — v2는 UPDATE, v1은 SOFT_DELETE를 요구한다 (F10) |
 | `vfolder` | `get` | `get_task_logs` | `scope` | `permission` | `rest (session task-log route)` | 미실행 | 미실행 | 해당 없음 | `X` | 선행 조건 부재 — 컴퓨트 에이전트가 없어 세션 태스크 로그가 생기지 않는다 |
-| `vfolder` | `get` | `get_vfolder_usage` | `single_entity` | `permission` | `rest-v1:GET /folders/_/usage` | 404 vfolder_read_not-found | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
-| `vfolder` | `get` | `get_vfolder_usage_legacy` | `single_entity` | `permission` | `rest-v1:GET /folders/_/usage` | 404 | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
-| `vfolder` | `get` | `get_vfolder_used_bytes` | `single_entity` | `permission` | `rest-v1:GET /folders/_/used-bytes` | 404 vfolder_read_not-found | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `W-GATE` | 라우트 게이트 선점 — 같은 사유 |
 | `vfolder` | `get` | `global_batch_load_vfolders` | `global` | `permission` | `gql:node/DataLoader` | 미실행 | 미실행 | 해당 없음 | `X` | 직접 구동 불가 — GraphQL DataLoader 배치 경로로만 실행된다 |
 | `vfolder` | `update` | `global_mount_host` | `global` | `permission` | `rest-v1:POST /folders/_/mounts` | 200 while | 403 backendai_generic_forbidden | 일치 (`global_mount_host \| global \| update`, status=success) | `W-AUDIT` | entity type 불일치 — 카탈로그 `vfolder` / 감사 `global`. 등록된 에이전트가 없어 실제로는 아무것도 마운트하지 않고 200을 준다 |
 | `vfolder` | `update` | `global_umount_host` | `global` | `permission` | `rest-v1:POST /folders/_/umounts` | ok | 403 backendai_generic_forbidden | 일치 (status=success) | `W-AUDIT` | entity type 불일치 — 카탈로그 `vfolder` / 감사 `global` |
 | `vfolder` | `lookup` | `lookup_accessible_vfolder` | `lookup` | `permission` | `rest-v1:GET /folders/{name} (name form)` | 미실행 | 미실행 | 해당 없음 | `X` | 별도 구동 안 함 — v1 이름 형태 경로에서 `_vfolder_resolver`가 쓰는 내부 단계 |
 | `vfolder` | `lookup` | `lookup_vfolder` | `lookup` | `permission` | `없음` | 미실행 | 미실행 | 해당 없음 | `W-UNREACH` | 직접 경로 없음 — 단일 엔티티 vfolder 액션 내부에서만 실행된다 |
-| `vfolder` | `search` | `public_list_shared_vfolders` | `global` | `public` | `rest-v1:GET /folders/_/shared` | ok | ok | 행 없음 (성공 read — 정책상 정상) | `W-GUARD` | 게이트 근거 미흡 — `public`을 정당화하려면 결과가 호출자와 관련된 공유로 한정돼야 하나, `list_shared_vfolder_permissions(None)`이 vfolder 필터 없이 시스템 전체 공유 행을 돌려준다. 소유자도 수신자도 아닌 사용자가 수신자 UUID와 이메일까지 읽는다 (F17) |
 | `vfolder` | `purge` | `purge_vfolder_v2` | `single_entity` | `permission` | `cli:vfolder purge` | 404 on | 403 role_create_forbidden | 일치 | `W-AUDIT` | purge가 purge가 아님 — `delete_vfolders_forever`를 불러 행이 `delete-complete`로 남는데 감사는 `purge \| success` (F5) |
 | `vfolder` | `update` | `share_vfolder` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/share` | 404 | 403 backendai_generic_forbidden | 일치 (status=error) | `E-GATE` | 라우트 게이트 선점 — `admin_required`라 폴더 소유자가 자기 폴더를 공유하지 못한다 (F7) |
-| `vfolder` | `delete` | `unshare_vfolder` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/unshare` | 404 | 403 backendai_generic_forbidden | 일치 (status=error, operation=delete) | `W-GATE` | 라우트 게이트 선점 — 같은 사유 (F7) |
 | `vfolder` | `update` | `update_vfolder_sharing_status` | `single_entity` | `permission` | `rest-v1:POST /folders/_/sharing` | 400 api_parsing_invalid-parameters | 미실행 | 해당 없음 | `X` | 요청 모델 불일치 — 검증 단계를 통과하지 못했다 |
-| `vfolder` | `create` | `vfolder_mkdir` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/mkdir` | ok | 403 role_create_forbidden | 일치 | `W-GATE` | v1/v2 불일치 — 같은 효과에 v1은 CREATE, v2는 UPDATE를 요구한다 (F10) |
-| `vfolder` | `update` | `vfolder_mkdir_v2` | `single_entity` | `permission` | `cli:vfolder mkdir` | 404 on | 403 role_create_forbidden | 일치 (`vfolder_mkdir_v2\|vfolder\|update\|single_entity`) | `W-GATE` | v1/v2 불일치 — 같은 효과에 v2는 UPDATE, v1은 CREATE를 요구한다 (F10) |
 | `vfolder_invitation` | `update` | `accept_invitation` | `single_entity` | `permission` | `rest-v1:POST /folders/invitations/accept` | ok | 403 role_create_forbidden | 일치 (status=denied) | `E-GATE` | 권한 행 부재 — 수신자가 자기 앞으로 온 초대를 수락하지 못한다 (F6) |
-| `vfolder_invitation` | `purge` | `leave_invited_vfolder` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/leave` | ok | 403 role_create_forbidden | 일치 (status=denied) | `W-GATE` | 권한 행 부재 — 같은 사유 (F6) |
 | `vfolder_invitation` | `search` | `list_invitation` | `scope` | `permission` | `rest-v1:GET /folders/invitations/list` | ok | 403 role_create_forbidden | 일치 (status=denied) | `E-GATE` | 권한 행 부재 — `vfolder_invitation`에 permission 행이 하나도 없어 자기 user 스코프 READ조차 거부된다 (F6) |
-| `vfolder_invitation` | `search` | `list_sent_invitations` | `scope` | `permission` | `rest-v1:GET /folders/invitations/list-sent` | ok | 403 role_create_forbidden | 일치 (status=denied) | `W-GATE` | 권한 행 부재 — 같은 사유 (F6) |
-| `vfolder_invitation` | `update` | `reject_invitation` | `single_entity` | `permission` | `rest-v1:POST /folders/invitations/delete` | ok | 403 role_create_forbidden | 일치 (status=denied) | `W-GATE` | 권한 행 부재 — 같은 사유 (F6) |
-| `vfolder_invitation` | `purge` | `revoke_invited_vfolder` | `single_entity` | `permission` | `rest-v1:POST /folders/invitations/delete` | ok | 403 role_create_forbidden | 일치 (status=denied) | `W-GATE` | 권한 행 부재 — 같은 사유 (F6) |
-| `vfolder_invitation` | `update` | `update_invitation` | `single_entity` | `permission` | `rest-v1:POST /folders/invitations/update/{inv_id}` | ok | 403 role_create_forbidden | 일치 (status=denied) | `W-GATE` | 권한 행 부재 — 같은 사유 (F6) |
 
-### vfolder — 성공 (39행)
+### vfolder — 성공 (56행)
 
 | entity_type | operation | action_name | kind | gate | 경로 | admin | 비-admin | 감사 | 판정 | 사유 |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `vfolder` | `update` | `change_vfolder_ownership` | `single_entity` | `permission` | `rest-v1:POST /folders/_/change-ownership` | 400 api_parsing_invalid-parameters | 403 backendai_generic_forbidden | 행 없음 (요청 파싱 단계에서 거부 — 액션 미실행) | `성공` | 라우트 게이트 선점 — `superadmin_required`가 선언된 단일 엔티티 게이트를 대체한다 |
+| `vfolder` | `create` | `create_vfolder_upload_session` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/request-upload` | ok | 403 role_create_forbidden | 일치 | `성공` | v1/v2 불일치 — v1은 CREATE, v2는 UPDATE를 요구한다 (F10) |
+| `vfolder` | `update` | `create_vfolder_upload_session_v2` | `single_entity` | `permission` | `rest:POST /v2/vfolders/{id}/upload-session` | ok | 403 role_create_forbidden | 일치 | `성공` | v1/v2 불일치 — v2는 UPDATE, v1은 CREATE를 요구한다 (F10) |
+| `vfolder` | `delete` | `delete_vfolder_files` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/delete-files` | ok | 403 role_create_forbidden | 일치 | `성공` | v1/v2 불일치 — v1은 SOFT_DELETE, v2는 UPDATE를 요구한다 (F10) |
+| `vfolder` | `update` | `delete_vfolder_files_v2` | `single_entity` | `permission` | `cli:vfolder rm` | 404 on | 403 role_create_forbidden | 일치 | `성공` | v1/v2 불일치 — v2는 UPDATE, v1은 SOFT_DELETE를 요구한다 (F10) |
+| `vfolder` | `get` | `get_vfolder_usage` | `single_entity` | `permission` | `rest-v1:GET /folders/_/usage` | 404 vfolder_read_not-found | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 게이트 선점 — `superadmin_required`가 RBAC 검사를 대체한다 |
+| `vfolder` | `get` | `get_vfolder_usage_legacy` | `single_entity` | `permission` | `rest-v1:GET /folders/_/usage` | 404 | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `vfolder` | `get` | `get_vfolder_used_bytes` | `single_entity` | `permission` | `rest-v1:GET /folders/_/used-bytes` | 404 vfolder_read_not-found | 403 backendai_generic_forbidden | 행 없음 (성공 read — 정책상 정상) | `성공` | 라우트 게이트 선점 — 같은 사유 |
+| `vfolder` | `search` | `public_list_shared_vfolders` | `global` | `public` | `rest-v1:GET /folders/_/shared` | ok | ok | 행 없음 (성공 read — 정책상 정상) | `성공` | 전체 공유 노출 — `public`을 정당화하려면 결과가 호출자와 관련된 공유로 한정돼야 하나, `list_shared_vfolder_permissions(None)`이 vfolder 필터 없이 시스템 전체 공유 행을 돌려준다. 소유자도 수신자도 아닌 사용자가 수신자 UUID와 이메일까지 읽는다 (F17) |
+| `vfolder` | `delete` | `unshare_vfolder` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/unshare` | 404 | 403 backendai_generic_forbidden | 일치 (status=error, operation=delete) | `성공` | 라우트 게이트 선점 — 같은 사유 (F7) |
+| `vfolder` | `create` | `vfolder_mkdir` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/mkdir` | ok | 403 role_create_forbidden | 일치 | `성공` | v1/v2 불일치 — 같은 효과에 v1은 CREATE, v2는 UPDATE를 요구한다 (F10) |
+| `vfolder` | `update` | `vfolder_mkdir_v2` | `single_entity` | `permission` | `cli:vfolder mkdir` | 404 on | 403 role_create_forbidden | 일치 (`vfolder_mkdir_v2\|vfolder\|update\|single_entity`) | `성공` | v1/v2 불일치 — 같은 효과에 v2는 UPDATE, v1은 CREATE를 요구한다 (F10) |
+| `vfolder_invitation` | `purge` | `leave_invited_vfolder` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/leave` | ok | 403 role_create_forbidden | 일치 (status=denied) | `성공` | 권한 행 부재 — 같은 사유 (F6) |
+| `vfolder_invitation` | `search` | `list_sent_invitations` | `scope` | `permission` | `rest-v1:GET /folders/invitations/list-sent` | ok | 403 role_create_forbidden | 일치 (status=denied) | `성공` | 권한 행 부재 — 같은 사유 (F6) |
+| `vfolder_invitation` | `update` | `reject_invitation` | `single_entity` | `permission` | `rest-v1:POST /folders/invitations/delete` | ok | 403 role_create_forbidden | 일치 (status=denied) | `성공` | 권한 행 부재 — 같은 사유 (F6) |
+| `vfolder_invitation` | `purge` | `revoke_invited_vfolder` | `single_entity` | `permission` | `rest-v1:POST /folders/invitations/delete` | ok | 403 role_create_forbidden | 일치 (status=denied) | `성공` | 권한 행 부재 — 같은 사유 (F6) |
+| `vfolder_invitation` | `update` | `update_invitation` | `single_entity` | `permission` | `rest-v1:POST /folders/invitations/update/{inv_id}` | ok | 403 role_create_forbidden | 일치 (status=denied) | `성공` | 권한 행 부재 — 같은 사유 (F6) |
 | `vfolder` | `get` | `get_vfolder_v2` | `single_entity` | `permission` | `cli:vfolder get / rest:GET /v2/vfolders/{id}` | ok | ok | 행 없음 (성공 read — 정책상 정상); 거부는 기록됨 | `성공` | 역할 부여대로 동작 — `role_domain_default_member`가 domain 스코프 vfolder READ를 가져 도메인 구성원이 통과한다. 액션이 아니라 역할 프리셋의 범위 문제이고, v1은 소유권을 검사해 모델이 갈린다 (F1) |
 | `vfolder` | `create` | `clone_vfolder` | `single_entity` | `permission` | `rest-v1:POST /folders/{id}/clone` | ok | 403 role_create_forbidden | 일치 (status=error) | `성공` | — |
 | `vfolder` | `create` | `clone_vfolder_v2` | `single_entity` | `permission` | `cli:vfolder clone` | 400 vfolder_access_invalid-parameters | 403 role_create_forbidden | 일치 (status=error) | `성공` | — |
