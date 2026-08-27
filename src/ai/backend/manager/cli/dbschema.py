@@ -224,7 +224,6 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
     from sqlalchemy.engine import Connection, Engine
 
     from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
-    from ai.backend.manager.models.resource_slot.seed import seed_resource_slot_types
     from ai.backend.manager.repositories.db.engine import create_async_engine
 
     ensure_all_tables_registered()
@@ -236,8 +235,6 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
     def _create_all_sync(connection: Connection, engine: Engine) -> None:
         alembic_cfg.attributes["connection"] = connection
         metadata.create_all(engine, checkfirst=False)
-        log.info("Seeding the resource slot type registry...")
-        seed_resource_slot_types(connection)
         log.info("Stamping alembic version to head...")
         script = ScriptDirectory.from_config(alembic_cfg)
         heads = script.get_heads()

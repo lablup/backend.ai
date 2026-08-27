@@ -132,6 +132,8 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
+from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.user import users
@@ -518,6 +520,29 @@ def database(
             obj=cli_ctx,
         )
         cli_schema_oneshot.invoke(click_ctx)
+
+    # `schema oneshot` creates the tables but applies no migration, so the seed
+    # rows the migrations carry are missing. Installs load them from the fixture
+    # files; do the same for the registry the manager reads at runtime.
+    async def seed_resource_slot_types() -> None:
+        fixture_path = (
+            Path(os.environ["BACKEND_BUILD_ROOT"])
+            / "fixtures"
+            / "manager"
+            / "example-resource-slot-types.json"
+        )
+        rows = [
+            {**row, "number_format": NumberFormat(**row["number_format"])}
+            for row in json.loads(fixture_path.read_text())["resource_slot_types"]
+        ]
+        engine = create_async_engine(str(test_db_url), connect_args=pgsql_connect_opts)
+        async with engine.begin() as conn:
+            await conn.execute(
+                pg_insert(ResourceSlotTypeRow.__table__).values(rows).on_conflict_do_nothing()
+            )
+        await engine.dispose()
+
+    asyncio.run(seed_resource_slot_types())
 
 
 # ---------------------------------------------------------------------------
