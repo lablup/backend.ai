@@ -1,22 +1,28 @@
 from collections.abc import Collection
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.auth.types import (
     GroupMembershipData,
+    KeyPairSigningMaterial,
     UserCreationData,
 )
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -25,6 +31,7 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     CredentialVerificationResult,
     LoginSessionCreationResult,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 auth_repository_resilience = Resilience(
@@ -37,8 +44,13 @@ auth_repository_resilience = Resilience(
 class AuthRepository:
     _db_source: AuthDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine, key_provider_pool: KeyProviderPool) -> None:
-        self._db_source = AuthDBSource(db, key_provider_pool)
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
+        self._db_source = AuthDBSource(db, v2_ops_provider, key_provider_pool)
 
     @auth_repository_resilience.apply()
     async def get_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
@@ -60,7 +72,7 @@ class AuthRepository:
         project_ids: Collection[ProjectID],
         *,
         keypair_resource_policy: str,
-        keypair_rate_limit: int,
+        keypair_rate_limit: int | None = None,
     ) -> UserCreationData:
         return await self._db_source.insert_user_with_keypair(
             user_spec,
@@ -96,6 +108,23 @@ class AuthRepository:
         await self._db_source.modify_ssh_keypair(access_key, public_key, private_key)
 
     @auth_repository_resilience.apply()
+    async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:
+        """Whether an active keypair holds the given secret key."""
+        return await self._db_source.verify_keypair_secret(access_key, secret_key)
+
+    @auth_repository_resilience.apply()
+    async def get_keypair_signing_material(self, access_key: str) -> KeyPairSigningMaterial:
+        """The owner and decrypted secret key of a keypair, for re-signing a request."""
+        return await self._db_source.fetch_keypair_signing_material(access_key)
+
+    @auth_repository_resilience.apply()
+    async def lookup[TEntityID: EntityIdentifier](
+        self, lookup: DataLookup[Any, TEntityID]
+    ) -> TEntityID | None:
+        """The id a key names, or None when it names nothing."""
+        return await self._db_source.lookup(lookup)
+
+    @auth_repository_resilience.apply()
     async def get_delegation_target_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
         return await self._db_source.fetch_user_info_by_access_key(access_key)
 
@@ -106,6 +135,11 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def get_user_uuid_by_email(self, email: str, domain_name: str) -> UUID | None:
         return await self._db_source.fetch_user_uuid_by_email(email, domain_name)
+
+    @auth_repository_resilience.apply()
+    async def query_user_data[TData](self, querier: DataQuerier[UserRow, TData]) -> TData | None:
+        """The user a querier names, or None when it names nothing."""
+        return await self._db_source.query_user_data(querier)
 
     @auth_repository_resilience.apply()
     async def verify_credential(
@@ -224,3 +258,7 @@ class AuthRepository:
         await self._db_source.record_login_history(
             user_id, domain_name, result, fail_reason, client_ip
         )
+
+    @auth_repository_resilience.apply()
+    async def invalidate_active_login_sessions(self, user_id: UserID) -> None:
+        await self._db_source.invalidate_active_login_sessions(user_id)

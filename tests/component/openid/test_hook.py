@@ -101,8 +101,8 @@ class TestOIDCHookPreAuth:
     ) -> None:
         raw_result: Any = await hook_plugin.pre_auth_hook(request_with_valid_stoken, {})
         assert raw_result is not None
-        assert raw_result["email"] == "alice@example.com"
-        assert raw_result["status"] == UserStatus.ACTIVE
+        assert raw_result.email == "alice@example.com"
+        assert raw_result.status == UserStatus.ACTIVE
 
     async def test_invalid_stoken_rejects(
         self, hook_plugin: OIDCHookPlugin, request_with_invalid_stoken: MagicMock
@@ -147,8 +147,8 @@ class TestOIDCHookPreAuth:
         params: dict[str, Any] = {"sToken": stoken}
         raw_result: Any = await hook_plugin.pre_auth_hook(request_without_stoken, params)
         assert raw_result is not None
-        assert raw_result["email"] == "alice@example.com"
-        assert raw_result["status"] == UserStatus.ACTIVE
+        assert raw_result.email == "alice@example.com"
+        assert raw_result.status == UserStatus.ACTIVE
 
     async def test_stoken_lowercase_key_in_params_authenticates(
         self,
@@ -161,7 +161,7 @@ class TestOIDCHookPreAuth:
         params: dict[str, Any] = {"stoken": stoken}
         raw_result: Any = await hook_plugin.pre_auth_hook(request_without_stoken, params)
         assert raw_result is not None
-        assert raw_result["email"] == "alice@example.com"
+        assert raw_result.email == "alice@example.com"
 
     async def test_expired_stoken_in_params_rejects(
         self,
