@@ -1682,30 +1682,27 @@ class VfolderRepository:
         )
         task_id = clone_response.bgtask_id
 
-        async def _insert_vfolder() -> None:
-            async with self._db.begin_session() as db_session:
-                insert_values = {
-                    "id": target_folder_id.folder_id,
-                    "name": vfolder_info.target_vfolder_name,
-                    "domain_name": vfolder_info.domain_name,
-                    "usage_mode": vfolder_info.usage_mode,
-                    "permission": vfolder_info.permission,
-                    "last_used": None,
-                    "host": vfolder_info.target_host,
-                    "creator": vfolder_info.email,
-                    "creator_id": vfolder_info.user_id,
-                    "ownership_type": VFolderOwnershipType("user"),
-                    "user": vfolder_info.user_id,
-                    "group": None,
-                    "unmanaged_path": None,
-                    "cloneable": vfolder_info.cloneable,
-                    "quota_scope_id": vfolder_info.target_quota_scope_id,
-                }
-                query = sa.insert(vfolders).values(**insert_values)
-                await db_session.execute(query)
-
-        # Insert the new vfolder record
-        await execute_with_retry(_insert_vfolder)
+        # Insert the new vfolder record. A clone target is always user-owned, and it
+        # goes through the entity creator so the RBAC scope association lands with the row.
+        async with self._v2_ops.write_ops() as w:
+            await w.create_entity(
+                VFolderCreator(
+                    id=target_folder_id.folder_id,
+                    name=vfolder_info.target_vfolder_name,
+                    domain_name=vfolder_info.domain_name,
+                    quota_scope_id=str(vfolder_info.target_quota_scope_id),
+                    host=vfolder_info.target_host,
+                    creator=vfolder_info.email,
+                    creator_id=vfolder_info.user_id,
+                    ownership_type=VFolderOwnershipType.USER,
+                    usage_mode=vfolder_info.usage_mode,
+                    permission=vfolder_info.permission,
+                    user=vfolder_info.user_id,
+                    group=None,
+                    unmanaged_path=None,
+                    cloneable=vfolder_info.cloneable,
+                )
+            )
 
         return task_id, target_folder_id.folder_id
 
