@@ -281,7 +281,7 @@ class TestUserDeleteCrud:
         user_factory: UserFactory,
         db_engine: SAEngine,
     ) -> None:
-        """S-1: Admin soft deletes ACTIVE user → success=True, DB status=DELETED, keypairs deactivated."""
+        """S-1: Admin soft deletes ACTIVE user → success=True, DB status=DELETED, keypairs untouched."""
         created = await user_factory()
 
         result = await admin_registry.user.delete(DeleteUserRequest(user_id=created.user.id))
@@ -297,15 +297,14 @@ class TestUserDeleteCrud:
             user_status = user_row.scalar()
             assert user_status == UserStatus.DELETED
 
-            # Verify all keypairs deactivated
+            # Keypairs stay active: the auth status gate keeps a deleted user out,
+            # so restore does not have to re-activate them.
             kp_row = await conn.execute(
                 sa.select(keypairs.c.is_active).where(keypairs.c.user == str(created.user.id))
             )
             kp_actives = kp_row.scalars().all()
             assert len(kp_actives) > 0, "Should have at least one keypair"
-            assert all(not active for active in kp_actives), (
-                "All keypairs should be deactivated after soft delete"
-            )
+            assert all(kp_actives), "Keypairs should stay active after soft delete"
 
     async def test_s2_soft_delete_inactive_user(
         self,
