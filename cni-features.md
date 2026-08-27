@@ -1,11 +1,11 @@
 # 런타임 백엔드 검증표 — CNI · 네트워크 · 기능 · 로그 · PID
 
 **결론: 9개 CNI 구성 × 3개 런타임 백엔드 = 27칸 전부 통과.** 두 CNI는 설정 없이, 나머지는 설정
-한두 개가 필요하다. 3개 백엔드는 3개 네트워크 옵션 × 11개 기능에서도 모두 통과하고, 컨테이너 로그
-로테이션과 PID 처리도 정상이다 — 단 컨테이너화된 에이전트에서 containerd 로그 경로가 어긋나 있었고
-(수정 완료), rootless 로테이션은 성질이 다르다.
+한두 개가 필요하다. 3개 백엔드는 3개 네트워크 옵션 × 11개 기능에서도 모두 통과하고, NCCL 분산 학습·
+컨테이너 로그 로테이션·PID 처리도 정상이다 — 단 컨테이너화된 에이전트에서 containerd 로그 경로가
+어긋나 있었고(수정 완료), rootless 로테이션은 성질이 다르다.
 
-측정일 2026-08-26 · 브랜치 `feat/containerd-network-v2-rebased` · 클러스터 4× k8s v1.34.1
+측정일 2026-08-26 ~ 27 · 브랜치 `feat/containerd-network-v2-rebased` · 클러스터 4× k8s v1.34.1
 
 ---
 
@@ -86,17 +86,47 @@ GPU 제약만으로 배치가 갈린다.
 | 오버레이 암호화 | 와이어 ESP + SA가 세션과 함께 생성·제거 | 통과 (수정 후) | 통과 (수정 후) | 통과 (수정 후) |
 | MTU 가드 | 파드 eth0를 1450으로 → 블랙홀이 아니라 거부해야 함 | 거부됨 | 거부됨 | 거부됨 |
 | 도달성 프로브 | udp/4789 차단 → 침묵이 아니라 로그로 보고해야 함 | 보고됨 | 보고됨 | 보고됨 |
-| NCCL all-reduce | `baimulti0` 위 2랭크 torch all-reduce | 미측정 | 통과 | 미측정 |
-| 컨테이너 로그 (4절) | 로테이션 상한·tail 정확도·terminate 후 삭제 | 통과 (수정 후) | 통과 (창이 짧음) | 통과 (창이 짧음) |
-| PID 처리 (5절) | PID 1 회수·pidns 격리·teardown 정리 | 통과 | 통과 | 통과 |
-
-NCCL은 일반 이미지로 검증했다. 커널 안에서 `pip install torch`가 그냥 되므로 별도 이미지가 필요 없다.
-정확도 정확(all-reduce 8회 후 2⁸ = 256), 그리고 **전량 오버레이 경유** — `baimulti0` tx +2187MB /
-rx +2204MB 대 `eth0` +0.0MB. 처리량 0.092 GB/s는 1GbE 링크 상한이지 오버레이 결함이 아니다.
+| NCCL all-reduce | `baimulti0` 위 2랭크 torch all-reduce (4절) | 통과 | 통과 | 통과 |
+| 컨테이너 로그 | 로테이션 상한·tail 정확도·terminate 후 삭제 (5절) | 통과 (수정 후) | 통과 (창이 짧음) | 통과 (창이 짧음) |
+| PID 처리 | PID 1 회수·pidns 격리·teardown 정리 (6절) | 통과 | 통과 | 통과 |
 
 ---
 
-## 4. 컨테이너 로그 로테이션
+## 4. NCCL 분산 학습
+
+처음엔 enroot 하나만 재놓고 "나머지는 미측정"으로 뒀었다. 원칙이 아니라 순서였고, 못 잴 이유가 없어서
+같은 하네스로 3개를 같은 날 같은 노드 쌍(.104 RTX 4070 ↔ .112 RTX 3070)에 다시 돌렸다.
+
+| 백엔드 | 정합성 (2⁸=256) | 8×256MB 소요 | 처리량 | `baimulti0` tx/rx | `eth0` |
+|---|---|---|---|---|---|
+| containerd | OK | 30.71 s | 0.065 GB/s | +2167 / +2179 MB | +0.0 MB |
+| enroot | OK | 29.47 s | 0.068 GB/s | +2178 / +2195 MB | +0.0 MB |
+| singularity | OK | 30.42 s | 0.066 GB/s | +2178 / +2199 MB | +0.0 MB |
+
+세 백엔드가 5% 안에 들어온다 — 셋 다 1GbE 링크에 걸려 있다는 뜻이지 백엔드 차이가 아니다. 중요한 건
+**`eth0` 가 정확히 0.0 MB** 라는 것: 2.2 GB 가 전부 세션 오버레이를 탔고 파드 네트워크로 새지 않았다.
+
+일반 이미지로 검증했다 — 커널 안에서 `pip install torch`(2.13.0+cu130)가 그냥 되므로 전용 이미지가
+필요 없다. `NCCL_SOCKET_IFNAME=baimulti0`, NCCL 2.29.7+cuda13.2.
+
+**singularity 커널 안에서는 `/sys/class/net` 을 믿으면 안 된다.** 측정: 커널 안에서
+
+```
+ls /sys/class/net  → bai2a5e231c8ce baibr4106 baif83cb683aa3 bailo4106 baivx4106 eth0 lo tunl0
+cat /proc/net/dev  → lo  tunl0  eth0  baimulti0
+```
+
+즉 sysfs 가 **에이전트의** 네트워크 디바이스를 보여준다. sysfs 인스턴스는 마운트 시점의 netns 에
+묶이는데 apptainer 가 컨테이너 netns 로 들어가기 전에 `/sys` 를 붙이기 때문이고, containerd·enroot 는
+컨테이너 안에서 새로 마운트해(ro) 목록이 일치한다. `/proc/net/dev` 는 3개 다 정확하다.
+
+실제로 깨진 것은 못 찾았다 — NCCL 은 `getifaddrs` 를 쓰므로 영향이 없고(2.2 GB 를 `baimulti0` 으로
+옮긴 것이 증거), 커널 러너는 `/sys/class/net` 을 읽지 않는다. 다만 사용자 코드가 sysfs 로 인터페이스를
+찾으면 틀린 목록을 받고, 덤으로 에이전트의 오버레이 브리지·VXLAN 디바이스 이름이 노출된다.
+
+---
+
+## 5. 컨테이너 로그 로테이션
 
 `container_logs.max_length` 기본 10 MiB, 파일 5개 → 파일당 2 MiB. **쓰기단을 누가 쥐느냐로 메커니즘이
 갈리고, 그 차이가 측정된다.**
@@ -145,7 +175,7 @@ rx +2204MB 대 `eth0` +0.0MB. 처리량 0.092 GB/s는 1GbE 링크 상한이지 �
 
 ---
 
-## 5. PID · 프로세스 처리
+## 6. PID · 프로세스 처리
 
 | 항목 | 확인 방법 | containerd | enroot | singularity |
 |---|---|---|---|---|
@@ -175,7 +205,7 @@ apptainer 는 `appinit` 을 자체로 PID 1 에 넣으므로 이중이 되지만
 
 ---
 
-## 6. 설정 방법
+## 7. 설정 방법
 
 플러그인 그룹 키는 `network_manager`, 플러그인 이름은 `cni`.
 
@@ -198,11 +228,11 @@ etcdctl put /sorna/local/config/plugins/network_manager/cni/overlay-encryption t
 
 ---
 
-## 7. 검증 수준
+## 8. 검증 수준
 
 | 축 | 무엇으로 검증했나 |
 |---|---|
-| 1~5절 전부 | **실제 Backend.AI 세션**. 라이브 4노드 클러스터(k8s v1.34.1)에서 멀티노드 GPU 세션을 스케줄·RUNNING까지 올리고 커널 컨테이너 안에서 확인한 뒤 정리. CNI 9개 구성은 **운영 클러스터의 CNI를 실제로 교체**하며 측정했다. |
+| 1~6절 전부 | **실제 Backend.AI 세션**. 라이브 4노드 클러스터(k8s v1.34.1)에서 멀티노드 GPU 세션을 스케줄·RUNNING까지 올리고 커널 컨테이너 안에서 확인한 뒤 정리. CNI 9개 구성은 **운영 클러스터의 CNI를 실제로 교체**하며 측정했다. |
 
 CNI 교체가 가능하려면 인프라가 먼저 견뎌야 했다. `postgres`·`etcd`가 emptyDir이라 파드 재생성마다
 데이터가 날아갔다. 노드 고정 hostPath로 전환(`/var/lib/bai-infra/{postgres,etcd}`)한 뒤에야
@@ -212,17 +242,17 @@ CNI 교체가 기계적인 작업이 됐다. 교체 후에도 35 agents / 444 se
 
 ---
 
-## 8. 미검증
+## 9. 미검증
 
-- NCCL은 enroot에서만 측정. containerd·singularity는 분산 잡 결과가 없다.
 - 노드당 GPU 1장이라 랭크당 1 GPU 구성만 봤다. 노드 내 NVLink/P2P 경로는 미검증.
+- NCCL은 2랭크뿐이다. 3노드 이상, 랭크당 다중 GPU는 하드웨어가 없어 못 잰다.
 - default-deny NetworkPolicy 클러스터, CNI 레벨 암호화(cilium WireGuard/IPsec)를 우리 것 아래 겹친 조합.
 - 포크밤을 실제로 터뜨려 보지는 않았다. `pids.max = max`는 읽어서 확인했고, 라이브 클러스터에서 재현할 성질이 아니다.
 - 로그·PID는 CPU 전용 2노드 세션으로 쟀다. GPU 축과 교차하지는 않았다(교차할 이유가 없는 축이다).
 
 ---
 
-## 9. 이 검증이 찾아낸 결함
+## 10. 이 검증이 찾아낸 결함
 
 | 상태 | 결함 | 커밋 |
 |---|---|---|
@@ -234,6 +264,7 @@ CNI 교체가 기계적인 작업이 됐다. 교체 후에도 35 agents / 444 se
 | 열림 | containerd 에이전트 pull 경로에서 `registry-hosts-dir`가 안 먹는다. 노브를 설정하고 디렉터리를 마운트해도 평문 HTTP 레지스트리를 HTTPS로 시도한다. 같은 디렉터리로 `ctr --hosts-dir`는 정상. 노드에 미리 pull해 우회. | — |
 | 환경 | Calico 기본 IP 자동탐지가 이중 홈 노드(.112: 유선 .112 + Wi-Fi .252)에서 **Wi-Fi 주소를 골라** BGP가 안 맺힌다. `IP_AUTODETECTION_METHOD=kubernetes-internal-ip` 로 해결. | — |
 | 설계 | 한 노드에서 두 백엔드를 돌리면 `/var/lib/backend.ai/net-local-subnet`을 공유해 저장소 가드가 거부한다(정상 동작). 테스트 구성에서만 닿는 문제라 코드 대신 에이전트별 hostPath로 분리. | — |
-| 설계 | rootless 로그 로테이션은 소프트 캡이라 **420 KiB/s 이상에서 구멍이 난다**(4절). 하드 캡을 주려면 컨테이너에 파이프를 쥐여주고 우리가 읽어야 하는데, 그러면 에이전트 재시작 중에 커널 stdout이 막힌다. 커널이 에이전트 재시작을 넘겨야 하므로 그 교환은 선택지가 아니다. | — |
+| 설계 | rootless 로그 로테이션은 소프트 캡이라 **420 KiB/s 이상에서 구멍이 난다**(5절). 하드 캡을 주려면 컨테이너에 파이프를 쥐여주고 우리가 읽어야 하는데, 그러면 에이전트 재시작 중에 커널 stdout이 막힌다. 커널이 에이전트 재시작을 넘겨야 하므로 그 교환은 선택지가 아니다. | — |
 | 열림 | `pids.max`가 3개 백엔드 모두 `max` — 포크밤 상한이 없다. 다만 **Docker 백엔드도 `PidsLimit`을 안 걸어** 회귀가 아니라 동등성이다. pids 컨트롤러는 이미 위임돼 있어 `_write_cgroup_limits` 한 줄이면 닫힌다. | — |
+| 열림 | singularity 커널 안 `/sys/class/net`이 **에이전트의** 네트워크 디바이스를 보여준다(4절). apptainer가 컨테이너 netns로 들어가기 전에 `/sys`를 붙여 sysfs 인스턴스가 에이전트 netns에 묶인다. `/proc/net/dev`는 정확하고 NCCL(`getifaddrs`)도 영향 없지만, sysfs로 인터페이스를 찾는 사용자 코드는 틀린 목록을 받고 에이전트의 브리지·VXLAN 이름이 노출된다. | — |
 | 배포 | 에이전트가 파드의 PID 1일 때 임의 고아를 blanket-reap 하지 않는다. 커널 라이프사이클로는 재현되지 않고 테스트용 `nsenter` 고아에서만 나왔다. fatPod 엔트리포인트를 `init.py`로 감싸면 닫히는, 코드가 아닌 배포 쪽 문제. | — |
