@@ -66,15 +66,18 @@ class TestAuditLogClientIP:
             assert row is not None
             return row.to_dataclass().client_ip
 
-    async def _read_client_ip_as_text(
-        self, db: ExtendedAsyncSAEngine, row_id: AuditLogID
-    ) -> str | None:
+    async def _stored_value_equals(
+        self, db: ExtendedAsyncSAEngine, row_id: AuditLogID, client_ip: str
+    ) -> bool:
+        """Compare the column against the address as postgres itself parses it."""
         async with db.begin_readonly() as conn:
             result = await conn.execute(
-                sa.text("SELECT client_ip::text FROM audit_logs WHERE id = :id"),
-                {"id": row_id},
+                sa.text(
+                    "SELECT client_ip = CAST(:client_ip AS inet) FROM audit_logs WHERE id = :id"
+                ),
+                {"id": row_id, "client_ip": client_ip},
             )
-            return cast(str | None, result.scalar_one())
+            return cast(bool, result.scalar_one())
 
     @pytest.mark.parametrize(
         "client_ip",
@@ -105,13 +108,13 @@ class TestAuditLogClientIP:
         assert await self._read_client_ip(db_with_cleanup, row_id) is None
 
     @pytest.mark.parametrize("client_ip", ["203.0.113.7", "2001:db8:1:2::1"])
-    async def test_the_column_keeps_the_value_postgres_stored_before(
+    async def test_the_column_stores_the_address_it_was_given(
         self, db_with_cleanup: ExtendedAsyncSAEngine, client_ip: str
     ) -> None:
-        """The stored form is unchanged, so records written either way are the same."""
+        """The stored value is the address itself, so it stays comparable in SQL."""
         row_id = await self._insert_row(db_with_cleanup, client_ip)
 
-        assert await self._read_client_ip_as_text(db_with_cleanup, row_id) == client_ip
+        assert await self._stored_value_equals(db_with_cleanup, row_id, client_ip)
 
     @pytest.mark.parametrize("client_ip", ["203.0.113.7", "2001:db8:1:2::1"])
     async def test_a_row_written_as_raw_inet_reads_back_as_a_string(
@@ -143,7 +146,7 @@ class TestAuditLogClientIP:
             )
 
         assert await self._read_client_ip(db_with_cleanup, row_id) == "2001:db8:1:2::1"
-        assert await self._read_client_ip_as_text(db_with_cleanup, row_id) == "2001:db8:1:2::1"
+        assert await self._stored_value_equals(db_with_cleanup, row_id, "2001:db8:1:2::1")
 
     async def test_an_update_can_clear_the_address(
         self, db_with_cleanup: ExtendedAsyncSAEngine

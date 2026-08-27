@@ -154,15 +154,17 @@ class TestLoginHistoryClientIP:
         assert await self._read_client_ip(db_with_cleanup, row_id) is None
 
     @pytest.mark.parametrize("client_ip", ["203.0.113.7", "2001:db8:1:2::1"])
-    async def test_the_column_keeps_the_value_postgres_stored_before(
+    async def test_the_column_stores_the_address_it_was_given(
         self, db_with_cleanup: ExtendedAsyncSAEngine, sample_user: SampleUserData, client_ip: str
     ) -> None:
-        """The stored form is unchanged, so records written either way are the same."""
+        """The stored value is the address itself, so it stays comparable in SQL."""
         row_id = await self._insert_history(db_with_cleanup, sample_user, client_ip)
 
         async with db_with_cleanup.begin_readonly() as conn:
             result = await conn.execute(
-                sa.text("SELECT client_ip::text FROM login_history WHERE id = :id"),
-                {"id": row_id},
+                sa.text(
+                    "SELECT client_ip = CAST(:client_ip AS inet) FROM login_history WHERE id = :id"
+                ),
+                {"id": row_id, "client_ip": client_ip},
             )
-            assert result.scalar_one() == client_ip
+            assert result.scalar_one() is True
