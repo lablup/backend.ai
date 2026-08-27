@@ -25,6 +25,12 @@ from ai.backend.common.exception import (
     ValkeyRoleMismatchError,
     ValkeySentinelMasterNotFound,
 )
+from ai.backend.common.resilience.policies.retry import (
+    BackoffStrategy,
+    RetryArgs,
+    RetryPolicy,
+)
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.common.utils import addr_to_hostport_pair
 from ai.backend.logging import BraceStyleAdapter
@@ -41,6 +47,9 @@ _DEFAULT_OPERATION_FAILURE_THRESHOLD: Final[int] = (
     10  # Number of consecutive operation failures before reconnection
 )
 _DEFAULT_MONITOR_INTERVAL: Final[float] = 10.0  # Interval between ping attempts in seconds
+_CONNECT_MAX_ATTEMPTS: Final[int] = 6  # Initial connection attempts before giving up
+_CONNECT_RETRY_DELAY: Final[float] = 1.0  # Initial delay between attempts in seconds
+_CONNECT_RETRY_MAX_DELAY: Final[float] = 16.0  # Delay ceiling in seconds (~31s total budget)
 
 # Connection error types that indicate a broken Valkey connection
 _VALKEY_CONNECTION_ERRORS: tuple[type[Exception], ...] = (
@@ -529,6 +538,22 @@ class MonitoringValkeyClientSpec:
     """Interval in seconds between health check pings."""
 
 
+# Retries only the initial connection; runtime reconnects are already retried by the
+# monitor loop in MonitoringValkeyClient._monitor_connection().
+_connect_resilience = Resilience(
+    policies=[
+        RetryPolicy(
+            RetryArgs(
+                max_retries=_CONNECT_MAX_ATTEMPTS,
+                retry_delay=_CONNECT_RETRY_DELAY,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                max_delay=_CONNECT_RETRY_MAX_DELAY,
+            )
+        ),
+    ]
+)
+
+
 class MonitoringValkeyClient(AbstractValkeyClient):
     """
     Valkey client wrapper with separated monitor client for health checks.
@@ -573,9 +598,23 @@ class MonitoringValkeyClient(AbstractValkeyClient):
 
     @override
     async def connect(self) -> None:
-        await self._operation_client.connect()
-        await self._monitor_client.connect()
+        """
+        Establish both connections, retrying while Valkey is unreachable.
+
+        A component may start before Valkey accepts commands (a cold boot, a Valkey
+        restart), so the initial connection is retried with exponential backoff.
+        """
+        await self._connect_with_retry()
         self._monitor_task = asyncio.create_task(self._monitor_connection())
+
+    @_connect_resilience.apply()
+    async def _connect_with_retry(self) -> None:
+        try:
+            await self._operation_client.connect()
+            await self._monitor_client.connect()
+        except Exception as e:
+            log.warning("Valkey connection attempt failed, retrying: {}", e)
+            raise
 
     @override
     async def disconnect(self) -> None:
