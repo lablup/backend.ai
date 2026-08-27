@@ -24,11 +24,6 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.types import TaskID
-<<<<<<< HEAD
-=======
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
-from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
->>>>>>> 6f620093 (fix(BA-7505): provision the RBAC scope graph when cloning a vfolder (#14016))
 from ai.backend.common.dto.manager.v2.vfolder.request import CloneVFolderInput
 from ai.backend.common.dto.manager.vfolder import CloneVFolderReq
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
@@ -39,17 +34,19 @@ from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler
 from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_routes
 from ai.backend.manager.api.rest.vfolder.handler import VFolderHandler
 from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.processors import Processors
@@ -155,41 +152,24 @@ def _configure_clone_storage_mock(storage_manager: StorageSessionManager) -> Asy
     return mock_client
 
 
-async def _fetch_scope_graph(
-    db_engine: SAEngine, vfolder_name: str, owner_id: uuid.UUID
-) -> tuple[int, int]:
-    """Count the vfolder's own virtual scope node and its memberships in the owner's scope."""
-    scopes = VirtualScopeRow.__table__
-    memberships = EntityMembershipRow.__table__
+async def _fetch_scope_associations(
+    db_engine: SAEngine, vfolder_name: str
+) -> list[sa.engine.Row[Any]]:
+    """Read the RBAC scope associations recorded for a vfolder, by name."""
+    assoc = AssociationScopesEntitiesRow.__table__
     async with db_engine.begin() as conn:
         vfolder_id = (
             await conn.execute(sa.select(vfolders.c.id).where(vfolders.c.name == vfolder_name))
         ).scalar_one()
-        own_nodes = (
+        rows = (
             await conn.execute(
-                sa.select(sa.func.count())
-                .select_from(scopes)
-                .where(
-                    scopes.c.scope_type == VFOLDER_ENTITY_TYPE,
-                    scopes.c.scope_id == vfolder_id,
+                sa.select(assoc).where(
+                    assoc.c.entity_type == EntityType.VFOLDER,
+                    assoc.c.entity_id == str(vfolder_id),
                 )
             )
-        ).scalar_one()
-        owner_memberships = (
-            await conn.execute(
-                sa.select(sa.func.count())
-                .select_from(
-                    memberships.join(scopes, scopes.c.id == memberships.c.virtual_scope_id)
-                )
-                .where(
-                    memberships.c.entity_type == VFOLDER_ENTITY_TYPE,
-                    memberships.c.entity_id == vfolder_id,
-                    scopes.c.scope_type == USER_SCOPE_TYPE,
-                    scopes.c.scope_id == owner_id,
-                )
-            )
-        ).scalar_one()
-    return own_nodes, owner_memberships
+        ).fetchall()
+    return list(rows)
 
 
 @pytest.fixture()
@@ -462,14 +442,14 @@ class TestVFolderCloneV2PolicyCheck:
 
 
 # ---------------------------------------------------------------------------
-# RBAC scope graph on the clone target
+# RBAC scope association on the clone target
 # ---------------------------------------------------------------------------
 
 
-class TestVFolderCloneScopeProvisioning:
-    """A cloned vfolder must enter the RBAC graph under its owner, like a created one."""
+class TestVFolderCloneScopeAssociation:
+    """A cloned vfolder must be bound to the requester's user scope, like a created one."""
 
-    async def test_clone_provisions_owner_scope_graph(
+    async def test_clone_registers_user_scope_association(
         self,
         admin_registry: BackendAIClientRegistry,
         admin_user_fixture: UserFixtureData,
@@ -477,22 +457,22 @@ class TestVFolderCloneScopeProvisioning:
         cloneable_user_vfolder: VFolderFixtureData,
         storage_manager: StorageSessionManager,
     ) -> None:
-        """v1 clone gives the target its own scope node and membership in the requester's."""
+        """v1 clone writes an auto edge from the requester's user scope to the target."""
         _configure_clone_storage_mock(storage_manager)
 
-        target_name = "cloned-scope-v1"
+        target_name = "cloned-assoc-v1"
         await admin_registry.vfolder.clone(
             cloneable_user_vfolder["name"],
             CloneVFolderReq(target_name=target_name),
         )
 
-        own_nodes, owner_memberships = await _fetch_scope_graph(
-            db_engine, target_name, admin_user_fixture.user_uuid
-        )
-        assert own_nodes == 1
-        assert owner_memberships == 1
+        rows = await _fetch_scope_associations(db_engine, target_name)
+        assert len(rows) == 1
+        assert rows[0].scope_type == ScopeType.USER
+        assert rows[0].scope_id == str(admin_user_fixture.user_uuid)
+        assert rows[0].relation_type == RelationType.AUTO
 
-    async def test_clone_v2_provisions_owner_scope_graph(
+    async def test_clone_v2_registers_user_scope_association(
         self,
         admin_v2_registry: V2ClientRegistry,
         admin_user_fixture: UserFixtureData,
@@ -500,17 +480,17 @@ class TestVFolderCloneScopeProvisioning:
         cloneable_user_vfolder: VFolderFixtureData,
         storage_manager: StorageSessionManager,
     ) -> None:
-        """v2 clone gives the target its own scope node and membership in the requester's."""
+        """v2 clone writes an auto edge from the requester's user scope to the target."""
         _configure_clone_storage_mock(storage_manager)
 
-        target_name = "cloned-scope-v2"
+        target_name = "cloned-assoc-v2"
         await admin_v2_registry.vfolder.clone(
             cloneable_user_vfolder["id"],
             CloneVFolderInput(name=target_name),
         )
 
-        own_nodes, owner_memberships = await _fetch_scope_graph(
-            db_engine, target_name, admin_user_fixture.user_uuid
-        )
-        assert own_nodes == 1
-        assert owner_memberships == 1
+        rows = await _fetch_scope_associations(db_engine, target_name)
+        assert len(rows) == 1
+        assert rows[0].scope_type == ScopeType.USER
+        assert rows[0].scope_id == str(admin_user_fixture.user_uuid)
+        assert rows[0].relation_type == RelationType.AUTO
