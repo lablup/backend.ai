@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
@@ -18,6 +17,7 @@ from ai.backend.manager.data.auth.login_session_types import (
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    IPAddressColumn,
     StrEnumType,
 )
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
@@ -109,7 +109,7 @@ class LoginHistoryRow(Base):
     fail_reason: Mapped[str | None] = mapped_column("fail_reason", sa.Text, nullable=True)
     # The address of the request that produced this record, not of the session it closes:
     # an eviction or an admin revocation carries the address of whoever triggered it.
-    client_ip: Mapped[str | None] = mapped_column("client_ip", pgsql.INET, nullable=True)
+    client_ip: Mapped[str | None] = mapped_column("client_ip", IPAddressColumn, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),

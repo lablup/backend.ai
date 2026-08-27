@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 from typing import override
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.audit_log import AuditLogID
@@ -17,6 +16,7 @@ from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    IPAddressColumn,
     StrEnumType,
 )
 
@@ -75,7 +75,7 @@ class AuditLogRow(Base):
     duration: Mapped[timedelta | None] = mapped_column("duration", sa.Interval, nullable=True)
     # The address of the request that produced this record, masked per the client IP
     # masking policy. NULL when the policy records none, or the address was unusable.
-    client_ip: Mapped[str | None] = mapped_column("client_ip", pgsql.INET, nullable=True)
+    client_ip: Mapped[str | None] = mapped_column("client_ip", IPAddressColumn, nullable=True)
 
     status: Mapped[OperationStatus] = mapped_column(
         "status",
