@@ -235,9 +235,8 @@ services:
       - half
     ports:
       - "4000:4000"
-    command: ["supergraph"]
+    command: ["supergraph", "--host", "0.0.0.0"]
     environment:
-      - HOST=0.0.0.0
       - PORT=4000
     configs:
       - source: supergraph_schema
