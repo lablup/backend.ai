@@ -16,6 +16,7 @@ from collections.abc import (
     AsyncIterator,
     Callable,
     Coroutine,
+    Generator,
     Iterable,
     Mapping,
     Sequence,
@@ -28,6 +29,7 @@ from pprint import pformat, pprint
 from typing import (
     Any,
     ClassVar,
+    Final,
     Literal,
     cast,
 )
@@ -103,6 +105,8 @@ from ai.backend.common.metrics.http import (
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
+from ai.backend.common.process.crashdump import enable_crash_dump
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
@@ -156,6 +160,9 @@ from .types import (
 from .utils import get_subnet_ip
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+_CRASH_DUMP_DIR_NAME: Final[str] = "crash-dumps"
+_NUM_WORKERS: Final[int] = 1
 
 
 def collect_error(meth: Callable[..., Any]) -> Callable[..., Any]:
@@ -1291,6 +1298,10 @@ async def server_main_logwrapper(
     setproctitle(f"backend.ai: agent worker-{pidx}")
     local_cfg: AgentUnifiedConfig = _args[0]
     log_endpoint = _args[1]
+    child_statuses: Sequence[ChildStatus] = _args[2]
+    child_status = child_statuses[pidx]
+    child_status.publish_pid()
+    enable_crash_dump(local_cfg.agent_common.var_base_path / _CRASH_DUMP_DIR_NAME, f"worker-{pidx}")
     logger = Logger(
         local_cfg.logging,
         is_master=False,
@@ -1304,6 +1315,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, _args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc(file=sys.stderr)
 
@@ -1800,8 +1812,28 @@ def main(
             with logger:
                 ns = server_config.etcd.namespace
                 setproctitle(f"backend.ai: agent {ns}")
+                enable_crash_dump(
+                    server_config.agent_common.var_base_path / _CRASH_DUMP_DIR_NAME,
+                    "supervisor",
+                )
                 log.info("Backend.AI Agent {0}", VERSION)
                 log.info("runtime: {0}", utils.env_info())
+
+                # Built here rather than at module scope: these allocate shared memory
+                # and a semaphore, which no other `ag` subcommand has any use for.
+                child_statuses = tuple(ChildStatus() for _ in range(_NUM_WORKERS))
+                child_exit_monitor = ChildExitMonitor(child_statuses)
+
+                @aiotools.main_context
+                def server_main_ctx() -> Generator[None, signal.Signals, None]:
+                    """Tear the supervisor down when a worker dies outside the shutdown
+                    path, so that the service manager sees a failed unit instead of a
+                    supervisor with no worker."""
+                    child_exit_monitor.start()
+                    try:
+                        yield
+                    finally:
+                        child_exit_monitor.disarm()
 
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if log_level == LogLevel.DEBUG:
@@ -1817,12 +1849,14 @@ def main(
                         runner = asyncio.run
                 aiotools.start_server(
                     server_main_logwrapper,
-                    num_workers=1,
-                    args=(server_config, log_endpoint),
+                    main_ctxmgr=server_main_ctx,
+                    num_workers=_NUM_WORKERS,
+                    args=(server_config, log_endpoint, child_statuses),
                     wait_timeout=5.0,
                     runner=runner,
                 )
                 log.info("exit.")
+                child_exit_monitor.raise_system_exit()
         finally:
             if server_config.agent_common.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
