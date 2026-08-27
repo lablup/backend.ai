@@ -79,7 +79,7 @@ pants lint --changed-since=origin/{base_branch}
    - **Title**: Conventional commit style with JIRA key as scope
      - Format: `type(BA-XXXX): description`
      - Example: `fix(BA-1234): resolve session cleanup race condition`
-     - Fixing code introduced earlier in this same, still-unreleased cycle, and it never reached a maintained release branch? Use `chore`, not `fix` — see backport table below and `changes/README.md` § Same-release fixes
+     - Fixing code introduced earlier in this unreleased cycle that never reached a maintained branch? Use `chore`, not `fix` — see step 3 below
    - **Body**: Use this template:
 
    ```markdown
@@ -126,7 +126,7 @@ pants lint --changed-since=origin/{base_branch}
    - Map from PR content:
      - New functionality → `feature`
      - Bug fix → `fix`
-     - Fix to code introduced earlier in this same, still-unreleased cycle, never shipped on a maintained release branch → `misc`, not `fix` (see `changes/README.md` § Same-release fixes; PR title uses `chore`, not `fix`)
+     - Fix to code introduced earlier in this unreleased cycle that never reached a maintained branch → `misc`, not `fix` (see `changes/README.md` § Same-release fixes)
      - Performance/refactoring → `enhance`
      - Breaking API change → `breaking`
      - Test-only change → `test`
