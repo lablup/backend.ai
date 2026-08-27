@@ -225,7 +225,7 @@ Then, create a systemd service file at
    KillMode=process
    KillSignal=SIGTERM
    PrivateTmp=false
-   Restart=always
+   Restart=on-failure
    RestartSec=10
    LimitNOFILE=5242880
    LimitNPROC=131072
