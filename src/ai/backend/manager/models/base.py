@@ -30,7 +30,7 @@ import trafaret as t
 import yarl
 from dateutil.parser import isoparse
 from pydantic import BaseModel
-from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, INET, JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.orm import DeclarativeBase, registry
@@ -808,6 +808,39 @@ class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6
         if value is None:
             return None
         return ReadableCIDR(value)
+
+
+_INETValue = (
+    str
+    | ipaddress.IPv4Address
+    | ipaddress.IPv6Address
+    | ipaddress.IPv4Interface
+    | ipaddress.IPv6Interface
+)
+
+
+class IPAddressColumn(TypeDecorator[str]):
+    """
+    A column type keeping an ``inet`` value as a string on both sides.
+
+    The driver decodes ``inet`` into an ``ipaddress`` object, while the callers of
+    these columns store and read plain strings.
+    """
+
+    impl = INET
+    cache_ok = True
+
+    @override
+    def process_bind_param(self, value: _INETValue | None, _dialect: Dialect) -> str | None:
+        if value is None:
+            return None
+        return str(value)
+
+    @override
+    def process_result_value(self, value: _INETValue | None, _dialect: Dialect) -> str | None:
+        if value is None:
+            return None
+        return str(value)
 
 
 class PermissionListColumn(TypeDecorator[set[AbstractPermission]]):
