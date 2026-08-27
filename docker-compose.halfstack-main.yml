@@ -235,7 +235,10 @@ services:
       - half
     ports:
       - "4000:4000"
-    command: ["supergraph"]
+    # Hive Gateway defaults --host to 127.0.0.1 when os.release() contains "microsoft",
+    # which is true inside a container on a WSL2 kernel. Bind explicitly; the HOST env
+    # var is not read by the CLI (only PORT is).
+    command: ["supergraph", "--host", "0.0.0.0"]
     environment:
       - HOST=0.0.0.0
       - PORT=4000
