@@ -1403,6 +1403,20 @@ class ResourceSlotEntry(BackendAISchema):
         """
         return ResourceSlot({e.resource_type: Decimal(e.quantity) for e in entries})
 
+    @classmethod
+    def inputs_to_resource_slot(cls, entries: Sequence[ResourceSlotEntry]) -> ResourceSlot:
+        """Collapse a user-supplied entry list into the legacy ``ResourceSlot``.
+
+        Unlike :meth:`to_resource_slot`, quantities are parsed with the tolerance
+        ``ResourceSlot.from_user_input`` gives, so ``"4g"`` is accepted.
+        """
+        try:
+            return ResourceSlot.from_user_input(
+                {e.resource_type: e.quantity for e in entries}, None
+            )
+        except ValueError as e:
+            raise InvalidResourceSlotQuantity(extra_msg=str(e)) from e
+
 
 class ResourceSlotState(enum.StrEnum):
     OCCUPIED = "occupied"

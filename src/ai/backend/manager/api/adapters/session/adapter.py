@@ -77,6 +77,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.common.types import ResourceSlotEntry as DataResourceSlotEntry
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
@@ -264,9 +265,7 @@ class SessionAdapter(BaseAdapter):
         parsed_entries = []
         for e in input.resource_entries:
             parsed_entries.append(
-                DataResourceSlotEntry(
-                    resource_type=ResourceSlotName(e.resource_type), quantity=e.quantity
-                )
+                DataResourceSlotEntry(resource_type=e.resource_type, quantity=e.quantity)
             )
         requested_slots = DataResourceSlotEntry.inputs_to_resource_slot(parsed_entries)
         resource_entries = []
