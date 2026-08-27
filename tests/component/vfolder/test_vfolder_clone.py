@@ -35,13 +35,18 @@ from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_
 from ai.backend.manager.api.rest.vfolder.handler import VFolderHandler
 from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.processors import Processors
@@ -145,6 +150,34 @@ def _configure_clone_storage_mock(storage_manager: StorageSessionManager) -> Asy
     mock_client.clone_folder.return_value = clone_response
 
     return mock_client
+
+
+async def _fetch_scope_associations(
+    db_engine: SAEngine, vfolder_name: str
+) -> list[sa.engine.Row[Any]]:
+    """Read the RBAC scope associations recorded for a vfolder, by name."""
+    assoc = AssociationScopesEntitiesRow.__table__
+    async with db_engine.begin() as conn:
+        vfolder_id = (
+            await conn.execute(sa.select(vfolders.c.id).where(vfolders.c.name == vfolder_name))
+        ).scalar_one()
+        rows = (
+            await conn.execute(
+                sa.select(assoc).where(
+                    assoc.c.entity_type == EntityType.VFOLDER,
+                    assoc.c.entity_id == str(vfolder_id),
+                )
+            )
+        ).fetchall()
+    return list(rows)
+
+
+@pytest.fixture()
+async def cloneable_user_vfolder(
+    vfolder_factory: VFolderFactory,
+) -> VFolderFixtureData:
+    """A cloneable user-owned vfolder as the clone source."""
+    return await vfolder_factory(name="user-source-clone-rbac", cloneable=True)
 
 
 @pytest.fixture()
@@ -406,3 +439,58 @@ class TestVFolderCloneV2PolicyCheck:
             CloneVFolderInput(name="cloned-v2-should-succeed"),
         )
         assert result.vfolder.metadata.name == "cloned-v2-should-succeed"
+
+
+# ---------------------------------------------------------------------------
+# RBAC scope association on the clone target
+# ---------------------------------------------------------------------------
+
+
+class TestVFolderCloneScopeAssociation:
+    """A cloned vfolder must be bound to the requester's user scope, like a created one."""
+
+    async def test_clone_registers_user_scope_association(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        admin_user_fixture: UserFixtureData,
+        db_engine: SAEngine,
+        cloneable_user_vfolder: VFolderFixtureData,
+        storage_manager: StorageSessionManager,
+    ) -> None:
+        """v1 clone writes an auto edge from the requester's user scope to the target."""
+        _configure_clone_storage_mock(storage_manager)
+
+        target_name = "cloned-assoc-v1"
+        await admin_registry.vfolder.clone(
+            cloneable_user_vfolder["name"],
+            CloneVFolderReq(target_name=target_name),
+        )
+
+        rows = await _fetch_scope_associations(db_engine, target_name)
+        assert len(rows) == 1
+        assert rows[0].scope_type == ScopeType.USER
+        assert rows[0].scope_id == str(admin_user_fixture.user_uuid)
+        assert rows[0].relation_type == RelationType.AUTO
+
+    async def test_clone_v2_registers_user_scope_association(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        admin_user_fixture: UserFixtureData,
+        db_engine: SAEngine,
+        cloneable_user_vfolder: VFolderFixtureData,
+        storage_manager: StorageSessionManager,
+    ) -> None:
+        """v2 clone writes an auto edge from the requester's user scope to the target."""
+        _configure_clone_storage_mock(storage_manager)
+
+        target_name = "cloned-assoc-v2"
+        await admin_v2_registry.vfolder.clone(
+            cloneable_user_vfolder["id"],
+            CloneVFolderInput(name=target_name),
+        )
+
+        rows = await _fetch_scope_associations(db_engine, target_name)
+        assert len(rows) == 1
+        assert rows[0].scope_type == ScopeType.USER
+        assert rows[0].scope_id == str(admin_user_fixture.user_uuid)
+        assert rows[0].relation_type == RelationType.AUTO
