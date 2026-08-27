@@ -132,8 +132,10 @@ class TestMonitoringValkeyClientConnectRetry:
         assert exc_info.value is failure
         assert operation.connect_count == _CONNECT_MAX_ATTEMPTS
         assert len(recorded_delays) == _CONNECT_MAX_ATTEMPTS - 1
-        # No monitor task is left behind after a failed startup.
+        # No monitor task and no open connection are left behind.
         assert monitor.connect_count == 0
+        assert not operation.connected
+        assert not monitor.connected
 
     async def test_healthy_connect_does_not_sleep(
         self,
@@ -150,7 +152,7 @@ class TestMonitoringValkeyClientConnectRetry:
             assert monitor.connect_count == 1
             assert recorded_delays == []
 
-    async def test_retry_does_not_reconnect_the_operation_client(
+    async def test_retry_closes_the_half_connected_operation_client(
         self,
         recorded_delays: list[float],
     ) -> None:
@@ -161,11 +163,29 @@ class TestMonitoringValkeyClientConnectRetry:
         async with _client(operation, monitor) as client:
             await client.connect()
 
-            # The already-connected operation client is not redialed on retry.
-            assert operation.connect_count == 1
-            assert operation.disconnect_count == 0
-            assert monitor.connect_count == 3
+            # Each failed attempt drops the operation client that did connect,
+            # so a retry never stacks a second GLIDE connection on top of it.
+            assert operation.disconnect_count == 2
+            assert operation.connect_count == 3
+            assert operation.connected
             assert recorded_delays == [1.0, 2.0]
+
+    async def test_exhausted_monitor_retries_leave_nothing_open(
+        self,
+        recorded_delays: list[float],
+    ) -> None:
+        """The operation client must not outlive a connect() that ultimately raises."""
+        operation = FakeValkeyClient()
+        monitor = FakeValkeyClient(fail_times=99)
+
+        async with _client(operation, monitor) as client:
+            with pytest.raises(ClientNotConnectedError):
+                await client.connect()
+
+        assert not operation.connected
+        assert not monitor.connected
+        assert operation.disconnect_count == _CONNECT_MAX_ATTEMPTS
+        assert client._monitor_task is None
 
     async def test_non_retryable_error_fails_fast(
         self,
@@ -199,4 +219,8 @@ class TestMonitoringValkeyClientConnectRetry:
 
         warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
         assert len(warnings) == 2
-        assert "retrying" in warnings[0].getMessage()
+        # The attempt number is named, and no attempt claims a retry that will
+        # not happen — RetryPolicy, not this log line, decides that.
+        assert "attempt 1/6" in warnings[0].getMessage()
+        assert "attempt 2/6" in warnings[1].getMessage()
+        assert "retrying" not in warnings[0].getMessage()

@@ -576,6 +576,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
     _reconnect_event: asyncio.Event
     _monitor_consecutive_failure_count: int
     _operation_failure_count: int
+    _connect_attempt: int
 
     def __init__(
         self,
@@ -594,6 +595,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._reconnect_event = asyncio.Event()
         self._monitor_consecutive_failure_count = 0
         self._operation_failure_count = 0
+        self._connect_attempt = 0
         self._closed = False
 
     @override
@@ -604,17 +606,43 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         A component may start before Valkey accepts commands (a cold boot, a Valkey
         restart), so the initial connection is retried with exponential backoff.
         """
+        self._connect_attempt = 0
         await self._connect_with_retry()
         self._monitor_task = asyncio.create_task(self._monitor_connection())
 
     @_connect_resilience.apply()
     async def _connect_with_retry(self) -> None:
+        self._connect_attempt += 1
+        connected = False
         try:
             await self._operation_client.connect()
             await self._monitor_client.connect()
+            connected = True
         except Exception as e:
-            log.warning("Valkey connection attempt failed, retrying: {}", e)
+            log.warning(
+                "Valkey connection failed (attempt {}/{}): {}",
+                self._connect_attempt,
+                _CONNECT_MAX_ATTEMPTS,
+                e,
+            )
             raise
+        finally:
+            if not connected:
+                await self._drop_half_open_connection()
+
+    async def _drop_half_open_connection(self) -> None:
+        """
+        Close whatever did connect, so a failed attempt leaves nothing behind.
+
+        Without this an operation client that connected before the monitor client
+        failed would outlive the raising connect() call, and no caller holds a
+        reference to close it.
+        """
+        for client in (self._monitor_client, self._operation_client):
+            try:
+                await client.disconnect()
+            except Exception as e:
+                log.debug("Error while dropping a half-open Valkey connection: {}", e)
 
     @override
     async def disconnect(self) -> None:
