@@ -182,6 +182,31 @@ async def test_body_parameter(aiohttp_client: Any) -> None:
     assert data["age"] == 30
 
 
+class TestRawBodyHandler:
+    @api_handler
+    async def handle_user(self, user: BodyParam[TestPostUserModel]) -> APIResponse:
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=TestPostUserResponse(
+                name=str((user.raw or {}).get("nickname")), age=len(user.raw or {})
+            ),
+        )
+
+
+async def test_raw_body_keeps_the_fields_the_model_drops(aiohttp_client: Any) -> None:
+    handler = TestRawBodyHandler()
+    app = web.Application()
+    app.router.add_route("POST", "/test", handler.handle_user)
+
+    client = await aiohttp_client(app)
+    resp = await client.post("/test", json={"name": "John", "age": 30, "nickname": "Johnny"})
+
+    assert resp.status == HTTPStatus.OK
+    data = await resp.json()
+    assert data["name"] == "Johnny"
+    assert data["age"] == 3
+
+
 class TestSearchQueryModel(BaseRequestModel):
     search: str
     page: int | None = Field(default=1)

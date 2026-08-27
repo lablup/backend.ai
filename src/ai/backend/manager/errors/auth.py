@@ -45,6 +45,19 @@ class InsufficientPrivilege(BackendAIError, web.HTTPForbidden):
         )
 
 
+class InvalidUserLookupData(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-user-lookup-data"
+    error_title = "The authentication plugin returned lookup data naming no account."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PLUGIN,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+        )
+
+
 class InvalidAuthParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-auth-params"
     error_title = "Missing or invalid authorization parameters."

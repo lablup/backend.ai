@@ -101,6 +101,7 @@ from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.notification import NotificationCenter
+from ai.backend.manager.plugin.auth import AuthPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.reporters.base import AbstractReporter
 from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
@@ -173,6 +174,7 @@ class ProcessingInput:
     background_task_manager: BackgroundTaskManager
     error_monitor: ErrorPluginContext
     hook_plugin_ctx: HookPluginContext
+    auth_plugin_ctx: AuthPluginContext
     deployment_controller: DeploymentController
     route_controller: RouteController
     agent_cache: AgentRPCCache
@@ -362,6 +364,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             idle_checker_host=setup_input.idle_checker_host,
             event_dispatcher=event_dispatcher,
             hook_plugin_ctx=setup_input.hook_plugin_ctx,
+            auth_plugin_ctx=setup_input.auth_plugin_ctx,
             scheduling_controller=setup_input.scheduling_controller,
             deployment_controller=setup_input.deployment_controller,
             route_controller=setup_input.route_controller,

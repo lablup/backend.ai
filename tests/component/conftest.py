@@ -1438,7 +1438,9 @@ def auth_processors(
 ) -> AuthProcessors:
     """Real AuthProcessors wired with real AuthService and AuthRepository."""
     repo = AuthRepository(
-        database_engine, KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN)
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
     user_repository = UserRepository(
@@ -1454,6 +1456,7 @@ def auth_processors(
         storage_manager,
     )
     service = AuthService(
+        auth_plugin_ctx=MagicMock(plugin=None),
         hook_plugin_ctx=hook_plugin_ctx,
         auth_repository=repo,
         config_provider=config_provider,

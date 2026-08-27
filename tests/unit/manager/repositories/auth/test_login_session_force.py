@@ -37,6 +37,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import AuthDBSource
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
@@ -82,6 +83,7 @@ class TestLoginSessionForce:
     async def auth_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AuthDBSource:
         return AuthDBSource(
             db_with_cleanup,
+            V2DBOpsProvider(db_with_cleanup),
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
 
@@ -247,7 +249,7 @@ class TestLoginSessionForce:
             email=sample_user.email,
             target_password_info=self._make_password_info(),
         )
-        assert cred_result.user["uuid"] == sample_user.user_id
+        assert cred_result.user.uuid == sample_user.user_id
         assert len(cred_result.active_sessions) == 0
 
         # Step 2: create login session
@@ -280,7 +282,7 @@ class TestLoginSessionForce:
             email=sample_user.email,
             target_password_info=self._make_password_info(),
         )
-        assert cred_result.user["uuid"] == sample_user.user_id
+        assert cred_result.user.uuid == sample_user.user_id
         assert len(cred_result.active_sessions) == 0
 
         # Step 2: create login session (no active sessions to evict)
@@ -317,7 +319,7 @@ class TestLoginSessionForce:
             email=sample_user.email,
             target_password_info=self._make_password_info(),
         )
-        assert cred_result.user["uuid"] == user_id
+        assert cred_result.user.uuid == user_id
         assert len(cred_result.active_sessions) == 1
 
         # Step 2: evict existing tokens via the dedicated repository call, then create
@@ -399,7 +401,7 @@ class TestLoginSessionForce:
             email=sample_user.email,
             target_password_info=self._make_password_info(),
         )
-        assert cred_result.user["uuid"] == sample_user.user_id
+        assert cred_result.user.uuid == sample_user.user_id
         assert len(cred_result.active_sessions) == 0
 
         result2 = await auth_db_source.create_login_session(

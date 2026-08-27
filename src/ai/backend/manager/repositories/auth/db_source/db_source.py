@@ -14,11 +14,13 @@ from sqlalchemy.dialects import postgresql as pgsql
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError, UserNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
     LoginSessionStatus,
@@ -34,9 +36,11 @@ from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
+from ai.backend.manager.models.keypair.lookups import KeypairAccessKeyUserLookup
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import generate_keypair_data, keypairs
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
+from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
@@ -46,9 +50,14 @@ from ai.backend.manager.models.user import (
     users,
 )
 from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.lookups import UserEmailLookup, UserNameLookup
+from ai.backend.manager.models.user.queriers import UserAuthQuerier
+from ai.backend.manager.models.user.row import user_row_to_auth_data
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.rbac.provider import FullUserCreation, RBACOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.user.creators import UserScopeCreation
 from ai.backend.manager.secret.pool import KeyProviderPool
 
@@ -80,7 +89,7 @@ class LoginSessionCreationResult:
 
 @dataclass(frozen=True)
 class CredentialVerificationResult:
-    user: sa.RowMapping
+    user: UserData
     active_sessions: list[ActiveSessionInfo]  # ordered by created_at ASC
 
 
@@ -91,11 +100,18 @@ class AuthDBSource:
     """
 
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
     _rbac_ops_provider: RBACOpsProvider
     _key_provider_pool: KeyProviderPool
 
-    def __init__(self, db: ExtendedAsyncSAEngine, key_provider_pool: KeyProviderPool) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
         self._db = db
+        self._v2_ops = v2_ops_provider
         self._rbac_ops_provider = RBACOpsProvider(db)
         self._key_provider_pool = key_provider_pool
 
@@ -248,27 +264,7 @@ class AuthDBSource:
             await conn.execute(query)
 
     def _user_row_to_data(self, row: UserRow | sa.Row[Any]) -> UserData:
-        """Convert UserRow to UserData."""
-        return UserData(
-            uuid=row.uuid,
-            username=row.username,
-            email=row.email,
-            password=row.password,
-            need_password_change=row.need_password_change or False,
-            full_name=row.full_name,
-            description=row.description,
-            is_active=row.status == UserStatus.ACTIVE,
-            status=row.status or UserStatus.ACTIVE,
-            status_info=row.status_info,
-            created_at=row.created_at,
-            modified_at=row.updated_at,
-            password_changed_at=row.password_changed_at,
-            domain_name=row.domain_name or "",
-            role=row.role or UserRole.USER,
-            integration_name=row.integration_id,  # DB column is integration_id
-            resource_policy=row.resource_policy,
-            sudo_session_enabled=row.sudo_session_enabled,
-        )
+        return user_row_to_auth_data(row)
 
     @auth_db_source_resilience.apply()
     async def fetch_user_info_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
@@ -389,6 +385,37 @@ class AuthDBSource:
                 )
             )
 
+    async def _fetch_user_by_lookup(self, lookup: DataLookup[Any, UserID]) -> UserData:
+        """Resolve a lookup key into the account it names, in one read transaction."""
+        async with self._v2_ops.read_ops() as r:
+            user_id = await r.lookup_entity_id(lookup)
+            if user_id is None:
+                raise UserNotFound("No account matches the given lookup data.")
+            return await self._fetch_user_by_id(r, user_id)
+
+    async def _fetch_user_by_id(self, r: V2ReadOps, user_id: UserID) -> UserData:
+        user = await r.query_data(UserAuthQuerier(user_id=user_id))
+        if user is None:
+            raise UserNotFound("No account matches the given lookup data.")
+        return user
+
+    @auth_db_source_resilience.apply()
+    async def fetch_user_by_uuid(self, user_id: UserID) -> UserData:
+        async with self._v2_ops.read_ops() as r:
+            return await self._fetch_user_by_id(r, user_id)
+
+    @auth_db_source_resilience.apply()
+    async def fetch_user_by_email(self, email: str) -> UserData:
+        return await self._fetch_user_by_lookup(UserEmailLookup(email=email))
+
+    @auth_db_source_resilience.apply()
+    async def fetch_user_by_username(self, username: str) -> UserData:
+        return await self._fetch_user_by_lookup(UserNameLookup(username=username))
+
+    @auth_db_source_resilience.apply()
+    async def fetch_user_by_access_key(self, access_key: AccessKey) -> UserData:
+        return await self._fetch_user_by_lookup(KeypairAccessKeyUserLookup(access_key=access_key))
+
     @auth_db_source_resilience.apply()
     async def verify_credential(
         self,
@@ -444,7 +471,7 @@ class AuthDBSource:
 
             await conn.commit()
             return CredentialVerificationResult(
-                user=row._mapping,
+                user=self._user_row_to_data(row),
                 active_sessions=active_sessions,
             )
 

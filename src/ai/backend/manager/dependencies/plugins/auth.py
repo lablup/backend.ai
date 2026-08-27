@@ -1,0 +1,51 @@
+from __future__ import annotations
+
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import override
+
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.plugin.auth import AuthPluginContext
+
+from .base import PluginDependency, PluginsInput
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class AuthPluginDependency(PluginDependency[AuthPluginContext]):
+    """Provides AuthPluginContext lifecycle management.
+
+    At most one authentication plugin may be loaded; a second one fails the stage.
+    """
+
+    @property
+    @override
+    def stage_name(self) -> str:
+        return "auth-plugin"
+
+    @asynccontextmanager
+    @override
+    async def provide(self, setup_input: PluginsInput) -> AsyncIterator[AuthPluginContext]:
+        """Initialize and provide an AuthPluginContext.
+
+        Args:
+            setup_input: Plugins input containing etcd and config
+
+        Yields:
+            Initialized AuthPluginContext
+
+        Raises:
+            ConfigurationError: If more than one authentication plugin is discovered
+        """
+        ctx = AuthPluginContext(setup_input.etcd, setup_input.local_config)
+        await ctx.init(
+            context=setup_input.init_context,
+            allowlist=setup_input.allowed_plugins,
+            blocklist=setup_input.disabled_plugins,
+        )
+        log.info("AuthPluginContext initialized with plugins: {}", list(ctx.plugins.keys()))
+        try:
+            yield ctx
+        finally:
+            await ctx.cleanup()

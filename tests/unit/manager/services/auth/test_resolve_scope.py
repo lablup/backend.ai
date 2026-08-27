@@ -1,5 +1,5 @@
 import uuid
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -37,6 +37,7 @@ def auth_service(
     mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
+        auth_plugin_ctx=MagicMock(plugin=None),
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,

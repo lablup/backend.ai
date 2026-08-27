@@ -322,6 +322,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 background_task_manager=system.background_task_manager,
                 error_monitor=monitoring.error_monitor,
                 hook_plugin_ctx=plugins.hook_plugin_ctx,
+                auth_plugin_ctx=plugins.auth_plugin_ctx,
                 deployment_controller=agents.deployment_controller,
                 route_controller=agents.route_controller,
                 agent_cache=components.agent_cache,

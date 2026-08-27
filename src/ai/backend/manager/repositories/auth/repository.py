@@ -6,13 +6,16 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.auth.types import (
     GroupMembershipData,
     UserCreationData,
+    UserData,
 )
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -25,6 +28,7 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     CredentialVerificationResult,
     LoginSessionCreationResult,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 auth_repository_resilience = Resilience(
@@ -37,8 +41,13 @@ auth_repository_resilience = Resilience(
 class AuthRepository:
     _db_source: AuthDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine, key_provider_pool: KeyProviderPool) -> None:
-        self._db_source = AuthDBSource(db, key_provider_pool)
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
+        self._db_source = AuthDBSource(db, v2_ops_provider, key_provider_pool)
 
     @auth_repository_resilience.apply()
     async def get_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
@@ -161,6 +170,19 @@ class AuthRepository:
         return await self._db_source.verify_credential_without_migration(
             domain_name, email, password
         )
+
+    async def find_user_by_uuid(self, user_id: UserID) -> UserData:
+        """The account a lookup key names; raises UserNotFound if absent."""
+        return await self._db_source.fetch_user_by_uuid(user_id)
+
+    async def find_user_by_email(self, email: str) -> UserData:
+        return await self._db_source.fetch_user_by_email(email)
+
+    async def find_user_by_username(self, username: str) -> UserData:
+        return await self._db_source.fetch_user_by_username(username)
+
+    async def find_user_by_access_key(self, access_key: AccessKey) -> UserData:
+        return await self._db_source.fetch_user_by_access_key(access_key)
 
     @auth_repository_resilience.apply()
     async def default_keypair(self, user_uuid: UUID) -> KeyPairData:

@@ -98,10 +98,12 @@ def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
 class BodyParam[TRequestModel: BaseRequestModel]:
     _model: type[TRequestModel]
     _parsed: TRequestModel | None
+    raw: Mapping[str, Any] | None
 
     def __init__(self, model: type[TRequestModel]) -> None:
         self._model = model
         self._parsed: TRequestModel | None = None
+        self.raw: Mapping[str, Any] | None = None
 
     @property
     def parsed(self) -> TRequestModel:
@@ -112,7 +114,8 @@ class BodyParam[TRequestModel: BaseRequestModel]:
         return self._parsed
 
     @convert_validation_error
-    def from_body(self, json_body: str) -> Self:
+    def from_body(self, json_body: Mapping[str, Any]) -> Self:
+        self.raw = json_body
         self._parsed = self._model.model_validate(json_body)
         return self
 

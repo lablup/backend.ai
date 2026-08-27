@@ -26,9 +26,12 @@ class TestPluginsComposer:
         mock_network = MagicMock(name="network_ctx")
         mock_hook = MagicMock(name="hook_ctx")
         mock_event = MagicMock(name="event_ctx")
+        mock_auth = MagicMock(name="auth_ctx")
 
         mock_stack = MagicMock()
-        mock_stack.enter_dependency = AsyncMock(side_effect=[mock_network, mock_hook, mock_event])
+        mock_stack.enter_dependency = AsyncMock(
+            side_effect=[mock_network, mock_hook, mock_event, mock_auth]
+        )
 
         composer = PluginsComposer()
 
@@ -37,8 +40,9 @@ class TestPluginsComposer:
             assert resources.network_plugin_ctx is mock_network
             assert resources.hook_plugin_ctx is mock_hook
             assert resources.event_dispatcher_plugin_ctx is mock_event
+            assert resources.auth_plugin_ctx is mock_auth
 
-        assert mock_stack.enter_dependency.call_count == 3
+        assert mock_stack.enter_dependency.call_count == 4
 
     async def test_compose_preserves_initialization_order(self) -> None:
         """Verify plugins are initialized in the correct order."""
@@ -61,4 +65,5 @@ class TestPluginsComposer:
             "NetworkPluginDependency",
             "HookPluginDependency",
             "EventDispatcherPluginDependency",
+            "AuthPluginDependency",
         ]

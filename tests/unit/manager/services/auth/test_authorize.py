@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from aiohttp import web
+from multidict import CIMultiDict, CIMultiDictProxy, MultiDict, MultiDictProxy
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.data.entity.resource_policy import (
@@ -15,6 +16,7 @@ from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookRes
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
+from ai.backend.manager.data.auth.request import HTTPRequestData
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
@@ -36,6 +38,16 @@ from ai.backend.manager.services.auth.actions.authorize import (
 from ai.backend.manager.services.auth.service import AuthService
 
 _DEFAULT_USER_UUID = UUID("12345678-1234-5678-1234-567812345678")
+
+
+def _empty_request_data() -> HTTPRequestData:
+    """A request with nothing an auth plugin could read."""
+    return HTTPRequestData(
+        headers=CIMultiDictProxy(CIMultiDict()),
+        body=None,
+        cookies={},
+        query_params=MultiDictProxy(MultiDict()),
+    )
 
 
 @pytest.fixture
@@ -81,6 +93,7 @@ def auth_service(
     mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
+        auth_plugin_ctx=MagicMock(plugin=None),
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
@@ -175,6 +188,7 @@ async def test_authorize_success(
         email="test@example.com",
         password="correct_password",
         request=MagicMock(),
+        request_data=_empty_request_data(),
         stoken=None,
         client_type_id=uuid4(),
         otp=None,
@@ -202,6 +216,7 @@ async def test_authorize_invalid_token_type(
         email="test@example.com",
         password="password",
         request=MagicMock(),
+        request_data=_empty_request_data(),
         stoken=None,
         client_type_id=uuid4(),
         otp=None,
@@ -229,6 +244,7 @@ async def test_authorize_invalid_credentials(
         email="test@example.com",
         password="wrong_password",
         request=MagicMock(),
+        request_data=_empty_request_data(),
         stoken=None,
         client_type_id=uuid4(),
         otp=None,
@@ -251,6 +267,7 @@ async def test_authorize_with_hook_authorization(
         email="hook@example.com",
         password="any_password",
         request=MagicMock(),
+        request_data=_empty_request_data(),
         stoken=None,
         client_type_id=uuid4(),
         otp=None,
@@ -305,6 +322,7 @@ async def test_authorize_with_password_expiry(
         email="expired@example.com",
         password="old_password",
         request=MagicMock(),
+        request_data=_empty_request_data(),
         stoken=None,
         client_type_id=uuid4(),
         otp=None,
@@ -348,6 +366,7 @@ async def test_authorize_with_post_hook_response(
         email="test@example.com",
         password="password",
         request=MagicMock(),
+        request_data=_empty_request_data(),
         stoken=None,
         client_type_id=uuid4(),
         otp=None,
@@ -390,6 +409,7 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
         email="test@example.com",
         password="password",
         request=MagicMock(),
+        request_data=_empty_request_data(),
         stoken=None,
         client_type_id=uuid4(),
         otp=None,
@@ -447,6 +467,7 @@ async def test_authorize_force_invalidates_existing_sessions(
         email="test@example.com",
         password="password",
         request=MagicMock(),
+        request_data=_empty_request_data(),
         stoken=None,
         client_type_id=uuid4(),
         otp=None,
@@ -531,6 +552,7 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
             email="test@example.com",
             password="password",
             request=MagicMock(),
+            request_data=_empty_request_data(),
             stoken=None,
             client_type_id=uuid4(),
             otp=None,
