@@ -1738,25 +1738,35 @@ class VfolderRepository:
         task_id = clone_response.bgtask_id
 
         # Insert the new vfolder record. A clone target is always user-owned, and it
-        # goes through the entity creator so the RBAC scope association lands with the row.
-        async with self._v2_ops.write_ops() as w:
-            await w.create_entity(
-                VFolderCreator(
-                    id=target_folder_id.folder_id,
-                    name=vfolder_info.target_vfolder_name,
-                    domain_name=vfolder_info.domain_name,
-                    quota_scope_id=str(vfolder_info.target_quota_scope_id),
-                    host=vfolder_info.target_host,
-                    creator=vfolder_info.email,
-                    creator_id=vfolder_info.user_id,
-                    ownership_type=VFolderOwnershipType.USER,
-                    usage_mode=vfolder_info.usage_mode,
-                    permission=vfolder_info.permission,
-                    user=vfolder_info.user_id,
-                    group=None,
-                    unmanaged_path=None,
-                    cloneable=vfolder_info.cloneable,
-                )
+        # goes through the RBAC entity creator so the scope association lands with the row.
+        async with self._db.begin_session() as session:
+            spec = VFolderCreatorSpec(
+                id=target_folder_id.folder_id,
+                name=vfolder_info.target_vfolder_name,
+                domain_name=vfolder_info.domain_name,
+                quota_scope_id=str(vfolder_info.target_quota_scope_id),
+                host=vfolder_info.target_host,
+                creator=vfolder_info.email,
+                creator_id=vfolder_info.user_id,
+                ownership_type=VFolderOwnershipType.USER,
+                usage_mode=vfolder_info.usage_mode,
+                permission=vfolder_info.permission,
+                user=vfolder_info.user_id,
+                group=None,
+                unmanaged_path=None,
+                cloneable=vfolder_info.cloneable,
+            )
+            await execute_rbac_entity_creator(
+                session,
+                RBACEntityCreator(
+                    spec=spec,
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.USER,
+                        element_id=str(vfolder_info.user_id),
+                    ),
+                    additional_scope_refs=[],
+                ),
             )
 
         return task_id, target_folder_id.folder_id
