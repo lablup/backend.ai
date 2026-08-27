@@ -6,11 +6,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DOMAIN_SCOPE_TYPE, DomainID
 from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
@@ -41,6 +41,11 @@ class ExportUserScopeAction(BaseScopeAction):
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
 
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
+
 
 @dataclass
 class ExportProjectScopeAction(BaseScopeAction):
@@ -56,6 +61,11 @@ class ExportProjectScopeAction(BaseScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (PROJECT_ENTITY_TYPE,)
 
 
 @dataclass
@@ -73,6 +83,11 @@ class ExportDomainScopeAction(BaseScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (DOMAIN_ENTITY_TYPE,)
 
 
 @dataclass

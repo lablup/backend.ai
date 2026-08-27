@@ -19,6 +19,7 @@ from ai.backend.common.data.entity.fair_share import (
     USER_FAIR_SHARE_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.resource_group import (
+    RESOURCE_GROUP_ENTITY_TYPE,
     RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
 )
@@ -65,6 +66,11 @@ class DomainFairShareAction(BaseScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (RESOURCE_GROUP_ENTITY_TYPE,)
 
 
 @dataclass(frozen=True)
@@ -212,6 +218,11 @@ class ProjectFairShareAction(BaseScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (RESOURCE_GROUP_ENTITY_TYPE,)
 
 
 @dataclass(frozen=True)
@@ -361,6 +372,11 @@ class UserFairShareAction(BaseScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=self.resource_group_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (RESOURCE_GROUP_ENTITY_TYPE,)
 
 
 @dataclass(frozen=True)

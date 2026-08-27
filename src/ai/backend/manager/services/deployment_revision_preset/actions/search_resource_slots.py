@@ -46,6 +46,11 @@ class SearchPresetResourceSlotsAction(
         )
 
     @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (DEPLOYMENT_PRESET_ENTITY_TYPE,)
+
+    @override
     def operation_scopes(self) -> Sequence[OperationScope]:
         return (DeploymentPresetSlotOperationScope(preset_id=self.preset_id),)
 

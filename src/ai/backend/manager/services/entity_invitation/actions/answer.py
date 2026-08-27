@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.entity_invitation import (
     EntityInvitationID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
@@ -53,6 +53,11 @@ class _InviteeAnswerAction(BaseScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.invitee_user_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
 
 
 @dataclass

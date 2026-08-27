@@ -86,6 +86,11 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
 
     @override
     @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (SESSION_ENTITY_TYPE,)
+
+    @override
+    @classmethod
     def entity_type(cls) -> EntityType:
         return SESSION_ENTITY_TYPE
 

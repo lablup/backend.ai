@@ -5,8 +5,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
 from ai.backend.common.types import VFolderHostPermission
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.vfolder.actions.base import (
@@ -33,6 +33,11 @@ class SearchStorageHostPermissionsAction(VFolderScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
 
     @override
     @classmethod

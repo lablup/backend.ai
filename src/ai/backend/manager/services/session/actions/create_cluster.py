@@ -3,8 +3,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.common.types import AccessKey, SessionTypes
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
@@ -42,6 +42,11 @@ class CreateClusterAction(SessionScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (PROJECT_ENTITY_TYPE,)
 
     @override
     @classmethod

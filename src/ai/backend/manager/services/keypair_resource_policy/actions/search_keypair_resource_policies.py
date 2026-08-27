@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.resource_policy import (
     KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
@@ -39,6 +39,11 @@ class SearchKeypairResourcePoliciesAction(
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:

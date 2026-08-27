@@ -5586,6 +5586,11 @@ type EntityType implements Node {
 
   """The entity type, as a request names it."""
   name: String!
+
+  """
+  Added in 26.9.0. The scope types an operation on this entity type may be targeted at; `global` where the caller names the scope type, empty where no operation on it names a scope.
+  """
+  scopeTypes: [String!]!
 }
 
 """Added in 26.4.4. Entity reference parametrized by RBAC element type."""

@@ -2,8 +2,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.session.base import (
@@ -28,6 +28,11 @@ class MatchSessionsAction(SessionScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
 
     @override
     @classmethod

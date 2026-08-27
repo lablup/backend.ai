@@ -7,7 +7,7 @@ from typing import override
 from ai.backend.common.data.entity.app_config import APP_CONFIG_ENTITY_TYPE
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigFragmentData
@@ -54,6 +54,11 @@ class SearchAppConfigsAction(
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
 
     @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
+
+    @override
     def operation_scopes(self) -> Sequence[OperationScope]:
         return (
             VisibleAppConfigFragmentOperationScope(user_id=self.user_id, domain_id=self.domain_id),
@@ -91,6 +96,11 @@ class AnonymousSearchAppConfigsAction(
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
+        return ()
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
         return ()
 
     @override

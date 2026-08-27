@@ -8,6 +8,7 @@ from typing import override
 
 from ai.backend.common.data.entity.entity_invitation import ENTITY_INVITATION_ENTITY_TYPE
 from ai.backend.common.data.entity.types import (
+    GLOBAL_ENTITY_TYPE,
     EntityType,
     ScopeRef,
     ScopeType,
@@ -47,6 +48,11 @@ class CreateEntityInvitationAction(
     def scope_targets(self) -> Sequence[ScopeRef]:
         target = self.creator.target
         return (ScopeRef(scope_type=ScopeType(target.entity_type()), scope_id=target),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (GLOBAL_ENTITY_TYPE,)
 
     @override
     def to_creator(self) -> EntityInvitationCreator:

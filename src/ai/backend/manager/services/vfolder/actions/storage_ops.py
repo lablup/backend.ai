@@ -5,9 +5,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
 
@@ -153,6 +153,11 @@ class SearchHostsAction(VFolderScopeAction):
         if self.group_id is not None:
             return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.group_id),)
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (PROJECT_ENTITY_TYPE, USER_ENTITY_TYPE)
 
     @override
     @classmethod

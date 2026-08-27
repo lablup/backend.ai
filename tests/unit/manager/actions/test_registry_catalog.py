@@ -74,6 +74,7 @@ from ai.backend.common.data.entity.service_catalog import SERVICE_CATALOG_ENTITY
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
 from ai.backend.common.data.entity.session_template import SESSION_TEMPLATE_ENTITY_TYPE
 from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import GLOBAL_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder_invitation import VFOLDER_INVITATION_ENTITY_TYPE
@@ -389,6 +390,24 @@ def test_every_defined_v2_action_is_wired() -> None:
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())
 
     assert wired == defined
+
+
+def test_scope_actions_declare_the_scope_types_they_accept() -> None:
+    """`global` stands for a scope type the caller names, so nothing bounds it further.
+
+    Listing it beside a concrete type would claim both, which no reader can act on.
+    """
+    for cls in _concrete_v2_action_classes():
+        if not issubclass(cls, BaseScopeAction):
+            continue
+        scope_types = list(cls.available_scope_types())
+        assert len(set(scope_types)) == len(scope_types), (
+            f"{cls.__module__}.{cls.__qualname__} lists a scope type twice."
+        )
+        assert GLOBAL_ENTITY_TYPE not in scope_types or scope_types == [GLOBAL_ENTITY_TYPE], (
+            f"{cls.__module__}.{cls.__qualname__} lists {GLOBAL_ENTITY_TYPE} beside a "
+            "concrete scope type; declare one or the other."
+        )
 
 
 def test_action_names_follow_the_snake_case_convention() -> None:

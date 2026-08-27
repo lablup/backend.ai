@@ -603,6 +603,11 @@ class _SearchPresetsAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _Pres
 
     @classmethod
     @override
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (EntityType("domain"),)
+
+    @classmethod
+    @override
     def entity_type(cls) -> EntityType:
         return EntityType("role_preset")
 

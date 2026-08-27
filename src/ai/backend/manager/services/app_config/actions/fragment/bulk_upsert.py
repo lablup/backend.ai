@@ -5,12 +5,14 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.app_config import APP_CONFIG_FRAGMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
     ScopeRef,
     ScopeType,
 )
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.manager.actions.v2.ops.base import AtomicUpsertEntityOpsAction
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
@@ -43,6 +45,11 @@ class BulkUpsertAppConfigFragmentsAction(
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=ScopeType(self.owner.entity_type()), scope_id=self.owner),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (DOMAIN_ENTITY_TYPE, USER_ENTITY_TYPE)
 
     @override
     def to_upserters(self) -> Sequence[AppConfigFragmentUpserter]:

@@ -3,9 +3,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.vfolder.types import VFolderData
@@ -35,6 +35,11 @@ class CreateVFolderV2Action(VFolderScopeAction):
         if self.project_id is not None:
             return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (PROJECT_ENTITY_TYPE, USER_ENTITY_TYPE)
 
     @override
     @classmethod

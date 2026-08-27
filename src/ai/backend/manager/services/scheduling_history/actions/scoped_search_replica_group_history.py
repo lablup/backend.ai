@@ -62,6 +62,11 @@ class ScopedSearchReplicaGroupHistoryAction(BaseScopeAction):
 
     @override
     @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (DEPLOYMENT_ENTITY_TYPE,)
+
+    @override
+    @classmethod
     def entity_type(cls) -> EntityType:
         return DEPLOYMENT_ENTITY_TYPE
 

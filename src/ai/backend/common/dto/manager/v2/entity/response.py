@@ -16,6 +16,13 @@ class EntityTypeNode(BaseResponseModel):
     """One entity type the manager has operations wired for."""
 
     name: str = Field(description="The entity type, as a request names it")
+    scope_types: list[str] = Field(
+        description=(
+            "The scope types an operation on this entity type may be targeted at; "
+            "`global` where the caller names the scope type, empty where no operation "
+            "on it names a scope"
+        )
+    )
 
 
 class ListEntityTypesPayload(BaseResponseModel):

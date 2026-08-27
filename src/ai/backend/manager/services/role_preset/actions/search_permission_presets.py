@@ -43,6 +43,11 @@ class SearchRolePermissionPresetsAction(
         return (ScopeRef(scope_type=ScopeType(ROLE_PRESET_ENTITY_TYPE), scope_id=self.preset_id),)
 
     @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (ROLE_PRESET_ENTITY_TYPE,)
+
+    @override
     def operation_scopes(self) -> Sequence[OperationScope]:
         return (RolePresetPermissionOperationScope(preset_id=self.preset_id),)
 

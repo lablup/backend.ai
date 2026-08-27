@@ -7,7 +7,7 @@ from typing import (
 )
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
 from ai.backend.common.data.entity.vfolder_invitation import (
     VFOLDER_INVITATION_ENTITY_TYPE,
     VFolderInvitationID,
@@ -52,6 +52,11 @@ class VFolderInvitationScopeAction(BaseScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_uuid),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
 
 
 @dataclass

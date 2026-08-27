@@ -189,6 +189,11 @@ class SearchMyKeypairsAction(BaseScopeAction):
 
     @override
     @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (USER_ENTITY_TYPE,)
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 

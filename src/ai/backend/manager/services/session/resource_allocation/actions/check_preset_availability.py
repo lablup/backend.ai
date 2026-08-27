@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
 from ai.backend.common.data.entity.user import UserID
@@ -38,6 +38,11 @@ class CheckPresetAvailabilityAction(BaseScopeAction):
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
         return (ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id),)
+
+    @override
+    @classmethod
+    def available_scope_types(cls) -> Sequence[EntityType]:
+        return (PROJECT_ENTITY_TYPE,)
 
     @override
     @classmethod
