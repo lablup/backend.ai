@@ -194,13 +194,11 @@ class ResourcePresetDBSource:
 
     async def known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
         """
-        The system-wide registry of enabled resource slot types, in ``rank`` order.
+        The system-wide registry of enabled resource slot types.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            stmt = (
-                sa.select(ResourceSlotTypeRow.slot_name, ResourceSlotTypeRow.slot_type)
-                .where(ResourceSlotTypeRow.enabled.is_(True))
-                .order_by(ResourceSlotTypeRow.rank, ResourceSlotTypeRow.slot_name)
+            stmt = sa.select(ResourceSlotTypeRow.slot_name, ResourceSlotTypeRow.slot_type).where(
+                ResourceSlotTypeRow.enabled.is_(True)
             )
             rows = (await session.execute(stmt)).all()
         return {SlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows}

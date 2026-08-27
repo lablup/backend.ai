@@ -191,7 +191,7 @@ class ResourcePresetRepository:
     @resource_preset_repository_resilience.apply()
     async def known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
         """
-        The system-wide registry of enabled resource slot types, in ``rank`` order.
+        The system-wide registry of enabled resource slot types.
         """
         return await self._db_source.known_slot_types()
 
