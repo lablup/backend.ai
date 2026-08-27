@@ -77,7 +77,6 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
     VFolderHostPermissionMap,
-    current_resource_slots,
 )
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
@@ -1147,13 +1146,6 @@ class _TestConfigProvider(ManagerConfigProvider):
         mock_etcd_loader.register_myself = AsyncMock()
         mock_etcd_loader.deregister_myself = AsyncMock()
         self._legacy_etcd_config_loader = mock_etcd_loader
-        # Set the current_resource_slots ContextVar so that ResourceSlot
-        # operations (e.g. normalize_slots) work without hitting etcd.
-        _slots = {
-            SlotName("cpu"): SlotTypes("count"),
-            SlotName("mem"): SlotTypes("bytes"),
-        }
-        current_resource_slots.set(_slots)
 
 
 @pytest.fixture()

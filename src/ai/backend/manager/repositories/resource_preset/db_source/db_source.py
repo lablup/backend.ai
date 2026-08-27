@@ -192,6 +192,19 @@ class ResourcePresetDBSource:
 
         return presets
 
+    async def known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
+        """
+        The system-wide registry of enabled resource slot types, in ``rank`` order.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = (
+                sa.select(ResourceSlotTypeRow.slot_name, ResourceSlotTypeRow.slot_type)
+                .where(ResourceSlotTypeRow.enabled.is_(True))
+                .order_by(ResourceSlotTypeRow.rank, ResourceSlotTypeRow.slot_name)
+            )
+            rows = (await session.execute(stmt)).all()
+        return {SlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows}
+
     async def search_presets(
         self,
         querier: BatchQuerier,
@@ -637,7 +650,9 @@ class ResourcePresetDBSource:
         for preset_data in preset_data_list:
             allocatable = False
             preset_slots = resource_slot_to_quantities(
-                preset_data.resource_slots.normalize_slots(ignore_unknown=True)
+                preset_data.resource_slots.normalize_slots_by_known_slots(
+                    known_slot_types, ignore_unknown=True
+                )
             )
             for agent_slot in agent_slots:
                 if quantities_ge(agent_slot, preset_slots) and quantities_ge(
