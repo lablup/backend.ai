@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.manager.config.unified import PluginsConfig
 from ai.backend.manager.dependencies.plugins.base import PluginsInput
 from ai.backend.manager.dependencies.plugins.network import NetworkPluginDependency
 
@@ -12,6 +13,7 @@ def _make_plugins_input() -> PluginsInput:
     return PluginsInput(
         etcd=MagicMock(),
         local_config={"key": "value"},
+        plugins_config=PluginsConfig.model_validate({}),
         allowed_plugins={"plugin_a"},
         disabled_plugins={"plugin_b"},
         init_context=MagicMock(),

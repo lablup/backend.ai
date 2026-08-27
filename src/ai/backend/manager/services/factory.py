@@ -408,7 +408,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         auth=AuthService(
             hook_plugin_ctx=args.hook_plugin_ctx,
-            auth_plugin_ctx=args.auth_plugin_ctx,
+            manager_plugins=args.manager_plugins,
             auth_repository=repositories.auth.repository,
             config_provider=args.config_provider,
             valkey_session_client=args.valkey_session_client,

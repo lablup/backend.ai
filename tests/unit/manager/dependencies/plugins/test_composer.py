@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
+from ai.backend.manager.config.unified import PluginsConfig
 from ai.backend.manager.dependencies.plugins.base import PluginsInput
 from ai.backend.manager.dependencies.plugins.composer import PluginsComposer, PluginsResources
 
@@ -10,6 +11,7 @@ def _make_plugins_input() -> PluginsInput:
     return PluginsInput(
         etcd=MagicMock(),
         local_config={"key": "value"},
+        plugins_config=PluginsConfig.model_validate({}),
         allowed_plugins={"plugin_a"},
         disabled_plugins={"plugin_b"},
         init_context=MagicMock(),
@@ -26,11 +28,11 @@ class TestPluginsComposer:
         mock_network = MagicMock(name="network_ctx")
         mock_hook = MagicMock(name="hook_ctx")
         mock_event = MagicMock(name="event_ctx")
-        mock_auth = MagicMock(name="auth_ctx")
+        mock_plugins = MagicMock(name="manager_plugins")
 
         mock_stack = MagicMock()
         mock_stack.enter_dependency = AsyncMock(
-            side_effect=[mock_network, mock_hook, mock_event, mock_auth]
+            side_effect=[mock_network, mock_hook, mock_event, mock_plugins]
         )
 
         composer = PluginsComposer()
@@ -40,7 +42,7 @@ class TestPluginsComposer:
             assert resources.network_plugin_ctx is mock_network
             assert resources.hook_plugin_ctx is mock_hook
             assert resources.event_dispatcher_plugin_ctx is mock_event
-            assert resources.auth_plugin_ctx is mock_auth
+            assert resources.manager_plugins is mock_plugins
 
         assert mock_stack.enter_dependency.call_count == 4
 
@@ -65,5 +67,5 @@ class TestPluginsComposer:
             "NetworkPluginDependency",
             "HookPluginDependency",
             "EventDispatcherPluginDependency",
-            "AuthPluginDependency",
+            "ManagerPluginsDependency",
         ]

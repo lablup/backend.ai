@@ -30,11 +30,11 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
-from ai.backend.manager.data.auth.lookup import UserLookupData
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair, UserData
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingTarget
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
+from ai.backend.manager.dto.auth.lookup import UserLookupData
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     EmailAlreadyExistsError,
@@ -64,11 +64,8 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import user_row_to_auth_data
-from ai.backend.manager.plugin.auth import (
-    MIN_LOOKUP_RETRY_COUNT,
-    AbstractAuthPlugin,
-    AuthPluginContext,
-)
+from ai.backend.manager.plugins.auth import MIN_LOOKUP_RETRY_COUNT, AuthPlugin
+from ai.backend.manager.plugins.plugins import ManagerPlugins
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.client_ip_masking.repository import (
@@ -158,7 +155,7 @@ class VerifiedUser:
 
 class AuthService:
     _hook_plugin_ctx: HookPluginContext
-    _auth_plugin_ctx: AuthPluginContext
+    _manager_plugins: ManagerPlugins
     _auth_repository: AuthRepository
     _config_provider: ManagerConfigProvider
     _valkey_session_client: ValkeySessionClient
@@ -171,7 +168,7 @@ class AuthService:
     def __init__(
         self,
         hook_plugin_ctx: HookPluginContext,
-        auth_plugin_ctx: AuthPluginContext,
+        manager_plugins: ManagerPlugins,
         auth_repository: AuthRepository,
         config_provider: ManagerConfigProvider,
         valkey_session_client: ValkeySessionClient,
@@ -183,7 +180,7 @@ class AuthService:
         key_provider_pool: KeyProviderPool,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
-        self._auth_plugin_ctx = auth_plugin_ctx
+        self._manager_plugins = manager_plugins
         self._auth_repository = auth_repository
         self._config_provider = config_provider
         self._valkey_session_client = valkey_session_client
@@ -285,7 +282,7 @@ class AuthService:
         Returns None when no plugin is installed or the request carries no
         credential it handles, leaving the hook and password paths to run.
         """
-        plugin = self._auth_plugin_ctx.plugin
+        plugin = self._manager_plugins.auth_plugin
         if plugin is None:
             return None
         lookup = await plugin.generate_lookup_data(action.request_data)
@@ -301,7 +298,7 @@ class AuthService:
 
     async def _resolve_lookup(
         self,
-        plugin: AbstractAuthPlugin,
+        plugin: AuthPlugin,
         lookup: UserLookupData,
     ) -> UserData:
         """Resolve the lookup data, reporting each failed attempt to the plugin.

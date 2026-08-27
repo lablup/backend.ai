@@ -49,7 +49,7 @@ from ai.backend.common.dto.manager.auth.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
-from ai.backend.manager.data.auth.request import HTTPRequestData
+from ai.backend.manager.dto.auth.request import HTTPRequestData
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction

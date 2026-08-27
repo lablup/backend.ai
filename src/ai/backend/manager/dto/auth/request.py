@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import Any
 
 from multidict import CIMultiDictProxy, MultiMapping
 
+from ai.backend.common.api_handlers import BaseRequestModel
 
-@dataclass
-class HTTPRequestData:
+
+class HTTPRequestData(BaseRequestModel):
     """The parts of an inbound request an authentication plugin may read.
 
     Headers and query parameters keep their multi-dict form: copying them into a

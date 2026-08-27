@@ -214,6 +214,7 @@ from ai.backend.common.meta import (
     CompositeType,
     ConfigExample,
 )
+from ai.backend.common.plugins.base import PluginName
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
@@ -235,6 +236,7 @@ from ai.backend.manager.data.secret.types import (
 )
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
+from ai.backend.manager.plugins.auth import AuthPluginConfig
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -1993,6 +1995,18 @@ class PluginsConfig(BaseConfigSchema):
                 "Values contain settings like MTU, subnet ranges, and encryption options."
             ),
             added_version="25.8.0",
+        ),
+    ]
+    auth: Annotated[
+        dict[PluginName, AuthPluginConfig],
+        Field(default_factory=dict),
+        BackendAIConfigMeta(
+            description=(
+                "Authentication plugin configurations, keyed by the name each plugin reports. "
+                "The manager looks up a loaded plugin's section by that name and builds the "
+                "plugin from it; a plugin with no section here is built from empty settings."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
         ),
     ]
 

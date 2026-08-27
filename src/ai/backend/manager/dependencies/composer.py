@@ -159,6 +159,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             PluginsInput(
                 etcd=bootstrap.etcd,
                 local_config=config.model_dump(by_alias=True),
+                plugins_config=config.plugins,
                 allowed_plugins=config.manager.allowed_plugins,
                 disabled_plugins=config.manager.disabled_plugins,
             ),
@@ -322,7 +323,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 background_task_manager=system.background_task_manager,
                 error_monitor=monitoring.error_monitor,
                 hook_plugin_ctx=plugins.hook_plugin_ctx,
-                auth_plugin_ctx=plugins.auth_plugin_ctx,
+                manager_plugins=plugins.manager_plugins,
                 deployment_controller=agents.deployment_controller,
                 route_controller=agents.route_controller,
                 agent_cache=components.agent_cache,

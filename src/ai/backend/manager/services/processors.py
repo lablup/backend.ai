@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
     from ai.backend.manager.notification import NotificationCenter
-    from ai.backend.manager.plugin.auth import AuthPluginContext
+    from ai.backend.manager.plugins.plugins import ManagerPlugins
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.repositories import Repositories
     from ai.backend.manager.service.container_registry.harbor import (
@@ -331,7 +331,7 @@ class ServiceArgs:
     idle_checker_host: IdleCheckerHost
     event_dispatcher: EventDispatcher
     hook_plugin_ctx: HookPluginContext
-    auth_plugin_ctx: AuthPluginContext
+    manager_plugins: ManagerPlugins
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
     route_controller: RouteController

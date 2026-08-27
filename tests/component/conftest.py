@@ -1456,7 +1456,7 @@ def auth_processors(
         storage_manager,
     )
     service = AuthService(
-        auth_plugin_ctx=MagicMock(plugin=None),
+        manager_plugins=MagicMock(auth_plugin=None),
         hook_plugin_ctx=hook_plugin_ctx,
         auth_repository=repo,
         config_provider=config_provider,

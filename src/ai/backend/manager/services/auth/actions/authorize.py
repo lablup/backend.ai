@@ -6,8 +6,8 @@ from aiohttp import web
 
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.auth.request import HTTPRequestData
 from ai.backend.manager.data.auth.types import AuthorizationResult
+from ai.backend.manager.dto.auth.request import HTTPRequestData
 from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
 
 

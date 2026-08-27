@@ -17,9 +17,9 @@ from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
-from ai.backend.manager.data.auth.request import HTTPRequestData
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.dto.auth.request import HTTPRequestData
 from ai.backend.manager.errors.auth import TooManyConcurrentLoginSessions
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -148,7 +148,7 @@ def auth_service(
     mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
-        auth_plugin_ctx=MagicMock(plugin=None),
+        manager_plugins=MagicMock(auth_plugin=None),
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
