@@ -69,8 +69,8 @@ class LookupActionAuditLogMonitor(LookupActionMonitor):
         if meta.entity_id is None:
             # The key named nothing, so only the key itself identifies the row.
             await self._repository.create_dangling_field(
-                action.entity_type(),
                 MissedLookupAuditLogCreator(
+                    entity_type=action.entity_type(),
                     action_id=meta.action_id,
                     operation=action.operation_type(),
                     action_name=action.action_name(),

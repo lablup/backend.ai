@@ -12,7 +12,6 @@ from dataclasses import dataclass
 
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
-    EntityType,
     FieldData,
     FieldIdentifier,
 )
@@ -173,14 +172,16 @@ class FieldCreator[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
 class DanglingFieldCreator[TRow: Base, TData: FieldData](FieldRowCreator[TRow, TData], ABC):
     """Insert spec of a field row written without an owner to build under.
 
-    The row names an entity type and no id: the operation being recorded named a kind but
-    no row, or named nothing at all. The type is on the creator, since there is no owner
-    to read it from. Reachable only by a read that names no owner either.
+    No owner names it, so what the row says about the entity it concerns is the spec's
+    own value like every other column — the kind it is about where there is one, nothing
+    where there is not. An operation that names scopes and no entity type is the latter.
+
+    Reachable only by a read that names no owner either.
     """
 
     @abstractmethod
-    def build_row(self, entity_type: EntityType) -> TRow:
-        """Build the row under a kind alone, since no owner names it."""
+    def build_row(self) -> TRow:
+        """Build the row, which no owner names."""
         raise NotImplementedError
 
 

@@ -14,6 +14,23 @@ write specs below, plus the read/update declarations (`querier.py`, `lookup.py`,
 `purger.py`). `repositories/base/` keeps legacy-compatible views for the transition
 only; do not declare a new spec there.
 
+## A relation is neither an entity nor a field
+
+- A row linking two entities belongs to neither: both own it. It is not a field row,
+  which has exactly one owner, and it is not an entity, which has a node in the graph.
+- Its specs are `RelationCreator` / `RelationLifecycleUpdater` / `RelationPurger`
+  (`relation.py`), and they name the pair rather than a row id — a relation row's id
+  never leaves the layer that wrote it.
+- The create declares its own conflict handling. Whether a soft-deleted row occupies the
+  pair is the table's unique constraint's business, so `build_conflict_values()` says
+  what to do: `None` leaves the row alone, a mapping revives it.
+- Only a relation carrying a lifecycle column declares the lifecycle updaters. One class
+  per direction, each returning a constant, as the entity soft delete does.
+- Do NOT carry a relation as a field on a `DataUpdater`. A value whose change drags
+  other writes along does not belong on the general edit path — the same rule soft
+  delete follows.
+- Rationale: `proposals/BEP-1075-entity-relation-operations.md`.
+
 ## What a spec splits on depends on the operation
 
 A row in the graph is an entity or a field, and which one it is comes from the table

@@ -26,6 +26,7 @@ class ActionKind(enum.StrEnum):
     SINGLE_ENTITY = "single_entity"
     BULK = "bulk"
     SCOPE = "scope"
+    RELATION = "relation"
     GLOBAL = "global"
     LOOKUP = "lookup"
     # Still on the legacy ``BaseAction`` base, which declares no shape.
@@ -40,6 +41,8 @@ class ActionKind(enum.StrEnum):
                 return "an action taking several entity ids and operating on each"
             case ActionKind.SCOPE:
                 return "an action reaching every entity under a scope at once"
+            case ActionKind.RELATION:
+                return "an action linking two entities, or unlinking them"
             case ActionKind.GLOBAL:
                 return "an action operating over everything, divided by no scope"
             case ActionKind.LOOKUP:

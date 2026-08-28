@@ -47,6 +47,9 @@ _FIELD_BLOCK_COLUMNS: Final[tuple[str, ...]] = tuple(
 _ENTITY_COLUMNS: Final[tuple[str, ...]] = ("concern", "entity_type", "field_type", "operations")
 # Stands for a column a wiring leaves unset, so every line has the same shape.
 _ABSENT: Final[str] = "-"
+# An operation targeting no entity at all, which only a relation does. Distinct from
+# `global`, which names an operation over every entity.
+_NO_ENTITY: Final[str] = "(none)"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -67,7 +70,7 @@ class CatalogEntry:
     def from_wiring(cls, wiring: WiredProcessor) -> CatalogEntry:
         return cls(
             concern=str(wiring.concern),
-            entity_type=str(wiring.entity_type),
+            entity_type=str(wiring.entity_type) if wiring.entity_type is not None else _NO_ENTITY,
             field_type=str(wiring.field_type) if wiring.field_type is not None else _ABSENT,
             operation=str(wiring.action_cls.operation_type()),
             action_name=wiring.action_cls.action_name(),

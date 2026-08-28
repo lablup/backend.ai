@@ -5,6 +5,7 @@ from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
 from ai.backend.manager.actions.v2.lookup.bulk_monitor.base import BulkLookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
+from ai.backend.manager.actions.v2.relation.monitor.base import RelationActionMonitor
 from ai.backend.manager.actions.v2.scope.monitor.base import ScopeActionMonitor
 from ai.backend.manager.actions.v2.single_entity.monitor.base import SingleEntityActionMonitor
 
@@ -23,6 +24,7 @@ class ActionMonitors:
     single_entity: list[SingleEntityActionMonitor] = field(default_factory=list)
     bulk: list[BulkActionMonitor] = field(default_factory=list)
     scope: list[ScopeActionMonitor] = field(default_factory=list)
+    relation: list[RelationActionMonitor] = field(default_factory=list)
     global_scope: list[GlobalActionMonitor] = field(default_factory=list)
     lookup: list[LookupActionMonitor] = field(default_factory=list)
     bulk_lookup: list[BulkLookupActionMonitor] = field(default_factory=list)

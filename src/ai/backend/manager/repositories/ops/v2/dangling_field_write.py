@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityType, FieldData
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import DanglingFieldCreator, NestedFieldCreator
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
@@ -19,20 +19,20 @@ class V2DanglingFieldWriteOps(V2WriteOpsBase):
     """Sidecar writes, bound to a single session."""
 
     async def create_dangling_field[TRow: Base, TData: FieldData](
-        self, entity_type: EntityType, creator: DanglingFieldCreator[TRow, TData]
+        self, creator: DanglingFieldCreator[TRow, TData]
     ) -> TData:
         """Insert one row that names a kind and no owner."""
-        row = creator.build_row(entity_type)
+        row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         return creator.to_data(row)
 
     async def atomic_create_dangling_fields[TRow: Base, TData: FieldData](
-        self, entity_type: EntityType, creators: Sequence[DanglingFieldCreator[TRow, TData]]
+        self, creators: Sequence[DanglingFieldCreator[TRow, TData]]
     ) -> list[TData]:
         """Insert such rows atomically in a single flush."""
         if not creators:
             return []
-        rows = [creator.build_row(entity_type) for creator in creators]
+        rows = [creator.build_row() for creator in creators]
         # First creator's checks: all specs share the same creator subclass.
         await self._insert_rows(rows, creators[0].integrity_error_checks())
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
@@ -44,7 +44,6 @@ class V2DanglingFieldWriteOps(V2WriteOpsBase):
         TFieldData: FieldData,
     ](
         self,
-        entity_type: EntityType,
         creators: Sequence[DanglingFieldCreator[TRow, TData]],
         field_creators: Sequence[NestedFieldCreator[Any, TFieldRow, TFieldData]],
     ) -> list[TData]:
@@ -56,7 +55,7 @@ class V2DanglingFieldWriteOps(V2WriteOpsBase):
         """
         if not creators:
             return []
-        rows = [creator.build_row(entity_type) for creator in creators]
+        rows = [creator.build_row() for creator in creators]
         await self._insert_rows(rows, creators[0].integrity_error_checks())
         if field_creators:
             owner_ids = [creator.field_id(row) for creator, row in zip(creators, rows, strict=True)]
