@@ -22,6 +22,7 @@ container — and even then the host netns can never be selected.
 
 from __future__ import annotations
 
+import ctypes
 import os
 from dataclasses import dataclass
 from functools import cache
@@ -33,6 +34,13 @@ from pathlib import Path
 # it, so it must be treated as optional. When absent, open_container_netns falls back to a
 # signal-0 liveness probe (see there) instead of hard-failing the whole privnet.
 _HAS_PIDFD_OPEN = hasattr(os, "pidfd_open")
+
+
+# ioctls on a namespace fd (linux/nsfs.h). NS_GET_USERNS yields the user namespace that owns the
+# namespace; NS_GET_OWNER_UID reads that user namespace's owner. Both are _IO (the owner uid comes
+# back through the pointer argument, which is why it is NOT _IOR).
+_NS_GET_USERNS = 0xB701
+_NS_GET_OWNER_UID = 0xB704
 
 
 class NetnsError(RuntimeError):
@@ -82,7 +90,26 @@ class PinnedNetns:
                 pass
 
 
-def open_container_netns(pid: int) -> PinnedNetns:
+def _netns_owner_uid(netns_fd: int) -> int:
+    """The uid that owns the user namespace this netns belongs to.
+
+    Answered by the kernel, which is the point: everything else about a container reaches the
+    privnet through the agent, and this does not.
+    """
+    libc = ctypes.CDLL("libc.so.6", use_errno=True)
+    userns_fd = libc.ioctl(netns_fd, _NS_GET_USERNS)
+    if userns_fd < 0:
+        raise NetnsError(f"cannot read the netns owner: {os.strerror(ctypes.get_errno())}")
+    try:
+        uid = ctypes.c_uint32()
+        if libc.ioctl(userns_fd, _NS_GET_OWNER_UID, ctypes.byref(uid)) < 0:
+            raise NetnsError(f"cannot read the netns owner uid: {os.strerror(ctypes.get_errno())}")
+        return uid.value
+    finally:
+        os.close(userns_fd)
+
+
+def open_container_netns(pid: int, *, expected_owner_uid: int | None = None) -> PinnedNetns:
     """Pin ``pid`` and its network namespace, rejecting the host netns.
 
     Raises NetnsError if the PID is invalid/exited or its netns is the host's. The
@@ -125,6 +152,31 @@ def open_container_netns(pid: int) -> PinnedNetns:
         if pidfd >= 0:
             os.close(pidfd)
         raise NetnsError("target resolves to the host netns")
+    if expected_owner_uid is not None:
+        # Which netns the agent may point us at, asked of the kernel rather than of the agent.
+        #
+        # It matters only where the PID is not authoritative. On containerd the PID comes from the
+        # daemon, which runs as root and the agent cannot forge; on a rootless backend the record
+        # is written by the agent itself, so a compromised agent could name any PID and have a
+        # privileged veth attached into that namespace. An unprivileged agent can only ever create
+        # namespaces inside a user namespace it owns, so requiring that ownership bounds it to
+        # exactly what it could have made anyway. (Measured: an enroot kernel's netns is owned by
+        # uid 1000, the host's by 0 — as is a containerd kernel's, which is why the caller only
+        # sets this for the rootless backends.)
+        try:
+            owner = _netns_owner_uid(netns_fd)
+        except NetnsError:
+            os.close(netns_fd)
+            if pidfd >= 0:
+                os.close(pidfd)
+            raise
+        if owner != expected_owner_uid:
+            os.close(netns_fd)
+            if pidfd >= 0:
+                os.close(pidfd)
+            raise NetnsError(
+                f"netns is owned by uid {owner}, not the agent's ({expected_owner_uid})"
+            )
     return PinnedNetns(netns_fd=netns_fd, pidfd=pidfd, pid=pid)
 
 
@@ -137,8 +189,8 @@ class NetnsPinner:
     what attach *does* would have to stop at the pin.
     """
 
-    def open(self, pid: int) -> PinnedNetns:
-        return open_container_netns(pid)
+    def open(self, pid: int, *, expected_owner_uid: int | None = None) -> PinnedNetns:
+        return open_container_netns(pid, expected_owner_uid=expected_owner_uid)
 
     def alive(self, pinned: PinnedNetns) -> bool:
         if pinned.pidfd < 0:

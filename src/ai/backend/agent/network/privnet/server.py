@@ -157,6 +157,7 @@ class PrivNetServer:
         journal: PrivNetJournal | None = None,
         ipam: HostLocalIpam | None = None,
         local_subnets: LocalSubnetAllocator | None = None,
+        netns_owner_uid: int | None = None,
         netns_pinner: netns_mod.NetnsPinner | None = None,
     ) -> None:
         self._socket_path = socket_path
@@ -177,6 +178,8 @@ class PrivNetServer:
         self._journal = journal or PrivNetJournal()
         self._ipam = ipam or get_host_local_ipam()
         self._local_subnets = local_subnets or get_local_subnet_allocator()
+        # Set only where the PID record is agent-written (the rootless backends); see _attach.
+        self._netns_owner_uid = netns_owner_uid
         self._netns = netns_pinner or netns_mod.NetnsPinner()
 
     @contextlib.asynccontextmanager
@@ -574,11 +577,17 @@ class PrivNetServer:
             # host-local IPAM confines it to the session's own /26 (a `requested` outside it, or one
             # already taken by a sibling, raises), so a lying agent can at worst fail its own attach.
             kernel_config["local_static_ip"] = policy.validate_ipv4(local_ip, what="local pin ip")
-        # Authoritative PID resolution from containerd — the agent's view is never trusted.
+        # PID resolution from the backend's own runtime rather than from the request.
+        #
+        # How much that is worth depends on the backend. containerd's daemon runs as root and the
+        # agent cannot forge its records, so the answer is authoritative. A rootless backend has no
+        # daemon: its record is a journal the agent writes, so this is one indirection away from
+        # taking the agent's word. `_netns_owner_uid` is what closes that gap — the kernel, not the
+        # agent, confirms the namespace is one this agent could have created.
         pid = await self._runtime.container_pid(container_id)
         if pid is None:
             raise PrivNetError("no running task for container")
-        pinned = self._netns.open(pid)
+        pinned = self._netns.open(pid, expected_owner_uid=self._netns_owner_uid)
         try:
             # Re-confirm the PID<->container binding still holds after pinning, so a
             # PID reused between resolution and pin cannot slip through.

@@ -162,6 +162,14 @@ def _resolve_local_subnet_layout(raw_cfg: Mapping[str, Any]) -> LocalSubnetLayou
     )
 
 
+def _is_rootless(raw_cfg: Mapping[str, Any]) -> bool:
+    """Whether this node's backend keeps its container records where the agent can write them."""
+    name = (raw_cfg.get("agent") or {}).get("backend") or (raw_cfg.get("agent") or {}).get("mode")
+    if not name:
+        return False
+    return AgentBackend(str(name)) in (AgentBackend.ENROOT, AgentBackend.SINGULARITY)
+
+
 def _build_runtime(raw_cfg: Mapping[str, Any], ctrd_ns: str) -> OciRuntime:
     """The runtime client for THIS node's backend, not containerd's by assumption.
 
@@ -239,6 +247,9 @@ async def _amain() -> None:
         # The same pool instance both backends carve from, so the LOCAL_SUBNET query reads the very
         # block a session's setup claimed rather than a second view that could drift from it.
         local_subnets=local_subnets,
+        # Only the rootless backends need it: containerd's PID comes from a root-owned daemon the
+        # agent cannot forge, and its kernels' namespaces are owned by uid 0 like the host's.
+        netns_owner_uid=allowed_uid if _is_rootless(raw_cfg) else None,
     )
     await server.serve_forever()
 

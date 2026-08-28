@@ -196,9 +196,16 @@ class _RecordingCni:
 
 class _FakeNetns:
     """Pins nothing. A real pin needs a live process in a non-host netns, which a unit test cannot
-    produce; the TOCTOU logic it guards is the module's own (netns.py), not the attach path's."""
+    produce; the TOCTOU logic it guards is the module's own (netns.py), not the attach path's.
 
-    def open(self, pid: int) -> PinnedNetns:
+    It does record the owner uid it was asked to require, so a test can assert the server passed
+    one (see netns.py for why it matters on a rootless backend)."""
+
+    def __init__(self) -> None:
+        self.expected_owner_uids: list[int | None] = []
+
+    def open(self, pid: int, *, expected_owner_uid: int | None = None) -> PinnedNetns:
+        self.expected_owner_uids.append(expected_owner_uid)
         return PinnedNetns(netns_fd=-1, pidfd=-1, pid=pid)  # close() tolerates a bad fd
 
     def alive(self, pinned: PinnedNetns) -> bool:
