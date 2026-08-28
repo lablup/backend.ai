@@ -2559,8 +2559,33 @@ input BulkDeleteVFoldersV2Input
 type BulkDeleteVFoldersV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """Number of virtual folders successfully soft-deleted."""
-  deletedCount: Int!
+  """
+  Added in 26.9.0. UUIDs of the vfolders that were soft-deleted, in the order they were requested. Together with `failed` this answers for every requested vfolder exactly once.
+  """
+  successes: [UUID!]!
+
+  """
+  Added in 26.4.2. Number of virtual folders successfully soft-deleted. Deprecated since 26.9.0.
+  """
+  deletedCount: Int! @deprecated(reason: "Use the length of successes.")
+
+  """
+  Added in 26.9.0. List of errors for vfolders that failed to be soft-deleted.
+  """
+  failed: [BulkDeleteVFolderV2Error!]!
+}
+
+"""
+Added in 26.9.0. Failure detail for a single vfolder in a bulk soft-deletion.
+"""
+type BulkDeleteVFolderV2Error
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the vfolder that failed to be soft-deleted."""
+  vfolderId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
 }
 
 """Added in 26.4.4. Input for bulk-hard-deleting role presets."""
@@ -2614,8 +2639,15 @@ input BulkPurgeUsersV2Options
 type BulkPurgeUsersV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """Number of users successfully purged."""
-  purgedCount: Int!
+  """
+  Added in 26.9.0. UUIDs of the users that were purged, in the order they were requested. Together with `failed` this answers for every requested user exactly once.
+  """
+  successes: [UUID!]!
+
+  """
+  Added in 26.3.0. Number of users successfully purged. Deprecated since 26.9.0.
+  """
+  purgedCount: Int! @deprecated(reason: "Use the length of successes.")
 
   """List of errors for users that failed to purge."""
   failed: [BulkPurgeUserV2Error!]!
@@ -2651,8 +2683,15 @@ input BulkPurgeVFoldersV2Input
 type BulkPurgeVFoldersV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """Number of virtual folders successfully purged."""
-  purgedCount: Int!
+  """
+  Added in 26.9.0. UUIDs of the vfolders that were purged, in the order they were requested. Together with `failed` this answers for every requested vfolder exactly once.
+  """
+  successes: [UUID!]!
+
+  """
+  Added in 26.4.2. Number of virtual folders successfully purged. Deprecated since 26.9.0.
+  """
+  purgedCount: Int! @deprecated(reason: "Use the length of successes.")
 
   """Added in 26.4.4. List of errors for vfolders that failed to purge."""
   failed: [BulkPurgeVFolderV2Error!]!
