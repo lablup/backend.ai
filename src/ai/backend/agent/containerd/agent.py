@@ -1652,6 +1652,7 @@ class ContainerdAgent(
             runtime=self._runtime,
             privnet_socket=self.local_config.agent.network_privnet_socket,
             local_subnet_layout=container_cfg.local_subnet_layout(),
+            local_subnet_state_dir=(self.local_config.agent.var_base_path / "net-local-subnet"),
             vtep_ip=self._vtep_ip,
             configured_dns=tuple(container_cfg.dns or ()),
         )

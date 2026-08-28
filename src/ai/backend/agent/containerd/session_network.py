@@ -22,6 +22,7 @@ import ipaddress
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from ai.backend.agent.containerd.dns import resolve_container_dns
@@ -1050,6 +1051,7 @@ def build_containerd_session_network(
     backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]] | None = None,
     privnet_socket: str | None = None,
     local_subnet_layout: LocalSubnetLayout | None = None,
+    local_subnet_state_dir: Path | None = None,
     vtep_ip: str | None = None,
     configured_dns: Sequence[str] = (),
 ) -> ContainerdSessionNetwork:
@@ -1109,7 +1111,12 @@ def build_containerd_session_network(
     else:
         # The process-wide owner of the node-local pool: shared by both backends here (they carve
         # their LOCAL block out of the same pool) and by every other agent this runtime hosts.
-        owned_local_subnets = get_local_subnet_allocator(layout=local_subnet_layout)
+        # The store is anchored to the agent's var-base-path, not a constant: two agents of
+        # different backends co-located on one node would otherwise share one store and the
+        # (correct) second-writer guard would refuse the second one's session.
+        owned_local_subnets = get_local_subnet_allocator(
+            local_subnet_state_dir, layout=local_subnet_layout
+        )
         owned_ipam = get_host_local_ipam()
         if backends is None:
             backends = {
