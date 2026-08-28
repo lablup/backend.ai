@@ -615,33 +615,51 @@ class RootlessOciRuntime(OciRuntime):
         path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write(path, json.dumps(meta))
 
-    def _recover_containers(self) -> None:
-        """Rebuild the in-memory container tables from the journal, dropping what is no longer live."""
+    def _adopt_journal_entry(self, container_id: str, *, drop_stale: bool = True) -> bool:
+        """Load one journalled container into the in-memory tables. True when it is live.
+
+        Split out of ``_recover_containers`` because the journal — not this process's memory — is
+        what makes the runtime readable by a SECOND process. The privnet daemon holds its own
+        runtime client and is asked about containers this instance never created, so a miss has to
+        fall back to the journal rather than answer "no such container".
+        """
+        entry = self._state_path / container_id
+        try:
+            meta = json.loads((entry / "container.json").read_text())
+        except FileNotFoundError:
+            return False
+        except (OSError, ValueError) as e:
+            log.warning("[{}] unreadable container journal {}: {!r}", self.backend_name, entry, e)
+            return False
+        pid = meta.get("pid")
+        if not isinstance(pid, int):
+            return False
+        # The PID must still be the same *live* process: not exited, not a zombie, and not a
+        # reused number (which is what the start time rules out).
+        if not self._alive(pid) or self._pid_start_time(pid) != meta.get("start_time"):
+            log.debug("[{}] journal entry {} is stale; dropping", self.backend_name, container_id)
+            if drop_stale:
+                shutil.rmtree(entry, ignore_errors=True)
+            self._pids.pop(container_id, None)
+            self._images.pop(container_id, None)
+            self._labels.pop(container_id, None)
+            return False
+        self._pids[container_id] = pid
+        self._images[container_id] = str(meta.get("image") or "")
+        self._labels[container_id] = dict(meta.get("labels") or {})
+        return True
+
+    def _rescan_journal(self) -> None:
+        """Re-read every journalled container. Cheap (one small read per container) and what lets
+        a second process see containers created after it started."""
         if not self._state_path.is_dir():
             return
         for entry in self._state_path.iterdir():
-            path = entry / "container.json"
-            try:
-                meta = json.loads(path.read_text())
-            except FileNotFoundError:
-                continue
-            except (OSError, ValueError) as e:
-                log.warning(
-                    "[{}] unreadable container journal {}: {!r}", self.backend_name, path, e
-                )
-                continue
-            pid = meta.get("pid")
-            if not isinstance(pid, int):
-                continue
-            # The PID must still be the same *live* process: not exited, not a zombie, and not a
-            # reused number (which is what the start time rules out).
-            if not self._alive(pid) or self._pid_start_time(pid) != meta.get("start_time"):
-                log.debug("[{}] journal entry {} is stale; dropping", self.backend_name, entry.name)
-                shutil.rmtree(entry, ignore_errors=True)
-                continue
-            self._pids[entry.name] = pid
-            self._images[entry.name] = str(meta.get("image") or "")
-            self._labels[entry.name] = dict(meta.get("labels") or {})
+            self._adopt_journal_entry(entry.name)
+
+    def _recover_containers(self) -> None:
+        """Rebuild the in-memory container tables from the journal, dropping what is no longer live."""
+        self._rescan_journal()
         if self._pids:
             log.info(
                 "[{}] recovered {} running container(s) from the journal",
@@ -999,8 +1017,9 @@ class RootlessOciRuntime(OciRuntime):
         # In-memory tracking, but it survives an agent restart: open() rebuilds it from the
         # per-container journal (neither runtime has a label store or a container-list API that
         # carries our labels, so the runtime has to keep that map itself). See _record_container.
+        await asyncio.to_thread(self._rescan_journal)
         infos: list[ContainerInfo] = []
-        for cid, pid in self._pids.items():
+        for cid, pid in list(self._pids.items()):
             infos.append(
                 ContainerInfo(
                     id=cid,
@@ -1014,6 +1033,12 @@ class RootlessOciRuntime(OciRuntime):
     @override
     async def container_pid(self, container_id: str) -> int | None:
         pid = self._pids.get(container_id)
+        if pid is None:
+            # Not ours *yet*: another process (the agent) may have created it since this instance
+            # opened. The journal is the shared record, so consult it before denying the container.
+            if not await asyncio.to_thread(self._adopt_journal_entry, container_id):
+                return None
+            pid = self._pids.get(container_id)
         if pid is None or not self._alive(pid):
             return None
         return pid

@@ -29,6 +29,18 @@ def _entry(journal: Path, container_id: str, **meta: object) -> Path:
     return path
 
 
+def _second_instance(runtime: RootlessOciRuntime) -> RootlessOciRuntime:
+    """Another client over the same roots — what privnet is relative to the agent."""
+    return type(runtime)(
+        data_path=runtime._data_path,
+        cache_path=runtime._cache_path,
+        runtime_path=runtime._runtime_path,
+        state_path=runtime._state_path,
+        kernel_uid=1000,
+        kernel_gid=1000,
+    )
+
+
 def _pretend(
     runtime: RootlessOciRuntime,
     monkeypatch: pytest.MonkeyPatch,
@@ -178,3 +190,42 @@ class TestRoundTrip:
         assert runtime._pids == {"kernel-1": 4242}
         assert runtime._images == {"kernel-1": "registry/py:3.12"}
         assert runtime._labels == {"kernel-1": {"ai.backend.kernel-id": "k1"}}
+
+
+class TestASecondProcessCanReadTheJournal:
+    """privnet holds its own runtime client and is asked about containers it never created — the
+    agent made them. The journal, not this instance's memory, is the shared record, so a miss has
+    to fall back to it rather than answer "no such container"."""
+
+    async def test_container_pid_falls_back_to_the_journal_on_a_miss(
+        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        reader = _second_instance(runtime)
+        _entry(journal, "c1", pid=4321, start_time=42, image="img:1", labels={})
+        _pretend(reader, monkeypatch, alive={4321: True}, start_times={4321: 42})
+
+        assert reader._pids == {}, "the reader has never seen this container"
+        assert await reader.container_pid("c1") == 4321
+
+    async def test_a_stale_journal_entry_is_still_refused(
+        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The liveness + start-time check is what makes the fallback safe: a recycled PID must not
+        be handed out as a live container."""
+        reader = _second_instance(runtime)
+        _entry(journal, "c1", pid=4321, start_time=42, image="img:1", labels={})
+        _pretend(reader, monkeypatch, alive={4321: True}, start_times={4321: 99})  # recycled
+
+        assert await reader.container_pid("c1") is None
+
+    async def test_list_container_infos_sees_what_arrived_after_open(
+        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _pretend(runtime, monkeypatch, alive={7: True}, start_times={7: 1})
+        assert list(await runtime.list_container_infos()) == []
+
+        _entry(journal, "c2", pid=7, start_time=1, image="img:2", labels={"a": "b"})
+
+        infos = list(await runtime.list_container_infos())
+        assert [i.id for i in infos] == ["c2"]
+        assert infos[0].labels == {"a": "b"}

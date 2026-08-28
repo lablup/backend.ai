@@ -55,7 +55,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime
+from ai.backend.agent.containerd.runtime.interface import OciRuntime
 from ai.backend.agent.network.backends.bridge import BridgeNetworkPlugin
 from ai.backend.agent.network.backends.vxlan import VxlanNetworkPlugin
 from ai.backend.agent.network.local_subnet import (
@@ -64,9 +66,14 @@ from ai.backend.agent.network.local_subnet import (
     LocalSubnetLayout,
     get_local_subnet_allocator,
 )
-from ai.backend.agent.network.native_attacher import NativeBridgeAttachRunner
+from ai.backend.agent.network.native_attacher import (
+    NativeBridgeAttachRunner,
+    get_host_local_ipam,
+)
+from ai.backend.agent.network.privnet.journal import PrivNetJournal
 from ai.backend.agent.network.privnet.server import PrivNetServer
 from ai.backend.agent.network.vtep import uplink_for_ip, usable_vtep
+from ai.backend.agent.types import AgentBackend, get_agent_discovery
 from ai.backend.common import config as common_config
 from ai.backend.common.network.types import NetworkBackendKind
 
@@ -104,6 +111,43 @@ def _resolve_socket_path(raw_cfg: Mapping[str, Any]) -> str:
     return _DEFAULT_SOCKET
 
 
+def _var_base_path(raw_cfg: Mapping[str, Any]) -> Path | None:
+    """The agent's ``var-base-path``, which is what every per-node store must hang off.
+
+    Three stores defaulted to a constant under /var/lib/backend.ai — the containerd log root, the
+    LOCAL subnet store, and privnet's own journal. Each broke the same two deployments: a host
+    running more than one agent (they collide) and an unprivileged privnet (the directory is
+    root-owned). Reading the agent's own setting is what keeps the two processes pointing at the
+    same place.
+    """
+    if base := (raw_cfg.get("agent") or {}).get("var-base-path"):
+        return Path(str(base))
+    return None
+
+
+def _resolve_ipam_state_dir(raw_cfg: Mapping[str, Any]) -> Path | None:
+    base = _var_base_path(raw_cfg)
+    return (base / "net-ipam") if base is not None else None
+
+
+def _resolve_privnet_state_dir(raw_cfg: Mapping[str, Any]) -> Path | None:
+    base = _var_base_path(raw_cfg)
+    return (base / "net-privnet") if base is not None else None
+
+
+def _resolve_local_subnet_state_dir(raw_cfg: Mapping[str, Any]) -> Path | None:
+    """Where the node-local subnet store lives, anchored the way the agent anchors it.
+
+    The default is a constant under /var/lib/backend.ai, which is root-owned — and privnet runs as
+    the agent's uid, so it cannot write there. Worse, that constant is shared by every agent on the
+    host, and the store's second-writer guard (correctly) refuses the second one. The agent anchors
+    it under its own `var-base-path`; privnet reads the same config, so it must anchor it the same
+    way or the two disagree about which store is the session's.
+    """
+    base = _var_base_path(raw_cfg)
+    return (base / "net-local-subnet") if base is not None else None
+
+
 def _resolve_local_subnet_layout(raw_cfg: Mapping[str, Any]) -> LocalSubnetLayout:
     """How the node's LOCAL pool is cut. Under a privnet this process owns the pool, so it must cut
     it exactly as the agent's config says — the agent hands it session ids and gets subnets back,
@@ -116,6 +160,34 @@ def _resolve_local_subnet_layout(raw_cfg: Mapping[str, Any]) -> LocalSubnetLayou
     return LocalSubnetLayout.parse(
         str(pool or DEFAULT_LOCAL_POOL), int(block or DEFAULT_BLOCK_PREFIXLEN)
     )
+
+
+def _build_runtime(raw_cfg: Mapping[str, Any], ctrd_ns: str) -> OciRuntime:
+    """The runtime client for THIS node's backend, not containerd's by assumption.
+
+    privnet answers `_attach` by asking the runtime for a container's PID, and hard-coding the
+    containerd client meant it asked a daemon that has never heard of an enroot or apptainer
+    container — so a rootless agent could not delegate its networking at all and had to run
+    privileged, which is the opposite of the point. The backend already publishes its own client
+    through the discovery (the same dispatch that fixed the equivalent bug in the commit path,
+    e2202cb5a); use it.
+
+    Falls back to containerd when there is no agent config to read, which is the only case where
+    the backend is genuinely unknown — and the historical default.
+    """
+    backend_name = (raw_cfg.get("agent") or {}).get("backend") or (raw_cfg.get("agent") or {}).get(
+        "mode"
+    )
+    if not backend_name:
+        log.warning(
+            "no agent config to read the backend from; assuming containerd. "
+            "Set BACKENDAI_PRIVNET_CONFIG so a rootless backend gets its own runtime client."
+        )
+        return ContainerdGrpcRuntime(namespace=ctrd_ns)
+    local_config = AgentUnifiedConfig.model_validate(raw_cfg)
+    backend = AgentBackend(str(backend_name))
+    log.info("privnet driving the %s runtime", backend.value)
+    return get_agent_discovery(backend).create_oci_runtime(local_config)
 
 
 async def _amain() -> None:
@@ -131,10 +203,16 @@ async def _amain() -> None:
 
     Path(socket_path).parent.mkdir(parents=True, exist_ok=True)
 
-    runtime = ContainerdGrpcRuntime(namespace=ctrd_ns)
+    runtime = _build_runtime(raw_cfg, ctrd_ns)
+    # The rootless runtimes keep their container->PID map in memory, rebuilt from the on-disk
+    # journal; opening here is what lets THIS process see containers the agent created.
+    await runtime.open()
     # This privnet is the node's single owner of every privileged network op, so it is also the
     # single owner of the node-local pool both backends carve their LOCAL block out of.
-    local_subnets = get_local_subnet_allocator(layout=_resolve_local_subnet_layout(raw_cfg))
+    local_subnets = get_local_subnet_allocator(
+        _resolve_local_subnet_state_dir(raw_cfg),
+        layout=_resolve_local_subnet_layout(raw_cfg),
+    )
     backends = {
         str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin(
             {}, {}, uplink=uplink, local_subnets=local_subnets
@@ -152,7 +230,11 @@ async def _amain() -> None:
         # the privnet refuses vxlan sessions instead of stranding them (see network.vtep).
         vtep_ip=usable_vtep(host_ip),
         runtime=runtime,
-        cni_runner=NativeBridgeAttachRunner(uplink=uplink),
+        journal=PrivNetJournal(_resolve_privnet_state_dir(raw_cfg)),
+        ipam=get_host_local_ipam(_resolve_ipam_state_dir(raw_cfg)),
+        cni_runner=NativeBridgeAttachRunner(
+            uplink=uplink, ipam_state_dir=_resolve_ipam_state_dir(raw_cfg)
+        ),
         backends=backends,
         # The same pool instance both backends carve from, so the LOCAL_SUBNET query reads the very
         # block a session's setup claimed rather than a second view that could drift from it.
