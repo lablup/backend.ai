@@ -68,7 +68,9 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.plugin.openid.hook import OIDCHookPlugin
 from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
 from ai.backend.manager.plugin.openid.webapp import OIDCWebAppPlugin
+from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.db.engine import connect_database
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     postgres_container,
@@ -553,12 +555,24 @@ def mock_config_provider(redis_container: Any) -> MagicMock:  # noqa: F811
 
 
 @pytest.fixture
+def auth_repository(seed_data: ExtendedAsyncSAEngine) -> AuthRepository:
+    """The only repository the OpenID plugin reaches the database through."""
+    return AuthRepository(
+        seed_data,
+        V2DBOpsProvider(seed_data),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
+
+
+@pytest.fixture
 def mock_root_app(
-    seed_data: ExtendedAsyncSAEngine, mock_config_provider: MagicMock
+    seed_data: ExtendedAsyncSAEngine,
+    mock_config_provider: MagicMock,
+    auth_repository: AuthRepository,
 ) -> dict[str, Any]:
     """
     Dict simulating root_app that plugin handlers access via
-    request.app["_root_app"]["_db"] / ["_config_provider"].
+    request.app["_root_app"]["_auth_repository"] / ["_config_provider"].
     """
     return {
         "_db": seed_data,  # seed_data yields database_engine
@@ -566,6 +580,7 @@ def mock_root_app(
         "_key_provider_pool": KeyProviderPool(
             providers=[], write_provider_type=KeyProviderType.PLAIN
         ),
+        "_auth_repository": auth_repository,
     }
 
 
@@ -657,9 +672,11 @@ def make_stoken(plugin_config: dict[str, Any]) -> Callable[..., str]:
 
 
 @pytest.fixture
-def make_hook_request(seed_data: ExtendedAsyncSAEngine) -> Callable[..., MagicMock]:
+def make_hook_request(
+    seed_data: ExtendedAsyncSAEngine, auth_repository: AuthRepository
+) -> Callable[..., MagicMock]:
     """Callable(cookies) -> mock Request with _root_app wired to seed_data."""
-    root_app: dict[str, Any] = {"_db": seed_data}
+    root_app: dict[str, Any] = {"_db": seed_data, "_auth_repository": auth_repository}
 
     def _make(cookies: dict[str, str]) -> MagicMock:
         request = MagicMock()

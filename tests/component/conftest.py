@@ -1438,7 +1438,9 @@ def auth_processors(
 ) -> AuthProcessors:
     """Real AuthProcessors wired with real AuthService and AuthRepository."""
     repo = AuthRepository(
-        database_engine, KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN)
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
     user_repository = UserRepository(

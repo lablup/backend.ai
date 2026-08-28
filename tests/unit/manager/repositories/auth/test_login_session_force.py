@@ -37,6 +37,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import AuthDBSource
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
@@ -82,6 +83,7 @@ class TestLoginSessionForce:
     async def auth_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AuthDBSource:
         return AuthDBSource(
             db_with_cleanup,
+            V2DBOpsProvider(db_with_cleanup),
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
 

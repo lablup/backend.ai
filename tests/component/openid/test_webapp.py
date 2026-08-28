@@ -11,7 +11,6 @@ import pytest
 import sqlalchemy as sa
 from aiohttp import web
 
-from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -24,7 +23,7 @@ from ai.backend.manager.plugin.openid.webapp import (
     create_user_if_not_exists,
     generate_user_data,
 )
-from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.repositories.auth.repository import AuthRepository
 
 # ===========================================================================
 # TestGenerateUserData — pure function, no DB needed
@@ -107,27 +106,29 @@ class TestCreateUserIfNotExists:
     async def test_creates_new_user_with_keypair(
         self,
         seed_data: ExtendedAsyncSAEngine,
+        auth_repository: AuthRepository,
         openid_claims: dict[str, Any],
         group_mapping: dict[str, Any],
         password_info: PasswordInfo,
     ) -> None:
-        user = await create_user_if_not_exists(
+        user_id = await create_user_if_not_exists(
             openid_claims,
             group_mapping,
             ["backend-ai-users"],
-            seed_data,
+            auth_repository,
             password_info,
-            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
 
-        assert user.email == "newuser@example.com"
-        assert user.full_name == "New User"
-
-        # Verify keypair was created
         async with seed_data.begin_readonly_session() as sess:
+            user_row = await sess.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
+            assert user_row is not None
+            assert user_row.email == "newuser@example.com"
+            assert user_row.full_name == "New User"
+
+            # Verify keypair was created
             conn = await sess.connection()
             row = (
-                await conn.execute(sa.select(keypairs).where(keypairs.c.user == user.uuid))
+                await conn.execute(sa.select(keypairs).where(keypairs.c.user == user_id))
             ).fetchone()
             assert row is not None
             assert row.is_default is True
@@ -135,29 +136,27 @@ class TestCreateUserIfNotExists:
     async def test_returns_existing_user_without_duplicate(
         self,
         seed_data: ExtendedAsyncSAEngine,
+        auth_repository: AuthRepository,
         openid_claims: dict[str, Any],
         group_mapping: dict[str, Any],
         password_info: PasswordInfo,
     ) -> None:
-        user1 = await create_user_if_not_exists(
+        user_id1 = await create_user_if_not_exists(
             openid_claims,
             group_mapping,
             ["backend-ai-users"],
-            seed_data,
+            auth_repository,
             password_info,
-            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
-        user2 = await create_user_if_not_exists(
+        user_id2 = await create_user_if_not_exists(
             openid_claims,
             group_mapping,
             ["backend-ai-users"],
-            seed_data,
+            auth_repository,
             password_info,
-            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         )
 
-        assert user1.uuid == user2.uuid
-        assert user1.email == user2.email
+        assert user_id1 == user_id2
 
         # Verify only one keypair exists
         async with seed_data.begin_readonly_session() as sess:
@@ -166,7 +165,7 @@ class TestCreateUserIfNotExists:
                 await conn.execute(
                     sa.select(sa.func.count())
                     .select_from(keypairs)
-                    .where(keypairs.c.user == user1.uuid)
+                    .where(keypairs.c.user == user_id1)
                 )
             ).scalar()
             assert count == 1

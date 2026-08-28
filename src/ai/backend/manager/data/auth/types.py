@@ -82,6 +82,33 @@ class AuthenticatedUser:
 
 
 @dataclass(frozen=True)
+class KeyPairSigningMaterial:
+    """The owner and decrypted secret key of a keypair, as a signature check needs them."""
+
+    user_id: UserID
+    secret_key: str
+
+
+@dataclass(frozen=True)
+class AuthorizingUser:
+    """The user record the authorize flow reads, and hands to its POST_AUTHORIZE plugins.
+
+    Wider than what the flow itself checks: ``totp_activated``, ``totp_key`` and
+    ``username`` are read by the two-factor plugins the flow dispatches to.
+    """
+
+    uuid: UserID
+    username: str
+    email: str
+    status: UserStatus
+    role: UserRole
+    resource_policy: str
+    password_changed_at: datetime | None
+    totp_activated: bool
+    totp_key: str | None
+
+
+@dataclass(frozen=True)
 class AuthenticatedKeypair:
     """The keypair the request authenticated with, limited to what request handling reads."""
 

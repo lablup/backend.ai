@@ -9,13 +9,13 @@ from datetime import UTC, datetime, timedelta
 from typing import (
     Any,
     Final,
+    cast,
     override,
 )
 
 import aiohttp
 import aiohttp_cors
 import jwt
-import sqlalchemy as sa
 import yarl
 from aiohttp import web
 from authlib.common.security import generate_token  # pants: no-infer-dep
@@ -24,26 +24,18 @@ from authlib.jose import jwt as joseJWT  # pants: no-infer-dep
 from authlib.oidc.core import CodeIDToken  # pants: no-infer-dep
 
 from ai.backend.common.cron import LocalCron, PeriodicTask
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair.row import generate_keypair_data
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
+from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.models.user.creators import UserCreator
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.user.lookups import UserEmailLookup
 from ai.backend.manager.plugin.webapp import WebappPlugin
-from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.ops.rbac.provider import (
-    FullUserCreation,
-    RBACOpsProvider,
-)
-from ai.backend.manager.repositories.user.creators import UserScopeCreation
-from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.repositories.auth.repository import AuthRepository
 
 from .config import OIDCWebAppConfig
 from .valkey_client import ValkeyOpenIDClient
@@ -129,65 +121,46 @@ async def create_user_if_not_exists(
     openid_user_data: Mapping[str, Any],
     group_mapping: Mapping[str, Any],
     group_order: list[str],
-    db: ExtendedAsyncSAEngine,
+    auth_repository: AuthRepository,
     password_info: PasswordInfo,
-    key_provider_pool: KeyProviderPool,
-) -> UserRow:
-    """Provision an OpenID user through the RBAC member ops: the user scope, its
+) -> UserID:
+    """Provision an OpenID user through the auth repository: the user scope, its
     default keypair, and the domain/project (model-store included) enrollments."""
     user_info = generate_user_data(openid_user_data, group_mapping, group_order)
     user_data = user_info["user"]
-    async with RBACOpsProvider(db).write_ops() as w:
-        existing = await w.batch_query_in_global(
-            sa.select(UserRow).where(UserRow.email == user_data["email"]),
-            BatchQuerier(pagination=NoPagination()),
-        )
-        if existing.rows:
-            user: UserRow = existing.rows[0].UserRow
-            log.info("OPENID.WEBAPP: found existing user ({})", user.email)
-            return user
+    existing_id = await auth_repository.lookup(UserEmailLookup(user_data["email"]))
+    if existing_id is not None:
+        log.info("OPENID.WEBAPP: found existing user ({})", user_data["email"])
+        return existing_id
 
-        domain_result = await w.batch_query_in_global(
-            sa.select(DomainRow.id).where(DomainRow.name == user_data["domain_name"]),
-            BatchQuerier(pagination=NoPagination()),
-        )
-        if not domain_result.rows:
-            raise OpenIDError(f"Domain '{user_data['domain_name']}' does not exist")
-        domain_id = DomainID(domain_result.rows[0].id)
+    domain_name = DomainName(user_data["domain_name"])
+    domain_id = await auth_repository.lookup(DomainNameLookup(domain_name))
+    if domain_id is None:
+        raise OpenIDError(f"Domain '{domain_name}' does not exist")
+    project_id = await auth_repository.lookup(
+        ProjectNameInDomainLookup(domain_name, user_info["project"])
+    )
 
-        project_result = await w.batch_query_in_global(
-            sa.select(ProjectRow.id).where(
-                ProjectRow.domain_name == user_data["domain_name"],
-                ProjectRow.name == user_info["project"],
-            ),
-            BatchQuerier(pagination=NoPagination()),
-        )
-        project_ids = [ProjectID(row.id) for row in project_result.rows]
-
-        user_creator = UserCreator(
-            domain_id=domain_id,
-            email=user_data["email"],
-            username=user_data["username"],
-            password=password_info,
-            need_password_change=user_data["need_password_change"],
-            full_name=user_data["full_name"],
-            description=user_data["description"],
-            status=user_data["status"],
-            status_info=user_data["status_info"],
-            role=user_data["role"],
-            resource_policy=user_data["resource_policy"],
-        )
-        result = await w.create_full_user(
-            FullUserCreation(
-                creation=UserScopeCreation(spec=user_creator),
-                domain_id=domain_id,
-                project_ids=project_ids,
-                keypair_resource_policy=user_info["keypair_resource_policy"],
-                keypair_secrets=await generate_keypair_data(key_provider_pool),
-            )
-        )
-        log.info("OPENID.WEBAPP: new user created ({})", result.user_row.email)
-        return result.user_row
+    user_creator = UserCreator(
+        domain_id=domain_id,
+        email=user_data["email"],
+        username=user_data["username"],
+        password=password_info,
+        need_password_change=user_data["need_password_change"],
+        full_name=user_data["full_name"],
+        description=user_data["description"],
+        status=user_data["status"],
+        status_info=user_data["status_info"],
+        role=user_data["role"],
+        resource_policy=user_data["resource_policy"],
+    )
+    creation = await auth_repository.create_user_with_keypair(
+        user_creator,
+        [project_id] if project_id is not None else [],
+        keypair_resource_policy=user_info["keypair_resource_policy"],
+    )
+    log.info("OPENID.WEBAPP: new user created ({})", creation.user.email)
+    return UserID(creation.user.uuid)
 
 
 _JWKS_REFRESH_INTERVAL: Final[float] = 86400.0
@@ -316,7 +289,7 @@ class OIDCWebAppPlugin(WebappPlugin):
     async def redirect(self, request: web.Request) -> web.Response:
         root_app = request.app["_root_app"]
         config_provider = root_app["_config_provider"]
-        db = root_app["_db"]
+        auth_repository = cast(AuthRepository, root_app["_auth_repository"])
         openid_config = self._config.openid
         token_endpoint = request.app["openid.token_endpoint"]
         state = urllib.parse.parse_qs(request.query["state"])
@@ -361,18 +334,17 @@ class OIDCWebAppPlugin(WebappPlugin):
             rounds=config.auth.password_hash_rounds,
             salt_size=config.auth.password_hash_salt_size,
         )
-        user = await create_user_if_not_exists(
+        user_id = await create_user_if_not_exists(
             claims,
             openid_config.group_mapping,
             [x.strip() for x in openid_config.group_order.split(",")],
-            db,
+            auth_repository,
             password_info,
-            root_app["_key_provider_pool"],
         )
         force = state.get("force", ["false"])[0].lower() == "true"
         token_data = {
-            "user": str(user.uuid),
-            "email": user.email,
+            "user": str(user_id),
+            "email": claims["email"],
             "exp": datetime.now(UTC) + timedelta(seconds=60),
             "force": force,
         }

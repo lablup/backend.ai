@@ -98,6 +98,7 @@ async def webapp_plugin_ctx(
     root_app["_etcd"] = r.bootstrap.etcd
     root_app["_valkey_stat"] = r.infrastructure.valkey.stat
     root_app["_key_provider_pool"] = r.bootstrap.key_provider_pool
+    root_app["_auth_repository"] = r.domain.repositories.auth.repository
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
         if pidx == 0:
             log.info("Loading webapp plugin: {0}", plugin_name)

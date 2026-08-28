@@ -5,24 +5,21 @@ import hmac
 import logging
 import re
 from collections.abc import Mapping, Sequence
-from typing import Any, override
+from typing import Any, cast, override
 
-import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 from dateutil.parser import parse as dateutil_parse
 
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
+from ai.backend.common.types import AccessKey
 from ai.backend.common.utils import nmget
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed, InvalidAuthParameters
-from ai.backend.manager.models.keypair.row import (
-    KEYPAIR_SECRET_KEY_CONTEXT,
-    KeyPairRow,
-    keypairs,
-)
-from ai.backend.manager.models.user import UserStatus, users
-from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.models.keypair.lookups import KeypairAccessKeyUserLookup
+from ai.backend.manager.models.user.queriers import AuthorizingUserQuerier
+from ai.backend.manager.repositories.auth.repository import AuthRepository
 
 from .utils import deserialize_stoken
 
@@ -124,8 +121,7 @@ class KeypairAuthHookPlugin(HookPlugin):
         params: Mapping[str, Any],
     ) -> Any:
         root_app = request.app["_root_app"]
-        db = root_app["_db"]
-        key_provider_pool: KeyProviderPool = root_app["_key_provider_pool"]
+        auth_repository = cast(AuthRepository, root_app["_auth_repository"])
         config_provider = root_app["_config_provider"]
         shared_config = await config_provider.legacy_etcd_config_loader.load()
         plugin_config = nmget(shared_config, "plugins.webapp.keypair_auth")
@@ -141,11 +137,12 @@ class KeypairAuthHookPlugin(HookPlugin):
             secret = plugin_config["secret"]
             try:
                 payload = deserialize_stoken(stoken, secret)
-                query = sa.select(KeyPairRow).where(KeyPairRow.access_key == payload.access_key)
-                async with db.begin_readonly_session() as db_session:
-                    keypair_row = await db_session.scalar(query)
-                    user_id = keypair_row.user
-
+                owner = await auth_repository.lookup(
+                    KeypairAccessKeyUserLookup(AccessKey(payload.access_key))
+                )
+                if owner is None:
+                    raise Reject("invalid authentication token")
+                user_id = owner
             except Exception:
                 try:
                     result = self.parse_token(stoken)
@@ -153,15 +150,9 @@ class KeypairAuthHookPlugin(HookPlugin):
                         raise Reject("invalid authentication token")
                     sign_method, access_key, signature = result
 
-                    async with db.begin() as conn:
-                        query = (
-                            sa.select(keypairs.c.user, keypairs.c.secret_key)
-                            .select_from(keypairs)
-                            .where(keypairs.c.access_key == access_key)
-                        )
-                        result = await conn.execute(query)
-                        keypair = result.fetchone()
-
+                    signing_material = await auth_repository.get_keypair_signing_material(
+                        access_key
+                    )
                     sign_params = {
                         "date": body.get("date"),
                         "endpoint": body.get("endpoint"),
@@ -169,14 +160,12 @@ class KeypairAuthHookPlugin(HookPlugin):
                     }
                     generated_token = await self.sign_token(
                         sign_method,
-                        await key_provider_pool.decrypt(
-                            keypair.secret_key, KEYPAIR_SECRET_KEY_CONTEXT
-                        ),
+                        signing_material.secret_key,
                         sign_params,
                     )
                     if generated_token != signature:
                         raise Reject("Invalid auth token")
-                    user_id = keypair.user
+                    user_id = signing_material.user_id
 
                 except Exception as e:
                     log.error("AUTHORIZE_KEYPAIR_HOOK: invalid auth token {}", _mask_token(stoken))
@@ -186,12 +175,9 @@ class KeypairAuthHookPlugin(HookPlugin):
         else:
             return None  # no-op for normal login
 
-        async with db.begin() as conn:
-            query = sa.select(users).select_from(users).where(users.c.uuid == user_id)
-            result = await conn.execute(query)
-            user = result.fetchone()
-            if not user:
-                raise Reject("No such user with access key")
-            if user.status != UserStatus.ACTIVE:
-                raise Reject("user is inactivated with access key")
-            return user
+        user = await auth_repository.query_user_data(AuthorizingUserQuerier(user_id))
+        if user is None:
+            raise Reject("No such user with access key")
+        if user.status != UserStatus.ACTIVE:
+            raise Reject("user is inactivated with access key")
+        return user

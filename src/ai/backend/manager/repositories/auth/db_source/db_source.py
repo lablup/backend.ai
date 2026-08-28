@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 import uuid as uuid_mod
 from collections.abc import Collection
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ from sqlalchemy.dialects import postgresql as pgsql
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError, UserNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -23,7 +26,12 @@ from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
     LoginSessionStatus,
 )
-from ai.backend.manager.data.auth.types import GroupMembershipData, UserCreationData, UserData
+from ai.backend.manager.data.auth.types import (
+    GroupMembershipData,
+    KeyPairSigningMaterial,
+    UserCreationData,
+    UserData,
+)
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
@@ -35,8 +43,14 @@ from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadReque
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
-from ai.backend.manager.models.keypair.row import generate_keypair_data, keypairs
+from ai.backend.manager.models.keypair.row import (
+    KEYPAIR_SECRET_KEY_CONTEXT,
+    generate_keypair_data,
+    keypairs,
+)
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
+from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.querier import DataQuerier
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
@@ -49,6 +63,7 @@ from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.rbac.provider import FullUserCreation, RBACOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.creators import UserScopeCreation
 from ai.backend.manager.secret.pool import KeyProviderPool
 
@@ -92,11 +107,18 @@ class AuthDBSource:
 
     _db: ExtendedAsyncSAEngine
     _rbac_ops_provider: RBACOpsProvider
+    _v2_ops: V2DBOpsProvider
     _key_provider_pool: KeyProviderPool
 
-    def __init__(self, db: ExtendedAsyncSAEngine, key_provider_pool: KeyProviderPool) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
         self._db = db
         self._rbac_ops_provider = RBACOpsProvider(db)
+        self._v2_ops = v2_ops_provider
         self._key_provider_pool = key_provider_pool
 
     @auth_db_source_resilience.apply()
@@ -138,7 +160,7 @@ class AuthDBSource:
         project_ids: Collection[ProjectID],
         *,
         keypair_resource_policy: str,
-        keypair_rate_limit: int,
+        keypair_rate_limit: int | None = None,
     ) -> UserCreationData:
         """Provision a signup user in one transaction: the row, its default keypair,
         and its domain/project (model-store included) scope enrollments."""
@@ -247,6 +269,50 @@ class AuthDBSource:
             query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
             await conn.execute(query)
 
+    @auth_db_source_resilience.apply()
+    async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:
+        """Whether an active keypair holds the given secret key."""
+        async with self._db.begin_readonly() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(keypairs.c.secret_key, keypairs.c.is_active).where(
+                        keypairs.c.access_key == access_key
+                    )
+                )
+            ).first()
+        if row is None or row.secret_key is None or not row.is_active:
+            return False
+        stored = await self._key_provider_pool.decrypt(row.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
+        return secrets.compare_digest(stored.encode("utf-8"), secret_key.encode("utf-8"))
+
+    @auth_db_source_resilience.apply()
+    async def fetch_keypair_signing_material(self, access_key: str) -> KeyPairSigningMaterial:
+        """Read the owner and the decrypted secret key of a keypair."""
+        async with self._db.begin_readonly() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(keypairs.c.user, keypairs.c.secret_key).where(
+                        keypairs.c.access_key == access_key
+                    )
+                )
+            ).first()
+        if row is None or row.secret_key is None:
+            raise KeyPairNotFound(f"No keypair holds the access key {access_key}")
+        return KeyPairSigningMaterial(
+            user_id=row.user,
+            secret_key=await self._key_provider_pool.decrypt(
+                row.secret_key, KEYPAIR_SECRET_KEY_CONTEXT
+            ),
+        )
+
+    @auth_db_source_resilience.apply()
+    async def lookup[TEntityID: EntityIdentifier](
+        self, lookup: DataLookup[Any, TEntityID]
+    ) -> TEntityID | None:
+        """The id a key names, or None when it names nothing."""
+        async with self._v2_ops.read_ops() as r:
+            return await r.lookup_entity_id(lookup)
+
     def _user_row_to_data(self, row: UserRow | sa.Row[Any]) -> UserData:
         """Convert UserRow to UserData."""
         return UserData(
@@ -315,6 +381,12 @@ class AuthDBSource:
                 .select_from(users)
                 .where((users.c.email == email) & (users.c.domain_name == domain_name))
             )
+
+    @auth_db_source_resilience.apply()
+    async def query_user_data[TData](self, querier: DataQuerier[UserRow, TData]) -> TData | None:
+        """The user a querier names, or None when it names nothing."""
+        async with self._v2_ops.read_ops() as r:
+            return await r.query_data(querier)
 
     async def _check_password(
         self,
@@ -713,3 +785,14 @@ class AuthDBSource:
             )
             await conn.commit()
             return session_token
+
+    @auth_db_source_resilience.apply()
+    async def invalidate_active_login_sessions(self, user_id: UserID) -> None:
+        """Mark every active login session of a user invalidated."""
+        ls = LoginSessionRow.__table__
+        async with self._db.begin() as conn:
+            await conn.execute(
+                sa.update(ls)
+                .where((ls.c.user_id == user_id) & (ls.c.status == LoginSessionStatus.ACTIVE))
+                .values(status=LoginSessionStatus.INVALIDATED, invalidated_at=sa.func.now())
+            )
