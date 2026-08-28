@@ -1236,7 +1236,23 @@ class ResourceSlot(UserDict[str, Decimal]):
         )
 
     def normalize_slots(self, *, ignore_unknown: bool) -> ResourceSlot:
-        known_slots = current_resource_slots.get()
+        """
+        Normalize using the known slots in the ``current_resource_slots`` ContextVar.
+        Callers must have set it; use :meth:`normalize_slots_by_known_slots` otherwise.
+        """
+        return self.normalize_slots_by_known_slots(
+            current_resource_slots.get(), ignore_unknown=ignore_unknown
+        )
+
+    def normalize_slots_by_known_slots(
+        self,
+        known_slots: Mapping[SlotName, SlotTypes],
+        *,
+        ignore_unknown: bool,
+    ) -> ResourceSlot:
+        """
+        Drop keys outside ``known_slots`` and fill unset known slots with zero.
+        """
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
             raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
