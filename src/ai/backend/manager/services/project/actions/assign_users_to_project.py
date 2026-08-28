@@ -6,6 +6,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.data.project.types import AssignUserFailure
 from ai.backend.manager.data.user.types import UserData
 
 
@@ -36,3 +37,4 @@ class AssignUsersToProjectAction(BaseSingleEntityAction):
 class AssignUsersToProjectActionResult:
     project_id: ProjectID
     assigned_users: list[UserData]
+    failures: list[AssignUserFailure]

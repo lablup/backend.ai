@@ -174,11 +174,13 @@ class ProjectService:
     async def assign_users_to_project(
         self, action: AssignUsersToProjectAction
     ) -> AssignUsersToProjectActionResult:
-        assigned_users = await self._group_repository.assign_users_to_project(
+        result = await self._group_repository.assign_users_to_project(
             action.project_id, action.user_ids, action.role_id
         )
         return AssignUsersToProjectActionResult(
-            project_id=action.project_id, assigned_users=assigned_users
+            project_id=action.project_id,
+            assigned_users=result.assigned_users,
+            failures=result.failures,
         )
 
     async def create_dotfile(

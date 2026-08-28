@@ -14,10 +14,12 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.group.types import ProjectType
 from ai.backend.common.dto.manager.v2.user.response import UserNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AdminSearchGroupsPayload",
+    "AssignUserError",
     "AssignUsersToProjectPayload",
     "DeleteProjectPayload",
     "ProjectBasicInfo",
@@ -174,10 +176,34 @@ class PurgeProjectPayload(BaseResponseModel):
     )
 
 
+class AssignUserError(BaseResponseModel):
+    """Error information for a single user that could not be assigned."""
+
+    user_id: UUID = Field(description="UUID of the user that failed to be assigned.")
+    message: str = Field(description="Error message describing the failure reason.")
+
+
 class AssignUsersToProjectPayload(BaseResponseModel):
     """Payload for assign users to project response."""
 
-    items: list[UserNode] = Field(description="List of users actually assigned.")
+    successes: list[UserNode] = Field(
+        default_factory=list,
+        description=(
+            "Users that were assigned, in the order they were requested. Together with "
+            "`failed` this answers for every requested user exactly once."
+        ),
+    )
+    failed: list[AssignUserError] = Field(
+        default_factory=list,
+        description="List of errors for users that could not be assigned.",
+    )
+    items: list[UserNode] = Field(
+        description=(
+            "List of users actually assigned. "
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use successes."
+        ),
+        deprecated=True,
+    )
 
 
 class AdminSearchGroupsPayload(BaseResponseModel):

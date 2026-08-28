@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     AdminSearchGroupsPayload,
+    AssignUserError,
     AssignUsersToProjectPayload,
     DeleteProjectPayload,
     ProjectBasicInfo,
@@ -62,6 +63,7 @@ __all__ = (
     "UnassignUsersFromProjectInput",
     # Response DTOs
     "AdminSearchGroupsPayload",
+    "AssignUserError",
     "AssignUsersToProjectPayload",
     "ProjectBasicInfo",
     "ProjectOrganizationInfo",

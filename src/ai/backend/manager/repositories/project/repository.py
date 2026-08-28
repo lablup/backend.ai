@@ -19,8 +19,11 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.project.types import ProjectData, UnassignUsersResult
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.project.types import (
+    AssignUsersResult,
+    ProjectData,
+    UnassignUsersResult,
+)
 from ai.backend.manager.errors.resource import (
     InvalidUserUpdateMode,
     ProjectNotFound,
@@ -139,10 +142,11 @@ class ProjectRepository:
     @project_repository_resilience.apply()
     async def assign_users_to_project(
         self, project_id: UUID, user_ids: list[UUID], role_id: UUID
-    ) -> list[UserData]:
+    ) -> AssignUsersResult:
         """Assign users to a project with domain validation and RBAC scope binding.
 
-        Returns the list of newly assigned users.
+        Answers for every id the caller named: who was enrolled, and why each of the
+        others was not.
         """
         return await self._db_source.assign_users_to_project(
             ProjectID(project_id), [UserID(uid) for uid in user_ids], role_id

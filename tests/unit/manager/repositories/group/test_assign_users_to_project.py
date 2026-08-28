@@ -318,9 +318,10 @@ class TestAssignUsersToProject:
             test_project, [same_domain_user_1, same_domain_user_2], test_role
         )
 
-        assert len(result) == 2
-        result_uuids = {u.uuid for u in result}
+        assert len(result.assigned_users) == 2
+        result_uuids = {u.uuid for u in result.assigned_users}
         assert result_uuids == {same_domain_user_1, same_domain_user_2}
+        assert result.failures == []
 
         # Verify ASE rows created (PROJECT scope, USER entity)
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -341,7 +342,8 @@ class TestAssignUsersToProject:
     ) -> None:
         """Empty user_ids list returns empty result without DB access."""
         result = await group_db_source.assign_users_to_project(test_project, [], test_role)
-        assert result == []
+        assert result.assigned_users == []
+        assert result.failures == []
 
     async def test_assign_filters_already_assigned_users(
         self,
@@ -352,17 +354,18 @@ class TestAssignUsersToProject:
         same_domain_user_1: UserID,
         same_domain_user_2: UserID,
     ) -> None:
-        """Already-assigned users are excluded; only new users are returned."""
+        """An already-assigned user is answered as a failure, not dropped."""
         # Pre-assign user_1
         await group_db_source.assign_users_to_project(test_project, [same_domain_user_1], test_role)
 
-        # Assign both — only user_2 should be returned
+        # Assign both — user_2 goes through and user_1 is answered as already assigned
         result = await group_db_source.assign_users_to_project(
             test_project, [same_domain_user_1, same_domain_user_2], test_role
         )
 
-        assert len(result) == 1
-        assert result[0].uuid == same_domain_user_2
+        assert [u.uuid for u in result.assigned_users] == [same_domain_user_2]
+        assert [f.user_id for f in result.failures] == [same_domain_user_1]
+        assert result.failures[0].reason == "User is already assigned to this project."
 
         # Verify total 2 ASE associations
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -383,13 +386,14 @@ class TestAssignUsersToProject:
         same_domain_user_1: UserID,
         cross_domain_user: UserID,
     ) -> None:
-        """Users from a different domain are silently excluded."""
+        """A user from another domain is answered as a failure, not dropped."""
         result = await group_db_source.assign_users_to_project(
             test_project, [same_domain_user_1, cross_domain_user], test_role
         )
 
-        assert len(result) == 1
-        assert result[0].uuid == same_domain_user_1
+        assert [u.uuid for u in result.assigned_users] == [same_domain_user_1]
+        assert [f.user_id for f in result.failures] == [cross_domain_user]
+        assert result.failures[0].reason == "User does not belong to the project's domain."
 
     async def test_assign_filters_nonexistent_users(
         self,
@@ -397,10 +401,12 @@ class TestAssignUsersToProject:
         test_project: ProjectID,
         test_role: uuid.UUID,
     ) -> None:
-        """Non-existent user UUIDs are silently excluded."""
+        """A UUID naming no user is answered as a failure, not dropped."""
         fake_user = UserID(uuid.uuid4())
         result = await group_db_source.assign_users_to_project(test_project, [fake_user], test_role)
-        assert result == []
+        assert result.assigned_users == []
+        assert [f.user_id for f in result.failures] == [fake_user]
+        assert result.failures[0].reason == "User does not exist."
 
     async def test_assign_all_invalid_returns_empty(
         self,
@@ -409,13 +415,14 @@ class TestAssignUsersToProject:
         test_role: uuid.UUID,
         cross_domain_user: UserID,
     ) -> None:
-        """When all users are invalid (wrong domain, nonexistent), return empty."""
+        """When every named user is invalid, each is still answered in request order."""
         fake_user = UserID(uuid.uuid4())
 
         result = await group_db_source.assign_users_to_project(
             test_project, [cross_domain_user, fake_user], test_role
         )
-        assert result == []
+        assert result.assigned_users == []
+        assert [f.user_id for f in result.failures] == [cross_domain_user, fake_user]
 
     async def test_assign_creates_user_role_rows(
         self,
