@@ -38,7 +38,7 @@ from ai.backend.agent.rootless.base import (
     RootlessOciRuntime,
     write_layer,
 )
-from ai.backend.agent.rootless.registry import fetch_image_metadata
+from ai.backend.agent.rootless.registry import fetch_image_metadata, is_insecure_registry
 from ai.backend.agent.rootless.registry import push_image as fetch_push
 from ai.backend.logging import BraceStyleAdapter
 
@@ -64,10 +64,6 @@ class EnrootRuntime(RootlessOciRuntime):
             "ENROOT_DATA_PATH": str(self._data_path),
             "ENROOT_CACHE_PATH": str(self._cache_path),
             "ENROOT_RUNTIME_PATH": str(self._runtime_path),
-            # BAI clusters commonly run an internal plain-HTTP registry; enroot import defaults to
-            # https and would fail the TLS handshake against it. (A dedicated config knob can gate
-            # this per-registry later.)
-            "ENROOT_ALLOW_HTTP": "y",
         }
 
     @override
@@ -148,8 +144,18 @@ class EnrootRuntime(RootlessOciRuntime):
         # report as present.
         staging = sqsh.with_name(f".pull-{os.getpid()}-{sqsh.name}")
         try:
+            # `ENROOT_ALLOW_HTTP` does not *permit* http, it FORCES it (enroot 4.2.1
+            # `docker.sh`: `if [ -n "$ENROOT_ALLOW_HTTP" ]; then curl_proto="http"`). Setting it
+            # for every pull sent public-registry traffic to port 80, where it hung for the full
+            # curl timeout. Only a registry we already treat as insecure gets it.
+            extra_env = {"ENROOT_ALLOW_HTTP": "y"} if is_insecure_registry(image_ref) else None
             rc, _out, err = await self._run(
-                _ENROOT_BIN, "import", "-o", str(staging), f"docker://{image_ref}"
+                _ENROOT_BIN,
+                "import",
+                "-o",
+                str(staging),
+                f"docker://{image_ref}",
+                extra_env=extra_env,
             )
             if rc != 0:
                 raise RuntimeError(

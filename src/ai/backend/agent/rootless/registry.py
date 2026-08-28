@@ -67,6 +67,19 @@ class _Ref:
     insecure: bool
 
 
+def _is_plain_http_port(registry: str) -> bool:
+    """Whether an explicit port on ``registry`` means "not TLS".
+
+    A port at all used to be the test, which called `registry.example.com:443` insecure and then
+    pinned it to http — the standard HTTPS port is the one case where naming the port says the
+    opposite. 80 is the other direction and stays insecure.
+    """
+    host, sep, port = registry.rpartition(":")
+    if not sep or not port.isdigit():
+        return False
+    return int(port) != 443
+
+
 def _parse_ref(canonical: str) -> _Ref:
     # [registry[:port]/]repo[/sub...][:tag|@digest]. A first path component with '.'/':' or
     # 'localhost' is the registry host; otherwise it is Docker Hub (single names get 'library/').
@@ -83,8 +96,21 @@ def _parse_ref(canonical: str) -> _Ref:
         registry, repo = head, rest
     else:
         registry, repo = _DOCKER_HUB_REGISTRY, name if slash else f"library/{name}"
-    insecure = registry != _DOCKER_HUB_REGISTRY and (":" in registry or registry == "localhost")
+    insecure = registry != _DOCKER_HUB_REGISTRY and (
+        registry == "localhost" or _is_plain_http_port(registry)
+    )
     return _Ref(registry=registry, repo=repo, reference=reference, insecure=insecure)
+
+
+def is_insecure_registry(canonical: str) -> bool:
+    """Whether ``canonical``'s registry is reached over plain HTTP.
+
+    The single place that decides it, so a runtime's pull flag and this module's own metadata
+    probe cannot disagree about one registry — they did: the probe already chose per registry
+    while the enroot/apptainer pull flags were unconditional, so a pull from a public HTTPS
+    registry was forced to port 80 and hung until it timed out (measured against cr.backend.ai).
+    """
+    return _parse_ref(canonical).insecure
 
 
 def _registry_url(ref: _Ref, scheme: str) -> yarl.URL:
@@ -102,6 +128,20 @@ async def _get_json(
     return data if isinstance(data, dict) else {}
 
 
+def _credentials_for(scheme: str, ref: _Ref, credentials: Mapping[str, Any]) -> dict[str, Any]:
+    """The credentials to send for one attempt — empty on an unexpected downgrade to http.
+
+    A registry we did not classify as insecure is tried over https first and http second, and that
+    second attempt used to carry the same username and password. So a registry whose TLS merely
+    broke — an expired certificate, a proxy in the way — got the operator's credentials in
+    cleartext, on the strength of a failure. An anonymous fallback still works for a public
+    registry; a private one fails, which is the right answer to "TLS did not work".
+    """
+    if scheme == "http" and not ref.insecure:
+        return {}
+    return dict(credentials)
+
+
 async def fetch_image_metadata(
     canonical: str, auth: Mapping[str, str] | None, *, architecture: str = "amd64"
 ) -> ImageMetadata | None:
@@ -115,7 +155,9 @@ async def fetch_image_metadata(
     last_err: Exception | None = None
     for scheme in schemes:
         try:
-            return await _fetch_one(ref, scheme, credentials, architecture)
+            return await _fetch_one(
+                ref, scheme, _credentials_for(scheme, ref, credentials), architecture
+            )
         except Exception as e:
             # A metadata probe must never break the pull; try the next scheme, else warn + null.
             last_err = e
@@ -227,7 +269,7 @@ async def push_image(
             await _push_one(
                 ref,
                 scheme,
-                dict(auth or {}),
+                _credentials_for(scheme, ref, dict(auth or {})),
                 config_bytes,
                 config_digest,
                 layer_path,

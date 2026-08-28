@@ -39,7 +39,7 @@ from ai.backend.agent.rootless.base import (
     force_rmtree,
     write_layer,
 )
-from ai.backend.agent.rootless.registry import fetch_image_metadata
+from ai.backend.agent.rootless.registry import fetch_image_metadata, is_insecure_registry
 from ai.backend.agent.rootless.registry import push_image as fetch_push
 from ai.backend.logging import BraceStyleAdapter
 
@@ -205,15 +205,15 @@ class SingularityRuntime(RootlessOciRuntime):
         staging = sandbox.with_name(f".pull-{os.getpid()}-{sandbox.name}")
         try:
             await asyncio.to_thread(shutil.rmtree, staging, ignore_errors=True)
+            # `--no-https` is not a fallback, it pins the scheme to http. Passing it for every
+            # pull sent public-registry traffic to port 80. Only a registry we already treat as
+            # insecure gets it; the same decision the metadata probe makes.
+            scheme_args = ["--no-https"] if is_insecure_registry(image_ref) else []
             rc, _out, err = await self._run(
                 self._binary,
                 "build",
                 "--force",
-                # BAI clusters commonly run an internal plain-HTTP registry; apptainer defaults to
-                # https and fails the handshake with "server gave HTTP response to HTTPS client".
-                # The enroot backend allows this the same way (ENROOT_ALLOW_HTTP). A dedicated
-                # config knob can gate it per-registry later.
-                "--no-https",
+                *scheme_args,
                 "--sandbox",
                 str(staging),
                 f"docker://{image_ref}",
