@@ -71,7 +71,6 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
     VFolderHostPermissionMap,
-    current_resource_slots,
 )
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
@@ -125,8 +124,13 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
+<<<<<<< HEAD
 from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
 from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
+=======
+from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot.types import NumberFormat
+>>>>>>> 46de869e (fix(BA-7510): source known resource slots from the slot-type registry (#14025))
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
@@ -507,6 +511,29 @@ def database(
             obj=cli_ctx,
         )
         cli_schema_oneshot.invoke(click_ctx)
+
+    # `schema oneshot` creates the tables but applies no migration, so the seed
+    # rows the migrations carry are missing. Installs load them from the fixture
+    # files; do the same for the registry the manager reads at runtime.
+    async def seed_resource_slot_types() -> None:
+        fixture_path = (
+            Path(os.environ["BACKEND_BUILD_ROOT"])
+            / "fixtures"
+            / "manager"
+            / "example-resource-slot-types.json"
+        )
+        rows = [
+            {**row, "number_format": NumberFormat(**row["number_format"])}
+            for row in json.loads(fixture_path.read_text())["resource_slot_types"]
+        ]
+        engine = create_async_engine(str(test_db_url), connect_args=pgsql_connect_opts)
+        async with engine.begin() as conn:
+            await conn.execute(
+                pg_insert(ResourceSlotTypeRow.__table__).values(rows).on_conflict_do_nothing()
+            )
+        await engine.dispose()
+
+    asyncio.run(seed_resource_slot_types())
 
 
 # ---------------------------------------------------------------------------
@@ -1016,13 +1043,6 @@ class _TestConfigProvider(ManagerConfigProvider):
         mock_etcd_loader.register_myself = AsyncMock()
         mock_etcd_loader.deregister_myself = AsyncMock()
         self._legacy_etcd_config_loader = mock_etcd_loader
-        # Set the current_resource_slots ContextVar so that ResourceSlot
-        # operations (e.g. normalize_slots) work without hitting etcd.
-        _slots = {
-            SlotName("cpu"): SlotTypes("count"),
-            SlotName("mem"): SlotTypes("bytes"),
-        }
-        current_resource_slots.set(_slots)
 
 
 @pytest.fixture()
