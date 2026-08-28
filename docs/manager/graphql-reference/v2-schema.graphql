@@ -1752,6 +1752,17 @@ type BulkAddRolePermissionsPayload {
 }
 
 """
+Added in 26.9.0. Failure detail for a single artifact in a bulk delete or restore.
+"""
+type BulkArtifactV2Error {
+  """UUID of the artifact that could not be reached."""
+  artifactId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
 Added in 26.3.0. Error information for a failed user in bulk role assignment.
 """
 type BulkAssignRoleError {
@@ -3941,8 +3952,20 @@ input DeleteArtifactsInput {
 Added in 25.15.0. Response payload for artifact deletion operations. Contains the artifacts that were soft-deleted. These can be restored later.
 """
 type DeleteArtifactsPayload {
-  """List of soft-deleted artifacts."""
-  artifacts: [Artifact!]!
+  """
+  Added in 26.9.0. Artifacts that were soft-deleted, in the order they were requested. Together with `failed` this answers for every requested artifact exactly once.
+  """
+  successes: [Artifact!]!
+
+  """
+  Added in 26.9.0. List of errors for artifacts that could not be soft-deleted.
+  """
+  failed: [BulkArtifactV2Error!]!
+
+  """
+  Added in 25.15.0. List of soft-deleted artifacts. Deprecated since 26.9.0.
+  """
+  artifacts: [Artifact!]! @deprecated(reason: "Use successes.")
 }
 
 """Added in 25.16.0. Input for deleting an auto-scaling rule"""
@@ -13170,8 +13193,18 @@ input RestoreArtifactsInput {
 Added in 25.15.0. Response payload for artifact restoration operations. Contains the artifacts that were restored from soft-deleted state.
 """
 type RestoreArtifactsPayload {
-  """List of restored artifacts."""
-  artifacts: [Artifact!]!
+  """
+  Added in 26.9.0. Artifacts that were restored, in the order they were requested. Together with `failed` this answers for every requested artifact exactly once.
+  """
+  successes: [Artifact!]!
+
+  """
+  Added in 26.9.0. List of errors for artifacts that could not be restored.
+  """
+  failed: [BulkArtifactV2Error!]!
+
+  """Added in 25.15.0. List of restored artifacts. Deprecated since 26.9.0."""
+  artifacts: [Artifact!]! @deprecated(reason: "Use successes.")
 }
 
 """Added in 26.9.0. Payload for domain restore mutation."""
