@@ -14,7 +14,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, SlotQuantity
+from ai.backend.common.types import AccessKey, SlotName, SlotQuantity, SlotTypes
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import (
@@ -178,14 +178,25 @@ class ResourcePresetRepository:
                 return presets
 
         # Fallback to DB
+<<<<<<< HEAD
         await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
         presets = await self._db_source.list_presets(scaling_group_name)
+=======
+        presets = await self._db_source.list_presets(resource_group_name)
+>>>>>>> 46de869e (fix(BA-7510): source known resource slots from the slot-type registry (#14025))
 
         # Cache the result
         with suppress_with_log([Exception], message="Failed to cache preset list"):
             await self._cache_source.set_preset_list(presets, scaling_group_name)
 
         return presets
+
+    @resource_preset_repository_resilience.apply()
+    async def known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
+        """
+        The system-wide registry of enabled resource slot types.
+        """
+        return await self._db_source.known_slot_types()
 
     @resource_preset_repository_resilience.apply()
     async def search_presets(
@@ -208,10 +219,6 @@ class ResourcePresetRepository:
         """
         Check resource presets availability and resource limits.
         """
-        # Get configuration values
-        known_slot_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
-        )
         # Try to get from cache first
         with suppress_with_log([Exception], message="Failed to get check presets data from cache"):
             cached_data = await self._cache_source.get_check_presets_data(
@@ -229,6 +236,7 @@ class ResourcePresetRepository:
             domain_name,
         )
 
+        known_slot_types = await self._db_source.known_slot_types()
         group_resource_visibility = await self._config_provider.legacy_etcd_config_loader.get_raw(
             "config/api/resources/group_resource_visibility"
         )
