@@ -1517,11 +1517,29 @@ class AbstractAgent[
                 try:
                     await self.destroy_kernel(ev.kernel_id, ev.container_id)
                 except Exception as e:
+                    # CLEAN is deliberately NOT enqueued here. It used to be (this was a
+                    # `finally`), which meant a destroy that failed still released the scratch,
+                    # the ports and the registry entry — so the container kept running while the
+                    # agent forgot it existed. That is how an unkillable container becomes an
+                    # invisible one: nothing lists it, the orphan sweep iterates the registry it
+                    # was just dropped from, and its eventual death is filed under a guessed
+                    # reason. Measured with a container runc could not signal.
+                    #
+                    # Leaving the kernel in the registry is the honest state — the container IS
+                    # still there — and the periodic reconciler retries from both directions: it
+                    # re-issues DESTROY while the container lives, and CLEANs with
+                    # CONTAINER_NOT_FOUND once it is gone.
+                    log.error(
+                        "destroy_kernel(k:{}, c:{}) failed; NOT cleaning up, the container may "
+                        "still be running (the lifecycle sync will retry): {!r}",
+                        ev.kernel_id,
+                        ev.container_id,
+                        e,
+                    )
                     ev.set_done_future_exception(e)
                     raise
                 else:
                     log.info("Kernel {0} destroyed", ev.kernel_id)
-                finally:
                     await self.container_lifecycle_queue.put(
                         ContainerLifecycleEvent(
                             ev.kernel_id,
