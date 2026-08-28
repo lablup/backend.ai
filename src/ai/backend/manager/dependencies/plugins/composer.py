@@ -9,10 +9,12 @@ from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.plugins.plugins import ManagerPlugins
 
 from .base import PluginsInput
 from .event_dispatcher import EventDispatcherPluginDependency
 from .hook import HookPluginDependency
+from .manager_plugins import ManagerPluginsDependency
 from .network import NetworkPluginDependency
 
 
@@ -23,6 +25,7 @@ class PluginsResources:
     hook_plugin_ctx: HookPluginContext
     network_plugin_ctx: NetworkPluginContext
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
+    manager_plugins: ManagerPlugins
 
 
 class PluginsComposer(DependencyComposer[PluginsInput, PluginsResources]):
@@ -36,6 +39,7 @@ class PluginsComposer(DependencyComposer[PluginsInput, PluginsResources]):
     1. NetworkPluginContext
     2. HookPluginContext (dispatches ACTIVATE_MANAGER)
     3. EventDispatcherPluginContext
+    4. ManagerPlugins (at most one authentication plugin)
     """
 
     @property
@@ -74,8 +78,14 @@ class PluginsComposer(DependencyComposer[PluginsInput, PluginsResources]):
             setup_input,
         )
 
+        manager_plugins = await stack.enter_dependency(
+            ManagerPluginsDependency(),
+            setup_input,
+        )
+
         yield PluginsResources(
             hook_plugin_ctx=hook_plugin_ctx,
             network_plugin_ctx=network_plugin_ctx,
             event_dispatcher_plugin_ctx=event_dispatcher_plugin_ctx,
+            manager_plugins=manager_plugins,
         )

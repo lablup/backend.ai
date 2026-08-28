@@ -53,6 +53,7 @@ def _make_processing_input() -> ProcessingInput:
         event_fetcher=MagicMock(),
         background_task_manager=MagicMock(),
         error_monitor=MagicMock(),
+        manager_plugins=MagicMock(),
         hook_plugin_ctx=MagicMock(),
         deployment_controller=MagicMock(),
         route_controller=MagicMock(),

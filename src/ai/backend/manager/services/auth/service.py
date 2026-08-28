@@ -4,11 +4,11 @@ import time
 import uuid
 from collections import ChainMap
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, cast
 
 from aiohttp import web
-from sqlalchemy import RowMapping
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
@@ -19,21 +19,27 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
+from ai.backend.common.exception import (
+    BackendAIError,
+    InvalidAPIParameters,
+    UserResourcePolicyNotFound,
+)
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
-from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair, UserData
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingTarget
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
+from ai.backend.manager.dto.auth.lookup import UserLookupData
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
+    InvalidUserLookupData,
     PasswordExpired,
     TooManyConcurrentLoginSessions,
 )
@@ -57,6 +63,9 @@ from ai.backend.manager.models.user import (
     compare_to_hashed_password,
 )
 from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import user_row_to_auth_data
+from ai.backend.manager.plugins.auth import MIN_LOOKUP_RETRY_COUNT, AuthPlugin
+from ai.backend.manager.plugins.plugins import ManagerPlugins
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.client_ip_masking.repository import (
@@ -136,8 +145,17 @@ def _classify_failure(exc: Exception) -> LoginAttemptResult:
     return _FAILURE_MAP.get(type(exc), LoginAttemptResult.FAILED_INVALID_CREDENTIALS)
 
 
+@dataclass(frozen=True)
+class VerifiedUser:
+    """The account an authorize attempt verified, with its live login sessions."""
+
+    user: UserData
+    active_sessions: list[ActiveSessionInfo]
+
+
 class AuthService:
     _hook_plugin_ctx: HookPluginContext
+    _manager_plugins: ManagerPlugins
     _auth_repository: AuthRepository
     _config_provider: ManagerConfigProvider
     _valkey_session_client: ValkeySessionClient
@@ -150,6 +168,7 @@ class AuthService:
     def __init__(
         self,
         hook_plugin_ctx: HookPluginContext,
+        manager_plugins: ManagerPlugins,
         auth_repository: AuthRepository,
         config_provider: ManagerConfigProvider,
         valkey_session_client: ValkeySessionClient,
@@ -161,6 +180,7 @@ class AuthService:
         key_provider_pool: KeyProviderPool,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
+        self._manager_plugins = manager_plugins
         self._auth_repository = auth_repository
         self._config_provider = config_provider
         self._valkey_session_client = valkey_session_client
@@ -225,10 +245,13 @@ class AuthService:
             raise InvalidAPIParameters("Unsupported authorization type")
         auth_config = self._config_provider.config.auth
         login_client_type_id = action.client_type_id
-        user, active_sessions = await self._verify_user(action, auth_config, login_client_type_id)
+        verified = await self._verify_user(action, auth_config, login_client_type_id)
+        user = verified.user
 
         try:
-            post_result = await self._post_check(action, user, active_sessions, auth_config)
+            post_result = await self._post_check(
+                action, user, verified.active_sessions, auth_config
+            )
             if isinstance(post_result, AuthorizeActionResult):
                 return post_result
             keypair, live_sessions = post_result
@@ -249,13 +272,73 @@ class AuthService:
             )
             raise
 
+    async def _verify_via_auth_plugin(
+        self,
+        action: AuthorizeAction,
+        login_client_type_id: uuid.UUID | None,
+    ) -> VerifiedUser | None:
+        """Let the auth plugin name the account, then resolve it here.
+
+        Returns None when no plugin is installed or the request carries no
+        credential it handles, leaving the hook and password paths to run.
+        """
+        plugin = self._manager_plugins.auth_plugin
+        if plugin is None:
+            return None
+        lookup = await plugin.generate_lookup_data(action.request_data)
+        if lookup is None:
+            return None
+
+        user = await self._resolve_lookup(plugin, lookup)
+        await plugin.on_user_lookup_success(user)
+        active_sessions = await self._auth_repository.get_active_session_tokens(
+            user.uuid, login_client_type_id=login_client_type_id
+        )
+        return VerifiedUser(user=user, active_sessions=active_sessions)
+
+    async def _resolve_lookup(
+        self,
+        plugin: AuthPlugin,
+        lookup: UserLookupData,
+    ) -> UserData:
+        """Resolve the lookup data, reporting each failed attempt to the plugin.
+
+        The callback decides what happens next: raising aborts the sign-in, returning
+        lets the manager try again. An exhausted lookup never names the account.
+        """
+        attempts = max(plugin.lookup_retry_count(), MIN_LOOKUP_RETRY_COUNT) + 1
+        for _ in range(attempts):
+            try:
+                return await self._lookup_user(lookup)
+            except InvalidUserLookupData:
+                raise
+            except BackendAIError as e:
+                await plugin.on_user_lookup_error(e)
+        raise AuthorizationFailed("User credential mismatch.")
+
+    async def _lookup_user(self, lookup: UserLookupData) -> UserData:
+        """The first field the lookup data sets, in the order it declares them."""
+        if lookup.user_id is not None:
+            return await self._auth_repository.find_user_by_uuid(lookup.user_id)
+        if lookup.email is not None:
+            return await self._auth_repository.find_user_by_email(lookup.email)
+        if lookup.username is not None:
+            return await self._auth_repository.find_user_by_username(lookup.username)
+        if lookup.access_key is not None:
+            return await self._auth_repository.find_user_by_access_key(lookup.access_key)
+        raise InvalidUserLookupData("The lookup data names no account.")
+
     async def _verify_user(
         self,
         action: AuthorizeAction,
         auth_config: AuthConfig,
         login_client_type_id: uuid.UUID | None,
-    ) -> tuple[RowMapping, list[ActiveSessionInfo]]:
-        """Step 1: Verify user identity via hook or password."""
+    ) -> VerifiedUser:
+        """Step 1: Verify user identity via the auth plugin, a hook, or the password."""
+        plugin_result = await self._verify_via_auth_plugin(action, login_client_type_id)
+        if plugin_result is not None:
+            return plugin_result
+
         params = action.hook_params
         hook_result = await self._hook_plugin_ctx.dispatch(
             "AUTHORIZE",
@@ -265,11 +348,11 @@ class AuthService:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         if hook_result.result:
-            user = hook_result.result
+            user = user_row_to_auth_data(hook_result.result)
             active_sessions = await self._auth_repository.get_active_session_tokens(
                 user.uuid, login_client_type_id=login_client_type_id
             )
-            return user, active_sessions
+            return VerifiedUser(user=user, active_sessions=active_sessions)
 
         target_password_info = PasswordInfo(
             password=action.password,
@@ -283,12 +366,12 @@ class AuthService:
             target_password_info=target_password_info,
             login_client_type_id=login_client_type_id,
         )
-        return cred_result.user, cred_result.active_sessions
+        return VerifiedUser(user=cred_result.user, active_sessions=cred_result.active_sessions)
 
     async def _post_check(
         self,
         action: AuthorizeAction,
-        user: RowMapping,
+        user: UserData,
         active_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
     ) -> tuple[KeyPairData, list[ActiveSessionInfo]] | AuthorizeActionResult:
@@ -375,7 +458,7 @@ class AuthService:
     async def _create_login_session(
         self,
         action: AuthorizeAction,
-        user: RowMapping,
+        user: UserData,
         keypair: KeyPairData,
         live_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
@@ -829,7 +912,7 @@ class AuthService:
             owner_role=owner_role,
         )
 
-    async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:
+    async def _check_password_age(self, user: UserData, auth_config: AuthConfig | None) -> None:
         if (
             auth_config is not None
             and (max_password_age := auth_config.max_password_age) is not None

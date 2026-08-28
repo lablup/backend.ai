@@ -20,6 +20,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiohttp import web
+from multidict import CIMultiDict, CIMultiDictProxy, MultiDict, MultiDictProxy
 
 from ai.backend.common.api_handlers import BodyParam, QueryParam
 from ai.backend.common.data.entity.user import UserID
@@ -92,7 +93,11 @@ def user_context() -> UserContext:
 @pytest.fixture
 def request_ctx() -> RequestCtx:
     """RequestCtx for endpoints needing raw request access."""
-    return RequestCtx(request=MagicMock(spec=web.Request))
+    request = MagicMock(spec=web.Request)
+    request.headers = CIMultiDictProxy(CIMultiDict())
+    request.cookies = {}
+    request.query = MultiDictProxy(MultiDict())
+    return RequestCtx(request=request)
 
 
 # ---------------------------------------------------------------------------

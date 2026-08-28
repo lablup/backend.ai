@@ -29,3 +29,22 @@ class UserEmailLookup(DataLookup[UserRow, UserID]):
     @override
     def to_entity_id(self, row: UserRow) -> UserID:
         return UserID(row.uuid)
+
+
+@dataclass
+class UserNameLookup(DataLookup[UserRow, UserID]):
+    """Resolves a user's username into the user it names."""
+
+    username: str
+
+    @override
+    def row_class(self) -> type[UserRow]:
+        return UserRow
+
+    @override
+    def conditions(self) -> Sequence[QueryCondition]:
+        return [lambda: UserRow.username == self.username]
+
+    @override
+    def to_entity_id(self, row: UserRow) -> UserID:
+        return UserID(row.uuid)

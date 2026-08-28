@@ -6,6 +6,7 @@ from typing import Any
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider, ResourceT
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.manager.config.unified import PluginsConfig
 
 
 @dataclass
@@ -14,6 +15,7 @@ class PluginsInput:
 
     etcd: AsyncEtcd
     local_config: Mapping[str, Any]
+    plugins_config: PluginsConfig
     allowed_plugins: set[str] | None
     disabled_plugins: set[str] | None
     init_context: Any | None = None

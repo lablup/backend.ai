@@ -49,6 +49,7 @@ from ai.backend.common.dto.manager.auth.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
+from ai.backend.manager.dto.auth.request import HTTPRequestData
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
@@ -145,6 +146,12 @@ class AuthHandler:
         )
         action = AuthorizeAction(
             request=ctx.request,
+            request_data=HTTPRequestData(
+                headers=ctx.request.headers,
+                body=body.raw,
+                cookies=ctx.request.cookies,
+                query_params=ctx.request.query,
+            ),
             type=AuthTokenType(params.type),
             domain_name=params.domain,
             email=params.username,

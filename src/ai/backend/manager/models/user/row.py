@@ -31,6 +31,7 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.auth.types import UserData as AuthUserData
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
@@ -311,6 +312,9 @@ class UserRow(LifecycleTimestampsMixin, Base):
             raise ObjectNotFound(f"User with id {user_uuid} not found")
         return rows[0]
 
+    def to_auth_data(self) -> AuthUserData:
+        return user_row_to_auth_data(self)
+
     def to_model_serving_user_data(self) -> ModelServingUserData:
         return ModelServingUserData(
             uuid=self.uuid,
@@ -501,3 +505,33 @@ async def check_credential(
 
     row_mapping: sa.RowMapping = row._mapping
     return row_mapping
+
+
+def user_row_to_auth_data(row: Any) -> AuthUserData:
+    """The account as the authorize flow reads it, from any row of the users table.
+
+    Row-shaped rather than a :class:`UserRow` method alone, because the flow still
+    meets core-table rows and the rows the legacy ``AUTHORIZE`` hook hands back.
+    """
+    return AuthUserData(
+        uuid=row.uuid,
+        username=row.username,
+        email=row.email,
+        password=row.password,
+        need_password_change=row.need_password_change or False,
+        full_name=row.full_name,
+        description=row.description,
+        is_active=row.status == UserStatus.ACTIVE,
+        status=row.status or UserStatus.ACTIVE,
+        status_info=row.status_info,
+        created_at=row.created_at,
+        modified_at=row.updated_at,
+        password_changed_at=row.password_changed_at,
+        domain_name=row.domain_name or "",
+        role=row.role or UserRole.USER,
+        integration_name=row.integration_id,  # DB column is integration_id
+        resource_policy=row.resource_policy,
+        sudo_session_enabled=row.sudo_session_enabled,
+        totp_activated=row.totp_activated or False,
+        totp_key=row.totp_key,
+    )

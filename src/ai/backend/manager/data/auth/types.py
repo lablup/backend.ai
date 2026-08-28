@@ -51,6 +51,8 @@ class UserData:
     integration_name: str | None
     resource_policy: str
     sudo_session_enabled: bool
+    totp_activated: bool
+    totp_key: str | None
 
 
 @dataclass

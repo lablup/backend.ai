@@ -23,8 +23,9 @@ __all__ = (
 
 
 class AbstractPlugin(metaclass=ABCMeta):
-    """
-    The minimum generic plugin interface.
+    """The minimum generic plugin interface.
+
+    Deprecated: implement `ai.backend.common.plugins.base.BasePlugin` instead.
     """
 
     plugin_config: Mapping[str, Any]

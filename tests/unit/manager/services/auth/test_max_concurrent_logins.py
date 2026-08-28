@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+from multidict import CIMultiDict, CIMultiDictProxy, MultiDict, MultiDictProxy
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.data.entity.resource_policy import (
@@ -18,6 +19,7 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.dto.auth.request import HTTPRequestData
 from ai.backend.manager.errors.auth import TooManyConcurrentLoginSessions
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -35,6 +37,16 @@ from ai.backend.manager.services.auth.service import AuthService
 
 _DEFAULT_USER_UUID = UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 _DEFAULT_RESOURCE_POLICY = "default"
+
+
+def _empty_request_data() -> HTTPRequestData:
+    """A request with nothing an auth plugin could read."""
+    return HTTPRequestData(
+        headers=CIMultiDictProxy(CIMultiDict()),
+        body=None,
+        cookies={},
+        query_params=MultiDictProxy(MultiDict()),
+    )
 
 
 def _make_auth_config() -> AuthConfig:
@@ -73,6 +85,7 @@ def _make_action(*, force: bool = False) -> AuthorizeAction:
         email="user@example.com",
         password="password",
         request=MagicMock(),
+        request_data=_empty_request_data(),
         stoken=None,
         client_type_id=uuid4(),
         otp=None,
@@ -135,6 +148,7 @@ def auth_service(
     mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
+        manager_plugins=MagicMock(auth_plugin=None),
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
