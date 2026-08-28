@@ -456,10 +456,7 @@ class BulkDeleteVFolderV2ErrorGQL(PydanticOutputMixin[BulkDeleteErrorDTO]):
     name="BulkDeleteVFoldersV2Payload",
 )
 class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
-    deleted_count: int = gql_field(
-        description="Number of virtual folders successfully soft-deleted."
-    )
-    deleted_ids: list[UUID] = gql_added_field(
+    successes: list[UUID] = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
@@ -468,6 +465,14 @@ class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
                 "vfolder exactly once."
             ),
         ),
+    )
+    deleted_count: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.2",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            description="Number of virtual folders successfully soft-deleted.",
+        ),
+        deprecation_reason="Use the length of successes.",
     )
     failed: list[BulkDeleteVFolderV2ErrorGQL] = gql_added_field(
         BackendAIGQLMeta(
@@ -548,8 +553,7 @@ class BulkPurgeVFolderV2ErrorGQL(PydanticOutputMixin[BulkPurgeErrorDTO]):
     name="BulkPurgeVFoldersV2Payload",
 )
 class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
-    purged_count: int = gql_field(description="Number of virtual folders successfully purged.")
-    purged_ids: list[UUID] = gql_added_field(
+    successes: list[UUID] = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
@@ -557,6 +561,14 @@ class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
                 "Together with `failed` this answers for every requested vfolder exactly once."
             ),
         ),
+    )
+    purged_count: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.2",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            description="Number of virtual folders successfully purged.",
+        ),
+        deprecation_reason="Use the length of successes.",
     )
     failed: list[BulkPurgeVFolderV2ErrorGQL] = gql_added_field(
         BackendAIGQLMeta(

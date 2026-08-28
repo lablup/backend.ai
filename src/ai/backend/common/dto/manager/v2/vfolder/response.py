@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     FileEntryType,
@@ -144,13 +145,19 @@ class BulkDeleteVFolderV2Error(BaseResponseModel):
 class BulkDeleteVFoldersPayload(BaseResponseModel):
     """Payload for bulk virtual folder soft-deletion."""
 
-    deleted_count: int = Field(description="Number of virtual folders successfully soft-deleted.")
-    deleted_ids: list[UUID] = Field(
+    successes: list[UUID] = Field(
         default_factory=list,
         description=(
             "UUIDs of the vfolders that were soft-deleted, in the order they were requested. "
             "Together with `failed` this answers for every requested vfolder exactly once."
         ),
+    )
+    deleted_count: int = Field(
+        description=(
+            "Number of virtual folders successfully soft-deleted. "
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the length of successes."
+        ),
+        deprecated=True,
     )
     failed: list[BulkDeleteVFolderV2Error] = Field(
         default_factory=list,
@@ -168,13 +175,19 @@ class BulkPurgeVFolderV2Error(BaseResponseModel):
 class BulkPurgeVFoldersPayload(BaseResponseModel):
     """Payload for bulk virtual folder purge."""
 
-    purged_count: int = Field(description="Number of virtual folders successfully purged.")
-    purged_ids: list[UUID] = Field(
+    successes: list[UUID] = Field(
         default_factory=list,
         description=(
             "UUIDs of the vfolders that were purged, in the order they were requested. "
             "Together with `failed` this answers for every requested vfolder exactly once."
         ),
+    )
+    purged_count: int = Field(
+        description=(
+            "Number of virtual folders successfully purged. "
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the length of successes."
+        ),
+        deprecated=True,
     )
     failed: list[BulkPurgeVFolderV2Error] = Field(
         description="List of errors for vfolders that failed to purge."

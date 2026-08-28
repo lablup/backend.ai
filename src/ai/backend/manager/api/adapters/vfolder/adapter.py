@@ -551,7 +551,7 @@ class VFolderAdapter(BaseAdapter):
         ``failed`` rather than aborting the batch and leaving the earlier ids deleted
         while the caller is told the whole call failed.
         """
-        deleted_ids: list[UUID] = []
+        deleted: list[UUID] = []
         failed: list[BulkDeleteVFolderV2Error] = []
         for vfolder_id in input.ids:
             action = DeleteVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
@@ -560,10 +560,10 @@ class VFolderAdapter(BaseAdapter):
             except BackendAIError as e:
                 failed.append(BulkDeleteVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
                 continue
-            deleted_ids.append(vfolder_id)
+            deleted.append(vfolder_id)
         return BulkDeleteVFoldersPayload(
-            deleted_count=len(deleted_ids),
-            deleted_ids=deleted_ids,
+            successes=deleted,
+            deleted_count=len(deleted),
             failed=failed,
         )
 
@@ -573,7 +573,7 @@ class VFolderAdapter(BaseAdapter):
         Each vfolder is processed independently; per-id failures are collected
         into ``failed`` rather than aborting the whole batch.
         """
-        purged_ids: list[UUID] = []
+        purged: list[UUID] = []
         failed: list[BulkPurgeVFolderV2Error] = []
         for vfolder_id in input.ids:
             action = PurgeVFolderV2Action(
@@ -586,10 +586,10 @@ class VFolderAdapter(BaseAdapter):
             except BackendAIError as e:
                 failed.append(BulkPurgeVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
                 continue
-            purged_ids.append(vfolder_id)
+            purged.append(vfolder_id)
         return BulkPurgeVFoldersPayload(
-            purged_count=len(purged_ids),
-            purged_ids=purged_ids,
+            successes=purged,
+            purged_count=len(purged),
             failed=failed,
         )
 
