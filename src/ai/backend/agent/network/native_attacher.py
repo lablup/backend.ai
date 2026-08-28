@@ -323,9 +323,10 @@ class NativeBridgeAttachRunner:
     _ipam: HostLocalIpam
     _uplink: str | None
 
-    def __init__(
-        self, *, uplink: str | None = None, ipam_state_dir: Path = _DEFAULT_IPAM_STATE_DIR
-    ) -> None:
+    def __init__(self, *, uplink: str | None = None, ipam_state_dir: Path | None = None) -> None:
+        # None means "the default store"; `get_host_local_ipam` already resolves that. Taking the
+        # constant as the default here made every caller that wanted the anchored path have to
+        # produce a Path it did not have, which is how the privnet ended up on the root-owned one.
         # The process-wide owner: every agent this runtime hosts shares one node-local IP space.
         self._ipam = get_host_local_ipam(ipam_state_dir)
         # The egress interface LOCAL-bridge traffic may leave the node on. Cross-session isolation

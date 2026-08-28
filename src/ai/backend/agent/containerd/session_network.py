@@ -1073,7 +1073,14 @@ def build_containerd_session_network(
     )
 
     runtime = runtime or ContainerdGrpcRuntime(namespace="backend-ai")
-    cni_runner = cni_runner or NativeBridgeAttachRunner(uplink=uplink)
+    # The attacher keeps its own IPAM handle, so the anchored path has to reach it too — a
+    # constant under /var/lib/backend.ai is shared by every agent on the host and root-owned.
+    ipam_state_dir = (
+        (local_subnet_state_dir.parent / "net-ipam") if local_subnet_state_dir is not None else None
+    )
+    cni_runner = cni_runner or NativeBridgeAttachRunner(
+        uplink=uplink, ipam_state_dir=ipam_state_dir
+    )
 
     # With a privnet socket, every privileged host op (bridge setup/teardown + veth/netns
     # attach) is delegated to the CAP_NET_ADMIN/CAP_SYS_ADMIN privnet, so this (agent) process
@@ -1117,7 +1124,10 @@ def build_containerd_session_network(
         owned_local_subnets = get_local_subnet_allocator(
             local_subnet_state_dir, layout=local_subnet_layout
         )
-        owned_ipam = get_host_local_ipam()
+        # Anchored for the same reason as the subnet store above: a constant under
+        # /var/lib/backend.ai is shared by every agent on the host and is root-owned, which breaks
+        # both a multi-backend node and an unprivileged privnet.
+        owned_ipam = get_host_local_ipam(ipam_state_dir)
         if backends is None:
             backends = {
                 str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin(
