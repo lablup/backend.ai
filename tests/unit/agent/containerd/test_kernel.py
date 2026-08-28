@@ -4,6 +4,7 @@ import asyncio
 import io
 import json
 import tarfile
+import uuid
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -16,7 +17,7 @@ from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
 from ai.backend.agent.resources import Mount
 from ai.backend.common.dto.agent.response import CodeCompletionResult
-from ai.backend.common.types import MountPermission, MountTypes
+from ai.backend.common.types import CommitStatus, KernelId, MountPermission, MountTypes
 
 
 class FakeRunner:
@@ -150,6 +151,64 @@ class TestCommit:
 
         assert k._create_commit_runtime() is sentinel
         assert asked == ["enroot"]
+
+
+class TestDuplicateCommit:
+    """The manager's pre-flight before it asks for a commit, and the Docker backend has answered
+    it the same way for as long as commits have existed: a lock file under the image-commit path
+    means one is already running. Both backends reimplement the path; neither was covered.
+    """
+
+    def _kernel(self, commit_root: Path) -> ContainerdKernel:
+        k = ContainerdKernel.__new__(ContainerdKernel)
+        k.agent_config = {"agent": {"image-commit-path": str(commit_root)}}
+        return k
+
+    def _lock(self, commit_root: Path, subdir: str, kernel_id: KernelId) -> Path:
+        lock_path = commit_root / subdir / "lock" / str(kernel_id)
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path.touch()
+        return lock_path
+
+    async def test_no_lock_means_ready(self, tmp_path: Path) -> None:
+        k = self._kernel(tmp_path)
+        kernel_id = KernelId(uuid.uuid4())
+
+        assert await k.check_duplicate_commit(kernel_id, "sub") == CommitStatus.READY
+
+    async def test_a_lock_means_ongoing(self, tmp_path: Path) -> None:
+        k = self._kernel(tmp_path)
+        kernel_id = KernelId(uuid.uuid4())
+        self._lock(tmp_path, "sub", kernel_id)
+
+        assert await k.check_duplicate_commit(kernel_id, "sub") == CommitStatus.ONGOING
+
+    async def test_an_untouched_commit_root_is_ready(self, tmp_path: Path) -> None:
+        """Nothing has ever been committed on this agent, so the whole tree is absent. That is a
+        READY, not a crash on a missing directory."""
+        k = self._kernel(tmp_path / "never-created")
+        kernel_id = KernelId(uuid.uuid4())
+
+        assert await k.check_duplicate_commit(kernel_id, "sub") == CommitStatus.READY
+
+    async def test_another_kernels_commit_does_not_block_this_one(self, tmp_path: Path) -> None:
+        """The lock is named for the kernel. Two sessions committing into the same subdir at once
+        are independent, and reporting ONGOING for the wrong one would refuse a valid commit."""
+        k = self._kernel(tmp_path)
+        mine = KernelId(uuid.uuid4())
+        theirs = KernelId(uuid.uuid4())
+        self._lock(tmp_path, "sub", theirs)
+
+        assert await k.check_duplicate_commit(mine, "sub") == CommitStatus.READY
+        assert await k.check_duplicate_commit(theirs, "sub") == CommitStatus.ONGOING
+
+    async def test_the_same_kernel_in_another_subdir_is_independent(self, tmp_path: Path) -> None:
+        k = self._kernel(tmp_path)
+        kernel_id = KernelId(uuid.uuid4())
+        self._lock(tmp_path, "sub-a", kernel_id)
+
+        assert await k.check_duplicate_commit(kernel_id, "sub-a") == CommitStatus.ONGOING
+        assert await k.check_duplicate_commit(kernel_id, "sub-b") == CommitStatus.READY
 
 
 class TestStartService:
