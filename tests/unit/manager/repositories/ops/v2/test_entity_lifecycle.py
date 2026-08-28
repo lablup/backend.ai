@@ -769,7 +769,7 @@ class _Sidecar(DanglingFieldCreator[EntityLifecycleTestRow, _SidecarData]):
         return ()
 
     @override
-    def build_row(self, entity_type: EntityType) -> EntityLifecycleTestRow:
+    def build_row(self) -> EntityLifecycleTestRow:
         return EntityLifecycleTestRow(name=self.name)
 
     @override
@@ -781,9 +781,7 @@ class TestSidecarCreate:
     async def test_create_provisions_no_scope_and_joins_nothing(
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
     ) -> None:
-        data = await repository.create_dangling_field(
-            EntityType("test_dangling"), _Sidecar(name="a")
-        )
+        data = await repository.create_dangling_field(_Sidecar(name="a"))
 
         assert await _virtual_scope_id(database, data.id) is None
         assert not await _self_membership_exists(database, data.id)
@@ -791,13 +789,10 @@ class TestSidecarCreate:
     async def test_atomic_create_writes_every_row(
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
     ) -> None:
-        items = await repository.atomic_create_dangling_fields(
-            EntityType("test_dangling"),
-            [
-                _Sidecar(name="a"),
-                _Sidecar(name="b"),
-            ],
-        )
+        items = await repository.atomic_create_dangling_fields([
+            _Sidecar(name="a"),
+            _Sidecar(name="b"),
+        ])
 
         assert [item.name for item in items] == ["a", "b"]
         assert await _row_count(database) == 2
@@ -806,9 +801,10 @@ class TestSidecarCreate:
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
     ) -> None:
         with pytest.raises(RepositoryIntegrityError):
-            await repository.atomic_create_dangling_fields(
-                EntityType("test_dangling"), [_Sidecar(name="a"), _Sidecar(name="a")]
-            )
+            await repository.atomic_create_dangling_fields([
+                _Sidecar(name="a"),
+                _Sidecar(name="a"),
+            ])
 
         assert await _row_count(database) == 0
 

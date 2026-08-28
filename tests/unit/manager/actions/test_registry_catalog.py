@@ -96,6 +96,7 @@ from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.lookup.bulk_base import BaseBulkLookupAction
+from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.validators import ActionValidators
@@ -194,6 +195,7 @@ _V2_ACTION_BASES: tuple[type[Any], ...] = (
     BaseSingleEntityAction,
     BaseBulkAction,
     BaseScopeAction,
+    BaseRelationAction,
     BaseGlobalAction,
     BaseLookupAction,
     BaseBulkLookupAction,

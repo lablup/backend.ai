@@ -52,7 +52,12 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     id: NodeID[str] = gql_field(description="Unique identifier of the audit log entry (UUID).")
 
     action_id: UUID = gql_field(description="UUID of the action that generated this log.")
-    entity_type: str = gql_field(description="Type of entity this log relates to.")
+    entity_type: str | None = gql_field(
+        description=(
+            "Type of entity this log relates to. Null for an operation that names "
+            "scopes and no entity kind, such as linking two entities."
+        )
+    )
     operation: str = gql_field(description="Operation performed (create, update, delete, etc.).")
     entity_id: str | None = gql_field(description="ID of the affected entity, if applicable.")
     created_at: datetime = gql_field(description="Timestamp when the audit log was created.")

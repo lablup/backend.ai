@@ -12,7 +12,6 @@ from typing import Any
 from ai.backend.common.data.entity.types import (
     EntityData,
     EntityIdentifier,
-    EntityType,
     FieldData,
     FieldIdentifier,
     RuntimeEntityID,
@@ -306,10 +305,10 @@ class OpsRepository[TData]:
             return await w.atomic_create_field_entities(owner_id, creators)
 
     async def create_dangling_field[TFieldData: FieldData](
-        self, entity_type: EntityType, creator: DanglingFieldCreator[Any, TFieldData]
+        self, creator: DanglingFieldCreator[Any, TFieldData]
     ) -> TFieldData:
         async with self._ops.write_ops() as w:
-            return await w.create_dangling_field(entity_type, creator)
+            return await w.create_dangling_field(creator)
 
     async def atomic_create_fields[TOwnerID: EntityIdentifier, TFieldData: FieldData](
         self, creations: Sequence[FieldToCreate[TOwnerID, Any, TFieldData]]
@@ -332,24 +331,21 @@ class OpsRepository[TData]:
             return await w.atomic_create_fields_with_nested(creations, nested_creators)
 
     async def atomic_create_dangling_fields[TFieldData: FieldData](
-        self, entity_type: EntityType, creators: Sequence[DanglingFieldCreator[Any, TFieldData]]
+        self, creators: Sequence[DanglingFieldCreator[Any, TFieldData]]
     ) -> list[TFieldData]:
         async with self._ops.write_ops() as w:
-            return await w.atomic_create_dangling_fields(entity_type, creators)
+            return await w.atomic_create_dangling_fields(creators)
 
     async def atomic_create_dangling_fields_with_nested[
         TFieldData: FieldData,
         TNestedData: FieldData,
     ](
         self,
-        entity_type: EntityType,
         creators: Sequence[DanglingFieldCreator[Any, TFieldData]],
         field_creators: Sequence[NestedFieldCreator[Any, Any, TNestedData]],
     ) -> list[TFieldData]:
         async with self._ops.write_ops() as w:
-            return await w.atomic_create_dangling_fields_with_nested(
-                entity_type, creators, field_creators
-            )
+            return await w.atomic_create_dangling_fields_with_nested(creators, field_creators)
 
     async def purge_entity(self, purger: EntityPurger[Any, TData]) -> TData:
         """Hard-delete one entity row, tearing its scope down with it."""

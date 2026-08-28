@@ -41,7 +41,10 @@ class AuditLogRow(Base):
         "action_kind", StrEnumType(ActionKind), nullable=True
     )
 
-    entity_type: Mapped[str] = mapped_column("entity_type", sa.String, index=True, nullable=False)
+    # NULL for a relation operation: it names two scopes and no entity kind.
+    entity_type: Mapped[str | None] = mapped_column(
+        "entity_type", sa.String, index=True, nullable=True
+    )
     operation: Mapped[str] = mapped_column("operation", sa.String, index=True, nullable=False)
 
     # Declared by v2 actions; legacy rows carry the "entity_type:operation" spec type.

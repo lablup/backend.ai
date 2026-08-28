@@ -79,7 +79,6 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
             return
         # Nothing was touched, but the run still has to leave a trace.
         await self._repository.atomic_create_dangling_fields_with_nested(
-            action.entity_type(),
             [self._build_empty_spec(action, result, client_ip)],
             nested,
         )
@@ -98,7 +97,9 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
         result: ScopeActionProcessResult,
         client_ip: str | None,
     ) -> EmptyScopeAuditLogCreator:
-        return EmptyScopeAuditLogCreator(**self._fields(action, result, client_ip))
+        return EmptyScopeAuditLogCreator(
+            entity_type=action.entity_type(), **self._fields(action, result, client_ip)
+        )
 
     def _fields(
         self,
