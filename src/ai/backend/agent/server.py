@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 import signal
+import socket
 import ssl
 import sys
 import time
@@ -1402,6 +1403,20 @@ def build_root_server() -> web.Application:
     return app
 
 
+def _port_is_free(port: int) -> bool:
+    """Whether ``port`` can still be bound on loopback, which is where aiomonitor listens.
+
+    Deliberately without SO_REUSEADDR: the question is whether aiomonitor's own bind will
+    succeed, and it does not set it either.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
+
+
 @asynccontextmanager
 async def aiomonitor_ctx(
     local_config: AgentUnifiedConfig,
@@ -1433,11 +1448,33 @@ async def aiomonitor_ctx(
     monitor.prompt = "monitor (agent) >>> "
     monitor.console_locals["local_config"] = local_config
     aiomon_started = False
-    try:
-        monitor.start()
-        aiomon_started = True
-    except Exception as e:
-        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
+    # Check the ports before handing them to aiomonitor. `Monitor.start()` brings its web UI up on
+    # a thread and waits for it; a bind failure raises THERE, so this `except` never sees it and
+    # startup simply hangs — the agent stops right after "Using uvloop" and never registers, with
+    # only a stray traceback in the log. That is what happens whenever two agents share a host and
+    # the default ports (38200/39200), which is the normal multi-backend layout.
+    busy = [
+        port
+        for port in (
+            local_config.agent_common.aiomonitor_termui_port + pidx,
+            local_config.agent_common.aiomonitor_webui_port + pidx,
+        )
+        if not _port_is_free(port)
+    ]
+    if busy:
+        log.warning(
+            "aiomonitor port(s) {} are already in use; continuing without it "
+            "(set agent.aiomonitor-termui-port / -webui-port per agent to keep it)",
+            ", ".join(str(p) for p in busy),
+        )
+    else:
+        try:
+            monitor.start()
+            aiomon_started = True
+        except Exception as e:
+            log.warning(
+                "aiomonitor could not start but skipping this error to continue", exc_info=e
+            )
     try:
         yield monitor
     finally:
