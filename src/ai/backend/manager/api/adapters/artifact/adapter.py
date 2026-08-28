@@ -33,7 +33,9 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     AdminSearchArtifactsPayload,
     ArtifactNode,
     ArtifactRevisionNode,
+    BulkArtifactV2Error,
     DeleteArtifactsPayload,
+    RestoreArtifactsGQLPayload,
     UpdateArtifactPayload,
 )
 from ai.backend.common.dto.manager.v2.artifact.types import (
@@ -291,8 +293,17 @@ class ArtifactAdapter(BaseAdapter):
         action_result = await self._processors.artifact.delete_artifacts.run(
             DeleteArtifactsAction(artifact_ids=input.artifact_ids)
         )
+        deleted = [self._data_to_dto(item) for item in action_result.artifacts]
         return DeleteArtifactsPayload(
-            artifacts=[self._data_to_dto(item) for item in action_result.artifacts]
+            successes=deleted,
+            failed=[self._missing_artifact(item) for item in action_result.missing],
+            artifacts=deleted,
+        )
+
+    def _missing_artifact(self, artifact_id: UUID) -> BulkArtifactV2Error:
+        """An id that named no artifact row."""
+        return BulkArtifactV2Error(
+            artifact_id=artifact_id, message="No artifact matches the given id."
         )
 
     async def get_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
@@ -417,14 +428,19 @@ class ArtifactAdapter(BaseAdapter):
         )
         return self._revision_data_to_dto(action_result.result)
 
-    async def restore(self, artifact_ids: list[UUID]) -> list[ArtifactNode]:
+    async def restore(self, artifact_ids: list[UUID]) -> RestoreArtifactsGQLPayload:
         """Restore previously deleted artifacts."""
         action_result: RestoreArtifactsActionResult = (
             await self._processors.artifact.restore_artifacts.run(
                 RestoreArtifactsAction(artifact_ids=artifact_ids)
             )
         )
-        return [self._data_to_dto(item) for item in action_result.artifacts]
+        restored = [self._data_to_dto(item) for item in action_result.artifacts]
+        return RestoreArtifactsGQLPayload(
+            successes=restored,
+            failed=[self._missing_artifact(item) for item in action_result.missing],
+            artifacts=restored,
+        )
 
     async def cancel_import(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Cancel an in-progress artifact import and revert to SCANNED status."""

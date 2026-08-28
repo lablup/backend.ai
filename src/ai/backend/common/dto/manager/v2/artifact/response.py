@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     ArtifactAvailability,
@@ -30,6 +31,7 @@ __all__ = (
     "ArtifactRevisionImportTaskInfo",
     "ArtifactRevisionImportTaskInfoGQL",
     "ArtifactRevisionNode",
+    "BulkArtifactV2Error",
     "ArtifactStatusChangedGQLPayload",
     "ArtifactVerificationGQLResultDTO",
     "ArtifactVerifierGQLResultDTO",
@@ -168,10 +170,34 @@ class AdminSearchArtifactRevisionsPayload(BaseResponseModel):
     has_previous_page: bool
 
 
+class BulkArtifactV2Error(BaseResponseModel):
+    """Error information for a single artifact that a bulk write could not reach."""
+
+    artifact_id: UUID = Field(description="UUID of the artifact that could not be reached.")
+    message: str = Field(description="Error message describing the failure.")
+
+
 class DeleteArtifactsPayload(BaseResponseModel):
     """Payload for artifact deletion result."""
 
-    artifacts: list[ArtifactNode] = Field(description="List of deleted artifact nodes.")
+    successes: list[ArtifactNode] = Field(
+        default_factory=list,
+        description=(
+            "Artifacts that were soft-deleted, in the order they were requested. Together "
+            "with `failed` this answers for every requested artifact exactly once."
+        ),
+    )
+    failed: list[BulkArtifactV2Error] = Field(
+        default_factory=list,
+        description="List of errors for artifacts that could not be soft-deleted.",
+    )
+    artifacts: list[ArtifactNode] = Field(
+        description=(
+            "List of deleted artifact nodes. "
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use successes."
+        ),
+        deprecated=True,
+    )
 
 
 class GetRevisionReadmePayload(BaseResponseModel):
@@ -370,10 +396,43 @@ class ScanArtifactModelsGQLPayload(BaseResponseModel):
 class DeleteArtifactsGQLPayload(BaseResponseModel):
     """GQL payload for artifact deletion operations."""
 
-    artifacts: list[ArtifactNode] = Field(description="List of soft-deleted artifacts.")
+    successes: list[ArtifactNode] = Field(
+        default_factory=list,
+        description=(
+            "Artifacts that were soft-deleted, in the order they were requested. Together "
+            "with `failed` this answers for every requested artifact exactly once."
+        ),
+    )
+    failed: list[BulkArtifactV2Error] = Field(
+        default_factory=list,
+        description="List of errors for artifacts that could not be soft-deleted.",
+    )
+    artifacts: list[ArtifactNode] = Field(
+        description=(
+            "List of soft-deleted artifacts. "
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use successes."
+        ),
+        deprecated=True,
+    )
 
 
 class RestoreArtifactsGQLPayload(BaseResponseModel):
     """GQL payload for artifact restoration operations."""
 
-    artifacts: list[ArtifactNode] = Field(description="List of restored artifacts.")
+    successes: list[ArtifactNode] = Field(
+        default_factory=list,
+        description=(
+            "Artifacts that were restored, in the order they were requested. Together with "
+            "`failed` this answers for every requested artifact exactly once."
+        ),
+    )
+    failed: list[BulkArtifactV2Error] = Field(
+        default_factory=list,
+        description="List of errors for artifacts that could not be restored.",
+    )
+    artifacts: list[ArtifactNode] = Field(
+        description=(
+            f"List of restored artifacts. Deprecated since {NEXT_RELEASE_VERSION}. Use successes."
+        ),
+        deprecated=True,
+    )

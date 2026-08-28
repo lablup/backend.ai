@@ -336,10 +336,11 @@ class TestArtifactRepository:
         sample_artifact_id: uuid.UUID,
     ) -> None:
         """Test deleting artifact (soft delete)"""
-        deleted_artifacts = await artifact_repository.delete_artifacts([sample_artifact_id])
+        result = await artifact_repository.delete_artifacts([sample_artifact_id])
 
-        assert len(deleted_artifacts) == 1
-        assert deleted_artifacts[0].availability == ArtifactAvailability.DELETED
+        assert len(result.successes) == 1
+        assert result.successes[0].availability == ArtifactAvailability.DELETED
+        assert result.missing == []
 
         # Verify artifact is marked as deleted
         artifact = await artifact_repository.get_artifact_by_id(sample_artifact_id)
@@ -355,10 +356,11 @@ class TestArtifactRepository:
         await artifact_repository.delete_artifacts([sample_artifact_id])
 
         # Then restore it
-        restored_artifacts = await artifact_repository.restore_artifacts([sample_artifact_id])
+        result = await artifact_repository.restore_artifacts([sample_artifact_id])
 
-        assert len(restored_artifacts) == 1
-        assert restored_artifacts[0].availability == ArtifactAvailability.ALIVE
+        assert len(result.successes) == 1
+        assert result.successes[0].availability == ArtifactAvailability.ALIVE
+        assert result.missing == []
 
     # =========================================================================
     # Tests - Search with filtering
