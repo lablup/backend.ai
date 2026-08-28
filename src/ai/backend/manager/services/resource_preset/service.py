@@ -81,10 +81,13 @@ class ResourcePresetService:
         preset_data_list = await self._resource_preset_repository.list_presets(
             action.resource_group
         )
+        known_slot_types = await self._resource_preset_repository.known_slot_types()
 
         presets = []
         for preset_data in preset_data_list:
-            preset_slots = preset_data.resource_slots.normalize_slots(ignore_unknown=True)
+            preset_slots = preset_data.resource_slots.normalize_slots_by_known_slots(
+                known_slot_types, ignore_unknown=True
+            )
             presets.append({
                 "id": str(preset_data.id),
                 "name": preset_data.name,
@@ -121,11 +124,15 @@ class ResourcePresetService:
             resource_group=action.resource_group,
         )
 
+        known_slot_types = await self._resource_preset_repository.known_slot_types()
+
         # Convert repository result to action result
         # Process presets to JSON format
         presets: list[Mapping[str, Any]] = []
         for preset_data in result.presets:
-            preset_slots = preset_data.preset.resource_slots.normalize_slots(ignore_unknown=True)
+            preset_slots = preset_data.preset.resource_slots.normalize_slots_by_known_slots(
+                known_slot_types, ignore_unknown=True
+            )
             presets.append({
                 "id": str(preset_data.preset.id),
                 "name": preset_data.preset.name,

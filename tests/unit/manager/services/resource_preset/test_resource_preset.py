@@ -21,7 +21,6 @@ from ai.backend.common.types import (
     SlotName,
     SlotQuantity,
     SlotTypes,
-    current_resource_slots,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
@@ -67,7 +66,6 @@ class TestResourcePresetServiceCompatibility:
     @pytest.fixture
     def mock_dependencies(self) -> dict[str, Any]:
         """Create mocked dependencies for testing."""
-        # Set up current_resource_slots context variable
         resource_slots = {
             SlotName("cpu"): SlotTypes("count"),
             SlotName("mem"): SlotTypes("bytes"),
@@ -77,12 +75,12 @@ class TestResourcePresetServiceCompatibility:
             SlotName("npu"): SlotTypes("count"),
             SlotName("tpu"): SlotTypes("count"),
         }
-        current_resource_slots.set(resource_slots)
 
         db_engine = MagicMock(spec=ExtendedAsyncSAEngine)
         agent_registry = MagicMock(spec=AgentRegistry)
         config_provider = MagicMock(spec=ManagerConfigProvider)
         resource_preset_repository = MagicMock(spec=ResourcePresetRepository)
+        resource_preset_repository.known_slot_types = AsyncMock(return_value=resource_slots)
 
         # Mock config provider methods
         config_provider.legacy_etcd_config_loader.get_resource_slots = AsyncMock(
