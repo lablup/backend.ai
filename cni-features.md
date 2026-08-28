@@ -249,6 +249,7 @@ CNI 교체가 기계적인 작업이 됐다. 교체 후에도 35 agents / 444 se
 - default-deny NetworkPolicy 클러스터, CNI 레벨 암호화(cilium WireGuard/IPsec)를 우리 것 아래 겹친 조합.
 - 포크밤을 실제로 터뜨려 보지는 않았다. `pids.max = max`는 읽어서 확인했고, 라이브 클러스터에서 재현할 성질이 아니다.
 - 로그·PID는 CPU 전용 2노드 세션으로 쟀다. GPU 축과 교차하지는 않았다(교차할 이유가 없는 축이다).
+- **단일노드 클러스터 세션**(한 노드에 커널 2개). 1~3절의 27칸은 전부 노드당 커널 1개다. containerd의 `create_local_network`가 no-op이므로(11절), 노드 내 경로가 세션 네트워크만으로 서는지 확인한 적이 없다.
 
 ---
 
@@ -261,10 +262,94 @@ CNI 교체가 기계적인 작업이 됐다. 교체 후에도 35 agents / 444 se
 | 수정 | XFRM teardown 누수. teardown에 XFRM 정리가 아예 없었다. SPI가 `(vni, src, dst)`로 결정되므로 잔재 SA는 같은 VNI를 재사용하는 다음 세션의 트래픽을 전부 먹는다. | `0a112d3fa` |
 | 수정 | 동시 브리지 생성 레이스. `ip link show` → `ip link add`가 check-then-act라 한 세션의 두 커널이 동시에 붙으면 진 쪽이 `File exists`로 세션을 실패시킴. | `d5c692d63` |
 | 수정 | **containerd 로그 루트가 네임스페이스를 건넌다.** 상수 `/var/lib/backend.ai/containerd-logs`를 넘기지만 containerd는 그 경로를 **자기** 마운트 네임스페이스에서 연다. 호스트 에이전트는 같은 파일시스템이라 안 드러나고, 컨테이너화된(fatPod) 에이전트는 증상 3개가 동시에 조용히 난다 — `session logs`가 1 byte, 커널 로그가 노드에 54개 누적(unlink가 containerd가 쓴 적 없는 디렉터리를 쓸었다), 배포판 프로브가 빈 파일을 읽고 `ImageNotAvailable`. 로그 루트를 `agent.var-base-path` 아래로 앵커링해 해결 — 그 디렉터리는 **이미** 양쪽이 같은 곳을 가리켜야만 한다(로그 라이터 런처가 거기 쓰이고 containerd가 경로로 exec한다). 통상 설정에선 하드코딩돼 있던 그 경로로 그대로 풀린다. | `b690a6791` |
-| 열림 | containerd 에이전트 pull 경로에서 `registry-hosts-dir`가 안 먹는다. 노브를 설정하고 디렉터리를 마운트해도 평문 HTTP 레지스트리를 HTTPS로 시도한다. 같은 디렉터리로 `ctr --hosts-dir`는 정상. 노드에 미리 pull해 우회. | — |
+| 닫힘 | ~~containerd pull 경로에서 `registry-hosts-dir`가 안 먹는다~~ — 결함이 아니라 **배포 요구사항**이었다. 라이브 재확인(11절): 같은 containerd·같은 ref에 노브만 바꿔 두 번 pull하면 없을 때만 실패한다. 앞선 관찰은 `certs.d` hostPath가 cd-agent 배포에 추가되기 전의 상태다. | — |
 | 환경 | Calico 기본 IP 자동탐지가 이중 홈 노드(.112: 유선 .112 + Wi-Fi .252)에서 **Wi-Fi 주소를 골라** BGP가 안 맺힌다. `IP_AUTODETECTION_METHOD=kubernetes-internal-ip` 로 해결. | — |
 | 설계 | 한 노드에서 두 백엔드를 돌리면 `/var/lib/backend.ai/net-local-subnet`을 공유해 저장소 가드가 거부한다(정상 동작). 테스트 구성에서만 닿는 문제라 코드 대신 에이전트별 hostPath로 분리. | — |
 | 설계 | rootless 로그 로테이션은 소프트 캡이라 **420 KiB/s 이상에서 구멍이 난다**(5절). 하드 캡을 주려면 컨테이너에 파이프를 쥐여주고 우리가 읽어야 하는데, 그러면 에이전트 재시작 중에 커널 stdout이 막힌다. 커널이 에이전트 재시작을 넘겨야 하므로 그 교환은 선택지가 아니다. | — |
 | 열림 | `pids.max`가 3개 백엔드 모두 `max` — 포크밤 상한이 없다. 다만 **Docker 백엔드도 `PidsLimit`을 안 걸어** 회귀가 아니라 동등성이다. pids 컨트롤러는 이미 위임돼 있어 `_write_cgroup_limits` 한 줄이면 닫힌다. | — |
 | 열림 | singularity 커널 안 `/sys/class/net`이 **에이전트의** 네트워크 디바이스를 보여준다(4절). apptainer가 컨테이너 netns로 들어가기 전에 `/sys`를 붙여 sysfs 인스턴스가 에이전트 netns에 묶인다. `/proc/net/dev`는 정확하고 NCCL(`getifaddrs`)도 영향 없지만, sysfs로 인터페이스를 찾는 사용자 코드는 틀린 목록을 받고 에이전트의 브리지·VXLAN 이름이 노출된다. | — |
 | 배포 | 에이전트가 파드의 PID 1일 때 임의 고아를 blanket-reap 하지 않는다. 커널 라이프사이클로는 재현되지 않고 테스트용 `nsenter` 고아에서만 나왔다. fatPod 엔트리포인트를 `init.py`로 감싸면 닫히는, 코드가 아닌 배포 쪽 문제. | — |
+
+---
+
+## 11. 추가 확인 (2026-08-28)
+
+세 가지다. 10절의 열린 항목 하나를 닫았고, 문서에 없던 백엔드 간 차이를 하나 찾았고, 그 차이들을
+단위 테스트로 고정했다.
+
+### `registry-hosts-dir` — 결함이 아니라 배포 요구사항
+
+라이브 containerd(`charsyam-nvidia`, 네임스페이스 `backend-ai`)에 에이전트가 쓰는 것과 같은
+`ContainerdGrpcRuntime`을 직접 붙여, 같은 ref를 노브만 바꿔 두 번 pull했다.
+
+| 설정 | 결과 |
+|---|---|
+| `registry_hosts_dir=None` | `failed to resolve image: ... Head "https://192.168.0.156:5000/v2/..." : http: server gave HTTP response to HTTPS client` |
+| `registry_hosts_dir="/etc/containerd/certs.d"` | **OK** |
+
+10절이 보고한 그 에러가 노브를 끄면 재현되고 켜면 사라진다. **코드 경로는 정상이다.**
+
+앞선 관찰은 배포 상태의 차이였다. `certs.d`는 hostPath 볼륨으로 파드에 들어가야 하는데,
+그 볼륨이 있는 배포와 없는 배포가 섞여 있었다.
+
+| 파드 | `/etc/containerd/certs.d` | `registry-hosts-dir` |
+|---|---|---|
+| cd-agent-104 / cd-agent-112 | 있음 (hostPath `certsd`) | 설정됨 |
+| en-agent-* / sg-agent-* | 없음 | 설정 없음 |
+
+rootless 백엔드에 이 디렉터리가 없는 것은 무관하다 — 그쪽은 containerd의 `hosts.toml`을 읽지
+않고 각각 `ENROOT_ALLOW_HTTP` / `--no-https`로 처리한다. 다만 그 두 노브는 **레지스트리를 가리지
+않고 평문을 강제**하므로(4절의 미해결 항목과 같은 뿌리), 레지스트리별 게이트를 넣을 때
+rootless 쪽에도 `certs.d`에 상응하는 설정 소스가 필요해진다.
+
+**한 줄 요약**: 노브는 동작한다. 배포에 hostPath 마운트가 빠지면 조용히 HTTPS로 떨어진다.
+
+### containerd의 단일노드 클러스터 네트워크는 no-op이다
+
+Docker 백엔드는 `create_local_network`에서 `ai.backend.cluster-network` 라벨을 단 bridge를 실제로
+만들고 destroy에서 지운다. containerd 백엔드는 같은 호출에 **아무것도 하지 않는다.**
+
+```python
+async def create_local_network(self, network_name: str) -> None:
+    # TODO: a dedicated agent-local bridge for single-node cluster sessions.
+    return
+```
+
+근거는 BEP-1062의 세션별 LOCAL/오버레이 브리지가 노드 내 경로를 이미 담당한다는 것이고, 그
+근거는 코드 주석에만 있었다. 그런데 **1~3절의 27칸은 전부 노드당 커널 1개**다. 한 노드에 커널
+2개가 뜨는 클러스터 세션은 측정한 적이 없다. 9절에 미검증으로 올렸다.
+
+### 단위 테스트로 닫은 패리티 구멍 3건
+
+Docker 백엔드가 먼저 갖고 있던 기능을 containerd가 재구현했는데 양쪽 다 테스트가 없던 자리들이다.
+
+| 대상 | 왜 중요한가 | 추가 |
+|---|---|---|
+| `restart_kernel__{store,load}_config` | `resource.txt`는 커널 프로세스가 이미 핀된 cpuset·가속기를 담는다. 재시작이 이를 조용히 잃으면 할당을 다시 유도해 **커널을 자기 cpuset 밖으로 옮길 수 있다.** 없는 config는 빈 바이트가 아니라 오류여야 하고, scratch 준비 전 저장도 성공한 척하면 안 된다 | 6 |
+| `check_duplicate_commit` | 락 파일 기반 판정. 커널별·subdir별 독립성이 검증된 적 없었다 — 남의 락을 내 것으로 읽으면 정상 commit을 거부한다 | 5 |
+| `create/destroy_local_network` | 위의 no-op을 계약으로 고정. TODO 구현이 조용한 변경이 아니라 의도적 변경이 되도록 | 3 |
+
+`tests/unit/agent/containerd::` 418 passed (재시도 끔).
+
+### 측정 방법에 관한 주의
+
+커버리지를 이름 grep으로 재면 안 된다. OciRuntime 24개 메서드 중 테스트 파일에 이름이 등장하는
+것은 23개지만, **실제 런타임 인스턴스에 대해 호출되는 것은 9개**다. 나머지 히트의 다수는 그
+메서드를 가짜로 갈아끼운 하네스(`FakeFacade`)이고, 그건 커버리지의 반대다.
+
+호출되지 않는 15개 중 대부분은 얇은 gRPC 위임이라 라이브 검증이 덮는 것이 맞다. 값이 있는 것은
+넷이다 — `exec_in_container`(파일 API·sudoers가 의존, 타임아웃 시 프로세스를 죽여야 함),
+`image_entrypoint`(Entrypoint와 Cmd를 합치면 의미가 달라진다), `list_image_infos`(라벨 파싱이
+틀리면 이미지가 통째로 안 보인다), `configure_logging`(로그 루트 계약).
+
+---
+
+## 12. CNI 없는 기준선
+
+이 문서의 모든 측정은 **파드 네트워크 위**에서 이뤄졌다. 그 변수를 없앤 구성 — k8s를 통째로
+내리고 Backend.AI만 호스트에 올려 언더레이가 물리 LAN뿐인 상태 — 은 별도 문서에 있다:
+`non-cni-features.md`.
+
+요약: containerd·singularity 통과, enroot 실패. 7절의 처방이 **하나도 필요 없는** 유일한
+구성이며(언더레이 1500이라 매니저 기본값이 그대로 맞다), rootless 백엔드의 privnet 위임이
+containerd 전용이라는 설계 제약이 거기서 드러났다.
