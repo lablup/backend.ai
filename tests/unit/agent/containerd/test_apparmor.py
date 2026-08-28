@@ -31,7 +31,32 @@ class TestProfile:
     def test_a_host_process_may_still_signal_into_the_container(self) -> None:
         # The agent stops kernels by signalling them; a profile that blocked that would leave every
         # kernel to be SIGKILLed after its grace period.
-        assert "signal (receive) peer=unconfined," in render_profile(PROFILE_NAME)
+        assert "signal (receive)," in render_profile(PROFILE_NAME)
+
+    def test_the_receive_rule_does_not_name_a_peer(self) -> None:
+        """Naming the sender's label is what broke force-kill on Ubuntu 24.04.
+
+        Upstream's rule is `signal (receive) peer=unconfined`, and the distro ships
+        /etc/apparmor.d/runc — a `flags=(unconfined)` profile whose only effect is to relabel runc
+        from "unconfined" to "runc". runc keeps every privilege, but the label stops matching, and
+        the kernel denies the signal:
+
+            apparmor="DENIED" operation="signal" profile="backendai-default"
+              denied_mask="receive" signal=kill peer="runc"
+
+        Every force-kill then fails with `unable to signal init: permission denied` — `ctr tasks
+        kill`, the agent's destroy, and the lifecycle reconciler's orphan reaping alike. Measured
+        on a healthy container, so it is not a corner case.
+        """
+        profile = render_profile(PROFILE_NAME)
+        receive_rules = [
+            line.strip()
+            for line in profile.splitlines()
+            if line.strip().startswith("signal (receive)")
+        ]
+        assert receive_rules == ["signal (receive),"], (
+            f"the receive rule must not depend on the sender's label: {receive_rules}"
+        )
 
 
 class TestLoadingDegrades:

@@ -49,8 +49,26 @@ profile {name} flags=(attach_disconnected,mediate_deleted) {{
   umount,
 
   # A privileged host process may signal a container process; container processes may signal
-  # each other. Nothing else may signal in.
-  signal (receive) peer=unconfined,
+  # each other.
+  #
+  # `receive` carries NO peer, and that is deliberate. Upstream's rule is
+  # `peer=unconfined`, which matches on the sender's AppArmor *label* — and Ubuntu 24.04 ships
+  # /etc/apparmor.d/runc, a `flags=(unconfined)` profile whose only purpose is to relabel runc
+  # from "unconfined" to "runc". runc keeps every privilege, but the label no longer matches, so
+  # the kernel denies it:
+  #
+  #   apparmor="DENIED" operation="signal" profile="backendai-default"
+  #     denied_mask="receive" signal=kill peer="runc"
+  #
+  # and every force-kill fails with `unable to signal init: permission denied` — `ctr tasks kill`,
+  # the agent's destroy, and the lifecycle reconciler's orphan reaping alike (measured on a
+  # healthy container, so it is not a corner case: it is every containerd kernel on such a host).
+  # Docker escapes this only by shipping its own runc outside that profile's attachment path.
+  #
+  # Naming the peer buys nothing anyway: it restricts only *other* profiles, and a container under
+  # this same profile is already permitted below. So the rule that survives a distro relabelling
+  # is the one that does not depend on the label.
+  signal (receive),
   signal (send,receive) peer={name},
 
   deny @{{PROC}}/* w,
