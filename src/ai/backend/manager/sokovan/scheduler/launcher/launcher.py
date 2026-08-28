@@ -454,6 +454,32 @@ class SessionLauncher:
                         *log_args,
                         failed_agent_ids,
                     )
+                    # Keep WHY, not just WHERE. `gather(return_exceptions=True)` hands back the
+                    # agent's exception and this branch used to drop it, recording the agent ids
+                    # alone — so a kernel the agent refused for a nameable reason left the session
+                    # sitting at PREPARED with `status_info` still "scheduled" until a timeout
+                    # swept it. Measured with the overlay-MTU guard: the agent raised
+                    # `OverlayMtuTooLarge` naming the uplink and both numbers, and none of it
+                    # reached anyone looking at the session. The same conversion the outer handler
+                    # uses is applied here.
+                    first_error = next(
+                        (r for r in results if isinstance(r, BaseException)),
+                        None,
+                    )
+                    if first_error is not None:
+                        try:
+                            await self._repository.update_session_error_info(
+                                session.session_id,
+                                convert_to_status_data(
+                                    first_error, self._config_provider.config.debug.enabled
+                                ),
+                            )
+                        except Exception:
+                            log.warning(
+                                log_fmt + "failed to record the agent error info",
+                                *log_args,
+                                exc_info=True,
+                            )
                     try:
                         await self._valkey_schedule.record_session_failed_agents(
                             session.session_id, failed_agent_ids
