@@ -30,6 +30,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload,
+    BulkDeleteVFolderV2Error,
     BulkPurgeVFoldersPayload,
     BulkPurgeVFolderV2Error,
     CloneVFolderPayload,
@@ -544,11 +545,27 @@ class VFolderAdapter(BaseAdapter):
         )
 
     async def bulk_delete(self, input: BulkDeleteVFoldersInput) -> BulkDeleteVFoldersPayload:
-        """Soft-delete multiple vfolders."""
+        """Soft-delete multiple vfolders.
+
+        Each vfolder is processed independently; per-id failures are collected into
+        ``failed`` rather than aborting the batch and leaving the earlier ids deleted
+        while the caller is told the whole call failed.
+        """
+        deleted_ids: list[UUID] = []
+        failed: list[BulkDeleteVFolderV2Error] = []
         for vfolder_id in input.ids:
             action = DeleteVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
-            await self._processors.vfolder.delete_v2.run(action)
-        return BulkDeleteVFoldersPayload(deleted_count=len(input.ids))
+            try:
+                await self._processors.vfolder.delete_v2.run(action)
+            except BackendAIError as e:
+                failed.append(BulkDeleteVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
+                continue
+            deleted_ids.append(vfolder_id)
+        return BulkDeleteVFoldersPayload(
+            deleted_count=len(deleted_ids),
+            deleted_ids=deleted_ids,
+            failed=failed,
+        )
 
     async def bulk_purge(self, input: BulkPurgeVFoldersInput) -> BulkPurgeVFoldersPayload:
         """Permanently purge multiple vfolders, optionally cascading linked model cards.
@@ -556,7 +573,7 @@ class VFolderAdapter(BaseAdapter):
         Each vfolder is processed independently; per-id failures are collected
         into ``failed`` rather than aborting the whole batch.
         """
-        purged_count = 0
+        purged_ids: list[UUID] = []
         failed: list[BulkPurgeVFolderV2Error] = []
         for vfolder_id in input.ids:
             action = PurgeVFolderV2Action(
@@ -569,8 +586,12 @@ class VFolderAdapter(BaseAdapter):
             except BackendAIError as e:
                 failed.append(BulkPurgeVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
                 continue
-            purged_count += 1
-        return BulkPurgeVFoldersPayload(purged_count=purged_count, failed=failed)
+            purged_ids.append(vfolder_id)
+        return BulkPurgeVFoldersPayload(
+            purged_count=len(purged_ids),
+            purged_ids=purged_ids,
+            failed=failed,
+        )
 
     async def list_files(self, vfolder_id: UUID, input: ListFilesInput) -> ListFilesPayload:
         """List files in a vfolder."""

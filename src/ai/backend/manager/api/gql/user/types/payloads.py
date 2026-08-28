@@ -299,6 +299,15 @@ class BulkPurgeUsersV2PayloadGQL:
     """Payload for bulk user permanent deletion."""
 
     purged_count: int = gql_field(description="Number of users successfully purged.")
+    purged_user_ids: list[UUID] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "UUIDs of the users that were purged, in the order they were requested. "
+                "Together with `failed` this answers for every requested user exactly once."
+            ),
+        ),
+    )
     failed: list[BulkPurgeUserV2ErrorGQL] = gql_field(
         description="List of errors for users that failed to purge."
     )

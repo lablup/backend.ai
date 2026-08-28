@@ -687,6 +687,7 @@ class UserAdapter(BaseAdapter):
         ]
         return BulkPurgeUsersPayload(
             purged_count=result.data.purged_count(),
+            purged_user_ids=list(result.data.purged_user_ids),
             failed=failed,
         )
 
