@@ -49,6 +49,14 @@ class PrivNetOp(enum.StrEnum):
     # binds an ephemeral loopback port (127.0.0.1:<dns_port>) and sends that port here. The privnet
     # derives the gateway/bridge from the session it owns; the agent supplies only the loopback port
     # it bound — it cannot point :53 at anything but its own loopback. See cluster-name-resolution.md.
+    # A rootless backend has no daemon to create its containers' cgroups: containerd/dockerd
+    # declare `cgroupsPath` in the OCI spec and their ROOT daemon makes it, while enroot and
+    # apptainer have no cgroup integration at all, so the agent must do it — and an
+    # unprivileged agent cannot. Delegated here, to the process that already holds the
+    # capabilities. Without it the kernel simply stays in the agent's own cgroup: no memory
+    # limit, no cpuset pin, and no per-kernel stats.
+    CONFINE_CONTAINER = "confine_container"
+    RELEASE_CONTAINER = "release_container"
     SETUP_DNS_REDIRECT = "setup_dns_redirect"
     TEARDOWN_DNS_REDIRECT = "teardown_dns_redirect"
 
@@ -142,6 +150,11 @@ class PrivNetRequest:
     # destination is fixed to 127.0.0.1:<this> — the agent picks only its own local port, never the
     # host or address.
     dns_port: int | None = None
+    # CONFINE_CONTAINER only: the container's top PID and the cgroup limits to write. The PID is
+    # checked to belong to the agent's uid before anything is done with it; the limits are the
+    # agent's own numbers, exactly as they are when the agent writes the cgroup itself.
+    cgroup_pid: int | None = None
+    cgroup_limits: dict[str, str] | None = None
 
     def encode(self) -> bytes:
         payload: dict[str, Any] = {"op": str(self.op), "session_id": self.session_id}
@@ -153,6 +166,10 @@ class PrivNetRequest:
             payload["ports"] = [list(pair) for pair in self.ports]
         if self.dns_port is not None:
             payload["dns_port"] = self.dns_port
+        if self.cgroup_pid is not None:
+            payload["cgroup_pid"] = self.cgroup_pid
+        if self.cgroup_limits is not None:
+            payload["cgroup_limits"] = self.cgroup_limits
         for key in ("vtep_ip", "ip", "mac", "local_ip"):
             value = getattr(self, key)
             if value is not None:
@@ -189,6 +206,17 @@ class PrivNetRequest:
         dns_port = data.get("dns_port")
         if dns_port is not None and (not isinstance(dns_port, int) or isinstance(dns_port, bool)):
             raise ProtocolError("dns_port must be an integer")
+        cgroup_pid = data.get("cgroup_pid")
+        if cgroup_pid is not None and (
+            not isinstance(cgroup_pid, int) or isinstance(cgroup_pid, bool) or cgroup_pid <= 1
+        ):
+            raise ProtocolError("cgroup_pid must be an integer > 1")
+        cgroup_limits = data.get("cgroup_limits")
+        if cgroup_limits is not None and not (
+            isinstance(cgroup_limits, dict)
+            and all(isinstance(k, str) and isinstance(v, str) for k, v in cgroup_limits.items())
+        ):
+            raise ProtocolError("cgroup_limits must be a string map")
         return cls(
             op=op,
             session_id=session_id,
@@ -196,6 +224,8 @@ class PrivNetRequest:
             network_config=network_config,
             ports=_decode_ports(data.get("ports")),
             dns_port=dns_port,
+            cgroup_pid=cgroup_pid,
+            cgroup_limits=cgroup_limits,
             **fields,
         )
 

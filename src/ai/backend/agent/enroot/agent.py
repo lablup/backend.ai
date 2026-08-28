@@ -41,6 +41,9 @@ def create_runtime(local_config: AgentUnifiedConfig) -> EnrootRuntime:
         # the configured kernel uid/gid as the fallback.
         kernel_uid=local_config.container.kernel_uid,
         kernel_gid=local_config.container.kernel_gid,
+        # An unprivileged agent cannot make a cgroup, and neither runtime has a daemon
+        # that would; when a privnet is configured the cgroup work goes there too.
+        privnet_socket=local_config.agent.network_privnet_socket,
     )
 
 

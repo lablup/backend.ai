@@ -110,6 +110,8 @@ TASK_POLL_INTERVAL_SEC: Final = 1.0
 # nothing, and the interval is what bounds the overshoot (see _rotate_logs_loop).
 LOG_ROTATE_INTERVAL_SEC: Final = 5.0
 _LOG_COPY_CHUNK: Final = 1024 * 1024
+# The label the agent stamps on every container; the privnet keys its records by session.
+_SESSION_ID_LABEL: Final = "ai.backend.session-id"
 # Presence of the unified hierarchy's controller list is what tells cgroup v2 from v1.
 _CGROUP_V2_MARKER: Final = "/sys/fs/cgroup/cgroup.controllers"
 # rmdir on a cgroup whose members are still exiting returns EBUSY; ~1s total is far more than the
@@ -190,6 +192,10 @@ class RootlessOciRuntime(OciRuntime):
     # paths: a runtime that hides its runtime dir inside the container's mount ns makes a bind
     # source under it invisible ("No such file or directory").
     _state_path: Path
+    # When set, cgroup work is delegated here: an unprivileged agent cannot create one
+    # itself and these runtimes have no daemon that would. None = do it locally (agent
+    # runs privileged), which is the historical behaviour.
+    _privnet_socket: str | None
     # oci_spec handed in at create_container, kept until the task is built (consumed as
     # mounts/env/hooks, not as a spec file).
     _specs: dict[str, Mapping[str, Any]]
@@ -227,6 +233,7 @@ class RootlessOciRuntime(OciRuntime):
         state_path: Path,
         kernel_uid: int,
         kernel_gid: int,
+        privnet_socket: str | None = None,
     ) -> None:
         self._data_path = data_path
         self._cache_path = cache_path
@@ -234,6 +241,7 @@ class RootlessOciRuntime(OciRuntime):
         self._state_path = state_path
         self._kernel_uid = kernel_uid
         self._kernel_gid = kernel_gid
+        self._privnet_socket = privnet_socket
         self._specs = {}
         self._commands = {}
         self._pids = {}
@@ -400,7 +408,10 @@ class RootlessOciRuntime(OciRuntime):
         # Confine the container now, while the wrapper is still blocked on the gate: every process
         # that will run the user's command is already forked, and none of it has started. Doing it
         # after start_task would let the workload run unconfined for however long the move takes.
-        await asyncio.to_thread(self._confine, container_id, spec, proc.pid)
+        if self._privnet_socket is not None:
+            await self._confine_via_privnet(container_id, spec, proc.pid)
+        else:
+            await asyncio.to_thread(self._confine, container_id, spec, proc.pid)
         return TaskHandle(container_id=container_id, pid=pid)
 
     @override
@@ -447,7 +458,12 @@ class RootlessOciRuntime(OciRuntime):
         await asyncio.to_thread(unlink_log_files, self._log_path(container_id))
         # ...and the two-phase gate (pause.sh + the `go` FIFO) under the per-container state dir.
         await asyncio.to_thread(force_rmtree, self._state_path / container_id)
-        await asyncio.to_thread(self._remove_cgroup, container_id)
+        if self._privnet_socket is not None:
+            # Whoever created the cgroup has to be the one to remove it: an unprivileged agent
+            # cannot rmdir under /sys/fs/cgroup any more than it could mkdir there.
+            await self._release_via_privnet(container_id)
+        else:
+            await asyncio.to_thread(self._remove_cgroup, container_id)
         self._specs.pop(container_id, None)
         self._commands.pop(container_id, None)
         self._pids.pop(container_id, None)
@@ -697,6 +713,53 @@ class RootlessOciRuntime(OciRuntime):
                     "[{}] cannot move pid {} into {}: {!r}", self.backend_name, pid, cgroup, e
                 )
 
+    async def _release_via_privnet(self, container_id: str) -> None:
+        from ai.backend.agent.network.privnet.client import PrivNetClient
+
+        session_id = str(self._labels.get(container_id, {}).get(_SESSION_ID_LABEL, container_id))
+        try:
+            await PrivNetClient(self._privnet_socket or "").release_container(
+                session_id, container_id
+            )
+        except Exception as e:
+            log.warning(
+                "[{}] privnet could not release the cgroup for {}: {!r}",
+                self.backend_name,
+                container_id,
+                e,
+            )
+
+    async def _confine_via_privnet(
+        self, container_id: str, spec: Mapping[str, Any], top_pid: int
+    ) -> None:
+        """Have the privnet create this container's cgroup and move its tree in.
+
+        These runtimes have no daemon of their own and an unprivileged agent cannot make a cgroup
+        under /sys/fs/cgroup, so there is nobody else to ask. containerd and dockerd get this for
+        free: they declare `cgroupsPath` in the OCI spec and their ROOT daemon obliges. Without the
+        delegation the kernel simply stays in the agent's own cgroup — measured on a kernel
+        allocated 8 GiB and 4 CPUs: `memory.max = max`, `Cpus_allowed_list: 0-31`.
+
+        Loud on failure and no fallback: the local path cannot work either (that is why we are
+        here), and a kernel silently running without its limits is what this whole method exists
+        to prevent.
+        """
+        from ai.backend.agent.network.privnet.client import PrivNetClient
+
+        session_id = str(self._labels.get(container_id, {}).get(_SESSION_ID_LABEL, container_id))
+        try:
+            await PrivNetClient(self._privnet_socket or "").confine_container(
+                session_id, container_id, top_pid, self._cgroup_limits(spec)
+            )
+        except Exception as e:
+            log.error(
+                "[{}] privnet could not confine {}: {!r} — the kernel is running WITHOUT its "
+                "cgroup limits",
+                self.backend_name,
+                container_id,
+                e,
+            )
+
     def _create_cgroup(self, container_id: str, spec: Mapping[str, Any]) -> Path | None:
         """Create the kernel's cgroup and write its limits. None when this host cannot do it."""
         if not Path(_CGROUP_V2_MARKER).exists():
@@ -726,7 +789,9 @@ class RootlessOciRuntime(OciRuntime):
         return cgroup
 
     @staticmethod
-    def _write_cgroup_limits(cgroup: Path, spec: Mapping[str, Any]) -> None:
+    def _cgroup_limits(spec: Mapping[str, Any]) -> dict[str, str]:
+        """The cgroup interface files this spec asks for. Split out so the privnet delegation and
+        the local writer send the same numbers."""
         limits: list[tuple[str, str]] = []
         if cpus := spec.get("cpuset_cpus"):
             limits.append(("cpuset.cpus", str(cpus)))
@@ -741,7 +806,11 @@ class RootlessOciRuntime(OciRuntime):
             # memory.swap.max is swap ALONE. Writing the combined figure would silently grant the
             # container its whole memory limit again as swap.
             limits.append(("memory.swap.max", str(max(0, int(memory_swap) - int(memory_limit)))))
-        for name, value in limits:
+        return dict(limits)
+
+    @staticmethod
+    def _write_cgroup_limits(cgroup: Path, spec: Mapping[str, Any]) -> None:
+        for name, value in RootlessOciRuntime._cgroup_limits(spec).items():
             try:
                 (cgroup / name).write_text(value)
             except OSError as e:

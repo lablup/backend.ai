@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast, override
 
 from ai.backend.agent.network.caps import probe_caps
@@ -71,6 +71,34 @@ class PrivNetClient:
         if not resp.ok:
             raise PrivNetClientError(resp.error or "privnet request failed")
         return resp
+
+    async def confine_container(
+        self, session_id: str, container_id: str, top_pid: int, limits: Mapping[str, str]
+    ) -> None:
+        """Have the privnet create this container's cgroup and move its tree in.
+
+        A rootless backend has no daemon to do it (containerd/dockerd declare `cgroupsPath` and
+        their root daemon obliges), so an unprivileged agent otherwise leaves the kernel in its own
+        cgroup: no memory limit, no cpuset pin, no per-kernel stats.
+        """
+        await self.call(
+            PrivNetRequest(
+                op=PrivNetOp.CONFINE_CONTAINER,
+                session_id=session_id,
+                container_id=container_id,
+                cgroup_pid=top_pid,
+                cgroup_limits=dict(limits),
+            )
+        )
+
+    async def release_container(self, session_id: str, container_id: str) -> None:
+        await self.call(
+            PrivNetRequest(
+                op=PrivNetOp.RELEASE_CONTAINER,
+                session_id=session_id,
+                container_id=container_id,
+            )
+        )
 
     async def local_subnet_of(self, session_id: str) -> str | None:
         """The session's node-local LOCAL /26, from the privnet that owns the pool.

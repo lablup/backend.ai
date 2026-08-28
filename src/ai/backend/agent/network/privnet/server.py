@@ -33,11 +33,12 @@ import logging
 import os
 import socket
 import struct
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
+from ai.backend.agent.containerd.runtime.spec import container_cgroup_fs_path
 from ai.backend.agent.errors.network import UnusableVtep
 from ai.backend.agent.network.cni import CniAttacher, plan_to_invocations
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
@@ -112,6 +113,46 @@ class _SessionEntry:
         self.backend = backend
         self.attached = {}
         self.local_ips = {}
+
+
+def _descendants(pid: int) -> list[int]:
+    """Every process under ``pid``, so the whole container tree lands in the cgroup."""
+    found: list[int] = []
+    frontier = [pid]
+    while frontier:
+        current = frontier.pop()
+        try:
+            children = Path(f"/proc/{current}/task/{current}/children").read_text().split()
+        except OSError:
+            continue
+        for raw in children:
+            child = int(raw)
+            found.append(child)
+            frontier.append(child)
+    return found
+
+
+def _make_cgroup(cgroup: Path, limits: Mapping[str, str], top_pid: int) -> None:
+    parent = cgroup.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    # A controller only reaches a child if the parent delegates it.
+    with contextlib.suppress(OSError):
+        (parent / "cgroup.subtree_control").write_text("+cpu +cpuset +io +memory")
+    cgroup.mkdir(exist_ok=True)
+    for name, value in limits.items():
+        # Only the leaf's own interface files, never a path the caller composed.
+        if "/" in name or name.startswith("."):
+            continue
+        with contextlib.suppress(OSError):
+            (cgroup / name).write_text(value)
+    for pid in (top_pid, *_descendants(top_pid)):
+        with contextlib.suppress(OSError):
+            (cgroup / "cgroup.procs").write_text(str(pid))
+
+
+def _remove_cgroup(cgroup: Path) -> None:
+    with contextlib.suppress(OSError):
+        cgroup.rmdir()
 
 
 class PrivNetServer:
@@ -495,6 +536,12 @@ class PrivNetServer:
                         return PrivNetResponse(ok=True, host_ports=await self._unpublish_ports(req))
                     case PrivNetOp.LIST_PORTS:
                         return PrivNetResponse(ok=True, forwards=await self._list_ports())
+                    case PrivNetOp.CONFINE_CONTAINER:
+                        await self._confine_container(req)
+                        return PrivNetResponse(ok=True)
+                    case PrivNetOp.RELEASE_CONTAINER:
+                        await self._release_container(req)
+                        return PrivNetResponse(ok=True)
                     case PrivNetOp.LOCAL_SUBNET:
                         return PrivNetResponse(ok=True, subnet=await self._local_subnet(session_id))
                     case PrivNetOp.SETUP_DNS_REDIRECT:
@@ -548,6 +595,40 @@ class PrivNetServer:
             meta = self._meta_of(session_id, raw_config)
             await self._resolve_backend(meta.backend).teardown_session_network(session_id)
         await self._journal.forget_session(session_id)
+
+    def _kernel_cgroup(self, container_id: str) -> Path:
+        """Where this container's cgroup lives. Derived from the validated id, never from the
+        request, so the agent cannot name a path outside the tree."""
+        return container_cgroup_fs_path(policy.validate_container_id(container_id))
+
+    def _require_agents_process(self, pid: int) -> None:
+        """Refuse a PID that is not the agent's to give.
+
+        The same bound the netns owner check applies on attach: an unprivileged agent can only own
+        processes running as its own uid, so anything else is a PID it should not be able to hand
+        a privileged operation. Without this the agent could ask for an arbitrary process — say a
+        root daemon — to be moved into a cgroup it controls.
+        """
+        try:
+            uid = Path(f"/proc/{pid}/status").read_text().split("Uid:")[1].split()[0]
+        except (OSError, IndexError) as e:
+            raise PrivNetError("no such process") from e
+        if int(uid) != self._allowed_uid:
+            raise PrivNetError(f"pid {pid} runs as uid {uid}, not the agent's")
+
+    async def _confine_container(self, req: PrivNetRequest) -> None:
+        """Create the container's cgroup, write its limits and move its process tree in."""
+        if req.container_id is None or req.cgroup_pid is None:
+            raise policy.PolicyViolation("confine requires container_id and cgroup_pid")
+        self._require_agents_process(req.cgroup_pid)
+        cgroup = self._kernel_cgroup(req.container_id)
+        await asyncio.to_thread(_make_cgroup, cgroup, req.cgroup_limits or {}, req.cgroup_pid)
+
+    async def _release_container(self, req: PrivNetRequest) -> None:
+        if req.container_id is None:
+            raise policy.PolicyViolation("release requires container_id")
+        cgroup = self._kernel_cgroup(req.container_id)
+        await asyncio.to_thread(_remove_cgroup, cgroup)
 
     async def _attach(
         self,

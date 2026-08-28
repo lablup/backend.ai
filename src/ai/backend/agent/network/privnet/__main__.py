@@ -8,13 +8,16 @@ Capabilities needed (all four, for the reasons noted):
                     privnet itself runs as a non-root uid (omitting it fails "cannot open container
                     netns")
 - CAP_DAC_READ_SEARCH — read those same ``/proc/<pid>`` entries across the uid boundary
+- CAP_DAC_OVERRIDE — create the per-kernel cgroup under the root-owned
+                    /sys/fs/cgroup/backend-ai. Not a widening in practice: a process holding
+                    CAP_SYS_ADMIN can already reach anything this would
 
 Run as a systemd service scoped to exactly those:
 
     [Service]
     User=backendai-agent
-    AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
-    CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
+    AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
+    CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
     NoNewPrivileges=yes
     ExecStart=/usr/bin/python -m ai.backend.agent.network.privnet ...
 
@@ -23,7 +26,7 @@ gotchas: ``--bounding-set`` tokens need the ``+`` prefix (unlike ``--ambient-cap
 is "bad capability string"), and dropping to the agent uid with ``--reuid`` is what makes the
 socket owned by — and so connectable by — the agent (a root-owned 0600 socket is not):
 
-    CAPS=+net_admin,+sys_admin,+sys_ptrace,+dac_read_search
+    CAPS=+net_admin,+sys_admin,+sys_ptrace,+dac_read_search,+dac_override
     sudo setpriv --reuid "$AGENT_UID" --regid "$AGENT_GID" --clear-groups \
         --ambient-caps "$CAPS" --bounding-set "$CAPS" --inh-caps "$CAPS" \
         -- ./py -m ai.backend.agent.network.privnet
