@@ -1,6 +1,9 @@
-"""Install a precompiled seccomp filter, then exec the real command. Runs INSIDE the container.
+"""Harden the container, then exec the real command. Runs INSIDE the container.
 
-    seccomp_installer.py <filter.bpf> <command> [args...]
+    seccomp_installer.py <filter.bpf|-> <command> [args...]
+
+``-`` for the filter means the operator chose the jail sandbox and there is nothing to install;
+the IPC step still runs, which is why this is invoked unconditionally.
 
 The agent compiles the profile (see ``seccomp.py``) and drops the packed ``struct sock_filter[]``
 into the container's gate directory; this puts it on and hands over. It sits between the two-phase
@@ -25,6 +28,9 @@ from pathlib import Path
 PR_SET_SECCOMP = 22
 SECCOMP_MODE_FILTER = 2
 _SOCK_FILTER_SIZE = 8
+# From <sched.h>. os.unshare exists on 3.12+, but the constant is spelled out so this file
+# keeps working against an older container interpreter.
+CLONE_NEWIPC = 0x08000000
 
 
 class _SockFilter(ctypes.Structure):
@@ -54,12 +60,42 @@ def install(program: bytes) -> None:
         raise OSError(ctypes.get_errno(), "PR_SET_SECCOMP failed")
 
 
+def unshare_ipc() -> None:
+    """Give the container its own SysV IPC namespace (message queues, semaphores, shm segments).
+
+    enroot cannot do this itself: passing `--ipc` makes its `10-devices` hook rebuild /dev, and
+    that hook bind-mounts /dev/log with no `nofail`, so it hard-fails on any host without a syslog
+    socket — which is every containerised agent. Without it every kernel on a node shares the
+    HOST's IPC namespace (measured: two kernels and the host all report the same
+    `ipc:[4026531839]`, and a segment created in one is listed by `ipcs` in the other). Docker
+    gives each container its own, so this is a parity gap, not a design choice.
+
+    Here it costs nothing: the container is already inside its user namespace, where its root holds
+    CAP_SYS_ADMIN, so the unshare is permitted. Doing it after the gate also keeps it away from the
+    runtime's own setup.
+
+    Loud but not fatal, matching how the agent treats a profile it cannot load: an isolation step
+    that fails should be visible, but refusing to start the kernel is the worse trade.
+    """
+    libc = ctypes.CDLL("libc.so.6", use_errno=True)
+    if libc.unshare(CLONE_NEWIPC) != 0:
+        err = ctypes.get_errno()
+        sys.stderr.write(
+            f"[bai] WARNING: could not unshare the IPC namespace ({os.strerror(err)}); "
+            "this kernel shares SysV IPC with the rest of the node\n"
+        )
+
+
 def main(argv: list[str]) -> None:
     """Ends in ``execv``, which never returns — so the failure paths raise rather than return."""
     if len(argv) < 3:
         sys.stderr.write(f"usage: {argv[0]} <filter.bpf> <command> [args...]\n")
         raise SystemExit(2)
     filter_path, command = argv[1], argv[2:]
+    unshare_ipc()
+    if filter_path == "-":
+        # Jail sandbox: no filter was generated. The IPC step above still ran.
+        os.execv(command[0], command)
     program = Path(filter_path).read_bytes()
     try:
         install(program)

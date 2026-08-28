@@ -85,7 +85,7 @@ read _ < {GATE_MNT}/go 2>/dev/null
 if [ -f {GATE_MNT}/{SECCOMP_FILTER} ]; then
   exec {_KRUNNER_PYTHON} {GATE_MNT}/{SECCOMP_INSTALLER} {GATE_MNT}/{SECCOMP_FILTER} "$@"
 fi
-exec "$@"
+exec {_KRUNNER_PYTHON} {GATE_MNT}/{SECCOMP_INSTALLER} - "$@"
 """
 # OCI mount types a userns runtime provides itself — never forwarded as host binds.
 SKIP_MOUNT_TYPES: Final = frozenset({
@@ -102,6 +102,8 @@ SKIP_MOUNT_TYPES: Final = frozenset({
 DEFAULT_SHM_BYTES: Final = 64 * 1024 * 1024
 # How long create_task waits for the container to reach its netns'd pause.
 TASK_START_TIMEOUT_SEC: Final = 30.0
+# How much of the container log a failed launch carries into its exception.
+_LAUNCH_DIAGNOSIS_LINES: Final = 15
 # Neither runtime has an event stream, so container death is polled for.
 TASK_POLL_INTERVAL_SEC: Final = 1.0
 # How often each live container's log is measured against the cap. A stat() per container is
@@ -387,7 +389,7 @@ class RootlessOciRuntime(OciRuntime):
             os.close(log_fd)
         self._procs[container_id] = proc
         try:
-            await self._wait_ready(proc, gate_dir)
+            await self._wait_ready(proc, gate_dir, container_id)
             pid = await self._find_netns_child(proc)
         except BaseException:
             await self._reap(container_id)
@@ -488,12 +490,14 @@ class RootlessOciRuntime(OciRuntime):
         A profile that is present but will not compile IS a failure: starting the container anyway
         would silently run it unconfined.
         """
+        # The helper runs on EVERY launch, filter or not: it also unshares the IPC namespace, which
+        # neither runtime does for us. So it is always staged; only the filter is conditional.
+        shutil.copyfile(_SECCOMP_INSTALLER_SRC, gate_dir / SECCOMP_INSTALLER)
         oci_seccomp = spec.get("seccomp")
         if not oci_seccomp:
             return
         program = compile_profile(oci_seccomp, arch=CURRENT_ARCH)
         (gate_dir / SECCOMP_FILTER).write_bytes(program)
-        shutil.copyfile(_SECCOMP_INSTALLER_SRC, gate_dir / SECCOMP_INSTALLER)
         log.debug(
             "[{}] seccomp: {} instructions for {}",
             self.backend_name,
@@ -501,7 +505,24 @@ class RootlessOciRuntime(OciRuntime):
             CURRENT_ARCH,
         )
 
-    async def _wait_ready(self, proc: asyncio.subprocess.Process, gate_dir: Path) -> None:
+    def _launch_diagnosis(self, container_id: str) -> str:
+        """The tail of what the runtime printed while failing to reach the pause.
+
+        The launch writes stdout/stderr into the container log rather than a pipe (the log has to
+        survive an agent restart), so a bare returncode is all the caller would otherwise see —
+        and `rc=1` says nothing about whether the image, the userns, or a missing file capability
+        was the problem. Best-effort: a diagnosis must never mask the failure it describes.
+        """
+        try:
+            text = self._log_path(container_id).read_text(errors="replace")
+        except OSError:
+            return ""
+        tail = [line for line in text.splitlines() if line.strip()][-_LAUNCH_DIAGNOSIS_LINES:]
+        return ("\n" + "\n".join(tail)) if tail else ""
+
+    async def _wait_ready(
+        self, proc: asyncio.subprocess.Process, gate_dir: Path, container_id: str
+    ) -> None:
         # Wait until the pause-wrapper writes its `ready` marker (it has reached the FIFO pause and
         # is the stable netns holder) before attaching — avoids racing a transient setup PID.
         ready = gate_dir / "ready"
@@ -511,11 +532,13 @@ class RootlessOciRuntime(OciRuntime):
                 return
             if proc.returncode is not None:
                 raise RuntimeError(
-                    f"{self.backend_name} launch exited before pause (rc={proc.returncode})"
+                    f"{self.backend_name} launch exited before pause "
+                    f"(rc={proc.returncode}):{self._launch_diagnosis(container_id)}"
                 )
             await asyncio.sleep(poll)
         raise TimeoutError(
-            f"{self.backend_name} container did not reach the pause (no ready marker)"
+            f"{self.backend_name} container did not reach the pause (no ready marker):"
+            f"{self._launch_diagnosis(container_id)}"
         )
 
     def _signal_go(self, go_fifo: Path) -> None:

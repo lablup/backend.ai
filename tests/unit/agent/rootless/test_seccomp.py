@@ -17,6 +17,8 @@ from typing import Any
 import pytest
 
 from ai.backend.agent.containerd.agent import _docker_seccomp_to_oci
+from ai.backend.agent.rootless import seccomp_installer
+from ai.backend.agent.rootless.base import PAUSE_SCRIPT
 from ai.backend.agent.rootless.seccomp import (
     SECCOMP_RET_ALLOW,
     SECCOMP_RET_ERRNO,
@@ -235,3 +237,38 @@ class TestRefusals:
                 ]),
                 arch="x86_64",
             )
+
+
+class TestTheHardeningStep:
+    """The gate's helper is the container's last hop before the kernel entrypoint, and it does two
+    things — IPC isolation and (when there is one) the seccomp filter."""
+
+    def test_the_pause_wrapper_runs_the_helper_even_without_a_filter(self) -> None:
+        """Without a filter the wrapper used to `exec "$@"` directly, skipping the helper — and
+        with it the IPC unshare, which every launch needs."""
+        execs = [ln.strip() for ln in PAUSE_SCRIPT.splitlines() if ln.strip().startswith("exec ")]
+        assert len(execs) == 2, execs
+        assert all("seccomp_installer.py" in ln for ln in execs), (
+            f"every exec path must go through the helper: {execs}"
+        )
+        assert any(ln.endswith('- "$@"') for ln in execs), (
+            f'the no-filter path must pass "-" as the filter: {execs}'
+        )
+
+    def test_the_helper_unshares_ipc_before_it_execs(self) -> None:
+        """enroot leaves every kernel in the HOST's IPC namespace (measured: two kernels and the
+        host all report the same `ipc:[...]`, and a segment made in one is listed by `ipcs` in the
+        other), because `--ipc` makes its 10-devices hook hard-fail on a host with no /dev/log."""
+        src = Path(seccomp_installer.__file__).read_text()
+        assert "CLONE_NEWIPC = 0x08000000" in src
+        assert "def unshare_ipc()" in src
+        # It must run before either exec path, so the isolation covers the jail sandbox too.
+        assert src.index("unshare_ipc()\n") < src.index("os.execv(command[0], command)")
+
+    def test_a_failed_unshare_warns_instead_of_refusing(self) -> None:
+        """The opposite trade from seccomp: a filter that will not install means running
+        unconfined, but losing IPC isolation must not stop the kernel from starting."""
+        src = Path(seccomp_installer.__file__).read_text()
+        body = src[src.index("def unshare_ipc()") : src.index("def main(")]
+        assert "WARNING" in body
+        assert "SystemExit" not in body and "raise" not in body
