@@ -881,3 +881,54 @@ class TestPublishPorts:
                 PrivNetRequest(op=PrivNetOp.LIST_PORTS, session_id="list-ports")
             )
             assert resp.forwards == (("c1", 30001, _LOCAL_IP, 8070),)
+
+
+class TestSessionBinding:
+    """The overlay address is confined to the session's subnet and the netns owner check bounds
+    which namespaces may be named, but neither says the container is *this session's*. Without the
+    binding, naming a sibling session's container attaches a veth from the wrong bridge into a
+    kernel that is not part of that session."""
+
+    async def test_a_container_of_another_session_is_refused(self) -> None:
+        runtime = _StubRuntime(pid=4242, live={"c-of-s2": "sess-b"})
+        async with _Harness(runtime=runtime) as h:
+            await h.client().call(
+                PrivNetRequest(
+                    PrivNetOp.SETUP_SESSION,
+                    "sess-a",
+                    network_config={"backend": "bridge", "subnet": "172.30.6.0/24"},
+                )
+            )
+            with pytest.raises(PrivNetClientError):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "sess-a", container_id="c-of-s2")
+                )
+
+    async def test_its_own_container_still_attaches(self) -> None:
+        runtime = _StubRuntime(pid=4242, live={"c-of-a": "sess-a"})
+        async with _Harness(runtime=runtime) as h:
+            await h.client().call(
+                PrivNetRequest(
+                    PrivNetOp.SETUP_SESSION,
+                    "sess-a",
+                    network_config={"backend": "bridge", "subnet": "172.30.7.0/24"},
+                )
+            )
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "sess-a", container_id="c-of-a")
+            )
+
+    async def test_a_container_we_cannot_place_is_allowed(self) -> None:
+        """The label is set on every path we know of; refusing on its absence would turn an
+        unknown into a broken session. It is warned about instead."""
+        async with _Harness(runtime=_StubRuntime(pid=4242)) as h:
+            await h.client().call(
+                PrivNetRequest(
+                    PrivNetOp.SETUP_SESSION,
+                    "sess-a",
+                    network_config={"backend": "bridge", "subnet": "172.30.8.0/24"},
+                )
+            )
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "sess-a", container_id="c-unknown")
+            )

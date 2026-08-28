@@ -630,6 +630,30 @@ class PrivNetServer:
         cgroup = self._kernel_cgroup(req.container_id)
         await asyncio.to_thread(_remove_cgroup, cgroup)
 
+    async def _require_container_of_session(self, container_id: str, session_id: str) -> None:
+        """Refuse a container that belongs to a different session.
+
+        The overlay address is already confined to the session's own subnet, and the netns owner
+        check bounds which namespaces the agent may name at all — but neither says the container
+        is *this session's*. Without that, naming a sibling session's container id attaches a veth
+        from the wrong session's bridge into a kernel that is not part of it.
+
+        The container carries its own session in a label the agent stamped at creation
+        (`ai.backend.session-id`), which the runtime reports: containerd from the daemon's record,
+        the rootless backends from their journal. A container we cannot place is warned about and
+        allowed — the label is set on every path we know of, and refusing on its absence would turn
+        an unknown into a broken session — but one that places *elsewhere* is refused.
+        """
+        owner = (await self._live_containers()).get(container_id)
+        if owner is None:
+            log.warning(
+                "privnet cannot tell which session container %s belongs to; allowing the attach",
+                container_id,
+            )
+            return
+        if owner != session_id:
+            raise PrivNetError("container belongs to another session")
+
     async def _attach(
         self,
         session_id: str,
@@ -643,6 +667,7 @@ class PrivNetServer:
         entry = self._sessions.get(session_id)
         if entry is None:
             raise PrivNetError("attach before setup")
+        await self._require_container_of_session(container_id, session_id)
         # The manager-assigned overlay IP (multi-node vxlan) is agent-supplied, so validate it is
         # confined to THIS session's subnet before trusting it; None (single node) keeps the
         # host-local fallback. attach_endpoint reads it from kernel_config["cluster_network_ip"];
