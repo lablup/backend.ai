@@ -124,13 +124,10 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
-<<<<<<< HEAD
-from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
-from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
-=======
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.types import NumberFormat
->>>>>>> 46de869e (fix(BA-7510): source known resource slots from the slot-type registry (#14025))
+from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
+from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users

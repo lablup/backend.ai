@@ -99,14 +99,8 @@ class ResourcePresetService:
         return DeleteResourcePresetActionResult(resource_preset=preset_data)
 
     async def list_presets(self, action: ListResourcePresetsAction) -> ListResourcePresetsResult:
-<<<<<<< HEAD
         preset_data_list = await self._resource_preset_repository.list_presets(action.scaling_group)
-=======
-        preset_data_list = await self._resource_preset_repository.list_presets(
-            action.resource_group
-        )
         known_slot_types = await self._resource_preset_repository.known_slot_types()
->>>>>>> 46de869e (fix(BA-7510): source known resource slots from the slot-type registry (#14025))
 
         presets = []
         for preset_data in preset_data_list:
