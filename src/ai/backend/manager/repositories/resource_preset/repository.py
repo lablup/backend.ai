@@ -178,12 +178,7 @@ class ResourcePresetRepository:
                 return presets
 
         # Fallback to DB
-<<<<<<< HEAD
-        await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
         presets = await self._db_source.list_presets(scaling_group_name)
-=======
-        presets = await self._db_source.list_presets(resource_group_name)
->>>>>>> 46de869e (fix(BA-7510): source known resource slots from the slot-type registry (#14025))
 
         # Cache the result
         with suppress_with_log([Exception], message="Failed to cache preset list"):
