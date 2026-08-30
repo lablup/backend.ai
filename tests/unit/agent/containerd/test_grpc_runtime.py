@@ -10,6 +10,7 @@ from typing import Any, cast
 import grpc
 import pytest
 
+from ai.backend.agent.containerd._grpcapi.api.services.containers.v1 import containers_pb2
 from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
 from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, _chain_id
@@ -723,3 +724,80 @@ class TestPreparingOverALeftoverSnapshot:
 
         with pytest.raises(grpc.aio.AioRpcError):
             await rt._prepare_rootfs("c1", "sha256:chain")
+
+
+class TestCreatingOverALeftoverContainerRecord:
+    """The same leak as the snapshot, one record along.
+
+    `remove_container` tolerates a Containers.Delete that fails while the task is still dying, so
+    the record can outlive the container it named and the retry of the same kernel id dies on
+    `ALREADY_EXISTS: container "<kernel-id>": already exists`. Measured immediately after the
+    snapshot half was fixed: the retry got past Prepare and stopped here instead, which is why
+    reclaiming only the snapshot was not enough to make a churned session survive.
+    """
+
+    def _runtime(self, *, delete_fails: bool = False) -> tuple[Any, list[str]]:
+        rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
+        calls: list[str] = []
+
+        class _Containers:
+            def __init__(self) -> None:
+                self.stale = True
+
+            async def Create(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                calls.append("create")
+                if self.stale:
+                    raise grpc.aio.AioRpcError(
+                        grpc.StatusCode.ALREADY_EXISTS, None, None, "already exists"
+                    )
+
+            async def Delete(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                calls.append("delete")
+                if delete_fails:
+                    raise grpc.aio.AioRpcError(
+                        grpc.StatusCode.FAILED_PRECONDITION, None, None, "still running"
+                    )
+                self.stale = False
+
+        containers = _Containers()
+        rt._containers_stub = lambda: containers
+        type(rt)._md = property(lambda self: [])
+        return rt, calls
+
+    async def test_a_stale_record_is_reclaimed_and_the_id_reused(self) -> None:
+        rt, calls = self._runtime()
+
+        await rt._create_container_record("c1", containers_pb2.Container(id="c1"))
+
+        assert calls == ["create", "delete", "create"]
+
+    async def test_a_record_that_will_not_delete_is_not_worked_around(self) -> None:
+        rt, calls = self._runtime(delete_fails=True)
+
+        with pytest.raises(ContainerCreationFailedError, match="cannot be reclaimed"):
+            await rt._create_container_record("c1", containers_pb2.Container(id="c1"))
+
+        assert calls == ["create", "delete"]  # never a second create
+
+    async def test_the_ordinary_path_creates_once(self) -> None:
+        rt, calls = self._runtime()
+        rt._containers_stub().stale = False
+
+        await rt._create_container_record("c1", containers_pb2.Container(id="c1"))
+
+        assert calls == ["create"]
+
+    async def test_any_other_create_failure_is_raised_untouched(self) -> None:
+        rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
+
+        class _Containers:
+            async def Create(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                raise grpc.aio.AioRpcError(
+                    grpc.StatusCode.UNAVAILABLE, None, None, "containerd is down"
+                )
+
+        rt._containers_stub = lambda: _Containers()
+        type(rt)._md = property(lambda self: [])
+
+        with pytest.raises(grpc.aio.AioRpcError):
+            await rt._create_container_record("c1", containers_pb2.Container(id="c1"))

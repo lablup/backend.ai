@@ -843,6 +843,44 @@ class ContainerdGrpcRuntime(OciRuntime):
             ) from e
         return await self._snapshots_stub().Prepare(request, metadata=self._md)
 
+    async def _create_container_record(self, container_id: str, container: Any) -> None:
+        """Create the container record, reclaiming one a previous attempt left behind.
+
+        The same leak as the snapshot, one record along: `remove_container` tolerates a
+        Containers.Delete that fails while the task is still dying, so the record can outlive the
+        container it named, and the manager's retry of the same kernel id then dies on
+        `ALREADY_EXISTS: container "<kernel-id>": already exists`. Measured immediately after the
+        snapshot half was fixed — the retry got past Prepare and stopped here instead.
+
+        Reclaimed only if it deletes cleanly. A record that will not go still names something the
+        daemon believes is alive, and creating a second container over it would be worse than
+        failing.
+        """
+        request = containers_pb2.CreateContainerRequest(container=container)
+        try:
+            await self._containers_stub().Create(request, metadata=self._md)
+            return
+        except grpc.aio.AioRpcError as e:
+            if e.code() is not grpc.StatusCode.ALREADY_EXISTS:
+                raise
+        log.warning(
+            "create_container(c:{}): a container record from an earlier attempt is still here;"
+            " reclaiming it so this id can be reused",
+            container_id,
+        )
+        try:
+            await self._containers_stub().Delete(
+                containers_pb2.DeleteContainerRequest(id=container_id),
+                metadata=self._md,
+                timeout=_LIFECYCLE_CALL_TIMEOUT,
+            )
+        except grpc.aio.AioRpcError as e:
+            raise ContainerCreationFailedError(
+                f"the container record of a previous attempt at {container_id} cannot be"
+                f" reclaimed ({e.code().name}); the daemon still believes it is alive"
+            ) from e
+        await self._containers_stub().Create(request, metadata=self._md)
+
     @override
     async def create_container(
         self,
@@ -894,9 +932,7 @@ class ContainerdGrpcRuntime(OciRuntime):
                 snapshot_key=container_id,
                 labels=dict(oci_spec.get("labels") or {}),
             )
-            await self._containers_stub().Create(
-                containers_pb2.CreateContainerRequest(container=container), metadata=self._md
-            )
+            await self._create_container_record(container_id, container)
         except BaseException:
             self._rootfs.pop(container_id, None)
             with contextlib.suppress(grpc.aio.AioRpcError):
