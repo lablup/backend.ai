@@ -10,7 +10,10 @@ encoding.
 from __future__ import annotations
 
 import json
+import os
 import struct
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -255,20 +258,56 @@ class TestTheHardeningStep:
             f'the no-filter path must pass "-" as the filter: {execs}'
         )
 
-    def test_the_helper_unshares_ipc_before_it_execs(self) -> None:
-        """enroot leaves every kernel in the HOST's IPC namespace (measured: two kernels and the
-        host all report the same `ipc:[...]`, and a segment made in one is listed by `ipcs` in the
-        other), because `--ipc` makes its 10-devices hook hard-fail on a host with no /dev/log."""
-        src = Path(seccomp_installer.__file__).read_text()
-        assert "CLONE_NEWIPC = 0x08000000" in src
-        assert "def unshare_ipc()" in src
-        # It must run before either exec path, so the isolation covers the jail sandbox too.
-        assert src.index("unshare_ipc()\n") < src.index("os.execv(command[0], command)")
+    def test_the_helper_actually_moves_into_a_new_ipc_namespace(self) -> None:
+        """Run it and read the namespace back, rather than reading the source that asks for it.
 
-    def test_a_failed_unshare_warns_instead_of_refusing(self) -> None:
+        enroot leaves every kernel in the HOST's IPC namespace (measured: two kernels and the host
+        all report the same `ipc:[...]`, and a segment made in one is listed by `ipcs` in the
+        other), because `--ipc` makes its 10-devices hook hard-fail on a host with no /dev/log.
+        The unshare needs CAP_SYS_ADMIN in the current user namespace, which is exactly what the
+        container has and this test arranges with `unshare -r`.
+
+        A source-text assertion cannot see the failure that matters: `libc.unshare(0)` keeps the
+        name, the constant and the call site and isolates nothing (verified by mutation).
+        """
+        host = os.readlink("/proc/self/ns/ipc")
+        out = subprocess.run(
+            [
+                "unshare",
+                "-r",
+                sys.executable,
+                seccomp_installer.__file__,
+                "-",
+                "/bin/sh",
+                "-c",
+                "readlink /proc/self/ns/ipc",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert out.returncode == 0, out.stderr
+        assert out.stdout.strip(), out.stderr
+        assert out.stdout.strip() != host, "the helper left the command in the host IPC namespace"
+
+    def test_the_command_still_runs_when_the_unshare_is_not_permitted(self) -> None:
         """The opposite trade from seccomp: a filter that will not install means running
-        unconfined, but losing IPC isolation must not stop the kernel from starting."""
-        src = Path(seccomp_installer.__file__).read_text()
-        body = src[src.index("def unshare_ipc()") : src.index("def main(")]
-        assert "WARNING" in body
-        assert "SystemExit" not in body and "raise" not in body
+        unconfined and is refused, but losing IPC isolation must not stop the kernel from
+        starting. Without a user namespace the unshare is EPERM, which is that path."""
+        host = os.readlink("/proc/self/ns/ipc")
+        out = subprocess.run(
+            [
+                sys.executable,
+                seccomp_installer.__file__,
+                "-",
+                "/bin/sh",
+                "-c",
+                "readlink /proc/self/ns/ipc",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert out.returncode == 0
+        assert out.stdout.strip() == host  # not isolated...
+        assert "WARNING" in out.stderr  # ...and it said so

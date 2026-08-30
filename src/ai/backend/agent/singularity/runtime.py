@@ -525,6 +525,13 @@ class SingularityRuntime(RootlessOciRuntime):
             # PID 1 there, so zombies are reaped — something enroot does not provide.
             "--uts",
             "--pid",
+            # And its own SysV IPC namespace. `--contain` does NOT cover this, whatever its name
+            # suggests: measured, apptainer's own `appinit` — PID 1 in the container — sat in the
+            # HOST's IPC namespace and listed every host segment, while the workload below it was
+            # isolated by the gate wrapper's unshare. Passing this moves PID 1 itself, so the
+            # container has no process left in the host's namespace. Unlike enroot, apptainer has
+            # no /dev-rebuilding hook to trip over here, so it simply works.
+            "--ipc",
             # Start from an empty environment; everything the kernel needs is passed explicitly
             # below. Without this the agent pod's own environment (NVIDIA_VISIBLE_DEVICES=all, to
             # get the driver injected into the *pod*) would reach the container.

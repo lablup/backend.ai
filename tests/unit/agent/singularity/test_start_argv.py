@@ -264,3 +264,14 @@ class TestGpuAllocationReachesNvccli:
         assert "all" not in runtime._launch_env({"gpus": ["0"]})["NVIDIA_DRIVER_CAPABILITIES"]
         env = _env_of(_argv(runtime, gate_dir, gpus=["0"]))
         assert env.get("NVIDIA_DRIVER_CAPABILITIES") != "all"
+
+
+class TestIpcNamespace:
+    def test_the_container_gets_its_own_ipc_namespace(
+        self, runtime: SingularityRuntime, gate_dir: Path
+    ) -> None:
+        """`--contain` does not cover SysV IPC, whatever the name suggests. Measured: without this
+        flag apptainer's own `appinit` — PID 1 in the container — sat in the HOST's IPC namespace
+        and `ipcs` there listed every host segment (5 of 5), while the workload below it saw none.
+        The gate wrapper's unshare isolates everything below PID 1; this is what moves PID 1 too."""
+        assert "--ipc" in _argv(runtime, gate_dir)

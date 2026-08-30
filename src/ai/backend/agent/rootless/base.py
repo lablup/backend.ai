@@ -730,14 +730,14 @@ class RootlessOciRuntime(OciRuntime):
                 )
 
     async def _release_via_privnet(self, container_id: str) -> None:
-        from ai.backend.agent.network.privnet.client import PrivNetClient
+        from ai.backend.agent.network.privnet.client import PrivNetClient, PrivNetClientError
 
         session_id = str(self._labels.get(container_id, {}).get(_SESSION_ID_LABEL, container_id))
         try:
             await PrivNetClient(self._privnet_socket or "").release_container(
                 session_id, container_id
             )
-        except Exception as e:
+        except (OSError, TimeoutError, PrivNetClientError) as e:
             log.warning(
                 "[{}] privnet could not release the cgroup for {}: {!r}",
                 self.backend_name,
@@ -756,18 +756,24 @@ class RootlessOciRuntime(OciRuntime):
         delegation the kernel simply stays in the agent's own cgroup — measured on a kernel
         allocated 8 GiB and 4 CPUs: `memory.max = max`, `Cpus_allowed_list: 0-31`.
 
-        Loud on failure and no fallback: the local path cannot work either (that is why we are
-        here), and a kernel silently running without its limits is what this whole method exists
-        to prevent.
+        Best-effort but loud, the same trade the local path makes (`_create_cgroup` returns None
+        and warns rather than refusing): the kernel still starts, and the log line below is the
+        only record that it is running unconfined. There is no fallback to try — the local path
+        cannot work either, which is why we are here.
+
+        The narrow except is deliberate. A bare `Exception` here also swallowed programming errors
+        in this method — a typo in `_cgroup_limits` surfaced as "privnet could not confine" and
+        silently disabled every limit on the node — so only the ways the privnet itself can fail
+        are caught.
         """
-        from ai.backend.agent.network.privnet.client import PrivNetClient
+        from ai.backend.agent.network.privnet.client import PrivNetClient, PrivNetClientError
 
         session_id = str(self._labels.get(container_id, {}).get(_SESSION_ID_LABEL, container_id))
         try:
             await PrivNetClient(self._privnet_socket or "").confine_container(
                 session_id, container_id, top_pid, self._cgroup_limits(spec)
             )
-        except Exception as e:
+        except (OSError, TimeoutError, PrivNetClientError) as e:
             log.error(
                 "[{}] privnet could not confine {}: {!r} — the kernel is running WITHOUT its "
                 "cgroup limits",
