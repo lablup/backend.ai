@@ -53,6 +53,7 @@ from ai.backend.common.types import (
     AgentId,
     CommitStatus,
     ContainerId,
+    KernelCreationResult,
     KernelId,
     ServicePort,
     SessionId,
@@ -195,6 +196,12 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
     environ: Mapping[str, Any]
     state: KernelLifecycleStatus
     session_type: SessionTypes
+    # What create_kernel answered for this kernel, kept so the same answer can be given again.
+    # The manager re-sends create_kernel for a kernel it has not heard back about -- when a peer
+    # kernel of the same session missed its readiness window, for instance -- and this agent's
+    # kernel may already be up and serving by then. Rebuilding it would mean creating a second
+    # container over a live one; replaying this is what makes that RPC idempotent.
+    creation_result: KernelCreationResult | None
 
     _tasks: set[asyncio.Task[Any]]
 
@@ -233,6 +240,7 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
         self.session_type = session_type
+        self.creation_result = None
 
     def set_container_id(self, cid: ContainerId) -> None:
         self.container_id = cid

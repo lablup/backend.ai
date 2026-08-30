@@ -799,6 +799,61 @@ class ContainerdGrpcRuntime(OciRuntime):
 
     # --- container/task lifecycle (Phase 2) ---
 
+    async def _refuse_to_reclaim_a_live_container(self, container_id: str) -> None:
+        """Stop a reclaim when the id names a container that is still running.
+
+        The reclaims below read ALREADY_EXISTS as "a previous attempt died holding this id". There
+        is a second way to get that answer: the id is in use *right now*. The manager re-sends
+        create_kernel for a kernel it never heard back about, and on a multi-node session that
+        kernel may be the healthy one -- so the reclaim would delete a serving container's snapshot
+        and record, and the create would then fail at the task anyway and take the kernel with it.
+
+        The task is what says which of the two it is: containerd keeps one per live container, and
+        it is gone once the container is.
+        """
+        status = await self.container_status(container_id)
+        if status in (None, "stopped", "unknown"):
+            return
+        raise ContainerCreationFailedError(
+            f"container {container_id} is already here and its task is {status}; refusing to"
+            " recreate it over the running one"
+        )
+
+    async def _create_task_record(self, container_id: str, request: Any) -> Any:
+        """Create the task, reclaiming one a previous attempt left behind.
+
+        The last of the three ids a failed attempt can keep hold of. The snapshot and the container
+        record are reclaimed above; a task that outlived them answers
+        `ALREADY_EXISTS: task "<kernel-id>": already exists` and the retry stops one step further
+        along than before -- measured on the multi-node session that produced the other two.
+
+        A task that is still running has already been refused by the reclaims above, so what reaches
+        here is a stopped task's leftover record. Deleting it is what frees the id.
+        """
+        try:
+            return await self._tasks_stub().Create(request, metadata=self._md)
+        except grpc.aio.AioRpcError as e:
+            if e.code() is not grpc.StatusCode.ALREADY_EXISTS:
+                raise
+        await self._refuse_to_reclaim_a_live_container(container_id)
+        log.warning(
+            "create_task(c:{}): a task from an earlier attempt is still here; reclaiming it so"
+            " this id can be reused",
+            container_id,
+        )
+        try:
+            await self._tasks_stub().Delete(
+                tasks_pb2.DeleteTaskRequest(container_id=container_id),
+                metadata=self._md,
+                timeout=_LIFECYCLE_CALL_TIMEOUT,
+            )
+        except grpc.aio.AioRpcError as e:
+            raise ContainerCreationFailedError(
+                f"the task of a previous attempt at container {container_id} cannot be reclaimed"
+                f" ({e.code().name}); the daemon still believes it is alive"
+            ) from e
+        return await self._tasks_stub().Create(request, metadata=self._md)
+
     async def _prepare_rootfs(self, container_id: str, chain_id: str) -> Any:
         """The container's writable snapshot, reclaiming one a previous attempt left behind.
 
@@ -825,6 +880,7 @@ class ContainerdGrpcRuntime(OciRuntime):
         except grpc.aio.AioRpcError as e:
             if e.code() is not grpc.StatusCode.ALREADY_EXISTS:
                 raise
+        await self._refuse_to_reclaim_a_live_container(container_id)
         log.warning(
             "create_container(c:{}): a snapshot from an earlier attempt is still here; reclaiming"
             " it so this id can be reused",
@@ -863,6 +919,7 @@ class ContainerdGrpcRuntime(OciRuntime):
         except grpc.aio.AioRpcError as e:
             if e.code() is not grpc.StatusCode.ALREADY_EXISTS:
                 raise
+        await self._refuse_to_reclaim_a_live_container(container_id)
         log.warning(
             "create_container(c:{}): a container record from an earlier attempt is still here;"
             " reclaiming it so this id can be reused",
@@ -961,14 +1018,14 @@ class ContainerdGrpcRuntime(OciRuntime):
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_path.touch(exist_ok=True)
             stdio = str(log_path)
-        resp = await self._tasks_stub().Create(
+        resp = await self._create_task_record(
+            container_id,
             tasks_pb2.CreateTaskRequest(
                 container_id=container_id,
                 rootfs=self._rootfs.get(container_id, []),
                 stdout=stdio,
                 stderr=stdio,
             ),
-            metadata=self._md,
         )
         return TaskHandle(container_id=container_id, pid=resp.pid)
 

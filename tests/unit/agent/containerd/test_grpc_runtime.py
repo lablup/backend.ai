@@ -4,6 +4,7 @@ import hashlib
 import json
 import signal
 import tarfile
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -11,6 +12,7 @@ import grpc
 import pytest
 
 from ai.backend.agent.containerd._grpcapi.api.services.containers.v1 import containers_pb2
+from ai.backend.agent.containerd._grpcapi.api.services.tasks.v1 import tasks_pb2
 from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
 from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, _chain_id
@@ -653,9 +655,17 @@ class TestPreparingOverALeftoverSnapshot:
     failure look like a permanent one.
     """
 
-    def _runtime(self, *, remove_fails: bool = False) -> tuple[Any, list[str]]:
+    def _runtime(
+        self, *, remove_fails: bool = False, task_status: str | None = None
+    ) -> tuple[Any, list[str]]:
         rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
         calls: list[str] = []
+
+        async def _container_status(container_id: str) -> str | None:
+            calls.append("status")
+            return task_status
+
+        rt.container_status = _container_status
 
         class _Snapshots:
             def __init__(self) -> None:
@@ -688,7 +698,7 @@ class TestPreparingOverALeftoverSnapshot:
         prepared = await rt._prepare_rootfs("c1", "sha256:chain")
 
         assert list(prepared.mounts) == ["m"]
-        assert calls == ["prepare", "remove", "prepare"]
+        assert calls == ["prepare", "status", "remove", "prepare"]
 
     async def test_a_snapshot_something_still_holds_is_not_worked_around(self) -> None:
         """Then the container it belongs to has not really gone, and ALREADY_EXISTS is the truthful
@@ -698,7 +708,7 @@ class TestPreparingOverALeftoverSnapshot:
         with pytest.raises(ContainerCreationFailedError, match="cannot be reclaimed"):
             await rt._prepare_rootfs("c1", "sha256:chain")
 
-        assert calls == ["prepare", "remove"]  # never a second prepare
+        assert calls == ["prepare", "status", "remove"]  # never a second prepare
 
     async def test_the_ordinary_path_prepares_once(self) -> None:
         """The control: without a leftover there is nothing to reclaim, and the reclaim must not
@@ -736,9 +746,17 @@ class TestCreatingOverALeftoverContainerRecord:
     reclaiming only the snapshot was not enough to make a churned session survive.
     """
 
-    def _runtime(self, *, delete_fails: bool = False) -> tuple[Any, list[str]]:
+    def _runtime(
+        self, *, delete_fails: bool = False, task_status: str | None = None
+    ) -> tuple[Any, list[str]]:
         rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
         calls: list[str] = []
+
+        async def _container_status(container_id: str) -> str | None:
+            calls.append("status")
+            return task_status
+
+        rt.container_status = _container_status
 
         class _Containers:
             def __init__(self) -> None:
@@ -769,7 +787,7 @@ class TestCreatingOverALeftoverContainerRecord:
 
         await rt._create_container_record("c1", containers_pb2.Container(id="c1"))
 
-        assert calls == ["create", "delete", "create"]
+        assert calls == ["create", "status", "delete", "create"]
 
     async def test_a_record_that_will_not_delete_is_not_worked_around(self) -> None:
         rt, calls = self._runtime(delete_fails=True)
@@ -777,7 +795,7 @@ class TestCreatingOverALeftoverContainerRecord:
         with pytest.raises(ContainerCreationFailedError, match="cannot be reclaimed"):
             await rt._create_container_record("c1", containers_pb2.Container(id="c1"))
 
-        assert calls == ["create", "delete"]  # never a second create
+        assert calls == ["create", "status", "delete"]  # never a second create
 
     async def test_the_ordinary_path_creates_once(self) -> None:
         rt, calls = self._runtime()
@@ -801,3 +819,204 @@ class TestCreatingOverALeftoverContainerRecord:
 
         with pytest.raises(grpc.aio.AioRpcError):
             await rt._create_container_record("c1", containers_pb2.Container(id="c1"))
+
+
+class TestARetryThatArrivesWhileTheContainerIsStillServing:
+    """ALREADY_EXISTS has a second meaning, and reclaiming is the wrong answer to it.
+
+    The reclaims above read it as "a previous attempt died holding this id". It also comes back when
+    the id is in use *right now*: the manager re-sends create_kernel for a kernel it never heard
+    back about, and on a multi-node session the kernel that did not answer can be the peer's, not
+    this one's. Measured — the reclaim deleted a serving container's snapshot and record, the create
+    then failed at the task anyway, and the failure path destroyed the kernel that had been up and
+    answering for a minute.
+
+    The task is what tells the two apart: containerd keeps one per live container and it is gone
+    once the container is.
+    """
+
+    def _runtime(self, status: str | None) -> Any:
+        rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
+
+        async def _container_status(container_id: str) -> str | None:
+            return status
+
+        rt.container_status = _container_status
+        return rt
+
+    @pytest.mark.parametrize("status", ["running", "created", "paused", "pausing"])
+    async def test_a_live_container_is_never_reclaimed(self, status: str) -> None:
+        rt = self._runtime(status)
+
+        with pytest.raises(ContainerCreationFailedError, match="refusing to recreate"):
+            await rt._refuse_to_reclaim_a_live_container("c1")
+
+    @pytest.mark.parametrize("status", [None, "stopped", "unknown"])
+    async def test_what_a_failed_attempt_leaves_is_reclaimable(self, status: str | None) -> None:
+        """No task at all is the ordinary leftover; a stopped one is the container that died
+        without its records being cleared."""
+        rt = self._runtime(status)
+
+        await rt._refuse_to_reclaim_a_live_container("c1")  # does not raise
+
+    async def test_the_snapshot_of_a_live_container_is_left_alone(self) -> None:
+        """End to end through the snapshot reclaim: the Remove must not be reached."""
+        rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
+        calls: list[str] = []
+
+        class _Snapshots:
+            async def Prepare(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                calls.append("prepare")
+                raise grpc.aio.AioRpcError(
+                    grpc.StatusCode.ALREADY_EXISTS, None, None, "already exists"
+                )
+
+            async def Remove(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                calls.append("remove")
+
+        async def _container_status(container_id: str) -> str | None:
+            return "running"
+
+        rt.container_status = _container_status
+        rt._snapshots_stub = lambda: _Snapshots()
+        type(rt)._md = property(lambda self: [])
+
+        with pytest.raises(ContainerCreationFailedError, match="refusing to recreate"):
+            await rt._prepare_rootfs("c1", "sha256:chain")
+
+        assert calls == ["prepare"]
+
+    async def test_the_record_of_a_live_container_is_left_alone(self) -> None:
+        rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
+        calls: list[str] = []
+
+        class _Containers:
+            async def Create(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                calls.append("create")
+                raise grpc.aio.AioRpcError(
+                    grpc.StatusCode.ALREADY_EXISTS, None, None, "already exists"
+                )
+
+            async def Delete(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                calls.append("delete")
+
+        async def _container_status(container_id: str) -> str | None:
+            return "running"
+
+        rt.container_status = _container_status
+        rt._containers_stub = lambda: _Containers()
+        type(rt)._md = property(lambda self: [])
+
+        with pytest.raises(ContainerCreationFailedError, match="refusing to recreate"):
+            await rt._create_container_record("c1", containers_pb2.Container(id="c1"))
+
+        assert calls == ["create"]
+
+
+class TestCreatingOverALeftoverTask:
+    """The last of the three ids a failed attempt can keep hold of.
+
+    With the snapshot and the container record reclaimed, the retry got one step further and stopped
+    at `ALREADY_EXISTS: task "<kernel-id>": already exists` — measured on the same multi-node
+    session that produced the other two. A task that is still running has already been refused by
+    the live-container check, so what reaches the reclaim is a stopped task's leftover record.
+    """
+
+    def _runtime(
+        self, *, delete_fails: bool = False, task_status: str | None = None
+    ) -> tuple[Any, list[str]]:
+        rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
+        calls: list[str] = []
+
+        async def _container_status(container_id: str) -> str | None:
+            calls.append("status")
+            return task_status
+
+        rt.container_status = _container_status
+
+        class _Tasks:
+            def __init__(self) -> None:
+                self.stale = True
+
+            async def Create(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                calls.append("create")
+                if self.stale:
+                    raise grpc.aio.AioRpcError(
+                        grpc.StatusCode.ALREADY_EXISTS, None, None, "already exists"
+                    )
+                return SimpleNamespace(pid=4242)
+
+            async def Delete(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                calls.append("delete")
+                if delete_fails:
+                    raise grpc.aio.AioRpcError(
+                        grpc.StatusCode.FAILED_PRECONDITION, None, None, "still running"
+                    )
+                self.stale = False
+
+        tasks = _Tasks()
+        rt._tasks_stub = lambda: tasks
+        type(rt)._md = property(lambda self: [])
+        return rt, calls
+
+    def _request(self) -> Any:
+        return tasks_pb2.CreateTaskRequest(container_id="c1")
+
+    async def test_a_stale_task_is_reclaimed_and_the_id_reused(self) -> None:
+        rt, calls = self._runtime(task_status="stopped")
+
+        resp = await rt._create_task_record("c1", self._request())
+
+        assert resp.pid == 4242
+        assert calls == ["create", "status", "delete", "create"]
+
+    async def test_a_task_that_will_not_delete_is_not_worked_around(self) -> None:
+        rt, calls = self._runtime(delete_fails=True, task_status="stopped")
+
+        with pytest.raises(ContainerCreationFailedError, match="cannot be reclaimed"):
+            await rt._create_task_record("c1", self._request())
+
+        assert calls == ["create", "status", "delete"]  # never a second create
+
+    async def test_a_running_task_is_refused_before_anything_is_deleted(self) -> None:
+        """This is the duplicate create_kernel of a kernel that is up and serving."""
+        rt, calls = self._runtime(task_status="running")
+
+        with pytest.raises(ContainerCreationFailedError, match="refusing to recreate"):
+            await rt._create_task_record("c1", self._request())
+
+        assert calls == ["create", "status"]
+
+    async def test_the_ordinary_path_creates_once(self) -> None:
+        rt, calls = self._runtime()
+        rt._tasks_stub().stale = False
+
+        await rt._create_task_record("c1", self._request())
+
+        assert calls == ["create"]
+
+    async def test_any_other_create_failure_is_raised_untouched(self) -> None:
+        rt, _ = self._runtime()
+
+        class _Tasks:
+            async def Create(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                raise grpc.aio.AioRpcError(
+                    grpc.StatusCode.UNAVAILABLE, None, None, "containerd is down"
+                )
+
+        rt._tasks_stub = lambda: _Tasks()
+
+        with pytest.raises(grpc.aio.AioRpcError):
+            await rt._create_task_record("c1", self._request())
+
+    async def test_create_task_itself_goes_through_the_reclaim(self) -> None:
+        """The reclaim is only worth anything if the task-creating path uses it — measured as a
+        surviving mutant when `create_task` called the stub directly."""
+        rt, calls = self._runtime(task_status="stopped")
+        rt._rootfs = {}
+        rt._log_config = (Path("/usr/bin/bai-logger"), Path("/var/log/bai"), 1024)
+
+        handle = await rt.create_task("c1")
+
+        assert handle.pid == 4242
+        assert calls == ["create", "status", "delete", "create"]

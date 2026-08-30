@@ -2688,6 +2688,30 @@ class AbstractAgent[
         kernel_id = ownership_data.kernel_id
         session_id = ownership_data.session_id
 
+        # The manager re-sends create_kernel for a kernel whose creation it never heard the end of,
+        # and this agent's kernel may have finished starting in the meantime -- a multi-node session
+        # whose *peer* kernel missed its readiness window is the case that produces it. Recreating
+        # then means building a second container over a live one, which cannot work: containerd
+        # answers ALREADY_EXISTS for the task, and the failure path destroys the kernel that was
+        # serving. Replaying the answer we already gave makes the retry idempotent, and the session
+        # survives on whatever its peer does next.
+        #
+        # `track_create` only covers a creation still in flight; this is the one that has finished.
+        if not restarting and kernel_id not in self.restarting_kernels:
+            existing = self.kernel_registry.get(kernel_id)
+            if (
+                existing is not None
+                and existing.state is KernelLifecycleStatus.RUNNING
+                and (previous_result := existing.creation_result) is not None
+            ):
+                log.warning(
+                    "create_kernel(kernel:{}, session:{}) this kernel is already running here;"
+                    " replying with the result of the creation that made it",
+                    kernel_id,
+                    session_id,
+                )
+                return previous_result
+
         # Track kernel creation for health monitoring
         with self.track_create(kernel_id, session_id) as should_proceed:
             if not should_proceed:
@@ -3446,6 +3470,9 @@ class AbstractAgent[
                     )
                     async with self.registry_lock:
                         kernel_obj.state = KernelLifecycleStatus.RUNNING
+                        # Kept for a duplicate create_kernel of this same kernel; see the top of
+                        # this method.
+                        kernel_obj.creation_result = kernel_creation_info
 
                     log.info(
                         "create_kernel(kernel:{}, session:{}, container:{}) done",
