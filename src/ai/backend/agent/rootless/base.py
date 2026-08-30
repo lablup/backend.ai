@@ -562,10 +562,10 @@ class RootlessOciRuntime(OciRuntime):
             f.write("go\n")
 
     def _log_hardening_disposition(self, container_id: str, spec: Mapping[str, Any]) -> None:
-        # Make the hardening model explicit and observable. Capabilities and AppArmor are dropped
-        # by design (the userns scopes caps; neither runtime has AppArmor integration). Syscall
-        # filtering comes from the compiled seccomp filter above, or — when the operator picked the
-        # jail sandbox and so no profile was generated — from jail alone.
+        # Make the hardening model explicit and observable. Capabilities are dropped by design
+        # (the userns scopes them), and no MAC profile is applied — the same as every other backend
+        # here. Syscall filtering comes from the compiled seccomp filter above, or — when the
+        # operator picked the jail sandbox and so no profile was generated — from jail alone.
         if not spec.get("seccomp"):
             log.info(
                 "[{}] no seccomp profile for container {} — syscall filtering comes from the "

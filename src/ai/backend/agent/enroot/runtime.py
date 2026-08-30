@@ -12,9 +12,10 @@ is genuinely enroot's, and so lives here:
 * **The launch line** (``enroot start``), including the GPU allowlist its ``98-nvidia`` hook reads,
   the private ``/dev/shm``, and the host binds carried over from the OCI spec.
 
-**Hardening**: the capability set and AppArmor profile are dropped — the userns already scopes caps
-to the pod, and enroot has no AppArmor integration. OCI seccomp is a runc feature, so the base
-compiles the profile to BPF itself and the pause wrapper installs it before the user command runs.
+**Hardening**: the capability set from the OCI spec is dropped — the userns already scopes caps to
+the pod. OCI seccomp is a runc feature, so the base compiles the profile to BPF itself and the
+pause wrapper installs it before the user command runs. No MAC profile is applied, which is what
+every backend here does (the Docker backend never names one either).
 """
 
 from __future__ import annotations
