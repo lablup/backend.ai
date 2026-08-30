@@ -71,6 +71,7 @@ from ai.backend.agent.containerd.runtime.interface import (
     TaskHandle,
 )
 from ai.backend.agent.containerd.runtime.spec import build_oci_runtime_spec
+from ai.backend.agent.errors.agent import ContainerCreationFailedError
 from ai.backend.agent.errors.kernel import ContainerExecTimeout
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.logging import BraceStyleAdapter
@@ -798,6 +799,50 @@ class ContainerdGrpcRuntime(OciRuntime):
 
     # --- container/task lifecycle (Phase 2) ---
 
+    async def _prepare_rootfs(self, container_id: str, chain_id: str) -> Any:
+        """The container's writable snapshot, reclaiming one a previous attempt left behind.
+
+        `remove_container` tolerates a snapshot Remove that fails FAILED_PRECONDITION — the task
+        pinning the overlay has not finished dying — and leaves the snapshot for later, because
+        aborting there would leak the container record and the logs as well. For a retry, "later"
+        meant never: the manager re-creates the SAME kernel id, Prepare answers ALREADY_EXISTS, and
+        it answers that forever.
+
+        Measured on a multi-node session whose kernels missed their readiness window: the original
+        timeout was transient and retryable, and the retry died on
+        `ALREADY_EXISTS: snapshot "<kernel-id>": already exists` — which is what made an
+        intermittent failure look like a permanent one.
+
+        The stale snapshot is only reclaimed if nothing holds it any more. If it is still pinned,
+        the container it belongs to has not really gone and ALREADY_EXISTS is the truthful answer,
+        so it is raised rather than worked around.
+        """
+        request = snapshots_pb2.PrepareSnapshotRequest(
+            snapshotter=_SNAPSHOTTER, key=container_id, parent=chain_id
+        )
+        try:
+            return await self._snapshots_stub().Prepare(request, metadata=self._md)
+        except grpc.aio.AioRpcError as e:
+            if e.code() is not grpc.StatusCode.ALREADY_EXISTS:
+                raise
+        log.warning(
+            "create_container(c:{}): a snapshot from an earlier attempt is still here; reclaiming"
+            " it so this id can be reused",
+            container_id,
+        )
+        try:
+            await self._snapshots_stub().Remove(
+                snapshots_pb2.RemoveSnapshotRequest(snapshotter=_SNAPSHOTTER, key=container_id),
+                metadata=self._md,
+                timeout=_LIFECYCLE_CALL_TIMEOUT,
+            )
+        except grpc.aio.AioRpcError as e:
+            raise ContainerCreationFailedError(
+                f"the snapshot of a previous attempt at container {container_id} cannot be"
+                f" reclaimed ({e.code().name}); something still holds it"
+            ) from e
+        return await self._snapshots_stub().Prepare(request, metadata=self._md)
+
     @override
     async def create_container(
         self,
@@ -815,12 +860,7 @@ class ContainerdGrpcRuntime(OciRuntime):
             if not str(mount["source"]).startswith("/"):
                 raise ValueError(f"mount source must be an absolute path, got {mount['source']!r}")
         # Active snapshot for the writable rootfs, layered on the image's chain.
-        prepared = await self._snapshots_stub().Prepare(
-            snapshots_pb2.PrepareSnapshotRequest(
-                snapshotter=_SNAPSHOTTER, key=container_id, parent=chain_id
-            ),
-            metadata=self._md,
-        )
+        prepared = await self._prepare_rootfs(container_id, chain_id)
         self._rootfs[container_id] = list(prepared.mounts)
         # The snapshot is now the container's, keyed on its id. If anything below fails — a bad
         # spec, Containers.Create — that snapshot and the _rootfs entry survive, and a retry of the

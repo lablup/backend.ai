@@ -13,6 +13,7 @@ import pytest
 from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
 from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, _chain_id
+from ai.backend.agent.errors.agent import ContainerCreationFailedError
 
 _ACTIVE_MOUNT = mount_pb2.Mount(type="overlay", source="overlay", options=["upperdir=/active"])
 _BASE_VIEW_MOUNT = mount_pb2.Mount(type="overlay", source="overlay", options=["lowerdir=/base"])
@@ -636,3 +637,89 @@ class TestRegistryResolution:
         expected = "Basic " + base64.b64encode(b"u:p").decode()
         assert resolver.headers["Authorization"] == expected
         assert resolver.host_dir == "/etc/containerd/certs.d"  # and both at once
+
+
+class TestPreparingOverALeftoverSnapshot:
+    """A retry of the same kernel id has to be able to take its snapshot back.
+
+    `remove_container` deliberately tolerates a snapshot Remove that fails FAILED_PRECONDITION —
+    the task pinning the overlay has not finished dying, and aborting there would leak the
+    container record and the logs too — so it leaves the snapshot for later. For the manager's
+    retry, later meant never: it re-creates the SAME kernel id and Prepare answers ALREADY_EXISTS,
+    forever. Measured on a multi-node session whose kernels missed their readiness window: the
+    timeout itself was transient, and the retry died on
+    `ALREADY_EXISTS: snapshot "<kernel-id>": already exists`, which is what made an intermittent
+    failure look like a permanent one.
+    """
+
+    def _runtime(self, *, remove_fails: bool = False) -> tuple[Any, list[str]]:
+        rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
+        calls: list[str] = []
+
+        class _Snapshots:
+            def __init__(self) -> None:
+                self.stale = True
+
+            async def Prepare(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                calls.append("prepare")
+                if self.stale:
+                    raise grpc.aio.AioRpcError(
+                        grpc.StatusCode.ALREADY_EXISTS, None, None, "already exists"
+                    )
+                return SimpleNamespace(mounts=["m"])
+
+            async def Remove(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                calls.append("remove")
+                if remove_fails:
+                    raise grpc.aio.AioRpcError(
+                        grpc.StatusCode.FAILED_PRECONDITION, None, None, "snapshot is in use"
+                    )
+                self.stale = False
+
+        snapshots = _Snapshots()
+        rt._snapshots_stub = lambda: snapshots
+        type(rt)._md = property(lambda self: [])
+        return rt, calls
+
+    async def test_a_stale_snapshot_is_reclaimed_and_the_id_reused(self) -> None:
+        rt, calls = self._runtime()
+
+        prepared = await rt._prepare_rootfs("c1", "sha256:chain")
+
+        assert list(prepared.mounts) == ["m"]
+        assert calls == ["prepare", "remove", "prepare"]
+
+    async def test_a_snapshot_something_still_holds_is_not_worked_around(self) -> None:
+        """Then the container it belongs to has not really gone, and ALREADY_EXISTS is the truthful
+        answer — creating a second container over a live overlay would be worse than failing."""
+        rt, calls = self._runtime(remove_fails=True)
+
+        with pytest.raises(ContainerCreationFailedError, match="cannot be reclaimed"):
+            await rt._prepare_rootfs("c1", "sha256:chain")
+
+        assert calls == ["prepare", "remove"]  # never a second prepare
+
+    async def test_the_ordinary_path_prepares_once(self) -> None:
+        """The control: without a leftover there is nothing to reclaim, and the reclaim must not
+        run on every create."""
+        rt, calls = self._runtime()
+        rt._snapshots_stub().stale = False
+
+        await rt._prepare_rootfs("c1", "sha256:chain")
+
+        assert calls == ["prepare"]
+
+    async def test_any_other_prepare_failure_is_raised_untouched(self) -> None:
+        rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
+
+        class _Snapshots:
+            async def Prepare(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                raise grpc.aio.AioRpcError(
+                    grpc.StatusCode.UNAVAILABLE, None, None, "containerd is down"
+                )
+
+        rt._snapshots_stub = lambda: _Snapshots()
+        type(rt)._md = property(lambda self: [])
+
+        with pytest.raises(grpc.aio.AioRpcError):
+            await rt._prepare_rootfs("c1", "sha256:chain")
