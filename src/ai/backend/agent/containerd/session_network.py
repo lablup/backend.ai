@@ -38,7 +38,11 @@ from ai.backend.agent.errors.network import (
 )
 from ai.backend.agent.network.cni import CniRunner
 from ai.backend.agent.network.coordinator import SessionClusterNames, SessionNetworkCoordinator
-from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, LocalSubnetLayout
+from ai.backend.agent.network.local_subnet import (
+    LocalSubnetAllocator,
+    LocalSubnetLayout,
+    cluster_host_ips,
+)
 from ai.backend.agent.network.native_attacher import HostLocalIpam
 from ai.backend.agent.network.privnet.resolver import (
     ClusterDNSServer,
@@ -720,6 +724,33 @@ class ContainerdSessionNetwork:
         coordinator = self._coordinators.get(session_id)
         if coordinator is not None:
             coordinator.register_static_names(session_id, names)
+
+    async def restore_cluster_names(self, session_id: str, peers: Sequence[str]) -> None:
+        """Recompute and re-register a single-node session's peer names after an agent restart.
+
+        `register_cluster_names` is called from ONE place — the kernel-creation path — and the
+        table it feeds is process memory. A restart therefore resumes the kernels (the journal
+        replay does that) while the resolver comes back knowing none of their names: the session's
+        containers still ping each other by address, and every cluster hostname stops resolving.
+        Measured after an agent restart: `getent hosts sub1` answered nothing while
+        `getent hosts cr.backend.ai` still resolved, because the resolver was up and forwarding —
+        only its own table was empty.
+
+        Multi-node sessions do not have this problem, and must not be touched here: their names
+        come from the manager's etcd ``endpoints/`` table, which a restart re-reads. Only the
+        single-node layout is *computed* by the agent, and computation is exactly what makes it
+        recoverable — `cluster_host_ips` is pure, and both of its inputs outlive the process (the
+        subnet in the LOCAL journal, the ordered peer list in the kernel's own environment).
+        """
+        if len(peers) <= 1:
+            return  # not a cluster, or the lone kernel: nothing for the resolver to answer
+        meta = await self._read_session_meta(session_id)
+        if meta is None or meta.backend is not NetworkBackendKind.BRIDGE:
+            return  # multi-node overlay: the etcd endpoints table is its source, not this
+        subnet = await self.local_subnet_of(session_id)
+        if subnet is None:
+            return  # no block held here; the session is not ours to answer for
+        self.register_cluster_names(session_id, cluster_host_ips(subnet, peers))
 
     async def local_gateway_of(self, session_id: str) -> str | None:
         """This session's LOCAL bridge gateway — the first usable host of its LOCAL subnet (the

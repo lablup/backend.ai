@@ -22,7 +22,7 @@ from ai.backend.agent.errors.network import (
     SessionNetworkGone,
     UnusableVtep,
 )
-from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, cluster_host_ips
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.network.types import (
@@ -1025,3 +1025,88 @@ class TestWhereTheNodeLocalStoresLive:
 
         assert recorded["local_subnet"] is None
         assert recorded["attacher_ipam"] is None
+
+
+class TestRestoringClusterNamesAfterARestart:
+    """The resolver's peer table is process memory with no durable source for single-node sessions.
+
+    `register_cluster_names` is called from exactly one place — the kernel-creation path — so a
+    restart resumes the kernels (the journal replay does that) and brings the resolver back knowing
+    none of their names. Measured on a live agent restart: the containers still pinged each other
+    by address and `getent hosts cr.backend.ai` still resolved through the forwarder, while
+    `getent hosts sub1` answered nothing. Only the session's own table was empty.
+
+    Multi-node sessions are not affected and must not be touched: their names come from the
+    manager's etcd `endpoints/` table, which a restart re-reads.
+    """
+
+    async def _facade_with_session(self, nc: dict[str, Any]) -> tuple[Any, Any]:
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        facade = _facade(etcd, backend, runner, vtep_ip="192.168.0.10")
+        await facade.ensure_session("s1", "k1", nc)
+        return facade, etcd
+
+    async def test_a_single_node_session_gets_its_names_back(self) -> None:
+        facade, _ = await self._facade_with_session(_BRIDGE_NC)
+        try:
+            await facade.restore_cluster_names("s1", ["main1", "sub1"])
+
+            coordinator = facade._coordinators["s1"]
+            assert coordinator.resolve_cluster_name("s1", "main1") is not None
+            assert coordinator.resolve_cluster_name("s1", "sub1") is not None
+        finally:
+            await facade.teardown_session("s1")
+
+    async def test_the_restored_map_is_the_one_creation_computed(self) -> None:
+        """Recomputed, not remembered — so it has to come out identical or peers would be told to
+        talk to addresses nobody holds."""
+        facade, _ = await self._facade_with_session(_BRIDGE_NC)
+        try:
+            subnet = await facade.local_subnet_of("s1")
+            expected = cluster_host_ips(str(subnet), ["main1", "sub1"])
+
+            await facade.restore_cluster_names("s1", ["main1", "sub1"])
+
+            coordinator = facade._coordinators["s1"]
+            for hostname, ip in expected.items():
+                assert coordinator.resolve_cluster_name("s1", hostname) == ip
+        finally:
+            await facade.teardown_session("s1")
+
+    async def test_a_multi_node_session_is_left_to_etcd(self) -> None:
+        """Its peers are on manager-assigned overlay addresses; laying them out in THIS node's
+        LOCAL block would answer with addresses that exist nowhere.
+
+        The meta is written explicitly: the agent persists one only for single-node sessions (the
+        manager writes the overlay's), so without it this case would return early on a missing meta
+        and never reach the check it is here to exercise — it passed for that reason until a
+        mutation showed the branch was shadowed.
+        """
+        facade, etcd = await self._facade_with_session(_VXLAN_NC)
+        etcd.store["network/session/s1/meta"] = json.dumps(_VXLAN_NC)
+        try:
+            assert await facade._read_session_meta("s1") is not None, "the check must be reachable"
+
+            await facade.restore_cluster_names("s1", ["main1", "sub1"])
+
+            coordinator = facade._coordinators["s1"]
+            assert coordinator.resolve_cluster_name("s1", "main1") is None
+        finally:
+            await facade.teardown_session("s1")
+
+    async def test_a_lone_kernel_registers_nothing(self) -> None:
+        """Not a cluster: there is no peer to answer for."""
+        facade, _ = await self._facade_with_session(_BRIDGE_NC)
+        try:
+            await facade.restore_cluster_names("s1", ["main1"])
+
+            assert facade._coordinators["s1"].resolve_cluster_name("s1", "main1") is None
+        finally:
+            await facade.teardown_session("s1")
+
+    async def test_a_session_this_node_does_not_hold_is_a_no_op(self) -> None:
+        """A restart may see kernels of a session whose network was torn down while we were down."""
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        facade = _facade(etcd, backend, runner)
+
+        await facade.restore_cluster_names("s-unknown", ["main1", "sub1"])

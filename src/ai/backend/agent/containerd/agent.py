@@ -1722,6 +1722,11 @@ class ContainerdAgent(
         # so the container-based loader can enumerate live containers.
         await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
+        # The registry is loaded now, so the recovered kernels can say what their session's peers
+        # are called. Must follow the base initializer for that reason, and follow
+        # `_session_network.recover()` above so the coordinators the names are registered with
+        # already exist.
+        await self._restore_recovered_cluster_names()
 
         # Real-time container-death/OOM detection via the containerd event stream (the
         # equivalent of DockerAgent.monitor_docker_events); the periodic reconciler is the
@@ -1952,6 +1957,37 @@ class ContainerdAgent(
 
     # execute is inherited from AbstractAgent: it delegates to kernel_obj.execute (the code
     # runner's ZMQ REPL), which is runtime-agnostic. No override needed.
+
+    async def _restore_recovered_cluster_names(self) -> None:
+        """Give the cluster resolver back the peer names of every single-node session we resumed.
+
+        A single-node session's names are computed by the agent rather than published to etcd, and
+        the only call that registers them sits on the kernel-creation path — which a resumed kernel
+        never takes. So without this a restart leaves the resolver up, forwarding, and unable to
+        answer a single cluster hostname, while the kernels themselves are perfectly alive. That is
+        the same shape as the two defects the destroy path had: logic present on the normal path
+        and absent from the recovery one.
+
+        The peer list is session-wide and identical in every kernel of the session
+        (BACKENDAI_CLUSTER_HOSTS), so the first kernel that names it settles the session.
+        """
+        peers_by_session: dict[SessionId, list[str]] = {}
+        for kernel_obj in self.kernel_registry.values():
+            session_id = kernel_obj.session_id
+            if session_id in peers_by_session:
+                continue
+            raw = (kernel_obj.environ or {}).get("BACKENDAI_CLUSTER_HOSTS") or ""
+            if peers := [h for h in str(raw).split(",") if h]:
+                peers_by_session[session_id] = peers
+        for session_id, peers in peers_by_session.items():
+            try:
+                await self._session_network.restore_cluster_names(str(session_id), peers)
+            except Exception:
+                # One session's names are not worth failing agent startup for; the rest still get
+                # theirs, and this one degrades to "cluster names unresolvable" — loudly.
+                log.exception(
+                    "could not restore cluster names for session {} after recovery", session_id
+                )
 
     @override
     async def _load_kernel_registry_from_recovery(self) -> dict[KernelId, AbstractKernel]:
