@@ -1870,6 +1870,8 @@ class AbstractAgent[
         kernel_session_map: dict[KernelId, SessionId] = {}
         own_kernels: dict[KernelId, ContainerId] = {}
         terminated_kernels: dict[KernelId, ContainerLifecycleEvent] = {}
+        # Kernels whose destroy did not take: still in the registry, container still running.
+        unreclaimed_kernels: dict[KernelId, ContainerId] = {}
 
         def _get_session_id(container: Container) -> SessionId | None:
             _session_id = container.labels.get(LabelName.SESSION_ID)
@@ -1968,6 +1970,36 @@ class AbstractAgent[
                             LifecycleEvent.DESTROY,
                             KernelLifecycleEventReason.TERMINATED_UNKNOWN_CONTAINER,
                         )
+                    # Check if: a destroy failed and left its container running.
+                    #
+                    # A kernel is TERMINATING only because destroy_kernel was entered for it, and
+                    # the handler keeps it in the registry when that raised — so registry-known,
+                    # still alive, TERMINATING, and nobody working on it is precisely "the destroy
+                    # did not take". Neither set-difference above sees it: it is in BOTH sets.
+                    # Without this the retry the destroy path promises does not exist, and the
+                    # container runs until an operator finds it by hand (measured: 40 minutes for
+                    # one, weeks for others, with no signal anywhere).
+                    for kernel_id in known_kernels.keys() & alive_kernels.keys():
+                        if kernel_id in self.restarting_kernels:
+                            continue
+                        kernel_obj = self.kernel_registry[kernel_id]
+                        if kernel_obj.state != KernelLifecycleStatus.TERMINATING:
+                            continue
+                        if kernel_id in self._ongoing_destruction_tasks:
+                            continue  # a destroy is running for it right now; let it finish
+                        unreclaimed_kernels[kernel_id] = alive_kernels[kernel_id]
+                        log.warning(
+                            "destroy did not reclaim the container; re-issuing (k:{}, c:{})",
+                            kernel_id,
+                            alive_kernels[kernel_id],
+                        )
+                        terminated_kernels[kernel_id] = ContainerLifecycleEvent(
+                            kernel_id,
+                            kernel_session_map[kernel_id],
+                            alive_kernels[kernel_id],
+                            LifecycleEvent.DESTROY,
+                            kernel_obj.termination_reason or KernelLifecycleEventReason.UNKNOWN,
+                        )
                 finally:
                     # Enqueue the events.
                     terminated_kernel_ids = ",".join([str(kid) for kid in terminated_kernels])
@@ -1978,6 +2010,11 @@ class AbstractAgent[
 
                     # Set container count
                     await self.set_container_count(len(own_kernels.keys()))
+                    # Published even when zero: a gauge that only appears while something is wrong
+                    # cannot be alerted on, and "no series" is what this looked like for weeks.
+                    self._sync_container_lifecycle_observer.observe_unreclaimed_containers(
+                        agent_id=self.id, count=len(unreclaimed_kernels)
+                    )
         except asyncio.CancelledError as e:
             self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
                 agent_id=self.id, exception=e

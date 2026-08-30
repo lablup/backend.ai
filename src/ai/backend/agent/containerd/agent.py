@@ -1922,9 +1922,9 @@ class ContainerdAgent(
                 # It used to default to SELF_TERMINATED, and that is worse than useless: a destroy
                 # that FAILED drops the kernel from the registry anyway, so when the container
                 # finally dies — minutes later, by an operator's hand — this path records "the
-                # kernel exited on its own". Measured: a containerd kernel whose destroy was denied
-                # by AppArmor survived 40 minutes and was still filed as `self-terminated`. The
-                # record read as the opposite of what happened, and nothing else contradicted it.
+                # kernel exited on its own". Measured on a kernel the runtime could not signal: it
+                # survived 40 minutes and was still filed as `self-terminated`. The record read as
+                # the opposite of what happened, and nothing else contradicted it.
                 reason = (
                     kernel_obj.termination_reason if kernel_obj is not None else None
                 ) or KernelLifecycleEventReason.UNKNOWN

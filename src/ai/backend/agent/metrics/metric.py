@@ -285,22 +285,47 @@ class SyncContainerLifecycleObserver:
     _task_trigger_count: Counter
     _task_success_count: Counter
     _task_failure_count: Counter
+    _synced_kernel_count: Counter
+    _unreclaimed_container_count: Gauge
 
     def __init__(self) -> None:
+        # trigger / success / failure are all per-SWEEP, so they can be read side by side.
+        # `success` used to be incremented by the number of kernels a sweep synced, which put a
+        # kernel count next to two sweep counts under matching names: "1024 triggered, 292
+        # succeeded" actually meant "1024 sweeps, which cleaned up 292 kernels", and an idle agent
+        # showed success frozen while trigger climbed. The kernel count is still published, under
+        # a name that says what it counts.
         self._task_trigger_count = Counter(
             name="backendai_sync_container_lifecycle_trigger_count",
-            documentation="Number of sync_container_lifecycle() task triggered",
+            documentation="Number of sync_container_lifecycle() sweeps triggered",
             labelnames=["agent_id"],
         )
         self._task_success_count = Counter(
             name="backendai_sync_container_lifecycle_success_count",
-            documentation="Number of sync_container_lifecycle() task succeeded",
+            documentation="Number of sync_container_lifecycle() sweeps that completed",
             labelnames=["agent_id"],
         )
         self._task_failure_count = Counter(
             name="backendai_sync_container_lifecycle_failure_count",
-            documentation="Number of sync_container_lifecycle() task failed",
+            documentation="Number of sync_container_lifecycle() sweeps that raised",
             labelnames=["agent_id", "exception"],
+        )
+        self._synced_kernel_count = Counter(
+            name="backendai_sync_container_lifecycle_synced_kernel_count",
+            documentation=(
+                "Number of kernels sync_container_lifecycle() enqueued a lifecycle event for. "
+                "Enqueued, not reclaimed: the queue handler runs afterwards and can still fail."
+            ),
+            labelnames=["agent_id"],
+        )
+        self._unreclaimed_container_count = Gauge(
+            name="backendai_sync_container_lifecycle_unreclaimed_containers",
+            documentation=(
+                "Containers still running for a kernel whose destroy did not finish, as of the "
+                "last sweep. Anything above zero for more than a few sweeps means the node cannot "
+                "reclaim them and no other signal will say so."
+            ),
+            labelnames=["agent_id"],
         )
 
     @classmethod
@@ -322,7 +347,23 @@ class SyncContainerLifecycleObserver:
         agent_id: AgentId,
         num_synced_kernels: int,
     ) -> None:
-        self._task_success_count.labels(agent_id=agent_id).inc(amount=num_synced_kernels)
+        self._task_success_count.labels(agent_id=agent_id).inc()
+        if num_synced_kernels:
+            self._synced_kernel_count.labels(agent_id=agent_id).inc(amount=num_synced_kernels)
+
+    def observe_unreclaimed_containers(
+        self,
+        *,
+        agent_id: AgentId,
+        count: int,
+    ) -> None:
+        """How many containers outlived a destroy that failed.
+
+        The reclamation failure happens in the lifecycle queue handler, which no counter here
+        watches — so a node whose containers could not be killed looked exactly like an idle one.
+        Measured: containers in that state survived for weeks with nothing reporting it.
+        """
+        self._unreclaimed_container_count.labels(agent_id=agent_id).set(count)
 
     def observe_container_lifecycle_failure(
         self,
