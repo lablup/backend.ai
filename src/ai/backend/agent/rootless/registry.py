@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -80,7 +81,55 @@ def _is_plain_http_port(registry: str) -> bool:
     return int(port) != 443
 
 
-def _parse_ref(canonical: str) -> _Ref:
+# containerd's own name for the Docker Hub directory in a certs.d tree.
+_DOCKER_HUB_HOSTS_DIR = "docker.io"
+
+
+def _hosts_toml_scheme(registry: str, hosts_dir: Path | None) -> bool | None:
+    """Whether ``registry`` is configured for plain HTTP, per the host's containerd `certs.d`.
+
+    True = plain HTTP, False = TLS, None = this registry is not described there.
+
+    The containerd backend already answers this question from these files (it hands the directory
+    to the transfer service; see `container.registry-hosts-dir`), and they are the same files `ctr`
+    and `nerdctl` read. The rootless backends guessed from the reference string instead, which gets
+    the one case that matters wrong in both directions: a plain-HTTP registry on the default port
+    (`registry.internal/img`) was called secure and its pull sent to 443, and any explicit port was
+    called insecure. Reading the operator's own configuration replaces the guess; the heuristic
+    stays only as the fallback for a registry nothing describes.
+
+    Never raises: an unreadable or malformed file means "not described", not a failed pull.
+    """
+    if hosts_dir is None:
+        return None
+    candidates = [registry]
+    if registry == _DOCKER_HUB_REGISTRY:
+        candidates.append(_DOCKER_HUB_HOSTS_DIR)
+    candidates.append("_default")
+    for name in candidates:
+        path = Path(hosts_dir) / name / "hosts.toml"
+        try:
+            doc = tomllib.loads(path.read_text())
+        except FileNotFoundError:
+            continue
+        except (OSError, tomllib.TOMLDecodeError, ValueError) as e:
+            log.warning("ignoring unreadable registry host config {}: {!r}", path, e)
+            continue
+        # A mirror under [host."<url>"] is tried before `server`, so it decides the scheme when
+        # present. Table order is the file's order, which is the order containerd tries them in.
+        hosts = doc.get("host")
+        endpoints = list(hosts) if isinstance(hosts, Mapping) else []
+        if isinstance(server := doc.get("server"), str):
+            endpoints.append(server)
+        for endpoint in endpoints:
+            if endpoint.startswith("http://"):
+                return True
+            if endpoint.startswith("https://"):
+                return False
+    return None
+
+
+def _parse_ref(canonical: str, hosts_dir: Path | None = None) -> _Ref:
     # [registry[:port]/]repo[/sub...][:tag|@digest]. A first path component with '.'/':' or
     # 'localhost' is the registry host; otherwise it is Docker Hub (single names get 'library/').
     if "@" in canonical:
@@ -96,21 +145,29 @@ def _parse_ref(canonical: str) -> _Ref:
         registry, repo = head, rest
     else:
         registry, repo = _DOCKER_HUB_REGISTRY, name if slash else f"library/{name}"
-    insecure = registry != _DOCKER_HUB_REGISTRY and (
-        registry == "localhost" or _is_plain_http_port(registry)
+    configured = _hosts_toml_scheme(registry, hosts_dir)
+    insecure = (
+        configured
+        if configured is not None
+        else registry != _DOCKER_HUB_REGISTRY
+        and (registry == "localhost" or _is_plain_http_port(registry))
     )
     return _Ref(registry=registry, repo=repo, reference=reference, insecure=insecure)
 
 
-def is_insecure_registry(canonical: str) -> bool:
+def is_insecure_registry(canonical: str, hosts_dir: Path | None = None) -> bool:
     """Whether ``canonical``'s registry is reached over plain HTTP.
 
     The single place that decides it, so a runtime's pull flag and this module's own metadata
     probe cannot disagree about one registry — they did: the probe already chose per registry
     while the enroot/apptainer pull flags were unconditional, so a pull from a public HTTPS
     registry was forced to port 80 and hung until it timed out (measured against cr.backend.ai).
+
+    ``hosts_dir`` is the agent's ``container.registry-hosts-dir``. When it describes the registry
+    that is the answer; the reference-string heuristic below is only for a registry the operator
+    has not configured.
     """
-    return _parse_ref(canonical).insecure
+    return _parse_ref(canonical, hosts_dir).insecure
 
 
 def _registry_url(ref: _Ref, scheme: str) -> yarl.URL:
@@ -143,13 +200,17 @@ def _credentials_for(scheme: str, ref: _Ref, credentials: Mapping[str, Any]) -> 
 
 
 async def fetch_image_metadata(
-    canonical: str, auth: Mapping[str, str] | None, *, architecture: str = "amd64"
+    canonical: str,
+    auth: Mapping[str, str] | None,
+    *,
+    architecture: str = "amd64",
+    hosts_dir: Path | None = None,
 ) -> ImageMetadata | None:
     """Fetch the config-blob digest + labels + architecture + entrypoint for ``canonical``.
 
     Returns ``None`` (and logs) rather than raising, so a metadata probe never breaks a pull.
     """
-    ref = _parse_ref(canonical)
+    ref = _parse_ref(canonical, hosts_dir)
     credentials = dict(auth or {})
     schemes = ("http",) if ref.insecure else ("https", "http")
     last_err: Exception | None = None
@@ -229,6 +290,7 @@ async def push_image(
     layer_diff_id: str,
     config: Mapping[str, Any],
     auth: Mapping[str, str] | None,
+    hosts_dir: Path | None = None,
 ) -> str:
     """Publish a single-layer image and return its manifest digest.
 
@@ -239,7 +301,7 @@ async def push_image(
     A committed enroot image is one squashed layer by nature: `enroot export` produces a full
     rootfs snapshot, not a stack of diffs, so there is nothing to preserve layering from.
     """
-    ref = _parse_ref(canonical)
+    ref = _parse_ref(canonical, hosts_dir)
     # Own the rootfs stanza rather than trusting the caller to pair it correctly: the manifest
     # references the COMPRESSED layer digest and the config the UNCOMPRESSED one, and a registry
     # rejects the image if they are crossed. Keeping both in one place makes that unmixable.

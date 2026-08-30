@@ -196,6 +196,9 @@ class RootlessOciRuntime(OciRuntime):
     # itself and these runtimes have no daemon that would. None = do it locally (agent
     # runs privileged), which is the historical behaviour.
     _privnet_socket: str | None
+    # The host's containerd `certs.d` tree (`container.registry-hosts-dir`), consulted to decide
+    # whether a registry is reached over plain HTTP. None = fall back to the reference heuristic.
+    _registry_hosts_dir: Path | None
     # oci_spec handed in at create_container, kept until the task is built (consumed as
     # mounts/env/hooks, not as a spec file).
     _specs: dict[str, Mapping[str, Any]]
@@ -234,7 +237,9 @@ class RootlessOciRuntime(OciRuntime):
         kernel_uid: int,
         kernel_gid: int,
         privnet_socket: str | None = None,
+        registry_hosts_dir: Path | None = None,
     ) -> None:
+        self._registry_hosts_dir = registry_hosts_dir
         self._data_path = data_path
         self._cache_path = cache_path
         self._runtime_path = runtime_path

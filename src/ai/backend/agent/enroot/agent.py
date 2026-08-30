@@ -44,6 +44,11 @@ def create_runtime(local_config: AgentUnifiedConfig) -> EnrootRuntime:
         # An unprivileged agent cannot make a cgroup, and neither runtime has a daemon
         # that would; when a privnet is configured the cgroup work goes there too.
         privnet_socket=local_config.agent.network_privnet_socket,
+        # How the operator describes a registry that is not plain public HTTPS (private CA,
+        # self-signed, plain HTTP, mirror). The containerd backend already hands this same
+        # `certs.d` tree to the transfer service; without it these backends can only guess the
+        # scheme from the reference string.
+        registry_hosts_dir=Path(local_config.container.registry_hosts_dir),
     )
 
 

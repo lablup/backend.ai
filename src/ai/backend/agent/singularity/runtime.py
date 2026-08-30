@@ -208,7 +208,9 @@ class SingularityRuntime(RootlessOciRuntime):
             # `--no-https` is not a fallback, it pins the scheme to http. Passing it for every
             # pull sent public-registry traffic to port 80. Only a registry we already treat as
             # insecure gets it; the same decision the metadata probe makes.
-            scheme_args = ["--no-https"] if is_insecure_registry(image_ref) else []
+            scheme_args = (
+                ["--no-https"] if is_insecure_registry(image_ref, self._registry_hosts_dir) else []
+            )
             rc, _out, err = await self._run(
                 self._binary,
                 "build",
@@ -229,7 +231,7 @@ class SingularityRuntime(RootlessOciRuntime):
         # A sandbox directory carries no OCI config, so record the identity scan_images/check_image
         # need from the registry, exactly as the enroot backend does. A failed probe leaves them
         # null (check_image then re-pulls, never blocks).
-        meta = await fetch_image_metadata(image_ref, auth)
+        meta = await fetch_image_metadata(image_ref, auth, hosts_dir=self._registry_hosts_dir)
         self._meta(image_ref).write_text(
             json.dumps({
                 "ref": image_ref,
@@ -435,6 +437,7 @@ class SingularityRuntime(RootlessOciRuntime):
                 layer_diff_id=diff_id,
                 config=self._image_config(meta),
                 auth=auth,
+                hosts_dir=self._registry_hosts_dir,
             )
         finally:
             await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)

@@ -149,3 +149,92 @@ class TestCredentialsOnTheHttpFallback:
         ref = _parse_ref("192.168.0.156:5000/stable/python:3.13")
         creds = {"username": "u", "password": "p"}
         assert _credentials_for("http", ref, creds) == creds
+
+
+class TestTheOperatorsOwnConfigurationWins:
+    """`certs.d` decides the scheme; the reference-string heuristic is only the fallback.
+
+    The heuristic gets the case that matters wrong in both directions. A plain-HTTP registry on the
+    default port has no port to read — `registry.internal/img` was called secure and its pull sent
+    to 443 — and a TLS registry on a non-standard port was called insecure. These files are how
+    containerd, `ctr` and `nerdctl` are already told, and the containerd backend already hands the
+    same directory to its transfer service (`container.registry-hosts-dir`), so reading them here
+    makes one node answer the same way whichever backend runs on it.
+    """
+
+    def _certs_d(self, root: Path, registry: str, body: str) -> Path:
+        (root / registry).mkdir(parents=True, exist_ok=True)
+        (root / registry / "hosts.toml").write_text(body)
+        return root
+
+    def test_a_plain_http_registry_on_the_default_port_is_found(self, tmp_path: Path) -> None:
+        """The regression the heuristic alone cannot see: no port to read, so it said 'secure'."""
+        hosts = self._certs_d(tmp_path, "registry.internal", 'server = "http://registry.internal"')
+
+        assert is_insecure_registry("registry.internal/team/img:1") is False  # without the config
+        assert is_insecure_registry("registry.internal/team/img:1", hosts) is True
+
+    def test_a_tls_registry_on_a_nonstandard_port_is_found(self, tmp_path: Path) -> None:
+        """The other direction: the heuristic pins any explicit port to http."""
+        hosts = self._certs_d(
+            tmp_path, "registry.example.com:5000", 'server = "https://registry.example.com:5000"'
+        )
+
+        assert is_insecure_registry("registry.example.com:5000/img:1") is True  # without it
+        assert is_insecure_registry("registry.example.com:5000/img:1", hosts) is False
+
+    def test_a_mirror_decides_before_the_server(self, tmp_path: Path) -> None:
+        """containerd tries the `[host.*]` mirrors before `server`, so the first one is the
+        endpoint actually reached."""
+        hosts = self._certs_d(
+            tmp_path,
+            "cr.backend.ai",
+            'server = "https://cr.backend.ai"\n\n[host."http://mirror.internal:5000"]\n'
+            '  capabilities = ["pull", "resolve"]\n',
+        )
+
+        assert is_insecure_registry("cr.backend.ai/stable/python:3.13", hosts) is True
+
+    def test_docker_hub_is_looked_up_under_its_own_directory_name(self, tmp_path: Path) -> None:
+        """A bare name resolves to registry-1.docker.io, but certs.d names that tree `docker.io`."""
+        hosts = self._certs_d(tmp_path, "docker.io", 'server = "http://localmirror:5000"')
+
+        assert is_insecure_registry("python:3.13", hosts) is True
+
+    def test_the_wildcard_directory_applies_to_anything_unnamed(self, tmp_path: Path) -> None:
+        hosts = self._certs_d(tmp_path, "_default", 'server = "http://proxy.internal"')
+
+        assert is_insecure_registry("whatever.example.com/img:1", hosts) is True
+
+    def test_a_registry_the_config_does_not_mention_falls_back(self, tmp_path: Path) -> None:
+        """A configured node must not change the answer for registries it says nothing about."""
+        hosts = self._certs_d(tmp_path, "registry.internal", 'server = "http://registry.internal"')
+
+        assert is_insecure_registry("cr.backend.ai/stable/python:3.13", hosts) is False
+        assert is_insecure_registry("192.168.0.156:5000/img:1", hosts) is True
+
+    def test_a_missing_directory_is_not_an_error(self, tmp_path: Path) -> None:
+        """The default path exists on no host that has never configured a registry."""
+        assert is_insecure_registry("cr.backend.ai/img:1", tmp_path / "nope") is False
+
+    def test_a_malformed_file_falls_back_instead_of_failing_the_pull(self, tmp_path: Path) -> None:
+        """Refusing to pull because a config file has a typo is the worse failure — and it would
+        surface as an unrelated crash inside the image-pull path."""
+        hosts = self._certs_d(tmp_path, "registry.internal", "server = [not toml")
+
+        assert is_insecure_registry("registry.internal/img:1", hosts) is False
+
+    def test_the_pull_flag_follows_the_configuration(self, tmp_path: Path) -> None:
+        """End to end on the flag itself: the runtime asks with its configured directory."""
+        hosts = self._certs_d(tmp_path, "registry.internal", 'server = "http://registry.internal"')
+        rt = SingularityRuntime(
+            data_path=tmp_path / "d",
+            cache_path=tmp_path / "c",
+            runtime_path=tmp_path / "r",
+            state_path=tmp_path / "s",
+            kernel_uid=os.geteuid(),
+            kernel_gid=os.getegid(),
+            registry_hosts_dir=hosts,
+        )
+
+        assert is_insecure_registry("registry.internal/img:1", rt._registry_hosts_dir) is True

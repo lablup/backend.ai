@@ -149,7 +149,11 @@ class EnrootRuntime(RootlessOciRuntime):
             # `docker.sh`: `if [ -n "$ENROOT_ALLOW_HTTP" ]; then curl_proto="http"`). Setting it
             # for every pull sent public-registry traffic to port 80, where it hung for the full
             # curl timeout. Only a registry we already treat as insecure gets it.
-            extra_env = {"ENROOT_ALLOW_HTTP": "y"} if is_insecure_registry(image_ref) else None
+            extra_env = (
+                {"ENROOT_ALLOW_HTTP": "y"}
+                if is_insecure_registry(image_ref, self._registry_hosts_dir)
+                else None
+            )
             rc, _out, err = await self._run(
                 _ENROOT_BIN,
                 "import",
@@ -169,7 +173,7 @@ class EnrootRuntime(RootlessOciRuntime):
         # need — config-blob digest (Docker's `Id`, the manager's image_id) + kernel-spec/base-distro
         # labels + architecture + entrypoint — from the registry. A failed probe leaves them null
         # (check_image then re-pulls, never blocks).
-        meta = await fetch_image_metadata(image_ref, auth)
+        meta = await fetch_image_metadata(image_ref, auth, hosts_dir=self._registry_hosts_dir)
         self._meta(image_ref).write_text(
             json.dumps({
                 "ref": image_ref,
@@ -242,6 +246,7 @@ class EnrootRuntime(RootlessOciRuntime):
                 layer_diff_id=diff_id,
                 config=self._image_config(meta),
                 auth=auth,
+                hosts_dir=self._registry_hosts_dir,
             )
         finally:
             await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
