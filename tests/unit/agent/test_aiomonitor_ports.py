@@ -87,10 +87,17 @@ class TestABusyPortIsSkipped:
         monkeypatch.setattr(aiomonitor, "Monitor", _Monitor)
         monkeypatch.setattr(server_mod, "Profiler", lambda **kw: None)
 
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-            probe.bind(("127.0.0.1", 0))
-            free = probe.getsockname()[1]
-        cfg = _config(termui=free, webui=free + 1)
+        # BOTH ports are taken from the kernel and released. `free + 1` used to stand in for the
+        # second one, which is a port nothing guarantees is free — and one busy port is exactly
+        # what makes this test's expectation false.
+        with (
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM) as a,
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM) as b,
+        ):
+            a.bind(("127.0.0.1", 0))
+            b.bind(("127.0.0.1", 0))
+            termui, webui = a.getsockname()[1], b.getsockname()[1]
+        cfg = _config(termui=termui, webui=webui)
         async with aiomonitor_ctx(cfg, 0):
             pass
 

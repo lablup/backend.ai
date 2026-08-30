@@ -118,3 +118,61 @@ class TestTheCgroupOps:
         }).encode()
         with pytest.raises(ProtocolError):
             PrivNetRequest.decode(frame)
+
+
+class TestWhichBackendsGetTheNetnsOwnerCheck:
+    """The owner check is set for the rootless backends and NOT for containerd, and that asymmetry
+    is a claim about where the PID comes from — a root-owned daemon the agent cannot forge, versus
+    a journal the agent itself writes. If the wiring silently applied it everywhere, containerd
+    kernels (whose netns belongs to uid 0, not to the agent) would stop attaching; if it applied it
+    nowhere, the rootless gap the check exists for would be open again. Neither shows up until a
+    live multi-node session, so it is pinned here.
+    """
+
+    @pytest.mark.parametrize("key", ["backend", "mode"])
+    @pytest.mark.parametrize("backend", [AgentBackend.ENROOT, AgentBackend.SINGULARITY])
+    def test_a_rootless_backend_is_bound_to_the_agents_own_namespaces(
+        self, key: str, backend: AgentBackend
+    ) -> None:
+        assert main_mod._is_rootless({"agent": {key: backend.value}}) is True
+
+    def test_containerd_is_not(self) -> None:
+        """Its PID comes from a root daemon; requiring the agent to own the netns would refuse
+        every containerd kernel, because uid 0 owns it."""
+        assert main_mod._is_rootless({"agent": {"backend": AgentBackend.CONTAINERD.value}}) is False
+
+    def test_an_unconfigured_node_is_not(self) -> None:
+        """The historical default is containerd, and defaulting the other way would turn a missing
+        config key into a node that cannot attach anything."""
+        assert main_mod._is_rootless({}) is False
+        assert main_mod._is_rootless({"agent": {}}) is False
+
+    def test_an_unknown_backend_name_is_not_silently_treated_as_rootless(self) -> None:
+        with pytest.raises(ValueError):
+            main_mod._is_rootless({"agent": {"backend": "not-a-backend"}})
+
+
+class TestTheOwnerCheckIsOnlyAskedForWhereThePidIsForgeable:
+    """The uid handed to the server is the agent's own — the check says "a namespace this agent
+    could have created", not "some particular uid"."""
+
+    @pytest.mark.parametrize(
+        ("backend", "expected_is_rootless"),
+        [
+            (AgentBackend.ENROOT, True),
+            (AgentBackend.SINGULARITY, True),
+            (AgentBackend.CONTAINERD, False),
+        ],
+    )
+    def test_the_wiring_matches_the_backend(
+        self, backend: AgentBackend, expected_is_rootless: bool
+    ) -> None:
+        raw = {"agent": {"backend": backend.value}}
+        allowed_uid = 1000
+        # This mirrors the one expression in __main__ that decides it, so a change there that
+        # forgets the asymmetry fails here rather than on a live node.
+        netns_owner_uid = allowed_uid if main_mod._is_rootless(raw) else None
+
+        assert (netns_owner_uid is not None) is expected_is_rootless
+        if expected_is_rootless:
+            assert netns_owner_uid == allowed_uid

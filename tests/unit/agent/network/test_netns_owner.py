@@ -12,7 +12,11 @@ a containerd kernel's, which is why the caller sets this only for the rootless b
 
 from __future__ import annotations
 
+import contextlib
 import os
+import subprocess
+import time
+from collections.abc import Iterator
 
 import pytest
 
@@ -50,3 +54,75 @@ class TestAMismatchIsRefused:
     def test_pid_one_is_refused_outright(self) -> None:
         with pytest.raises(NetnsError, match="PID <= 1"):
             open_container_netns(1, expected_owner_uid=0)
+
+
+def _userns_available() -> bool:
+    """Whether this kernel lets an unprivileged process create a user namespace."""
+    return (
+        subprocess.run(["unshare", "-r", "-n", "true"], capture_output=True, timeout=10).returncode
+        == 0
+    )
+
+
+@contextlib.contextmanager
+def _a_netns_we_own() -> Iterator[int]:
+    """A live process in a NON-host netns owned by this uid — an enroot kernel in miniature.
+
+    The host netns is rejected before the owner is ever consulted, so a test that points at its own
+    PID exercises nothing. This is the only shape that reaches the check.
+    """
+    proc = subprocess.Popen(
+        ["unshare", "-r", "-n", "sleep", "60"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        host_ino = os.stat("/proc/self/ns/net").st_ino
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            # `unshare` execs `sleep` only after the namespaces are made, so wait for the child's
+            # netns to stop being the one we are in rather than for the process to merely exist.
+            try:
+                if os.stat(f"/proc/{proc.pid}/ns/net").st_ino != host_ino:
+                    break
+            except OSError:
+                pass
+            time.sleep(0.02)
+        else:
+            pytest.skip("the unshared netns never appeared")
+        yield proc.pid
+    finally:
+        proc.kill()
+        proc.wait()
+
+
+@pytest.mark.skipif(not _userns_available(), reason="unprivileged user namespaces are disabled")
+class TestTheOwnerCheckOnANamespaceWeActuallyOwn:
+    """The check exists so a compromised rootless agent cannot name a netns it did not create.
+
+    Pointing at the test's own PID cannot show that: `open_container_netns` rejects the host netns
+    two branches earlier, so such a test passes with `expected_owner_uid` deleted from the function
+    (verified by mutation). These use a real unshared namespace, where the owner branch is the only
+    one that can fire.
+    """
+
+    def test_a_namespace_this_uid_owns_is_accepted(self) -> None:
+        with _a_netns_we_own() as pid:
+            pinned = open_container_netns(pid, expected_owner_uid=os.getuid())
+            try:
+                assert pinned.netns_fd >= 0
+            finally:
+                pinned.close()
+
+    def test_the_same_namespace_is_refused_for_another_uid(self) -> None:
+        """The negative half. Refused *on the ownership* — the message is asserted so a future
+        reordering that shadows this branch again fails here instead of passing quietly."""
+        with _a_netns_we_own() as pid:
+            with pytest.raises(NetnsError, match="owned by uid"):
+                open_container_netns(pid, expected_owner_uid=os.getuid() + 1)
+
+    def test_without_an_expectation_the_owner_is_not_consulted(self) -> None:
+        """containerd passes None: the PID came from a root daemon and is already authoritative."""
+        with _a_netns_we_own() as pid:
+            pinned = open_container_netns(pid)
+            pinned.close()
