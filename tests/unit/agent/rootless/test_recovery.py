@@ -8,8 +8,11 @@ the orphan sweep, while recovering a dead one leaves a phantom kernel holding re
 
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -229,3 +232,73 @@ class TestASecondProcessCanReadTheJournal:
         infos = list(await runtime.list_container_infos())
         assert [i.id for i in infos] == ["c2"]
         assert infos[0].labels == {"a": "b"}
+
+
+class TestTheKernelOutlivesTheAgent:
+    """Everything above only means something if the kernel is still there to recover.
+
+    These runtimes have no daemon: the kernel is a direct CHILD of the agent process. Inheriting
+    the agent's process group makes it reachable by any signal aimed at that group — an operator's
+    Ctrl+C, a closing terminal, tmux killing its session, systemd's default
+    KillMode=control-group. Measured: restarting the agent that way killed a running session's
+    kernel outright, and the manager was left holding a RUNNING session with nothing behind it.
+    """
+
+    @pytest.fixture
+    def spawner(self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch) -> Any:
+        """The real `create_task` spawn, with only the parts that need a live container stubbed."""
+        monkeypatch.setattr(runtime, "_launch_argv", lambda *a, **k: ["sleep", "30"])
+        monkeypatch.setattr(runtime, "_uid_drop_prefix", list)
+        monkeypatch.setattr(runtime, "_write_seccomp", lambda *a, **k: None)
+
+        async def _ready(proc: Any, gate_dir: Path, container_id: str) -> None:
+            return None
+
+        async def _child(proc: Any) -> int:
+            return int(proc.pid)
+
+        async def _hostname(pid: int, hostname: str | None) -> None:
+            return None
+
+        monkeypatch.setattr(runtime, "_wait_ready", _ready)
+        monkeypatch.setattr(runtime, "_find_netns_child", _child)
+        monkeypatch.setattr(runtime, "_set_hostname", _hostname)
+        runtime._specs["c1"] = {}
+        return runtime
+
+    async def test_the_launch_lands_in_its_own_session(self, spawner: Any) -> None:
+        """`setsid`, observed on the real spawned process rather than on the argv that asked for
+        it. A different session id is exactly what puts the kernel out of reach of a signal sent
+        to the agent's process group."""
+        handle = await spawner.create_task("c1")
+        try:
+            assert os.getsid(handle.pid) != os.getsid(0)
+            assert os.getpgid(handle.pid) != os.getpgid(0)
+        finally:
+            await spawner._reap("c1")
+
+    async def test_without_it_a_child_shares_the_agents_group(self) -> None:
+        """The control. Without this the assertion above would pass on any spawn at all — and the
+        default really is to inherit, which is how the kernel came to die with its agent."""
+        proc = await asyncio.create_subprocess_exec(
+            "sleep", "30", stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+        )
+        try:
+            assert os.getsid(proc.pid) == os.getsid(0)
+            assert os.getpgid(proc.pid) == os.getpgid(0)
+        finally:
+            proc.kill()
+            await proc.wait()
+
+    async def test_reaping_still_reaches_the_detached_kernel(self, spawner: Any) -> None:
+        """Detaching must not cost the agent its ability to stop the kernel: `_reap` and `_signal`
+        address the pid, never the group, so a new session changes nothing for them."""
+        handle = await spawner.create_task("c1")
+        pid = handle.pid
+
+        await spawner._reap("c1")
+
+        with pytest.raises(ProcessLookupError):
+            for _ in range(50):
+                os.kill(pid, 0)
+                await asyncio.sleep(0.02)

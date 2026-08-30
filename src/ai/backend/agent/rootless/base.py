@@ -397,6 +397,17 @@ class RootlessOciRuntime(OciRuntime):
                 stdout=log_fd,
                 stderr=log_fd,
                 env={**self._process_env(), **self._launch_env(spec)},
+                # `setsid` in the child: its own session and process group, no controlling
+                # terminal. These runtimes have no daemon, so the kernel is a CHILD of the agent —
+                # and everything about recovery here (the journal, `_recover_containers`,
+                # `container_pid` falling back to it) is built on the kernel outliving the agent.
+                # Without this it does not: a signal aimed at the agent's process group takes the
+                # kernel with it, which is what an operator's Ctrl+C, a closing terminal, tmux
+                # killing its session, or systemd's default KillMode=control-group all send.
+                # Measured: restarting the agent this way killed a running session's kernel
+                # outright, leaving the manager holding a RUNNING session with nothing behind it.
+                # Reaping is unaffected — `_reap` and `_signal` address the pid, never the group.
+                start_new_session=True,
             )
         finally:
             os.close(log_fd)
