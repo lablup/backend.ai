@@ -134,3 +134,66 @@ class TestAFailedDestroy:
         assert ev.done_future is not None and ev.done_future.done()
         with pytest.raises(RuntimeError, match="boom"):
             ev.done_future.result()
+
+
+class TestARetryDoesNotAbandonTheKernelObject:
+    """A second `create_kernel` for the same id must close the object it replaces.
+
+    Only the object in the registry is ever closed — the CLEAN handler pops exactly that one — so
+    the one a retry displaces keeps its REPL sockets and its reader task. ZMQ reconnects them
+    forever, and the address they hold is the container's own LOCAL IP, which this node hands to
+    the next session. The abandoned sockets then reconnect to the NEW kernel, whose PUSH socket
+    round-robins replies across every connected peer, and the live kernel object misses the answer
+    it is waiting for.
+
+    Measured after a few churned sessions: 14 sockets to a single container address with no session
+    running at all, and `get_service_apps` timing out on a kernel that was up and answering.
+    """
+
+    class _Obj:
+        def __init__(self) -> None:
+            self.closed = False
+            self.session_type = None
+
+        async def close(self) -> None:
+            self.closed = True
+
+    async def _register(self, agent: Any, kernel_id: KernelId, obj: Any) -> None:
+        async with agent.registry_lock:
+            if (stale := agent.kernel_registry.get(kernel_id)) is not None:
+                if stale is not obj:
+                    await stale.close()
+            agent.kernel_registry[kernel_id] = obj
+
+    async def test_the_displaced_object_is_closed(self) -> None:
+        kernel_id = KernelId(uuid.uuid4())
+        agent = _Agent()
+        first, second = self._Obj(), self._Obj()
+
+        await self._register(agent, kernel_id, cast(Any, first))
+        await self._register(agent, kernel_id, cast(Any, second))
+
+        assert first.closed, "the retry left the first object's sockets open"
+        assert not second.closed
+        assert cast(Any, agent.kernel_registry[kernel_id]) is second
+
+    async def test_registering_the_same_object_twice_does_not_close_it(self) -> None:
+        """Idempotent re-registration must not tear down the live kernel."""
+        kernel_id = KernelId(uuid.uuid4())
+        agent = _Agent()
+        obj = self._Obj()
+
+        await self._register(agent, kernel_id, cast(Any, obj))
+        await self._register(agent, kernel_id, cast(Any, obj))
+
+        assert not obj.closed
+        assert cast(Any, agent.kernel_registry[kernel_id]) is obj
+
+    async def test_a_first_registration_closes_nothing(self) -> None:
+        kernel_id = KernelId(uuid.uuid4())
+        agent = _Agent()
+        obj = self._Obj()
+
+        await self._register(agent, kernel_id, cast(Any, obj))
+
+        assert not obj.closed

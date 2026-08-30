@@ -3148,6 +3148,21 @@ class AbstractAgent[
                     )
                     kernel_obj.session_type = kernel_config["session_type"]
                     async with self.registry_lock:
+                        # A retry of the same kernel id builds a SECOND kernel object, and only the
+                        # one in the registry is ever closed (the CLEAN handler pops and closes
+                        # exactly that). The one being replaced here keeps its REPL sockets and its
+                        # reader task, and ZMQ keeps them reconnecting to the same address forever.
+                        #
+                        # That address is the container's own LOCAL IP, which the next session on
+                        # this node is handed again. So the abandoned sockets reconnect to the NEW
+                        # kernel, whose PUSH socket then round-robins its replies across every
+                        # connected peer — and the live kernel object misses the answer it is
+                        # waiting for. Measured after a few churned sessions: 14 sockets to one
+                        # container address with no session running at all, and `get_service_apps`
+                        # timing out on a kernel that was up and answering.
+                        if (stale := self.kernel_registry.get(kernel_id)) is not None:
+                            if stale is not kernel_obj:
+                                await stale.close()
                         self.kernel_registry[kernel_id] = kernel_obj
                     log.info(
                         "create_kernel(kernel:{}, session:{}) starting container",

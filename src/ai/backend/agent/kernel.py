@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import codecs
+import contextlib
 import io
 import json
 import logging
@@ -244,14 +245,32 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
             default_api_version,
             default_client_features,
         )
+        # A retry of the same kernel calls init() again. Replacing `self.runner` without closing
+        # the old one abandons its REPL sockets and its reader task, and ZMQ keeps them
+        # reconnecting to the same address for the life of the agent. That address is the
+        # container's own LOCAL IP, which this node hands to the next session — so the abandoned
+        # sockets reconnect to the NEW kernel, whose PUSH socket round-robins its replies across
+        # every connected peer, and the live runner never receives the answer it is waiting for.
+        # Measured: repl sockets grew by one pair per retry and `get_service_apps` timed out on a
+        # kernel that was up and answering.
+        if self.runner is not None:
+            await self.runner.close()
+            self.runner = None
+        runner = None
         try:
-            self.runner = await self.create_code_runner(
+            runner = await self.create_code_runner(
                 event_producer,
                 client_features=default_client_features,
                 api_version=default_api_version,
             )
+            self.runner = runner
         except Exception as e:
             log.error("kernel.init(k:{0}): failed to create code runner: {1}", self.kernel_id, e)
+            # A runner that raised partway through __ainit__ may already hold its sockets; dropping
+            # the reference would leak them exactly as above.
+            if runner is not None:
+                with contextlib.suppress(Exception):
+                    await runner.close()
             self.runner = None
             raise
 
