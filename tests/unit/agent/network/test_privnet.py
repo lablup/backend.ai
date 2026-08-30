@@ -9,14 +9,18 @@ tests and requires a real container namespace, so it is out of scope here.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import ipaddress
 import os
+import subprocess
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 
+import ai.backend.agent.network.privnet.server as server_mod
 from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
 from ai.backend.agent.containerd.runtime.interface import ContainerInfo
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
@@ -223,6 +227,7 @@ class _Harness:
         state_dir: Path | None = None,
         forwarder: _RecordingForwarder | None = None,
         vtep_ip: str | None = "192.168.0.10",
+        allowed_uid: int | None = None,
     ) -> None:
         self.backend = _StubBackend()
         self.forwarder = forwarder or _RecordingForwarder()
@@ -238,7 +243,7 @@ class _Harness:
         self.cni = _RecordingCni(self.ipam)
         self.server = PrivNetServer(
             socket_path=_short_socket_path(),
-            allowed_uid=os.getuid(),
+            allowed_uid=os.getuid() if allowed_uid is None else allowed_uid,
             agent_id="i-test",
             host_ip="127.0.0.1",
             # The entry point validates the real address; a test injects one so it does not depend
@@ -932,3 +937,222 @@ class TestSessionBinding:
             await h.client().call(
                 PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "sess-a", container_id="c-unknown")
             )
+
+
+def _a_pid_owned_by_someone_else() -> int | None:
+    """Any live PID > 1 that does not run as this uid — what the agent must not be able to name."""
+    me = os.getuid()
+    for entry in sorted(Path("/proc").iterdir()):
+        if not entry.name.isdigit() or int(entry.name) <= 1:
+            continue
+        try:
+            uid = int(entry.joinpath("status").read_text().split("Uid:")[1].split()[0])
+        except (OSError, IndexError, ValueError):
+            continue
+        if uid != me:
+            return int(entry.name)
+    return None
+
+
+@contextlib.contextmanager
+def _a_leaf_process() -> Iterator[int]:
+    """A live child of ours with no children of its own, so the pid set written is deterministic."""
+    proc = subprocess.Popen(["sleep", "60"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        yield proc.pid
+    finally:
+        proc.kill()
+        proc.wait()
+
+
+class TestConfiningAContainer:
+    """The cgroup delegation, driven through the daemon rather than through its wire format.
+
+    The only coverage this had was a `PrivNetRequest` JSON round-trip, which is why `_make_cgroup`
+    and `_require_agents_process` could both be replaced by `return` with the whole suite still
+    green (verified by mutation). What the delegation exists to do is put numbers in cgroup files,
+    so that is what is asserted here.
+    """
+
+    @pytest.fixture
+    def cgroup_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+        """Redirect the cgroup tree into tmp: the real one is /sys/fs/cgroup and root-owned."""
+        root = tmp_path / "cgroup"
+        monkeypatch.setattr(
+            server_mod, "container_cgroup_fs_path", lambda cid: root / "backendai" / cid
+        )
+        return root
+
+    async def test_the_limits_actually_land_in_the_cgroup(self, cgroup_root: Path) -> None:
+        async with _Harness() as h:
+            with _a_leaf_process() as pid:
+                await h.client().confine_container(
+                    "sess-a", "c1", pid, {"memory.max": "8589934592", "cpuset.cpus": "0-3"}
+                )
+
+            leaf = cgroup_root / "backendai" / "c1"
+            assert (leaf / "memory.max").read_text() == "8589934592"
+            assert (leaf / "cpuset.cpus").read_text() == "0-3"
+
+    async def test_the_process_tree_is_moved_in(self, cgroup_root: Path) -> None:
+        """A cgroup with the right numbers and nobody in it limits nothing."""
+        async with _Harness() as h:
+            with _a_leaf_process() as pid:
+                await h.client().confine_container("sess-a", "c1", pid, {"memory.max": "1024"})
+
+                assert (cgroup_root / "backendai" / "c1" / "cgroup.procs").read_text() == str(pid)
+
+    async def test_a_pid_that_is_not_the_agents_is_refused(self, cgroup_root: Path) -> None:
+        """The one privilege boundary on this path: an unprivileged agent may only hand over its
+        own processes, or it could have a root daemon moved into a cgroup it controls."""
+        other = _a_pid_owned_by_someone_else()
+        if other is None:
+            pytest.skip("no process of another uid on this host")
+        async with _Harness() as h:
+            with pytest.raises(PrivNetClientError, match="not the agent's"):
+                await h.client().confine_container("sess-a", "c1", other, {"memory.max": "1024"})
+
+            assert not (cgroup_root / "backendai" / "c1").exists()
+
+    async def test_a_pid_that_has_exited_is_refused(self, cgroup_root: Path) -> None:
+        with _a_leaf_process() as pid:
+            pass  # killed and reaped on the way out
+        async with _Harness() as h:
+            with pytest.raises(PrivNetClientError, match="no such process"):
+                await h.client().confine_container("sess-a", "c1", pid, {"memory.max": "1024"})
+
+    async def test_releasing_removes_the_cgroup(self, cgroup_root: Path) -> None:
+        async with _Harness() as h:
+            with _a_leaf_process() as pid:
+                await h.client().confine_container("sess-a", "c1", pid, {"memory.max": "1024"})
+            leaf = cgroup_root / "backendai" / "c1"
+            # cgroupfs interface files are not ordinary files and do not block rmdir; the tmp tree
+            # standing in for it has to be emptied for the same rmdir to succeed.
+            for f in leaf.iterdir():
+                f.unlink()
+
+            await h.client().release_container("sess-a", "c1")
+
+            assert not leaf.exists()
+
+    async def test_a_container_id_that_is_not_one_cannot_name_a_path(
+        self, cgroup_root: Path
+    ) -> None:
+        """`_kernel_cgroup` composes a filesystem path out of the id, so the id is validated."""
+        async with _Harness() as h:
+            with _a_leaf_process() as pid:
+                with pytest.raises(PrivNetClientError):
+                    await h.client().confine_container(
+                        "sess-a", "../../../escape", pid, {"memory.max": "1024"}
+                    )
+
+    @pytest.mark.skipif(os.geteuid() == 0, reason="root ignores the directory permission")
+    async def test_a_limit_that_could_not_be_written_is_reported(self, cgroup_root: Path) -> None:
+        """The failure mode this whole delegation exists to remove, on the delegation itself.
+
+        Writing the limits used to be wrapped in `suppress(OSError)`: an undelegated controller or
+        a read-only leaf produced a kernel running with `memory.max = max`, no exception, no log —
+        exactly what was measured before the delegation existed. Modelled here by a leaf that
+        accepts no new files.
+        """
+        leaf = cgroup_root / "backendai" / "c1"
+        leaf.mkdir(parents=True)
+        leaf.chmod(0o500)
+        try:
+            async with _Harness() as h:
+                with _a_leaf_process() as pid:
+                    with pytest.raises(PrivNetClientError, match=r"memory\.max"):
+                        await h.client().confine_container(
+                            "sess-a", "c1", pid, {"memory.max": "8589934592"}
+                        )
+        finally:
+            leaf.chmod(0o700)
+
+    async def test_a_cgroup_nobody_could_be_moved_into_is_reported(
+        self, cgroup_root: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Limits on an empty cgroup confine nothing, so writing them all is not success."""
+        monkeypatch.setattr(server_mod, "_descendants", lambda pid: [], raising=True)
+        async with _Harness() as h:
+            with _a_leaf_process() as pid:
+                leaf = cgroup_root / "backendai" / "c1"
+                leaf.mkdir(parents=True)
+                (leaf / "cgroup.procs").mkdir()  # a directory cannot be written to
+
+                with pytest.raises(PrivNetClientError, match="could be moved in"):
+                    await h.client().confine_container("sess-a", "c1", pid, {"memory.max": "1024"})
+
+
+class TestPeerAuthentication:
+    """Only the configured agent uid may drive the privnet.
+
+    This is the first line of the daemon's trust model and it had no test at all: the harness
+    always passed its own uid, so the refusal branch was never taken. Everything else in that model
+    — session binding, the netns owner, the cgroup PID check — assumes the caller already got past
+    here.
+    """
+
+    async def test_a_connection_from_another_uid_is_refused(self) -> None:
+        """SO_PEERCRED is the kernel's answer, not the caller's claim, so a wrong uid cannot be
+        talked around. Modelled by a daemon that expects somebody else."""
+        async with _Harness(allowed_uid=os.getuid() + 1) as h:
+            with pytest.raises(PrivNetClientError, match="unauthorized"):
+                await h.client().call(
+                    PrivNetRequest(
+                        PrivNetOp.SETUP_SESSION,
+                        "sess-a",
+                        network_config={"backend": "bridge", "subnet": "172.30.9.0/24"},
+                    )
+                )
+
+    async def test_the_refused_request_is_not_performed(self) -> None:
+        """A refusal that still ran the verb would be no refusal. The backend is the thing that
+        would have touched the host."""
+        async with _Harness(allowed_uid=os.getuid() + 1) as h:
+            with contextlib.suppress(PrivNetClientError):
+                await h.client().call(
+                    PrivNetRequest(
+                        PrivNetOp.SETUP_SESSION,
+                        "sess-a",
+                        network_config={"backend": "bridge", "subnet": "172.30.9.0/24"},
+                    )
+                )
+
+            assert h.backend.setup_calls == []
+
+    async def test_nothing_is_journalled_for_a_refused_caller(self) -> None:
+        """The journal is replayed at the next boot; a record written for a caller we refused would
+        outlive the refusal."""
+        async with _Harness(allowed_uid=os.getuid() + 1) as h:
+            with contextlib.suppress(PrivNetClientError):
+                await h.client().call(
+                    PrivNetRequest(
+                        PrivNetOp.SETUP_SESSION,
+                        "sess-a",
+                        network_config={"backend": "bridge", "subnet": "172.30.9.0/24"},
+                    )
+                )
+
+            assert await h.journal.sessions() == {}
+
+    async def test_the_configured_uid_is_accepted(self) -> None:
+        """The positive control: without it the tests above also pass on a daemon that refuses
+        everyone."""
+        async with _Harness() as h:
+            await h.client().call(
+                PrivNetRequest(
+                    PrivNetOp.SETUP_SESSION,
+                    "sess-a",
+                    network_config={"backend": "bridge", "subnet": "172.30.9.0/24"},
+                )
+            )
+
+            assert h.backend.setup_calls == ["sess-a"]
+
+    async def test_the_socket_is_not_reachable_by_other_users(self) -> None:
+        """Peer auth answers who is calling; the mode is what stops them connecting at all. Both,
+        because a socket anyone may open is a refusal path anyone may exercise."""
+        async with _Harness() as h:
+            mode = os.stat(h.server._socket_path).st_mode & 0o777
+
+            assert mode == 0o600, oct(mode)

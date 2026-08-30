@@ -175,6 +175,22 @@ def _validate_subnet(subnet: str) -> str:
     raise PolicyViolation("subnet outside allowed private pools")
 
 
+def _as_int(value: Any, what: str) -> int:
+    """An integer, and only an integer.
+
+    ``int()`` on its own accepts a float and silently truncates it, so a JSON ``1.5`` became VNI 1
+    — a segment identifier the operator never chose and another session on the node may already
+    hold, which is an isolation question rather than a formatting one. ``bool`` is an ``int``
+    subclass and would become 0/1 the same way.
+    """
+    if isinstance(value, (bool, float)):
+        raise PolicyViolation(f"invalid {what}")
+    try:
+        return int(value)
+    except (TypeError, ValueError) as e:
+        raise PolicyViolation(f"invalid {what}") from e
+
+
 def validate_network_config(raw: dict[str, Any]) -> ValidatedNetworkConfig:
     """Validate the manager-provided ``{backend, subnet, vni, mtu}``. Every field is
     treated as untrusted (it reaches the privnet via the agent)."""
@@ -189,20 +205,14 @@ def validate_network_config(raw: dict[str, Any]) -> ValidatedNetworkConfig:
     vni_raw = raw.get("vni")
     vni: int | None = None
     if vni_raw is not None:
-        try:
-            vni = int(vni_raw)
-        except (TypeError, ValueError) as e:
-            raise PolicyViolation("invalid vni") from e
+        vni = _as_int(vni_raw, "vni")
         if not (_VNI_MIN <= vni <= _VNI_MAX):
             raise PolicyViolation("vni out of range")
 
     mtu_raw = raw.get("mtu")
     mtu = _MTU_MIN
     if mtu_raw is not None:
-        try:
-            mtu = int(mtu_raw)
-        except (TypeError, ValueError) as e:
-            raise PolicyViolation("invalid mtu") from e
+        mtu = _as_int(mtu_raw, "mtu")
         if not (_MTU_MIN <= mtu <= _MTU_MAX):
             raise PolicyViolation("mtu out of range")
 

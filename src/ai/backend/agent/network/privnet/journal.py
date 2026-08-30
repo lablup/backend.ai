@@ -28,8 +28,10 @@ on the next boot; a device with no record can be named by nobody):
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -63,13 +65,38 @@ class PrivNetJournal:
     def _path(self, kind: str, key: str) -> Path:
         return self._dir / kind / key
 
+    def _make_private_dir(self, path: Path) -> None:
+        """Create ``path`` and make sure it, and the journal root above it, are owner-only.
+
+        ``mkdir``'s mode argument is masked by the process umask and is ignored entirely for a
+        directory that already exists, so the mode is set explicitly — including on a tree an
+        earlier release left world-readable.
+        """
+        path.mkdir(parents=True, exist_ok=True)
+        for d in (self._dir, path):
+            with contextlib.suppress(OSError):
+                d.chmod(0o700)
+
     def _write(self, kind: str, key: str, payload: dict[str, Any]) -> None:
         path = self._path(kind, key)
-        path.parent.mkdir(parents=True, exist_ok=True)
+        self._make_private_dir(path.parent)
         # Write through a temporary file: a half-written record read on the next boot would name a
         # session whose subnet we cannot parse, and the reconcile pass would skip it forever.
         tmp = path.with_name(f".{path.name}.tmp")
-        tmp.write_text(json.dumps(payload))
+        # 0600 from the moment it exists. A session record holds the overlay's IPsec key, and this
+        # is the one component that holds CAP_NET_ADMIN — leaving the key at the umask's mercy put
+        # it in a world-readable file (measured: 0664 in a 0775 directory). Creating the file and
+        # then chmod-ing it would still leave a window where it is readable, so the mode goes on
+        # the open() and is reasserted on the fd in case the temp file survived a crash.
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w") as f:
+                f.write(json.dumps(payload))
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.close(fd)
+            raise
         tmp.replace(path)
 
     def _read_all(self, kind: str) -> dict[str, dict[str, Any]]:

@@ -11,8 +11,17 @@ Trust model (why a compromised agent stays contained):
   only the configured agent uid may drive the privnet.
 - **No caller-supplied targets**: the agent sends only ``session_id`` / ``container_id``.
   The privnet derives device names/subnets from the session it set up and re-resolves the
-  container PID from containerd (authoritative) — never trusting a PID/netns/argv/config
-  from the agent (closes the argv-injection and PID-TOCTOU classes; see ``netns.py``).
+  container PID from THIS NODE'S runtime — never trusting a PID/netns/argv/config from the
+  agent (closes the argv-injection and PID-TOCTOU classes; see ``netns.py``). On containerd
+  that resolution is authoritative on its own: the PID comes from a root-owned daemon. A
+  rootless backend has no daemon and its container record is a journal the agent writes, so
+  the netns is additionally required to be owned by the agent's own user namespace — an
+  unprivileged agent can only have created namespaces it owns, which bounds it to what it
+  could have made anyway (``expected_owner_uid`` in ``netns.py``).
+- **Session binding**: a container may only be attached to the session that owns it, read from
+  the container's own label rather than from the request.
+- **Only the agent's own processes**: a cgroup operation names a PID, and that PID must run as
+  the agent's uid, so a root daemon cannot be moved into a cgroup the agent controls.
 - **Per-session serialization**: one asyncio.Lock per session serializes
   setup/attach/detach/teardown so concurrent requests cannot race the device registry.
 
@@ -133,26 +142,58 @@ def _descendants(pid: int) -> list[int]:
 
 
 def _make_cgroup(cgroup: Path, limits: Mapping[str, str], top_pid: int) -> None:
+    """Create the leaf, write the limits and move the tree in — reporting what did not land.
+
+    Every write here used to be swallowed, which reproduced on this path the exact defect the
+    delegation exists to fix: a kernel running with `memory.max = max` and nothing anywhere saying
+    so. An undelegated controller or a read-only leaf is not a corner case (it is what an operator
+    sees after changing the cgroup layout), so a limit that could not be written is raised — the
+    agent already logs it against the container and starts the kernel anyway, so the launch is not
+    made more fragile, only less silent.
+    """
     parent = cgroup.parent
     parent.mkdir(parents=True, exist_ok=True)
-    # A controller only reaches a child if the parent delegates it.
+    # A controller only reaches a child if the parent delegates it. Not fatal on its own: the leaf
+    # may already have the files, and the per-limit failures below are the ones that matter.
     with contextlib.suppress(OSError):
         (parent / "cgroup.subtree_control").write_text("+cpu +cpuset +io +memory")
     cgroup.mkdir(exist_ok=True)
+    failed: list[str] = []
     for name, value in limits.items():
         # Only the leaf's own interface files, never a path the caller composed.
         if "/" in name or name.startswith("."):
+            failed.append(f"{name} (not an interface file)")
             continue
-        with contextlib.suppress(OSError):
+        try:
             (cgroup / name).write_text(value)
+        except OSError as e:
+            failed.append(f"{name}={value} ({e.strerror})")
+    moved = False
     for pid in (top_pid, *_descendants(top_pid)):
-        with contextlib.suppress(OSError):
+        try:
             (cgroup / "cgroup.procs").write_text(str(pid))
+            moved = True
+        except ProcessLookupError:
+            continue  # a transient setup process that already exited
+        except OSError as e:
+            failed.append(f"cgroup.procs={pid} ({e.strerror})")
+    if not moved:
+        # Limits on a cgroup nobody is in confine nothing, so this is a failure even if every
+        # interface file was written.
+        failed.append(f"no process of the tree under {top_pid} could be moved in")
+    if failed:
+        raise PrivNetError(f"cgroup {cgroup} only partly applied: {'; '.join(failed)}")
 
 
 def _remove_cgroup(cgroup: Path) -> None:
-    with contextlib.suppress(OSError):
+    try:
         cgroup.rmdir()
+    except FileNotFoundError:
+        pass  # never created, or already reclaimed
+    except OSError as e:
+        # EBUSY means processes are still in it. Left behind rather than retried here, but said
+        # out loud: these accumulate one per kernel and nothing else revisits this path.
+        log.warning("could not remove the cgroup {}: {!r}", cgroup, e)
 
 
 class PrivNetServer:
