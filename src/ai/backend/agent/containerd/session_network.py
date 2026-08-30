@@ -1051,7 +1051,7 @@ def build_containerd_session_network(
     backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]] | None = None,
     privnet_socket: str | None = None,
     local_subnet_layout: LocalSubnetLayout | None = None,
-    local_subnet_state_dir: Path | None = None,
+    agent_state_dir: Path | None = None,
     vtep_ip: str | None = None,
     configured_dns: Sequence[str] = (),
 ) -> ContainerdSessionNetwork:
@@ -1075,9 +1075,7 @@ def build_containerd_session_network(
     runtime = runtime or ContainerdGrpcRuntime(namespace="backend-ai")
     # The attacher keeps its own IPAM handle, so the anchored path has to reach it too — a
     # constant under /var/lib/backend.ai is shared by every agent on the host and root-owned.
-    ipam_state_dir = (
-        (local_subnet_state_dir.parent / "net-ipam") if local_subnet_state_dir is not None else None
-    )
+    ipam_state_dir = (agent_state_dir / "net-ipam") if agent_state_dir is not None else None
     cni_runner = cni_runner or NativeBridgeAttachRunner(
         uplink=uplink, ipam_state_dir=ipam_state_dir
     )
@@ -1116,17 +1114,27 @@ def build_containerd_session_network(
         make_provisioner = _privnet_provisioner_factory
         privnet_local_subnet = client.local_subnet_of
     else:
-        # The process-wide owner of the node-local pool: shared by both backends here (they carve
-        # their LOCAL block out of the same pool) and by every other agent this runtime hosts.
-        # The store is anchored to the agent's var-base-path, not a constant: two agents of
-        # different backends co-located on one node would otherwise share one store and the
-        # (correct) second-writer guard would refuse the second one's session.
+        # The owner of the node-local pool: shared by both backends here (they carve their LOCAL
+        # block out of the same pool) and — deliberately — by every other agent on the node.
+        #
+        # The store is NOT anchored to the agent's var-base-path. It was, briefly, and that is a
+        # collision: an index names the bridge device `bailo<index>` and the subnet its gateway
+        # sits on, both node-global, so a per-agent index space has every agent starting at 0 and
+        # the second one's setup deleting the first one's bridge by name. Measured on a
+        # multi-backend node: a running containerd cluster session went from 0% to 100% loss the
+        # moment an apptainer session was created beside it. `owner` is what lets several agents
+        # share one journal — see `local_subnet`.
         owned_local_subnets = get_local_subnet_allocator(
-            local_subnet_state_dir, layout=local_subnet_layout
+            layout=local_subnet_layout,
+            owner=agent_id,
+            # Whatever this agent already claimed in its own store before the journal became
+            # node-wide. Adopted, not re-picked: those blocks carry live sessions.
+            legacy_dir=(agent_state_dir / "net-local-subnet") if agent_state_dir else None,
         )
-        # Anchored for the same reason as the subnet store above: a constant under
-        # /var/lib/backend.ai is shared by every agent on the host and is root-owned, which breaks
-        # both a multi-backend node and an unprivileged privnet.
+        # The IPAM store, unlike the one above, IS anchored: it hands out addresses *within* a
+        # session's own block, so two agents holding disjoint blocks cannot collide through it —
+        # and a constant under /var/lib/backend.ai is root-owned, which an unprivileged agent
+        # cannot write.
         owned_ipam = get_host_local_ipam(ipam_state_dir)
         if backends is None:
             backends = {

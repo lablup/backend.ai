@@ -7,6 +7,8 @@ from typing import Any, cast, override
 import pytest
 
 import ai.backend.agent.containerd.session_network as session_network_mod
+import ai.backend.agent.network.local_subnet as local_subnet_mod
+import ai.backend.agent.network.native_attacher as attacher_mod
 from ai.backend.agent.containerd.oci import OWNER_AGENT_LABEL, SESSION_ID_LABEL
 from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime, TaskHandle
 from ai.backend.agent.containerd.session_network import (
@@ -907,3 +909,119 @@ class TestFactory:
 def test_meta_roundtrip_backend(nc: dict[str, Any]) -> None:
     meta = session_net_meta_from_network_config("sX", nc)
     assert str(meta.backend) == nc["backend"]
+
+
+class TestWhereTheNodeLocalStoresLive:
+    """Two stores, two different scopes, and getting them the same way is a defect either way.
+
+    The IPAM store IS anchored to the agent's var-base-path: it hands out addresses *within* a
+    session's own block, so agents holding disjoint blocks cannot collide through it, and the old
+    constant under /var/lib/backend.ai is root-owned — unwritable by an unprivileged agent.
+
+    The LOCAL-subnet journal is NOT anchored, and briefly was. An index there becomes the bridge
+    device ``bailo<index>`` and the subnet its gateway sits on, both node-global, so a per-agent
+    index space has every agent starting at 0 and the second one deleting the first one's bridge by
+    name. Measured on a multi-backend node: a containerd cluster session at 0% loss went to 100%
+    the moment an apptainer session was created beside it.
+    """
+
+    @pytest.fixture
+    def recorded(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+        """What the factory hands each store, captured at their source modules — the factory
+        imports them lazily, so patching its own namespace would not take."""
+        seen: dict[str, Any] = {}
+
+        def _allocator(
+            state_dir: Any = None,
+            *,
+            layout: Any = None,
+            owner: Any = None,
+            legacy_dir: Any = None,
+        ) -> Any:
+            seen["local_subnet"] = state_dir
+            seen["local_subnet_owner"] = owner
+            seen["local_subnet_legacy"] = legacy_dir
+            return cast(Any, object())
+
+        def _ipam(state_dir: Any = None) -> Any:
+            seen.setdefault("ipam", []).append(state_dir)
+            return cast(Any, object())
+
+        class _Runner:
+            def __init__(self, *, uplink: Any = None, ipam_state_dir: Any = None) -> None:
+                seen["attacher_ipam"] = ipam_state_dir
+
+        monkeypatch.setattr(local_subnet_mod, "get_local_subnet_allocator", _allocator)
+        monkeypatch.setattr(attacher_mod, "get_host_local_ipam", _ipam)
+        monkeypatch.setattr(attacher_mod, "NativeBridgeAttachRunner", _Runner)
+        return seen
+
+    def test_the_ipam_stores_are_anchored_to_the_agent(
+        self, recorded: dict[str, Any], tmp_path: Path
+    ) -> None:
+        """Both of them: the attacher keeps its own IPAM handle, and a constant there is the same
+        bug in a second place — which is how the privnet ended up on the root-owned store."""
+        agent_dir = tmp_path / "var" / "bai-singularity"
+
+        build_containerd_session_network(
+            cast(AbstractKVStore, FakeEtcd()),
+            agent_id="i-sg-104",
+            host_ip="192.168.0.10",
+            agent_state_dir=agent_dir,
+        )
+
+        assert recorded["ipam"] == [agent_dir / "net-ipam"]
+        assert recorded["attacher_ipam"] == agent_dir / "net-ipam"
+
+    def test_the_local_subnet_journal_stays_node_wide(
+        self, recorded: dict[str, Any], tmp_path: Path
+    ) -> None:
+        """Anchoring this one is the collision. `None` means the node-wide default."""
+        build_containerd_session_network(
+            cast(AbstractKVStore, FakeEtcd()),
+            agent_id="i-sg-104",
+            host_ip="192.168.0.10",
+            agent_state_dir=tmp_path / "var" / "bai-singularity",
+        )
+
+        assert recorded["local_subnet"] is None
+
+    def test_the_agents_own_old_store_is_offered_for_adoption(
+        self, recorded: dict[str, Any], tmp_path: Path
+    ) -> None:
+        """A half-upgraded node still has blocks claimed in per-agent stores, and their bridges are
+        up. The allocator has to see them or it hands one to a co-located agent."""
+        agent_dir = tmp_path / "var" / "bai-enroot"
+
+        build_containerd_session_network(
+            cast(AbstractKVStore, FakeEtcd()),
+            agent_id="i-en-104",
+            host_ip="192.168.0.10",
+            agent_state_dir=agent_dir,
+        )
+
+        assert recorded["local_subnet_legacy"] == agent_dir / "net-local-subnet"
+
+    def test_the_agent_tags_its_claims(self, recorded: dict[str, Any], tmp_path: Path) -> None:
+        """A shared journal needs to know whose session holds which block, or an agent's restart
+        recovery would reclaim a neighbour's block while it is still carrying traffic."""
+        build_containerd_session_network(
+            cast(AbstractKVStore, FakeEtcd()),
+            agent_id="i-sg-104",
+            host_ip="192.168.0.10",
+            agent_state_dir=tmp_path / "var" / "bai-singularity",
+        )
+
+        assert recorded["local_subnet_owner"] == "i-sg-104"
+
+    def test_an_agent_with_no_var_base_path_still_gets_the_defaults(
+        self, recorded: dict[str, Any]
+    ) -> None:
+        build_containerd_session_network(
+            cast(AbstractKVStore, FakeEtcd()),
+            agent_id="i-cd-104",
+            host_ip="192.168.0.10",
+        )
+
+        assert recorded["local_subnet"] is None
+        assert recorded["attacher_ipam"] is None

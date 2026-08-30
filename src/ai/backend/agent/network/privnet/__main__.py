@@ -218,11 +218,16 @@ async def _amain() -> None:
     # The rootless runtimes keep their container->PID map in memory, rebuilt from the on-disk
     # journal; opening here is what lets THIS process see containers the agent created.
     await runtime.open()
-    # This privnet is the node's single owner of every privileged network op, so it is also the
-    # single owner of the node-local pool both backends carve their LOCAL block out of.
+    # One privnet per agent, but the node-local pool is per NODE: the index it hands out names the
+    # bridge device `bailo<index>`, which every process on this host shares. So this reads the
+    # node-wide store and tags its claims with the agent it serves, rather than keeping a private
+    # index space that would start at 0 alongside everyone else's. See `local_subnet`.
     local_subnets = get_local_subnet_allocator(
-        _resolve_local_subnet_state_dir(raw_cfg),
         layout=_resolve_local_subnet_layout(raw_cfg),
+        owner=agent_id,
+        # The store this privnet used before the journal became node-wide; its claims are adopted
+        # so a half-upgraded node cannot hand the same block to two agents.
+        legacy_dir=_resolve_local_subnet_state_dir(raw_cfg),
     )
     backends = {
         str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin(

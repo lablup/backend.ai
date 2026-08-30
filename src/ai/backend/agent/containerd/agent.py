@@ -1640,7 +1640,9 @@ class ContainerdAgent(
             runtime=self._runtime,
             privnet_socket=self.local_config.agent.network_privnet_socket,
             local_subnet_layout=container_cfg.local_subnet_layout(),
-            local_subnet_state_dir=(self.local_config.agent.var_base_path / "net-local-subnet"),
+            # Anchors this agent's IPAM store only; the LOCAL-subnet journal is node-wide (a
+            # per-agent one collides on `bailo<index>` — see `local_subnet`).
+            agent_state_dir=self.local_config.agent.var_base_path,
             vtep_ip=self._vtep_ip,
             configured_dns=tuple(container_cfg.dns or ()),
         )

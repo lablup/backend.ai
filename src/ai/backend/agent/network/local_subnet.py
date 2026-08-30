@@ -24,13 +24,37 @@ replays it once at startup; `allocate` decides in memory and writes the record t
 dockerd, whose libnetwork allocates from an in-memory bitmap behind a mutex and merely persists the
 outcome to boltdb, reading it back only on boot.
 
-That works because a store has exactly one writer on the node — the agent, or (when privilege is
-separated) the network helper, never both — and exactly one owner per process, obtained via
-`get_local_subnet_allocator`. Nothing here defends against a second writer, and nothing should:
-`setup_session_network` already deletes and recreates host devices by name, so a second writer
-destroys the data plane long before it could corrupt this journal. A record that exists on disk
-while the owner believes it free means exactly that has happened, so the claim raises
-`NetworkStateStoreConflict` instead of quietly allocating around it.
+**The store is node-wide, and several agents may write it.** What an index names — the bridge
+device ``bailo<index>`` and the subnet its gateway sits on — is a node-global name, so the index
+space has to be node-global too. A node running one agent per backend (containerd + enroot +
+apptainer, the multi-backend layout) therefore has several writers, each owning its own sessions
+inside one shared journal.
+
+Anchoring this store per agent instead was tried and is wrong: each agent then starts counting at
+index 0, every one of them derives ``bailo0`` and the same gateway subnet, and the second agent's
+``setup_session_network`` — which deletes and recreates host devices *by name* — takes the first
+agent's bridge away underneath its running session. Measured: a containerd cluster session at 0%
+loss went to 100% the moment an apptainer session was created on the same node, with its host-side
+veths gone.
+
+Two mechanisms keep the shared journal honest, and neither needs a lock between agents:
+
+- **Owner-tagged claims.** A record is ``<session_id>\n<owner>``, so an agent replaying the journal
+  can tell its own sessions (which it may release, and must reconcile against its live containers)
+  from another agent's (which it must treat as taken and never touch). A record with no owner line
+  predates this and is read as ours, which is what a single-agent node upgrading in place needs.
+- **Exclusive create, then move on.** The claim is an ``O_EXCL`` link, so two agents racing for the
+  same index cannot both win; the loser simply takes the next free index. That collision is an
+  ordinary outcome of a shared pool, not the corruption it used to be reported as.
+
+A node does not upgrade all at once, so the allocator also **adopts** whatever an agent already
+holds in its own (pre-node-wide) store: those blocks are carrying live sessions whose bridges are
+up on this host, and a node-wide allocator that could not see them would hand the same index to
+somebody else. Measured while a co-located agent was still on the old code: the new agent was
+handed the block a legacy session already held, and the node ended up with two bridges on
+172.30.0.64/26 both claiming .65 as their gateway — the :53 redirect is keyed on that address, so
+one session's cluster DNS silently answered for the other and its kernels could not resolve their
+peers.
 
 Records are written before the host is mutated. A crash in between leaves a claim with no device,
 which restart recovery reconciles against the live containers; the reverse order would leave a
@@ -41,7 +65,9 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
-from collections.abc import Sequence
+import logging
+import socket
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
@@ -49,11 +75,18 @@ from typing import override
 from ai.backend.agent.errors.network import (
     LocalSubnetLayoutChanged,
     LocalSubnetPoolExhausted,
-    NetworkStateStoreConflict,
 )
 from ai.backend.agent.network.journal_io import atomic_exclusive_write, atomic_write
+from ai.backend.logging import BraceStyleAdapter
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# Node-wide on purpose: see the module docstring. This is NOT anchored to an agent's
+# var-base-path, because the index it hands out names a node-global bridge device.
 _DEFAULT_LOCAL_SUBNET_STATE_DIR = Path("/var/lib/backend.ai/net-local-subnet")
+# The shared claim directory is created like /tmp: any co-located agent may add its own claim,
+# and the sticky bit stops it removing anyone else's.
+_SHARED_DIR_MODE = 0o1777
 
 DEFAULT_LOCAL_POOL = "172.30.0.0/16"
 DEFAULT_BLOCK_PREFIXLEN = 26
@@ -125,13 +158,51 @@ DEFAULT_LAYOUT = LocalSubnetLayout.parse(DEFAULT_LOCAL_POOL, DEFAULT_BLOCK_PREFI
 _LEGACY_LAYOUT = LocalSubnetLayout.parse("172.30.0.0/16", 24)
 
 
+def host_ipv4_addresses() -> frozenset[str]:
+    """Every IPv4 address currently configured on this host.
+
+    The authority on "is this block already in use here" is the host, not any one journal. An
+    agent still running the pre-node-wide code keeps its claims in a store this one cannot see, and
+    a leaked bridge is in no store at all — both leave an address sitting on the node, and handing
+    that block out again puts two bridges on one subnet with the same gateway.
+    """
+    found: set[str] = set()
+    try:
+        import psutil
+    except ImportError:  # pragma: no cover - psutil is an agent dependency
+        return frozenset()
+    try:
+        for addrs in psutil.net_if_addrs().values():
+            for addr in addrs:
+                if addr.family == socket.AF_INET and addr.address:
+                    found.add(addr.address)
+    except Exception as e:  # pragma: no cover - reading host state must never fail allocation
+        log.warning("could not read this host's addresses ({!r}); allocating without them", e)
+        return frozenset()
+    return frozenset(found)
+
+
 def get_local_subnet_allocator(
     state_dir: Path | None = None,
     *,
     layout: LocalSubnetLayout | None = None,
+    owner: str | None = None,
+    legacy_dir: Path | None = None,
+    host_addresses: Callable[[], Iterable[str]] | None = None,
 ) -> LocalSubnetAllocator:
     """The process-wide allocator owning ``state_dir``. Construct the class directly only in
-    tests, where each case owns its own store."""
+    tests, where each case owns its own store.
+
+    ``owner`` is this agent's id. It is written into every claim so a co-located agent replaying the
+    same node-wide journal can tell whose sessions are whose; None means "unowned", which is read
+    back as ours (the single-agent node).
+
+    ``legacy_dir`` is this agent's own pre-node-wide store, if it had one. Claims found there are
+    adopted at load so a half-upgraded node does not hand out a block a legacy session still holds.
+
+    ``host_addresses`` reads the node's own addresses; defaults to the real reader here and is
+    injected only by tests.
+    """
     resolved = state_dir if state_dir is not None else _DEFAULT_LOCAL_SUBNET_STATE_DIR
     wanted = layout if layout is not None else DEFAULT_LAYOUT
     if (existing := _allocators.get(resolved)) is not None:
@@ -143,7 +214,13 @@ def get_local_subnet_allocator(
                 f" {existing.layout}, but was requested as {wanted}"
             )
         return existing
-    allocator = LocalSubnetAllocator(resolved, layout=wanted)
+    allocator = LocalSubnetAllocator(
+        resolved,
+        layout=wanted,
+        owner=owner,
+        legacy_dir=legacy_dir,
+        host_addresses=host_addresses or host_ipv4_addresses,
+    )
     _allocators[resolved] = allocator
     return allocator
 
@@ -154,7 +231,16 @@ class LocalSubnetAllocator:
     _dir: Path
     _layout: LocalSubnetLayout
     _lock: asyncio.Lock
+    #: session_id -> index, for the sessions THIS agent owns.
     _indices: dict[str, int]
+    #: Indices a co-located agent holds. Not ours to hand out, and not ours to reconcile away.
+    _foreign: set[int]
+    _owner: str | None
+    #: This agent's pre-node-wide store, whose claims are adopted at load. None when there is none.
+    _legacy_dir: Path | None
+    #: Reads the host's own addresses, so a block already carried by a device nobody journalled
+    #: here (a legacy agent, a leaked bridge) is not handed out a second time.
+    _host_addresses: Callable[[], Iterable[str]]
     _loaded: bool
 
     def __init__(
@@ -162,11 +248,21 @@ class LocalSubnetAllocator:
         state_dir: Path | None = None,
         *,
         layout: LocalSubnetLayout | None = None,
+        owner: str | None = None,
+        legacy_dir: Path | None = None,
+        host_addresses: Callable[[], Iterable[str]] | None = None,
     ) -> None:
         self._dir = state_dir if state_dir is not None else _DEFAULT_LOCAL_SUBNET_STATE_DIR
         self._layout = layout if layout is not None else DEFAULT_LAYOUT
         self._lock = asyncio.Lock()
         self._indices = {}
+        self._foreign = set()
+        self._owner = owner
+        self._legacy_dir = legacy_dir if legacy_dir != state_dir else None
+        # Pure by default: the class is what tests construct, and a reader that inspects the
+        # machine would make every one of them depend on whatever bridges it happens to have.
+        # `get_local_subnet_allocator` — the production composition root — passes the real one.
+        self._host_addresses = host_addresses or (lambda: ())
         self._loaded = False
 
     @property
@@ -190,16 +286,27 @@ class LocalSubnetAllocator:
             ) from e
 
     def _write_layout(self) -> None:
-        self._dir.mkdir(parents=True, exist_ok=True)
+        if self._read_layout() == self._layout:
+            # Already marked, and possibly by another agent — in a sticky shared directory we could
+            # not replace their file anyway, and there is nothing to change.
+            return
+        self._ensure_dir()
         # Atomic overwrite: a crash mid-write must never leave an empty/truncated marker, which
         # _read_layout would reject as an "unreadable layout" and fail block allocation node-wide.
         atomic_write(self._dir / _LAYOUT_FILE, self._layout.serialize())
 
     def _replay(self) -> dict[str, int]:
-        """Rebuild session -> index from the journal. A session recorded twice (only possible in a
-        store written by an older, racy allocator) keeps its lowest index."""
+        """Rebuild session -> index for OUR sessions, and remember which indices are somebody
+        else's.
+
+        A session recorded twice (only possible in a store written by an older, racy allocator)
+        keeps its lowest index. A record with no owner line predates owner tagging and is read as
+        ours — that is the single-agent node upgrading over its own journal.
+        """
         indices: dict[str, int] = {}
+        foreign: set[int] = set()
         if not self._dir.is_dir():
+            self._foreign = foreign
             return indices
         for entry in sorted(self._dir.iterdir()):
             if not entry.is_file():
@@ -208,8 +315,17 @@ class LocalSubnetAllocator:
                 index = int(entry.name)  # skips the (dot-prefixed) layout marker
             except ValueError:
                 continue
-            session_id = entry.read_text().strip()
+            try:
+                session_id, _, owner = entry.read_text().strip().partition("\n")
+            except OSError:
+                # Another agent's claim we may not even read. It is taken either way.
+                foreign.add(index)
+                continue
+            if owner and owner != self._owner:
+                foreign.add(index)
+                continue
             indices.setdefault(session_id, index)
+        self._foreign = foreign
         return indices
 
     def _replay_and_reconcile(self) -> dict[str, int]:
@@ -221,6 +337,7 @@ class LocalSubnetAllocator:
         the pool means draining the node first, and we say so rather than guess.
         """
         indices = self._replay()
+        self._adopt_legacy(indices)
         recorded = self._read_layout()
         if recorded is None and indices:
             recorded = _LEGACY_LAYOUT  # an unmarked store with claims predates the marker
@@ -239,19 +356,103 @@ class LocalSubnetAllocator:
             self._write_layout()
         return indices
 
-    def _write_claim(self, index: int, session_id: str) -> None:
-        self._dir.mkdir(parents=True, exist_ok=True)
+    def _blocks_in_use_on_the_host(self) -> set[int]:
+        """Indices whose block already holds a live address on this node."""
+        pool = self._layout.pool
+        block_bits = 32 - self._layout.block_prefixlen
+        occupied: set[int] = set()
+        for raw in self._host_addresses():
+            try:
+                addr = ipaddress.IPv4Address(raw)
+            except ValueError:
+                continue
+            if addr not in pool:
+                continue
+            occupied.add((int(addr) - int(pool.network_address)) >> block_bits)
+        return occupied
+
+    def _adopt_legacy(self, indices: dict[str, int]) -> None:
+        """Carry this agent's own pre-node-wide claims into the shared journal.
+
+        A node upgrades one agent at a time. The blocks in an agent's old store are carrying live
+        sessions whose bridges are already up on this host, so a node-wide allocator that started
+        without them would hand the same index to a co-located agent — two bridges on one subnet,
+        both answering as its gateway. The index is preserved, never re-picked: it names the device
+        that already exists.
+
+        The legacy record is left in place rather than deleted. It costs nothing, adoption is
+        idempotent, and an operator who rolls an agent back to the old code still finds its state.
+        """
+        if self._legacy_dir is None or not self._legacy_dir.is_dir():
+            return
+        for entry in sorted(self._legacy_dir.iterdir()):
+            if not entry.is_file():
+                continue
+            try:
+                index = int(entry.name)
+                session_id = entry.read_text().strip().partition("\n")[0]
+            except (ValueError, OSError):
+                continue
+            if not session_id or indices.get(session_id) == index:
+                continue
+            if index in self._foreign or index in set(indices.values()):
+                # Somebody else already holds it node-wide. We cannot move the session — its bridge
+                # is up on this index — so say so rather than allocate around a live collision.
+                log.error(
+                    "local-subnet index {} is held both by this agent's legacy store (session {})"
+                    " and by another writer in {}; two bridges now share {}. Drain one of them.",
+                    index,
+                    session_id,
+                    self._dir,
+                    self._layout.subnet(index),
+                )
+                continue
+            if self._write_claim(index, session_id):
+                log.info(
+                    "adopted local-subnet index {} ({}) from the legacy store {}",
+                    index,
+                    session_id,
+                    self._legacy_dir,
+                )
+            else:
+                # It appeared node-wide between our replay and now; treat it as taken either way.
+                self._foreign.add(index)
+                continue
+            indices[session_id] = index
+
+    def _write_claim(self, index: int, session_id: str) -> bool:
+        """Claim ``index``. False when a co-located agent got there first.
+
+        Not an error: the journal is node-wide (see the module docstring), so losing a race for one
+        index just means taking the next. Raising here is what the per-agent store was introduced
+        to avoid, and that cure was worse than the disease — it gave every agent its own index
+        space and let them collide on the bridge names those indices produce.
+        """
+        self._ensure_dir()
         self._write_layout()  # the first claim is what marks a fresh store
+        record = f"{session_id}\n{self._owner}" if self._owner else session_id
         try:
             # Atomic + exclusive: a crash mid-write must never leave an empty claim (replay would
-            # read a block owned by "" -- a leaked /26), and an existing file still signals a second
-            # writer.
-            atomic_exclusive_write(self._dir / str(index), session_id)
-        except FileExistsError as e:
-            raise NetworkStateStoreConflict(
-                f"local-subnet index {index} exists on disk but is free in memory "
-                f"(store: {self._dir}) — another writer owns this node's network"
-            ) from e
+            # read a block owned by "" -- a leaked /26), and O_EXCL is what makes the race between
+            # two agents resolvable without a lock.
+            atomic_exclusive_write(self._dir / str(index), record)
+        except FileExistsError:
+            return False
+        return True
+
+    def _ensure_dir(self) -> None:
+        """The shared claim directory, created so any co-located agent may add to it.
+
+        Sticky + world-writable, exactly like /tmp: an agent running as its own uid can create its
+        claims, and cannot unlink another agent's. Best-effort — a directory somebody else created
+        is not ours to re-mode, and the claim below will say plainly if we cannot write.
+        """
+        self._dir.mkdir(parents=True, exist_ok=True)
+        try:
+            if (self._dir.stat().st_mode & 0o7777) != _SHARED_DIR_MODE:
+                self._dir.chmod(_SHARED_DIR_MODE)
+        except OSError:
+            pass
 
     async def _load_locked(self) -> None:
         if self._loaded:
@@ -271,12 +472,33 @@ class LocalSubnetAllocator:
             await self._load_locked()
             if (existing := self._indices.get(session_id)) is not None:
                 return existing  # idempotent re-allocate
-            used = set(self._indices.values())
+            used = set(self._indices.values()) | self._foreign
+            # The host is the last word on which blocks are already carrying traffic. A co-located
+            # agent still on the pre-node-wide code journals nowhere we can read, and a bridge
+            # leaked by a teardown that did not finish is journalled nowhere at all — both leave an
+            # address on this node, and reusing that block puts two bridges on one subnet, both
+            # answering as its gateway. Measured: the cluster-DNS :53 redirect is keyed on that
+            # gateway address, so one session's resolver silently answered for the other and its
+            # kernels could not resolve their peers.
+            occupied = await asyncio.to_thread(self._blocks_in_use_on_the_host)
             for index in range(self._layout.size):
                 if index in used:
                     continue
+                if index in occupied:
+                    log.warning(
+                        "local-subnet index {} ({}) is already carried by a device on this host"
+                        " that no journal here names; skipping it",
+                        index,
+                        self._layout.subnet(index),
+                    )
+                    self._foreign.add(index)
+                    continue
                 # Journal before the caller mutates the host, and only then commit to memory.
-                await asyncio.to_thread(self._write_claim, index, session_id)
+                if not await asyncio.to_thread(self._write_claim, index, session_id):
+                    # A co-located agent claimed it between our replay and now. Remember that and
+                    # take the next one rather than handing out a block we do not own.
+                    self._foreign.add(index)
+                    continue
                 self._indices[session_id] = index
                 return index
             raise LocalSubnetPoolExhausted(
@@ -322,6 +544,10 @@ class LocalSubnetAllocator:
             # Drop the record first: a failed unlink must not leave memory handing the index out
             # again while the journal still names this session.
             await asyncio.to_thread((self._dir / str(index)).unlink, True)
+            if self._legacy_dir is not None:
+                # Adoption left it behind on purpose; releasing the block is when it stops being
+                # true, and a legacy store nobody prunes only ever grows.
+                await asyncio.to_thread((self._legacy_dir / str(index)).unlink, True)
             del self._indices[session_id]
 
 

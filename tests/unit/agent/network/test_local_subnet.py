@@ -6,14 +6,15 @@ import pytest
 from ai.backend.agent.errors.network import (
     LocalSubnetLayoutChanged,
     LocalSubnetPoolExhausted,
-    NetworkStateStoreConflict,
 )
 from ai.backend.agent.network.local_subnet import (
     DEFAULT_LAYOUT,
     LocalSubnetAllocator,
     LocalSubnetLayout,
+    _allocators,
     cluster_host_ips,
     get_local_subnet_allocator,
+    host_ipv4_addresses,
 )
 
 
@@ -167,30 +168,111 @@ class TestRecuttingThePool:
         assert await restarted.allocate_subnet("survivor") == held
 
 
-class TestForeignWriter:
-    """The store has one writer per node. A record that exists on disk while the owner believes
-    the index free means a second writer is mutating this node's network, which the data plane
-    cannot survive anyway. It must be reported, never allocated around."""
+class TestSeveralAgentsOnOneNode:
+    """Co-located agents share this journal, because what an index names does not belong to any one
+    of them.
 
-    async def test_a_record_appearing_behind_the_owner_raises(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir)
-        await alloc.load()  # owner's memory is now authoritative and empty
+    An index becomes the bridge device ``bailo<index>`` and the subnet its gateway sits on — both
+    node-global names. Giving each agent its own store (which is what a var-base-path-anchored
+    store does) has every agent start counting at 0, so the second one's ``setup_session_network``
+    deletes the first one's bridge *by name* while its session is running. Measured on a
+    multi-backend node: a containerd cluster session at 0% loss went to 100%, host-side veths gone,
+    the moment an apptainer session was created beside it.
+    """
 
+    async def test_two_agents_never_get_the_same_block(self, state_dir: Path) -> None:
+        containerd = LocalSubnetAllocator(state_dir, owner="i-cd-104")
+        apptainer = LocalSubnetAllocator(state_dir, owner="i-sg-104")
+
+        first = await containerd.allocate_subnet("s-cd")
+        second = await apptainer.allocate_subnet("s-sg")
+
+        assert first != second
+
+    async def test_an_agent_that_starts_later_sees_the_blocks_already_taken(
+        self, state_dir: Path
+    ) -> None:
+        """The agents do not start together; the second one replays a journal the first wrote."""
+        containerd = LocalSubnetAllocator(state_dir, owner="i-cd-104")
+        await containerd.allocate("s-cd")
+
+        apptainer = LocalSubnetAllocator(state_dir, owner="i-sg-104")
+
+        assert await apptainer.allocate("s-sg") != 0
+
+    async def test_a_claim_that_appears_after_the_replay_is_taken_not_fatal(
+        self, state_dir: Path
+    ) -> None:
+        """The race the per-agent store was introduced to avoid. Two agents replay an empty
+        journal, both pick 0, and one loses the O_EXCL create — which is an ordinary outcome of a
+        shared pool, so it takes the next index instead of refusing the session."""
+        containerd = LocalSubnetAllocator(state_dir, owner="i-cd-104")
+        apptainer = LocalSubnetAllocator(state_dir, owner="i-sg-104")
+        await containerd.load()
+        await apptainer.load()  # both believe every index is free
+
+        assert await containerd.allocate("s-cd") == 0
+        assert await apptainer.allocate("s-sg") == 1
+
+    async def test_an_agent_only_reports_its_own_sessions(self, state_dir: Path) -> None:
+        """`sessions()` feeds restart recovery, which reclaims blocks whose session died while the
+        agent was down. Returning a neighbour's session there would have this agent free a block
+        that is still carrying traffic."""
+        containerd = LocalSubnetAllocator(state_dir, owner="i-cd-104")
+        apptainer = LocalSubnetAllocator(state_dir, owner="i-sg-104")
+        await containerd.allocate("s-cd")
+        await apptainer.allocate("s-sg")
+
+        assert await containerd.sessions() == frozenset({"s-cd"})
+        assert await apptainer.sessions() == frozenset({"s-sg"})
+
+    async def test_releasing_does_not_touch_a_neighbours_claim(self, state_dir: Path) -> None:
+        containerd = LocalSubnetAllocator(state_dir, owner="i-cd-104")
+        apptainer = LocalSubnetAllocator(state_dir, owner="i-sg-104")
+        await containerd.allocate("s-cd")
+        theirs = await apptainer.allocate("s-sg")
+
+        await containerd.release("s-sg")  # not ours; a no-op
+        await containerd.release("s-cd")
+
+        assert (state_dir / str(theirs)).exists()
+        assert await apptainer.lookup("s-sg") == theirs
+
+    async def test_a_released_block_is_handed_to_whoever_asks_next(self, state_dir: Path) -> None:
+        containerd = LocalSubnetAllocator(state_dir, owner="i-cd-104")
+        apptainer = LocalSubnetAllocator(state_dir, owner="i-sg-104")
+        freed = await containerd.allocate("s-cd")
+        await containerd.release("s-cd")
+
+        assert await apptainer.allocate("s-sg") == freed
+
+    async def test_a_claim_written_before_owner_tagging_is_read_as_ours(
+        self, state_dir: Path
+    ) -> None:
+        """A single-agent node upgrading in place over its own journal: those records name no
+        owner, and losing track of them would leak the blocks their live sessions still hold."""
         state_dir.mkdir(parents=True, exist_ok=True)
-        (state_dir / "0").write_text("written-by-someone-else")
+        # The layout marker too: without it the store reads as pre-marker, which is a separate
+        # (already covered) refusal and would hide what this case is about.
+        (state_dir / ".layout").write_text(DEFAULT_LAYOUT.serialize())
+        (state_dir / "0").write_text("s-old")
 
-        with pytest.raises(NetworkStateStoreConflict):
-            await alloc.allocate("s1")
+        alloc = LocalSubnetAllocator(state_dir, owner="i-cd-104")
 
-    async def test_the_foreign_record_is_left_intact(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir)
-        await alloc.load()
-        state_dir.mkdir(parents=True, exist_ok=True)
-        (state_dir / "0").write_text("written-by-someone-else")
+        assert await alloc.lookup("s-old") == 0
+        assert await alloc.allocate("s-new") == 1
 
-        with pytest.raises(NetworkStateStoreConflict):
-            await alloc.allocate("s1")
-        assert (state_dir / "0").read_text() == "written-by-someone-else"
+    async def test_the_shared_directory_is_writable_by_a_co_located_agent(
+        self, state_dir: Path
+    ) -> None:
+        """Agents may run as different uids (an unprivileged rootless agent beside a root one), so
+        the claim directory is created like /tmp — anyone may add, the sticky bit stops anyone
+        removing what is not theirs. A root-owned 0755 directory is what made the per-agent store
+        look necessary in the first place."""
+        await LocalSubnetAllocator(state_dir, owner="i-cd-104").allocate("s-cd")
+
+        mode = state_dir.stat().st_mode & 0o7777
+        assert mode == 0o1777, oct(mode)
 
 
 class TestJournalReplay:
@@ -299,3 +381,191 @@ class TestClusterHostIps:
         # /30 has two usable hosts; one is the gateway, leaving room for exactly one peer.
         with pytest.raises(LocalSubnetPoolExhausted):
             cluster_host_ips("10.0.0.0/30", ["main1", "sub1"])
+
+
+class TestAdoptingALegacyStore:
+    """A node does not upgrade all at once.
+
+    Before this journal was node-wide, every agent kept its own; those stores still name blocks
+    whose bridges are up on the host right now. An upgraded agent that started from an empty
+    node-wide journal would hand one of them to somebody else. Measured on a half-upgraded node: a
+    new agent took the block a legacy enroot session held, and the host ended up with two bridges
+    on 172.30.0.64/26 both answering as .65 — the cluster-DNS :53 redirect is keyed on that
+    address, so one session's resolver answered for the other and its kernels could not resolve
+    their peers (ping and TCP between them still worked, which is what made it look like anything
+    but DNS).
+    """
+
+    @pytest.fixture
+    def legacy(self, tmp_path: Path) -> Path:
+        d = tmp_path / "bai-enroot" / "net-local-subnet"
+        d.mkdir(parents=True)
+        (d / ".layout").write_text(DEFAULT_LAYOUT.serialize())
+        return d
+
+    async def test_a_legacy_claim_is_carried_over_at_the_same_index(
+        self, state_dir: Path, legacy: Path
+    ) -> None:
+        """The index names a bridge that already exists, so it is preserved, never re-picked."""
+        (legacy / "1").write_text("s-live")
+
+        alloc = LocalSubnetAllocator(state_dir, owner="i-en-104", legacy_dir=legacy)
+
+        assert await alloc.lookup("s-live") == 1
+        assert (state_dir / "1").read_text().splitlines()[0] == "s-live"
+
+    async def test_a_co_located_agent_no_longer_gets_that_block(
+        self, state_dir: Path, legacy: Path
+    ) -> None:
+        """The whole point: without adoption the new agent is handed index 1 and the node ends up
+        with two bridges on one subnet."""
+        (legacy / "1").write_text("s-live")
+        await LocalSubnetAllocator(state_dir, owner="i-en-104", legacy_dir=legacy).load()
+
+        newcomer = LocalSubnetAllocator(state_dir, owner="i-sg-104")
+
+        assert await newcomer.allocate("s-new") not in (1,)
+
+    async def test_adoption_is_idempotent_across_restarts(
+        self, state_dir: Path, legacy: Path
+    ) -> None:
+        (legacy / "1").write_text("s-live")
+        await LocalSubnetAllocator(state_dir, owner="i-en-104", legacy_dir=legacy).load()
+
+        again = LocalSubnetAllocator(state_dir, owner="i-en-104", legacy_dir=legacy)
+
+        assert await again.lookup("s-live") == 1
+        assert sorted(p.name for p in state_dir.iterdir() if p.name.isdigit()) == ["1"]
+
+    async def test_the_legacy_record_survives_adoption(self, state_dir: Path, legacy: Path) -> None:
+        """Left in place on purpose: adoption is idempotent, and an operator who rolls this agent
+        back to the old code still finds its state."""
+        (legacy / "1").write_text("s-live")
+
+        await LocalSubnetAllocator(state_dir, owner="i-en-104", legacy_dir=legacy).load()
+
+        assert (legacy / "1").exists()
+
+    async def test_releasing_prunes_both_records(self, state_dir: Path, legacy: Path) -> None:
+        """Otherwise the legacy store only ever grows, and a later restart re-adopts a block whose
+        session is long gone."""
+        (legacy / "1").write_text("s-live")
+        alloc = LocalSubnetAllocator(state_dir, owner="i-en-104", legacy_dir=legacy)
+        await alloc.load()
+
+        await alloc.release("s-live")
+
+        assert not (state_dir / "1").exists()
+        assert not (legacy / "1").exists()
+
+    async def test_a_block_already_taken_node_wide_is_reported_not_stolen(
+        self, state_dir: Path, legacy: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A genuine live collision that predates us. The session's bridge is up on that index, so
+        it cannot be moved — say so instead of silently allocating around it."""
+        await LocalSubnetAllocator(state_dir, owner="i-cd-104").allocate("s-theirs")  # takes 0
+        (legacy / "0").write_text("s-ours")
+
+        alloc = LocalSubnetAllocator(state_dir, owner="i-en-104", legacy_dir=legacy)
+        with caplog.at_level("ERROR"):
+            await alloc.load()
+
+        assert "two bridges now share" in caplog.text
+        assert (state_dir / "0").read_text().splitlines()[0] == "s-theirs"
+
+    async def test_an_agent_with_no_legacy_store_is_unaffected(self, state_dir: Path) -> None:
+        alloc = LocalSubnetAllocator(state_dir, owner="i-cd-104", legacy_dir=None)
+
+        assert await alloc.allocate("s1") == 0
+
+    async def test_a_legacy_dir_that_is_the_store_itself_is_not_adopted_from(
+        self, state_dir: Path
+    ) -> None:
+        """A single-agent node may already point both at the same path; adopting from itself would
+        be a no-op at best and a self-conflict at worst."""
+        alloc = LocalSubnetAllocator(state_dir, owner="i-cd-104", legacy_dir=state_dir)
+
+        assert await alloc.allocate("s1") == 0
+
+
+class TestTheHostIsTheLastWord:
+    """A block whose subnet already carries an address on this node is not free, whoever put it
+    there.
+
+    Adoption covers this agent's own old store, but not a co-located agent still running the
+    pre-node-wide code — its claims live in a store this one cannot even name — nor a bridge left
+    behind by a teardown that did not finish, which is journalled nowhere at all. Both leave an
+    address on the host. Measured: an upgraded agent was handed the block a legacy session held,
+    and the node ended up with two bridges on 172.30.0.64/26 both configured as .65. Peers still
+    pinged and still accepted TCP; only DNS broke, because the :53 redirect is keyed on that
+    gateway address and one session's resolver answered for the other.
+    """
+
+    def _alloc(self, state_dir: Path, addrs: list[str]) -> LocalSubnetAllocator:
+        return LocalSubnetAllocator(state_dir, owner="i-sg-104", host_addresses=lambda: addrs)
+
+    async def test_a_block_a_foreign_device_already_holds_is_skipped(self, state_dir: Path) -> None:
+        """172.30.0.65 is the gateway of block 1 — exactly what the legacy session's bridge holds."""
+        alloc = self._alloc(state_dir, ["192.168.0.104", "172.30.0.65"])
+
+        assert await alloc.allocate("s1") == 0
+        assert await alloc.allocate("s2") == 2  # 1 is taken by the device, not by any journal
+
+    async def test_any_address_inside_the_block_counts_not_just_the_gateway(
+        self, state_dir: Path
+    ) -> None:
+        """A container address is as good a proof that the block is live as the gateway is."""
+        alloc = self._alloc(state_dir, ["172.30.0.70"])
+
+        assert await alloc.allocate("s1") == 0
+        assert await alloc.allocate("s2") == 2
+
+    async def test_addresses_outside_the_pool_are_ignored(self, state_dir: Path) -> None:
+        """The node's real NICs, docker0, the k8s CNI — none of them name a block of this pool."""
+        alloc = self._alloc(state_dir, ["192.168.0.104", "10.244.1.1", "172.17.0.1"])
+
+        assert await alloc.allocate("s1") == 0
+        assert await alloc.allocate("s2") == 1
+
+    def test_the_occupancy_map_holds_only_this_pool(self, state_dir: Path) -> None:
+        """Asserted on the map itself, not through `allocate`: an out-of-pool address can only ever
+        compute an index outside `range(size)`, so dropping the pool check is invisible from the
+        allocation side. It stays because the index arithmetic is what makes that true, and a
+        future change to it would otherwise turn every host address into a phantom claim."""
+        alloc = self._alloc(state_dir, ["192.168.0.104", "10.244.1.1", "172.17.0.1", "172.30.0.65"])
+
+        assert alloc._blocks_in_use_on_the_host() == {1}
+
+    async def test_a_session_that_already_holds_a_block_still_gets_it_back(
+        self, state_dir: Path
+    ) -> None:
+        """Its own bridge is one of those addresses; re-allocation is a lookup, not a fresh pick,
+        so the guard must not lock a session out of the block it is already on."""
+        alloc = self._alloc(state_dir, [])
+        first = await alloc.allocate("s1")
+
+        alloc._host_addresses = lambda: ["172.30.0.1"]  # its own gateway now up
+        assert await alloc.allocate("s1") == first
+
+    async def test_garbage_from_the_host_reader_does_not_stop_allocation(
+        self, state_dir: Path
+    ) -> None:
+        alloc = self._alloc(state_dir, ["not-an-ip", "", "172.30.0.65"])
+
+        assert await alloc.allocate("s1") == 0
+
+    async def test_a_reader_that_returns_nothing_allocates_as_before(self, state_dir: Path) -> None:
+        """psutil missing, or the read failing, must degrade to the journal alone rather than
+        refusing every session."""
+        alloc = self._alloc(state_dir, [])
+
+        assert await alloc.allocate("s1") == 0
+
+    def test_the_production_factory_wires_the_real_reader(self, tmp_path: Path) -> None:
+        """The class stays pure so tests are hermetic; the composition root is where the host
+        coupling belongs, and forgetting it there is what the guard exists to prevent."""
+        alloc = get_local_subnet_allocator(tmp_path / "prod-store")
+        try:
+            assert alloc._host_addresses is host_ipv4_addresses
+        finally:
+            _allocators.pop(tmp_path / "prod-store", None)
