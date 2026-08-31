@@ -463,9 +463,13 @@ case_G4() {
 # ---------------------------------------------------------------- main
 printf '\033[1m백엔드 인수 테스트 — %s\033[0m  (케이스: %s)\n' "$BK" "$SELECTED"
 printf '노드: local=%s peer=%s\n' "$ACC_LOCAL_HOST" "${ACC_PEER_HOST:-없음}"
+result_open "$BK" "$SELECTED"
+printf '기록: %s\n' "$RESULT_FILE"
 trap 'echo; echo "정리 중..."; teardown_all' EXIT
 for c in $CASES; do run_case "$c"; done
 teardown_all
+result_close "$BK"
 printf '\n\033[1m결과\033[0m  통과 %d · 실패 %d · 건너뜀 %d\n' "$PASS" "$FAIL" "$SKIP"
 [ -n "$FAILED_IDS" ] && printf '실패한 케이스:%s\n' "$FAILED_IDS"
+printf '기록: %s\n' "$RESULT_FILE"
 exit $(( FAIL > 0 ? 1 : 0 ))

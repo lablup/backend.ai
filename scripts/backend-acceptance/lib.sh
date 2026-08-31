@@ -32,13 +32,47 @@ agent_id() { echo "i-$(backend_agent_kind "$1")-$2"; }
 log_root() { echo "$(backend_var_base "$1")/containerd-logs"; }
 scratch_root() { echo "$(backend_var_base "$1")/scratches"; }
 
-# --- output -----------------------------------------------------------------
+# --- output and the run record ----------------------------------------------
+# testcase.md is the specification and says nothing about outcomes; a run writes its own record
+# here so the two never have to be kept in step by hand.
+: "${ACC_RESULT_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/results}"
+mkdir -p "$ACC_RESULT_DIR"
+RESULT_FILE=""
+
+result_open() {  # $1 = backend, $2 = selected case ids
+  local stamp
+  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  RESULT_FILE="$ACC_RESULT_DIR/$1-$stamp.tsv"
+  {
+    printf '# backend\t%s\n' "$1"
+    printf '# started_utc\t%s\n' "$stamp"
+    printf '# cases\t%s\n' "$2"
+    printf '# local_host\t%s\n' "$ACC_LOCAL_HOST"
+    printf '# peer_host\t%s\n' "${ACC_PEER_HOST:-none}"
+    printf '# image_id\t%s\n' "$ACC_IMAGE_ID"
+    printf '# git_commit\t%s\n' "$( cd "$BAI_ROOT" && git rev-parse --short HEAD 2>/dev/null )"
+    printf '# host\t%s\n' "$(uname -srm)"
+    printf 'case\tstatus\tdetail\n'
+  } > "$RESULT_FILE"
+}
+
+result_row() { [ -n "$RESULT_FILE" ] && printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$RESULT_FILE"; }
+
+result_close() {
+  [ -n "$RESULT_FILE" ] || return 0
+  {
+    printf '# finished_utc\t%s\n' "$(date -u +%Y%m%dT%H%M%SZ)"
+    printf '# pass\t%s\n# fail\t%s\n# skip\t%s\n' "$PASS" "$FAIL" "$SKIP"
+  } >> "$RESULT_FILE"
+  ln -sf "$(basename "$RESULT_FILE")" "$ACC_RESULT_DIR/latest-$1.tsv"
+}
+
 PASS=0; FAIL=0; SKIP=0; FAILED_IDS=""
 _c() { case "$1" in ok) printf '\033[32m';; no) printf '\033[31m';; sk) printf '\033[33m';; *) printf '';; esac; }
 _r() { printf '\033[0m'; }
-pass()  { PASS=$((PASS+1)); _c ok; printf 'PASS'; _r; printf ' %-4s %s\n' "$CASE_ID" "$1"; }
-fail()  { FAIL=$((FAIL+1)); FAILED_IDS="$FAILED_IDS $CASE_ID"; _c no; printf 'FAIL'; _r; printf ' %-4s %s\n' "$CASE_ID" "$1"; }
-skip()  { SKIP=$((SKIP+1)); _c sk; printf 'SKIP'; _r; printf ' %-4s %s\n' "$CASE_ID" "$1"; }
+pass()  { PASS=$((PASS+1)); _c ok; printf 'PASS'; _r; printf ' %-4s %s\n' "$CASE_ID" "$1"; result_row "$CASE_ID" PASS "$1"; }
+fail()  { FAIL=$((FAIL+1)); FAILED_IDS="$FAILED_IDS $CASE_ID"; _c no; printf 'FAIL'; _r; printf ' %-4s %s\n' "$CASE_ID" "$1"; result_row "$CASE_ID" FAIL "$1"; }
+skip()  { SKIP=$((SKIP+1)); _c sk; printf 'SKIP'; _r; printf ' %-4s %s\n' "$CASE_ID" "$1"; result_row "$CASE_ID" SKIP "$1"; }
 info()  { printf '       %s\n' "$1"; }
 check() { if [ "$2" = "$3" ]; then pass "$1 ($2)"; else fail "$1 — 기대 $3, 실제 $2"; fi; }
 
