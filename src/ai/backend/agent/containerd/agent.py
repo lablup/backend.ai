@@ -51,7 +51,11 @@ from ai.backend.agent.config.unified import (
     ScratchType,
 )
 from ai.backend.agent.containerd.dns import resolve_container_dns
-from ai.backend.agent.containerd.logs import read_tail_plan, write_logger_launcher
+from ai.backend.agent.containerd.logs import (
+    read_tail_plan,
+    unlink_log_files,
+    write_logger_launcher,
+)
 from ai.backend.agent.containerd.runtime.spec import (
     _DEFAULT_CAPS,
     container_cgroup_fs_path,
@@ -1802,6 +1806,11 @@ class ContainerdAgent(
         self._runtime.configure_logging(
             launcher, log_root, int(self.local_config.container_logs.max_length)
         )
+        # Only now. Every log path is derived from the root set two lines up, and this whole method
+        # runs before it -- a sweep placed beside the scratch one walks the *default* root and finds
+        # nothing to do, silently. (Measured twice: once with the sweep in the rootless runtime's
+        # open(), and again here.)
+        await self._sweep_orphan_logs()
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
@@ -2443,6 +2452,47 @@ class ContainerdAgent(
         # a teardown hiccup must not abort the clean event.
         if not restarting:
             await self._destroy_scratch(kernel_id)
+
+    async def _sweep_orphan_logs(self) -> None:
+        """Remove container logs left behind by an agent that died before it could clean up.
+
+        `remove_container` is the only thing that unlinks a log, and it only runs while the agent is
+        alive to run it: kill the agent mid-session and the log outlives the container. The rootless
+        rotation loop keeps such a log *capped* — it globs the log root by design — but capped is not
+        removed, and on containerd nothing revisits it at all.
+
+        Here rather than in a runtime, because the question needs both halves of what an agent knows
+        and neither runtime has both: where the logs are (the log root is configured on the runtime)
+        and which containers are still live (the registry, and the runtime's own list). It is the
+        same judgement `_sweep_orphan_scratches` makes, minus the third signal's weight — a log is
+        agent-generated output with a defined lifetime, not somebody's files.
+        """
+        log_root = container_log_path("_").parent
+        if not log_root.is_dir():
+            return
+        try:
+            live_containers = set(await self._runtime.list_containers())
+        except Exception as e:
+            log.warning("orphan log sweep: cannot list containers ({!r}); skipping", e)
+            return
+        known = {str(kernel_id) for kernel_id in self.kernel_registry}
+        removed = 0
+        for active in sorted(log_root.glob("*.log")):
+            container_id = active.stem
+            if container_id in known or container_id in live_containers:
+                continue
+            try:
+                if (container_cgroup_fs_path(container_id) / "cgroup.procs").read_text().strip():
+                    continue  # processes are still running under this id
+            except OSError:
+                pass  # no cgroup at all: nothing is running under it
+            try:
+                await asyncio.to_thread(unlink_log_files, active)
+                removed += 1
+            except OSError as e:
+                log.warning("cannot remove the orphaned log {}: {!r}", active, e)
+        if removed:
+            log.info("removed {} orphaned container log(s)", removed)
 
     async def _sweep_orphan_scratches(self) -> None:
         """Remove scratch directories left behind by an agent that died before it could clean up.

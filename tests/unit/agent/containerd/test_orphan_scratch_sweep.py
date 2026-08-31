@@ -1,4 +1,4 @@
-"""Scratch directories left behind by an agent that died before it could clean up.
+"""Scratch directories and container logs left behind by an agent that died before it could clean up.
 
 `clean_kernel` tears the scratch down, and like every other reclaim it only runs while the agent is
 alive to run it. Measured on the testbed with no session running: 12, 11 and 19 directories on the
@@ -19,6 +19,7 @@ import pytest
 
 from ai.backend.agent.containerd import agent as agent_mod
 from ai.backend.agent.containerd.agent import ContainerdAgent
+from ai.backend.agent.containerd.logs import rotated_paths
 
 
 class _Runtime:
@@ -146,3 +147,87 @@ class TestWhatIsLeftAlone:
         agent = _Agent(scratches, containers=ConnectionError("runtime is down"))
 
         assert await _sweep(agent, monkeypatch, cgroups) == []
+
+
+class TestTheLogSweep:
+    """The same leak, one artifact along. `remove_container` is the only thing that unlinks a log,
+    so a kernel whose agent died keeps its log forever — the rootless rotation loop keeps it capped,
+    and on containerd nothing revisits it at all.
+
+    It lives beside the scratch sweep rather than in a runtime because the question needs both
+    halves of what an agent knows and neither runtime has both: where the logs are, and which
+    containers are still live. Putting it in the rootless runtime — where it was first written —
+    left containerd uncovered, which is what the acceptance suite's G3 case reported.
+    """
+
+    def _log(self, root: Path, container_id: str, *, rotated: int = 0) -> Path:
+        active = root / f"{container_id}.log"
+        active.write_text("output")
+        for i in range(1, rotated + 1):
+            rotated_paths(active)[i].write_text("older output")
+        return active
+
+    async def _sweep(
+        self, agent: _Agent, monkeypatch: pytest.MonkeyPatch, logs: Path, cgroups: Path
+    ) -> None:
+        monkeypatch.setattr(agent_mod, "container_cgroup_fs_path", lambda cid: cgroups / cid)
+        monkeypatch.setattr(agent_mod, "container_log_path", lambda cid: logs / f"{cid}.log")
+        await ContainerdAgent._sweep_orphan_logs(cast(Any, agent))
+
+    async def test_a_log_with_no_container_behind_it_goes(
+        self, tmp_path: Path, cgroups: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        logs = tmp_path / "logs"
+        logs.mkdir()
+        active = self._log(logs, str(uuid.uuid4()), rotated=4)
+        agent = _Agent(tmp_path / "scratches")
+
+        await self._sweep(agent, monkeypatch, logs, cgroups)
+
+        assert [p for p in rotated_paths(active) if p.exists()] == [], "회전분도 함께 사라져야 한다"
+
+    @pytest.mark.parametrize("who", ["registry", "runtime", "cgroup"])
+    async def test_a_live_container_keeps_its_log(
+        self, tmp_path: Path, cgroups: Path, monkeypatch: pytest.MonkeyPatch, who: str
+    ) -> None:
+        logs = tmp_path / "logs"
+        logs.mkdir()
+        kid = uuid.uuid4()
+        active = self._log(logs, str(kid))
+        agent = _Agent(tmp_path / "scratches")
+        if who == "registry":
+            agent.kernel_registry[kid] = object()
+        elif who == "runtime":
+            agent._runtime = _Runtime([str(kid)])
+        else:
+            (cgroups / str(kid)).mkdir()
+            (cgroups / str(kid) / "cgroup.procs").write_text("4242\n")
+
+        await self._sweep(agent, monkeypatch, logs, cgroups)
+
+        assert active.exists()
+
+    async def test_a_runtime_that_cannot_be_asked_stops_the_sweep(
+        self, tmp_path: Path, cgroups: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        logs = tmp_path / "logs"
+        logs.mkdir()
+        active = self._log(logs, str(uuid.uuid4()))
+        agent = _Agent(tmp_path / "scratches", containers=ConnectionError("runtime is down"))
+
+        await self._sweep(agent, monkeypatch, logs, cgroups)
+
+        assert active.exists()
+
+    async def test_a_file_that_is_not_a_log_is_left(
+        self, tmp_path: Path, cgroups: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        logs = tmp_path / "logs"
+        logs.mkdir()
+        other = logs / "notes.txt"
+        other.write_text("not ours")
+        agent = _Agent(tmp_path / "scratches")
+
+        await self._sweep(agent, monkeypatch, logs, cgroups)
+
+        assert other.exists()
