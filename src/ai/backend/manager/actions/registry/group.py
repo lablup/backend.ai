@@ -502,15 +502,16 @@ class ProcessorGroup[TData: EntityData]:
     ) -> LookupActionProcessor[TAction, FieldOwnerLookupOpsResult]:
         """The owner of the field row a caller-facing key names.
 
-        Authentication is the only gate, as with every lookup: what the key resolved to
-        is what the operation following it is checked against.
+        Gated in two halves, as every lookup is: authentication first, then read on the
+        owner the key resolved to -- the same entity the operation following it is
+        checked against.
         """
         self._record(action_cls, ActionKind.LOOKUP, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return LookupActionProcessor(
             FieldOwnerKeyLookupService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.lookup, *monitors),
             validators=self._deps.validators.lookup,
-            post_validators=(),
+            post_validators=self._deps.validators.single_entity,
         )
 
     def key_field_lookup_ops[TAction: LookupFieldByKeyOpsAction[Any, Any]](
@@ -521,15 +522,16 @@ class ProcessorGroup[TData: EntityData]:
     ) -> LookupActionProcessor[TAction, FieldKeyLookupOpsResult]:
         """The field row a caller-facing key names, and the entity owning it.
 
-        Authentication is the only gate, as with every lookup: the operation naming the
-        resolved row is checked against the owner its own lookup reads.
+        Gated in two halves, as every lookup is: authentication first, then read on the
+        owner the key resolved to -- the same entity the operation naming the row is
+        checked against.
         """
         self._record(action_cls, ActionKind.LOOKUP, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return LookupActionProcessor(
             FieldKeyLookupService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.lookup, *monitors),
             validators=self._deps.validators.lookup,
-            post_validators=(),
+            post_validators=self._deps.validators.single_entity,
         )
 
     def field_group[TFieldData: FieldData](

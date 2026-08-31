@@ -89,7 +89,7 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   the row's id, never the key.
 - That lookup answers with the owner's id beside the row's, because a field row is not
   an entity and the run still has to be recorded against something. The action that
-  follows runs its own owner lookup; the key lookup gates on authentication alone.
+  follows runs its own owner lookup; the key lookup is checked against that same owner.
 - Do NOT resolve the owner in the adapter and pass it to a `single_entity` action. That
   is the field shape written by hand, and it lets the owner and the row part ways.
 
@@ -189,8 +189,10 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 - A key that named nothing offers no entity to check. It is one failed key.
 - Wiring through `public_lookup_ops` leaves the second half empty, so every
   authenticated caller may resolve.
-- Adapters must return the same response for a lookup miss and for a permission denial
-  (no existence leakage).
+- A lookup with post-validators answers a key naming nothing and a key the caller may
+  not reach with one exception, so no status code says whether the key exists. The
+  processor merges them; adapters must not split them apart again. The audit record
+  keeps the two causes apart.
 - The owner lookup a field operation runs first is checked the same way. It is a
   different permission from the write that follows — the lookup asks for read, the
   write for write.
