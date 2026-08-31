@@ -57,6 +57,7 @@ from ai.backend.agent.containerd.runtime.interface import (
     TaskHandle,
 )
 from ai.backend.agent.containerd.runtime.spec import container_cgroup_fs_path
+from ai.backend.agent.errors.agent import ContainerConfinementFailedError
 from ai.backend.agent.network.journal_io import atomic_write
 from ai.backend.agent.rootless.seccomp import compile_profile
 from ai.backend.common.arch import CURRENT_ARCH
@@ -402,11 +403,21 @@ class RootlessOciRuntime(OciRuntime):
                 # and everything about recovery here (the journal, `_recover_containers`,
                 # `container_pid` falling back to it) is built on the kernel outliving the agent.
                 # Without this it does not: a signal aimed at the agent's process group takes the
-                # kernel with it, which is what an operator's Ctrl+C, a closing terminal, tmux
-                # killing its session, or systemd's default KillMode=control-group all send.
-                # Measured: restarting the agent this way killed a running session's kernel
-                # outright, leaving the manager holding a RUNNING session with nothing behind it.
-                # Reaping is unaffected — `_reap` and `_signal` address the pid, never the group.
+                # kernel with it, which is what an operator's Ctrl+C, a closing terminal, and tmux
+                # killing its session all send. Measured: restarting the agent that way killed a
+                # running session's kernel outright, leaving the manager holding a RUNNING session
+                # with nothing behind it. Reaping is unaffected — `_reap` and `_signal` address the
+                # pid, never the group.
+                #
+                # This is not the whole story, and it is worth being exact about what it does NOT
+                # cover. systemd's default KillMode=control-group signals a unit's *cgroup*, which
+                # a new session does not leave. What keeps a kernel out of that blast is the
+                # separate top-level cgroup the privnet makes for it
+                # (`/sys/fs/cgroup/backend-ai/<kernel-id>`, see `_confine_via_privnet`) — measured:
+                # the kernel is not among the pids in the agent's own cgroup. That delegation is
+                # best-effort, so on a node where it fails the kernel stays in the agent's cgroup
+                # and an `systemctl stop` does take it. Nor does any of this survive the agent's
+                # whole container or pod being torn down, where the boundary is the pod's.
                 start_new_session=True,
             )
         finally:
@@ -420,14 +431,20 @@ class RootlessOciRuntime(OciRuntime):
             raise
         self._pids[container_id] = pid
         await asyncio.to_thread(self._record_container, container_id, pid)
-        await self._set_hostname(pid, spec.get("hostname"))
-        # Confine the container now, while the wrapper is still blocked on the gate: every process
-        # that will run the user's command is already forked, and none of it has started. Doing it
-        # after start_task would let the workload run unconfined for however long the move takes.
-        if self._privnet_socket is not None:
-            await self._confine_via_privnet(container_id, spec, proc.pid)
-        else:
-            await asyncio.to_thread(self._confine, container_id, spec, proc.pid)
+        try:
+            await self._set_hostname(pid, spec.get("hostname"))
+            # Confine the container now, while the wrapper is still blocked on the gate: every
+            # process that will run the user's command is already forked, and none of it has
+            # started. Doing it after start_task would let the workload run unconfined for however
+            # long the move takes — and it is also what makes failing here safe, because there is
+            # no workload to have observed the unconfined window.
+            if self._privnet_socket is not None:
+                await self._confine_via_privnet(container_id, spec, proc.pid)
+            else:
+                await asyncio.to_thread(self._confine, container_id, spec, proc.pid)
+        except BaseException:
+            await self._abandon_container(container_id)
+            raise
         return TaskHandle(container_id=container_id, pid=pid)
 
     @override
@@ -485,6 +502,24 @@ class RootlessOciRuntime(OciRuntime):
         self._pids.pop(container_id, None)
         self._images.pop(container_id, None)
         self._labels.pop(container_id, None)
+
+    async def _abandon_container(self, container_id: str) -> None:
+        """Undo a container that was created but is not going to become one.
+
+        The reap on the earlier failure path is enough while the container is only a process. Past
+        the point where it is journalled and in `_pids` it is not: a journal entry left behind is
+        adopted by the next recovery as a *running* container — holding its slots, and safe from
+        the orphan sweep for as long as its PID happens to be reused — and its log is one that
+        nothing else ever removes, because `remove_container` is the only thing that unlinks a log
+        and this container will never reach it.
+
+        So it takes down the same set `remove_container` does, minus the runtime's own discard: the
+        container never started, so there is nothing for the runtime to discard.
+        """
+        await self._reap(container_id)
+        self._pids.pop(container_id, None)
+        await asyncio.to_thread(unlink_log_files, self._log_path(container_id))
+        await asyncio.to_thread(force_rmtree, self._state_path / container_id)
 
     async def _reap(self, container_id: str) -> None:
         proc = self._procs.pop(container_id, None)
@@ -715,7 +750,7 @@ class RootlessOciRuntime(OciRuntime):
         """
         cgroup = self._create_cgroup(container_id, spec)
         if cgroup is None:
-            return
+            return  # cgroup v1 host: a standing property of the node, not a failed attempt
         # Move the top process and everything under it. The netns holder — the process that will
         # exec the user command — is in there, and children inherit the cgroup, so the workload and
         # anything it spawns stay confined.
@@ -756,10 +791,11 @@ class RootlessOciRuntime(OciRuntime):
         delegation the kernel simply stays in the agent's own cgroup — measured on a kernel
         allocated 8 GiB and 4 CPUs: `memory.max = max`, `Cpus_allowed_list: 0-31`.
 
-        Best-effort but loud, the same trade the local path makes (`_create_cgroup` returns None
-        and warns rather than refusing): the kernel still starts, and the log line below is the
-        only record that it is running unconfined. There is no fallback to try — the local path
-        cannot work either, which is why we are here.
+        A failure here fails the creation. It used to warn and start the kernel anyway, and what
+        that produced is not a degraded kernel but a dishonest one: the manager placed it on this
+        node believing its limits hold, and it has none of them. There is no fallback to try — the
+        local path cannot work either, which is why we are here — and the caller is still holding
+        the container at its gate, so nothing of the user's command has run yet.
 
         The narrow except is deliberate. A bare `Exception` here also swallowed programming errors
         in this method — a typo in `_cgroup_limits` surfaced as "privnet could not confine" and
@@ -774,13 +810,10 @@ class RootlessOciRuntime(OciRuntime):
                 session_id, container_id, top_pid, self._cgroup_limits(spec)
             )
         except (OSError, TimeoutError, PrivNetClientError) as e:
-            log.error(
-                "[{}] privnet could not confine {}: {!r} — the kernel is running WITHOUT its "
-                "cgroup limits",
-                self.backend_name,
-                container_id,
-                e,
-            )
+            raise ContainerConfinementFailedError(
+                f"the privnet could not confine {container_id} ({e!r}); refusing to start a kernel"
+                " that would run without the CPU and memory it was allocated"
+            ) from e
 
     def _create_cgroup(self, container_id: str, spec: Mapping[str, Any]) -> Path | None:
         """Create the kernel's cgroup and write its limits. None when this host cannot do it."""
@@ -805,8 +838,10 @@ class RootlessOciRuntime(OciRuntime):
             (parent / "cgroup.subtree_control").write_text("+cpu +cpuset +io +memory")
             cgroup.mkdir(exist_ok=True)
         except OSError as e:
-            log.warning("[{}] cannot create the cgroup {}: {!r}", self.backend_name, cgroup, e)
-            return None
+            raise ContainerConfinementFailedError(
+                f"cannot create the cgroup {cgroup} ({e!r}); refusing to start a kernel that would"
+                " run without the CPU and memory it was allocated"
+            ) from e
         self._write_cgroup_limits(cgroup, spec)
         return cgroup
 
@@ -832,11 +867,23 @@ class RootlessOciRuntime(OciRuntime):
 
     @staticmethod
     def _write_cgroup_limits(cgroup: Path, spec: Mapping[str, Any]) -> None:
+        """Apply every limit, or fail saying which ones did not take.
+
+        Per-file, because a partial apply is the worst of the three outcomes: the kernel looks
+        confined and is not, in whichever dimension failed. The privnet's own `_make_cgroup` already
+        collects its failures and raises; this is the same rule on the local path.
+        """
+        failed: list[str] = []
         for name, value in RootlessOciRuntime._cgroup_limits(spec).items():
             try:
                 (cgroup / name).write_text(value)
             except OSError as e:
                 log.warning("cannot set {}={} on {}: {!r}", name, value, cgroup, e)
+                failed.append(f"{name}={value} ({e.__class__.__name__})")
+        if failed:
+            raise ContainerConfinementFailedError(
+                f"these limits could not be applied to {cgroup}: {', '.join(failed)}"
+            )
 
     def _sweep_orphan_cgroups(self) -> None:
         """Reclaim kernel cgroups left behind by an agent that died before it could clean up.

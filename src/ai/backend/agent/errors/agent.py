@@ -62,6 +62,27 @@ class ContainerCreationFailedError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class ContainerConfinementFailedError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a kernel's cgroup could not be created, delegated, or fully applied.
+
+    Distinct from a generic creation failure because the consequence is specific: the kernel would
+    run with none of the CPU/memory it was allocated, report no utilization (the stats reader looks
+    for a cgroup that is not there), and sit in the agent's own cgroup, where a `systemctl stop`
+    takes it down with the agent. The manager scheduled it believing those limits hold.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/container-confinement-failed"
+    error_title = "Container resource confinement failed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class ContainerStartupTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
     """Raised when container startup times out."""
 

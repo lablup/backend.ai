@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from ai.backend.agent.errors.agent import ContainerConfinementFailedError
 from ai.backend.agent.rootless.base import RootlessOciRuntime
 
 _GIB = 1024**3
@@ -85,26 +86,80 @@ class TestCpuset:
 
 class TestResilience:
     @pytest.mark.skipif(os.geteuid() == 0, reason="root ignores the directory permission")
-    def test_an_undelegated_controller_does_not_stop_the_rest(self, cgroup: Path) -> None:
+    def test_an_undelegated_controller_fails_the_apply(self, cgroup: Path) -> None:
         """A controller only has files in the leaf if the parent delegated it, and cgroupfs will
         not let anyone create the missing ones — modelled here by a directory that accepts writes
-        to existing files but no new ones. Losing the memory limit as collateral would be far worse
-        than losing the CPU pinning."""
+        to existing files but no new ones.
+
+        This used to apply the rest and carry on, on the reasoning that losing the CPU pinning beats
+        losing the memory limit as collateral. Both are worse than the third option, which is what
+        it does now: not starting a kernel whose allocation is a fiction. The caller confines while
+        the container is still held at its gate, so nothing of the user's command has run.
+        """
         (cgroup / "cpuset.cpus").unlink()
         cgroup.chmod(0o500)
         try:
-            written = _apply(cgroup, cpuset_cpus="0-1", memory_limit=_GIB)
+            with pytest.raises(ContainerConfinementFailedError, match=r"cpuset\.cpus"):
+                _apply(cgroup, cpuset_cpus="0-1", memory_limit=_GIB)
+            # and the limits that could be written still were — the raise comes after the loop
+            assert (cgroup / "memory.max").read_text() == str(_GIB)
         finally:
             cgroup.chmod(0o700)
 
-        assert "cpuset.cpus" not in written
-        assert written["memory.max"] == str(_GIB)
-
-    def test_a_cgroup_that_vanished_is_not_an_error(self, tmp_path: Path) -> None:
-        """The container can die between creating the cgroup and writing its limits, and the sweep
-        reclaims empty ones. Raising here would abort container startup over a container that is
-        already gone."""
-        RootlessOciRuntime._write_cgroup_limits(tmp_path / "gone", {"memory_limit": _GIB})
+    def test_a_cgroup_that_vanished_fails_too(self, tmp_path: Path) -> None:
+        """The container can die between creating the cgroup and writing its limits. That used to
+        be tolerated so startup would not abort "over a container that is already gone" — but a
+        create_task that returns a handle for a dead container is the worse answer, and the caller
+        now reaps and cleans up on the way out."""
+        with pytest.raises(ContainerConfinementFailedError, match=r"memory\.max"):
+            RootlessOciRuntime._write_cgroup_limits(tmp_path / "gone", {"memory_limit": _GIB})
 
     def test_an_empty_spec_writes_nothing(self, cgroup: Path) -> None:
         assert _apply(cgroup) == dict.fromkeys(_written(cgroup), "max")
+
+
+class TestALimitThatCouldNotBeApplied:
+    """A partial apply is the worst of the three outcomes.
+
+    The kernel looks confined and is not, in whichever dimension failed — and nothing downstream can
+    tell: the manager placed it here believing the limits hold, `bai admin agent search` still shows
+    the slots as occupied, and the only trace used to be one warning line per file. Measured on the
+    delegation failing outright: `memory.max = max`, `Cpus_allowed_list: 0-31` on a kernel allocated
+    8 GiB and 4 CPUs.
+    """
+
+    def test_one_unwritable_file_fails_the_whole_apply(self, cgroup: Path) -> None:
+        (cgroup / "memory.max").chmod(0o400)
+
+        with pytest.raises(ContainerConfinementFailedError, match=r"memory\.max"):
+            _apply(cgroup, memory_limit=2 * _GIB, cpuset_cpus="0-3")
+
+    def test_the_error_names_every_limit_that_did_not_take(self, cgroup: Path) -> None:
+        """One line an operator can act on, rather than one warning per file to correlate."""
+        (cgroup / "memory.max").chmod(0o400)
+        (cgroup / "cpuset.cpus").chmod(0o400)
+
+        with pytest.raises(ContainerConfinementFailedError) as excinfo:
+            _apply(cgroup, memory_limit=2 * _GIB, cpuset_cpus="0-3")
+
+        assert "memory.max" in str(excinfo.value)
+        assert "cpuset.cpus" in str(excinfo.value)
+
+    def test_an_apply_with_nothing_to_write_is_not_a_failure(self, cgroup: Path) -> None:
+        """A spec that asks for no limits asks for nothing; there is no dishonesty in that."""
+        assert _apply(cgroup) == {
+            "cpuset.cpus": "max",
+            "cpuset.mems": "max",
+            "memory.max": "max",
+            "memory.swap.max": "max",
+        }
+
+    def test_the_limits_that_did_apply_are_still_written(self, cgroup: Path) -> None:
+        """The raise comes after the loop, not out of it: the kernel is being torn down either way,
+        and stopping early would leave a cgroup even less like what was asked for."""
+        (cgroup / "memory.max").chmod(0o400)
+
+        with pytest.raises(ContainerConfinementFailedError):
+            _apply(cgroup, memory_limit=2 * _GIB, cpuset_cpus="0-3")
+
+        assert (cgroup / "cpuset.cpus").read_text() == "0-3"

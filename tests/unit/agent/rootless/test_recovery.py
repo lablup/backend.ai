@@ -263,6 +263,15 @@ class TestTheKernelOutlivesTheAgent:
         monkeypatch.setattr(runtime, "_wait_ready", _ready)
         monkeypatch.setattr(runtime, "_find_netns_child", _child)
         monkeypatch.setattr(runtime, "_set_hostname", _hostname)
+
+        # Confinement is now part of create_task's contract — it refuses rather than starting a
+        # kernel without the CPU and memory it was allocated (see test_confinement_failure) — and
+        # an unprivileged test user cannot write under /sys/fs/cgroup. What these tests are about
+        # is the spawn, so the cgroup step stands aside for them.
+        def _confine(container_id: str, spec: Any, top_pid: int) -> None:
+            return None
+
+        monkeypatch.setattr(runtime, "_confine", _confine)
         runtime._specs["c1"] = {}
         return runtime
 
