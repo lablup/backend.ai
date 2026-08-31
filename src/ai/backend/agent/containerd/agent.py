@@ -1727,6 +1727,9 @@ class ContainerdAgent(
         # `_session_network.recover()` above so the coordinators the names are registered with
         # already exist.
         await self._restore_recovered_cluster_names()
+        # The registry is loaded, so anything on disk that it does not know about can now be
+        # judged. Last, because every earlier step is what teaches it which kernels are alive.
+        await self._sweep_orphan_scratches()
 
         # Real-time container-death/OOM detection via the containerd event stream (the
         # equivalent of DockerAgent.monitor_docker_events); the periodic reconciler is the
@@ -2438,27 +2441,88 @@ class ContainerdAgent(
         # Tear down the scratch (skipped on restart, which reuses it). HOSTFILE must be
         # unmounted (loop image) before removal; otherwise remove the directory tree. Best-effort:
         # a teardown hiccup must not abort the clean event.
+        if not restarting:
+            await self._destroy_scratch(kernel_id)
+
+    async def _sweep_orphan_scratches(self) -> None:
+        """Remove scratch directories left behind by an agent that died before it could clean up.
+
+        `clean_kernel` tears the scratch down, and like every other reclaim it only runs while the
+        agent is alive to run it: kill the agent mid-session and the directory outlives the kernel.
+        Nothing else ever comes back for it. Measured on this testbed with no session running:
+        12, 11 and 19 directories on the three backends.
+
+        A scratch is the kernel's `/home/work`, so this is the one sweep that can destroy something
+        a person would miss. It therefore takes THREE independent signals, and removes only what
+        all three call dead:
+
+        1. the kernel registry, rebuilt from disk by the initializer above,
+        2. the runtime's own list of live containers, which does not depend on our records at all,
+        3. the kernel's cgroup, which holds its processes and is written by the OCI spec.
+
+        Any one of them saying "alive" leaves the directory alone. A false negative here costs a
+        directory that gets swept on the next restart; a false positive costs a running session its
+        working files.
+        """
+        scratch_root = self.local_config.container.scratch_root
+        if not scratch_root.is_dir():
+            return
+        try:
+            live_containers = set(await self._runtime.list_containers())
+        except Exception as e:
+            log.warning("orphan scratch sweep: cannot list containers ({!r}); skipping", e)
+            return
+        known = {str(kernel_id) for kernel_id in self.kernel_registry}
+        removed = 0
+        for entry in scratch_root.iterdir():
+            name = entry.name
+            if not entry.is_dir():
+                continue
+            try:
+                UUID(name)
+            except ValueError:
+                # Not a kernel id, so not a kernel scratch: whatever else an operator keeps under
+                # this root, and the MEMORY scratch's `<id>_tmp` sibling, which is a live tmpfs
+                # mount that goes down with its owner rather than on its own.
+                continue
+            if name in known or name in live_containers:
+                continue
+            try:
+                if (container_cgroup_fs_path(name) / "cgroup.procs").read_text().strip():
+                    continue  # processes are still running under this id
+            except OSError:
+                pass  # no cgroup at all: nothing is running under it
+            await self._destroy_scratch(KernelId(UUID(name)))
+            removed += 1
+        if removed:
+            log.info("removed {} orphaned scratch director(ies)", removed)
+
+    async def _destroy_scratch(self, kernel_id: KernelId) -> None:
+        """Tear down one kernel's scratch. Idempotent — `clean_kernel` may be re-invoked.
+
+        Best-effort: a teardown hiccup must not abort the clean event that called it.
+        """
         scratch_root = self.local_config.container.scratch_root
         scratch_dir = scratch_root / str(kernel_id)
-        # Skip if already gone (clean_kernel may be re-invoked) so teardown stays idempotent.
-        if not restarting and scratch_dir.exists():
-            scratch_type = self.local_config.container.scratch_type
-            try:
-                if sys.platform.startswith("linux") and scratch_type == ScratchType.HOSTFILE:
-                    await destroy_loop_filesystem(scratch_root, kernel_id)
-                elif sys.platform.startswith("linux") and scratch_type == ScratchType.MEMORY:
-                    # Unmount before removing: rmtree on a live tmpfs deletes the files but leaves
-                    # the mount, so the RAM is never given back and the mount table grows with
-                    # every kernel that ever ran here.
-                    tmp_dir = scratch_root / f"{kernel_id}_tmp"
-                    await destroy_scratch_filesystem(scratch_dir)
-                    await destroy_scratch_filesystem(tmp_dir)
-                    await asyncio.to_thread(shutil.rmtree, scratch_dir, ignore_errors=True)
-                    await asyncio.to_thread(shutil.rmtree, tmp_dir, ignore_errors=True)
-                else:
-                    await asyncio.to_thread(shutil.rmtree, scratch_dir, ignore_errors=True)
-            except Exception:
-                log.exception("clean_kernel(k:{}): scratch teardown failed", kernel_id)
+        if not scratch_dir.exists():
+            return
+        scratch_type = self.local_config.container.scratch_type
+        try:
+            if sys.platform.startswith("linux") and scratch_type == ScratchType.HOSTFILE:
+                await destroy_loop_filesystem(scratch_root, kernel_id)
+            elif sys.platform.startswith("linux") and scratch_type == ScratchType.MEMORY:
+                # Unmount before removing: rmtree on a live tmpfs deletes the files but leaves the
+                # mount, so the RAM is never given back and the mount table grows with every kernel
+                # that ever ran here.
+                tmp_dir = scratch_root / f"{kernel_id}_tmp"
+                await destroy_scratch_filesystem(scratch_dir)
+                await destroy_scratch_filesystem(tmp_dir)
+                await asyncio.to_thread(shutil.rmtree, scratch_dir, ignore_errors=True)
+                await asyncio.to_thread(shutil.rmtree, tmp_dir, ignore_errors=True)
+            else:
+                await asyncio.to_thread(shutil.rmtree, scratch_dir, ignore_errors=True)
+        except Exception:
+            log.exception("scratch teardown failed (k:{})", kernel_id)
 
     @override
     async def create_local_network(self, network_name: str) -> None:

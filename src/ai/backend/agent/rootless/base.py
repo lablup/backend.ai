@@ -911,6 +911,46 @@ class RootlessOciRuntime(OciRuntime):
         if removed:
             log.info("[{}] reclaimed {} orphaned kernel cgroup(s)", self.backend_name, removed)
 
+    def _sweep_orphan_logs(self) -> None:
+        """Remove container logs left behind by an agent that died before it could clean up.
+
+        The same leak the cgroup sweep above exists for, one artifact along. `remove_container` is
+        the only thing that unlinks a log, and it only runs while the agent is alive to run it: kill
+        the agent mid-session and the log outlives the container. The rotation loop revisits these
+        files forever — it globs the log root by design, so an orphan stays *capped* — but capped is
+        not removed, and nothing else ever comes back for them. Measured on this testbed: four and
+        five logs from kernels of two days earlier, on nodes with no session running.
+
+        Called from `configure_logging`, which is the first point that knows where the logs are —
+        `open()` runs before it and would find nothing to walk (measured: the sweep silently did
+        nothing there). The journal replay in `open()` has already happened, so a recovered
+        container is in `_pids` and skipped. A live container whose journal entry was lost would
+        not be, which is what the cgroup check is for: its processes are still in it. Only a log
+        with no live container behind it by either measure is removed.
+        """
+        if self._log_root is None or not self._log_root.is_dir():
+            return
+        removed = 0
+        for active in self._log_root.glob("*.log"):
+            container_id = active.stem
+            if container_id in self._pids:
+                continue
+            cgroup = container_cgroup_fs_path(container_id)
+            try:
+                if (cgroup / "cgroup.procs").read_text().strip():
+                    continue  # something is still running under this id
+            except OSError:
+                pass  # no cgroup at all: nothing is running under it
+            try:
+                unlink_log_files(active)
+                removed += 1
+            except OSError as e:
+                log.warning(
+                    "[{}] cannot remove the orphaned log {}: {!r}", self.backend_name, active, e
+                )
+        if removed:
+            log.info("[{}] removed {} orphaned container log(s)", self.backend_name, removed)
+
     def _remove_cgroup(self, container_id: str) -> None:
         """Reclaim the kernel's cgroup once its processes are gone.
 
@@ -952,6 +992,10 @@ class RootlessOciRuntime(OciRuntime):
         # _rotate_logs_loop.
         self._log_root = log_root
         self._log_max_bytes = max_total_bytes
+        # Now — not at open(), which runs before this and would find no log root to walk. The
+        # recovery that decides which containers are live has already happened by then, so this is
+        # simply the first moment both halves of the question are answerable.
+        self._sweep_orphan_logs()
 
     def _log_path(self, container_id: str) -> Path:
         # The path the agent's reader expects (containerd.runtime.grpc.container_log_path); it must
