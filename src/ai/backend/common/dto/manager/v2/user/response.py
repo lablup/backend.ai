@@ -278,7 +278,20 @@ class BulkPurgeUserV2Error(BaseResponseModel):
 class BulkPurgeUsersPayload(BaseResponseModel):
     """Payload for bulk user permanent deletion mutation."""
 
-    purged_count: int = Field(description="Number of users successfully purged.")
+    successes: list[UUID] = Field(
+        default_factory=list,
+        description=(
+            "UUIDs of the users that were purged, in the order they were requested. "
+            "Together with `failed` this answers for every requested user exactly once."
+        ),
+    )
+    purged_count: int = Field(
+        description=(
+            "Number of users successfully purged. "
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the length of successes."
+        ),
+        deprecated=True,
+    )
     failed: list[BulkPurgeUserV2Error] = Field(
         description="List of errors for users that failed to purge.",
     )
