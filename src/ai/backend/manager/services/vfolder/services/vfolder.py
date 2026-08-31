@@ -1845,8 +1845,10 @@ class VFolderService:
             user_uuid=me.user_id,
         )
 
-        await self._vfolder_repository.move_vfolders_to_trash([vfolder_data.id])
-        return DeleteVFolderV2ActionResult(vfolder_id=action.vfolder_uuid)
+        trashed = await self._vfolder_repository.move_vfolders_to_trash([vfolder_data.id])
+        if not trashed:
+            raise UnreachableError(f"VFolder disappeared while trashing: {vfolder_data.id}")
+        return DeleteVFolderV2ActionResult(vfolder=trashed[0])
 
     async def purge_v2(self, action: PurgeVFolderV2Action) -> PurgeVFolderV2ActionResult:
         """Permanently purge a vfolder by ID. RBAC enforced at processor level.

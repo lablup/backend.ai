@@ -145,17 +145,18 @@ class BulkDeleteVFolderV2Error(BaseResponseModel):
 class BulkDeleteVFoldersPayload(BaseResponseModel):
     """Payload for bulk virtual folder soft-deletion."""
 
-    successes: list[UUID] = Field(
+    items: list[VFolderNode] = Field(
         default_factory=list,
         description=(
-            "UUIDs of the vfolders that were soft-deleted, in the order they were requested. "
+            "The vfolders that were soft-deleted, in the order they were requested. "
+            "A soft-deleted vfolder is still addressable, so it is returned whole. "
             "Together with `failed` this answers for every requested vfolder exactly once."
         ),
     )
     deleted_count: int = Field(
         description=(
             "Number of virtual folders successfully soft-deleted. "
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the length of successes."
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the length of items."
         ),
         deprecated=True,
     )

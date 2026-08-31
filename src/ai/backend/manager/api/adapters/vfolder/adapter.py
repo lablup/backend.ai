@@ -551,18 +551,18 @@ class VFolderAdapter(BaseAdapter):
         ``failed`` rather than aborting the batch and leaving the earlier ids deleted
         while the caller is told the whole call failed.
         """
-        deleted: list[UUID] = []
+        deleted: list[VFolderNode] = []
         failed: list[BulkDeleteVFolderV2Error] = []
         for vfolder_id in input.ids:
             action = DeleteVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
             try:
-                await self._processors.vfolder.delete_v2.run(action)
+                result = await self._processors.vfolder.delete_v2.run(action)
             except BackendAIError as e:
                 failed.append(BulkDeleteVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
                 continue
-            deleted.append(vfolder_id)
+            deleted.append(self._vfolder_data_to_node(result.vfolder))
         return BulkDeleteVFoldersPayload(
-            successes=deleted,
+            items=deleted,
             deleted_count=len(deleted),
             failed=failed,
         )

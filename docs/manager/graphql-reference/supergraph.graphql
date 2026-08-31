@@ -2560,14 +2560,14 @@ type BulkDeleteVFoldersV2Payload
   @join__type(graph: STRAWBERRY)
 {
   """
-  Added in 26.9.0. UUIDs of the vfolders that were soft-deleted, in the order they were requested. Together with `failed` this answers for every requested vfolder exactly once.
+  Added in 26.9.0. The vfolders that were soft-deleted, in the order they were requested. A soft-deleted vfolder is still addressable, so it is returned whole. Together with `failed` this answers for every requested vfolder exactly once.
   """
-  successes: [UUID!]!
+  items: [VFolder!]!
 
   """
   Added in 26.4.2. Number of virtual folders successfully soft-deleted. Deprecated since 26.9.0.
   """
-  deletedCount: Int! @deprecated(reason: "Use the length of successes.")
+  deletedCount: Int! @deprecated(reason: "Use the length of items.")
 
   """
   Added in 26.9.0. List of errors for vfolders that failed to be soft-deleted.
