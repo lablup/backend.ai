@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy.orm import InstrumentedAttribute
@@ -59,6 +60,11 @@ _USER_CASES: list[tuple[UserFairShareOrderField, InstrumentedAttribute[Any]]] = 
 ]
 
 
+@pytest.fixture
+def adapter() -> FairShareAdapter:
+    return FairShareAdapter(MagicMock())
+
+
 def _assert_sorts_on(
     order: QueryOrder, column: InstrumentedAttribute[Any], ascending: bool
 ) -> None:
@@ -73,12 +79,13 @@ class TestDomainOrderConversion:
     @pytest.mark.parametrize("field, column", _DOMAIN_CASES)
     def test_global_field_sorts_on_column(
         self,
+        adapter: FairShareAdapter,
         field: DomainFairShareOrderField,
         column: InstrumentedAttribute[Any],
         direction: OrderDirection,
         ascending: bool,
     ) -> None:
-        order = FairShareAdapter._convert_domain_order(
+        order = adapter._convert_domain_order(
             DomainFairShareOrder(field=field, direction=direction)
         )
         _assert_sorts_on(order, column, ascending)
@@ -87,12 +94,13 @@ class TestDomainOrderConversion:
     @pytest.mark.parametrize("field, column", _DOMAIN_RG_CASES)
     def test_rg_field_sorts_on_column(
         self,
+        adapter: FairShareAdapter,
         field: DomainFairShareOrderField,
         column: InstrumentedAttribute[Any],
         direction: OrderDirection,
         ascending: bool,
     ) -> None:
-        order = FairShareAdapter._convert_domain_order_rg(
+        order = adapter._convert_domain_order_rg(
             DomainFairShareOrder(field=field, direction=direction)
         )
         _assert_sorts_on(order, column, ascending)
@@ -109,12 +117,13 @@ class TestProjectOrderConversion:
     @pytest.mark.parametrize("field, column", _PROJECT_CASES)
     def test_global_field_sorts_on_column(
         self,
+        adapter: FairShareAdapter,
         field: ProjectFairShareOrderField,
         column: InstrumentedAttribute[Any],
         direction: OrderDirection,
         ascending: bool,
     ) -> None:
-        order = FairShareAdapter._convert_project_order(
+        order = adapter._convert_project_order(
             ProjectFairShareOrder(field=field, direction=direction)
         )
         _assert_sorts_on(order, column, ascending)
@@ -123,12 +132,13 @@ class TestProjectOrderConversion:
     @pytest.mark.parametrize("field, column", _PROJECT_CASES)
     def test_rg_field_sorts_on_column(
         self,
+        adapter: FairShareAdapter,
         field: ProjectFairShareOrderField,
         column: InstrumentedAttribute[Any],
         direction: OrderDirection,
         ascending: bool,
     ) -> None:
-        order = FairShareAdapter._convert_project_order_rg(
+        order = adapter._convert_project_order_rg(
             ProjectFairShareOrder(field=field, direction=direction)
         )
         _assert_sorts_on(order, column, ascending)
@@ -144,28 +154,26 @@ class TestUserOrderConversion:
     @pytest.mark.parametrize("field, column", _USER_CASES)
     def test_global_field_sorts_on_column(
         self,
+        adapter: FairShareAdapter,
         field: UserFairShareOrderField,
         column: InstrumentedAttribute[Any],
         direction: OrderDirection,
         ascending: bool,
     ) -> None:
-        order = FairShareAdapter._convert_user_order(
-            UserFairShareOrder(field=field, direction=direction)
-        )
+        order = adapter._convert_user_order(UserFairShareOrder(field=field, direction=direction))
         _assert_sorts_on(order, column, ascending)
 
     @pytest.mark.parametrize("direction, ascending", _DIRECTIONS)
     @pytest.mark.parametrize("field, column", _USER_CASES)
     def test_rg_field_sorts_on_column(
         self,
+        adapter: FairShareAdapter,
         field: UserFairShareOrderField,
         column: InstrumentedAttribute[Any],
         direction: OrderDirection,
         ascending: bool,
     ) -> None:
-        order = FairShareAdapter._convert_user_order_rg(
-            UserFairShareOrder(field=field, direction=direction)
-        )
+        order = adapter._convert_user_order_rg(UserFairShareOrder(field=field, direction=direction))
         _assert_sorts_on(order, column, ascending)
 
     def test_cases_cover_every_field(self) -> None:
@@ -175,8 +183,8 @@ class TestUserOrderConversion:
 class TestOrderListConversion:
     """The list converters keep the caller's sort priority."""
 
-    def test_multiple_orders_keep_their_sequence(self) -> None:
-        orders = FairShareAdapter._convert_project_orders([
+    def test_multiple_orders_keep_their_sequence(self, adapter: FairShareAdapter) -> None:
+        orders = adapter._convert_project_orders([
             ProjectFairShareOrder(
                 field=ProjectFairShareOrderField.PROJECT_NAME,
                 direction=OrderDirection.ASC,
@@ -191,13 +199,13 @@ class TestOrderListConversion:
         _assert_sorts_on(orders[0], ProjectRow.name, ascending=True)
         _assert_sorts_on(orders[1], ProjectFairShareRow.created_at, ascending=False)
 
-    def test_empty_input_yields_no_orders(self) -> None:
+    def test_empty_input_yields_no_orders(self, adapter: FairShareAdapter) -> None:
         empty: Sequence[list[QueryOrder]] = [
-            FairShareAdapter._convert_domain_orders([]),
-            FairShareAdapter._convert_domain_orders_rg([]),
-            FairShareAdapter._convert_project_orders([]),
-            FairShareAdapter._convert_project_orders_rg([]),
-            FairShareAdapter._convert_user_orders([]),
-            FairShareAdapter._convert_user_orders_rg([]),
+            adapter._convert_domain_orders([]),
+            adapter._convert_domain_orders_rg([]),
+            adapter._convert_project_orders([]),
+            adapter._convert_project_orders_rg([]),
+            adapter._convert_user_orders([]),
+            adapter._convert_user_orders_rg([]),
         ]
         assert all(orders == [] for orders in empty)
