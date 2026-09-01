@@ -36,7 +36,7 @@ Implemented-Version:
 
 1. The current UX must be expressible as configuration, and that configuration is the default.
 2. Unify the ownership representation into `scope -> virtual_scope -> entity` and remove every other path.
-3. Roles answer visibility, selectable below the entity kind at the sub-target and field level.
+3. Roles answer visibility, selectable below the entity kind at the field level.
 4. Define one uniform set of operations for handing an entity to another scope.
 
 ## 3. Non-Goals
@@ -80,7 +80,7 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | ✅ | Global search serves superadmin and globally shared values only and skips permissions; that stays. The user data loader also skips permissions; that is to be fixed — `repositories/ops/repository.py:199`, `api/gql/data_loader/data_loaders.py:669` |
 | ➕ | Backfill existing resource entities into the graph and **remove every path that is not `scope -> virtual_scope -> entity`**: the legacy recursive path, `association_scopes_entities`, `object_permissions`, `RBACElementType` (BA-7204) |
 | ➕ | Membership enrollment writes the roster only. No row binds a user's virtual scope into a scope — the existing user bindings are removed. Reaching what a user owns goes only through each entity's own enrollment |
-| ➕ | Add `subject_entity_type` (sub-targets only) to `EntityPermissionCheckKey`, add a `field_permissions` table as a child of permission rows, and declare a catalog (sub-targets, fields, default-visible set) per entity |
+| ➕ | Add a `field_permissions` table as a child of permission rows, and declare a catalog (fields, default-visible set) per entity. Checks always name the owning entity — the former colon sub-target names are fields |
 | ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows granted via `EntityGrant` to the accessible set |
 | ➕ | Blank unreadable fields and refuse filtering or sorting by them. Replace the data loaders with permission-aware bulk queries |
 
@@ -92,8 +92,8 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 |---|---|
 | ✅ | Only virtual-folder invitations exist, on two legacy tables. Sessions, deployments, images, and model cards have none |
 | ✅ | The grant primitive takes the recipient as an entity identifier. The invitation table assumes an email recipient and has no expiry — `models/specs/membership.py:21`, `models/entity_invitation/row.py:32` |
-| ✅ | `permission_cap` carries only operation bits, so it cannot express which sub-targets are handed over |
-| ➕ | A sharing-record table and named caps carrying a sub-target axis |
+| ✅ | `permission_cap` carries only operation bits, so it cannot express which fields are handed over |
+| ➕ | A sharing-record table and named caps carrying a field axis |
 | ➕ | Add sessions, deployments, images, and model cards as sharing targets |
 
 ## 5. Implementation Design
@@ -149,20 +149,11 @@ Two invariants:
 
 Business-logic relations — resource groups, container registries — plus quota and resource-policy applicability are not expressed through virtual scopes. Relation tables and entity rows answer them.
 
-### 5.2 Sub-targets and FieldPermission
+### 5.2 FieldPermission
 
-Permission on an entity is subdivided into two layers.
+Permission below the entity kind is field-level. What the colon declarations named as sub-target types (`deployment:token`, `vfolder:data`, ...) are fields of their owning entity — token rows, folder contents, session environment — and none is promoted to an entity type. Checks always name the owning entity. The colon declarations, wired nowhere, retire together with `RBACElementType` (BA-7204).
 
-| Layer | What | Notation | Allowed operations | Mechanism |
-|---|---|---|---|---|
-| Sub-target | Something with content of its own | Dot notation, `deployment.token` | All | `EntityType`; permission rows match on `subject_entity_type` |
-| Field | A column of the parent row | The API field name as is | Read and update | `FieldPermission` — child rows of a permission row |
-
-It is `EntityType`, not `RBACElementType`. The latter is a closed enum being merged into `EntityType`, and `permissions.entity_type` is a `String(32)`, so dotted values need no schema change. The existing colon-notation declarations, wired nowhere, are re-declared in dot notation and the colon form is retired.
-
-`EntityPermissionCheckKey` gains `subject_entity_type`. It is for sub-targets only and defaults to the parent entity's kind. `entity_memberships` lookups and audit records answer with the parent entity.
-
-A permission row without `FieldPermission` covers all fields. With `FieldPermission` attached, it covers only the listed fields, per operation (read and update). The catalog's default-visible set is the base list presets reference when opening only part.
+A permission row without `FieldPermission` covers all fields. With `FieldPermission` attached, it covers only the listed fields, per operation (read and update). Adding and removing a field's rows — issuing a token — is update on that field. The catalog's default-visible set is the base list presets reference when opening only part.
 
 Field checks are performed by the query, search, and update specs. Fields without permission are blanked on reads and dropped from update input. Interfaces where fields are requested explicitly, such as GraphQL, must answer with a rejection.
 
@@ -170,7 +161,6 @@ Each entity declares a catalog. A name not in the list can receive no permission
 
 | The catalog answers | |
 |---|---|
-| Sub-target list | Dot-notation names and allowed operations; an absent operation cannot even be granted |
 | Field list | The names used in queries, sorting, and updates |
 | Default-visible fields | The base set presets use when building field lists |
 
@@ -296,7 +286,7 @@ granted[entity][element_type] |= permission(scope, element_type) & scope_cap & e
 
 A shareable kind must exist in the recipient's own-scope role. Caps only narrow, so without one the share grants nothing. A cap of zero is valid: it grants nothing while leaving the enrollment (5.4).
 
-Re-sharing is expressed by the cap's create bit and defaults to closed. Opening it requires cascading revocation, which requires recording the parent share. No combination opens re-sharing without the cascade. Sub-targets one does not hold cannot be passed on.
+Re-sharing is expressed by the cap's create bit and defaults to closed. Opening it requires cascading revocation, which requires recording the parent share. No combination opens re-sharing without the cascade. Fields one does not hold cannot be passed on.
 
 Revocation can be done both by anyone who can grant and by the recipient, and is not retroactive on running work.
 
@@ -327,9 +317,9 @@ Resource-group allowance is checked against the submitting subject and stays own
 
 | Entity | Ownership | Access | Sharing | Migration |
 |---|---|---|---|---|
-| Virtual folder | Personal folders in personal projects, project folders in their project | Wire `vfolder.data`; members get all operations on project folders | New; includes cap-0 enrollment | Move personal folders' ownership and enrollment to personal projects |
+| Virtual folder | Personal folders in personal projects, project folders in their project | Folder data served as a field; members get all operations on project folders | New; includes cap-0 enrollment | Move personal folders' ownership and enrollment to personal projects |
 | Session | Already project | Members create only; detail and environment split as fields | Observation only | None |
-| Deployment | Already project | Members create only; wire `deployment.token`, `deployment.revision` | New | None |
+| Deployment | Already project | Members create only; token and revision served as fields | New | None |
 | Image | Label to column; committed images owned by personal projects | Nothing to split | After the column migration | Label backfill |
 | Model card | Already project | Nothing to split | New | None |
 | User | Is a scope itself | Credentials and profile split as fields | Not a target | None |
@@ -343,7 +333,6 @@ Resource-group allowance is checked against the submitting subject and stays own
 | 3 | Move personal folders' owner column and enrollment to personal projects. `quota_scope_id` stays |
 | 4 | Move image labels into the owner column, targeting personal projects. The label serves only as this initial input |
 | 5 | Migrate the legacy virtual-folder sharing tables into the sharing record and the graph |
-| 6 | Retire the colon notation |
 
 Without step 1 nothing else does anything. Sessions, deployments, and model cards have non-null project columns, so there is nothing to move.
 
@@ -388,7 +377,7 @@ Opening project-folder creation and narrowing user information are the intended 
 | Membership and bindings | A user's virtual scope is never bound into a scope; joining enrolls the user in the roster only. Belongings are reached only through each entity's own enrollment |
 | Business-logic relations | Resource groups, registries, and quota are not expressed through virtual scopes; relation tables answer |
 | Rows from `EntityMembershipEntry` | Cannot be removed by unsharing and carry no `permission_cap` |
-| Sub-targets | `EntityType` + the `subject_entity_type` axis; dot notation (`deployment.token`), colon retired |
+| Former colon sub-targets | Fields of their owning entity — none is promoted to an entity type; the colon declarations retire with `RBACElementType` |
 | Fields | `FieldPermission` — child of a permission row, read and update. Absent means all fields; present means only the list |
 | Catalog | Declared per entity; unlisted names get no permission and unlisted fields are invisible |
 | Visibility | Roles answer. Resource entities use the permission axis only; person fields use permission or the subject's disclosure range |
@@ -402,7 +391,7 @@ Opening project-folder creation and narrowing user information are the intended 
 | Scoped reads | Filter instead of rejecting; write actions keep rejecting |
 | Sharing address | Invisible targets cannot be named. People by email, projects only those I am a member of |
 | Share acceptance | Unneeded when only capability grows; projects answer with an acceptance setting |
-| Share caps | Named references carrying a sub-target axis |
+| Share caps | Named references carrying a field axis |
 | Re-sharing | Closed by default; opening requires cascading revocation |
 | Sharing records | Separate from `entity_memberships`; the invited state has no graph row |
 | Non-owning projects | No delete operation, only unshare |
@@ -414,7 +403,7 @@ Opening project-folder creation and narrowing user information are the intended 
 
 ## 7. Open Questions
 
-- Whether the catalog (sub-targets, fields, default-visible set) lives in code declarations or a table
+- Whether the catalog (fields, default-visible set) lives in code declarations or a table
 - Whether user purge is blocked until the personal project is empty, or auto-purged after a grace period
 - Whether model cards fold into virtual folders or stay a separate entity
 - Whether admins should be able to observe cap-0 enrollments (external folders hooked into a project); if so, putting read into the cap is a separate decision
