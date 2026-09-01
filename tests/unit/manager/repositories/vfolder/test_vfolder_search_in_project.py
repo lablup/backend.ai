@@ -11,7 +11,8 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -41,7 +42,6 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 class TestVfolderSearchInProject:
@@ -216,15 +216,26 @@ class TestVfolderSearchInProject:
                 )
             await db_sess.flush()
 
-            seeder = VirtualScopeSeeder()
+            project_scopes: dict[uuid.UUID, uuid.UUID] = {}
+            for gid in (project_a_id, project_b_id):
+                scope = VirtualScopeRow(scope_type=PROJECT_SCOPE_TYPE, scope_id=gid)
+                db_sess.add(scope)
+                await db_sess.flush()
+                project_scopes[gid] = scope.id
+
             for vid, group_id in [
                 (vfolder_a1_id, project_a_id),
                 (vfolder_a2_id, project_a_id),
                 (vfolder_b1_id, project_b_id),
             ]:
-                await seeder.enroll_entity_in_scope(
-                    db_sess, ScopeType.PROJECT, group_id, EntityType.VFOLDER, vid
+                db_sess.add(
+                    EntityMembershipRow(
+                        virtual_scope_id=project_scopes[group_id],
+                        entity_type=VFOLDER_ENTITY_TYPE,
+                        entity_id=vid,
+                    )
                 )
+            await db_sess.flush()
 
         yield {
             "project_a_id": project_a_id,

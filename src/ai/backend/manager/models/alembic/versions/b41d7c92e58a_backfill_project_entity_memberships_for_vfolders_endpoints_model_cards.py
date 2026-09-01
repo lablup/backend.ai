@@ -57,21 +57,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Drop only the edges this revision adds: the project-scope membership of the three
-    entity types. Edges written by the create path carry no marker distinguishing them,
-    so a re-upgrade restores what a downgrade removed.
-    """
-    for entity_type, table, owner_column in _OWNED_BY_PROJECT:
-        op.execute(
-            sa.text(
-                f"""
-                DELETE FROM entity_memberships em
-                USING virtual_scopes vs, {table} t
-                WHERE em.virtual_scope_id = vs.id
-                    AND em.entity_type = :entity_type
-                    AND em.entity_id = t.id
-                    AND vs.scope_type = 'project'
-                    AND vs.scope_id = t."{owner_column}"
-                """
-            ).bindparams(entity_type=entity_type)
-        )
+    """No-op: backfilled rows are indistinguishable from runtime-written ones."""

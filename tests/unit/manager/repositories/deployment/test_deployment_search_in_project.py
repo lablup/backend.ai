@@ -12,10 +12,10 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import DeploymentSummarySearchResult
@@ -58,7 +58,6 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 @dataclass
@@ -278,19 +277,22 @@ class TestEndpointSearchInProject:
             endpoint_ids_in_b.append(eid)
             await db_sess.flush()
 
-            seeder = VirtualScopeSeeder()
             for project_id, endpoint_ids in [
                 (project_a_id, endpoint_ids_in_a),
                 (project_b_id, endpoint_ids_in_b),
             ]:
+                scope = VirtualScopeRow(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
+                db_sess.add(scope)
+                await db_sess.flush()
                 for endpoint_id in endpoint_ids:
-                    await seeder.enroll_entity_in_scope(
-                        db_sess,
-                        ScopeType.PROJECT,
-                        project_id,
-                        EntityType.DEPLOYMENT,
-                        endpoint_id,
+                    db_sess.add(
+                        EntityMembershipRow(
+                            virtual_scope_id=scope.id,
+                            entity_type=DEPLOYMENT_ENTITY_TYPE,
+                            entity_id=endpoint_id,
+                        )
                     )
+            await db_sess.flush()
 
         yield TestData(
             project_a_id=project_a_id,

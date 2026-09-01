@@ -13,10 +13,9 @@ from dataclasses import dataclass
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.model_card import ModelCardID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE, ModelCardID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
@@ -52,7 +51,6 @@ from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRo
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 @dataclass
@@ -228,15 +226,26 @@ class TestModelCardSearchInProject:
                 )
             await db_sess.flush()
 
-            seeder = VirtualScopeSeeder()
+            project_scopes: dict[uuid.UUID, uuid.UUID] = {}
+            for pid in (project_a_id, project_b_id):
+                scope = VirtualScopeRow(scope_type=PROJECT_SCOPE_TYPE, scope_id=pid)
+                db_sess.add(scope)
+                await db_sess.flush()
+                project_scopes[pid] = scope.id
+
             for card_id, project_id in [
                 (card_a1_id, project_a_id),
                 (card_a2_id, project_a_id),
                 (card_b1_id, project_b_id),
             ]:
-                await seeder.enroll_entity_in_scope(
-                    db_sess, ScopeType.PROJECT, project_id, EntityType.MODEL_CARD, card_id
+                db_sess.add(
+                    EntityMembershipRow(
+                        virtual_scope_id=project_scopes[project_id],
+                        entity_type=MODEL_CARD_ENTITY_TYPE,
+                        entity_id=card_id,
+                    )
                 )
+            await db_sess.flush()
 
         yield TestData(
             project_a_id=project_a_id,
