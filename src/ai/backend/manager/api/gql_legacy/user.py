@@ -48,7 +48,7 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.updaters import UserUpdater
-from ai.backend.manager.models.virtual_scope.queries import (
+from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,
 )
@@ -106,7 +106,7 @@ __all__ = (
 
 
 def _project_membership_join(base_table: sa.Table | sa.sql.Join) -> sa.sql.Join:
-    """Join the base users selectable to groups via the virtual-scope membership pairs."""
+    """Join the base users selectable to groups via the virtual-entity membership pairs."""
     ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
     return sa.join(
         base_table,

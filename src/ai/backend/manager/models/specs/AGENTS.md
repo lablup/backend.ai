@@ -61,7 +61,7 @@ values (`row_class`, `pk_value`, ...).
 ## A global entity is an entity too
 
 `GlobalEntityCreator` merely does not go under another entity; it provisions its own
-virtual scope node exactly as `EntityCreator` does. Rows are created under a global
+virtual entity node exactly as `EntityCreator` does. Rows are created under a global
 entity too — an image under its container registry — so it has to be namable in the
 graph. What it does not have is `member_of`, and the missing hook is what says it
 joins nothing.
@@ -69,7 +69,7 @@ joins nothing.
 ## Membership declarations
 
 - `member_of(row)` declares which existing entities the new one joins as a member; a
-  target without a virtual scope node fails the write. It never carries a permission
+  target without a virtual entity node fails the write. It never carries a permission
   cap (membership vs sharing: `KNOWLEDGE.md`).
 - Sharing an entity afterwards is an `EntityGrant`, executed by `grant_entities` /
   `revoke_entities`. Its `permission_cap` is the ceiling the grantee's permissions are
@@ -95,7 +95,7 @@ joins nothing.
 
 ## A batch purge says which kind it removes, and what bounds it
 
-- `EntityBatchPurger` tears down each deleted row's virtual scope, memberships and
+- `EntityBatchPurger` tears down each deleted row's virtual entity, memberships and
   permissions, as `EntityPurger` does for one; `FieldBatchPurger` does not, because a
   field row holds nothing in the graph.
 - The two are unrelated roots, so an entity spec cannot flow through the field path and

@@ -83,10 +83,10 @@ class ContainerRegistryRepository:
         self,
         creator: ContainerRegistryCreator,
     ) -> ContainerRegistryData:
-        """Create a container registry with its own virtual scope.
+        """Create a container registry with its own virtual entity.
 
         The registry becomes a scope of its own so the entities it owns (images)
-        resolve through the virtual-scope chain; allowed projects are enrolled in
+        resolve through the virtual-entity chain; allowed projects are enrolled in
         that scope to reach them.
         """
         allowed_groups = creator.allowed_groups
@@ -286,7 +286,7 @@ class ContainerRegistryRepository:
         associated, and ContainerRegistryGroupsAssociationNotFound when none of the
         projects to remove was associated.
         """
-        # Registries created before the virtual-scope rollout have no node.
+        # Registries created before the virtual-entity rollout have no node.
         await ops.provision_registry(registry_id)
 
         for raw_project_id in allowed_group_updates.add:

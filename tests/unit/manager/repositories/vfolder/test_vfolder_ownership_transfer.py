@@ -60,8 +60,8 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderInvitationRow, VFolderPermissionRow, VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
@@ -79,7 +79,7 @@ class UserWithKeypair(NamedTuple):
 async def _membership_cap(
     db: ExtendedAsyncSAEngine, vfolder_id: uuid.UUID, user_id: uuid.UUID
 ) -> tuple[bool, Permission | None]:
-    """Whether the vfolder sits in the user's virtual scope, and under what cap.
+    """Whether the vfolder sits in the user's virtual entity, and under what cap.
 
     The v2 shape of what the legacy tables split into an AUTO/REF mapping plus
     permission rows: owning it is a membership with no cap, being shared it is the same
@@ -90,12 +90,12 @@ async def _membership_cap(
             await db_sess.execute(
                 sa.select(EntityMembershipRow.permission_cap)
                 .join(
-                    VirtualScopeRow,
-                    VirtualScopeRow.id == EntityMembershipRow.virtual_scope_id,
+                    VirtualEntityRow,
+                    VirtualEntityRow.id == EntityMembershipRow.virtual_entity_id,
                 )
                 .where(
-                    VirtualScopeRow.scope_type == USER_SCOPE_TYPE,
-                    VirtualScopeRow.scope_id == user_id,
+                    VirtualEntityRow.entity_type == USER_SCOPE_TYPE,
+                    VirtualEntityRow.entity_id == user_id,
                     EntityMembershipRow.entity_type == VFOLDER_ENTITY_TYPE,
                     EntityMembershipRow.entity_id == vfolder_id,
                 )
@@ -133,7 +133,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 AssociationScopesEntitiesRow,
                 ObjectPermissionRow,
                 PermissionRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 EntityMembershipRow,
                 EntityLabelRow,
             ],
@@ -355,13 +355,13 @@ class TestVFolderOwnershipTransferRBACCleanup:
             )
             db_sess.add(keypair)
 
-            # Sharing a vfolder enrolls it in the grantee's virtual scope, which the
+            # Sharing a vfolder enrolls it in the grantee's virtual entity, which the
             # real user-create path provisions.
             db_sess.add(
-                VirtualScopeRow(
+                VirtualEntityRow(
                     id=uuid.uuid4(),
-                    scope_type=USER_SCOPE_TYPE,
-                    scope_id=UserID(user_uuid),
+                    entity_type=USER_SCOPE_TYPE,
+                    entity_id=UserID(user_uuid),
                 )
             )
             await db_sess.flush()

@@ -76,7 +76,7 @@ class KernelKernelHistoryOperationScope(OperationScope):
     Not reachable yet: kernels hold no RBAC permission records of their own, so
     a kernel-keyed query is authorized on the owning session and narrowed with a
     ``kernel_id`` condition instead. This is what it should scope by once
-    virtual scopes land.
+    virtual entities land.
     """
 
     kernel_id: KernelId

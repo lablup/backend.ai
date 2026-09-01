@@ -56,9 +56,9 @@ from ai.backend.manager.models.resource_slot.row import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -90,7 +90,7 @@ class TestModelCardScanResourceRequirements:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
                 EntityMembershipRow,
                 RoleRow,
@@ -227,7 +227,7 @@ class TestModelCardScanResourceRequirements:
                 allowed_vfolder_hosts={},
             )
             db_sess.add(group)
-            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group.id))
+            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group.id))
             await db_sess.flush()
         return group
 

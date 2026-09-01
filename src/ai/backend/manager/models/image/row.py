@@ -87,7 +87,7 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.user import UserRole, UserRow
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow

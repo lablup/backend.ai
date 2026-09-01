@@ -7,16 +7,16 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.v2.relation.trigger import RelationActionTriggerMeta
 from ai.backend.manager.actions.v2.relation.validator.base import RelationActionValidator
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.permission.virtual_scope import EntityPermissionCheckKey
+from ai.backend.manager.data.permission.virtual_entity import EntityPermissionCheckKey
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 
-__all__ = ("VirtualScopeRelationActionRBACValidator",)
+__all__ = ("VirtualEntityRelationActionRBACValidator",)
 
 
-class VirtualScopeRelationActionRBACValidator(RelationActionValidator):
+class VirtualEntityRelationActionRBACValidator(RelationActionValidator):
     """The operation's permission asked of every scope the run names, as an entity.
 
     Asked of the scope itself rather than of a type within it: the action declares no
@@ -54,7 +54,7 @@ class VirtualScopeRelationActionRBACValidator(RelationActionValidator):
             for entity in entities
         ]
         permission = meta.operation_type.to_permission()
-        permission_map = await self._repository.check_bulk_permission_via_virtual_scope(
+        permission_map = await self._repository.check_bulk_permission_via_virtual_entity(
             keys, permission
         )
         denied = [key.entity for key in keys if not permission_map.get(key, False)]

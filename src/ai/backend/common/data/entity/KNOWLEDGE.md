@@ -3,7 +3,7 @@ name: entity-type-catalog
 type: reference
 description: entity classification (Entity/Public entity/Global/Field/Virtual), ownership and reference relations, the foreign-key rule for assignments
 scope: src/ai/backend/common/data/entity
-keywords: [EntityType, ENTITY_TYPE, EntityCreator, GlobalEntityCreator, FieldEntityCreator, member_of, virtual scope, ownership, entity relation]
+keywords: [EntityType, ENTITY_TYPE, EntityCreator, GlobalEntityCreator, FieldEntityCreator, member_of, virtual entity, ownership, entity relation]
 sources:
   - src/ai/backend/common/data/entity
   - src/ai/backend/manager/models
@@ -191,7 +191,7 @@ artifact registry
 ## Assignment
 
 An administrator assigns a shared resource to a scope. Neither side contains the other,
-so this is not a virtual-scope edge; an assignment table is not an entity itself but a
+so this is not a virtual-entity edge; an assignment table is not an entity itself but a
 relation between two entities.
 
 ### resource group
@@ -226,7 +226,7 @@ Built without a row of its own. It exists only as the subject of audit and autho
 
 ## Out of scope
 
-A virtual scope is the layer that expresses ownership, not an entity.
+A virtual entity is the layer that expresses ownership, not an entity.
 
 ## Missing foreign keys
 

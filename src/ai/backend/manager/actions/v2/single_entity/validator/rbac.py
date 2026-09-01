@@ -8,15 +8,15 @@ from ai.backend.manager.actions.v2.single_entity.trigger import (
 )
 from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.permission.virtual_scope import EntityPermissionCheckKey
+from ai.backend.manager.data.permission.virtual_entity import EntityPermissionCheckKey
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 
 
-class VirtualScopeSingleEntityActionRBACValidator(SingleEntityActionValidator):
-    """Single-entity RBAC validator resolving permissions via the virtual-scope chain."""
+class VirtualEntitySingleEntityActionRBACValidator(SingleEntityActionValidator):
+    """Single-entity RBAC validator resolving permissions via the virtual-entity chain."""
 
     _repository: PermissionControllerRepository
     _config_provider: ManagerConfigProvider
@@ -45,7 +45,7 @@ class VirtualScopeSingleEntityActionRBACValidator(SingleEntityActionValidator):
             entity=meta.entity,
         )
         permission = meta.operation_type.to_permission()
-        allowed = await self._repository.check_single_entity_permission_via_virtual_scope(
+        allowed = await self._repository.check_single_entity_permission_via_virtual_entity(
             key, permission
         )
         if not allowed:

@@ -45,9 +45,9 @@ from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, R
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
 )
@@ -98,7 +98,7 @@ async def database(
     async with with_tables(
         database_connection,
         [
-            VirtualScopeRow,
+            VirtualEntityRow,
             EntityMembershipRow,
             ScopeBindingRow,
             EntityLabelRow,

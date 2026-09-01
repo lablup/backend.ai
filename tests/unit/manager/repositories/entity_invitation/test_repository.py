@@ -41,9 +41,9 @@ from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.specs.membership import EntityGrant
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.entity_invitation.repository import EntityInvitationRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -110,7 +110,7 @@ async def database(
     async with with_tables(
         database_connection,
         [
-            VirtualScopeRow,
+            VirtualEntityRow,
             EntityMembershipRow,
             ScopeBindingRow,
             EntityLabelRow,
@@ -142,9 +142,9 @@ async def database(
             # The target entity and the people are reachable in the graph; the
             # invitation joins the target and the grant lands in the invitee's scope.
             session.add_all([
-                VirtualScopeRow(scope_type=_TARGET_TYPE, scope_id=_TARGET_ID),
-                VirtualScopeRow(scope_type=USER_ENTITY_TYPE, scope_id=_INVITEE_ID),
-                VirtualScopeRow(scope_type=USER_ENTITY_TYPE, scope_id=_OUTSIDER_ID),
+                VirtualEntityRow(entity_type=_TARGET_TYPE, entity_id=_TARGET_ID),
+                VirtualEntityRow(entity_type=USER_ENTITY_TYPE, entity_id=_INVITEE_ID),
+                VirtualEntityRow(entity_type=USER_ENTITY_TYPE, entity_id=_OUTSIDER_ID),
             ])
         yield database_connection
 
@@ -177,12 +177,12 @@ async def _cap(database: ExtendedAsyncSAEngine, grantee: UserID) -> tuple[bool, 
             await session.execute(
                 sa.select(EntityMembershipRow.permission_cap)
                 .join(
-                    VirtualScopeRow,
-                    VirtualScopeRow.id == EntityMembershipRow.virtual_scope_id,
+                    VirtualEntityRow,
+                    VirtualEntityRow.id == EntityMembershipRow.virtual_entity_id,
                 )
                 .where(
-                    VirtualScopeRow.scope_type == USER_ENTITY_TYPE,
-                    VirtualScopeRow.scope_id == grantee,
+                    VirtualEntityRow.entity_type == USER_ENTITY_TYPE,
+                    VirtualEntityRow.entity_id == grantee,
                     EntityMembershipRow.entity_type == _TARGET_TYPE,
                     EntityMembershipRow.entity_id == _TARGET_ID,
                 )
@@ -346,12 +346,12 @@ class TestCreate:
                     await session.execute(
                         sa.select(EntityMembershipRow.entity_id)
                         .join(
-                            VirtualScopeRow,
-                            VirtualScopeRow.id == EntityMembershipRow.virtual_scope_id,
+                            VirtualEntityRow,
+                            VirtualEntityRow.id == EntityMembershipRow.virtual_entity_id,
                         )
                         .where(
-                            VirtualScopeRow.scope_type == _TARGET_TYPE,
-                            VirtualScopeRow.scope_id == _TARGET_ID,
+                            VirtualEntityRow.entity_type == _TARGET_TYPE,
+                            VirtualEntityRow.entity_id == _TARGET_ID,
                             EntityMembershipRow.entity_type == "entity_invitation",
                         )
                     )

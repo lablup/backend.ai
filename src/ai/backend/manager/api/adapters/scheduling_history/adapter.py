@@ -476,7 +476,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
             raise InvalidAPIParameters(
                 "Kernel scheduling history scope accepts exactly one scope item"
             )
-        # TODO: Pass KernelKernelHistoryTarget(kernel_id=...) once virtual scopes
+        # TODO: Pass KernelKernelHistoryTarget(kernel_id=...) once virtual entities
         # land and a kernel becomes a scope of its own. Kernels hold no permission
         # records today, so a kernel scope item is converted to a target on its
         # owning session and narrowed back down with a kernel_id query condition.

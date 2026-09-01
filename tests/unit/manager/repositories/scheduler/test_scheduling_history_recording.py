@@ -86,9 +86,9 @@ from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHi
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
@@ -122,7 +122,7 @@ class TestEnqueueSessionSchedulingHistory:
                 ProjectRow,
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
                 AgentRow,
@@ -394,15 +394,15 @@ class TestEnqueueSessionSchedulingHistory:
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
     ) -> AsyncGenerator[None, None]:
-        """Provision the user's and the project's virtual scopes.
+        """Provision the user's and the project's virtual entities.
 
         Existing deployments carry them from the backfill migration; a session joins
-        both as a member, and a parent without a virtual scope fails the write.
+        both as a member, and a parent without a virtual entity fails the write.
         """
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add_all([
-                VirtualScopeRow(scope_type="user", scope_id=test_user_uuid),
-                VirtualScopeRow(scope_type="project", scope_id=test_group_id),
+                VirtualEntityRow(entity_type="user", entity_id=test_user_uuid),
+                VirtualEntityRow(entity_type="project", entity_id=test_group_id),
             ])
             await db_sess.flush()
 
@@ -563,9 +563,9 @@ class TestEnqueueSessionSchedulingHistory:
             # The session became its own scope and joined its user and project.
             assert (
                 await db_sess.scalar(
-                    sa.select(VirtualScopeRow.id).where(
-                        VirtualScopeRow.scope_type == "session",
-                        VirtualScopeRow.scope_id == session_id,
+                    sa.select(VirtualEntityRow.id).where(
+                        VirtualEntityRow.entity_type == "session",
+                        VirtualEntityRow.entity_id == session_id,
                     )
                 )
                 is not None
@@ -575,10 +575,10 @@ class TestEnqueueSessionSchedulingHistory:
                     sa.select(ScopeBindingRow.scope_type, ScopeBindingRow.scope_id)
                     .select_from(ScopeBindingRow)
                     .join(
-                        VirtualScopeRow,
-                        VirtualScopeRow.id == ScopeBindingRow.virtual_scope_id,
+                        VirtualEntityRow,
+                        VirtualEntityRow.id == ScopeBindingRow.virtual_entity_id,
                     )
-                    .where(VirtualScopeRow.scope_id == session_id)
+                    .where(VirtualEntityRow.entity_id == session_id)
                 )
             ).all()
             assert {(row.scope_type, row.scope_id) for row in parents} == {

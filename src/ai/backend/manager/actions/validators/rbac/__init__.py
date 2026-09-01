@@ -1,17 +1,17 @@
 from dataclasses import dataclass
 
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
-    VirtualScopeAtomicBulkActionRBACValidator,
-    VirtualScopePartialBulkActionRBACValidator,
+    VirtualEntityAtomicBulkActionRBACValidator,
+    VirtualEntityPartialBulkActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.relation.validator.rbac import (
-    VirtualScopeRelationActionRBACValidator,
+    VirtualEntityRelationActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
-    VirtualScopeScopeActionRBACValidator,
+    VirtualEntityScopeActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
-    VirtualScopeSingleEntityActionRBACValidator,
+    VirtualEntitySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -39,14 +39,14 @@ class LegacyRBACValidators:
 
 
 @dataclass
-class VirtualScopeRBACValidators:
+class VirtualEntityRBACValidators:
     """RBAC validators for the v2 action bases (actions/v2/{single_entity,bulk,scope,relation})."""
 
-    scope: VirtualScopeScopeActionRBACValidator
-    single_entity: VirtualScopeSingleEntityActionRBACValidator
-    partial_bulk: VirtualScopePartialBulkActionRBACValidator
-    atomic_bulk: VirtualScopeAtomicBulkActionRBACValidator
-    relation: VirtualScopeRelationActionRBACValidator
+    scope: VirtualEntityScopeActionRBACValidator
+    single_entity: VirtualEntitySingleEntityActionRBACValidator
+    partial_bulk: VirtualEntityPartialBulkActionRBACValidator
+    atomic_bulk: VirtualEntityAtomicBulkActionRBACValidator
+    relation: VirtualEntityRelationActionRBACValidator
 
     def to_action_validators(self) -> V2ActionValidators:
         """Place every validator in this bundle into its shape's slot.

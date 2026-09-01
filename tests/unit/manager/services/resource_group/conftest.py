@@ -67,9 +67,9 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
@@ -131,7 +131,7 @@ async def database_fixture(
     Overrides the guard fixture in tests/unit/manager/services/conftest.py.
 
     The purge and RBAC scope paths issue whole-entity SELECTs (batch purgers,
-    virtual-scope writes), so the real rows are created instead of minimal stub
+    virtual-entity writes), so the real rows are created instead of minimal stub
     tables, mirroring the repository-level test fixture.
     """
     async with database_engine.begin() as conn:
@@ -149,7 +149,7 @@ async def database_fixture(
             PermissionRow,
             RolePresetRow,
             RolePermissionPresetRow,
-            VirtualScopeRow,
+            VirtualEntityRow,
             EntityMembershipRow,
             ScopeBindingRow,
             EntityLabelRow,

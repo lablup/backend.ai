@@ -1,6 +1,6 @@
 """Entity writes of the v2 ops: every entity doubles as a scope.
 
-Creating always provisions the row's virtual scope node with its self edges and
+Creating always provisions the row's virtual entity node with its self edges and
 joins the scopes the spec's ``member_of`` declares; purging tears the same
 things down. The role-managed variants — typed against the combined spec — also
 provision the roles the scope type's active presets call for; the plain paths
@@ -56,9 +56,9 @@ from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.specs.upserter import EntityUpserter
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
 if TYPE_CHECKING:
@@ -83,7 +83,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
     # Rendered role names are stored in ``roles.name`` (sa.String(64)).
     _MAX_ROLE_NAME_LENGTH: ClassVar[int] = 64
 
-    # Roles enroll in their scope's virtual scope as entities of this type.
+    # Roles enroll in their scope's virtual entity as entities of this type.
     _ROLE_ENTITY_TYPE: ClassVar[EntityType] = EntityType("role")
 
     _template_env: jinja2.sandbox.ImmutableSandboxedEnvironment
@@ -95,7 +95,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         )
 
     async def create_entity[TRow: Base, TData](self, creator: EntityCreator[TRow, TData]) -> TData:
-        """Insert one entity row: the row, its virtual scope node (self membership
+        """Insert one entity row: the row, its virtual entity node (self membership
         and self binding), and its membership in each ``member_of`` scope — one
         transaction. No roles are involved on this path."""
         row = creator.build_row()
@@ -190,7 +190,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         self, upserter: EntityUpserter[TRow, TData]
     ) -> TData:
         """Insert or update an entity row on conflict; the scope stays provisioned
-        idempotently — the virtual scope node is get-or-create, and the declared
+        idempotently — the virtual entity node is get-or-create, and the declared
         memberships are registered idempotently."""
         row = await self._upsert_row_returning(
             upserter.row_class(),
@@ -235,18 +235,18 @@ class V2EntityWriteOps(V2WriteOpsBase):
         self, member: EntityIdentifier, parents: Collection[EntityIdentifier]
     ) -> None:
         """Enroll the new entity as a member of each parent scope: membership in
-        the parent's virtual scope, and the parent's binding into the member's own
-        virtual scope — permission_cap NULL throughout, since capped sharing is the
+        the parent's virtual entity, and the parent's binding into the member's own
+        virtual entity — permission_cap NULL throughout, since capped sharing is the
         object-sharing mechanism, not creation.
 
-        A user member gets the membership alone: no row binds a user's virtual scope
+        A user member gets the membership alone: no row binds a user's virtual entity
         into a scope, so a scope reaches what a user owns through each entity's own
         enrollment.
 
         Pure graph edges — no role state is touched here; granting a joining
         user the parents' auto_assign roles is the explicit
         :meth:`_grant_auto_assign_roles` primitive, wired by the user domain. A
-        parent without a virtual scope raises :class:`VirtualScopeNotFound`.
+        parent without a virtual entity raises :class:`VirtualEntityNotFound`.
         """
         if not parents:
             return
@@ -255,13 +255,13 @@ class V2EntityWriteOps(V2WriteOpsBase):
         ])
         if member.entity_type() == USER_ENTITY_TYPE:
             return
-        member_virtual_scope_id = (await self._resolve_virtual_scope_ids([member]))[
+        member_virtual_entity_id = (await self._resolve_virtual_entity_ids([member]))[
             (member.entity_type(), member)
         ]
         await self._bulk_insert_ignore_conflicts(
             [
                 ScopeBindingRow(
-                    virtual_scope_id=member_virtual_scope_id,
+                    virtual_entity_id=member_virtual_entity_id,
                     scope_type=parent.entity_type(),
                     scope_id=parent,
                     permission_cap=None,
@@ -274,7 +274,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         self, entities: Collection[EntityIdentifier], user_id: UserID
     ) -> None:
         """Map the user to every active auto_assign role enrolled in ``scopes``'
-        virtual scopes; already-granted pairs are skipped via the (user_id, role_id)
+        virtual entities; already-granted pairs are skipped via the (user_id, role_id)
         unique key.
 
         Not called by the generic entity paths: whether (and for which scopes — the
@@ -285,11 +285,11 @@ class V2EntityWriteOps(V2WriteOpsBase):
                 sa.select(RoleRow.id)
                 .join(EntityMembershipRow, EntityMembershipRow.entity_id == RoleRow.id)
                 .join(
-                    VirtualScopeRow,
-                    EntityMembershipRow.virtual_scope_id == VirtualScopeRow.id,
+                    VirtualEntityRow,
+                    EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id,
                 )
                 .where(
-                    sa.tuple_(VirtualScopeRow.scope_type, VirtualScopeRow.scope_id).in_([
+                    sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
                         (e.entity_type(), e) for e in entities
                     ]),
                     EntityMembershipRow.entity_type == self._ROLE_ENTITY_TYPE,
@@ -318,7 +318,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
     ) -> None:
         """Create the roles the active presets matching the scopes' types call for —
         presets are the only source of a scope's roles. Each role is enrolled in
-        its scope's virtual scope (the scope owns its roles)."""
+        its scope's virtual entity (the scope owns its roles)."""
         specs = await self._preset_role_specs(entity_values)
         if not specs:
             return

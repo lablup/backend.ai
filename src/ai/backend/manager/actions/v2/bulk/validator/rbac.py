@@ -11,14 +11,14 @@ from ai.backend.manager.actions.v2.bulk.validator.base import (
     PartialBulkActionValidator,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.permission.virtual_scope import EntityPermissionCheckKey
+from ai.backend.manager.data.permission.virtual_entity import EntityPermissionCheckKey
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 
 
-class VirtualScopeBulkPermissionCheck:
+class VirtualEntityBulkPermissionCheck:
     """Which of a run's named entities the caller lacks the run's permission on.
 
     The check itself, kept apart from what a shape does with the answer: one shape
@@ -54,27 +54,27 @@ class VirtualScopeBulkPermissionCheck:
             for entity_id in meta.entity_ids
         ]
         permission = meta.operation_type.to_permission()
-        permission_map = await self._repository.check_bulk_permission_via_virtual_scope(
+        permission_map = await self._repository.check_bulk_permission_via_virtual_entity(
             keys, permission
         )
         return [key.entity for key in keys if not permission_map.get(key, False)]
 
 
-class VirtualScopeAtomicBulkActionRBACValidator(AtomicBulkActionValidator):
+class VirtualEntityAtomicBulkActionRBACValidator(AtomicBulkActionValidator):
     """The check applied to the run: one target lacking the permission rejects it all.
 
-    For the per-entity answer see :class:`VirtualScopePartialBulkActionRBACValidator`; both
-    ask the same question of the virtual-scope chain.
+    For the per-entity answer see :class:`VirtualEntityPartialBulkActionRBACValidator`; both
+    ask the same question of the virtual-entity chain.
     """
 
-    _check: VirtualScopeBulkPermissionCheck
+    _check: VirtualEntityBulkPermissionCheck
 
     def __init__(
         self,
         repository: PermissionControllerRepository,
         config_provider: ManagerConfigProvider,
     ) -> None:
-        self._check = VirtualScopeBulkPermissionCheck(repository, config_provider)
+        self._check = VirtualEntityBulkPermissionCheck(repository, config_provider)
 
     @override
     async def validate(self, meta: BulkActionTriggerMeta) -> None:
@@ -85,21 +85,21 @@ class VirtualScopeAtomicBulkActionRBACValidator(AtomicBulkActionValidator):
             )
 
 
-class VirtualScopePartialBulkActionRBACValidator(PartialBulkActionValidator):
+class VirtualEntityPartialBulkActionRBACValidator(PartialBulkActionValidator):
     """The check answered per entity, so the run keeps going without the denied ones.
 
     A denied entity becomes one failed item of the result, told apart from an id that
     matched no row by the error it carries.
     """
 
-    _check: VirtualScopeBulkPermissionCheck
+    _check: VirtualEntityBulkPermissionCheck
 
     def __init__(
         self,
         repository: PermissionControllerRepository,
         config_provider: ManagerConfigProvider,
     ) -> None:
-        self._check = VirtualScopeBulkPermissionCheck(repository, config_provider)
+        self._check = VirtualEntityBulkPermissionCheck(repository, config_provider)
 
     @override
     async def validate(self, meta: BulkActionTriggerMeta) -> Mapping[EntityIdentifier, Exception]:

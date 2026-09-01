@@ -1,9 +1,9 @@
 """Grant writes of the v2 ops: access to an existing entity, offered, handed out and
 taken back.
 
-A grant records the entity as a member of the grantee's virtual scope carrying a
+A grant records the entity as a member of the grantee's virtual entity carrying a
 permission cap, which is what
-``PermissionControllerDBSource._resolve_permissions_for_virtual_scope_group`` clips the
+``PermissionControllerDBSource._resolve_permissions_for_virtual_entity_group`` clips the
 grantee's permissions to. Creation-time belonging is not this: see
 ``models/specs/AGENTS.md``.
 """
@@ -19,7 +19,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.entity_invitation.types import EntityInvitationData
 from ai.backend.manager.models.entity_invitation.updaters import EntityInvitationAcceptUpdater
 from ai.backend.manager.models.specs.membership import EntityGrant
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
 
@@ -31,14 +31,14 @@ class V2GrantWriteOps(V2WriteOpsBase):
 
         Re-granting rewrites the cap rather than keeping the earlier one: a grant
         states the ceiling that holds now, so a widened or narrowed one has to win.
-        A grantee with no virtual scope fails, as every membership write does.
+        A grantee with no virtual entity fails, as every membership write does.
         """
         if not grants:
             return
-        scope_ids = await self._resolve_virtual_scope_ids([g.grantee for g in grants])
+        scope_ids = await self._resolve_virtual_entity_ids([g.grantee for g in grants])
         stmt = pg_insert(EntityMembershipRow).values([
             {
-                "virtual_scope_id": scope_ids[(g.grantee.entity_type(), g.grantee)],
+                "virtual_entity_id": scope_ids[(g.grantee.entity_type(), g.grantee)],
                 "entity_type": g.entity.entity_type(),
                 "entity_id": g.entity,
                 "permission_cap": g.permission_cap,
@@ -47,7 +47,7 @@ class V2GrantWriteOps(V2WriteOpsBase):
         ])
         await self._sess.execute(
             stmt.on_conflict_do_update(
-                index_elements=["virtual_scope_id", "entity_type", "entity_id"],
+                index_elements=["virtual_entity_id", "entity_type", "entity_id"],
                 set_={"permission_cap": stmt.excluded.permission_cap},
             )
         )
@@ -62,10 +62,10 @@ class V2GrantWriteOps(V2WriteOpsBase):
         """
         if not grants:
             return
-        scope_ids = await self._resolve_virtual_scope_ids([g.grantee for g in grants])
+        scope_ids = await self._resolve_virtual_entity_ids([g.grantee for g in grants])
         stmt = pg_insert(EntityMembershipRow).values([
             {
-                "virtual_scope_id": scope_ids[(g.grantee.entity_type(), g.grantee)],
+                "virtual_entity_id": scope_ids[(g.grantee.entity_type(), g.grantee)],
                 "entity_type": g.entity.entity_type(),
                 "entity_id": g.entity,
                 "permission_cap": g.permission_cap,
@@ -76,7 +76,7 @@ class V2GrantWriteOps(V2WriteOpsBase):
         offered = stmt.excluded.permission_cap
         await self._sess.execute(
             stmt.on_conflict_do_update(
-                index_elements=["virtual_scope_id", "entity_type", "entity_id"],
+                index_elements=["virtual_entity_id", "entity_type", "entity_id"],
                 set_={
                     "permission_cap": sa.case(
                         (
@@ -99,10 +99,11 @@ class V2GrantWriteOps(V2WriteOpsBase):
         """
         if not entities:
             return
-        scope_ids = await self._resolve_virtual_scope_ids([grantee])
+        scope_ids = await self._resolve_virtual_entity_ids([grantee])
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
-                EntityMembershipRow.virtual_scope_id == scope_ids[(grantee.entity_type(), grantee)],
+                EntityMembershipRow.virtual_entity_id
+                == scope_ids[(grantee.entity_type(), grantee)],
                 sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
                     (e.entity_type(), e) for e in entities
                 ]),

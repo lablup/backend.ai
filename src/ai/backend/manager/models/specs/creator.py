@@ -23,7 +23,7 @@ from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 class GlobalEntityCreator[TRow: Base, TData](ABC):
     """Insert spec of a global entity: an entity that belongs under no other scope.
 
-    Creating a row provisions its virtual scope node exactly as :class:`EntityCreator`
+    Creating a row provisions its virtual entity node exactly as :class:`EntityCreator`
     does — rows are created under a global entity too (an image under its container
     registry), so it has to be namable in the graph. What it does not have is
     ``member_of``: it joins nothing, and the missing hook is what says so.
@@ -51,7 +51,7 @@ class GlobalEntityCreator[TRow: Base, TData](ABC):
 
 class EntityCreator[TRow: Base, TData](ABC):
     """Insert spec of an entity: creating a row always provisions it in the RBAC graph
-    (its virtual scope node, self membership and self binding) and joins the entities
+    (its virtual entity node, self membership and self binding) and joins the entities
     ``member_of`` declares.
 
     The spec knows nothing about roles; entities that allow role presets use

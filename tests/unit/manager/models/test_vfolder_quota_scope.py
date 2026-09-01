@@ -52,12 +52,12 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow, ensure_quota_scope_accessible_by_user
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
-from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 class TestEnsureQuotaScopeAccessibleByUser:
@@ -99,7 +99,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 ReplicaGroupRow,
                 RoutingRow,
                 AssociationScopesEntitiesRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
                 EntityLabelRow,
                 EntityMembershipRow,
@@ -427,7 +427,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                     entity_id=str(regular_user),
                 )
             )
-            await VirtualScopeSeeder().enroll_user_in_project(session, test_group, regular_user)
+            await VirtualEntitySeeder().enroll_user_in_project(session, test_group, regular_user)
             await session.flush()
         yield
 
@@ -463,7 +463,9 @@ class TestEnsureQuotaScopeAccessibleByUser:
                     entity_id=str(regular_user),
                 )
             )
-            await VirtualScopeSeeder().enroll_user_in_project(session, other_group_id, regular_user)
+            await VirtualEntitySeeder().enroll_user_in_project(
+                session, other_group_id, regular_user
+            )
             await session.flush()
         yield other_group_id
 

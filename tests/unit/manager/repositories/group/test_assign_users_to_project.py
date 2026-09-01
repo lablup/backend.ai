@@ -43,15 +43,15 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.db_source import ProjectDBSource
 from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
-from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 class TestAssignUsersToProject:
@@ -96,7 +96,7 @@ class TestAssignUsersToProject:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
                 EntityLabelRow,
                 EntityMembershipRow,
@@ -203,9 +203,9 @@ class TestAssignUsersToProject:
                 )
             )
             session.add(
-                VirtualScopeRow(
-                    scope_type=ScopeType.PROJECT.value,
-                    scope_id=project_id,
+                VirtualEntityRow(
+                    entity_type=ScopeType.PROJECT.value,
+                    entity_id=project_id,
                 )
             )
             await session.commit()
@@ -243,9 +243,9 @@ class TestAssignUsersToProject:
                 )
             )
             session.add(
-                VirtualScopeRow(
-                    scope_type=ScopeType.PROJECT.value,
-                    scope_id=project_id,
+                VirtualEntityRow(
+                    entity_type=ScopeType.PROJECT.value,
+                    entity_id=project_id,
                 )
             )
             await session.commit()
@@ -280,7 +280,7 @@ class TestAssignUsersToProject:
                     domain_id=domain_id,
                 )
             )
-            await VirtualScopeSeeder().seed_user_scope(session, user_uuid)
+            await VirtualEntitySeeder().seed_user_scope(session, user_uuid)
             await session.commit()
         return user_uuid
 
@@ -512,28 +512,28 @@ class TestAssignUsersToProject:
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
     ) -> None:
-        """Assigned users become members of the project's virtual scope, and the project
+        """Assigned users become members of the project's virtual entity, and the project
         is not bound into theirs — project-scoped permissions must not reach the entities
         a member owns."""
         await group_db_source.assign_users_to_project(test_project, [same_domain_user_1], test_role)
 
         async with db_with_cleanup.begin_readonly_session() as session:
             user_vs_id = await session.scalar(
-                sa.select(VirtualScopeRow.id).where(
-                    VirtualScopeRow.scope_type == ScopeType.USER.value,
-                    VirtualScopeRow.scope_id == same_domain_user_1,
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == ScopeType.USER.value,
+                    VirtualEntityRow.entity_id == same_domain_user_1,
                 )
             )
             project_vs_id = await session.scalar(
-                sa.select(VirtualScopeRow.id).where(
-                    VirtualScopeRow.scope_type == ScopeType.PROJECT.value,
-                    VirtualScopeRow.scope_id == test_project,
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                    VirtualEntityRow.entity_id == test_project,
                 )
             )
             bindings_into_user_scope = (
                 await session.scalars(
                     sa.select(ScopeBindingRow.scope_id).where(
-                        ScopeBindingRow.virtual_scope_id == user_vs_id,
+                        ScopeBindingRow.virtual_entity_id == user_vs_id,
                         ScopeBindingRow.scope_id == test_project,
                     )
                 )
@@ -541,7 +541,7 @@ class TestAssignUsersToProject:
             memberships_in_project_scope = (
                 await session.scalars(
                     sa.select(EntityMembershipRow.entity_id).where(
-                        EntityMembershipRow.virtual_scope_id == project_vs_id,
+                        EntityMembershipRow.virtual_entity_id == project_vs_id,
                         EntityMembershipRow.entity_id == same_domain_user_1,
                     )
                 )
@@ -625,7 +625,7 @@ class TestUnassignUsersFromProject:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
                 EntityMembershipRow,
             ],
@@ -707,9 +707,9 @@ class TestUnassignUsersFromProject:
                 )
             )
             session.add(
-                VirtualScopeRow(
-                    scope_type=ScopeType.PROJECT.value,
-                    scope_id=project_id,
+                VirtualEntityRow(
+                    entity_type=ScopeType.PROJECT.value,
+                    entity_id=project_id,
                 )
             )
             await session.commit()
@@ -744,7 +744,7 @@ class TestUnassignUsersFromProject:
                     domain_id=domain_id,
                 )
             )
-            await VirtualScopeSeeder().seed_user_scope(session, user_uuid)
+            await VirtualEntitySeeder().seed_user_scope(session, user_uuid)
             await session.commit()
         return user_uuid
 

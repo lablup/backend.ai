@@ -40,7 +40,7 @@ from ai.backend.manager.models.project.updaters import ProjectSoftDeleteUpdater,
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.virtual_scope.queries import (
+from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,
 )
@@ -216,7 +216,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        # Project membership comes from the virtual-scope chain (PROJECT/USER).
+        # Project membership comes from the virtual-entity chain (PROJECT/USER).
         membership_filter = user_scope_membership_exists(PROJECT_SCOPE_TYPE, self.id, UserRow.uuid)
         user_query = query.where(membership_filter)
         cnt_query = sa.select(sa.func.count()).select_from(UserRow).where(membership_filter)

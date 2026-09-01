@@ -1,6 +1,6 @@
-"""Membership queries over the virtual-scope chain.
+"""Membership queries over the virtual-entity chain.
 
-The virtual-scope chain (``entity_memberships`` joined to ``virtual_scopes``) is the
+The virtual-entity chain (``entity_memberships`` joined to ``virtual_entities``) is the
 read model for user-scope membership. ``association_scopes_entities`` remains as the
 legacy dual-written association and must not be used for new membership reads.
 """
@@ -14,8 +14,8 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.types import EntityID, ScopeID, ScopeType
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 __all__ = (
     "user_scope_membership_exists",
@@ -33,12 +33,12 @@ def user_scope_membership_query(scope_type: ScopeType) -> sa.Select[tuple[Entity
     return (
         sa.select(
             EntityMembershipRow.entity_id.label("user_id"),
-            VirtualScopeRow.scope_id.label("scope_id"),
+            VirtualEntityRow.entity_id.label("scope_id"),
         )
         .select_from(EntityMembershipRow)
-        .join(VirtualScopeRow, EntityMembershipRow.virtual_scope_id == VirtualScopeRow.id)
+        .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
         .where(
-            VirtualScopeRow.scope_type == scope_type,
+            VirtualEntityRow.entity_type == scope_type,
             EntityMembershipRow.entity_type == USER_ENTITY_TYPE,
         )
     )
@@ -49,7 +49,7 @@ def user_scope_membership_exists(
     scope_id: _UuidExpr,
     user_id: _UuidExpr,
 ) -> sa.ColumnElement[bool]:
-    """EXISTS predicate: the user is enrolled in the scope's virtual scope.
+    """EXISTS predicate: the user is enrolled in the scope's virtual entity.
 
     ``scope_id`` / ``user_id`` accept literal UUIDs or column expressions, so the
     predicate works both as a direct filter and as a correlated condition inside a
@@ -58,10 +58,10 @@ def user_scope_membership_exists(
     return sa.exists(
         sa.select(sa.literal(1))
         .select_from(EntityMembershipRow)
-        .join(VirtualScopeRow, EntityMembershipRow.virtual_scope_id == VirtualScopeRow.id)
+        .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
         .where(
-            VirtualScopeRow.scope_type == scope_type,
-            VirtualScopeRow.scope_id == scope_id,
+            VirtualEntityRow.entity_type == scope_type,
+            VirtualEntityRow.entity_id == scope_id,
             EntityMembershipRow.entity_type == USER_ENTITY_TYPE,
             EntityMembershipRow.entity_id == user_id,
         )

@@ -41,7 +41,7 @@ class KernelKernelHistoryTarget(KernelHistoryTarget):
     so the adapter converts a kernel scope item into a
     ``SessionKernelHistoryTarget`` on the owning session and narrows the rows
     back down with a ``kernel_id`` query condition. This is the target it must
-    pass once virtual scopes land.
+    pass once virtual entities land.
     """
 
     kernel_id: KernelId

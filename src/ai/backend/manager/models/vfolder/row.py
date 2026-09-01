@@ -95,8 +95,8 @@ from ai.backend.manager.models.utils import (
     execute_with_txn_retry,
     sql_json_merge,
 )
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.queries import (
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,
 )

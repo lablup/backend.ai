@@ -2,7 +2,7 @@
 
 What these tests pin down:
 
-- Every entity doubles as a scope: a create provisions the row's virtual scope
+- Every entity doubles as a scope: a create provisions the row's virtual entity
   node (self membership and self binding) and joins each ``member_of`` scope;
   a purge tears the same things down symmetrically; an upsert keeps the scope
   provisioned idempotently.
@@ -13,7 +13,7 @@ What these tests pin down:
   spec-declared ``template_value``.
 - Scope types outside the RBAC element enum are accepted — the chain is open;
   only permission-carrying paths need the conversion, and teardown skips it.
-- A ``member_of`` target without a virtual scope fails the whole write with
+- A ``member_of`` target without a virtual entity fails the whole write with
   nothing persisted; the bulk create is all-or-nothing; the bulk purge answers
   per named entity.
 """
@@ -52,7 +52,7 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as LegacyScopeType,
 )
-from ai.backend.manager.errors.permission import VirtualScopeNotFound
+from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import (
     EntityNotFoundError,
     RepositoryIntegrityError,
@@ -74,9 +74,9 @@ from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -296,7 +296,7 @@ async def database(
     async with with_tables(
         database_connection,
         [
-            VirtualScopeRow,
+            VirtualEntityRow,
             EntityMembershipRow,
             ScopeBindingRow,
             EntityLabelRow,
@@ -320,10 +320,10 @@ _PRESET_NAME = "preset-project-member"
 
 @pytest.fixture
 async def parent_id(database: ExtendedAsyncSAEngine) -> UUID:
-    """A domain scope whose virtual scope node exists — a ``memberships`` target."""
+    """A domain scope whose virtual entity node exists — a ``memberships`` target."""
     parent = uuid.uuid4()
     async with database.begin_session() as sess:
-        sess.add(VirtualScopeRow(scope_type=_PARENT_SCOPE_TYPE, scope_id=parent))
+        sess.add(VirtualEntityRow(entity_type=_PARENT_SCOPE_TYPE, entity_id=parent))
     return parent
 
 
@@ -368,14 +368,14 @@ def _expected_preset_role_name(scope_id: UUID) -> str:
     return f"{_PRESET_NAME}-{str(scope_id)[:8]}"
 
 
-async def _virtual_scope_id(
+async def _virtual_entity_id(
     database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: ScopeType = _SCOPE_TYPE
 ) -> UUID | None:
     async with database.begin_readonly_session() as sess:
         result = await sess.execute(
-            sa.select(VirtualScopeRow.id).where(
-                VirtualScopeRow.scope_type == scope_type,
-                VirtualScopeRow.scope_id == scope_id,
+            sa.select(VirtualEntityRow.id).where(
+                VirtualEntityRow.entity_type == scope_type,
+                VirtualEntityRow.entity_id == scope_id,
             )
         )
         return result.scalar_one_or_none()
@@ -387,10 +387,10 @@ async def _self_membership_exists(
     async with database.begin_readonly_session() as sess:
         row = await sess.scalar(
             sa.select(EntityMembershipRow.entity_id)
-            .join(VirtualScopeRow, EntityMembershipRow.virtual_scope_id == VirtualScopeRow.id)
+            .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
             .where(
-                VirtualScopeRow.scope_type == scope_type,
-                VirtualScopeRow.scope_id == scope_id,
+                VirtualEntityRow.entity_type == scope_type,
+                VirtualEntityRow.entity_id == scope_id,
                 EntityMembershipRow.entity_type == scope_type,
                 EntityMembershipRow.entity_id == scope_id,
             )
@@ -404,10 +404,10 @@ async def _self_binding_exists(
     async with database.begin_readonly_session() as sess:
         row = await sess.scalar(
             sa.select(ScopeBindingRow.scope_id)
-            .join(VirtualScopeRow, ScopeBindingRow.virtual_scope_id == VirtualScopeRow.id)
+            .join(VirtualEntityRow, ScopeBindingRow.virtual_entity_id == VirtualEntityRow.id)
             .where(
-                VirtualScopeRow.scope_type == scope_type,
-                VirtualScopeRow.scope_id == scope_id,
+                VirtualEntityRow.entity_type == scope_type,
+                VirtualEntityRow.entity_id == scope_id,
                 ScopeBindingRow.scope_type == scope_type,
                 ScopeBindingRow.scope_id == scope_id,
             )
@@ -418,14 +418,14 @@ async def _self_binding_exists(
 async def _parent_membership_entity_ids(
     database: ExtendedAsyncSAEngine, parent_id: UUID
 ) -> set[UUID]:
-    """Entity ids enrolled in the parent scope's virtual scope."""
+    """Entity ids enrolled in the parent scope's virtual entity."""
     async with database.begin_readonly_session() as sess:
         rows = await sess.scalars(
             sa.select(EntityMembershipRow.entity_id)
-            .join(VirtualScopeRow, EntityMembershipRow.virtual_scope_id == VirtualScopeRow.id)
+            .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
             .where(
-                VirtualScopeRow.scope_type == _PARENT_SCOPE_TYPE,
-                VirtualScopeRow.scope_id == parent_id,
+                VirtualEntityRow.entity_type == _PARENT_SCOPE_TYPE,
+                VirtualEntityRow.entity_id == parent_id,
                 EntityMembershipRow.entity_type == _SCOPE_TYPE,
             )
         )
@@ -435,14 +435,14 @@ async def _parent_membership_entity_ids(
 async def _parent_binding_exists(
     database: ExtendedAsyncSAEngine, scope_id: UUID, parent_id: UUID
 ) -> bool:
-    """Whether the parent scope is bound into the new entity's virtual scope."""
+    """Whether the parent scope is bound into the new entity's virtual entity."""
     async with database.begin_readonly_session() as sess:
         row = await sess.scalar(
             sa.select(ScopeBindingRow.scope_id)
-            .join(VirtualScopeRow, ScopeBindingRow.virtual_scope_id == VirtualScopeRow.id)
+            .join(VirtualEntityRow, ScopeBindingRow.virtual_entity_id == VirtualEntityRow.id)
             .where(
-                VirtualScopeRow.scope_type == _SCOPE_TYPE,
-                VirtualScopeRow.scope_id == scope_id,
+                VirtualEntityRow.entity_type == _SCOPE_TYPE,
+                VirtualEntityRow.entity_id == scope_id,
                 ScopeBindingRow.scope_type == _PARENT_SCOPE_TYPE,
                 ScopeBindingRow.scope_id == parent_id,
             )
@@ -459,7 +459,7 @@ class _RoleProbe:
 
 
 async def _scope_roles(database: ExtendedAsyncSAEngine, scope_id: UUID) -> dict[str, _RoleProbe]:
-    """The roles enrolled in the scope's virtual scope, by name."""
+    """The roles enrolled in the scope's virtual entity, by name."""
     async with database.begin_readonly_session() as sess:
         rows = (
             await sess.execute(
@@ -468,12 +468,12 @@ async def _scope_roles(database: ExtendedAsyncSAEngine, scope_id: UUID) -> dict[
                 )
                 .join(EntityMembershipRow, EntityMembershipRow.entity_id == RoleRow.id)
                 .join(
-                    VirtualScopeRow,
-                    EntityMembershipRow.virtual_scope_id == VirtualScopeRow.id,
+                    VirtualEntityRow,
+                    EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id,
                 )
                 .where(
-                    VirtualScopeRow.scope_type == _SCOPE_TYPE,
-                    VirtualScopeRow.scope_id == scope_id,
+                    VirtualEntityRow.entity_type == _SCOPE_TYPE,
+                    VirtualEntityRow.entity_id == scope_id,
                     EntityMembershipRow.entity_type == EntityType("role"),
                 )
             )
@@ -506,12 +506,12 @@ async def _row_count(database: ExtendedAsyncSAEngine) -> int:
 
 
 class TestEntityCreate:
-    async def test_create_provisions_virtual_scope_with_self_edges(
+    async def test_create_provisions_virtual_entity_with_self_edges(
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
     ) -> None:
         data = await repository.create_entity(_Creator(name="a"))
 
-        assert await _virtual_scope_id(database, data.id) is not None
+        assert await _virtual_entity_id(database, data.id) is not None
         assert await _self_membership_exists(database, data.id)
         assert await _self_binding_exists(database, data.id)
 
@@ -529,12 +529,14 @@ class TestEntityCreate:
     async def test_missing_membership_target_fails_without_inserting(
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
     ) -> None:
-        with pytest.raises(VirtualScopeNotFound):
+        with pytest.raises(VirtualEntityNotFound):
             await repository.create_entity(_Creator(name="a", parents=(uuid.uuid4(),)))
 
         assert await _row_count(database) == 0
         async with database.begin_readonly_session() as sess:
-            assert (await sess.scalar(sa.select(sa.func.count()).select_from(VirtualScopeRow))) == 0
+            assert (
+                await sess.scalar(sa.select(sa.func.count()).select_from(VirtualEntityRow))
+            ) == 0
 
     async def test_create_never_consults_presets(
         self,
@@ -553,7 +555,7 @@ class TestEntityCreate:
         # The chain constrains no scope types; permission paths convert lazily.
         data = await repository.create_entity(_OpenTypeCreator(name="a"))
 
-        assert await _virtual_scope_id(database, data.id, _OPEN_SCOPE_TYPE) is not None
+        assert await _virtual_entity_id(database, data.id, _OPEN_SCOPE_TYPE) is not None
         assert await _self_membership_exists(database, data.id, _OPEN_SCOPE_TYPE)
 
     async def test_bulk_create_provisions_and_joins_each_entity(
@@ -569,7 +571,7 @@ class TestEntityCreate:
 
         assert len(created) == 2
         for data in created:
-            assert await _virtual_scope_id(database, data.id) is not None
+            assert await _virtual_entity_id(database, data.id) is not None
             assert await _self_membership_exists(database, data.id)
         assert await _parent_membership_entity_ids(database, parent_id) == {c.id for c in created}
 
@@ -676,7 +678,7 @@ class TestEntityPurge:
 
         assert purged.id == data.id
         assert await _row_count(database) == 0
-        assert await _virtual_scope_id(database, data.id) is None
+        assert await _virtual_entity_id(database, data.id) is None
         assert await _self_membership_exists(database, data.id) is False
         assert await _self_binding_exists(database, data.id) is False
         assert await _scope_roles(database, data.id) == {}
@@ -710,7 +712,7 @@ class TestEntityPurge:
         await repository.purge_entity(_OpenTypePurger(target=data.id))
 
         assert await _row_count(database) == 0
-        assert await _virtual_scope_id(database, data.id, _OPEN_SCOPE_TYPE) is None
+        assert await _virtual_entity_id(database, data.id, _OPEN_SCOPE_TYPE) is None
 
     async def test_bulk_purge_answers_for_each_named_entity(
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
@@ -725,7 +727,7 @@ class TestEntityPurge:
 
         assert set(result.successes) == {data.id}
         assert isinstance(result.errors[absent], EntityNotFoundError)
-        assert await _virtual_scope_id(database, data.id) is None
+        assert await _virtual_entity_id(database, data.id) is None
         assert await _row_count(database) == 0
 
 
@@ -783,7 +785,7 @@ class TestSidecarCreate:
     ) -> None:
         data = await repository.create_dangling_field(_Sidecar(name="a"))
 
-        assert await _virtual_scope_id(database, data.id) is None
+        assert await _virtual_entity_id(database, data.id) is None
         assert not await _self_membership_exists(database, data.id)
 
     async def test_atomic_create_writes_every_row(
@@ -818,7 +820,7 @@ class TestEntityUpsert:
     ) -> None:
         data = await repository.upsert_entity(_Upserter(name="a", parents=(parent_id,)))
 
-        assert await _virtual_scope_id(database, data.id) is not None
+        assert await _virtual_entity_id(database, data.id) is not None
         assert await _self_membership_exists(database, data.id)
         assert await _parent_membership_entity_ids(database, parent_id) == {data.id}
 
@@ -841,7 +843,7 @@ class TestEntityUpsert:
     async def test_upsert_with_a_missing_membership_target_fails(
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
     ) -> None:
-        with pytest.raises(VirtualScopeNotFound):
+        with pytest.raises(VirtualEntityNotFound):
             await repository.upsert_entity(_Upserter(name="a", parents=(uuid.uuid4(),)))
 
         assert await _row_count(database) == 0
@@ -859,7 +861,7 @@ class TestEntityUpsert:
 
         assert [item.name for item in items] == ["a", "b"]
         for item in items:
-            assert await _virtual_scope_id(database, item.id) is not None
+            assert await _virtual_entity_id(database, item.id) is not None
             assert await _self_membership_exists(database, item.id)
         assert await _parent_membership_entity_ids(database, parent_id) == {
             item.id for item in items
@@ -888,7 +890,7 @@ class TestEntityUpsert:
         repository: OpsRepository[_EntityData],
         parent_id: UUID,
     ) -> None:
-        with pytest.raises(VirtualScopeNotFound):
+        with pytest.raises(VirtualEntityNotFound):
             await repository.atomic_upsert_entities([
                 _Upserter(name="a", parents=(parent_id,)),
                 _Upserter(name="b", parents=(uuid.uuid4(),)),

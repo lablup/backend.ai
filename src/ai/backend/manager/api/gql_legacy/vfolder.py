@@ -66,8 +66,8 @@ from ai.backend.manager.models.vfolder import (
     vfolder_permissions,
     vfolders,
 )
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
 # Re-export for backward compatibility
 __all__ = (

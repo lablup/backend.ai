@@ -3,7 +3,7 @@ name: write-spec-design
 type: design-rationale
 description: write-spec selection criteria (Entity/Global/Field/Sidecar/Relation), why a row two entities own belongs to neither position and declares its own conflict handling, why the roots share no common ABC, what a sidecar row is and why it belongs to neither position, why the role-managed root is not an EntityCreator subtype, why a global entity is provisioned in the graph, how a field row's owner is read, the distinction between member_of and cap-based sharing, open entity-type strings
 scope: src/ai/backend/manager/models/specs
-keywords: [RelationCreator, RelationPurger, RelationLifecycleUpdater, EntityCreator, GlobalEntityCreator, FieldCreator, RoleManagedEntityCreator, SidecarCreator, FieldOwnerLookup, RoleTemplateSource, member_of, entity_id, virtual-scope, preset-role, DataUpdater, soft-delete]
+keywords: [RelationCreator, RelationPurger, RelationLifecycleUpdater, EntityCreator, GlobalEntityCreator, FieldCreator, RoleManagedEntityCreator, SidecarCreator, FieldOwnerLookup, RoleTemplateSource, member_of, entity_id, virtual-entity, preset-role, DataUpdater, soft-delete]
 sources:
   - src/ai/backend/manager/models/specs/creator.py
   - src/ai/backend/manager/models/specs/lookup.py
@@ -59,7 +59,7 @@ execution path.
 
 ## A sidecar belongs to neither position
 
-- An entity can stand on its own and is woven to other entities through virtual scopes;
+- An entity can stand on its own and is woven to other entities through virtual entities;
   a field cannot stand on its own and is an extension of its owner's value, handled with
   the owner's permission.
 - A sidecar takes the diagonal: it stands on its own, yet carries no node and is read
@@ -157,7 +157,7 @@ updater's fields rather than about a column name.
 
 - `member_of(row)` declares ontological belonging at creation time — a project joins
   its domain, a keypair joins its user.
-- A user member is enrolled in the roster alone: no row binds a user's virtual scope
+- A user member is enrolled in the roster alone: no row binds a user's virtual entity
   into a scope, and a scope reaches what a user owns only through each entity's own
   enrollment (BEP-1077).
 - It carries no permission caps — cap-bounded access is the object-sharing mechanism

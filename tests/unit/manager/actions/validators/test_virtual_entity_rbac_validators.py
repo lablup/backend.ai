@@ -1,10 +1,10 @@
-"""Tests for the virtual-scope-chain RBAC action validators (BA-6876 scope).
+"""Tests for the virtual-entity-chain RBAC action validators (BA-6876 scope).
 
 These tests drive the validators against a real ``PermissionControllerRepository``
 backed by a real Postgres connection. Permissions are seeded through the
-virtual-scope chain (``virtual_scopes`` / ``scope_bindings`` /
+virtual-entity chain (``virtual_entities`` / ``scope_bindings`` /
 ``entity_memberships``) with a self scope_binding on the owner scope, so the
-non-superadmin path exercises the virtual-scope-chain permission resolution —
+non-superadmin path exercises the virtual-entity-chain permission resolution —
 not the recursive scope-walk.
 """
 
@@ -29,7 +29,7 @@ from ai.backend.common.data.entity.types import (
     ScopeRef,
     ScopeType,
 )
-from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
+from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import (
     EntityType as PermEntityType,
 )
@@ -48,18 +48,18 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
-    VirtualScopeAtomicBulkActionRBACValidator,
+    VirtualEntityAtomicBulkActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
-    VirtualScopeScopeActionRBACValidator,
+    VirtualEntityScopeActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.single_entity.trigger import (
     SingleEntityActionTriggerMeta,
 )
 from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
-    VirtualScopeSingleEntityActionRBACValidator,
+    VirtualEntitySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -87,9 +87,9 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -287,7 +287,7 @@ async def _seed_user_with_role(
             RoleRow(
                 id=role_id,
                 name=f"role-{suffix}",
-                description="virtual-scope validator test role",
+                description="virtual-entity validator test role",
             )
         )
         await db_sess.flush()
@@ -340,24 +340,24 @@ async def _seed_vs_chain(
     scope_cap: Permission | None = None,
     entity_cap: Permission | None = None,
 ) -> None:
-    """Materialize the owner's virtual scope with a self scope_binding and one
+    """Materialize the owner's virtual entity with a self scope_binding and one
     entity membership per id: ``owner scope -> VS(owner) -> entities``."""
-    vs_id = VirtualScopeID(uuid.uuid4())
+    ve_id = VirtualEntityID(uuid.uuid4())
     async with db.begin_session() as db_sess:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())
         db_sess.add(DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot()))
         db_sess.add(
-            VirtualScopeRow(
-                id=vs_id,
-                scope_type=ScopeType(EntityType(owner_scope_type)),
-                scope_id=owner_scope_id,
+            VirtualEntityRow(
+                id=ve_id,
+                entity_type=ScopeType(EntityType(owner_scope_type)),
+                entity_id=owner_scope_id,
             )
         )
         await db_sess.flush()
         db_sess.add(
             ScopeBindingRow(
-                virtual_scope_id=vs_id,
+                virtual_entity_id=ve_id,
                 scope_type=ScopeType(EntityType(owner_scope_type)),
                 scope_id=owner_scope_id,
                 permission_cap=scope_cap,
@@ -366,7 +366,7 @@ async def _seed_vs_chain(
         for entity_id in entity_ids:
             db_sess.add(
                 EntityMembershipRow(
-                    virtual_scope_id=vs_id,
+                    virtual_entity_id=ve_id,
                     entity_type=EntityType(entity_type),
                     entity_id=entity_id,
                     permission_cap=entity_cap,
@@ -390,7 +390,7 @@ async def _seed_granted_user(
     entity_cap: Permission | None = None,
 ) -> UserData:
     """Seed a non-superadmin user whose role grants *operation* on
-    *perm_entity_type* at the owner scope, reachable via the virtual-scope chain."""
+    *perm_entity_type* at the owner scope, reachable via the virtual-entity chain."""
     user_id = uuid.uuid4()
     role_id = uuid.uuid4()
     await _seed_user_with_role(db, user_id=user_id, role_id=role_id)
@@ -460,7 +460,7 @@ async def db_with_rbac_tables(
             PermissionRow,
             ObjectPermissionRow,
             AssociationScopesEntitiesRow,
-            VirtualScopeRow,
+            VirtualEntityRow,
             ScopeBindingRow,
             EntityLabelRow,
             EntityMembershipRow,
@@ -479,22 +479,22 @@ def repository(
 @pytest.fixture
 def scope_validator(
     repository: PermissionControllerRepository,
-) -> VirtualScopeScopeActionRBACValidator:
-    return VirtualScopeScopeActionRBACValidator(repository, _make_config_provider())
+) -> VirtualEntityScopeActionRBACValidator:
+    return VirtualEntityScopeActionRBACValidator(repository, _make_config_provider())
 
 
 @pytest.fixture
 def single_entity_validator(
     repository: PermissionControllerRepository,
-) -> VirtualScopeSingleEntityActionRBACValidator:
-    return VirtualScopeSingleEntityActionRBACValidator(repository, _make_config_provider())
+) -> VirtualEntitySingleEntityActionRBACValidator:
+    return VirtualEntitySingleEntityActionRBACValidator(repository, _make_config_provider())
 
 
 @pytest.fixture
 def bulk_validator(
     repository: PermissionControllerRepository,
-) -> VirtualScopeAtomicBulkActionRBACValidator:
-    return VirtualScopeAtomicBulkActionRBACValidator(repository, _make_config_provider())
+) -> VirtualEntityAtomicBulkActionRBACValidator:
+    return VirtualEntityAtomicBulkActionRBACValidator(repository, _make_config_provider())
 
 
 @pytest.fixture
@@ -673,10 +673,10 @@ async def user_with_read_capped_bulk_vfolder(
     )
 
 
-class TestVirtualScopeScopeActionRBACValidator:
+class TestVirtualEntityScopeActionRBACValidator:
     async def test_superadmin_bypasses_check(
         self,
-        scope_validator: VirtualScopeScopeActionRBACValidator,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
         scope_action: _ProjectCreateScopeAction,
         trigger_meta: BaseActionTriggerMeta,
         superadmin_user: UserData,
@@ -692,14 +692,14 @@ class TestVirtualScopeScopeActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
         # Short-circuits before the user-context lookup, so no user is set.
-        validator = VirtualScopeScopeActionRBACValidator(
+        validator = VirtualEntityScopeActionRBACValidator(
             repository, _make_config_provider(enforcement_enabled=False)
         )
         await validator.validate(scope_action, trigger_meta)
 
     async def test_missing_user_raises(
         self,
-        scope_validator: VirtualScopeScopeActionRBACValidator,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
         scope_action: _ProjectCreateScopeAction,
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
@@ -708,7 +708,7 @@ class TestVirtualScopeScopeActionRBACValidator:
 
     async def test_permission_on_subject_type_at_scope_passes(
         self,
-        scope_validator: VirtualScopeScopeActionRBACValidator,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
         scope_action: _ProjectCreateScopeAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_project_create_at_domain: UserData,
@@ -718,7 +718,7 @@ class TestVirtualScopeScopeActionRBACValidator:
 
     async def test_unauthorized_scope_among_targets_raises(
         self,
-        scope_validator: VirtualScopeScopeActionRBACValidator,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
         partially_authorized_scope_action: _ProjectCreateScopeAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_project_create_at_domain: UserData,
@@ -730,7 +730,7 @@ class TestVirtualScopeScopeActionRBACValidator:
 
     async def test_scope_cap_clips_granted_permission(
         self,
-        scope_validator: VirtualScopeScopeActionRBACValidator,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
         scope_action: _ProjectCreateScopeAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_read_capped_domain_scope: UserData,
@@ -740,10 +740,10 @@ class TestVirtualScopeScopeActionRBACValidator:
                 await scope_validator.validate(scope_action, trigger_meta)
 
 
-class TestVirtualScopeSingleEntityActionRBACValidator:
+class TestVirtualEntitySingleEntityActionRBACValidator:
     async def test_permission_via_chain_passes(
         self,
-        single_entity_validator: VirtualScopeSingleEntityActionRBACValidator,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
         single_entity_action: _VfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_vfolder_update_at_project: UserData,
@@ -761,7 +761,7 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
 
     async def test_without_permission_raises(
         self,
-        single_entity_validator: VirtualScopeSingleEntityActionRBACValidator,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
         single_entity_action: _VfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
         regular_user_without_permission: UserData,
@@ -780,7 +780,7 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
 
     async def test_entity_cap_clips_granted_permission(
         self,
-        single_entity_validator: VirtualScopeSingleEntityActionRBACValidator,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
         single_entity_action: _VfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_read_capped_vfolder: UserData,
@@ -808,7 +808,7 @@ class TestUpsertRequiresBothCreateAndUpdate:
 
     async def test_create_only_is_rejected(
         self,
-        single_entity_validator: VirtualScopeSingleEntityActionRBACValidator,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
         upsert_action: _VfolderUpsertAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_vfolder_create_only: UserData,
@@ -827,7 +827,7 @@ class TestUpsertRequiresBothCreateAndUpdate:
 
     async def test_update_only_is_rejected(
         self,
-        single_entity_validator: VirtualScopeSingleEntityActionRBACValidator,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
         upsert_action: _VfolderUpsertAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_vfolder_update_only: UserData,
@@ -846,7 +846,7 @@ class TestUpsertRequiresBothCreateAndUpdate:
 
     async def test_both_bits_pass(
         self,
-        single_entity_validator: VirtualScopeSingleEntityActionRBACValidator,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
         upsert_action: _VfolderUpsertAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_vfolder_create_and_update: UserData,
@@ -864,7 +864,7 @@ class TestUpsertRequiresBothCreateAndUpdate:
 
     async def test_single_bit_operation_still_passes_with_one_bit(
         self,
-        single_entity_validator: VirtualScopeSingleEntityActionRBACValidator,
+        single_entity_validator: VirtualEntitySingleEntityActionRBACValidator,
         single_entity_action: _VfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_vfolder_update_only: UserData,
@@ -882,10 +882,10 @@ class TestUpsertRequiresBothCreateAndUpdate:
             )
 
 
-class TestVirtualScopeAtomicBulkActionRBACValidator:
+class TestVirtualEntityAtomicBulkActionRBACValidator:
     async def test_superadmin_bypasses_check(
         self,
-        bulk_validator: VirtualScopeAtomicBulkActionRBACValidator,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
         bulk_vfolder_action: _BulkVfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
         superadmin_user: UserData,
@@ -904,7 +904,7 @@ class TestVirtualScopeAtomicBulkActionRBACValidator:
 
     async def test_all_targets_granted_passes(
         self,
-        bulk_validator: VirtualScopeAtomicBulkActionRBACValidator,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
         bulk_vfolder_action: _BulkVfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_all_bulk_vfolders_granted: UserData,
@@ -922,7 +922,7 @@ class TestVirtualScopeAtomicBulkActionRBACValidator:
 
     async def test_any_denied_target_rejects_whole_action(
         self,
-        bulk_validator: VirtualScopeAtomicBulkActionRBACValidator,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
         bulk_vfolder_action: _BulkVfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
         user_with_partial_bulk_membership: UserData,
@@ -942,7 +942,7 @@ class TestVirtualScopeAtomicBulkActionRBACValidator:
 
     async def test_entity_cap_clips_granted_permission(
         self,
-        bulk_validator: VirtualScopeAtomicBulkActionRBACValidator,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
         trigger_meta: BaseActionTriggerMeta,
         user_with_read_capped_bulk_vfolder: UserData,
     ) -> None:
@@ -954,7 +954,7 @@ class TestVirtualScopeAtomicBulkActionRBACValidator:
 
     async def test_empty_targets_passes(
         self,
-        bulk_validator: VirtualScopeAtomicBulkActionRBACValidator,
+        bulk_validator: VirtualEntityAtomicBulkActionRBACValidator,
         trigger_meta: BaseActionTriggerMeta,
         regular_user_without_permission: UserData,
     ) -> None:

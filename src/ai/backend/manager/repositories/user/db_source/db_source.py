@@ -105,9 +105,9 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
@@ -739,7 +739,7 @@ class UserDBSource:
             current_result = await w.batch_query_in_global(
                 user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
                     EntityMembershipRow.entity_id == user_uuid,
-                    VirtualScopeRow.scope_id.not_in(
+                    VirtualEntityRow.entity_id.not_in(
                         sa.select(ProjectRow.id).where(ProjectRow.type == ProjectType.PERSONAL)
                     ),
                 ),
@@ -969,7 +969,7 @@ class UserDBSource:
     ) -> UserSearchResult:
         """Search users within a project.
 
-        Membership comes from the project's virtual scope; the scope supplies
+        Membership comes from the project's virtual entity; the scope supplies
         the membership predicate.
 
         Args:

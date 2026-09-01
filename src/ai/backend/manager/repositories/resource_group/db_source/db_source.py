@@ -271,7 +271,7 @@ class ResourceGroupDBSource:
         binder: RBACScopeBinder[ResourceGroupForDomainRow],
     ) -> None:
         """Associates a resource group with multiple domains, binding each domain scope
-        to the resource group's virtual scope."""
+        to the resource group's virtual entity."""
         await self._associate_resource_groups(binder)
 
     async def disassociate_resource_group_with_domains(
@@ -279,13 +279,13 @@ class ResourceGroupDBSource:
         unbinder: RBACScopeEntityUnbinder[ResourceGroupForDomainRow],
     ) -> None:
         """Disassociates resource groups from a domain, unbinding the domain scope from
-        each resource group's virtual scope."""
+        each resource group's virtual entity."""
         await self._disassociate_resource_groups(unbinder)
 
     async def _associate_resource_groups[TRow: Base](self, binder: RBACScopeBinder[TRow]) -> None:
         """Create the N:N mapping rows and enroll each pair's resource group into the
         pair's scope (association row + membership), binding the scope to the resource
-        group's virtual scope so it reaches the resource group's entities."""
+        group's virtual entity so it reaches the resource group's entities."""
         if not binder.pairs:
             return
         async with self._rbac_ops_provider.write_ops() as w:
@@ -299,7 +299,7 @@ class ResourceGroupDBSource:
         self, unbinder: RBACScopeEntityUnbinder[TRow]
     ) -> None:
         """Delete the N:N mapping rows and withdraw each resource group from the
-        unbinder's scope (association row + membership + virtual-scope binding)."""
+        unbinder's scope (association row + membership + virtual-entity binding)."""
         async with self._rbac_ops_provider.write_ops() as w:
             accessor_scope = self._scope_ref_of(unbinder.scope_ref)
             entity_ids = unbinder.entity_ids
@@ -324,8 +324,8 @@ class ResourceGroupDBSource:
     ) -> None:
         """Enroll resource groups under ``accessor_scope`` as inheriting members:
         membership, the legacy scope association, and the scope's binding into each
-        resource group's virtual scope. The virtual scopes are ensured first, since
-        rows created before the virtual-scope rollout may not have one."""
+        resource group's virtual entity. The virtual entities are ensured first, since
+        rows created before the virtual-entity rollout may not have one."""
         if not resource_group_ids:
             return
         await w.ensure_scope(accessor_scope)
@@ -349,7 +349,7 @@ class ResourceGroupDBSource:
     ) -> None:
         """Withdraw resource groups from ``accessor_scope`` via ``remove_bulk_members``:
         membership, the legacy scope association, and the scope's binding in each
-        resource group's virtual scope (missing virtual scopes never raise)."""
+        resource group's virtual entity (missing virtual entities never raise)."""
         if not resource_group_ids:
             return
         await w.remove_bulk_members(
@@ -416,7 +416,7 @@ class ResourceGroupDBSource:
         binder: RBACScopeBinder[ResourceGroupForProjectRow],
     ) -> None:
         """Associates a resource group with multiple user groups (projects), binding each
-        project scope to the resource group's virtual scope."""
+        project scope to the resource group's virtual entity."""
         await self._associate_resource_groups(binder)
 
     async def disassociate_resource_group_with_user_groups(
@@ -424,7 +424,7 @@ class ResourceGroupDBSource:
         unbinder: RBACScopeEntityUnbinder[ResourceGroupForProjectRow],
     ) -> None:
         """Disassociates resource groups from a project, unbinding the project scope from
-        each resource group's virtual scope."""
+        each resource group's virtual entity."""
         await self._disassociate_resource_groups(unbinder)
 
     async def check_resource_group_user_group_association_exists(
@@ -562,7 +562,7 @@ class ResourceGroupDBSource:
         """Atomically add/remove allowed resource groups for a domain.
 
         Alongside the N:N mapping rows, maintains the domain scope's RBAC association
-        with each resource group (association row + membership + virtual-scope binding).
+        with each resource group (association row + membership + virtual-entity binding).
 
         Returns the current list of allowed resource group names after the update.
         """
@@ -615,7 +615,7 @@ class ResourceGroupDBSource:
         """Atomically add/remove allowed resource groups for a project.
 
         Alongside the N:N mapping rows, maintains the project scope's RBAC association
-        with each resource group (association row + membership + virtual-scope binding).
+        with each resource group (association row + membership + virtual-entity binding).
 
         Returns the current list of allowed resource group names after the update.
         """

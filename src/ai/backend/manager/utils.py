@@ -17,7 +17,7 @@ from .models.keypair import keypairs
 from .models.project import groups
 from .models.resource_policy import keypair_resource_policies
 from .models.user import UserRole, users
-from .models.virtual_scope.queries import user_scope_membership_exists
+from .models.virtual_entity.queries import user_scope_membership_exists
 
 
 def check_if_requester_is_eligible_to_act_as_target_user(

@@ -234,7 +234,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def _create_scanned_images(self, creators: list[ImageCreator]) -> list[ImageData]:
         """Insert the images the scan found, each joining the registry it came from.
 
-        A registry created before the virtual-scope rollout has no node to join, so it
+        A registry created before the virtual-entity rollout has no node to join, so it
         is put into the graph first.
         """
         if not creators:

@@ -66,9 +66,9 @@ from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
 from ai.backend.manager.repositories.replica_group import ReplicaGroupRepository
 from ai.backend.manager.repositories.replica_group.types import (
@@ -169,7 +169,7 @@ class TestReplicaGroupRepository:
         async with with_tables(
             database_connection,
             [
-                VirtualScopeRow,
+                VirtualEntityRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
                 EntityLabelRow,
@@ -276,8 +276,8 @@ class TestReplicaGroupRepository:
             await db_sess.flush()
             # A session group joins its project and its owner, which must be in the
             # graph first.
-            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group_id))
-            db_sess.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
+            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group_id))
+            db_sess.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
             await db_sess.flush()
             db_sess.add(
                 EndpointRow(

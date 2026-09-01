@@ -51,8 +51,8 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.utils import query_userinfo, query_userinfo_from_session
@@ -70,7 +70,7 @@ ALL_ROWS: list[TableOrORM] = [
     KeyPairRow,
     ProjectRow,
     AssociationScopesEntitiesRow,
-    VirtualScopeRow,
+    VirtualEntityRow,
     EntityMembershipRow,
     EntityLabelRow,
     ContainerRegistryRow,
@@ -234,20 +234,20 @@ class TestQueryUserinfo:
                     relation_type=RelationType.AUTO,
                 )
             )
-            # Membership read model: the project's virtual scope with the user
+            # Membership read model: the project's virtual entity with the user
             # enrolled in it.
-            project_vs_id = uuid.uuid4()
+            project_ve_id = uuid.uuid4()
             sess.add(
-                VirtualScopeRow(
-                    id=project_vs_id,
-                    scope_type=ScopeType.PROJECT.value,
-                    scope_id=group_id,
+                VirtualEntityRow(
+                    id=project_ve_id,
+                    entity_type=ScopeType.PROJECT.value,
+                    entity_id=group_id,
                 )
             )
             await sess.flush()
             sess.add(
                 EntityMembershipRow(
-                    virtual_scope_id=project_vs_id,
+                    virtual_entity_id=project_ve_id,
                     entity_type=EntityType.USER.value,
                     entity_id=user_uuid,
                 )
@@ -633,20 +633,20 @@ class TestQueryUserinfoFromSession:
                     relation_type=RelationType.AUTO,
                 )
             )
-            # Membership read model: the project's virtual scope with the user
+            # Membership read model: the project's virtual entity with the user
             # enrolled in it.
-            project_vs_id = uuid.uuid4()
+            project_ve_id = uuid.uuid4()
             sess.add(
-                VirtualScopeRow(
-                    id=project_vs_id,
-                    scope_type=ScopeType.PROJECT.value,
-                    scope_id=group_id,
+                VirtualEntityRow(
+                    id=project_ve_id,
+                    entity_type=ScopeType.PROJECT.value,
+                    entity_id=group_id,
                 )
             )
             await sess.flush()
             sess.add(
                 EntityMembershipRow(
-                    virtual_scope_id=project_vs_id,
+                    virtual_entity_id=project_ve_id,
                     entity_type=EntityType.USER.value,
                     entity_id=user_uuid,
                 )

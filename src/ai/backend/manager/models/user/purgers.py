@@ -42,8 +42,8 @@ from ai.backend.manager.models.specs.purger import (
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder.row import VFolderPermissionRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 
 @dataclass
@@ -150,7 +150,7 @@ class UserScopeAssociationPurger(FieldBatchPurger[UserID, AssociationScopesEntit
 class UserProjectRolePurger(FieldBatchPurger[UserID, UserRoleRow, RoleID]):
     """Unmaps a user from the roles a project scope owns.
 
-    The project's roles are the role entities enrolled in its virtual scope.
+    The project's roles are the role entities enrolled in its virtual entity.
     """
 
     project_id: ProjectID
@@ -159,10 +159,10 @@ class UserProjectRolePurger(FieldBatchPurger[UserID, UserRoleRow, RoleID]):
     def build_subquery(self, owner_id: UserID) -> sa.sql.Select[Any]:
         project_role_ids = (
             sa.select(EntityMembershipRow.entity_id)
-            .join(VirtualScopeRow, EntityMembershipRow.virtual_scope_id == VirtualScopeRow.id)
+            .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
             .where(
-                VirtualScopeRow.scope_type == PROJECT_SCOPE_TYPE,
-                VirtualScopeRow.scope_id == self.project_id,
+                VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                VirtualEntityRow.entity_id == self.project_id,
                 EntityMembershipRow.entity_type == ROLE_ENTITY_TYPE,
             )
         )

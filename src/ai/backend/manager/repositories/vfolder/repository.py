@@ -123,7 +123,7 @@ from ai.backend.manager.models.vfolder.updaters import (
     VFolderSoftDeleteUpdater,
     VFolderTrashUpdater,
 )
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
