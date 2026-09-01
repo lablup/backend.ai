@@ -101,8 +101,10 @@ class RootlessOciRuntime(OciRuntime):
 
         The kernel-runner must stay **container-root**, which every rootless runtime here maps to
         the host's ``container.kernel-uid`` -- the uid that owns the scratch. A non-zero id inside
-        would be a *different* host id (unmapped on enroot/apptainer, ``100000+`` on podman) that
-        cannot read the files it is supposed to own, so all three force these to 0.
+        is a *different* host id and cannot read the files it is supposed to own, so all three
+        force these to 0. Measured: container uid N is host 99999+N under podman and apptainer
+        (both map /etc/subuid's range), and simply does not exist under enroot, whose namespace
+        holds exactly one id -- ``setuid`` to any other silently leaves the caller where it was.
 
         Which is exactly right when the requested id IS the kernel uid: container-root maps to it,
         so the files land under the requested identity either way. It is not right when an operator

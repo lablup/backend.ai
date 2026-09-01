@@ -1176,62 +1176,190 @@ pid로는 EPERM을 받는다 — ssh 세션이나 사용자 백그라운드 잡�
 uid에게 넘겨준다.
 
 
-## 19. rootless 와 사용자별 호스트 uid (9/1)
+## 19. rootless 와 사용자별 uid — 전면 재조사 (9/1~9/2)
 
-### 19.1 커널이 그은 선 (실측)
+§19 는 처음 쓴 뒤 세 번 정정했다. 아래는 전부 이 노드에서 실측한 것이고, 추론은 그렇게 표시했다.
 
-| uid_map 쓰기 | root | `CAP_SETUID`만 | privnet 현재 cap | 비특권 |
+### 19.1 커널이 그은 선
+
+`uid_map` 에 무엇을 쓸 수 있나 (`unshare -U` 로 만든 네임스페이스에 각 주체가 write):
+
+| 매핑 | root | `CAP_SETUID` 만 | privnet 현재 cap | 비특권 |
 |---|---|---|---|---|
-| `0 -> 5001` (조직 uid) | 성공 | **성공** | 거부 | 거부 (`newuidmap: uid range [0-1) -> [5001-5002) not allowed`) |
+| `0 -> 5001` (조직 uid) | 성공 | **성공** | 거부 | 거부 |
 | `0 -> 0` (호스트 root) | 성공 | **거부** | 거부 | 거부 |
 
-비특권 에이전트가 호스트에 만들 수 있는 파일 소유자는 `{자기 uid} ∪ [subuid 범위]` 뿐이다.
-podman/enroot/apptainer 공통이며 런타임 특성이 아니라 `newuidmap`의 규칙이다.
+비특권으로 `newuidmap` 을 부르면 `newuidmap: uid range [0-1) -> [5001-5002) not allowed`.
+`/etc/subuid` 에 `charsyam:5001:1` 을 넣어도 podman 의 바깥 맵에는 반영되지 않았다
+(`0 1000 1` / `1 100000 65536` 그대로, 상대 문법은 `parent ID UID 5001 is not mapped/delegated`).
 
-### 19.2 백엔드별 실제 동작 (같은 이미지, 같은 쓰기 테스트)
+즉 **비특권 에이전트가 만들 수 있는 파일 소유자는 `{자기 uid} ∪ [subuid 범위]`** 뿐이다.
 
-| | user namespace | 컨테이너 root 로 쓰기 | 컨테이너 uid 1000 으로 쓰기 | 사용자별 uid |
-|---|---|---|---|---|
-| containerd | **없음** (`0 0 4294967295`) | 호스트 uid 0 | 호스트 uid 1000 | 지원 |
-| docker | 없음 (userns-remap 꺼짐) | 〃 | 〃 | 지원 |
-| podman | 있음 (`0->kernel_uid`, `1->100000`) | 호스트 kernel_uid | **Permission denied** | 기본 불가 |
-| enroot / apptainer | 있음 | 호스트 kernel_uid | unmapped (nobody) | 불가 |
+`CAP_SETUID` 만으로 조직 uid 매핑이 되고 호스트 root 는 안 된다는 것도 확인했다 — 생각보다
+잘 제한된 권한이다. 다만 podman 은 그 권한을 쓸 구조가 아니다 (19.3).
 
-### 19.3 podman `keep-id` 는 되지만 비싸다
+### 19.2 백엔드별 실제 맵
 
-`--userns=keep-id:uid=1000,gid=1000` 은 **동작한다** — 컨테이너 uid 1000 = 호스트 uid 1000,
-파일도 1000:1000 으로 떨어진다. 대가:
+| | uid_map | 컨테이너 안에서 쓸 수 있는 uid |
+|---|---|---|
+| containerd | `0 0 4294967295` (**userns 없음**) | 전부 (= 호스트 uid) |
+| docker | 동일 (`userns-remap` 꺼짐) | 전부 |
+| podman | `0 1000 1` + `1 100000 65536` | 65,537 개 |
+| apptainer `--fakeroot` | `0 1000 1` + `1 100000 65536` | 65,537 개 |
+| **enroot `--root`** | `0 1000 1` | **1 개** |
+
+컨테이너 안 uid *N* -> 호스트 *99999+N*. podman·apptainer 양쪽에서 같은 값 확인
+(컨테이너 5001 -> 호스트 **105000**).
+
+enroot 에서는 `setuid(6)` 이 **오류 없이 아무 일도 안 한다** (uid 그대로 0, 파일도 호스트 1000).
+소스로도 확정 — `bin/common.h:92 unshare_userns()` 가 맵을 만드는 유일한 지점이고
+
+```c
+asprintf(&uidmap, "%u %u 1", remap_root ? 0 : geteuid(), geteuid());
+{"/proc/self/setgroups", "deny"}, ...
+```
+
+count 가 `1` 로 하드코딩돼 있으며 `newuidmap` 을 부르지 않는다. 저장소 전체에 `subuid` 문자열이
+0 건이고, `doc/requirements.md` 는 커널 설정만 요구한다. README 첫 특징 줄이 근거다 —
+*"Fully unprivileged and multi-user capable (**no setuid binary**, ...)"*. `newuidmap` 이 바로 그
+setuid 바이너리이므로 subuid 배제는 그 원칙의 귀결이지 별도 정의가 아니다.
+
+### 19.3 조직 uid 는 불가, 세션별 신원은 가능
+
+**불가**: 조직의 uid 번호(5001)로 파일을 만드는 것. 19.1 의 커널 규칙.
+
+**가능**: subuid 범위에서 세션마다 다른 호스트 신원을 주는 것. 측정:
+
+```
+세션 A (--uidmap 0:@100005:1) -> 파일 100005:100005
+세션 B (--uidmap 0:@100006:1) -> A 의 0700 파일 "읽기 거부", 자기 파일은 쓰기 성공
+```
+
+즉 **목적이 "격리"라면 rootless 로도 선다.** 단 podman/apptainer 한정 (enroot 는 id 1 개).
+
+podman `--uidmap` 으로 기본 맵을 벗어나면 비용이 붙는다 — 이미지 레이어 재-chown:
 
 | 실행 | 매핑 | 시간 |
 |---|---|---|
-| 1회차 | uid 1000 | 약 3~4분 |
+| 1회차 | uid 1000 (keep-id) | 3~4분 |
 | 2회차 | uid 1001 | 5분 11초 |
-| 3회차 | uid 1000 (재방문) | **0초** (캐시됨) |
+| 3회차 | uid 1000 재방문 | **0초** (캐시) |
+| 실제 커널 이미지 | `0:@100007:1` | **5분 13초**, 스토리지 4.1G -> 5.5G |
 
-디스크는 **매핑마다 이미지 사본 1벌**: 원본 1.4G + 매핑 2개 = storage 4.1G,
-`podman images` 보고값 4.98 GB -> 7.47 GB. 사용자 N명이면 N벌이다.
+(이미지, 매핑) 쌍당 1 회지만 **매핑마다 이미지 사본 1 벌**(약 1.4 GB)이 남는다.
+반면 **기본 맵 안에서 컨테이너 안 uid 만 고르면 이 비용이 없다** — `--uidmap` 을 안 쓰기 때문.
+apptainer 는 `--uidmap` 자체가 없어 이 경로만 쓸 수 있다.
 
-idmapped bind mount 는 rootless 에서 커널이 거부한다 (`MOUNT_ATTR_IDMAP: operation not
-permitted`).
+idmapped bind mount 는 rootless 에서 커널이 거부한다
+(`MOUNT_ATTR_IDMAP: operation not permitted`).
 
-### 19.4 결론과 이번 변경
+### 19.4 에이전트는 무권한으로 subuid 범위에 chown 할 수 있다
 
-`users.container_uid` 는 BAI 의 1급 기능이다
-(`AssignContainerUserMappingRule` -> `kernels.uid` -> `LOCAL_USER_ID`). rootless 백엔드는 그걸
-**조용히 버리고** 있었다 — 세션은 뜨지만 파일이 요청과 다른 uid 로 떨어진다. 공유 파일시스템에서
-가장 늦게 발견되고 되돌리기 비싼 종류의 오동작이다.
+자기 userns 안에서 하면 된다. 네임스페이스 안의 id 로 지정해야 한다 (호스트 100005 = ns 6):
 
-그래서 `RootlessOciRuntime._container_identity_env()` 를 두고 세 백엔드가 공유한다:
+```
+podman unshare chown 6:6 <file>          -> 호스트 100005   (양방향 가능: 6:6 <-> 0:0)
+unshare -U + newuidmap + chown 6:6       -> 호스트 100005   (podman 없이도 동일)
+파일 10,000 개 재귀 chown                 -> 0.12 초 (로컬 ZFS)
+```
 
-* 요청 uid/gid 가 **노드의 `kernel-uid`와 같으면** 컨테이너-root 로 돌려도 호스트 소유권이
-  동일하므로 그대로 진행한다 (UID_MATCH 이미지가 여기 해당).
-* 그 외 값이면 `ContainerUserMappingUnsupportedError` 로 **세션을 거절**한다.
+### 19.5 vfolder — 지금은 정상, 그리고 더 나은 길
 
-라이브 확인: `container_uid=5001` 설정 후 세션 생성 →
-`this session asks to run as uid=5001, and the podman backend can only give it 1000 ... Run this
-user on a backend that uses the host's own ids (containerd/docker)`. 설정 해제 후 세션 RUNNING 정상.
+**현재 상태는 정상이다.** 세 백엔드 모두:
 
-**설계 방향**: "podman 에 매핑 구조를 도입"이 아니라, rootless 백엔드는 *사용자별 호스트 uid 가
-필요 없는 배포*용으로 위치를 잡는 것이 맞다. 사용자별 uid 가 요구사항이면 containerd 를 쓴다.
-privnet 에 `CAP_SETUID`/`CAP_SETGID` 를 주는 중간 경로는 기술적으로 가능하지만(19.1 측정),
-podman 쪽 이미지 chown 비용(19.3)이 그대로 남고 enroot/apptainer 에는 통로가 없다.
+```
+vfolder 생성(프록시) -> 호스트 1000:1000
+컨테이너(안 uid 0 = 호스트 1000)에서 쓰기 -> 성공
+호스트 파일 1000:1000, 프록시가 다시 읽기 -> 성공
+```
+
+`LOCAL_USER_ID=0` 강제는 문제를 감추는 우회가 아니라 **vfolder 를 성립시키는 선택**이다.
+컨테이너-root 가 `kernel_uid` 로 매핑되고 vfolder 도 프록시가 같은 uid 로 만들기 때문.
+전제: **노드의 `container.kernel-uid` == vfolder 를 소유하는 uid** (이 노드는 둘 다 1000).
+
+사용자별 신원으로 가면 워크로드가 호스트 105000 이 되어 vfolder(1000 소유)를 못 쓴다.
+세션 종료 시 chown 하는 방식은 가능하지만(19.4) 세 가지가 걸린다:
+세션 *중* 프록시가 접근 불가 / 공유·프로젝트 vfolder 는 uid 하나로 정할 수 없음 /
+에이전트 크래시 시 잔존. (추론: NFS 등 원격 스토리지에서는 chown 자체가 서버에서 거부될 수 있음.)
+
+**공유 gid + setgid 디렉터리가 더 낫다 — chown 이 아예 필요 없다:**
+
+```
+vfolder: drwxrws--- 1000 1000            (chmod 2770)
+세션:    uid=5001(호스트 105000) groups=5001,0(호스트 1000)
+결과:    -rw-rw-r-- 105000:1000          (setgid 상속, umask 002)
+프록시(1000): 읽기 O / 덧쓰기 O / 새 파일 생성 O
+```
+
+세션 중에도 양쪽이 동시에 접근하고, 공유 vfolder 도 그대로 되고, 크래시해도 되돌릴 상태가 없다.
+
+### 19.6 `container_uid` 의 역할은 vfolder 하나가 아니다
+
+`runner/entrypoint.sh` 가 `LOCAL_USER_ID` 로 하는 일:
+
+| 줄 | |
+|---|---|
+| 114 | `useradd -u $USER_ID` — 컨테이너 안 사용자 계정 생성 |
+| 159·164 | `chown $USER_ID:$GROUP_ID /opt/kernel/agent.sock` |
+| 168·172·178 | `su-exec` 로 dotfile 추출 / ssh-agent / 비밀번호 |
+| **213** | **`su-exec "$USER_ID:$GROUP_ID,$ADDITIONAL_GIDS,42"` — 워크로드 자체** |
+
+즉 파일 소유권이 아니라 **사용자 프로세스의 신원 전체**다. `USER_ID=0` 이면 39 행의 다른 분기를
+타서 `useradd` 도 `su-exec` 도 없이 `exec_main "$@"` 로 끝난다 — 사용자 코드가 컨테이너-root 로
+돈다.
+
+그게 보안 문제는 아니다: 호스트에서는 비특권 uid 1000 이고, seccomp 는 그대로 걸리며
+(D1: 커널+자손 6 개 전부 filter 모드), krunner 파일은 `ro` 바인드라 덮어쓰기가
+`Read-only file system` 으로 거부된다. 실제 영향은 **동작 차이**다 — pip/jupyter 의 root 경고,
+`sudo_session_enabled` 가 죽은 설정이 됨(`work` 사용자 없음), `container_gids` 무시.
+
+### 19.7 지금 있는 버그: 보조 gid 가 통째로 버려진다
+
+흐름은 갖춰져 있다:
+`container_gids` -> `agent.py:2771 update_additional_gids()` -> `ADDITIONAL_GIDS` /
+`spec.py:317 user["additionalGids"]` -> `entrypoint.sh:213 su-exec`.
+
+rootless 에서 **두 군데가 끊겨 있다**:
+
+1. `LOCAL_USER_ID=0` 강제 -> entrypoint 가 su-exec 분기를 안 탐 -> `ADDITIONAL_GIDS` 미적용
+2. 세 rootless 런타임 어디도 OCI spec 의 `additionalGids` 를 런타임에 전달하지 않음
+   (podman 런타임의 `--group-add` 사용 0 회)
+
+결과 — 컴퓨트 플러그인이 요청한 gid(ROCm `video`/`render` 등)도 함께 버려진다:
+
+```
+컨테이너 안에서 본 /dev/dri/card0 :  crw-rw---- 65534 65534   (root:video 둘 다 unmapped)
+컨테이너-root 가 열기             :  Permission denied
+```
+
+NVIDIA 가 지금까지 문제 없던 건 `/dev/nvidia0` 이 `crw-rw-rw-`(666) 이라 소유권과 무관하게
+열리기 때문이다. **그룹 권한에 의존하는 장치(AMD ROCm, NPU, IB HCA)는 rootless 세 백엔드
+모두에서 안 열린다.**
+
+이건 공유 gid 로도 못 고친다. vfolder 는 gid 를 우리가 고를 수 있지만(에이전트 gid 1000 ->
+ns gid 0), 장치 노드의 gid 는 호스트가 정한 값(`video`=44)이고 subgid 범위 밖이라 매핑이 안 된다.
+
+### 19.8 결론과 이번 변경
+
+| 요구 | enroot | apptainer / podman | containerd |
+|---|---|---|---|
+| 컨테이너 안에서 그 uid 로 실행 | **불가** (uid 1 개) | 가능 | 가능 |
+| 호스트 파일이 조직 uid 소유 | 불가 | 불가 (105000 이 됨) | 가능 |
+| 세션별로 구분되는 호스트 신원 | 불가 | 가능 (subuid 범위) | 가능 |
+| vfolder (현재 구성) | **정상** | **정상** | 정상 |
+
+`users.container_uid` 는 호스트 uid 를 뜻하므로 rootless 세 백엔드 모두 지킬 수 없다. 그래서
+조용히 무시하는 대신 **거절**한다 (`RootlessOciRuntime._container_identity_env`,
+`ContainerUserMappingUnsupportedError`). 요청 uid 가 노드의 `kernel-uid` 와 같으면
+컨테이너-root 가 이미 그 신원이므로 그대로 진행한다 (UID_MATCH 이미지).
+
+라이브 확인: `container_uid=5001` 설정 후 세션 -> `asks to run as uid=5001, and the podman
+backend can only give it 1000 ... Run this user on a backend that uses the host's own ids`.
+해제 후 세션 RUNNING 정상.
+
+**남은 항목**
+
+* `container_gids` 도 같은 이유로 조용히 무시된다 — 거절 대상에 추가 필요 (19.7)
+* 그룹 권한 의존 장치가 rootless 에서 안 열리는 것 — 최소한 경고 (19.7)
+* 세션별 신원 설계 (BEP 감): subuid 대역의 노드 간 일관성, 사용자->오프셋 결정적 배정,
+  스크래치 chown(19.4), 공유 gid + setgid(19.5), enroot 는 대상 외
