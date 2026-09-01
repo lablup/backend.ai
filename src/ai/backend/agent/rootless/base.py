@@ -41,7 +41,6 @@ import logging
 import os
 import shutil
 import tarfile
-import time
 from abc import abstractmethod
 from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path
@@ -61,8 +60,8 @@ from ai.backend.agent.containerd.runtime.interface import (
     TaskHandle,
 )
 from ai.backend.agent.containerd.runtime.spec import container_cgroup_fs_path
-from ai.backend.agent.errors.agent import ContainerConfinementFailedError
 from ai.backend.agent.network.journal_io import atomic_write
+from ai.backend.agent.rootless.gate import GATE_MNT, signal_go, wait_ready, write_gate
 from ai.backend.agent.rootless.runtime import RootlessOciRuntime
 from ai.backend.agent.rootless.seccomp import compile_profile
 from ai.backend.common.arch import CURRENT_ARCH
@@ -70,9 +69,6 @@ from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
-# The per-container gate directory (pause script + go FIFO) is bind-mounted here inside the
-# container; a top-level hidden path avoids colliding with the image / OCI-spec mounts.
-GATE_MNT: Final = "/.bai-rootless-gate"
 # The seccomp filter the agent compiled for this container, and the installer that puts it on.
 # Both are bind-mounted in with the gate.
 SECCOMP_FILTER: Final = "seccomp.bpf"
@@ -116,14 +112,6 @@ TASK_POLL_INTERVAL_SEC: Final = 1.0
 # nothing, and the interval is what bounds the overshoot (see _rotate_logs_loop).
 LOG_ROTATE_INTERVAL_SEC: Final = 5.0
 _LOG_COPY_CHUNK: Final = 1024 * 1024
-# The label the agent stamps on every container; the privnet keys its records by session.
-_SESSION_ID_LABEL: Final = "ai.backend.session-id"
-# Presence of the unified hierarchy's controller list is what tells cgroup v2 from v1.
-_CGROUP_V2_MARKER: Final = "/sys/fs/cgroup/cgroup.controllers"
-# rmdir on a cgroup whose members are still exiting returns EBUSY; ~1s total is far more than the
-# kernel needs to reap processes that have already been SIGKILLed.
-_CGROUP_RMDIR_RETRIES: Final = 20
-_CGROUP_RMDIR_DELAY_SEC: Final = 0.05
 
 
 class _HashingWriter:
@@ -199,10 +187,6 @@ class SelfHostedRootlessRuntime(RootlessOciRuntime):
     _procs: dict[str, asyncio.subprocess.Process]
     # container_id -> source image ref, so remove/commit can find the image.
     _images: dict[str, str]
-    # container_id -> the OCI spec's labels (KERNEL_ID_LABEL/OWNER_AGENT_LABEL/...). enumerate_
-    # containers filters on these to reconcile live kernels + rebuild the resource alloc map, so an
-    # empty set here would drop every container from reconstruct_resource_usage.
-    _labels: dict[str, Mapping[str, str]]
     _log_root: Path | None
     # container_logs.max_length: the total budget across the active log and its rotated siblings.
     # 0 until configure_logging() runs (which is after open()), meaning "not configured, do not
@@ -220,7 +204,6 @@ class SelfHostedRootlessRuntime(RootlessOciRuntime):
         self._pids = {}
         self._procs = {}
         self._images = {}
-        self._labels = {}
         self._log_root = None
         self._log_max_bytes = 0
         self._rotator_task = None
@@ -428,22 +411,7 @@ class SelfHostedRootlessRuntime(RootlessOciRuntime):
         return self._state_path / container_id / "gate"
 
     def _write_gate(self, gate_dir: Path) -> None:
-        gate_dir.mkdir(parents=True, exist_ok=True)
-        script = gate_dir / "pause.sh"
-        script.write_text(PAUSE_SCRIPT)
-        script.chmod(0o755)
-        fifo = gate_dir / "go"
-        if not fifo.exists():
-            os.mkfifo(fifo, 0o600)
-        # The container runs as the kernel uid, so it — not the root agent — is what writes the
-        # `ready` marker into the gate dir and reads the `go` FIFO. Hand the gate (and its parent,
-        # the per-container state dir) to the kernel uid so those cross into the container. No-op
-        # when the agent already runs as the kernel uid.
-        if os.geteuid() != self._kernel_uid:
-            os.chown(gate_dir.parent, self._kernel_uid, self._kernel_gid)
-            os.chown(gate_dir, self._kernel_uid, self._kernel_gid)
-            os.chown(script, self._kernel_uid, self._kernel_gid)
-            os.chown(fifo, self._kernel_uid, self._kernel_gid)
+        write_gate(gate_dir, PAUSE_SCRIPT, uid=self._kernel_uid, gid=self._kernel_gid)
 
     def _write_seccomp(self, gate_dir: Path, spec: Mapping[str, Any]) -> None:
         """Compile this container's seccomp profile into the gate, for the pause wrapper to apply.
@@ -486,27 +454,27 @@ class SelfHostedRootlessRuntime(RootlessOciRuntime):
     async def _wait_ready(
         self, proc: asyncio.subprocess.Process, gate_dir: Path, container_id: str
     ) -> None:
-        # Wait until the pause-wrapper writes its `ready` marker (it has reached the FIFO pause and
-        # is the stable netns holder) before attaching — avoids racing a transient setup PID.
-        ready = gate_dir / "ready"
-        poll = 0.1
-        for _ in range(max(1, int(TASK_START_TIMEOUT_SEC / poll))):
-            if ready.exists():
-                return
-            if proc.returncode is not None:
-                raise RuntimeError(
-                    f"{self.backend_name} launch exited before pause "
-                    f"(rc={proc.returncode}):{self._launch_diagnosis(container_id)}"
+        try:
+            async with asyncio.timeout(TASK_START_TIMEOUT_SEC):
+                await wait_ready(
+                    gate_dir,
+                    failure=lambda: (
+                        None
+                        if proc.returncode is None
+                        else (
+                            f"{self.backend_name} launch exited before pause "
+                            f"(rc={proc.returncode}):{self._launch_diagnosis(container_id)}"
+                        )
+                    ),
                 )
-            await asyncio.sleep(poll)
-        raise TimeoutError(
-            f"{self.backend_name} container did not reach the pause (no ready marker):"
-            f"{self._launch_diagnosis(container_id)}"
-        )
+        except TimeoutError:
+            raise TimeoutError(
+                f"{self.backend_name} container did not reach the pause (no ready marker):"
+                f"{self._launch_diagnosis(container_id)}"
+            ) from None
 
     def _signal_go(self, go_fifo: Path) -> None:
-        with go_fifo.open("w") as f:
-            f.write("go\n")
+        signal_go(go_fifo.parent)
 
     def _log_hardening_disposition(self, container_id: str, spec: Mapping[str, Any]) -> None:
         # Make the hardening model explicit and observable. Capabilities are dropped by design
@@ -660,127 +628,6 @@ class SelfHostedRootlessRuntime(RootlessOciRuntime):
                     "[{}] cannot move pid {} into {}: {!r}", self.backend_name, pid, cgroup, e
                 )
 
-    async def _release_via_privnet(self, container_id: str) -> None:
-        from ai.backend.agent.network.privnet.client import PrivNetClient, PrivNetClientError
-
-        session_id = str(self._labels.get(container_id, {}).get(_SESSION_ID_LABEL, container_id))
-        try:
-            await PrivNetClient(self._privnet_socket or "").release_container(
-                session_id, container_id
-            )
-        except (OSError, TimeoutError, PrivNetClientError) as e:
-            log.warning(
-                "[{}] privnet could not release the cgroup for {}: {!r}",
-                self.backend_name,
-                container_id,
-                e,
-            )
-
-    async def _confine_via_privnet(
-        self, container_id: str, spec: Mapping[str, Any], top_pid: int
-    ) -> None:
-        """Have the privnet create this container's cgroup and move its tree in.
-
-        These runtimes have no daemon of their own and an unprivileged agent cannot make a cgroup
-        under /sys/fs/cgroup, so there is nobody else to ask. containerd and dockerd get this for
-        free: they declare `cgroupsPath` in the OCI spec and their ROOT daemon obliges. Without the
-        delegation the kernel simply stays in the agent's own cgroup — measured on a kernel
-        allocated 8 GiB and 4 CPUs: `memory.max = max`, `Cpus_allowed_list: 0-31`.
-
-        A failure here fails the creation. It used to warn and start the kernel anyway, and what
-        that produced is not a degraded kernel but a dishonest one: the manager placed it on this
-        node believing its limits hold, and it has none of them. There is no fallback to try — the
-        local path cannot work either, which is why we are here — and the caller is still holding
-        the container at its gate, so nothing of the user's command has run yet.
-
-        The narrow except is deliberate. A bare `Exception` here also swallowed programming errors
-        in this method — a typo in `_cgroup_limits` surfaced as "privnet could not confine" and
-        silently disabled every limit on the node — so only the ways the privnet itself can fail
-        are caught.
-        """
-        from ai.backend.agent.network.privnet.client import PrivNetClient, PrivNetClientError
-
-        session_id = str(self._labels.get(container_id, {}).get(_SESSION_ID_LABEL, container_id))
-        try:
-            await PrivNetClient(self._privnet_socket or "").confine_container(
-                session_id, container_id, top_pid, self._cgroup_limits(spec)
-            )
-        except (OSError, TimeoutError, PrivNetClientError) as e:
-            raise ContainerConfinementFailedError(
-                f"the privnet could not confine {container_id} ({e!r}); refusing to start a kernel"
-                " that would run without the CPU and memory it was allocated"
-            ) from e
-
-    def _create_cgroup(self, container_id: str, spec: Mapping[str, Any]) -> Path | None:
-        """Create the kernel's cgroup and write its limits. None when this host cannot do it."""
-        if not Path(_CGROUP_V2_MARKER).exists():
-            # cgroup v1 splits every controller into its own hierarchy; the agent's stats reader
-            # composes those per-controller mount points itself. Rather than half-apply limits
-            # across trees, say plainly that this host gets none.
-            log.warning(
-                "[{}] cgroup v1 host: per-kernel CPU/memory limits and stats are NOT applied",
-                self.backend_name,
-            )
-            return None
-        cgroup = container_cgroup_fs_path(container_id)
-        parent = cgroup.parent
-        try:
-            parent.mkdir(parents=True, exist_ok=True)
-            # A controller only reaches a child if the parent delegates it. Without this the leaf
-            # has no cpuset.cpus / memory.max files to write at all. `io` is not something we set,
-            # but the memory plugin reads `io.stat` on every pass and an undelegated controller
-            # means that file does not exist — which is a FileNotFoundError, i.e. no memory
-            # measurement either.
-            (parent / "cgroup.subtree_control").write_text("+cpu +cpuset +io +memory")
-            cgroup.mkdir(exist_ok=True)
-        except OSError as e:
-            raise ContainerConfinementFailedError(
-                f"cannot create the cgroup {cgroup} ({e!r}); refusing to start a kernel that would"
-                " run without the CPU and memory it was allocated"
-            ) from e
-        self._write_cgroup_limits(cgroup, spec)
-        return cgroup
-
-    @staticmethod
-    def _cgroup_limits(spec: Mapping[str, Any]) -> dict[str, str]:
-        """The cgroup interface files this spec asks for. Split out so the privnet delegation and
-        the local writer send the same numbers."""
-        limits: list[tuple[str, str]] = []
-        if cpus := spec.get("cpuset_cpus"):
-            limits.append(("cpuset.cpus", str(cpus)))
-        if mems := spec.get("cpuset_mems"):
-            limits.append(("cpuset.mems", str(mems)))
-        memory_limit = spec.get("memory_limit")
-        if memory_limit is not None:
-            limits.append(("memory.max", str(int(memory_limit))))
-        memory_swap = spec.get("memory_swap")
-        if memory_swap is not None and memory_limit is not None:
-            # OCI (and Docker) count `memory_swap` as memory+swap combined; cgroup v2's
-            # memory.swap.max is swap ALONE. Writing the combined figure would silently grant the
-            # container its whole memory limit again as swap.
-            limits.append(("memory.swap.max", str(max(0, int(memory_swap) - int(memory_limit)))))
-        return dict(limits)
-
-    @staticmethod
-    def _write_cgroup_limits(cgroup: Path, spec: Mapping[str, Any]) -> None:
-        """Apply every limit, or fail saying which ones did not take.
-
-        Per-file, because a partial apply is the worst of the three outcomes: the kernel looks
-        confined and is not, in whichever dimension failed. The privnet's own `_make_cgroup` already
-        collects its failures and raises; this is the same rule on the local path.
-        """
-        failed: list[str] = []
-        for name, value in SelfHostedRootlessRuntime._cgroup_limits(spec).items():
-            try:
-                (cgroup / name).write_text(value)
-            except OSError as e:
-                log.warning("cannot set {}={} on {}: {!r}", name, value, cgroup, e)
-                failed.append(f"{name}={value} ({e.__class__.__name__})")
-        if failed:
-            raise ContainerConfinementFailedError(
-                f"these limits could not be applied to {cgroup}: {', '.join(failed)}"
-            )
-
     def _sweep_orphan_cgroups(self) -> None:
         """Reclaim kernel cgroups left behind by an agent that died before it could clean up.
 
@@ -806,36 +653,6 @@ class SelfHostedRootlessRuntime(RootlessOciRuntime):
                 continue
         if removed:
             log.info("[{}] reclaimed {} orphaned kernel cgroup(s)", self.backend_name, removed)
-
-    def _remove_cgroup(self, container_id: str) -> None:
-        """Reclaim the kernel's cgroup once its processes are gone.
-
-        An empty cgroup is only a directory, but they are never reused (the name is the kernel id),
-        so leaving them accumulates one per kernel this node has ever run.
-
-        rmdir fails with EBUSY while *any* member is still exiting, and the caller has just killed
-        them — a single attempt loses that race and leaks the directory (measured). `cgroup.kill`
-        is the v2 way to make that deterministic: it SIGKILLs every remaining member at once, and
-        the short retry then only has to outlast the kernel reaping them.
-        """
-        cgroup = container_cgroup_fs_path(container_id)
-        if not cgroup.exists():
-            return
-        with contextlib.suppress(OSError):
-            (cgroup / "cgroup.kill").write_text("1")
-        for _ in range(_CGROUP_RMDIR_RETRIES):
-            try:
-                cgroup.rmdir()
-                return
-            except FileNotFoundError:
-                return
-            except OSError:
-                time.sleep(_CGROUP_RMDIR_DELAY_SEC)
-        log.warning(
-            "[{}] could not reclaim the cgroup {}; it will be left behind",
-            self.backend_name,
-            cgroup,
-        )
 
     # ------------------------------------------------------------------ logs
     @override

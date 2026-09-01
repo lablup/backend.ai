@@ -170,7 +170,11 @@ def _is_rootless(raw_cfg: Mapping[str, Any]) -> bool:
     name = (raw_cfg.get("agent") or {}).get("backend") or (raw_cfg.get("agent") or {}).get("mode")
     if not name:
         return False
-    return AgentBackend(str(name)) in (AgentBackend.ENROOT, AgentBackend.SINGULARITY)
+    return AgentBackend(str(name)) in (
+        AgentBackend.ENROOT,
+        AgentBackend.SINGULARITY,
+        AgentBackend.PODMAN,
+    )
 
 
 def _build_runtime(raw_cfg: Mapping[str, Any], ctrd_ns: str) -> OciRuntime:

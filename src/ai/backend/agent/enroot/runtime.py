@@ -34,11 +34,11 @@ from typing import Any, ClassVar, Final, override
 from ai.backend.agent.containerd.runtime.interface import ImageInfo
 from ai.backend.agent.rootless.base import (
     DEFAULT_SHM_BYTES,
-    GATE_MNT,
     SKIP_MOUNT_TYPES,
     SelfHostedRootlessRuntime,
     write_layer,
 )
+from ai.backend.agent.rootless.gate import GATE_MNT
 from ai.backend.agent.rootless.registry import fetch_image_metadata, is_insecure_registry
 from ai.backend.agent.rootless.registry import push_image as fetch_push
 from ai.backend.logging import BraceStyleAdapter

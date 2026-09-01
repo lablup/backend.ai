@@ -43,6 +43,7 @@ class AgentBackend(enum.StrEnum):
     CONTAINERD = "containerd"
     ENROOT = "enroot"
     SINGULARITY = "singularity"
+    PODMAN = "podman"
 
 
 class AbstractAgentDiscovery(ABC):

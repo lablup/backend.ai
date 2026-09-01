@@ -21,7 +21,7 @@ import pytest
 from ai.backend.agent.containerd.logs import rotated_paths
 from ai.backend.agent.errors.agent import ContainerConfinementFailedError
 from ai.backend.agent.network.privnet.client import PrivNetClient, PrivNetClientError
-from ai.backend.agent.rootless import base
+from ai.backend.agent.rootless import runtime as rootless_runtime
 from ai.backend.agent.rootless.base import SelfHostedRootlessRuntime
 
 
@@ -79,7 +79,7 @@ class TestTheLocalPath:
     ) -> None:
         marker = tmp_path / "cgroup.controllers"
         marker.write_text("cpu memory")
-        monkeypatch.setattr(base, "_CGROUP_V2_MARKER", str(marker))
+        monkeypatch.setattr(rootless_runtime, "_CGROUP_V2_MARKER", str(marker))
 
         def _refuse(*args: Any, **kwargs: Any) -> None:
             raise PermissionError(13, "Permission denied")
@@ -97,7 +97,7 @@ class TestTheLocalPath:
         here would make every kernel on such a host unstartable — a different decision from the one
         this module is making, and not one to take as a side effect of it.
         """
-        monkeypatch.setattr(base, "_CGROUP_V2_MARKER", str(tmp_path / "absent"))
+        monkeypatch.setattr(rootless_runtime, "_CGROUP_V2_MARKER", str(tmp_path / "absent"))
 
         assert runtime._create_cgroup("c1", {"memory_limit": 1024}) is None
 

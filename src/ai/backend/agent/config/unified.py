@@ -2495,6 +2495,10 @@ class AgentSpecificConfig(BaseConfigSchema):
                 # Same again for apptainer (sandbox + overlay + userns): it reuses the containerd
                 # agent's OCI-spec build, so the container config is validated the same way.
                 DockerExtraConfig.model_validate(self.container.model_dump())
+            case AgentBackend.PODMAN:
+                # And again for podman (rootless userns, its own monitor): same OCI-spec build,
+                # same container config.
+                DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.DUMMY:
                 pass
 
