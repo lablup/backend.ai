@@ -7,18 +7,18 @@ from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.permission.virtual_scope import ScopePermissionCheckKey
+from ai.backend.manager.data.permission.virtual_entity import ScopePermissionCheckKey
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 
 
-class VirtualScopeScopeActionRBACValidator(ScopeActionValidator):
-    """Scope-action RBAC validator resolving permissions via the virtual-scope chain.
+class VirtualEntityScopeActionRBACValidator(ScopeActionValidator):
+    """Scope-action RBAC validator resolving permissions via the virtual-entity chain.
 
     Each target scope is checked as an entity (reachable through its own and its
-    ancestors' virtual scopes), while permission rows are matched on the
+    ancestors' virtual entities), while permission rows are matched on the
     acted-on entity type (``entity_type``). Every target scope must be
     authorized for the action to pass.
     """
@@ -54,7 +54,7 @@ class VirtualScopeScopeActionRBACValidator(ScopeActionValidator):
             for scope in action.scope_targets()
         ]
         permission = action.operation_type().to_permission()
-        permission_map = await self._repository.check_scope_permission_via_virtual_scope(
+        permission_map = await self._repository.check_scope_permission_via_virtual_entity(
             keys, permission
         )
         denied = [key.scope for key in keys if not permission_map.get(key, False)]

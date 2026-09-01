@@ -30,9 +30,9 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import users
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import UserFactory
@@ -439,17 +439,17 @@ class TestUserCreateAutoAssignRoles:
                     type=ProjectType.MODEL_STORE,
                 )
             )
-            virtual_scope_id = uuid.uuid4()
+            virtual_entity_id = uuid.uuid4()
             await conn.execute(
-                sa.insert(VirtualScopeRow.__table__).values(
-                    id=virtual_scope_id,
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=project_id,
+                sa.insert(VirtualEntityRow.__table__).values(
+                    id=virtual_entity_id,
+                    entity_type=ScopeType.PROJECT,
+                    entity_id=project_id,
                 )
             )
             await conn.execute(
                 sa.insert(EntityMembershipRow.__table__).values(
-                    virtual_scope_id=virtual_scope_id,
+                    virtual_entity_id=virtual_entity_id,
                     entity_type=EntityType.PROJECT,
                     entity_id=project_id,
                     permission_cap=None,
@@ -457,7 +457,7 @@ class TestUserCreateAutoAssignRoles:
             )
             await conn.execute(
                 sa.insert(ScopeBindingRow.__table__).values(
-                    virtual_scope_id=virtual_scope_id,
+                    virtual_entity_id=virtual_entity_id,
                     scope_type=ScopeType.PROJECT,
                     scope_id=project_id,
                     permission_cap=None,
@@ -466,9 +466,9 @@ class TestUserCreateAutoAssignRoles:
         yield project_id
         async with db_engine.begin() as conn:
             await conn.execute(
-                VirtualScopeRow.__table__.delete().where(
-                    VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
-                    VirtualScopeRow.__table__.c.scope_id == project_id,
+                VirtualEntityRow.__table__.delete().where(
+                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_id == project_id,
                 )
             )
             await conn.execute(

@@ -22,7 +22,7 @@ from ai.backend.common.data.entity.types import (
     ScopeType,
 )
 from ai.backend.common.data.entity.types import (
-    EntityType as VirtualScopeEntityType,
+    EntityType as VirtualEntityEntityType,
 )
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.permission.types import (
@@ -41,7 +41,7 @@ from ai.backend.common.exception import (
 )
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.permission import VirtualScopeNotFound
+from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     UnsupportedCompositePrimaryKeyError,
@@ -72,9 +72,9 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
@@ -122,10 +122,10 @@ _ORM_CLUSTER = (
 )
 
 # A scope that carries roles must name a type the permission layer knows.
-_TEST_SCOPE_TYPE = ScopeType(VirtualScopeEntityType(PermissionScopeType.PROJECT.value))
-_TEST_ENTITY_TYPE = VirtualScopeEntityType(PermissionScopeType.PROJECT.value)
-_TEST_MEMBER_ENTITY_TYPE = VirtualScopeEntityType(RBACElementType.USER.value)
-_TEST_MEMBER_SCOPE_TYPE = ScopeType(VirtualScopeEntityType(RBACElementType.USER.value))
+_TEST_SCOPE_TYPE = ScopeType(VirtualEntityEntityType(PermissionScopeType.PROJECT.value))
+_TEST_ENTITY_TYPE = VirtualEntityEntityType(PermissionScopeType.PROJECT.value)
+_TEST_MEMBER_ENTITY_TYPE = VirtualEntityEntityType(RBACElementType.USER.value)
+_TEST_MEMBER_SCOPE_TYPE = ScopeType(VirtualEntityEntityType(RBACElementType.USER.value))
 
 _USER_SCOPE_ID = str(uuid.uuid4())
 _USER_SCOPE_REF = RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID)
@@ -189,7 +189,7 @@ def make_scope_creation(scope_id: UUID, name: str) -> ScopeCreation[OpsRBACScope
 class StubMember(ScopeMember):
     member_id: UUID
     role_user: UserID | None = None
-    entity_type: VirtualScopeEntityType = _TEST_MEMBER_ENTITY_TYPE
+    entity_type: VirtualEntityEntityType = _TEST_MEMBER_ENTITY_TYPE
     cap: Permission | None = None
 
     @override
@@ -273,7 +273,7 @@ class _ScopedRow:
 
 _SCOPE_TABLES = [
     OpsRBACScopeRow,
-    VirtualScopeRow,
+    VirtualEntityRow,
     EntityMembershipRow,
     ScopeBindingRow,
     EntityLabelRow,
@@ -303,7 +303,7 @@ async def rbac_ops_tables(
 
 
 _ENTITY_MEMBER_TABLES = [
-    VirtualScopeRow,
+    VirtualEntityRow,
     EntityMembershipRow,
     ScopeBindingRow,
     AssociationScopesEntitiesRow,
@@ -360,19 +360,19 @@ def bulk_scopes() -> BulkScopeContext:
 # =============================================================================
 
 
-class TestScopeCreationVirtualScope:
-    """create_scope / bulk_create_scopes materialize the VS node, self-membership, and
+class TestScopeCreationVirtualEntity:
+    """create_scope / bulk_create_scopes materialize the virtual entity, self-membership, and
     self scope_binding."""
 
-    async def test_create_scope_adds_virtual_scope_membership_and_self_binding(
+    async def test_create_scope_adds_virtual_entity_membership_and_self_binding(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         scope_tables: None,
         single_scope: SingleScopeContext,
     ) -> None:
-        """create_scope creates the VS node, registers the scope in its own VS, and binds
-        the scope to its own VS."""
+        """create_scope creates the virtual entity, registers the scope in its own virtual entity, and binds
+        the scope to its own virtual entity."""
         scope_id = single_scope.scope_id
 
         async with provider.write_ops() as w:
@@ -381,10 +381,10 @@ class TestScopeCreationVirtualScope:
         assert result.row.id == scope_id
 
         async with database_connection.begin_session_read_committed() as sess:
-            vs_rows = (
+            ve_rows = (
                 (
                     await sess.execute(
-                        sa.select(VirtualScopeRow).where(VirtualScopeRow.scope_id == scope_id)
+                        sa.select(VirtualEntityRow).where(VirtualEntityRow.entity_id == scope_id)
                     )
                 )
                 .scalars()
@@ -393,21 +393,21 @@ class TestScopeCreationVirtualScope:
             membership_rows = (await sess.execute(sa.select(EntityMembershipRow))).scalars().all()
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
 
-        assert len(vs_rows) == 1
-        vs = vs_rows[0]
-        assert vs.scope_type == _TEST_SCOPE_TYPE
-        assert vs.scope_id == scope_id
+        assert len(ve_rows) == 1
+        ve = ve_rows[0]
+        assert ve.entity_type == _TEST_SCOPE_TYPE
+        assert ve.entity_id == scope_id
 
         assert len(membership_rows) == 1
         membership = membership_rows[0]
-        assert membership.virtual_scope_id == vs.id
+        assert membership.virtual_entity_id == ve.id
         assert membership.entity_type == _TEST_ENTITY_TYPE
         assert membership.entity_id == scope_id
         assert membership.permission_cap is None
 
         assert len(binding_rows) == 1
         binding = binding_rows[0]
-        assert binding.virtual_scope_id == vs.id
+        assert binding.virtual_entity_id == ve.id
         assert binding.scope_type == _TEST_SCOPE_TYPE
         assert binding.scope_id == scope_id
         assert binding.permission_cap is None
@@ -419,7 +419,7 @@ class TestScopeCreationVirtualScope:
         scope_tables: None,
         bulk_scopes: BulkScopeContext,
     ) -> None:
-        """bulk_create_scopes creates one VS node, self-membership, and self binding per
+        """bulk_create_scopes creates one virtual entity, self-membership, and self binding per
         scope."""
         scope_ids = bulk_scopes.scope_ids
 
@@ -427,30 +427,30 @@ class TestScopeCreationVirtualScope:
             await w.bulk_create_scopes(bulk_scopes.creations)
 
         async with database_connection.begin_session_read_committed() as sess:
-            vs_rows = (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
+            ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             membership_rows = (await sess.execute(sa.select(EntityMembershipRow))).scalars().all()
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
 
-        assert {vs.scope_id for vs in vs_rows} == set(scope_ids)
-        vs_by_scope = {vs.scope_id: vs for vs in vs_rows}
+        assert {ve.entity_id for ve in ve_rows} == set(scope_ids)
+        ve_by_scope = {ve.entity_id: ve for ve in ve_rows}
 
         assert len(membership_rows) == 3
         for membership in membership_rows:
             assert membership.entity_type == _TEST_ENTITY_TYPE
             assert membership.entity_id in scope_ids
-            assert membership.virtual_scope_id == vs_by_scope[membership.entity_id].id
+            assert membership.virtual_entity_id == ve_by_scope[membership.entity_id].id
             assert membership.permission_cap is None
 
         assert len(binding_rows) == 3
         for binding in binding_rows:
             assert binding.scope_type == _TEST_SCOPE_TYPE
             assert binding.scope_id in scope_ids
-            assert binding.virtual_scope_id == vs_by_scope[binding.scope_id].id
+            assert binding.virtual_entity_id == ve_by_scope[binding.scope_id].id
             assert binding.permission_cap is None
 
 
 class TestEnsureScope:
-    """ensure_scope backfills the VS node, self-membership, and self binding for an
+    """ensure_scope backfills the virtual entity, self-membership, and self binding for an
     already-created scope, without creating the real scope row."""
 
     async def test_ensure_scope_adds_vs_membership_and_self_binding_without_real_row(
@@ -459,7 +459,7 @@ class TestEnsureScope:
         provider: RBACOpsProvider,
         scope_tables: None,
     ) -> None:
-        """ensure_scope creates the VS node, self-membership, and self binding, and leaves
+        """ensure_scope creates the virtual entity, self-membership, and self binding, and leaves
         no real scope row behind."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
@@ -468,23 +468,23 @@ class TestEnsureScope:
             await w.ensure_scope(scope)
 
         async with database_connection.begin_session_read_committed() as sess:
-            vs_rows = (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
+            ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             membership_rows = (await sess.execute(sa.select(EntityMembershipRow))).scalars().all()
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
             real_row_count = await sess.scalar(
                 sa.select(sa.func.count()).select_from(OpsRBACScopeRow)
             )
 
-        assert len(vs_rows) == 1
-        vs = vs_rows[0]
-        assert vs.scope_id == scope_id
+        assert len(ve_rows) == 1
+        ve = ve_rows[0]
+        assert ve.entity_id == scope_id
 
         assert len(membership_rows) == 1
-        assert membership_rows[0].virtual_scope_id == vs.id
+        assert membership_rows[0].virtual_entity_id == ve.id
         assert membership_rows[0].entity_id == scope_id
 
         assert len(binding_rows) == 1
-        assert binding_rows[0].virtual_scope_id == vs.id
+        assert binding_rows[0].virtual_entity_id == ve.id
         assert binding_rows[0].scope_id == scope_id
         assert binding_rows[0].permission_cap is None
 
@@ -496,7 +496,7 @@ class TestEnsureScope:
         provider: RBACOpsProvider,
         scope_tables: None,
     ) -> None:
-        """Calling ensure_scope twice leaves exactly one VS node, membership, and binding."""
+        """Calling ensure_scope twice leaves exactly one virtual entity, membership, and binding."""
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=uuid.uuid4())
 
         async with provider.write_ops() as w:
@@ -504,7 +504,7 @@ class TestEnsureScope:
             await w.ensure_scope(scope)
 
         async with database_connection.begin_session_read_committed() as sess:
-            vs_count = await sess.scalar(sa.select(sa.func.count()).select_from(VirtualScopeRow))
+            ve_count = await sess.scalar(sa.select(sa.func.count()).select_from(VirtualEntityRow))
             membership_count = await sess.scalar(
                 sa.select(sa.func.count()).select_from(EntityMembershipRow)
             )
@@ -512,7 +512,7 @@ class TestEnsureScope:
                 sa.select(sa.func.count()).select_from(ScopeBindingRow)
             )
 
-        assert vs_count == 1
+        assert ve_count == 1
         assert membership_count == 1
         assert binding_count == 1
 
@@ -736,8 +736,8 @@ class TestBulkPurgeScopedPartial:
 
 
 class TestAddBulkMembers:
-    """add_bulk_members enrolls each member into the scope's VS with its scope
-    association, and leaves the member's own VS untouched — the scope reaches the
+    """add_bulk_members enrolls each member into the scope's virtual entity with its scope
+    association, and leaves the member's own virtual entity untouched — the scope reaches the
     member entities, not what they own."""
 
     async def test_writes_membership_and_association_without_binding(
@@ -747,7 +747,7 @@ class TestAddBulkMembers:
         entity_member_tables: None,
     ) -> None:
         """Each member gets membership and association, and no binding is written into
-        its own VS — nor a reverse binding in the scope's VS."""
+        its own virtual entity — nor a reverse binding in the scope's virtual entity."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
         member_ids = [uuid.uuid4(), uuid.uuid4()]
@@ -764,14 +764,14 @@ class TestAddBulkMembers:
             )
 
         async with database_connection.begin_session_read_committed() as sess:
-            vs_rows = (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
+            ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
-            vs_by_scope = {vs.scope_id: vs.id for vs in vs_rows}
+            ve_by_scope = {ve.entity_id: ve.id for ve in ve_rows}
             membership_ids = set(
                 (
                     await sess.scalars(
                         sa.select(EntityMembershipRow.entity_id).where(
-                            EntityMembershipRow.virtual_scope_id == vs_by_scope[scope_id],
+                            EntityMembershipRow.virtual_entity_id == ve_by_scope[scope_id],
                             EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
                         )
                     )
@@ -795,23 +795,23 @@ class TestAddBulkMembers:
             member_bindings = {
                 (b.scope_type, b.scope_id)
                 for b in binding_rows
-                if b.virtual_scope_id == vs_by_scope[mid]
+                if b.virtual_entity_id == ve_by_scope[mid]
             }
             assert member_bindings == {(_TEST_MEMBER_SCOPE_TYPE, mid)}  # self binding only
-        scope_vs_bindings = {
+        scope_ve_bindings = {
             (b.scope_type, b.scope_id)
             for b in binding_rows
-            if b.virtual_scope_id == vs_by_scope[scope_id]
+            if b.virtual_entity_id == ve_by_scope[scope_id]
         }
-        assert scope_vs_bindings == {(_TEST_SCOPE_TYPE, scope_id)}  # self binding only
+        assert scope_ve_bindings == {(_TEST_SCOPE_TYPE, scope_id)}  # self binding only
 
-    async def test_member_without_own_virtual_scope_is_added(
+    async def test_member_without_own_virtual_entity_is_added(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         entity_member_tables: None,
     ) -> None:
-        """Only the scope's VS is required: a member that has none of its own is still
+        """Only the scope's virtual entity is required: a member that has none of its own is still
         enrolled, since nothing is written on the member side."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
@@ -824,16 +824,16 @@ class TestAddBulkMembers:
             )
 
         async with database_connection.begin_session_read_committed() as sess:
-            scope_vs = (
+            scope_ve = (
                 await sess.execute(
-                    sa.select(VirtualScopeRow).where(VirtualScopeRow.scope_id == scope_id)
+                    sa.select(VirtualEntityRow).where(VirtualEntityRow.entity_id == scope_id)
                 )
             ).scalar_one()
             membership_ids = set(
                 (
                     await sess.scalars(
                         sa.select(EntityMembershipRow.entity_id).where(
-                            EntityMembershipRow.virtual_scope_id == scope_vs.id,
+                            EntityMembershipRow.virtual_entity_id == scope_ve.id,
                             EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
                         )
                     )
@@ -841,8 +841,8 @@ class TestAddBulkMembers:
             )
             member_vs_count = await sess.scalar(
                 sa.select(sa.func.count())
-                .select_from(VirtualScopeRow)
-                .where(VirtualScopeRow.scope_id == member_id)
+                .select_from(VirtualEntityRow)
+                .where(VirtualEntityRow.entity_id == member_id)
             )
 
         assert membership_ids == {member_id}
@@ -877,16 +877,16 @@ class TestAddBulkMembers:
             )
 
         async with database_connection.begin_session_read_committed() as sess:
-            scope_vs = (
+            scope_ve = (
                 await sess.execute(
-                    sa.select(VirtualScopeRow).where(VirtualScopeRow.scope_id == scope_id)
+                    sa.select(VirtualEntityRow).where(VirtualEntityRow.entity_id == scope_id)
                 )
             ).scalar_one()
             membership_rows = (
                 (
                     await sess.execute(
                         sa.select(EntityMembershipRow).where(
-                            EntityMembershipRow.virtual_scope_id == scope_vs.id
+                            EntityMembershipRow.virtual_entity_id == scope_ve.id
                         )
                     )
                 )
@@ -931,7 +931,7 @@ class TestAddBulkMembers:
 
 class TestUserRosterEnrollment:
     """A user joins a scope's roster only: the enrollment row carries the scope kind's
-    constant cap, and nothing is bound into the user's own VS."""
+    constant cap, and nothing is bound into the user's own virtual entity."""
 
     @pytest.fixture
     async def roster_tables(
@@ -980,13 +980,13 @@ class TestUserRosterEnrollment:
             )
 
         async with database_connection.begin_session_read_committed() as sess:
-            vs_by_scope = {
-                vs.scope_id: vs.id
-                for vs in (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
+            ve_by_scope = {
+                ve.entity_id: ve.id
+                for ve in (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             }
             cap = await sess.scalar(
                 sa.select(EntityMembershipRow.permission_cap).where(
-                    EntityMembershipRow.virtual_scope_id == vs_by_scope[scope.scope_id],
+                    EntityMembershipRow.virtual_entity_id == ve_by_scope[scope.scope_id],
                     EntityMembershipRow.entity_id == user_id,
                 )
             )
@@ -995,7 +995,7 @@ class TestUserRosterEnrollment:
                 for b in (
                     await sess.execute(
                         sa.select(ScopeBindingRow).where(
-                            ScopeBindingRow.virtual_scope_id == vs_by_scope[user_id]
+                            ScopeBindingRow.virtual_entity_id == ve_by_scope[user_id]
                         )
                     )
                 )
@@ -1009,7 +1009,7 @@ class TestUserRosterEnrollment:
 
 class TestAddBulkInheritingMembers:
     """add_bulk_inheriting_members writes everything add_bulk_members does and additionally binds
-    the scope into the member's own VS — never the reverse binding."""
+    the scope into the member's own virtual entity — never the reverse binding."""
 
     async def test_writes_membership_association_and_binding(
         self,
@@ -1018,7 +1018,7 @@ class TestAddBulkInheritingMembers:
         entity_member_tables: None,
     ) -> None:
         """Each member gets membership, association, and the scope's uncapped binding
-        in its own VS — and no reverse binding in the scope's VS."""
+        in its own virtual entity — and no reverse binding in the scope's virtual entity."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
         member_ids = [uuid.uuid4(), uuid.uuid4()]
@@ -1035,14 +1035,14 @@ class TestAddBulkInheritingMembers:
             )
 
         async with database_connection.begin_session_read_committed() as sess:
-            vs_rows = (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
+            ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
-            vs_by_scope = {vs.scope_id: vs.id for vs in vs_rows}
+            ve_by_scope = {ve.entity_id: ve.id for ve in ve_rows}
             membership_ids = set(
                 (
                     await sess.scalars(
                         sa.select(EntityMembershipRow.entity_id).where(
-                            EntityMembershipRow.virtual_scope_id == vs_by_scope[scope_id],
+                            EntityMembershipRow.virtual_entity_id == ve_by_scope[scope_id],
                             EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
                         )
                     )
@@ -1066,18 +1066,18 @@ class TestAddBulkInheritingMembers:
             member_bindings = {
                 (b.scope_type, b.scope_id): b.permission_cap
                 for b in binding_rows
-                if b.virtual_scope_id == vs_by_scope[mid]
+                if b.virtual_entity_id == ve_by_scope[mid]
             }
             assert member_bindings == {
                 (_TEST_MEMBER_SCOPE_TYPE, mid): None,  # self binding
                 (_TEST_SCOPE_TYPE, scope_id): None,
             }
-        scope_vs_bindings = {
+        scope_ve_bindings = {
             (b.scope_type, b.scope_id)
             for b in binding_rows
-            if b.virtual_scope_id == vs_by_scope[scope_id]
+            if b.virtual_entity_id == ve_by_scope[scope_id]
         }
-        assert scope_vs_bindings == {(_TEST_SCOPE_TYPE, scope_id)}  # self binding only
+        assert scope_ve_bindings == {(_TEST_SCOPE_TYPE, scope_id)}  # self binding only
 
     async def test_readd_is_idempotent(
         self,
@@ -1100,20 +1100,20 @@ class TestAddBulkInheritingMembers:
             await w.add_bulk_inheriting_members(addition)
 
         async with database_connection.begin_session_read_committed() as sess:
-            scope_vs = (
+            scope_ve = (
                 await sess.execute(
-                    sa.select(VirtualScopeRow).where(VirtualScopeRow.scope_id == scope_id)
+                    sa.select(VirtualEntityRow).where(VirtualEntityRow.entity_id == scope_id)
                 )
             ).scalar_one()
             member_vs = (
                 await sess.execute(
-                    sa.select(VirtualScopeRow).where(VirtualScopeRow.scope_id == member_id)
+                    sa.select(VirtualEntityRow).where(VirtualEntityRow.entity_id == member_id)
                 )
             ).scalar_one()
             membership_count = await sess.scalar(
                 sa.select(sa.func.count())
                 .select_from(EntityMembershipRow)
-                .where(EntityMembershipRow.virtual_scope_id == scope_vs.id)
+                .where(EntityMembershipRow.virtual_entity_id == scope_ve.id)
             )
             assoc_count = await sess.scalar(
                 sa.select(sa.func.count())
@@ -1124,7 +1124,7 @@ class TestAddBulkInheritingMembers:
                 (
                     await sess.execute(
                         sa.select(ScopeBindingRow).where(
-                            ScopeBindingRow.virtual_scope_id == member_vs.id
+                            ScopeBindingRow.virtual_entity_id == member_vs.id
                         )
                     )
                 )
@@ -1147,8 +1147,8 @@ class TestAddBulkInheritingMembers:
         provider: RBACOpsProvider,
         entity_member_tables: None,
     ) -> None:
-        """One member without a VS raises VirtualScopeNotFound and nothing is written —
-        no membership and no binding, not even for the members whose VS exists."""
+        """One member without a virtual entity raises VirtualEntityNotFound and nothing is written —
+        no membership and no binding, not even for the members whose virtual entity exists."""
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=uuid.uuid4())
         present_id, missing_id = uuid.uuid4(), uuid.uuid4()
 
@@ -1156,7 +1156,7 @@ class TestAddBulkInheritingMembers:
             await w.ensure_scope(scope)
             await w.ensure_scope(ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=present_id))
 
-        with pytest.raises(VirtualScopeNotFound):
+        with pytest.raises(VirtualEntityNotFound):
             async with provider.write_ops() as w:
                 await w.add_bulk_inheriting_members(
                     EntityMembersAddition(
@@ -1203,8 +1203,8 @@ class TestAddBulkInheritingMembers:
 
 
 class TestRemoveBulkMembers:
-    """remove_bulk_members deletes the VS membership, the scope association, and the
-    scope's binding in the member's own VS — and never raises for missing virtual
+    """remove_bulk_members deletes the virtual entity membership, the scope association, and the
+    scope's binding in the member's own virtual entity — and never raises for missing virtual
     scopes."""
 
     async def test_remove_deletes_membership_association_and_binding(
@@ -1213,7 +1213,7 @@ class TestRemoveBulkMembers:
         provider: RBACOpsProvider,
         entity_member_tables: None,
     ) -> None:
-        """The removed member loses all three rows — its own VS keeps only the self
+        """The removed member loses all three rows — its own virtual entity keeps only the self
         binding — while the other one keeps all of them."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
@@ -1235,14 +1235,14 @@ class TestRemoveBulkMembers:
             )
 
         async with database_connection.begin_session_read_committed() as sess:
-            vs_rows = (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
-            vs_by_scope = {vs.scope_id: vs.id for vs in vs_rows}
+            ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
+            ve_by_scope = {ve.entity_id: ve.id for ve in ve_rows}
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
             membership_ids = set(
                 (
                     await sess.scalars(
                         sa.select(EntityMembershipRow.entity_id).where(
-                            EntityMembershipRow.virtual_scope_id == vs_by_scope[scope_id],
+                            EntityMembershipRow.virtual_entity_id == ve_by_scope[scope_id],
                             EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
                         )
                     )
@@ -1263,13 +1263,13 @@ class TestRemoveBulkMembers:
         removed_bindings = {
             (b.scope_type, b.scope_id)
             for b in binding_rows
-            if b.virtual_scope_id == vs_by_scope[removed_id]
+            if b.virtual_entity_id == ve_by_scope[removed_id]
         }
         assert removed_bindings == {(_TEST_MEMBER_SCOPE_TYPE, removed_id)}  # self binding only
         kept_bindings = {
             (b.scope_type, b.scope_id)
             for b in binding_rows
-            if b.virtual_scope_id == vs_by_scope[kept_id]
+            if b.virtual_entity_id == ve_by_scope[kept_id]
         }
         assert kept_bindings == {
             (_TEST_MEMBER_SCOPE_TYPE, kept_id),
@@ -1282,7 +1282,7 @@ class TestRemoveBulkMembers:
         provider: RBACOpsProvider,
         entity_member_tables: None,
     ) -> None:
-        """A member without a VS (legacy data) still loses its membership and
+        """A member without a virtual entity (legacy data) still loses its membership and
         association — the removal does not raise."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
@@ -1292,14 +1292,14 @@ class TestRemoveBulkMembers:
             await w.ensure_scope(scope)
 
         async with database_connection.begin_session() as sess:
-            scope_vs = (
+            scope_ve = (
                 await sess.execute(
-                    sa.select(VirtualScopeRow).where(VirtualScopeRow.scope_id == scope_id)
+                    sa.select(VirtualEntityRow).where(VirtualEntityRow.entity_id == scope_id)
                 )
             ).scalar_one()
             sess.add(
                 EntityMembershipRow(
-                    virtual_scope_id=scope_vs.id,
+                    virtual_entity_id=scope_ve.id,
                     entity_type=_TEST_MEMBER_ENTITY_TYPE,
                     entity_id=member_id,
                     permission_cap=None,
@@ -1358,7 +1358,7 @@ class TestAddBulkMembersPartial:
         valid = StubMember(member_id=uuid.uuid4())
         invalid = StubMember(
             member_id=uuid.uuid4(),
-            entity_type=VirtualScopeEntityType("unregistered-type"),
+            entity_type=VirtualEntityEntityType("unregistered-type"),
         )
 
         async with provider.write_ops() as w:
@@ -1368,7 +1368,7 @@ class TestAddBulkMembersPartial:
             )
             await w.ensure_scope(
                 ScopeRef(
-                    scope_type=ScopeType(VirtualScopeEntityType("unregistered-type")),
+                    scope_type=ScopeType(VirtualEntityEntityType("unregistered-type")),
                     scope_id=invalid.member_id,
                 )
             )
@@ -1381,16 +1381,16 @@ class TestAddBulkMembersPartial:
         assert result.errors[0].index == 1
 
         async with database_connection.begin_session_read_committed() as sess:
-            scope_vs = (
+            scope_ve = (
                 await sess.execute(
-                    sa.select(VirtualScopeRow).where(VirtualScopeRow.scope_id == scope.scope_id)
+                    sa.select(VirtualEntityRow).where(VirtualEntityRow.entity_id == scope.scope_id)
                 )
             ).scalar_one()
             membership_rows = (
                 (
                     await sess.execute(
                         sa.select(EntityMembershipRow).where(
-                            EntityMembershipRow.virtual_scope_id == scope_vs.id
+                            EntityMembershipRow.virtual_entity_id == scope_ve.id
                         )
                     )
                 )
@@ -1419,51 +1419,51 @@ class TestAddBulkMembersPartial:
         provider: RBACOpsProvider,
         entity_member_tables: None,
     ) -> None:
-        """Members are enrolled whether or not they have a VS of their own, and no
+        """Members are enrolled whether or not they have a virtual entity of their own, and no
         binding is written into the one that does."""
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=uuid.uuid4())
-        with_vs = StubMember(member_id=uuid.uuid4(), cap=Permission.READ)
-        without_vs = StubMember(member_id=uuid.uuid4(), cap=Permission.READ)
+        with_ve = StubMember(member_id=uuid.uuid4(), cap=Permission.READ)
+        without_ve = StubMember(member_id=uuid.uuid4(), cap=Permission.READ)
 
         async with provider.write_ops() as w:
             await w.ensure_scope(scope)
             await w.ensure_scope(
-                ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=with_vs.member_id)
+                ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=with_ve.member_id)
             )
             result = await w.add_bulk_members_partial(
-                EntityMembersAddition(scope=scope, members=[with_vs, without_vs])
+                EntityMembersAddition(scope=scope, members=[with_ve, without_ve])
             )
 
-        assert result.successes == [with_vs, without_vs]
+        assert result.successes == [with_ve, without_ve]
         assert result.errors == []
 
         async with database_connection.begin_session_read_committed() as sess:
-            vs_rows = (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
+            ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
-            vs_by_scope = {vs.scope_id: vs.id for vs in vs_rows}
+            ve_by_scope = {ve.entity_id: ve.id for ve in ve_rows}
             membership_ids = set(
                 (
                     await sess.scalars(
                         sa.select(EntityMembershipRow.entity_id).where(
-                            EntityMembershipRow.virtual_scope_id == vs_by_scope[scope.scope_id],
+                            EntityMembershipRow.virtual_entity_id == ve_by_scope[scope.scope_id],
                             EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
                         )
                     )
                 ).all()
             )
 
-        assert without_vs.member_id not in vs_by_scope
-        assert membership_ids == {with_vs.member_id, without_vs.member_id}
+        assert without_ve.member_id not in ve_by_scope
+        assert membership_ids == {with_ve.member_id, without_ve.member_id}
         member_bindings = {
             (b.scope_type, b.scope_id)
             for b in binding_rows
-            if b.virtual_scope_id == vs_by_scope[with_vs.member_id]
+            if b.virtual_entity_id == ve_by_scope[with_ve.member_id]
         }
-        assert member_bindings == {(_TEST_MEMBER_SCOPE_TYPE, with_vs.member_id)}  # self only
+        assert member_bindings == {(_TEST_MEMBER_SCOPE_TYPE, with_ve.member_id)}  # self only
 
 
 # =============================================================================
-# Scope deletion: virtual-scope edge cleanup
+# Scope deletion: virtual-entity edge cleanup
 # =============================================================================
 
 
@@ -1511,7 +1511,7 @@ class ScopeRowBatchPurgerSpec(RBACEntityBatchPurgerSpec[OpsRBACScopeRow]):
 
 _SCOPE_DELETE_TABLES = [
     OpsRBACScopeRow,
-    VirtualScopeRow,
+    VirtualEntityRow,
     EntityMembershipRow,
     ScopeBindingRow,
     RolePresetRow,
@@ -1529,20 +1529,20 @@ async def scope_delete_tables(
         yield
 
 
-class TestScopeDeletionVirtualScopeCleanup:
-    """delete_scope / batch_delete_scopes remove not only the scope's own VS node but
-    also the edges the scope left in other virtual scopes: its bindings as the reaching
+class TestScopeDeletionVirtualEntityCleanup:
+    """delete_scope / batch_delete_scopes remove not only the scope's own virtual entity but
+    also the edges the scope left in other virtual entities: its bindings as the reaching
     side and its entity memberships."""
 
-    async def test_delete_scope_removes_edges_in_other_virtual_scopes(
+    async def test_delete_scope_removes_edges_in_other_virtual_entities(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         scope_delete_tables: None,
         single_scope: SingleScopeContext,
     ) -> None:
-        """The deleted scope's binding and membership in another VS are removed; the
-        other VS keeps its node and self edges."""
+        """The deleted scope's binding and membership in another virtual entity are removed; the
+        other virtual entity keeps its node and self edges."""
         scope_id = single_scope.scope_id
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
         other = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=uuid.uuid4())
@@ -1550,7 +1550,7 @@ class TestScopeDeletionVirtualScopeCleanup:
         async with provider.write_ops() as w:
             await w.create_scope(single_scope.creation)
             await w.ensure_scope(other)
-            # Two-way membership leaves scope's binding and membership in other's VS.
+            # Two-way membership leaves scope's binding and membership in other's virtual entity.
             await w.add_bulk_inheriting_members(
                 EntityMembersAddition(
                     scope=scope,
@@ -1583,26 +1583,29 @@ class TestScopeDeletionVirtualScopeCleanup:
         assert result is not None
 
         async with database_connection.begin_session_read_committed() as sess:
-            vs_rows = (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
+            ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
             membership_rows = (await sess.execute(sa.select(EntityMembershipRow))).scalars().all()
 
-        assert {vs.scope_id for vs in vs_rows} == {other.scope_id}
+        assert {ve.entity_id for ve in ve_rows} == {other.scope_id}
         assert {(b.scope_type, b.scope_id) for b in binding_rows} == {
-            (_TEST_SCOPE_TYPE, other.scope_id),  # the other VS keeps only its self binding
+            (
+                _TEST_SCOPE_TYPE,
+                other.scope_id,
+            ),  # the other virtual entity keeps only its self binding
         }
         assert {(m.entity_type, m.entity_id) for m in membership_rows} == {
             (_TEST_ENTITY_TYPE, other.scope_id),  # and only its self membership
         }
 
-    async def test_batch_delete_scopes_removes_edges_in_other_virtual_scopes(
+    async def test_batch_delete_scopes_removes_edges_in_other_virtual_entities(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         scope_delete_tables: None,
         bulk_scopes: BulkScopeContext,
     ) -> None:
-        """Every batch-deleted scope's binding and membership in the surviving VS are
+        """Every batch-deleted scope's binding and membership in the surviving virtual entity are
         removed along with the real rows."""
         scope_ids = bulk_scopes.scope_ids
         scopes = [ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=sid) for sid in scope_ids]
@@ -1611,7 +1614,7 @@ class TestScopeDeletionVirtualScopeCleanup:
         async with provider.write_ops() as w:
             await w.bulk_create_scopes(bulk_scopes.creations)
             await w.ensure_scope(other)
-            # Two-way membership leaves each scope's binding and membership in other's VS.
+            # Two-way membership leaves each scope's binding and membership in other's virtual entity.
             for scope in scopes:
                 await w.add_bulk_inheriting_members(
                     EntityMembersAddition(
@@ -1651,12 +1654,12 @@ class TestScopeDeletionVirtualScopeCleanup:
             real_row_count = await sess.scalar(
                 sa.select(sa.func.count()).select_from(OpsRBACScopeRow)
             )
-            vs_rows = (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
+            ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
             membership_rows = (await sess.execute(sa.select(EntityMembershipRow))).scalars().all()
 
         assert real_row_count == 0
-        assert {vs.scope_id for vs in vs_rows} == {other.scope_id}
+        assert {ve.entity_id for ve in ve_rows} == {other.scope_id}
         assert {(b.scope_type, b.scope_id) for b in binding_rows} == {
             (_TEST_SCOPE_TYPE, other.scope_id),
         }
@@ -2223,7 +2226,7 @@ class TestResolveScopeTemplateValues:
         """A scope type without a registered row resolves to None; others still resolve."""
         seed = scope_name_seed
         unregistered = ScopeRef(
-            scope_type=ScopeType(VirtualScopeEntityType("unregistered")), scope_id=uuid.uuid4()
+            scope_type=ScopeType(VirtualEntityEntityType("unregistered")), scope_id=uuid.uuid4()
         )
 
         async with provider.write_ops() as w:

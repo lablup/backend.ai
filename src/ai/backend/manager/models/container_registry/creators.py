@@ -32,7 +32,7 @@ class ContainerRegistryCreator(
     """Creator for a container registry.
 
     A registry goes under no other scope, and the entities it owns (images) resolve
-    through its own virtual scope; the projects allowed to reach them are bound to
+    through its own virtual entity; the projects allowed to reach them are bound to
     that scope separately.
     """
 

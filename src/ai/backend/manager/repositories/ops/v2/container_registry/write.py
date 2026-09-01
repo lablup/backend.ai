@@ -1,7 +1,7 @@
 """Container registry writes: the edges that let a project reach a registry.
 
 A registry is reachable from the projects it is allowed in, and that reach is graph
-edges rather than a row of its own — the registry joins each project's virtual scope
+edges rather than a row of its own — the registry joins each project's virtual entity
 and each project is bound into the registry's, so project-scoped permissions carry
 onto the images the registry owns. Only this domain has that relation, so the
 primitives sit here: :class:`ContainerRegistryWriteOps` extends the general write ops,
@@ -14,9 +14,9 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 
@@ -26,7 +26,7 @@ class ContainerRegistryWriteOps(V2WriteOps):
     async def provision_registry(self, registry_id: ContainerRegistryID) -> None:
         """Put the registry into the RBAC graph if it is not there yet.
 
-        Registries created before the virtual-scope rollout have no node, and every
+        Registries created before the virtual-entity rollout have no node, and every
         edge written against one resolves-or-fails.
         """
         await self._provision_entities([registry_id])
@@ -43,15 +43,15 @@ class ContainerRegistryWriteOps(V2WriteOps):
     ) -> None:
         """Reverse :meth:`enroll_registry_in_project`.
 
-        Matches through the virtual scope nodes rather than resolving them first, so a
+        Matches through the virtual entity nodes rather than resolving them first, so a
         project or registry that never had one is a no-op instead of a failure.
         """
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
-                EntityMembershipRow.virtual_scope_id.in_(
-                    sa.select(VirtualScopeRow.id).where(
-                        VirtualScopeRow.scope_type == project_id.entity_type(),
-                        VirtualScopeRow.scope_id == project_id,
+                EntityMembershipRow.virtual_entity_id.in_(
+                    sa.select(VirtualEntityRow.id).where(
+                        VirtualEntityRow.entity_type == project_id.entity_type(),
+                        VirtualEntityRow.entity_id == project_id,
                     )
                 ),
                 EntityMembershipRow.entity_type == registry_id.entity_type(),
@@ -60,10 +60,10 @@ class ContainerRegistryWriteOps(V2WriteOps):
         )
         await self._sess.execute(
             sa.delete(ScopeBindingRow).where(
-                ScopeBindingRow.virtual_scope_id.in_(
-                    sa.select(VirtualScopeRow.id).where(
-                        VirtualScopeRow.scope_type == registry_id.entity_type(),
-                        VirtualScopeRow.scope_id == registry_id,
+                ScopeBindingRow.virtual_entity_id.in_(
+                    sa.select(VirtualEntityRow.id).where(
+                        VirtualEntityRow.entity_type == registry_id.entity_type(),
+                        VirtualEntityRow.entity_id == registry_id,
                     )
                 ),
                 ScopeBindingRow.scope_type == project_id.entity_type(),

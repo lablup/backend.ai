@@ -31,7 +31,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
 )
 from ai.backend.manager.models.vfolder import vfolder_invitations, vfolders
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -385,7 +385,7 @@ class TestVFolderInviteAcceptReject:
             assert row is not None
             assert row.state == VFolderInvitationState.ACCEPTED
 
-    async def test_accept_fails_when_invitee_has_no_virtual_scope(
+    async def test_accept_fails_when_invitee_has_no_virtual_entity(
         self,
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
@@ -393,8 +393,8 @@ class TestVFolderInviteAcceptReject:
         regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
-        """Accepting an invitation fails with a 5xx VirtualScopeNotFound error when the
-        invitee has no virtual scope to hold the vfolder — a server-side data-integrity
+        """Accepting an invitation fails with a 5xx VirtualEntityNotFound error when the
+        invitee has no virtual entity to hold the vfolder — a server-side data-integrity
         condition, since every user is provisioned one."""
         vf = await vfolder_factory()
         await admin_registry.vfolder.invite(
@@ -409,10 +409,10 @@ class TestVFolderInviteAcceptReject:
 
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.delete(VirtualScopeRow).where(
+                sa.delete(VirtualEntityRow).where(
                     sa.and_(
-                        VirtualScopeRow.scope_type == USER_SCOPE_TYPE,
-                        VirtualScopeRow.scope_id == regular_user_fixture.user_uuid,
+                        VirtualEntityRow.entity_type == USER_SCOPE_TYPE,
+                        VirtualEntityRow.entity_id == regular_user_fixture.user_uuid,
                     )
                 )
             )

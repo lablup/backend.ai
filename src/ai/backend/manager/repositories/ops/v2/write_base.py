@@ -21,8 +21,8 @@ from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
 )
-from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
-from ai.backend.manager.errors.permission import VirtualScopeNotFound
+from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
+from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import (
     CheckConstraintViolationError,
     ExclusionViolationError,
@@ -37,9 +37,9 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
 
@@ -47,20 +47,20 @@ class V2WriteOpsBase(V2OpsBase):
     """The shared write primitives, bound to a single session."""
 
     async def _provision_entities(self, entities: Sequence[EntityIdentifier]) -> None:
-        """Put each entity into the RBAC graph: its virtual scope node, its self
+        """Put each entity into the RBAC graph: its virtual entity node, its self
         entity-membership and its self scope-binding (permission_cap NULL). The reverse
         of :meth:`_teardown_entity`. Idempotent: an existing node is a no-op."""
         if not entities:
             return
-        values = [{"scope_type": e.entity_type(), "scope_id": e} for e in entities]
+        values = [{"entity_type": e.entity_type(), "entity_id": e} for e in entities]
         insert_stmt = (
-            pg_insert(VirtualScopeRow)
+            pg_insert(VirtualEntityRow)
             .values(values)
-            .on_conflict_do_nothing(index_elements=["scope_type", "scope_id"])
+            .on_conflict_do_nothing(index_elements=["entity_type", "entity_id"])
             .returning(
-                VirtualScopeRow.id,
-                VirtualScopeRow.scope_type,
-                VirtualScopeRow.scope_id,
+                VirtualEntityRow.id,
+                VirtualEntityRow.entity_type,
+                VirtualEntityRow.entity_id,
             )
         )
         inserted = (await self._sess.execute(insert_stmt)).all()
@@ -70,9 +70,9 @@ class V2WriteOpsBase(V2OpsBase):
             pg_insert(EntityMembershipRow)
             .values([
                 {
-                    "virtual_scope_id": row.id,
-                    "entity_type": row.scope_type,
-                    "entity_id": row.scope_id,
+                    "virtual_entity_id": row.id,
+                    "entity_type": row.entity_type,
+                    "entity_id": row.entity_id,
                     "permission_cap": None,
                 }
                 for row in inserted
@@ -84,9 +84,9 @@ class V2WriteOpsBase(V2OpsBase):
             pg_insert(ScopeBindingRow)
             .values([
                 {
-                    "virtual_scope_id": row.id,
-                    "scope_type": row.scope_type,
-                    "scope_id": row.scope_id,
+                    "virtual_entity_id": row.id,
+                    "scope_type": row.entity_type,
+                    "scope_id": row.entity_id,
                     "permission_cap": None,
                 }
                 for row in inserted
@@ -96,7 +96,7 @@ class V2WriteOpsBase(V2OpsBase):
         await self._sess.execute(binding_stmt)
 
     async def _teardown_entity(self, entity: EntityIdentifier) -> None:
-        """Remove what the entity left: permissions granted on it, its virtual scope node
+        """Remove what the entity left: permissions granted on it, its virtual entity node
         if it provisioned one, its membership edges, and the labels put on it.
 
         The permission delete keys on the id alone, which is a UUID and so already
@@ -106,9 +106,9 @@ class V2WriteOpsBase(V2OpsBase):
             sa.delete(PermissionRow).where(PermissionRow.scope_id == str(entity))
         )
         await self._sess.execute(
-            sa.delete(VirtualScopeRow).where(
-                VirtualScopeRow.scope_type == entity.entity_type(),
-                VirtualScopeRow.scope_id == entity,
+            sa.delete(VirtualEntityRow).where(
+                VirtualEntityRow.entity_type == entity.entity_type(),
+                VirtualEntityRow.entity_id == entity,
             )
         )
         await self._sess.execute(
@@ -381,15 +381,15 @@ class V2WriteOpsBase(V2OpsBase):
         await self._sess.flush()
 
     async def _record_memberships(self, entries: Sequence[EntityMembershipEntry]) -> None:
-        """Record declared memberships in the parents' virtual scopes, idempotently;
-        a declared parent without a virtual scope fails (resolve-or-fail)."""
+        """Record declared memberships in the parents' virtual entities, idempotently;
+        a declared parent without a virtual entity fails (resolve-or-fail)."""
         if not entries:
             return
-        scope_ids = await self._resolve_virtual_scope_ids([e.parent for e in entries])
+        scope_ids = await self._resolve_virtual_entity_ids([e.parent for e in entries])
         await self._bulk_insert_ignore_conflicts(
             [
                 EntityMembershipRow(
-                    virtual_scope_id=scope_ids[(entry.parent.entity_type(), entry.parent)],
+                    virtual_entity_id=scope_ids[(entry.parent.entity_type(), entry.parent)],
                     entity_type=entry.member.entity_type(),
                     entity_id=entry.member,
                     permission_cap=None,
@@ -411,28 +411,28 @@ class V2WriteOpsBase(V2OpsBase):
             )
         )
 
-    async def _resolve_virtual_scope_ids(
+    async def _resolve_virtual_entity_ids(
         self, entities: Sequence[EntityIdentifier]
-    ) -> dict[tuple[EntityType, uuid.UUID], VirtualScopeID]:
+    ) -> dict[tuple[EntityType, uuid.UUID], VirtualEntityID]:
         """Resolve-or-fail, never get-or-create: a declared parent without a virtual
-        scope raises :class:`VirtualScopeNotFound` naming every missing scope."""
+        scope raises :class:`VirtualEntityNotFound` naming every missing scope."""
         stmt = sa.select(
-            VirtualScopeRow.scope_type,
-            VirtualScopeRow.scope_id,
-            VirtualScopeRow.id,
+            VirtualEntityRow.entity_type,
+            VirtualEntityRow.entity_id,
+            VirtualEntityRow.id,
         ).where(
-            sa.tuple_(VirtualScopeRow.scope_type, VirtualScopeRow.scope_id).in_([
+            sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
                 (e.entity_type(), e) for e in entities
             ])
         )
         resolved = {
-            (EntityType(row.scope_type), row.scope_id): row.id
+            (row.entity_type, row.entity_id): row.id
             for row in (await self._sess.execute(stmt)).all()
         }
         missing = [e for e in entities if (e.entity_type(), e) not in resolved]
         if missing:
-            raise VirtualScopeNotFound(
-                "No virtual scope for entities: "
+            raise VirtualEntityNotFound(
+                "No virtual entity for entities: "
                 + ", ".join(f"{e.entity_type()}:{e}" for e in missing)
             )
         return resolved

@@ -79,7 +79,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
     vfolder_status_map,
 )
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
@@ -538,7 +538,7 @@ class ProjectDBSource:
         """Assign users to a project with domain validation via the RBAC member ops.
 
         Validates that the role exists, filters to users in the project's domain
-        that are not already assigned, writes each new member's virtual-scope
+        that are not already assigned, writes each new member's virtual-entity
         membership and scope association, and creates user-role mappings for the
         specified role. Membership grants the project's ``auto_assign`` roles on
         top of that role.
@@ -577,7 +577,7 @@ class ProjectDBSource:
     ) -> UnassignUsersResult:
         """Remove users from a project and return unassigned users and failures.
 
-        Deletes each member's virtual-scope membership and scope association via
+        Deletes each member's virtual-entity membership and scope association via
         the RBAC member ops. Reports which requested user IDs could not be
         unassigned and why.
         """
@@ -758,7 +758,7 @@ class ProjectDBSource:
     ) -> ProjectSearchResult:
         """Search projects a user is member of.
 
-        Membership comes from the projects' virtual scopes; the scope supplies
+        Membership comes from the projects' virtual entities; the scope supplies
         the membership predicate.
 
         Args:

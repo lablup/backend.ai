@@ -28,7 +28,7 @@ from ai.backend.manager.actions.v2.relation.result import RelationActionProcessR
 from ai.backend.manager.actions.v2.relation.trigger import RelationActionTriggerMeta
 from ai.backend.manager.actions.v2.relation.validator.base import RelationActionValidator
 from ai.backend.manager.actions.v2.relation.validator.rbac import (
-    VirtualScopeRelationActionRBACValidator,
+    VirtualEntityRelationActionRBACValidator,
 )
 from ai.backend.manager.errors.permission import NotEnoughPermission
 
@@ -156,16 +156,16 @@ class TestRelationActionProcessor:
 
 
 class TestEveryEndMustPermitTheRun:
-    def _validator(self, permitted: set[uuid.UUID]) -> VirtualScopeRelationActionRBACValidator:
+    def _validator(self, permitted: set[uuid.UUID]) -> VirtualEntityRelationActionRBACValidator:
         repository = MagicMock()
 
         async def check(keys: list[Any], permission: Any) -> dict[Any, bool]:
             return {key: key.entity in permitted for key in keys}
 
-        repository.check_bulk_permission_via_virtual_scope = check
+        repository.check_bulk_permission_via_virtual_entity = check
         config_provider = MagicMock()
         config_provider.config.manager.rbac.enforcement_enabled = True
-        return VirtualScopeRelationActionRBACValidator(repository, config_provider)
+        return VirtualEntityRelationActionRBACValidator(repository, config_provider)
 
     def _meta(self, action: _LinkAction) -> RelationActionTriggerMeta:
         return RelationActionTriggerMeta(

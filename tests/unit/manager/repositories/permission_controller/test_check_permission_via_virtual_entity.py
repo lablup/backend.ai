@@ -1,7 +1,7 @@
 """
-Tests for PermissionDBSource virtual-scope-chain permission checks.
+Tests for PermissionDBSource virtual-entity-chain permission checks.
 
-Covers resolution through the ``entity -> virtual_scope -> scope`` chain with
+Covers resolution through the ``entity -> virtual_entity -> scope`` chain with
 per-hop ``permission_cap`` clipping, parallel to the direct scope-walk check.
 """
 
@@ -21,7 +21,7 @@ from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
+from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -34,7 +34,7 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as PermScopeType,
 )
-from ai.backend.manager.data.permission.virtual_scope import EntityPermissionCheckKey
+from ai.backend.manager.data.permission.virtual_entity import EntityPermissionCheckKey
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 
@@ -59,9 +59,9 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
     RBACOpsProvider,
@@ -84,11 +84,13 @@ _UNMAPPED_ENTITY_TYPE = ROLE_PRESET_ENTITY_TYPE
 
 @dataclass
 class VSChainFixture:
-    """Identifiers for a virtual-scope chain test."""
+    """Identifiers for a virtual-entity chain test."""
 
     user_id: UserID = field(default_factory=lambda: UserID(uuid.uuid4()))
     role_id: uuid.UUID = field(default_factory=uuid.uuid4)
-    virtual_scope_id: VirtualScopeID = field(default_factory=lambda: VirtualScopeID(uuid.uuid4()))
+    virtual_entity_id: VirtualEntityID = field(
+        default_factory=lambda: VirtualEntityID(uuid.uuid4())
+    )
     owner_scope_id: uuid.UUID = field(default_factory=uuid.uuid4)
     bound_scope_id: uuid.UUID = field(default_factory=uuid.uuid4)
     entity_id: EntityID = field(default_factory=uuid.uuid4)
@@ -96,7 +98,7 @@ class VSChainFixture:
 
 @dataclass
 class VSChainSpec:
-    """Declarative description of the virtual-scope chain to materialize."""
+    """Declarative description of the virtual-entity chain to materialize."""
 
     granted: Permission
     scope_cap: Permission | None = None
@@ -105,7 +107,7 @@ class VSChainSpec:
     role_status: RoleStatus = RoleStatus.ACTIVE
 
 
-class TestCheckPermissionViaVirtualScope:
+class TestCheckPermissionViaVirtualEntity:
     @pytest.fixture
     async def db_with_rbac_tables(
         self,
@@ -124,7 +126,7 @@ class TestCheckPermissionViaVirtualScope:
                 PermissionRow,
                 ObjectPermissionRow,
                 AssociationScopesEntitiesRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
                 EntityLabelRow,
                 EntityMembershipRow,
@@ -190,7 +192,7 @@ class TestCheckPermissionViaVirtualScope:
         ids: VSChainFixture,
         spec: VSChainSpec,
     ) -> None:
-        """Materialize: virtual scope, scope binding, entity membership, and a
+        """Materialize: virtual entity, scope binding, entity membership, and a
         permission granting ``spec.granted`` at the bound scope."""
         async with db.begin_session() as db_sess:
             domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -199,17 +201,17 @@ class TestCheckPermissionViaVirtualScope:
                 DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
             )
             db_sess.add(
-                VirtualScopeRow(
-                    id=ids.virtual_scope_id,
-                    scope_type=ScopeType(EntityType("project")),
-                    scope_id=ids.owner_scope_id,
+                VirtualEntityRow(
+                    id=ids.virtual_entity_id,
+                    entity_type=ScopeType(EntityType("project")),
+                    entity_id=ids.owner_scope_id,
                 )
             )
             await db_sess.flush()
 
             db_sess.add(
                 ScopeBindingRow(
-                    virtual_scope_id=ids.virtual_scope_id,
+                    virtual_entity_id=ids.virtual_entity_id,
                     scope_type=ScopeType(EntityType("project")),
                     scope_id=ids.bound_scope_id,
                     permission_cap=spec.scope_cap,
@@ -218,7 +220,7 @@ class TestCheckPermissionViaVirtualScope:
             if spec.attach_membership:
                 db_sess.add(
                     EntityMembershipRow(
-                        virtual_scope_id=ids.virtual_scope_id,
+                        virtual_entity_id=ids.virtual_entity_id,
                         entity_type=_TARGET_ENTITY_TYPE,
                         entity_id=ids.entity_id,
                         permission_cap=spec.entity_cap,
@@ -276,7 +278,7 @@ class TestCheckPermissionViaVirtualScope:
                 ),
                 Permission.UPDATE,
                 False,
-                id="clip-at-scope-to-vs-hop",
+                id="clip-at-scope-to-ve-hop",
             ),
             pytest.param(
                 VSChainSpec(
@@ -294,7 +296,7 @@ class TestCheckPermissionViaVirtualScope:
                 ),
                 Permission.UPDATE,
                 False,
-                id="clip-at-vs-to-entity-hop",
+                id="clip-at-ve-to-entity-hop",
             ),
             pytest.param(
                 VSChainSpec(
@@ -315,7 +317,7 @@ class TestCheckPermissionViaVirtualScope:
                 VSChainSpec(granted=Permission.READ, attach_membership=False),
                 Permission.READ,
                 False,
-                id="no-vs-fallback",
+                id="no-ve-fallback",
             ),
             pytest.param(
                 VSChainSpec(granted=Permission.READ, role_status=RoleStatus.INACTIVE),
@@ -366,7 +368,7 @@ class TestCheckPermissionViaVirtualScope:
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_scope(key, permission)
+        result = await db_source.check_single_entity_permission_via_virtual_entity(key, permission)
         assert result is expected
 
     @pytest.mark.parametrize(
@@ -399,7 +401,7 @@ class TestCheckPermissionViaVirtualScope:
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        resolved = await db_source.resolve_effective_permissions_via_virtual_scope([key])
+        resolved = await db_source.resolve_effective_permissions_via_virtual_entity([key])
         assert resolved[key] == expected
 
     @pytest.mark.parametrize(
@@ -420,7 +422,7 @@ class TestCheckPermissionViaVirtualScope:
             user_id=chain.user_id,
             entity=VFolderUUID(uuid.uuid4()),
         )
-        result = await db_source.check_bulk_permission_via_virtual_scope(
+        result = await db_source.check_bulk_permission_via_virtual_entity(
             [reachable, unreachable], Permission.READ
         )
         assert result == {reachable: True, unreachable: False}
@@ -444,7 +446,7 @@ class TestCheckPermissionViaVirtualScope:
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_bulk_permission_via_virtual_scope(
+        result = await db_source.check_bulk_permission_via_virtual_entity(
             [reachable], Permission.CREATE | Permission.UPDATE
         )
         assert result == {reachable: False}
@@ -463,7 +465,7 @@ class TestCheckPermissionViaVirtualScope:
             user_id=UserID(uuid.uuid4()),
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_scope(
+        result = await db_source.check_single_entity_permission_via_virtual_entity(
             key, Permission.READ
         )
         assert result is False
@@ -477,23 +479,23 @@ class TestCheckPermissionViaVirtualScope:
         does not name."""
         async with db.begin_session() as db_sess:
             db_sess.add(
-                VirtualScopeRow(
-                    id=ids.virtual_scope_id,
-                    scope_type=ScopeType(EntityType("project")),
-                    scope_id=ids.owner_scope_id,
+                VirtualEntityRow(
+                    id=ids.virtual_entity_id,
+                    entity_type=ScopeType(EntityType("project")),
+                    entity_id=ids.owner_scope_id,
                 )
             )
             await db_sess.flush()
             db_sess.add(
                 ScopeBindingRow(
-                    virtual_scope_id=ids.virtual_scope_id,
+                    virtual_entity_id=ids.virtual_entity_id,
                     scope_type=ScopeType(EntityType("project")),
                     scope_id=ids.bound_scope_id,
                 )
             )
             db_sess.add(
                 EntityMembershipRow(
-                    virtual_scope_id=ids.virtual_scope_id,
+                    virtual_entity_id=ids.virtual_entity_id,
                     entity_type=_UNMAPPED_ENTITY_TYPE,
                     entity_id=ids.entity_id,
                 )
@@ -525,7 +527,7 @@ class TestCheckPermissionViaVirtualScope:
             user_id=fixture_ids.user_id,
             entity=RolePresetID(fixture_ids.entity_id),
         )
-        resolved = await db_source.resolve_effective_permissions_via_virtual_scope([key])
+        resolved = await db_source.resolve_effective_permissions_via_virtual_entity([key])
         assert resolved[key] == Permission.READ
 
     async def test_stored_unmapped_entity_type_reads_back(
@@ -582,7 +584,7 @@ class TestUserRosterEnrollment:
                 PermissionRow,
                 ObjectPermissionRow,
                 AssociationScopesEntitiesRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
                 EntityMembershipRow,
             ],
@@ -668,18 +670,18 @@ class TestUserRosterEnrollment:
         db: ExtendedAsyncSAEngine,
         ids: VSChainFixture,
     ) -> None:
-        """Enroll the user's personal vfolder in the user's own virtual scope, as the
-        virtual-scope backfill does for ordinary resource entities."""
+        """Enroll the user's personal vfolder in the user's own virtual entity, as the
+        virtual-entity backfill does for ordinary resource entities."""
         async with db.begin_session() as db_sess:
             user_vs_id = await db_sess.scalar(
-                sa.select(VirtualScopeRow.id).where(
-                    VirtualScopeRow.scope_type == USER_SCOPE_TYPE,
-                    VirtualScopeRow.scope_id == ids.user_id,
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == USER_SCOPE_TYPE,
+                    VirtualEntityRow.entity_id == ids.user_id,
                 )
             )
             db_sess.add(
                 EntityMembershipRow(
-                    virtual_scope_id=user_vs_id,
+                    virtual_entity_id=user_vs_id,
                     entity_type=_TARGET_ENTITY_TYPE,
                     entity_id=ids.entity_id,
                     permission_cap=None,
@@ -693,18 +695,18 @@ class TestUserRosterEnrollment:
         project_id: uuid.UUID,
         session_id: uuid.UUID,
     ) -> None:
-        """Enroll a session in the project's virtual scope, as session creation does for
+        """Enroll a session in the project's virtual entity, as session creation does for
         the project the session runs in."""
         async with db.begin_session() as db_sess:
-            project_vs_id = await db_sess.scalar(
-                sa.select(VirtualScopeRow.id).where(
-                    VirtualScopeRow.scope_type == PROJECT_SCOPE_TYPE,
-                    VirtualScopeRow.scope_id == project_id,
+            project_ve_id = await db_sess.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_id == project_id,
                 )
             )
             db_sess.add(
                 EntityMembershipRow(
-                    virtual_scope_id=project_vs_id,
+                    virtual_entity_id=project_ve_id,
                     entity_type=SESSION_ENTITY_TYPE,
                     entity_id=session_id,
                     permission_cap=None,
@@ -736,7 +738,7 @@ class TestUserRosterEnrollment:
         ids: VSChainFixture,
     ) -> None:
         """A project-scope grant must not resolve onto a vfolder enrolled only in the
-        member user's own virtual scope: no row binds that scope into the project."""
+        member user's own virtual entity: no row binds that scope into the project."""
         project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
         user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
         await self._grant_on_project(db_with_rbac_tables, ids, ids.owner_scope_id)
@@ -748,7 +750,7 @@ class TestUserRosterEnrollment:
             user_id=ids.user_id,
             entity=VFolderUUID(ids.entity_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_scope(
+        result = await db_source.check_single_entity_permission_via_virtual_entity(
             key, Permission.READ
         )
         assert result is False
@@ -760,7 +762,7 @@ class TestUserRosterEnrollment:
         ops_provider: RBACOpsProvider,
         ids: VSChainFixture,
     ) -> None:
-        """The same grant does reach a session enrolled in the project's virtual scope,
+        """The same grant does reach a session enrolled in the project's virtual entity,
         so the check above fails for the intended reason and not by accident."""
         project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
         user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
@@ -781,7 +783,7 @@ class TestUserRosterEnrollment:
             user_id=ids.user_id,
             entity=SessionID(session_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_scope(
+        result = await db_source.check_single_entity_permission_via_virtual_entity(
             key, Permission.READ
         )
         assert result is True
@@ -809,5 +811,5 @@ class TestUserRosterEnrollment:
         await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
 
         key = EntityPermissionCheckKey(user_id=ids.user_id, entity=UserID(ids.user_id))
-        resolved = await db_source.resolve_effective_permissions_via_virtual_scope([key])
+        resolved = await db_source.resolve_effective_permissions_via_virtual_entity([key])
         assert resolved[key] == Permission.READ

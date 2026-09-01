@@ -35,8 +35,8 @@ from ai.backend.manager.actions.v2.bulk.monitor.audit_log import BulkActionAudit
 from ai.backend.manager.actions.v2.bulk.monitor.prometheus import BulkActionPrometheusMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.reporter import BulkActionReporterMonitor
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
-    VirtualScopeAtomicBulkActionRBACValidator,
-    VirtualScopePartialBulkActionRBACValidator,
+    VirtualEntityAtomicBulkActionRBACValidator,
+    VirtualEntityPartialBulkActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.global_scope.monitor.audit_log import (
     GlobalActionAuditLogMonitor,
@@ -55,13 +55,13 @@ from ai.backend.manager.actions.v2.lookup.monitor.prometheus import (
     LookupActionPrometheusMonitor,
 )
 from ai.backend.manager.actions.v2.relation.validator.rbac import (
-    VirtualScopeRelationActionRBACValidator,
+    VirtualEntityRelationActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.scope.monitor.audit_log import ScopeActionAuditLogMonitor
 from ai.backend.manager.actions.v2.scope.monitor.prometheus import ScopeActionPrometheusMonitor
 from ai.backend.manager.actions.v2.scope.monitor.reporter import ScopeActionReporterMonitor
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
-    VirtualScopeScopeActionRBACValidator,
+    VirtualEntityScopeActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.single_entity.monitor.audit_log import (
     SingleEntityActionAuditLogMonitor,
@@ -73,13 +73,13 @@ from ai.backend.manager.actions.v2.single_entity.monitor.reporter import (
     SingleEntityActionReporterMonitor,
 )
 from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
-    VirtualScopeSingleEntityActionRBACValidator,
+    VirtualEntitySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import (
     LegacyRBACValidators,
     RBACValidators,
-    VirtualScopeRBACValidators,
+    VirtualEntityRBACValidators,
 )
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.legacy import (
@@ -390,20 +390,20 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             scope=LegacyScopeActionRBACValidator(permission_controller_repository),
             single_entity=LegacySingleEntityActionRBACValidator(permission_controller_repository),
         )
-        virtual_scope_rbac_validators = VirtualScopeRBACValidators(
-            scope=VirtualScopeScopeActionRBACValidator(
+        virtual_entity_rbac_validators = VirtualEntityRBACValidators(
+            scope=VirtualEntityScopeActionRBACValidator(
                 permission_controller_repository, config_provider
             ),
-            single_entity=VirtualScopeSingleEntityActionRBACValidator(
+            single_entity=VirtualEntitySingleEntityActionRBACValidator(
                 permission_controller_repository, config_provider
             ),
-            partial_bulk=VirtualScopePartialBulkActionRBACValidator(
+            partial_bulk=VirtualEntityPartialBulkActionRBACValidator(
                 permission_controller_repository, config_provider
             ),
-            atomic_bulk=VirtualScopeAtomicBulkActionRBACValidator(
+            atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(
                 permission_controller_repository, config_provider
             ),
-            relation=VirtualScopeRelationActionRBACValidator(
+            relation=VirtualEntityRelationActionRBACValidator(
                 permission_controller_repository, config_provider
             ),
         )
@@ -418,9 +418,9 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 validators=ActionValidators(
                     rbac=rbac_validators,
                     legacy_rbac=legacy_rbac_validators,
-                    virtual_scope_rbac=virtual_scope_rbac_validators,
+                    virtual_entity_rbac=virtual_entity_rbac_validators,
                 ),
-                v2_validators=virtual_scope_rbac_validators.to_action_validators(),
+                v2_validators=virtual_entity_rbac_validators.to_action_validators(),
             ),
         )
         processors = processor_bundle.processors

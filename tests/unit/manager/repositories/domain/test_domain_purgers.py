@@ -37,9 +37,9 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.session import SessionRow, SessionStatus, SessionTypes
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -61,7 +61,7 @@ class TestDomainPurgersIntegration:
                 # FK dependency order: parents before children
                 RoleRow,
                 PermissionRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
                 EntityLabelRow,

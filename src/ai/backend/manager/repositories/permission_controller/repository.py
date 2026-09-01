@@ -45,7 +45,7 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.types import (
     ScopeListResult,
 )
-from ai.backend.manager.data.permission.virtual_scope import (
+from ai.backend.manager.data.permission.virtual_entity import (
     EntityPermissionCheckKey,
     ScopePermissionCheckKey,
 )
@@ -429,49 +429,49 @@ class PermissionControllerRepository:
         return await self._db_source.check_bulk_permission_with_scope_chain(data)
 
     @permission_controller_repository_resilience.apply()
-    async def check_single_entity_permission_via_virtual_scope(
+    async def check_single_entity_permission_via_virtual_entity(
         self,
         key: EntityPermissionCheckKey,
         permission: Permission,
     ) -> bool:
-        """Permission check on a single entity through the virtual-scope chain.
+        """Permission check on a single entity through the virtual-entity chain.
 
         Resolves the effective permission via
         ``entity -> entity_memberships -> scope_bindings -> scope`` with per-hop
         cap clipping and grants only when it covers every bit of ``permission``,
         which may be a mask (``UPSERT`` requires ``CREATE | UPDATE``).
         """
-        return await self._db_source.check_single_entity_permission_via_virtual_scope(
+        return await self._db_source.check_single_entity_permission_via_virtual_entity(
             key, permission
         )
 
     @permission_controller_repository_resilience.apply()
-    async def check_bulk_permission_via_virtual_scope(
+    async def check_bulk_permission_via_virtual_entity(
         self,
         keys: Collection[EntityPermissionCheckKey],
         permission: Permission,
     ) -> Mapping[EntityPermissionCheckKey, bool]:
-        """Batch permission check on multiple entities through the virtual-scope chain.
+        """Batch permission check on multiple entities through the virtual-entity chain.
 
-        Same semantics as check_single_entity_permission_via_virtual_scope but
+        Same semantics as check_single_entity_permission_via_virtual_entity but
         for an arbitrary collection of per-entity keys, batched per
         ``(user_id, entity_type)`` group.
         """
-        return await self._db_source.check_bulk_permission_via_virtual_scope(keys, permission)
+        return await self._db_source.check_bulk_permission_via_virtual_entity(keys, permission)
 
     @permission_controller_repository_resilience.apply()
-    async def check_scope_permission_via_virtual_scope(
+    async def check_scope_permission_via_virtual_entity(
         self,
         keys: Collection[ScopePermissionCheckKey],
         permission: Permission,
     ) -> Mapping[ScopePermissionCheckKey, bool]:
-        """Permission check on target scopes through the virtual-scope chain.
+        """Permission check on target scopes through the virtual-entity chain.
 
         Each scope is walked as an entity while permission rows are matched on
         the key's ``entity_type``, batched per
         ``(user_id, scope_type, entity_type)`` group.
         """
-        return await self._db_source.check_scope_permission_via_virtual_scope(keys, permission)
+        return await self._db_source.check_scope_permission_via_virtual_entity(keys, permission)
 
     @permission_controller_repository_resilience.apply()
     async def resolve_effective_permissions(

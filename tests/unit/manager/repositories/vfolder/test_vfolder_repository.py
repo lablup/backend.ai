@@ -101,9 +101,9 @@ from ai.backend.manager.models.vfolder import (
     VFolderRow,
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
@@ -179,7 +179,7 @@ class TestVfolderRepository:
                 ResourcePresetRow,
                 VFolderPermissionRow,
                 AssociationScopesEntitiesRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 EntityMembershipRow,
                 ScopeBindingRow,
                 EntityLabelRow,
@@ -306,13 +306,13 @@ class TestVfolderRepository:
             db_sess.add(user_role)
             await db_sess.flush()
 
-            # Sharing a vfolder enrolls it in the grantee's virtual scope, which the
+            # Sharing a vfolder enrolls it in the grantee's virtual entity, which the
             # real user-create path provisions.
             db_sess.add(
-                VirtualScopeRow(
+                VirtualEntityRow(
                     id=uuid.uuid4(),
-                    scope_type=USER_SCOPE_TYPE,
-                    scope_id=UserID(user_uuid),
+                    entity_type=USER_SCOPE_TYPE,
+                    entity_id=UserID(user_uuid),
                 )
             )
             await db_sess.flush()
@@ -343,13 +343,13 @@ class TestVfolderRepository:
             )
             db_sess.add(group)
             await db_sess.flush()
-            # Creating a vfolder enrolls it in the owning project's virtual scope,
+            # Creating a vfolder enrolls it in the owning project's virtual entity,
             # which the real project-create path provisions.
             db_sess.add(
-                VirtualScopeRow(
+                VirtualEntityRow(
                     id=uuid.uuid4(),
-                    scope_type=PROJECT_SCOPE_TYPE,
-                    scope_id=ProjectID(group_uuid),
+                    entity_type=PROJECT_SCOPE_TYPE,
+                    entity_id=ProjectID(group_uuid),
                 )
             )
             await db_sess.flush()

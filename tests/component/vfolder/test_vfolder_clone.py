@@ -46,8 +46,8 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.processors import Processors
@@ -157,8 +157,8 @@ def _configure_clone_storage_mock(storage_manager: StorageSessionManager) -> Asy
 async def _fetch_scope_graph(
     db_engine: SAEngine, vfolder_name: str, owner_id: uuid.UUID
 ) -> tuple[int, int]:
-    """Count the vfolder's own virtual scope node and its memberships in the owner's scope."""
-    scopes = VirtualScopeRow.__table__
+    """Count the vfolder's own virtual entity node and its memberships in the owner's scope."""
+    scopes = VirtualEntityRow.__table__
     memberships = EntityMembershipRow.__table__
     async with db_engine.begin() as conn:
         vfolder_id = (
@@ -169,8 +169,8 @@ async def _fetch_scope_graph(
                 sa.select(sa.func.count())
                 .select_from(scopes)
                 .where(
-                    scopes.c.scope_type == VFOLDER_ENTITY_TYPE,
-                    scopes.c.scope_id == vfolder_id,
+                    scopes.c.entity_type == VFOLDER_ENTITY_TYPE,
+                    scopes.c.entity_id == vfolder_id,
                 )
             )
         ).scalar_one()
@@ -178,13 +178,13 @@ async def _fetch_scope_graph(
             await conn.execute(
                 sa.select(sa.func.count())
                 .select_from(
-                    memberships.join(scopes, scopes.c.id == memberships.c.virtual_scope_id)
+                    memberships.join(scopes, scopes.c.id == memberships.c.virtual_entity_id)
                 )
                 .where(
                     memberships.c.entity_type == VFOLDER_ENTITY_TYPE,
                     memberships.c.entity_id == vfolder_id,
-                    scopes.c.scope_type == USER_SCOPE_TYPE,
-                    scopes.c.scope_id == owner_id,
+                    scopes.c.entity_type == USER_SCOPE_TYPE,
+                    scopes.c.entity_id == owner_id,
                 )
             )
         ).scalar_one()

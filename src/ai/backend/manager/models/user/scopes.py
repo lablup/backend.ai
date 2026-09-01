@@ -19,7 +19,7 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
 __all__ = (
     "DomainUserOperationScope",
@@ -66,7 +66,7 @@ class ProjectUserOperationScope(OperationScope):
     """Required scope for searching users within a project.
 
     Used for project_users query (project member+).
-    Membership is read from the project's virtual scope.
+    Membership is read from the project's virtual entity.
     """
 
     project_id: UUID

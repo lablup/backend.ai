@@ -60,15 +60,15 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 @dataclass
@@ -136,7 +136,7 @@ class TestAuthRepository:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
                 EntityLabelRow,
                 EntityMembershipRow,
@@ -369,7 +369,7 @@ class TestAuthRepository:
                 )
             )
             await db_sess.flush()
-            await VirtualScopeSeeder().enroll_user_in_project(
+            await VirtualEntitySeeder().enroll_user_in_project(
                 db_sess, group_id, sample_user_data.uuid
             )
             await db_sess.refresh(group)

@@ -68,9 +68,9 @@ class UserWriteOps(RBACWriteOps):
     ) -> FullUserCreationResult:
         """Provision a user end to end in one transaction.
 
-        Creates the user scope (row, virtual scope, own-scope roles) and grants those
+        Creates the user scope (row, virtual entity, own-scope roles) and grants those
         roles, writes the keypair the user authorizes with, then enrolls the user in
-        its domain's and projects' virtual scopes.
+        its domain's and projects' virtual entities.
         """
         user_row = await self._create_user_scope(full_creation.creation)
         user_id = UserID(user_row.uuid)
@@ -87,7 +87,7 @@ class UserWriteOps(RBACWriteOps):
         return FullUserCreationResult(user_row=user_row, keypair=keypair)
 
     async def _create_user_scope(self, creation: ScopeCreation[UserRow]) -> UserRow:
-        """Write the user row with its virtual scope and own-scope roles, and grant
+        """Write the user row with its virtual entity and own-scope roles, and grant
         those roles to the user."""
         creation_result = await self.create_scope(creation)
         user_row = creation_result.row
@@ -114,7 +114,7 @@ class UserWriteOps(RBACWriteOps):
 
     async def _enroll_in_domain(self, user_id: UserID, domain_id: DomainID) -> None:
         """Enroll the user in its domain's roster. The domain reaches what the user owns
-        through each entity's own enrollment, not through the user's virtual scope."""
+        through each entity's own enrollment, not through the user's virtual entity."""
         domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id)
         await self.ensure_scope(domain_scope)
         await self.add_bulk_members(
@@ -127,7 +127,7 @@ class UserWriteOps(RBACWriteOps):
         domain_id: DomainID,
         project_ids: Collection[ProjectID],
     ) -> None:
-        """Enroll the user in each project's virtual scope — the domain's model-store
+        """Enroll the user in each project's virtual entity — the domain's model-store
         projects always included, ``project_ids`` narrowed to projects that exist in
         the domain, and personal projects left out."""
         member = ScopeUserMember(user_id=user_id)

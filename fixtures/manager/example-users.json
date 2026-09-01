@@ -265,248 +265,248 @@
             "relation_type": "auto"
         }
     ],
-    "virtual_scopes": [
+    "virtual_entities": [
         {
             "id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
-            "scope_type": "domain",
-            "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
-        },
-        {
-            "id": "12e8b72e-9dc7-598f-953f-55576c104d19",
-            "scope_type": "project",
-            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831"
-        },
-        {
-            "id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
-            "scope_type": "project",
-            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5"
-        },
-        {
-            "id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
-            "scope_type": "user",
-            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
-        },
-        {
-            "id": "19a685b0-dc01-5497-885e-8e9a05109574",
-            "scope_type": "user",
-            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860"
-        },
-        {
-            "id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
-            "scope_type": "user",
-            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
-        },
-        {
-            "id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
-            "scope_type": "user",
-            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
-        },
-        {
-            "id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
-            "scope_type": "user",
-            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
-        }
-    ],
-    "entity_memberships": [
-        {
-            "virtual_scope_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
             "entity_type": "domain",
             "entity_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         },
         {
-            "virtual_scope_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "id": "12e8b72e-9dc7-598f-953f-55576c104d19",
             "entity_type": "project",
             "entity_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831"
         },
         {
-            "virtual_scope_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
             "entity_type": "project",
             "entity_id": "8e32dd28-d319-4e3b-8851-ea37837699a5"
         },
         {
-            "virtual_scope_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
             "entity_type": "user",
             "entity_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
         },
         {
-            "virtual_scope_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "id": "19a685b0-dc01-5497-885e-8e9a05109574",
             "entity_type": "user",
             "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860"
         },
         {
-            "virtual_scope_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
             "entity_type": "user",
             "entity_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
         },
         {
-            "virtual_scope_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
             "entity_type": "user",
             "entity_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
         },
         {
-            "virtual_scope_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
             "entity_type": "user",
             "entity_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
+        }
+    ],
+    "entity_memberships": [
+        {
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "entity_type": "domain",
+            "entity_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         },
         {
-            "virtual_scope_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
             "entity_type": "project",
             "entity_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831"
         },
         {
-            "virtual_scope_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
             "entity_type": "project",
             "entity_id": "8e32dd28-d319-4e3b-8851-ea37837699a5"
         },
         {
-            "virtual_scope_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "virtual_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
             "entity_type": "user",
             "entity_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
         },
         {
-            "virtual_scope_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "virtual_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574",
             "entity_type": "user",
             "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860"
         },
         {
-            "virtual_scope_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "virtual_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
             "entity_type": "user",
             "entity_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
         },
         {
-            "virtual_scope_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "virtual_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
             "entity_type": "user",
             "entity_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
         },
         {
-            "virtual_scope_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "virtual_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
             "entity_type": "user",
             "entity_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
         },
         {
-            "virtual_scope_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "entity_type": "project",
+            "entity_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831"
+        },
+        {
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "entity_type": "project",
+            "entity_id": "8e32dd28-d319-4e3b-8851-ea37837699a5"
+        },
+        {
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
             "entity_type": "user",
             "entity_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
         },
         {
-            "virtual_scope_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
             "entity_type": "user",
             "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860"
         },
         {
-            "virtual_scope_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
             "entity_type": "user",
             "entity_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
         },
         {
-            "virtual_scope_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
             "entity_type": "user",
             "entity_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
         },
         {
-            "virtual_scope_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
             "entity_type": "user",
             "entity_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
         },
         {
-            "virtual_scope_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
             "entity_type": "user",
             "entity_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
         },
         {
-            "virtual_scope_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
             "entity_type": "user",
             "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860"
         },
         {
-            "virtual_scope_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
             "entity_type": "user",
             "entity_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
         },
         {
-            "virtual_scope_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
             "entity_type": "user",
             "entity_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
         },
         {
-            "virtual_scope_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "entity_type": "user",
+            "entity_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
+        },
+        {
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "entity_type": "user",
+            "entity_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
+        },
+        {
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "entity_type": "user",
+            "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860"
+        },
+        {
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "entity_type": "user",
+            "entity_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
+        },
+        {
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "entity_type": "user",
+            "entity_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
+        },
+        {
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
             "entity_type": "user",
             "entity_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
         }
     ],
     "scope_bindings": [
         {
-            "virtual_scope_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
+            "virtual_entity_id": "df651a2a-3138-5cbe-b6d4-081ddb8ae04d",
             "scope_type": "domain",
             "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         },
         {
-            "virtual_scope_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
             "scope_type": "project",
             "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831"
         },
         {
-            "virtual_scope_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
             "scope_type": "project",
             "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5"
         },
         {
-            "virtual_scope_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "virtual_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
             "scope_type": "user",
             "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
         },
         {
-            "virtual_scope_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "virtual_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574",
             "scope_type": "user",
             "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860"
         },
         {
-            "virtual_scope_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "virtual_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
             "scope_type": "user",
             "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
         },
         {
-            "virtual_scope_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "virtual_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
             "scope_type": "user",
             "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
         },
         {
-            "virtual_scope_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "virtual_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
             "scope_type": "user",
             "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
         },
         {
-            "virtual_scope_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
+            "virtual_entity_id": "12e8b72e-9dc7-598f-953f-55576c104d19",
             "scope_type": "domain",
             "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         },
         {
-            "virtual_scope_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
+            "virtual_entity_id": "5843749e-d1be-56bb-a4c9-7327f7ad30c5",
             "scope_type": "domain",
             "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         },
         {
-            "virtual_scope_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
+            "virtual_entity_id": "8c6dfd8d-1325-5387-ba52-c562efa19c97",
             "scope_type": "domain",
             "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         },
         {
-            "virtual_scope_id": "19a685b0-dc01-5497-885e-8e9a05109574",
+            "virtual_entity_id": "19a685b0-dc01-5497-885e-8e9a05109574",
             "scope_type": "domain",
             "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         },
         {
-            "virtual_scope_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
+            "virtual_entity_id": "1bed1ef5-6c47-53f8-8db1-169dda388d38",
             "scope_type": "domain",
             "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         },
         {
-            "virtual_scope_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
+            "virtual_entity_id": "63a8d662-fd1e-5411-9910-34f18ad43fb3",
             "scope_type": "domain",
             "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         },
         {
-            "virtual_scope_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
+            "virtual_entity_id": "5c97d84e-1599-54f2-82cc-28e6b24e285f",
             "scope_type": "domain",
             "scope_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         }

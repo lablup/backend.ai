@@ -61,7 +61,7 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.user.write import FullUserCreation
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider

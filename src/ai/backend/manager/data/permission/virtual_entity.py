@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.user import UserID
 
 @dataclass(frozen=True)
 class EntityPermissionCheckKey:
-    """Identifies a ``(user, entity)`` target for virtual-scope-chain
+    """Identifies a ``(user, entity)`` target for virtual-entity-chain
     permission resolution.
     """
 
@@ -18,11 +18,11 @@ class EntityPermissionCheckKey:
 
 @dataclass(frozen=True)
 class ScopePermissionCheckKey:
-    """Identifies a ``(user, scope)`` target for virtual-scope-chain
+    """Identifies a ``(user, scope)`` target for virtual-entity-chain
     permission resolution.
 
     The scope itself is walked as an entity (reachable through its own and its
-    ancestors' virtual scopes), while permission rows are matched on
+    ancestors' virtual entities), while permission rows are matched on
     ``entity_type`` — the type of entity acted on within the scope.
     """
 

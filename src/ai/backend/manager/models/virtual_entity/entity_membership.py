@@ -4,9 +4,9 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.types import EntityID, EntityType
-from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
+from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.data.permission.virtual_scope import EntityMembershipData
+from ai.backend.common.data.permission.virtual_entity import EntityMembershipData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -22,14 +22,14 @@ class EntityMembershipRow(CreatedAtMixin, Base):
             "ix_entity_memberships_entity",
             "entity_type",
             "entity_id",
-            postgresql_include=["virtual_scope_id", "permission_cap"],
+            postgresql_include=["virtual_entity_id", "permission_cap"],
         ),
     )
 
-    virtual_scope_id: Mapped[VirtualScopeID] = mapped_column(
-        "virtual_scope_id",
-        GUID(VirtualScopeID),
-        sa.ForeignKey("virtual_scopes.id", ondelete="CASCADE"),
+    virtual_entity_id: Mapped[VirtualEntityID] = mapped_column(
+        "virtual_entity_id",
+        GUID(VirtualEntityID),
+        sa.ForeignKey("virtual_entities.id", ondelete="CASCADE"),
         primary_key=True,
     )
     entity_type: Mapped[EntityType] = mapped_column(
@@ -42,7 +42,7 @@ class EntityMembershipRow(CreatedAtMixin, Base):
 
     def to_data(self) -> EntityMembershipData:
         return EntityMembershipData(
-            virtual_scope_id=self.virtual_scope_id,
+            virtual_entity_id=self.virtual_entity_id,
             entity_type=self.entity_type,
             entity_id=self.entity_id,
             permission_cap=self.permission_cap,

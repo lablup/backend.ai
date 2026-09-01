@@ -241,7 +241,7 @@ class OpsRepository[TData]:
             return EntityWithFieldsResult(data=data, fields=fields)
 
     async def create_entity(self, creator: EntityCreator[Any, TData]) -> TData:
-        """Insert one entity row; the write provisions its virtual scope and joins
+        """Insert one entity row; the write provisions its virtual entity and joins
         the declared memberships. No roles are involved on this path."""
         async with self._ops.write_ops() as w:
             return await w.create_entity(creator)

@@ -16,7 +16,7 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
 __all__ = (
     "DomainProjectOperationScope",
@@ -68,7 +68,7 @@ class UserProjectOperationScope(OperationScope):
     """Required scope for searching projects a user is member of.
 
     Used for user-scoped project search (any authenticated user).
-    Membership is read from the projects' virtual scopes.
+    Membership is read from the projects' virtual entities.
     """
 
     user_uuid: UUID

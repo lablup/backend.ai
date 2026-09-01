@@ -61,5 +61,5 @@ the entity type, shape, operation, gate and backing.
   rests on the RBAC validators.
 - No `migrate_error_log_data_to_rbac` exists, so until the permission rows land
   a non-super-admin caller is refused.
-- The component suite cannot see either state: it replaces the virtual-scope
+- The component suite cannot see either state: it replaces the virtual-entity
   validators with mocks, so its fixtures admit every caller.
