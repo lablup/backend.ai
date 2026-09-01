@@ -104,6 +104,8 @@ Ownership of every entity is expressed as `scope -> virtual_scope -> entity`, no
 
 **This path is the only one.** The recursive path over `association_scopes_entities`, `object_permissions`, and `RBACElementType` are removed. Keeping them leaves two answers to the same question.
 
+The graph and permission rows — virtual scopes, enrollments, bindings, permissions, field permissions — are written only through the ops layer's named primitives. No other layer takes a creator or purger for these rows, and nothing creates or updates them piecemeal outside those primitives; role and preset editing hands over whole declarations that ops derives the rows from. Data migrations are the one writer outside ops. The admin mutations that address permission rows directly retire with the legacy paths.
+
 The resource entities are sessions, virtual folders, deployments, images, and model cards. Their ownership scope is always a project. **A resource entity owned by an individual belongs to that person's personal project.** No resource entity sits under a user scope.
 
 A user's own information is not a resource entity. Keypairs, SSH keys, dotfiles, and passwords stay under the user and do not move to a project.
@@ -373,6 +375,7 @@ Opening project-folder creation and narrowing user information are the intended 
 |---|---|
 | Ownership representation | Unified into `scope -> virtual_scope -> entity`, not limited to resource entities |
 | Other paths | Removed: the legacy recursive path, `association_scopes_entities`, `object_permissions`, `RBACElementType` |
+| Writing the graph and permission rows | Only through the ops primitives — no creator/purger surface for these rows elsewhere. Role and preset editing passes whole declarations; direct permission-row mutations retire with the legacy paths |
 | Resource-entity ownership scope | Always a project; individually owned ones go to personal projects |
 | Personal folders | Created only in personal projects; none inside team projects |
 | Allowed storage hosts and resource policies | Relocation is follow-up work; until then the keypair-policy path answers, so check behavior does not change |
