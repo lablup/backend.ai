@@ -42,7 +42,6 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -97,7 +96,6 @@ class TestModelCardSearchInProject:
                 SessionRow,
                 KernelRow,
                 ModelCardRow,
-                ModelCardResourceRequirementRow,
                 AssociationScopesEntitiesRow,
             ],
         ):
