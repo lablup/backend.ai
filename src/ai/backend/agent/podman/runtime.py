@@ -31,6 +31,7 @@ import json
 import logging
 import os
 import shutil
+import signal
 from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, ClassVar, Final, override
@@ -601,6 +602,23 @@ class PodmanRuntime(RootlessOciRuntime):
 
     def _signal_cgroup(self, container_id: str, signum: int) -> None:
         cgroup = container_cgroup_fs_path(container_id)
+        if signum == signal.SIGKILL:
+            # cgroup.kill reaches processes the agent cannot signal by pid. Anything inside the
+            # container that dropped to a non-root user is a *mapped* uid on the host (100000+),
+            # and an agent running as the kernel uid gets EPERM trying to kill it -- an ssh
+            # session or a user's own background job would survive the teardown. The kernel does
+            # not care who owns the process, only who may write this file, and the privnet's
+            # delegation already hands it to the kernel uid along with the cgroup.
+            try:
+                (cgroup / "cgroup.kill").write_text("1")
+                return
+            except OSError as e:
+                log.warning(
+                    "[podman] cgroup.kill unavailable for {} ({!r}); falling back to per-pid"
+                    " signals, which cannot reach a process running as a mapped uid",
+                    container_id,
+                    e,
+                )
         try:
             pids = [int(line) for line in (cgroup / "cgroup.procs").read_text().split()]
         except OSError:

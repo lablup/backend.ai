@@ -1161,9 +1161,16 @@ OciRuntime
 
 `./run.sh pm` — 피어 노드에 podman이 없어 멀티노드(B2/C1–C7/B3)는 실행 불가.
 
-| 통과 | A1 A2 B1 B4 D1 D2 D4 E2 F3 G1 G4 |
+| 통과 (16) | A1 A2 B1 B4 D1 D2 D4 E1 E2 F1 F3 F5 G1 G2 G3 G4 |
 |---|---|
-| 확인된 사실 | seccomp filter 모드(커널+자손 6개), `memory.max=2147483648`/`cpuset.cpus=0-3`, 커널 cgroup이 에이전트와 분리, 에이전트 SIGKILL 후 커널 생존, 좀비 0 |
+| 실행 불가 | B2 C1–C7 B3 (피어 노드에 podman 없음), F6 (containerd 전용) |
+| 확인된 사실 | seccomp filter 모드(커널+자손 6개), `memory.max=2147483648`/`cpuset.cpus=0-3`, 커널 cgroup이 에이전트와 분리, 지표 8종 전부 존재, 48 MiB 쏟아도 8.7 MB (10 MiB 예산 내), 에이전트 SIGKILL 후 커널 생존 → 재기동 후 세션 RUNNING, 고아 정리하면서 살아있는 커널 보존, 좀비 0 |
 
 F1은 로그 파일 **모양**이 다르다 — conmon은 회전 형제를 두지 않고 한 파일에 전체 예산을 쓴다.
 총량은 동일하므로 스위트의 백엔드 표에 `backend_log_files` 행을 넣어 표현했다.
+
+`kill_container(all_processes=True)`는 pid 순회 대신 `cgroup.kill`을 쓴다. 컨테이너 안에서
+비-root로 떨어진 프로세스는 호스트에서 **매핑된 uid(100000+)** 라서 커널 uid로 도는 에이전트가
+pid로는 EPERM을 받는다 — ssh 세션이나 사용자 백그라운드 잡이 teardown에서 살아남는다. 커널은
+프로세스 소유자가 아니라 그 파일을 쓸 수 있는지만 보고, privnet 위임이 이미 그 파일을 커널
+uid에게 넘겨준다.
