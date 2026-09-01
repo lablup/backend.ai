@@ -533,8 +533,7 @@ class FairShareAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ filter helpers (domain)
 
-    @staticmethod
-    def _convert_domain_filter(filter: DomainFairShareFilter) -> list[QueryCondition]:
+    def _convert_domain_filter(self, filter: DomainFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -562,23 +561,22 @@ class FairShareAdapter(BaseAdapter):
             )
         if filter.AND:
             for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_domain_filter(sub_filter))
+                conditions.extend(self._convert_domain_filter(sub_filter))
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_domain_filter(sub_filter))
+                or_conditions.extend(self._convert_domain_filter(sub_filter))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_domain_filter(sub_filter))
+                not_conditions.extend(self._convert_domain_filter(sub_filter))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_domain_filter_rg(filter: DomainFairShareFilter) -> list[QueryCondition]:
+    def _convert_domain_filter_rg(self, filter: DomainFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -606,57 +604,54 @@ class FairShareAdapter(BaseAdapter):
             )
         if filter.AND:
             for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_domain_filter_rg(sub_filter))
+                conditions.extend(self._convert_domain_filter_rg(sub_filter))
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_domain_filter_rg(sub_filter))
+                or_conditions.extend(self._convert_domain_filter_rg(sub_filter))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_domain_filter_rg(sub_filter))
+                not_conditions.extend(self._convert_domain_filter_rg(sub_filter))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_domain_orders(orders: list[DomainFairShareOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirection.ASC
-            match o.field:
-                case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
-                    result.append(DomainFairShareOrders.by_fair_share_factor(ascending=ascending))
-                case DomainFairShareOrderField.DOMAIN_NAME:
-                    result.append(DomainFairShareOrders.by_domain_name(ascending=ascending))
-                case DomainFairShareOrderField.CREATED_AT:
-                    result.append(DomainFairShareOrders.by_created_at(ascending=ascending))
-                case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
-                    result.append(DomainFairShareOrders.by_domain_is_active(ascending=ascending))
-        return result
+    def _convert_domain_orders(self, orders: list[DomainFairShareOrder]) -> list[QueryOrder]:
+        return [self._convert_domain_order(o) for o in orders]
 
-    @staticmethod
-    def _convert_domain_orders_rg(orders: list[DomainFairShareOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirection.ASC
-            match o.field:
-                case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
-                    result.append(RGDomainFairShareOrders.by_fair_share_factor(ascending=ascending))
-                case DomainFairShareOrderField.DOMAIN_NAME:
-                    result.append(RGDomainFairShareOrders.by_domain_name(ascending=ascending))
-                case DomainFairShareOrderField.CREATED_AT:
-                    result.append(RGDomainFairShareOrders.by_created_at(ascending=ascending))
-                case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
-                    result.append(DomainFairShareOrders.by_domain_is_active(ascending=ascending))
-        return result
+    def _convert_domain_order(self, order: DomainFairShareOrder) -> QueryOrder:
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
+                return DomainFairShareOrders.by_fair_share_factor(ascending=ascending)
+            case DomainFairShareOrderField.DOMAIN_NAME:
+                return DomainFairShareOrders.by_domain_name(ascending=ascending)
+            case DomainFairShareOrderField.CREATED_AT:
+                return DomainFairShareOrders.by_created_at(ascending=ascending)
+            case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
+                return DomainFairShareOrders.by_domain_is_active(ascending=ascending)
+
+    def _convert_domain_orders_rg(self, orders: list[DomainFairShareOrder]) -> list[QueryOrder]:
+        return [self._convert_domain_order_rg(o) for o in orders]
+
+    def _convert_domain_order_rg(self, order: DomainFairShareOrder) -> QueryOrder:
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case DomainFairShareOrderField.FAIR_SHARE_FACTOR:
+                return RGDomainFairShareOrders.by_fair_share_factor(ascending=ascending)
+            case DomainFairShareOrderField.DOMAIN_NAME:
+                return RGDomainFairShareOrders.by_domain_name(ascending=ascending)
+            case DomainFairShareOrderField.CREATED_AT:
+                return RGDomainFairShareOrders.by_created_at(ascending=ascending)
+            case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
+                return RGDomainFairShareOrders.by_domain_is_active(ascending=ascending)
 
     # ------------------------------------------------------------------ filter helpers (project)
 
-    @staticmethod
-    def _convert_project_filter(filter: ProjectFairShareFilter) -> list[QueryCondition]:
+    def _convert_project_filter(self, filter: ProjectFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -691,23 +686,22 @@ class FairShareAdapter(BaseAdapter):
             )
         if filter.AND:
             for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_project_filter(sub_filter))
+                conditions.extend(self._convert_project_filter(sub_filter))
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_project_filter(sub_filter))
+                or_conditions.extend(self._convert_project_filter(sub_filter))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_project_filter(sub_filter))
+                not_conditions.extend(self._convert_project_filter(sub_filter))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_project_filter_rg(filter: ProjectFairShareFilter) -> list[QueryCondition]:
+    def _convert_project_filter_rg(self, filter: ProjectFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -742,51 +736,54 @@ class FairShareAdapter(BaseAdapter):
             )
         if filter.AND:
             for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_project_filter_rg(sub_filter))
+                conditions.extend(self._convert_project_filter_rg(sub_filter))
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_project_filter_rg(sub_filter))
+                or_conditions.extend(self._convert_project_filter_rg(sub_filter))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_project_filter_rg(sub_filter))
+                not_conditions.extend(self._convert_project_filter_rg(sub_filter))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_project_orders(orders: list[ProjectFairShareOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirection.ASC
-            match o.field:
-                case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
-                    result.append(ProjectFairShareOrders.by_fair_share_factor(ascending=ascending))
-                case ProjectFairShareOrderField.CREATED_AT:
-                    result.append(ProjectFairShareOrders.by_created_at(ascending=ascending))
-        return result
+    def _convert_project_orders(self, orders: list[ProjectFairShareOrder]) -> list[QueryOrder]:
+        return [self._convert_project_order(o) for o in orders]
 
-    @staticmethod
-    def _convert_project_orders_rg(orders: list[ProjectFairShareOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirection.ASC
-            match o.field:
-                case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
-                    result.append(
-                        RGProjectFairShareOrders.by_fair_share_factor(ascending=ascending)
-                    )
-                case ProjectFairShareOrderField.CREATED_AT:
-                    result.append(RGProjectFairShareOrders.by_created_at(ascending=ascending))
-        return result
+    def _convert_project_order(self, order: ProjectFairShareOrder) -> QueryOrder:
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
+                return ProjectFairShareOrders.by_fair_share_factor(ascending=ascending)
+            case ProjectFairShareOrderField.CREATED_AT:
+                return ProjectFairShareOrders.by_created_at(ascending=ascending)
+            case ProjectFairShareOrderField.PROJECT_NAME:
+                return ProjectFairShareOrders.by_project_name(ascending=ascending)
+            case ProjectFairShareOrderField.PROJECT_IS_ACTIVE:
+                return ProjectFairShareOrders.by_project_is_active(ascending=ascending)
+
+    def _convert_project_orders_rg(self, orders: list[ProjectFairShareOrder]) -> list[QueryOrder]:
+        return [self._convert_project_order_rg(o) for o in orders]
+
+    def _convert_project_order_rg(self, order: ProjectFairShareOrder) -> QueryOrder:
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
+                return RGProjectFairShareOrders.by_fair_share_factor(ascending=ascending)
+            case ProjectFairShareOrderField.CREATED_AT:
+                return RGProjectFairShareOrders.by_created_at(ascending=ascending)
+            case ProjectFairShareOrderField.PROJECT_NAME:
+                return RGProjectFairShareOrders.by_project_name(ascending=ascending)
+            case ProjectFairShareOrderField.PROJECT_IS_ACTIVE:
+                return RGProjectFairShareOrders.by_project_is_active(ascending=ascending)
 
     # ------------------------------------------------------------------ filter helpers (user)
 
-    @staticmethod
-    def _convert_user_filter(filter: UserFairShareFilter) -> list[QueryCondition]:
+    def _convert_user_filter(self, filter: UserFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -826,23 +823,22 @@ class FairShareAdapter(BaseAdapter):
             conditions.append(UserFairShareConditions.by_user_is_active(filter.user.is_active))
         if filter.AND:
             for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_user_filter(sub_filter))
+                conditions.extend(self._convert_user_filter(sub_filter))
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_user_filter(sub_filter))
+                or_conditions.extend(self._convert_user_filter(sub_filter))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_user_filter(sub_filter))
+                not_conditions.extend(self._convert_user_filter(sub_filter))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_user_filter_rg(filter: UserFairShareFilter) -> list[QueryCondition]:
+    def _convert_user_filter_rg(self, filter: UserFairShareFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter.resource_group is not None:
             cond = filter.resource_group.build_query_condition(
@@ -882,44 +878,50 @@ class FairShareAdapter(BaseAdapter):
             conditions.append(UserFairShareConditions.by_user_is_active(filter.user.is_active))
         if filter.AND:
             for sub_filter in filter.AND:
-                conditions.extend(FairShareAdapter._convert_user_filter_rg(sub_filter))
+                conditions.extend(self._convert_user_filter_rg(sub_filter))
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(FairShareAdapter._convert_user_filter_rg(sub_filter))
+                or_conditions.extend(self._convert_user_filter_rg(sub_filter))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
             not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(FairShareAdapter._convert_user_filter_rg(sub_filter))
+                not_conditions.extend(self._convert_user_filter_rg(sub_filter))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_user_orders(orders: list[UserFairShareOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirection.ASC
-            match o.field:
-                case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                    result.append(UserFairShareOrders.by_fair_share_factor(ascending=ascending))
-                case UserFairShareOrderField.CREATED_AT:
-                    result.append(UserFairShareOrders.by_created_at(ascending=ascending))
-        return result
+    def _convert_user_orders(self, orders: list[UserFairShareOrder]) -> list[QueryOrder]:
+        return [self._convert_user_order(o) for o in orders]
 
-    @staticmethod
-    def _convert_user_orders_rg(orders: list[UserFairShareOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirection.ASC
-            match o.field:
-                case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                    result.append(RGUserFairShareOrders.by_fair_share_factor(ascending=ascending))
-                case UserFairShareOrderField.CREATED_AT:
-                    result.append(RGUserFairShareOrders.by_created_at(ascending=ascending))
-        return result
+    def _convert_user_order(self, order: UserFairShareOrder) -> QueryOrder:
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case UserFairShareOrderField.FAIR_SHARE_FACTOR:
+                return UserFairShareOrders.by_fair_share_factor(ascending=ascending)
+            case UserFairShareOrderField.CREATED_AT:
+                return UserFairShareOrders.by_created_at(ascending=ascending)
+            case UserFairShareOrderField.USER_USERNAME:
+                return UserFairShareOrders.by_user_username(ascending=ascending)
+            case UserFairShareOrderField.USER_EMAIL:
+                return UserFairShareOrders.by_user_email(ascending=ascending)
+
+    def _convert_user_orders_rg(self, orders: list[UserFairShareOrder]) -> list[QueryOrder]:
+        return [self._convert_user_order_rg(o) for o in orders]
+
+    def _convert_user_order_rg(self, order: UserFairShareOrder) -> QueryOrder:
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case UserFairShareOrderField.FAIR_SHARE_FACTOR:
+                return RGUserFairShareOrders.by_fair_share_factor(ascending=ascending)
+            case UserFairShareOrderField.CREATED_AT:
+                return RGUserFairShareOrders.by_created_at(ascending=ascending)
+            case UserFairShareOrderField.USER_USERNAME:
+                return RGUserFairShareOrders.by_user_username(ascending=ascending)
+            case UserFairShareOrderField.USER_EMAIL:
+                return RGUserFairShareOrders.by_user_email(ascending=ascending)
 
     # ------------------------------------------------------------------ data → DTO converters
 
