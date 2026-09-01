@@ -347,11 +347,13 @@ from .rbac import (
     admin_roles,
     admin_update_permission,
     admin_update_role,
+    my_permissions,
     my_roles,
     project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
+    user_permissions,
 )
 from .reservoir_registry import (
     create_reservoir_registry,
@@ -671,6 +673,8 @@ class Query:
     my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
+    my_permissions = my_permissions
+    user_permissions = user_permissions
     # RBAC Scoped APIs
     project_roles = project_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations

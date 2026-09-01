@@ -20,11 +20,13 @@ from .resolver import (
     admin_roles,
     admin_update_permission,
     admin_update_role,
+    my_permissions,
     my_roles,
     project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
+    user_permissions,
 )
 from .types import (
     AssignRoleInput,
@@ -111,6 +113,8 @@ __all__ = (
     "admin_permissions",
     "admin_role_assignments",
     "admin_entities",
+    "my_permissions",
+    "user_permissions",
     "my_roles",
     "project_roles",
     "rbac_entity_operation_combinations",

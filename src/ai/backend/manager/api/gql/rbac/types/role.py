@@ -249,7 +249,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
             limit=limit,
             offset=offset,
         )
-        result = await info.context.adapters.rbac.admin_search_permissions_gql(search_input)
+        result = await info.context.adapters.rbac.role_search_permissions(search_input)
 
         edges = [
             PermissionEdge(

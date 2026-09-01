@@ -7,10 +7,13 @@ lands in one place rather than in every conftest.
 
 from typing import Any
 
+from ai.backend.common.data.entity.types import FieldData
 from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry.field import FieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
 )
@@ -33,3 +36,17 @@ def ops_processor_group(db: ExtendedAsyncSAEngine, meta: GroupMeta) -> Processor
             repository=OpsRepository(V2DBOpsProvider(db)),
         )
     ).group(meta)
+
+
+def ops_field_group[TFieldData: FieldData](
+    db: ExtendedAsyncSAEngine, meta: FieldGroupMeta, data_cls: type[TFieldData]
+) -> FieldGroup[TFieldData]:
+    """The field-row counterpart of :func:`ops_processor_group`, for a field kind whose
+    owner is not fixed."""
+    return ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=ActionValidators(),
+            repository=OpsRepository(V2DBOpsProvider(db)),
+        )
+    ).dangling_field_group(meta, data_cls)

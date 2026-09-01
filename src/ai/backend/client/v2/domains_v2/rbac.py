@@ -139,6 +139,28 @@ class V2RBACClient(BaseDomainClient):
             response_model=AdminSearchPermissionsPayload,
         )
 
+    async def my_search_permissions(
+        self, request: AdminSearchPermissionsGQLInput
+    ) -> AdminSearchPermissionsPayload:
+        """Search the permissions the current user holds."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/permissions/my/search",
+            request=request,
+            response_model=AdminSearchPermissionsPayload,
+        )
+
+    async def user_search_permissions(
+        self, user_id: UUID, request: AdminSearchPermissionsGQLInput
+    ) -> AdminSearchPermissionsPayload:
+        """Search the permissions one user holds."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/permissions/users/{user_id}/search",
+            request=request,
+            response_model=AdminSearchPermissionsPayload,
+        )
+
     async def update_permission(self, request: UpdatePermissionInput) -> PermissionNode:
         """Update an existing scoped permission."""
         return await self._client.typed_request(

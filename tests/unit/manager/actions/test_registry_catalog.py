@@ -51,6 +51,7 @@ from ai.backend.common.data.entity.notification import (
     NOTIFICATION_RULE_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.permission import PERMISSION_FIELD_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.prometheus_query_preset import (
     PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
@@ -103,6 +104,7 @@ from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
+from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
@@ -149,6 +151,9 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.notification.processors import NotificationProcessors
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
+from ai.backend.manager.services.permission_contoller.processors import (
+    PermissionControllerProcessors,
+)
 from ai.backend.manager.services.project.processors import ProjectProcessors
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
@@ -273,6 +278,14 @@ def test_every_defined_v2_action_is_wired() -> None:
     UserResourcePolicyProcessors(registry.group(GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE)))
     KeypairResourcePolicyProcessors(registry.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE)))
     RolePresetProcessors(registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)), MagicMock())
+    PermissionControllerProcessors(
+        MagicMock(),
+        [],
+        MagicMock(),
+        registry.concern(ConcernMeta(Concern.RBAC)).dangling_field_group(
+            FieldGroupMeta(PERMISSION_FIELD_TYPE), PermissionData
+        ),
+    )
     EntityInvitationProcessors(
         registry.group(GroupMeta(ENTITY_INVITATION_ENTITY_TYPE)), MagicMock()
     )

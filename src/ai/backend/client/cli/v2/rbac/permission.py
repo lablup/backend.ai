@@ -92,3 +92,78 @@ def search(
             await registry.close()
 
     asyncio.run(_run())
+
+
+@permission.command(name="search-user")
+@click.option("--user-id", type=click.UUID, required=True, help="The user to read.")
+@click.option("--limit", type=int, default=None, help="Maximum items to return.")
+@click.option("--offset", type=int, default=None, help="Number of items to skip.")
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., id:asc, entity_type:desc).",
+)
+@click.option("--role-id", type=str, default=None, help="Filter by role UUID.")
+@click.option("--scope-type", type=str, default=None, help="Filter by scope type (e.g., domain).")
+@click.option(
+    "--entity-type", type=str, default=None, help="Filter by entity type (e.g., session)."
+)
+def search_user(
+    user_id: UUID,
+    limit: int | None,
+    offset: int | None,
+    order_by: tuple[str, ...],
+    role_id: str | None,
+    scope_type: str | None,
+    entity_type: str | None,
+) -> None:
+    """Search the permissions one user holds."""
+    from ai.backend.common.dto.manager.query import UUIDFilter
+    from ai.backend.common.dto.manager.v2.rbac.request import (
+        AdminSearchPermissionsGQLInput,
+        PermissionFilter,
+        PermissionOrderBy,
+    )
+    from ai.backend.common.dto.manager.v2.rbac.types import (
+        PermissionOrderField,
+        RBACElementTypeDTO,
+        RBACElementTypeFilter,
+    )
+
+    filter_dto: PermissionFilter | None = None
+    if any([role_id is not None, scope_type is not None, entity_type is not None]):
+        filter_dto = PermissionFilter(
+            role_id=UUIDFilter(equals=UUID(role_id)) if role_id is not None else None,
+            scope_type=(
+                RBACElementTypeFilter(equals=RBACElementTypeDTO(scope_type))
+                if scope_type is not None
+                else None
+            ),
+            entity_type=(
+                RBACElementTypeFilter(equals=RBACElementTypeDTO(entity_type))
+                if entity_type is not None
+                else None
+            ),
+        )
+
+    orders = (
+        parse_order_options(order_by, PermissionOrderField, PermissionOrderBy) if order_by else None
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.rbac.user_search_permissions(
+                user_id,
+                AdminSearchPermissionsGQLInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())

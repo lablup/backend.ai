@@ -146,7 +146,7 @@ class TestSearchPermissions:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_permissions(querier)
+        result = await repository.batch_load_permissions(querier)
 
         assert result.total_count == 2
         for item in result.items:
@@ -163,7 +163,7 @@ class TestSearchPermissions:
             pagination=OffsetPagination(limit=10, offset=0),
         )
 
-        result = await repository.search_permissions(querier)
+        result = await repository.batch_load_permissions(querier)
 
         entity_types = [item.entity_type for item in result.items]
         assert entity_types == sorted(entity_types)

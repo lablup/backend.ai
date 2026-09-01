@@ -12,6 +12,7 @@ from uuid import UUID
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
 from ai.backend.common.data.permission.types import RBACElementType
@@ -185,6 +186,7 @@ from ai.backend.manager.models.rbac_models.orders import (
     ScopedPermissionOrders,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.searchers import PermissionSearcher
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -244,8 +246,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_entities im
     SearchEntitiesActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
-    SearchPermissionsAction,
-    SearchPermissionsActionResult,
+    BatchLoadPermissionsAction,
+    BatchLoadPermissionsActionResult,
+    GlobalSearchPermissionsAction,
+    SearchPermissionsByUserAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
@@ -370,9 +374,9 @@ class RBACAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[ScopedPermissionConditions.by_ids(permission_ids)],
         )
-        action_result: SearchPermissionsActionResult = (
-            await self._processors.permission_controller.search_permissions.wait_for_complete(
-                SearchPermissionsAction(querier=querier)
+        action_result: BatchLoadPermissionsActionResult = (
+            await self._processors.permission_controller.batch_load_permissions.wait_for_complete(
+                BatchLoadPermissionsAction(querier=querier)
             )
         )
         permission_map: dict[UUID, PermissionNode] = {
@@ -459,9 +463,9 @@ class RBACAdapter(BaseAdapter):
             pagination=NoPagination(),
             conditions=[ScopedPermissionConditions.by_role_ids(role_ids)],
         )
-        action_result: SearchPermissionsActionResult = (
-            await self._processors.permission_controller.search_permissions.wait_for_complete(
-                SearchPermissionsAction(querier=querier)
+        action_result: BatchLoadPermissionsActionResult = (
+            await self._processors.permission_controller.batch_load_permissions.wait_for_complete(
+                BatchLoadPermissionsAction(querier=querier)
             )
         )
         result_map: dict[UUID, list[PermissionNode]] = defaultdict(list)
@@ -619,17 +623,62 @@ class RBACAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ GQL search
 
+    async def my_search_permissions(
+        self,
+        input: AdminSearchPermissionsGQLInput,
+    ) -> SearchResult[PermissionNode]:
+        """Search the permissions the current user holds."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        return await self.user_search_permissions(UserID(me.user_id), input)
+
+    async def user_search_permissions(
+        self,
+        user_id: UserID,
+        input: AdminSearchPermissionsGQLInput,
+    ) -> SearchResult[PermissionNode]:
+        """Search the permissions one user holds, answered for at that user."""
+        result = await self._processors.permission_controller.search_permissions_by_user.run(
+            SearchPermissionsByUserAction(
+                user_id=user_id,
+                searcher=self._build_permission_searcher(input),
+            )
+        )
+        return SearchResult(
+            items=[self._permission_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def admin_search_permissions_gql(
         self,
         input: AdminSearchPermissionsGQLInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> SearchResult[PermissionNode]:
-        """Search scoped permissions with cursor/offset pagination."""
-        conditions = self._convert_permission_filter(input.filter) if input.filter else []
-        orders = self._convert_permission_orders(input.order) if input.order else []
+        """Search every scoped permission with cursor/offset pagination (superadmin)."""
+        result = await self._processors.permission_controller.global_search_permissions.run(
+            GlobalSearchPermissionsAction(searcher=self._build_permission_searcher(input))
+        )
+        return SearchResult(
+            items=[self._permission_data_to_node(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def role_search_permissions(
+        self,
+        input: AdminSearchPermissionsGQLInput,
+    ) -> SearchResult[PermissionNode]:
+        """Page through the permissions a role node field names.
+
+        Ungated like the loaders beside it: the role was authorized before this field
+        resolved, and the filter naming it is set by the resolver, not the caller.
+        """
         querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
+            conditions=self._convert_permission_filter(input.filter) if input.filter else [],
+            orders=self._convert_permission_orders(input.order) if input.order else [],
             pagination_spec=_permission_pagination_spec(),
             first=input.first,
             after=input.after,
@@ -637,11 +686,10 @@ class RBACAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=base_conditions,
         )
-        action_result: SearchPermissionsActionResult = (
-            await self._processors.permission_controller.search_permissions.wait_for_complete(
-                SearchPermissionsAction(querier=querier)
+        action_result: BatchLoadPermissionsActionResult = (
+            await self._processors.permission_controller.batch_load_permissions.wait_for_complete(
+                BatchLoadPermissionsAction(querier=querier)
             )
         )
         raw = action_result.result
@@ -650,6 +698,23 @@ class RBACAdapter(BaseAdapter):
             total_count=raw.total_count,
             has_next_page=raw.has_next_page,
             has_previous_page=raw.has_previous_page,
+        )
+
+    def _build_permission_searcher(
+        self, input: AdminSearchPermissionsGQLInput
+    ) -> PermissionSearcher:
+        """Build the search spec every permission read shares."""
+        return self._build_searcher(
+            PermissionSearcher,
+            conditions=self._convert_permission_filter(input.filter) if input.filter else [],
+            orders=self._convert_permission_orders(input.order) if input.order else [],
+            pagination_spec=_permission_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
 
     async def admin_search_roles_gql(

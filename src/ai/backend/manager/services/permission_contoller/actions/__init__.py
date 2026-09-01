@@ -25,8 +25,10 @@ from .resolve_effective_permissions import (
 )
 from .revoke_role import RevokeRoleAction, RevokeRoleActionResult
 from .search_permissions import (
-    SearchPermissionsAction,
-    SearchPermissionsActionResult,
+    BatchLoadPermissionsAction,
+    BatchLoadPermissionsActionResult,
+    GlobalSearchPermissionsAction,
+    SearchPermissionsByUserAction,
 )
 from .search_roles import SearchRolesAction, SearchRolesActionResult
 from .search_roles_in_scope import (
@@ -77,8 +79,10 @@ __all__ = [
     "SearchRolesActionResult",
     "SearchRolesInScopeAction",
     "SearchRolesInScopeActionResult",
-    "SearchPermissionsAction",
-    "SearchPermissionsActionResult",
+    "BatchLoadPermissionsAction",
+    "BatchLoadPermissionsActionResult",
+    "GlobalSearchPermissionsAction",
+    "SearchPermissionsByUserAction",
     "SearchUsersAssignedToRoleAction",
     "SearchUsersAssignedToRoleActionResult",
     "UpdatePermissionAction",
