@@ -34,6 +34,7 @@ from ai.backend.agent.network.backends.vxlan import (
     vxlan_link_add_args,
     xfrm_add_args,
     xfrm_del_args,
+    xfrm_state_add_args,
 )
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.common.network.types import (
@@ -459,11 +460,11 @@ class TestEncryptionBuilders:
     def test_spi_is_directional_and_agrees_across_ends(self) -> None:
         # A's out-SA (src=A,dst=B) and B's in-SA (both computed as src=A,dst=B) must be identical,
         # and the reverse direction must differ — otherwise the two ends cannot match SAs.
-        out = xfrm_add_args("10.0.0.1", "10.0.0.2", 4097, _KEY)
+        out = xfrm_add_args("10.0.0.1", "10.0.0.2", _KEY)
         # state[0] is the out SA src=self dst=peer; extract its spi
         state_out = out[0]
         spi_ab = state_out[state_out.index("spi") + 1]
-        rev = xfrm_add_args("10.0.0.2", "10.0.0.1", 4097, _KEY)
+        rev = xfrm_add_args("10.0.0.2", "10.0.0.1", _KEY)
         # rev's in-SA is state[1]: src=self(=.1) dst=peer... from .2's perspective the in SA is
         # src=.1 dst=.2 — same directed pair as A's out SA, so same SPI.
         state_in_from_b = rev[1]
@@ -472,13 +473,13 @@ class TestEncryptionBuilders:
 
     def test_aead_key_appends_derived_salt(self) -> None:
         # rfc4106 needs key(32B)+salt(4B); the key portion is the raw session key, salt is derived.
-        out = xfrm_add_args("10.0.0.1", "10.0.0.2", 4097, _KEY)
+        out = xfrm_add_args("10.0.0.1", "10.0.0.2", _KEY)
         aead_key = out[0][out[0].index("aead") + 2]
         assert aead_key.startswith("0x" + _KEY)
         assert len(aead_key) == len("0x") + 64 + 8  # 32B key + 4B salt, hex
 
     def test_add_builds_two_states_and_two_policies(self) -> None:
-        out = xfrm_add_args("10.0.0.1", "10.0.0.2", 4097, _KEY)
+        out = xfrm_add_args("10.0.0.1", "10.0.0.2", _KEY)
         kinds = [(a[1], a[2]) for a in out]  # ("xfrm", "state"|"policy")
         assert kinds == [
             ("xfrm", "state"),
@@ -491,8 +492,8 @@ class TestEncryptionBuilders:
             assert "dport" in policy and "4789" in policy
 
     def test_del_matches_add_spis(self) -> None:
-        add = xfrm_add_args("10.0.0.1", "10.0.0.2", 4097, _KEY)
-        dele = xfrm_del_args("10.0.0.1", "10.0.0.2", 4097)
+        add = xfrm_add_args("10.0.0.1", "10.0.0.2", _KEY)
+        dele = xfrm_del_args("10.0.0.1", "10.0.0.2")
         add_out_spi = add[0][add[0].index("spi") + 1]
         del_out_spi = dele[0][dele[0].index("spi") + 1]
         assert add_out_spi == del_out_spi
@@ -507,7 +508,7 @@ class TestEncryptedPeers:
         await plugin.add_peer("s1", _PEER)
         assert rec.calls == [
             fdb_append_args(4097, "10.0.0.2"),
-            *xfrm_add_args("10.0.0.1", "10.0.0.2", 4097, _KEY),
+            *xfrm_add_args("10.0.0.1", "10.0.0.2", _KEY),
         ]
 
     async def test_add_peer_no_xfrm_without_key(self) -> None:
@@ -525,7 +526,7 @@ class TestEncryptedPeers:
         rec.calls.clear()
         await plugin.del_peer("s1", _PEER)
         assert rec.calls == [
-            *xfrm_del_args("10.0.0.1", "10.0.0.2", 4097),
+            *xfrm_del_args("10.0.0.1", "10.0.0.2"),
             fdb_del_args(4097, "10.0.0.2"),
         ]
 
@@ -628,14 +629,12 @@ class TestVxlanPort:
         # Both policies select on the VXLAN UDP port; a selector left on 4789 while the device
         # moved would leave the tunnel unencrypted rather than fail loudly.
         policies = [
-            a
-            for a in xfrm_add_args("1.1.1.1", "2.2.2.2", 7, "ab" * 32, dstport=4790)
-            if "policy" in a
+            a for a in xfrm_add_args("1.1.1.1", "2.2.2.2", "ab" * 32, dstport=4790) if "policy" in a
         ]
         assert len(policies) == 2
         for args in policies:
             assert args[args.index("dport") + 1] == "4790"
-        for args in xfrm_del_args("1.1.1.1", "2.2.2.2", 7, dstport=4790):
+        for args in xfrm_del_args("1.1.1.1", "2.2.2.2", dstport=4790):
             if "policy" in args:
                 assert args[args.index("dport") + 1] == "4790"
 
@@ -792,7 +791,7 @@ class TestXfrmStateVerb:
     """
 
     def test_states_are_added_not_updated(self) -> None:
-        cmds = xfrm_add_args("10.0.0.1", "10.0.0.2", 7, "ab" * 32)
+        cmds = xfrm_add_args("10.0.0.1", "10.0.0.2", "ab" * 32)
         states = [c for c in cmds if c[:3] == ["ip", "xfrm", "state"]]
         assert len(states) == 2
         for c in states:
@@ -800,7 +799,7 @@ class TestXfrmStateVerb:
 
     def test_policies_stay_update(self) -> None:
         # XFRM_MSG_UPDPOLICY does create when absent, so the policies need no add/EEXIST dance.
-        cmds = xfrm_add_args("10.0.0.1", "10.0.0.2", 7, "ab" * 32)
+        cmds = xfrm_add_args("10.0.0.1", "10.0.0.2", "ab" * 32)
         policies = [c for c in cmds if c[:3] == ["ip", "xfrm", "policy"]]
         assert len(policies) == 2
         for c in policies:
@@ -921,14 +920,16 @@ def _states(rec: Recorder) -> list[list[str]]:
     return [c for c in rec.calls if c[:3] == ["ip", "xfrm", "state"]]
 
 
-class TestTheEspPolicyIsSharedBetweenSessions:
-    """The policy selector is the OUTER packet — src/dst VTEP, udp dport — and the VNI lives inside
-    the UDP payload where no XFRM selector reaches it. So two sessions between the same two nodes
-    on the same port share one policy, however many SAs they have.
+class TestTheNodePairIsProgrammedOnce:
+    """ESP state and policy both belong to the node pair, not to a session.
 
-    That is a fact about transport-mode ESP, not a choice, and the danger is what it does to
-    teardown: removing the policy with whichever session ends first leaves the others running with
-    their SAs intact and nothing selecting them — in clear text, silently.
+    The policy has no choice about it: its selector is the OUTER packet — VTEP addresses and the
+    VXLAN UDP port — and the VNI that names a session lives inside that packet's payload, where no
+    XFRM selector reaches. The SA follows, because the key is the cluster's (see the manager's
+    `overlay_encryption_key`): every session between two nodes wants the same SA with the same
+    secret. What used to happen instead was measurable and bad — of two SAs matching one policy the
+    kernel carried every packet on one and none on the other, and whichever session ended first
+    deleted the policy and dropped the survivors to clear text.
     """
 
     async def _two_sessions(self, rec: Recorder) -> VxlanNetworkPlugin:
@@ -939,22 +940,22 @@ class TestTheEspPolicyIsSharedBetweenSessions:
             await plugin.add_peer(session_id, _PEER)
         return plugin
 
-    async def test_the_second_session_does_not_reinstall_the_policy(self) -> None:
+    async def test_the_second_session_programs_nothing(self) -> None:
         rec = Recorder()
         await self._two_sessions(rec)
 
-        assert len(_states(rec)) == 4, "each session programs its own SA pair"
-        assert len(_policies(rec)) == 2, "but the policy pair is installed once"
+        assert len(_states(rec)) == 2, "one SA pair for the node pair, not one per session"
+        assert len(_policies(rec)) == 2
 
-    async def test_the_first_teardown_leaves_the_policy_for_the_other(self) -> None:
+    async def test_the_first_teardown_leaves_it_for_the_other(self) -> None:
         rec = Recorder()
         plugin = await self._two_sessions(rec)
         rec.calls.clear()
 
         await plugin.teardown_session_network("s1")
 
-        assert [c[3] for c in _states(rec)] == ["del", "del"], "its own SAs go"
-        assert _policies(rec) == [], "the policy the other session is using stays"
+        assert _states(rec) == [], "the surviving session is still carried by this SA"
+        assert _policies(rec) == []
 
     async def test_the_last_teardown_removes_it(self) -> None:
         rec = Recorder()
@@ -965,6 +966,7 @@ class TestTheEspPolicyIsSharedBetweenSessions:
         await plugin.teardown_session_network("s2")
 
         assert [c[3] for c in _policies(rec)] == ["del", "del"]
+        assert [c[3] for c in _states(rec)] == ["del", "del"]
 
     async def test_a_lone_session_still_removes_it(self) -> None:
         rec = Recorder()
@@ -976,9 +978,9 @@ class TestTheEspPolicyIsSharedBetweenSessions:
         await plugin.teardown_session_network("s1")
 
         assert [c[3] for c in _policies(rec)] == ["del", "del"]
+        assert [c[3] for c in _states(rec)] == ["del", "del"]
 
-    async def test_a_different_peer_gets_its_own_policy(self) -> None:
-        """The sharing is per (self, peer, port) — a second peer is a different tunnel."""
+    async def test_a_different_peer_is_a_different_pair(self) -> None:
         rec = Recorder()
         plugin = _plugin(rec)
         await plugin.setup_session_network(_ENC_META, _SELF)
@@ -986,6 +988,31 @@ class TestTheEspPolicyIsSharedBetweenSessions:
         await plugin.add_peer("s1", Member(agent_id="a3", host_ip="10.0.0.3", vtep_ip="10.0.0.3"))
 
         assert len(_policies(rec)) == 4
+        assert len(_states(rec)) == 4
+
+    def test_a_different_peer_gets_a_different_spi(self) -> None:
+        """The SPI names the PAIR. Deriving it from the local end alone would still satisfy both
+        properties the builder tests check — it stays directional, and both ends still agree —
+        because SAs are keyed by (dst, spi, proto) and the dst already differs. It would just make
+        every tunnel out of this node wear the same number, which is a needless way to make
+        `ip xfrm state` unreadable when something is wrong.
+        """
+
+        def spi(cmd: list[str]) -> str:
+            return cmd[cmd.index("spi") + 1]
+
+        to_b = xfrm_state_add_args("10.0.0.1", "10.0.0.2", _KEY)[0]
+        to_c = xfrm_state_add_args("10.0.0.1", "10.0.0.3", _KEY)[0]
+
+        assert spi(to_b) != spi(to_c)
+
+    async def test_the_spi_does_not_depend_on_the_session(self) -> None:
+        """Two sessions between the same nodes derive the same SA, which is the point: there is
+        nothing to tell apart, so nothing for the policy to pick wrongly."""
+        a = xfrm_state_add_args("10.0.0.1", "10.0.0.2", _KEY)
+        b = xfrm_state_add_args("10.0.0.1", "10.0.0.2", _KEY)
+
+        assert a == b
 
 
 class TestAnEncryptedSessionOnANodeWithNoVtep:

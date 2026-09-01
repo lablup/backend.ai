@@ -140,11 +140,19 @@ def fdb_replace_args(vni: int, mac: str, dst: str) -> list[str]:
 _ICV_BITS = 128  # AES-GCM authentication tag length
 
 
-def _esp_spi(vni: int, src: str, dst: str) -> int:
-    """A deterministic 32-bit SPI for the directed VTEP pair, so both ends agree without a handshake:
-    A's out-SA (src=A,dst=B) and B's in-SA (src=A,dst=B) compute the same value. The VNI is folded in
-    so concurrent sessions on one node do not collide. Kept above 255 (SPIs 0-255 are reserved)."""
-    digest = hashlib.sha256(f"{vni}:{src}:{dst}".encode()).digest()
+def _esp_spi(src: str, dst: str) -> int:
+    """A deterministic 32-bit SPI for the directed VTEP pair, so both ends agree without a
+    handshake: A's out-SA (src=A,dst=B) and B's in-SA (src=A,dst=B) compute the same value.
+
+    The pair is the whole input. It used to fold the VNI in as well, to keep concurrent sessions
+    from colliding on one node -- but with a cluster key (the manager's `overlay_encryption_key`) a
+    collision is not a collision: every session between these two nodes wants the same SA, with the
+    same secret, and one is what they get. Folding the VNI in now would only manufacture several
+    identical-key SAs for one policy to choose between, which is the ambiguity this removed.
+
+    Kept above 255 (SPIs 0-255 are reserved). A future key rotation belongs in this hash, so two
+    generations get distinct SPIs and can coexist while the change propagates."""
+    digest = hashlib.sha256(f"{src}:{dst}".encode()).digest()
     return (int.from_bytes(digest[:4], "big") % (2**32 - 256)) + 256
 
 
@@ -155,12 +163,12 @@ def _aead_key(key_hex: str) -> str:
     return "0x" + key_hex + salt.hex()
 
 
-def xfrm_state_add_args(self_vtep: str, peer_vtep: str, vni: int, key_hex: str) -> list[list[str]]:
-    """The ESP SA pair for this session on this ordered VTEP pair. Per session: the SPI folds the
-    VNI in, so concurrent sessions between the same nodes get distinct SAs."""
+def xfrm_state_add_args(self_vtep: str, peer_vtep: str, key_hex: str) -> list[list[str]]:
+    """The ESP SA pair for this ordered VTEP pair -- one pair per node pair, shared by every
+    session between them, which is what makes it safe for one policy to select it."""
     key = _aead_key(key_hex)
-    spi_out = f"{_esp_spi(vni, self_vtep, peer_vtep):#x}"
-    spi_in = f"{_esp_spi(vni, peer_vtep, self_vtep):#x}"
+    spi_out = f"{_esp_spi(self_vtep, peer_vtep):#x}"
+    spi_in = f"{_esp_spi(peer_vtep, self_vtep):#x}"
     aead = ["aead", "rfc4106(gcm(aes))", key, str(_ICV_BITS)]
     return [
         ["ip", "xfrm", "state", "add", "src", self_vtep, "dst", peer_vtep,
@@ -178,8 +186,8 @@ def xfrm_policy_add_args(
     NOT per session, and it cannot be: the selector is the OUTER packet (src/dst IP, udp dport) and
     the VNI lives inside the UDP payload, where no XFRM selector can reach it. So every session
     between the same two nodes on the same port shares one policy — which is why the caller
-    refcounts it instead of deleting it with whichever session ends first. (See the SA args above:
-    the SAs *are* per session, and both ends pick one by the SPI in the packet.)
+    refcounts it instead of deleting it with whichever session ends first. The SA it selects is
+    shared the same way (see the state args above), so "which one" is no longer a question.
     """
     return [
         ["ip", "xfrm", "policy", "update", "src", self_vtep, "dst", peer_vtep,
@@ -191,9 +199,9 @@ def xfrm_policy_add_args(
     ]  # fmt: skip
 
 
-def xfrm_state_del_args(self_vtep: str, peer_vtep: str, vni: int) -> list[list[str]]:
-    spi_out = f"{_esp_spi(vni, self_vtep, peer_vtep):#x}"
-    spi_in = f"{_esp_spi(vni, peer_vtep, self_vtep):#x}"
+def xfrm_state_del_args(self_vtep: str, peer_vtep: str) -> list[list[str]]:
+    spi_out = f"{_esp_spi(self_vtep, peer_vtep):#x}"
+    spi_in = f"{_esp_spi(peer_vtep, self_vtep):#x}"
     return [
         ["ip", "xfrm", "state", "del", "src", self_vtep, "dst", peer_vtep, "proto", "esp",
          "spi", spi_out],
@@ -214,7 +222,7 @@ def xfrm_policy_del_args(
 
 
 def xfrm_add_args(
-    self_vtep: str, peer_vtep: str, vni: int, key_hex: str, *, dstport: int = VXLAN_DSTPORT
+    self_vtep: str, peer_vtep: str, key_hex: str, *, dstport: int = VXLAN_DSTPORT
 ) -> list[list[str]]:
     """The `ip xfrm` commands that encrypt this node↔peer VXLAN traffic: an out/in ESP SA pair plus
     the out/in policy selecting the VXLAN UDP.
@@ -227,16 +235,16 @@ def xfrm_add_args(
     upsert (`XFRM_MSG_UPDPOLICY` creates when absent).
     """
     return [
-        *xfrm_state_add_args(self_vtep, peer_vtep, vni, key_hex),
+        *xfrm_state_add_args(self_vtep, peer_vtep, key_hex),
         *xfrm_policy_add_args(self_vtep, peer_vtep, dstport=dstport),
     ]
 
 
 def xfrm_del_args(
-    self_vtep: str, peer_vtep: str, vni: int, *, dstport: int = VXLAN_DSTPORT
+    self_vtep: str, peer_vtep: str, *, dstport: int = VXLAN_DSTPORT
 ) -> list[list[str]]:
     return [
-        *xfrm_state_del_args(self_vtep, peer_vtep, vni),
+        *xfrm_state_del_args(self_vtep, peer_vtep),
         *xfrm_policy_del_args(self_vtep, peer_vtep, dstport=dstport),
     ]
 
@@ -418,12 +426,13 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     # netns rather than on the device, so teardown has to unprogram it explicitly and cannot rely
     # on `del_peer` having run for every peer first.
     _encrypted_peers: dict[str, set[str]]
-    # Which sessions are relying on the ESP policy for a given (self VTEP, peer VTEP, port). The
-    # policy selector is the outer packet and carries nothing per session, so every session between
-    # the same two nodes shares ONE policy; deleting it with whichever session ends first drops the
-    # others to clear text, silently. Keyed by session id rather than counted so add/remove stay
-    # idempotent under the coordinator's retries.
-    _policy_users: dict[tuple[str, str, int], set[str]]
+    # Which sessions are carried by the ESP state+policy of a given (self VTEP, peer VTEP, port).
+    # Both are node-pair resources: the policy selector is the outer packet and carries nothing per
+    # session, and the SA it selects is now the pair's too (one cluster key, so there is nothing to
+    # tell apart). Tearing either down with whichever session ends first is what broke the others
+    # -- silently to clear text when it was the policy. Keyed by session id rather than counted so
+    # add/remove stay idempotent under the coordinator's retries.
+    _pair_users: dict[tuple[str, str, int], set[str]]
     # Per-session background reach probes, so teardown does not leave them running against a
     # bridge that is being deleted.
     _reach_tasks: dict[str, set[asyncio.Task[None]]]
@@ -448,7 +457,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._reach_probe = reach_probe or arp_probe
         self._reach_tasks = {}
         self._encrypted_peers = {}
-        self._policy_users = {}
+        self._pair_users = {}
         self._sessions = {}
         # This node's own VXLAN tunnel endpoint per session — the local `src` for every XFRM SA,
         # captured from `self_member` at setup/adopt because add_peer/del_peer only receive the peer.
@@ -688,14 +697,15 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # key and its traffic is dropped wholesale. Over-recording costs one best-effort delete;
         # under-recording costs a dead overlay.
         self._encrypted_peers.setdefault(session_id, set()).add(peer_vtep)
-        for args in xfrm_state_add_args(self_vtep, peer_vtep, meta.vni, meta.encryption_key):
-            await self._run_xfrm(args)
-        users = self._policy_users.setdefault((self_vtep, peer_vtep, meta.vxlan_port), set())
+        users = self._pair_users.setdefault((self_vtep, peer_vtep, meta.vxlan_port), set())
         first = not users
         users.add(session_id)
-        if first:
-            for args in xfrm_policy_add_args(self_vtep, peer_vtep, dstport=meta.vxlan_port):
-                await self._runner(args)
+        if not first:
+            return  # another session on this node already programmed this pair
+        for args in xfrm_state_add_args(self_vtep, peer_vtep, meta.encryption_key):
+            await self._run_xfrm(args)
+        for args in xfrm_policy_add_args(self_vtep, peer_vtep, dstport=meta.vxlan_port):
+            await self._runner(args)
 
     async def _unprogram_encryption(
         self, meta: SessionNetMeta, session_id: str, peer_vtep: str, self_vtep: str | None
@@ -711,22 +721,26 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         if meta.encryption_key is None or meta.vni is None or self_vtep is None:
             self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
             return
-        for args in xfrm_state_del_args(self_vtep, peer_vtep, meta.vni):
+        key = (self_vtep, peer_vtep, meta.vxlan_port)
+        users = self._pair_users.get(key, set())
+        users.discard(session_id)
+        self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
+        if users:
+            return  # another session is still carried by this pair's SA and policy
+        self._pair_users.pop(key, None)
+        # SA first, then the policy. Between the two there is a window, and this order makes it a
+        # window where traffic is blocked (a policy with no SA) rather than one where it leaves in
+        # clear text (a live tunnel with nothing requiring ESP). Nothing should be flowing here --
+        # this runs when the last session on the pair is gone -- but of the two ways to be wrong,
+        # dropping is the one to pick.
+        for args in (
+            *xfrm_state_del_args(self_vtep, peer_vtep),
+            *xfrm_policy_del_args(self_vtep, peer_vtep, dstport=meta.vxlan_port),
+        ):
             try:
                 await self._runner(args)
             except RuntimeError:
-                log.debug("xfrm state already gone for peer {} in {}", peer_vtep, session_id)
-        key = (self_vtep, peer_vtep, meta.vxlan_port)
-        users = self._policy_users.get(key, set())
-        users.discard(session_id)
-        if not users:
-            self._policy_users.pop(key, None)
-            for args in xfrm_policy_del_args(self_vtep, peer_vtep, dstport=meta.vxlan_port):
-                try:
-                    await self._runner(args)
-                except RuntimeError:
-                    log.debug("xfrm policy already gone for peer {}", peer_vtep)
-        self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
+                log.debug("xfrm entry already gone for peer {} in {}", peer_vtep, session_id)
 
     async def _run_xfrm(self, argv: Sequence[str]) -> None:
         """Run one `ip xfrm` command, replaying a state `add` as `update` when it already exists.

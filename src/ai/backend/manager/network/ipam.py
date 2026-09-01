@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import logging
+import secrets
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from ai.backend.common.network.keys import endpoint_key, session_ipam_key
 from ai.backend.common.network.types import EndpointAddr, mac_for_ip
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import (
     NetworkPoolExhausted,
     RequestedSubnetInvalid,
@@ -30,6 +33,9 @@ DEFAULT_VNI_RANGE = (4096, 16777215)
 
 _ALLOCATED_PREFIX = "network/ipam/allocated"
 _VNI_PREFIX = "network/ipam/vni"
+_OVERLAY_KEY = "network/overlay-encryption-key"
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _prefix_for_hosts(host_count: int, *, default_prefixlen: int, floor_prefixlen: int) -> int:
@@ -235,6 +241,33 @@ class EndpointAllocator:
     async def release(self, session_id: str, container_id: str, ip: str) -> None:
         await self._etcd.delete(session_ipam_key(session_id, ip))
         await self._etcd.delete(endpoint_key(session_id, container_id))
+
+
+async def overlay_encryption_key(etcd: AsyncEtcd) -> str:
+    """The cluster's overlay encryption key, created once and reused.
+
+    One key for the whole cluster, not one per session — the same shape Docker Swarm uses, and the
+    only shape the data plane can actually honour. ESP policies select on the OUTER packet (VTEP
+    addresses and the VXLAN UDP port); the VNI that identifies a session lives inside that packet's
+    payload, where no XFRM selector reaches it. So every session between a pair of nodes shares one
+    policy no matter how many keys exist, and with per-session keys the kernel simply picks one of
+    the matching SAs — measured: of two SAs on one policy, one carried every packet and the other
+    none, and which one is not something either end chooses. A per-session key was therefore a
+    promise the layer below could not keep.
+
+    With one key the ambiguity is gone: whichever SA is used, it is the same secret. Session
+    isolation on the overlay is the VNI's job (L2), as it is in Swarm.
+
+    Created with put_if_absent so racing managers converge on one value. Rotation is still a
+    non-goal (see the BEP); when it arrives, the generation belongs in the SPI derivation.
+    """
+    created = await etcd.put_if_absent(_OVERLAY_KEY, secrets.token_hex(32))
+    if created:
+        log.info("generated the cluster overlay encryption key")
+    key = await etcd.get(_OVERLAY_KEY)
+    if not key:
+        raise RuntimeError("the overlay encryption key vanished from etcd right after it was set")
+    return str(key)
 
 
 class VNIAllocator:

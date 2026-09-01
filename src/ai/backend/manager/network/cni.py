@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-import secrets
 import uuid
 from collections.abc import Mapping
 from typing import Any, override
@@ -39,6 +38,7 @@ from ai.backend.manager.network.ipam import (
     EndpointAllocator,
     SubnetAllocator,
     VNIAllocator,
+    overlay_encryption_key,
 )
 from ai.backend.manager.network.pairing import require_members_can_serve_driver
 from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
@@ -139,11 +139,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         vni: int | None = None
         try:
             # Encrypt the overlay only for the encapsulating (VXLAN) backend, and only when the
-            # operator opted in. A fresh 256-bit key per session (hex, the shape the agent policy
-            # and `ip xfrm` accept) is the sole encryption secret; it is distributed via the etcd
-            # meta exactly like the VNI. See overlay-encryption.md.
+            # operator opted in. The key is the CLUSTER's, not this session's: ESP policies select
+            # on the outer packet, where nothing identifies a session, so sessions between the same
+            # pair of nodes share one policy and a per-session key was a promise the data plane
+            # could not keep (see overlay_encryption_key). It still travels in the session meta,
+            # exactly like the VNI, so the agents need no second source.
             encrypt = backend is NetworkBackendKind.VXLAN and self._encryption_enabled(options)
-            encryption_key = secrets.token_hex(32) if encrypt else None
+            encryption_key = await overlay_encryption_key(etcd) if encrypt else None
             if backend is NetworkBackendKind.VXLAN:
                 vni = await self._vni_allocator.acquire(session_id)
             # `mtu` in plugin_config is the UNDERLAY MTU; the overlay MTU (what the kernel's NIC
