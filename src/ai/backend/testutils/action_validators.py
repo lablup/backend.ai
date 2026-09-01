@@ -6,6 +6,9 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualScopeAtomicBulkActionRBACValidator,
     VirtualScopePartialBulkActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.relation.validator.rbac import (
+    VirtualScopeRelationActionRBACValidator,
+)
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
 )
@@ -26,4 +29,5 @@ def mock_virtual_scope_rbac_validators() -> VirtualScopeRBACValidators:
         single_entity=MagicMock(spec=VirtualScopeSingleEntityActionRBACValidator),
         partial_bulk=MagicMock(spec=VirtualScopePartialBulkActionRBACValidator),
         atomic_bulk=MagicMock(spec=VirtualScopeAtomicBulkActionRBACValidator),
+        relation=MagicMock(spec=VirtualScopeRelationActionRBACValidator),
     )
