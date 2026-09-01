@@ -11,6 +11,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -33,11 +34,14 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.vfolder.scopes import ProjectVFolderOperationScope
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 class TestVfolderSearchInProject:
@@ -61,6 +65,8 @@ class TestVfolderSearchInProject:
                 ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -209,6 +215,16 @@ class TestVfolderSearchInProject:
                     )
                 )
             await db_sess.flush()
+
+            seeder = VirtualScopeSeeder()
+            for vid, group_id in [
+                (vfolder_a1_id, project_a_id),
+                (vfolder_a2_id, project_a_id),
+                (vfolder_b1_id, project_b_id),
+            ]:
+                await seeder.enroll_entity_in_scope(
+                    db_sess, ScopeType.PROJECT, group_id, EntityType.VFOLDER, vid
+                )
 
         yield {
             "project_a_id": project_a_id,

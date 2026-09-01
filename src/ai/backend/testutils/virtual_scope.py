@@ -60,6 +60,27 @@ class VirtualScopeSeeder:
         )
         await sess.flush()
 
+    async def enroll_entity_in_scope(
+        self,
+        sess: AsyncSession,
+        scope_type: ScopeType,
+        scope_id: uuid.UUID,
+        entity_type: EntityType,
+        entity_id: uuid.UUID,
+    ) -> None:
+        """Write the chain row the create path makes for an entity owned by a scope:
+        the entity joins the owning scope's virtual scope."""
+        virtual_scope_id = await self.get_or_create_scope(sess, scope_type, scope_id)
+        sess.add(
+            EntityMembershipRow(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                permission_cap=None,
+            )
+        )
+        await sess.flush()
+
     async def enroll_user_in_project(
         self, sess: AsyncSession, group_id: uuid.UUID, user_id: uuid.UUID
     ) -> None:
@@ -67,13 +88,6 @@ class VirtualScopeSeeder:
         membership: the user joins the project's virtual scope. The project is not bound
         into the user's own virtual scope — a member does not hand the project its
         personal entities."""
-        project_scope_id = await self.get_or_create_scope(sess, ScopeType.PROJECT, group_id)
-        sess.add(
-            EntityMembershipRow(
-                virtual_scope_id=project_scope_id,
-                entity_type=EntityType.USER,
-                entity_id=user_id,
-                permission_cap=None,
-            )
+        await self.enroll_entity_in_scope(
+            sess, ScopeType.PROJECT, group_id, EntityType.USER, user_id
         )
-        await sess.flush()

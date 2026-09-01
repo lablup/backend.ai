@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import DeploymentSummarySearchResult
@@ -51,10 +52,13 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 @dataclass
@@ -101,6 +105,8 @@ class TestEndpointSearchInProject:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -271,6 +277,20 @@ class TestEndpointSearchInProject:
             )
             endpoint_ids_in_b.append(eid)
             await db_sess.flush()
+
+            seeder = VirtualScopeSeeder()
+            for project_id, endpoint_ids in [
+                (project_a_id, endpoint_ids_in_a),
+                (project_b_id, endpoint_ids_in_b),
+            ]:
+                for endpoint_id in endpoint_ids:
+                    await seeder.enroll_entity_in_scope(
+                        db_sess,
+                        ScopeType.PROJECT,
+                        project_id,
+                        EntityType.DEPLOYMENT,
+                        endpoint_id,
+                    )
 
         yield TestData(
             project_a_id=project_a_id,

@@ -9,7 +9,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE, ModelCardID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
@@ -17,6 +18,7 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.virtual_scope.queries import scope_membership_exists
 
 __all__ = (
     "ModelCardResourceRequirementOperationScope",
@@ -48,16 +50,23 @@ class ModelCardResourceRequirementOperationScope(OperationScope):
 
 @dataclass(frozen=True)
 class ProjectModelCardOperationScope(OperationScope):
-    """Scope for searching model cards within a MODEL_STORE project."""
+    """Scope for searching model cards within a MODEL_STORE project.
+
+    Ownership is read from the project's virtual scope.
+    """
 
     project_id: UUID
 
     @override
     def to_condition(self) -> QueryCondition:
+        """Membership predicate: the model card is enrolled in the project's virtual
+        scope."""
         project_id = self.project_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ModelCardRow.project == project_id
+            return scope_membership_exists(
+                PROJECT_SCOPE_TYPE, project_id, MODEL_CARD_ENTITY_TYPE, ModelCardRow.id
+            )
 
         return inner
 
