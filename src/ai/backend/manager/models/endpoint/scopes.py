@@ -9,28 +9,36 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.virtual_scope.queries import scope_membership_exists
 
 
 @dataclass(frozen=True)
 class ProjectDeploymentOperationScope(OperationScope):
     """Required scope for searching endpoints within a project.
 
-    Used for project-scoped deployment search (project admin).
+    Used for project-scoped deployment search (project admin). Ownership is read
+    from the project's virtual scope.
     """
 
     project_id: UUID
 
     @override
     def to_condition(self) -> QueryCondition:
+        """Membership predicate: the deployment is enrolled in the project's virtual
+        scope."""
         project_id = self.project_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.project == project_id
+            return scope_membership_exists(
+                PROJECT_SCOPE_TYPE, project_id, DEPLOYMENT_ENTITY_TYPE, EndpointRow.id
+            )
 
         return inner
 

@@ -12,9 +12,10 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import DeploymentSummarySearchResult
@@ -51,6 +52,8 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
@@ -101,6 +104,8 @@ class TestEndpointSearchInProject:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -270,6 +275,23 @@ class TestEndpointSearchInProject:
                 )
             )
             endpoint_ids_in_b.append(eid)
+            await db_sess.flush()
+
+            for project_id, endpoint_ids in [
+                (project_a_id, endpoint_ids_in_a),
+                (project_b_id, endpoint_ids_in_b),
+            ]:
+                scope = VirtualScopeRow(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
+                db_sess.add(scope)
+                await db_sess.flush()
+                for endpoint_id in endpoint_ids:
+                    db_sess.add(
+                        EntityMembershipRow(
+                            virtual_scope_id=scope.id,
+                            entity_type=DEPLOYMENT_ENTITY_TYPE,
+                            entity_id=endpoint_id,
+                        )
+                    )
             await db_sess.flush()
 
         yield TestData(

@@ -31,7 +31,7 @@ Test the observable contract — a good test is one that survives a refactor as 
 - Group by the unit under test (class/module/function) into test classes.
 - Express test conditions as fixtures, not inline setup.
 - Keep functions concise: Arrange (fixture) → Act → Assert.
-- Do NOT import from other test files — put shared utilities in `conftest.py` or `ai.backend.testutils`.
+- Do NOT import from other test files — put shared utilities in `conftest.py`.
 - For patterns and examples, see the `/tdd-guide` skill.
 
 ## `with_tables` core rules

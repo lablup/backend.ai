@@ -9,6 +9,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
@@ -16,6 +18,7 @@ from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.virtual_scope.queries import scope_membership_exists
 
 __all__ = (
     "ProjectVFolderOperationScope",
@@ -27,7 +30,8 @@ __all__ = (
 class ProjectVFolderOperationScope(OperationScope):
     """Required scope for searching vfolders within a project.
 
-    Used for project-scoped vfolder search (project admin).
+    Used for project-scoped vfolder search (project admin). Ownership is read from
+    the project's virtual scope.
     """
 
     project_id: UUID
@@ -35,11 +39,14 @@ class ProjectVFolderOperationScope(OperationScope):
 
     @override
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for VFolderRow."""
+        """Membership predicate: the vfolder is enrolled in the project's virtual
+        scope."""
         project_id = self.project_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return VFolderRow.group == project_id
+            return scope_membership_exists(
+                PROJECT_SCOPE_TYPE, project_id, VFOLDER_ENTITY_TYPE, VFolderRow.id
+            )
 
         return inner
 
