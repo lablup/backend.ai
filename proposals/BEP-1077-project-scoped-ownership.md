@@ -141,6 +141,8 @@ Two invariants:
 - It cannot be removed by unsharing.
 - It carries no `permission_cap`. Permissions do not vary per row within one scope.
 
+A scope-membership enrollment (a user joining a scope's roster) may carry a per-scope-kind constant cap, identical on every member row: user-to-project enrollments are capped to read, user-to-domain enrollments carry none. Per-row variance stays forbidden either way.
+
 | Question | Answered by |
 |---|---|
 | Whose project is it — target of resource policy and quota, deletion rights | The entity row's project column (`vfolders.group`, `sessions.group_id`) |
@@ -195,6 +197,7 @@ Default presets differ per entity kind. Reproducing today's behavior is the defa
 | Virtual folder (project folder) | All operations | All operations | - |
 | Session, deployment | Create only, no read | Default-visible set | Everything of one's own |
 | Image, model card | None | Default-visible set | Everything of one's own |
+| User (roster) | None — peers see each other through disclosure ranges | Read, default-visible fields | - |
 
 A member without session read still sees their own sessions: self-ownership is a separate source of the accessible set (5.4).
 
@@ -207,6 +210,7 @@ self / project / domain / authenticated users
 - Admins are not on this list. Admins see through the permission path.
 - The project policy sets the minimum disclosure range; the subject can only pick wider.
 - Fields visible to no one, like passwords, are answered by catalog non-listing. They are outside this setting.
+- Updating a user belongs to domain roles and always carries a FieldPermission list. Credential secrets — secret keys, passwords, private keys — are never in any administrator's field list: administration is reissue and disable, not read, with the secret shown once to its owner at issuance.
 - Session environment variables are not person fields. They are handled as session fields.
 
 | Field | Default disclosure |
@@ -271,7 +275,7 @@ An invisible target cannot be named.
 
 To give to an outside team, give to a person on that team who then puts it into their own team. What is given to a person lands in that person's personal project.
 
-Caps are named references.
+Caps are named references. A named cap carries operation bits and a field list, and a grant row references a cap by name instead of holding an inline bitmask — sharing a deployment without its token is a cap whose field list excludes it. Effective fields are the role's field list intersected with the field lists of the caps along the path.
 
 | Place | Meaning | Composition |
 |---|---|---|
@@ -353,6 +357,7 @@ A personal project left behind becomes an ownerless project. Either block purgin
 | Folder invitations | Same, with projects added as targets |
 | Session commit | Same, personal-owned only |
 | Teammates' user information | Narrows: credentials become hidden |
+| Admins reading keypair secrets | Narrows: credential secrets become unreadable for everyone; administration becomes reissue and disable |
 
 Opening project-folder creation and narrowing user information are the intended changes.
 
@@ -375,6 +380,9 @@ Opening project-folder creation and narrowing user information are the intended 
 | A user's own information | Not a resource entity; stays under the user |
 | Column vs. graph | The column answers resource policy and quota, permission resolution answers capability, graph enrollment answers view membership |
 | Membership and bindings | A user's virtual scope is never bound into a scope; joining enrolls the user in the roster only. Belongings are reached only through each entity's own enrollment |
+| Roster caps | Per-scope-kind constants: user-to-project enrollment capped to read, user-to-domain uncapped. Field narrowing stays with FieldPermission |
+| Joining a project | Project admins invite, with the invitee's acceptance; direct registration is a domain-admin operation (BEP-1076) |
+| Credential secrets | Never readable by any administrator; administration is reissue and disable. The secret is shown once to its owner at issuance |
 | Business-logic relations | Resource groups, registries, and quota are not expressed through virtual scopes; relation tables answer |
 | Rows from `EntityMembershipEntry` | Cannot be removed by unsharing and carry no `permission_cap` |
 | Former colon sub-targets | Fields of their owning entity — none is promoted to an entity type; the colon declarations retire with `RBACElementType` |
@@ -391,7 +399,7 @@ Opening project-folder creation and narrowing user information are the intended 
 | Scoped reads | Filter instead of rejecting; write actions keep rejecting |
 | Sharing address | Invisible targets cannot be named. People by email, projects only those I am a member of |
 | Share acceptance | Unneeded when only capability grows; projects answer with an acceptance setting |
-| Share caps | Named references carrying a field axis |
+| Share caps | Named references carrying operation bits and a field list; grant rows reference them instead of an inline bitmask |
 | Re-sharing | Closed by default; opening requires cascading revocation |
 | Sharing records | Separate from `entity_memberships`; the invited state has no graph row |
 | Non-owning projects | No delete operation, only unshare |
