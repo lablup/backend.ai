@@ -169,6 +169,26 @@ class UnusableVtep(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class OverlayEncryptionUnavailable(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a session asks for an encrypted overlay this node cannot encrypt.
+
+    The ESP SAs are keyed on the ordered VTEP pair, so a node with no usable tunnel endpoint has no
+    `src` to program them with. Running anyway is the failure worth refusing: the session comes up,
+    carries traffic, and is in clear text on the wire with only a log line to say so.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/overlay-encryption-unavailable"
+    error_title = "Overlay encryption cannot be programmed on this node."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
 class OverlayMtuTooLarge(BackendAIError, web.HTTPInternalServerError):
     """The overlay MTU the manager computed does not fit this node's real underlay.
 

@@ -6,7 +6,11 @@ from typing import Any, cast, override
 
 import pytest
 
-from ai.backend.agent.errors.network import OverlayAddressNotAssigned, OverlayMtuTooLarge
+from ai.backend.agent.errors.network import (
+    OverlayAddressNotAssigned,
+    OverlayEncryptionUnavailable,
+    OverlayMtuTooLarge,
+)
 from ai.backend.agent.network.backends import vxlan as vx
 from ai.backend.agent.network.backends.vxlan import (
     OVERLAY_IFNAME,
@@ -584,7 +588,15 @@ class TestAttachEndpoint:
         assert local.role is NetworkRole.LOCAL
         # per-session LOCAL bridge on a node-local subnet (not the stretched overlay)
         assert local.cni_config is not None
-        assert local.cni_config["bridge"] == local_bridge_dev(4097)
+        # Named after the node-local block INDEX, not the VNI: `local_subnet` documents the index
+        # as naming both the device and the subnet its gateway sits on, and the node-wide store
+        # keeps two agents from deriving the same one. Naming the device off the VNI put it
+        # outside that guarantee and left the device and the address it carries keyed on unrelated
+        # numbers -- which only stays safe while the VNI range (4096+) and the index range
+        # (0..pool size) do not meet, and `vni_range` is configurable.
+        index = await plugin._local_subnets.lookup(_META.session_id)
+        assert index is not None
+        assert local.cni_config["bridge"] == local_bridge_dev(index)
         assert local.cni_config["ipam"]["subnet"].startswith("172.30.")
 
     async def test_overlay_uses_manager_assigned_static_ip(self) -> None:
@@ -888,3 +900,147 @@ class TestEncryptionTeardown:
         rec.calls.clear()
         await plugin.teardown_session_network("s1")
         assert any(other.vtep_ip in c for c in self._xfrm(rec))
+
+
+def _enc_meta(session_id: str, vni: int, key: str = _KEY) -> SessionNetMeta:
+    return SessionNetMeta(
+        session_id=session_id,
+        subnet="10.128.5.0/24",
+        backend=NetworkBackendKind.VXLAN,
+        mtu=1412,
+        vni=vni,
+        encryption_key=key,
+    )
+
+
+def _policies(rec: Recorder) -> list[list[str]]:
+    return [c for c in rec.calls if c[:3] == ["ip", "xfrm", "policy"]]
+
+
+def _states(rec: Recorder) -> list[list[str]]:
+    return [c for c in rec.calls if c[:3] == ["ip", "xfrm", "state"]]
+
+
+class TestTheEspPolicyIsSharedBetweenSessions:
+    """The policy selector is the OUTER packet — src/dst VTEP, udp dport — and the VNI lives inside
+    the UDP payload where no XFRM selector reaches it. So two sessions between the same two nodes
+    on the same port share one policy, however many SAs they have.
+
+    That is a fact about transport-mode ESP, not a choice, and the danger is what it does to
+    teardown: removing the policy with whichever session ends first leaves the others running with
+    their SAs intact and nothing selecting them — in clear text, silently.
+    """
+
+    async def _two_sessions(self, rec: Recorder) -> VxlanNetworkPlugin:
+        plugin = _plugin(rec)
+        for session_id, vni in (("s1", 4097), ("s2", 4098)):
+            meta = _enc_meta(session_id, vni)
+            await plugin.setup_session_network(meta, _SELF)
+            await plugin.add_peer(session_id, _PEER)
+        return plugin
+
+    async def test_the_second_session_does_not_reinstall_the_policy(self) -> None:
+        rec = Recorder()
+        await self._two_sessions(rec)
+
+        assert len(_states(rec)) == 4, "each session programs its own SA pair"
+        assert len(_policies(rec)) == 2, "but the policy pair is installed once"
+
+    async def test_the_first_teardown_leaves_the_policy_for_the_other(self) -> None:
+        rec = Recorder()
+        plugin = await self._two_sessions(rec)
+        rec.calls.clear()
+
+        await plugin.teardown_session_network("s1")
+
+        assert [c[3] for c in _states(rec)] == ["del", "del"], "its own SAs go"
+        assert _policies(rec) == [], "the policy the other session is using stays"
+
+    async def test_the_last_teardown_removes_it(self) -> None:
+        rec = Recorder()
+        plugin = await self._two_sessions(rec)
+        await plugin.teardown_session_network("s1")
+        rec.calls.clear()
+
+        await plugin.teardown_session_network("s2")
+
+        assert [c[3] for c in _policies(rec)] == ["del", "del"]
+
+    async def test_a_lone_session_still_removes_it(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.calls.clear()
+
+        await plugin.teardown_session_network("s1")
+
+        assert [c[3] for c in _policies(rec)] == ["del", "del"]
+
+    async def test_a_different_peer_gets_its_own_policy(self) -> None:
+        """The sharing is per (self, peer, port) — a second peer is a different tunnel."""
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        await plugin.add_peer("s1", Member(agent_id="a3", host_ip="10.0.0.3", vtep_ip="10.0.0.3"))
+
+        assert len(_policies(rec)) == 4
+
+
+class TestAnEncryptedSessionOnANodeWithNoVtep:
+    """The SAs are keyed on the ordered VTEP pair, so with no local endpoint there is no `src` to
+    program them with. This used to warn from `add_peer` and carry on: the session came up, carried
+    traffic, and was in clear text with one log line to say so."""
+
+    async def test_setup_refuses_it(self) -> None:
+        plugin = _plugin(Recorder())
+        headless = Member(agent_id="a1", host_ip="10.0.0.1", vtep_ip=None)
+
+        with pytest.raises(OverlayEncryptionUnavailable, match="usable VTEP"):
+            await plugin.setup_session_network(_ENC_META, headless)
+
+    async def test_it_leaves_no_devices_behind(self) -> None:
+        """A precondition, so it runs before any side effect."""
+        rec = Recorder()
+        plugin = _plugin(rec)
+        headless = Member(agent_id="a1", host_ip="10.0.0.1", vtep_ip=None)
+
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(_ENC_META, headless)
+
+        assert [c for c in rec.calls if c[:3] == ["ip", "link", "add"]] == []
+
+    async def test_a_plaintext_session_is_unaffected(self) -> None:
+        plugin = _plugin(Recorder())
+        headless = Member(agent_id="a1", host_ip="10.0.0.1", vtep_ip=None)
+
+        await plugin.setup_session_network(_META, headless)  # does not raise
+
+
+class TestAPartiallyProgrammedPeerIsStillRecorded:
+    """A failure partway through leaves SAs in the kernel. An unrecorded SA is never unprogrammed,
+    and the SPI is derived from (vni, src, dst) — so the next session that reuses the VNI on this
+    VTEP pair computes the same SPI with a different key and its traffic is dropped wholesale."""
+
+    async def test_the_peer_is_recorded_before_the_commands_run(self) -> None:
+        # Fail on the policy, which is the first command with no retry behind it: a failing
+        # `state add` is replayed as `update` (the EEXIST path) and would not surface here.
+        class _Failing(Recorder):
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                await super().__call__(argv)
+                if argv[:3] == ["ip", "xfrm", "policy"]:
+                    raise RuntimeError("kernel said no")
+
+        rec = _Failing()
+        plugin = _plugin(cast(Recorder, rec))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+
+        with pytest.raises(RuntimeError):
+            await plugin.add_peer("s1", _PEER)
+
+        assert len(_states(rec)) == 2, "the SA pair did get installed"
+        assert plugin._encrypted_peers.get("s1") == {"10.0.0.2"}, (
+            "teardown must still know to unprogram what did get installed"
+        )
