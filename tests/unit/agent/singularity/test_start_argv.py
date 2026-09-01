@@ -9,6 +9,7 @@ less isolated than it claims.
 from __future__ import annotations
 
 import itertools
+import os
 from pathlib import Path
 from typing import Any
 
@@ -162,7 +163,11 @@ class TestEnvironment:
     def test_the_runner_is_forced_to_container_root(
         self, runtime: SingularityRuntime, gate_dir: Path
     ) -> None:
-        argv = _argv(runtime, gate_dir, env={"LOCAL_USER_ID": "1100"})
+        """The uid asked for here is the node's own kernel uid — what a UID_MATCH image gets — so
+        container-root already lands on it. An id this backend cannot produce is refused instead;
+        see tests/unit/agent/rootless/test_container_identity.
+        """
+        argv = _argv(runtime, gate_dir, env={"LOCAL_USER_ID": str(os.geteuid())})
 
         env = _env_of(argv)
         assert env["LOCAL_USER_ID"] == "0"

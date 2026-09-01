@@ -83,6 +83,35 @@ class ContainerConfinementFailedError(BackendAIError, web.HTTPInternalServerErro
         )
 
 
+class ContainerUserMappingUnsupportedError(BackendAIError, web.HTTPBadRequest):
+    """Raised when a per-user container uid/gid cannot be honoured by a rootless backend.
+
+    ``users.container_uid`` says which host identity a session's files must carry -- the point of
+    it is a shared filesystem where the organisation's own POSIX ids are what other tools see. A
+    rootless agent cannot produce them: it may only map its own uid and the range /etc/subuid
+    delegates to it, and the kernel refuses the rest (measured: ``newuidmap: uid range [0-1) ->
+    [5001-5002) not allowed``).
+
+    Running anyway is the failure that matters. The session would start and write its files under
+    the node's ``container.kernel-uid`` instead of the requested identity, which on a shared
+    filesystem means silently wrong ownership -- expensive to notice and expensive to undo. So the
+    session is refused where it was placed, naming the one thing that would fix it: schedule this
+    user on a backend whose containers run with the host's own uids (containerd/docker), or clear
+    the per-user mapping for this deployment.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/container-user-mapping-unsupported"
+    error_title = "The backend cannot run this container under the requested user identity."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class ContainerStartupTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
     """Raised when container startup times out."""
 

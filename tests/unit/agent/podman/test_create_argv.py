@@ -105,12 +105,20 @@ class TestMounts:
 class TestTheKernelRunnersIdentity:
     def test_local_user_id_is_forced_to_container_root(self, runtime: PodmanRuntime) -> None:
         """Rootless podman maps container-root to the invoking uid, which owns the scratch. A
-        non-zero LOCAL_USER_ID would be unmapped in that namespace and could not read it."""
-        argv = _argv(runtime, {"env": {"LOCAL_USER_ID": "1100", "LOCAL_GROUP_ID": "1100"}})
+        non-zero LOCAL_USER_ID would be unmapped in that namespace and could not read it.
+
+        The uid asked for here is the node's own kernel uid — what a UID_MATCH image gets — so
+        container-root already lands on it. An id this backend cannot produce is refused instead;
+        see tests/unit/agent/rootless/test_container_identity.
+        """
+        wanted = str(os.geteuid())
+        argv = _argv(
+            runtime, {"env": {"LOCAL_USER_ID": wanted, "LOCAL_GROUP_ID": str(os.getegid())}}
+        )
 
         assert "LOCAL_USER_ID=0" in argv
         assert "LOCAL_GROUP_ID=0" in argv
-        assert "LOCAL_USER_ID=1100" not in argv
+        assert f"LOCAL_USER_ID={wanted}" not in argv
 
     def test_the_rest_of_the_environment_is_forwarded(self, runtime: PodmanRuntime) -> None:
         argv = _argv(runtime, {"env": {"BACKENDAI_KERNEL_ID": "k1"}})

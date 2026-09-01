@@ -469,14 +469,9 @@ class EnrootRuntime(SelfHostedRootlessRuntime):
         env["NVIDIA_VISIBLE_DEVICES"] = ",".join(str(g) for g in gpus) if gpus else "void"
         if gpus:
             env.setdefault("NVIDIA_DRIVER_CAPABILITIES", "all")
-        # The kernel-runner must stay **container-root**, which `--root` maps to the host kernel uid
-        # (the scratch owner). If it instead dropped to a non-zero LOCAL_USER_ID, that container uid
-        # would be unmapped in the rootless userns (-> nobody) and could not read the scratch it owns
-        # on the host. So force LOCAL_USER_ID/GID to 0: the runner runs as container-root == the host
-        # kernel uid, files it creates land under the kernel uid on the host exactly as intended, and
-        # sshd/jupyter/`su-exec` all succeed. Drop any LOCAL_USER_ID/GID the base injected.
-        env["LOCAL_USER_ID"] = "0"
-        env["LOCAL_GROUP_ID"] = "0"
+        # Container-root, which `--root` maps to the host kernel uid (the scratch owner). See
+        # _container_identity_env for why, and for the one case it refuses instead.
+        env.update(self._container_identity_env(spec))
         for key, value in env.items():
             # enroot's env file is line-oriented (`key=value`); a multi-line value would corrupt it
             # and silently shift every later variable. The runner still sees it via environ.txt.

@@ -487,14 +487,11 @@ class PodmanRuntime(RootlessOciRuntime):
             if not src:
                 continue
             argv += ["--device", f"{src}:{device.get('destination') or src}:rwm"]
-        for key, value in (spec.get("env") or {}).items():
-            # The kernel-runner must stay container-root, which the rootless userns maps to the
-            # host kernel uid (the scratch owner). A non-zero LOCAL_USER_ID would be unmapped
-            # inside the namespace and could not read the scratch it owns on the host.
-            if key in ("LOCAL_USER_ID", "LOCAL_GROUP_ID"):
-                continue
+        # Container-root, which the rootless userns maps to the host kernel uid (the scratch
+        # owner). See _container_identity_env for why, and for the one case it refuses instead.
+        identity = self._container_identity_env(spec)
+        for key, value in {**(spec.get("env") or {}), **identity}.items():
             argv += ["--env", f"{key}={value}"]
-        argv += ["--env", "LOCAL_USER_ID=0", "--env", "LOCAL_GROUP_ID=0"]
         # The wrapper is the entrypoint; the real command is its argument, exec'd on release.
         argv += [image_ref, *command]
         return argv

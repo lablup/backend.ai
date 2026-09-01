@@ -581,11 +581,9 @@ class SingularityRuntime(SelfHostedRootlessRuntime):
             # "no GPU" is expressed by omitting --nvccli above. Drop the variable so nothing
             # downstream reads a stale allocation out of it.
             env.pop("NVIDIA_VISIBLE_DEVICES", None)
-        # The kernel-runner must stay container-root, which --fakeroot maps to the host kernel uid
-        # (the scratch owner). A non-zero LOCAL_USER_ID would be an unmapped uid in the rootless
-        # userns (-> nobody) and could not read the scratch it owns on the host.
-        env["LOCAL_USER_ID"] = "0"
-        env["LOCAL_GROUP_ID"] = "0"
+        # Container-root, which --fakeroot maps to the host kernel uid (the scratch owner). See
+        # _container_identity_env for why, and for the one case it refuses instead.
+        env.update(self._container_identity_env(spec))
         for key, value in env.items():
             if "\n" in value:
                 # A newline would split one variable into two on apptainer's side. The runner still

@@ -1174,3 +1174,64 @@ F1은 로그 파일 **모양**이 다르다 — conmon은 회전 형제를 두�
 pid로는 EPERM을 받는다 — ssh 세션이나 사용자 백그라운드 잡이 teardown에서 살아남는다. 커널은
 프로세스 소유자가 아니라 그 파일을 쓸 수 있는지만 보고, privnet 위임이 이미 그 파일을 커널
 uid에게 넘겨준다.
+
+
+## 19. rootless 와 사용자별 호스트 uid (9/1)
+
+### 19.1 커널이 그은 선 (실측)
+
+| uid_map 쓰기 | root | `CAP_SETUID`만 | privnet 현재 cap | 비특권 |
+|---|---|---|---|---|
+| `0 -> 5001` (조직 uid) | 성공 | **성공** | 거부 | 거부 (`newuidmap: uid range [0-1) -> [5001-5002) not allowed`) |
+| `0 -> 0` (호스트 root) | 성공 | **거부** | 거부 | 거부 |
+
+비특권 에이전트가 호스트에 만들 수 있는 파일 소유자는 `{자기 uid} ∪ [subuid 범위]` 뿐이다.
+podman/enroot/apptainer 공통이며 런타임 특성이 아니라 `newuidmap`의 규칙이다.
+
+### 19.2 백엔드별 실제 동작 (같은 이미지, 같은 쓰기 테스트)
+
+| | user namespace | 컨테이너 root 로 쓰기 | 컨테이너 uid 1000 으로 쓰기 | 사용자별 uid |
+|---|---|---|---|---|
+| containerd | **없음** (`0 0 4294967295`) | 호스트 uid 0 | 호스트 uid 1000 | 지원 |
+| docker | 없음 (userns-remap 꺼짐) | 〃 | 〃 | 지원 |
+| podman | 있음 (`0->kernel_uid`, `1->100000`) | 호스트 kernel_uid | **Permission denied** | 기본 불가 |
+| enroot / apptainer | 있음 | 호스트 kernel_uid | unmapped (nobody) | 불가 |
+
+### 19.3 podman `keep-id` 는 되지만 비싸다
+
+`--userns=keep-id:uid=1000,gid=1000` 은 **동작한다** — 컨테이너 uid 1000 = 호스트 uid 1000,
+파일도 1000:1000 으로 떨어진다. 대가:
+
+| 실행 | 매핑 | 시간 |
+|---|---|---|
+| 1회차 | uid 1000 | 약 3~4분 |
+| 2회차 | uid 1001 | 5분 11초 |
+| 3회차 | uid 1000 (재방문) | **0초** (캐시됨) |
+
+디스크는 **매핑마다 이미지 사본 1벌**: 원본 1.4G + 매핑 2개 = storage 4.1G,
+`podman images` 보고값 4.98 GB -> 7.47 GB. 사용자 N명이면 N벌이다.
+
+idmapped bind mount 는 rootless 에서 커널이 거부한다 (`MOUNT_ATTR_IDMAP: operation not
+permitted`).
+
+### 19.4 결론과 이번 변경
+
+`users.container_uid` 는 BAI 의 1급 기능이다
+(`AssignContainerUserMappingRule` -> `kernels.uid` -> `LOCAL_USER_ID`). rootless 백엔드는 그걸
+**조용히 버리고** 있었다 — 세션은 뜨지만 파일이 요청과 다른 uid 로 떨어진다. 공유 파일시스템에서
+가장 늦게 발견되고 되돌리기 비싼 종류의 오동작이다.
+
+그래서 `RootlessOciRuntime._container_identity_env()` 를 두고 세 백엔드가 공유한다:
+
+* 요청 uid/gid 가 **노드의 `kernel-uid`와 같으면** 컨테이너-root 로 돌려도 호스트 소유권이
+  동일하므로 그대로 진행한다 (UID_MATCH 이미지가 여기 해당).
+* 그 외 값이면 `ContainerUserMappingUnsupportedError` 로 **세션을 거절**한다.
+
+라이브 확인: `container_uid=5001` 설정 후 세션 생성 →
+`this session asks to run as uid=5001, and the podman backend can only give it 1000 ... Run this
+user on a backend that uses the host's own ids (containerd/docker)`. 설정 해제 후 세션 RUNNING 정상.
+
+**설계 방향**: "podman 에 매핑 구조를 도입"이 아니라, rootless 백엔드는 *사용자별 호스트 uid 가
+필요 없는 배포*용으로 위치를 잡는 것이 맞다. 사용자별 uid 가 요구사항이면 containerd 를 쓴다.
+privnet 에 `CAP_SETUID`/`CAP_SETGID` 를 주는 중간 경로는 기술적으로 가능하지만(19.1 측정),
+podman 쪽 이미지 chown 비용(19.3)이 그대로 남고 enroot/apptainer 에는 통로가 없다.

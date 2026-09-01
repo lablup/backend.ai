@@ -10,6 +10,7 @@ container starts fine and is simply wrong — so they are pinned here as argv as
 from __future__ import annotations
 
 import itertools
+import os
 from pathlib import Path
 from typing import Any
 
@@ -73,8 +74,17 @@ class TestEnvironment:
     ) -> None:
         """`--root` maps container-root to the host kernel uid, which owns the scratch. A non-zero
         LOCAL_USER_ID from the image base would leave the runner as a container uid that is
-        unmapped in the rootless userns, i.e. `nobody`, unable to read the scratch it owns."""
-        argv = _argv(runtime, gate_dir, env={"LOCAL_USER_ID": "1100", "LOCAL_GROUP_ID": "1100"})
+        unmapped in the rootless userns, i.e. `nobody`, unable to read the scratch it owns.
+
+        The uid asked for here is the node's own kernel uid — what a UID_MATCH image gets — so
+        container-root already lands on it and there is nothing this backend cannot honour. An id
+        it cannot produce is refused instead; see tests/unit/agent/rootless/test_container_identity.
+        """
+        argv = _argv(
+            runtime,
+            gate_dir,
+            env={"LOCAL_USER_ID": str(os.geteuid()), "LOCAL_GROUP_ID": str(os.getegid())},
+        )
 
         env = _env_of(argv)
         assert env["LOCAL_USER_ID"] == "0"

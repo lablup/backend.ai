@@ -27,7 +27,10 @@ from typing import Any, ClassVar, Final
 
 from ai.backend.agent.containerd.runtime.interface import OciRuntime
 from ai.backend.agent.containerd.runtime.spec import container_cgroup_fs_path
-from ai.backend.agent.errors.agent import ContainerConfinementFailedError
+from ai.backend.agent.errors.agent import (
+    ContainerConfinementFailedError,
+    ContainerUserMappingUnsupportedError,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -91,6 +94,45 @@ class RootlessOciRuntime(OciRuntime):
         self._kernel_gid = kernel_gid
         self._privnet_socket = privnet_socket
         self._labels = {}
+
+    # ------------------------------------------------------------------ the container's identity
+    def _container_identity_env(self, spec: Mapping[str, Any]) -> dict[str, str]:
+        """``LOCAL_USER_ID``/``LOCAL_GROUP_ID`` for a rootless container, or a refusal.
+
+        The kernel-runner must stay **container-root**, which every rootless runtime here maps to
+        the host's ``container.kernel-uid`` -- the uid that owns the scratch. A non-zero id inside
+        would be a *different* host id (unmapped on enroot/apptainer, ``100000+`` on podman) that
+        cannot read the files it is supposed to own, so all three force these to 0.
+
+        Which is exactly right when the requested id IS the kernel uid: container-root maps to it,
+        so the files land under the requested identity either way. It is not right when an operator
+        asked for something else through ``users.container_uid`` -- there the session would run
+        under an identity nobody asked for and write files owned by the wrong user. A rootless
+        agent has no way to honour that (see ContainerUserMappingUnsupportedError), and quietly
+        substituting an identity is worse than not starting, so it does not start.
+        """
+        env = spec.get("env") or {}
+        for name, key, allowed in (
+            ("uid", "LOCAL_USER_ID", self._kernel_uid),
+            ("gid", "LOCAL_GROUP_ID", self._kernel_gid),
+        ):
+            requested = env.get(key)
+            if requested is None:
+                continue
+            try:
+                wanted = int(requested)
+            except (TypeError, ValueError):
+                continue  # not something we set; leave it to the runner to complain about
+            if wanted in (0, allowed):
+                continue
+            raise ContainerUserMappingUnsupportedError(
+                f"this session asks to run as {name}={wanted}, and the {self.backend_name}"
+                f" backend can only give it {allowed} (the node's"
+                " container.kernel-uid/gid): a rootless agent may map only its own id and the"
+                " range /etc/subuid delegates to it. Run this user on a backend that uses the"
+                " host's own ids (containerd/docker), or clear the per-user container uid/gid."
+            )
+        return {"LOCAL_USER_ID": "0", "LOCAL_GROUP_ID": "0"}
 
     # ------------------------------------------------------------------ cgroup confinement
     async def _release_via_privnet(self, container_id: str) -> None:
