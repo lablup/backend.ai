@@ -21,8 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_SCOPE_TYPE
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeID, ScopeRef, ScopeType
@@ -32,10 +32,8 @@ from ai.backend.common.data.permission.types import (
     Permission,
     RBACElementType,
 )
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import RBACTypeConversionError, UnreachableError
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -56,8 +54,7 @@ from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.keypair.creators import DefaultKeypairCreator
-from ai.backend.manager.models.project import ProjectRow, ProjectType
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -68,7 +65,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.user import UserRow, UserStatus
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
@@ -156,31 +153,6 @@ class ScopeCreationResult[TRow: Base]:
 
     row: TRow
     auto_grant_role_ids: list[UUID]
-
-
-@dataclass
-class FullUserCreation:
-    """Everything needed to provision a user in full: the user-scope creation, the
-    scopes to enroll in, the default keypair's policy, and that keypair's key material.
-
-    The caller generates ``keypair_secrets`` because the secret key is encrypted through
-    the key provider pool before it is bound.
-    """
-
-    creation: ScopeCreation[UserRow]
-    domain_id: DomainID
-    project_ids: Collection[ProjectID]
-    keypair_resource_policy: str
-    keypair_secrets: KeyPairSecrets
-    keypair_rate_limit: int | None = None
-
-
-@dataclass
-class FullUserCreationResult:
-    """A fully provisioned user: the row and the keypair the user authorizes with."""
-
-    user_row: UserRow
-    keypair: KeyPairData
 
 
 class ScopeMember(ABC):
@@ -978,74 +950,6 @@ class RBACWriteOps(WriteOps):
         ]
         if specs:
             await self.bulk_create(BulkCreator(specs=specs))
-
-    async def create_full_user(
-        self,
-        full_creation: FullUserCreation,
-    ) -> FullUserCreationResult:
-        """Provision a user end to end in one transaction.
-
-        Creates the user scope (row, virtual scope, own-scope roles) and grants those
-        roles, writes the keypair the user authorizes with, then enrolls the user in
-        its domain's and projects' virtual scopes — the domain's model-store projects
-        always included, and ``project_ids`` narrowed to projects that exist in the
-        domain.
-        """
-        creation_result = await self.create_scope(full_creation.creation)
-        user_row = creation_result.row
-        user_id = UserID(user_row.uuid)
-        await self.assign_roles_to_user(user_id, creation_result.auto_grant_role_ids)
-
-        keypair = await self.create_field(
-            user_id,
-            DefaultKeypairCreator(
-                secrets=full_creation.keypair_secrets,
-                is_active=user_row.status == UserStatus.ACTIVE,
-                is_admin=user_row.role in (UserRole.SUPERADMIN, UserRole.ADMIN),
-                resource_policy=full_creation.keypair_resource_policy,
-                rate_limit=full_creation.keypair_rate_limit,
-            ),
-        )
-
-        member = ScopeUserMember(user_id=user_id)
-        domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=full_creation.domain_id)
-        await self.ensure_scope(domain_scope)
-        await self.add_bulk_inheriting_members(
-            EntityMembersAddition(scope=domain_scope, members=[member])
-        )
-        for project_id in await self._domain_member_project_ids(
-            full_creation.domain_id, full_creation.project_ids
-        ):
-            project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
-            await self.ensure_scope(project_scope)
-            await self.add_bulk_members(
-                EntityMembersAddition(scope=project_scope, members=[member])
-            )
-
-        # The insert leaves the server-default columns unloaded, and default_keypair is the
-        # keypair created just above; reload both so callers can read the row without a
-        # sync-context lazy refresh.
-        await self._sess.flush()
-        await self._sess.refresh(user_row)
-        await self._sess.refresh(user_row, ["default_keypair"])
-        return FullUserCreationResult(user_row=user_row, keypair=keypair)
-
-    async def _domain_member_project_ids(
-        self,
-        domain_id: DomainID,
-        project_ids: Collection[ProjectID],
-    ) -> list[ProjectID]:
-        """``project_ids`` narrowed to the domain's real projects, plus the domain's
-        model-store projects that every user joins."""
-        stmt = (
-            sa.select(ProjectRow.id)
-            .join(DomainRow, DomainRow.name == ProjectRow.domain_name)
-            .where(
-                DomainRow.id == domain_id,
-                sa.or_(ProjectRow.id.in_(project_ids), ProjectRow.type == ProjectType.MODEL_STORE),
-            )
-        )
-        return [ProjectID(row) for row in (await self._sess.scalars(stmt)).all()]
 
     async def add_bulk_members(
         self,

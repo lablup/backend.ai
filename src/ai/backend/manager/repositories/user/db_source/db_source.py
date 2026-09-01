@@ -110,11 +110,10 @@ from ai.backend.manager.models.virtual_scope.queries import user_scope_membershi
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
-    FullUserCreation,
-    RBACOpsProvider,
-    RBACWriteOps,
     ScopeUserMember,
 )
+from ai.backend.manager.repositories.ops.user.provider import UserOpsProvider
+from ai.backend.manager.repositories.ops.user.write import FullUserCreation, UserWriteOps
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.creators import (
     UserCreateSpec,
@@ -131,7 +130,7 @@ class UserDBSource:
 
     _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
-    _rbac_ops_provider: RBACOpsProvider
+    _user_ops_provider: UserOpsProvider
     _key_provider_pool: KeyProviderPool
 
     def __init__(
@@ -142,7 +141,7 @@ class UserDBSource:
     ) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
-        self._rbac_ops_provider = RBACOpsProvider(db)
+        self._user_ops_provider = UserOpsProvider(db)
         self._key_provider_pool = key_provider_pool
 
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
@@ -183,12 +182,12 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             policy = await self._default_keypair_resource_policy(session)
-        async with self._rbac_ops_provider.write_ops() as w:
+        async with self._user_ops_provider.write_ops() as w:
             return await self._create_user_with_keypair_and_groups(w, creator, group_ids, policy)
 
     async def _create_user_with_keypair_and_groups(
         self,
-        w: RBACWriteOps,
+        w: UserWriteOps,
         creator: UserCreator,
         group_ids: list[str] | None,
         keypair_resource_policy: str,
@@ -239,7 +238,7 @@ class UserDBSource:
 
         async with self._db.begin_readonly_session_read_committed() as session:
             policy = await self._default_keypair_resource_policy(session)
-        async with self._rbac_ops_provider.write_ops() as w:
+        async with self._user_ops_provider.write_ops() as w:
             for idx, item in enumerate(items):
                 try:
                     async with w.savepoint():
@@ -721,7 +720,7 @@ class UserDBSource:
         """
         member_ref = EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=UserID(user_uuid))
         left_project_ids: list[ProjectID] = []
-        async with self._rbac_ops_provider.write_ops() as w:
+        async with self._user_ops_provider.write_ops() as w:
             target_result = await w.batch_query_in_global(
                 sa.select(ProjectRow.id).where(
                     ProjectRow.domain_name == domain_name,

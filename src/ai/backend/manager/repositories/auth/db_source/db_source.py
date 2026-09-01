@@ -62,7 +62,8 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.ops.rbac.provider import FullUserCreation, RBACOpsProvider
+from ai.backend.manager.repositories.ops.user.provider import UserOpsProvider
+from ai.backend.manager.repositories.ops.user.write import FullUserCreation
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.creators import UserScopeCreation
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -106,7 +107,7 @@ class AuthDBSource:
     """
 
     _db: ExtendedAsyncSAEngine
-    _rbac_ops_provider: RBACOpsProvider
+    _user_ops_provider: UserOpsProvider
     _v2_ops: V2DBOpsProvider
     _key_provider_pool: KeyProviderPool
 
@@ -117,7 +118,7 @@ class AuthDBSource:
         key_provider_pool: KeyProviderPool,
     ) -> None:
         self._db = db
-        self._rbac_ops_provider = RBACOpsProvider(db)
+        self._user_ops_provider = UserOpsProvider(db)
         self._v2_ops = v2_ops_provider
         self._key_provider_pool = key_provider_pool
 
@@ -164,7 +165,7 @@ class AuthDBSource:
     ) -> UserCreationData:
         """Provision a signup user in one transaction: the row, its default keypair,
         and its domain/project (model-store included) scope enrollments."""
-        async with self._rbac_ops_provider.write_ops() as w:
+        async with self._user_ops_provider.write_ops() as w:
             result = await w.create_full_user(
                 FullUserCreation(
                     creation=UserScopeCreation(spec=user_spec),
