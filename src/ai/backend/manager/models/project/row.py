@@ -47,7 +47,6 @@ from ai.backend.manager.models.association_container_registries_groups import (
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    EnumValueType,
     ResourceSlotColumn,
     SlugType,
     StrEnumType,
@@ -198,7 +197,7 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     )
     type: Mapped[ProjectType] = mapped_column(
         "type",
-        EnumValueType(ProjectType),
+        StrEnumType(ProjectType),
         nullable=False,
         default=ProjectType.GENERAL,
     )

@@ -29,11 +29,14 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.project.types import (
     ProjectData,
+    ProjectType,
     UnassignUserFailure,
     UnassignUsersResult,
 )
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
+    PersonalProjectDeletionError,
+    PersonalProjectMemberAdditionError,
     ProjectHasActiveEndpointsError,
     ProjectHasVFoldersMountedError,
     ProjectNotFound,
@@ -133,12 +136,27 @@ class ProjectDBSource:
             if existing_group is None:
                 raise ProjectNotFound(f"Group not found: {project_id}")
             if user_update_mode == "add":
+                await self._refuse_personal_project(w, project_id)
                 await self._add_users_to_project(w, project_id, user_ids)
             elif user_update_mode == "remove":
                 await w.remove_bulk_members(
                     ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                     [EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=uid) for uid in user_ids],
                 )
+
+    async def _refuse_personal_project(self, w: RBACWriteOps, project_id: ProjectID) -> None:
+        """Refuse the write when the project is a personal one, which keeps its owner
+        as its only member."""
+        result = await w.batch_query_in_global(
+            sa.select(ProjectRow.id).where(
+                ProjectRow.id == project_id, ProjectRow.type == ProjectType.PERSONAL
+            ),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        if result.rows:
+            raise PersonalProjectMemberAdditionError(
+                f"Personal project takes no members: {project_id}"
+            )
 
     async def _users_addable_to_project(
         self,
@@ -395,6 +413,13 @@ class ProjectDBSource:
         """Completely remove a group and all its associated data."""
         project_id = ProjectID(group_id)
         async with self._db.begin_readonly_session_read_committed() as sess:
+            project_type = await sess.scalar(
+                sa.select(ProjectRow.type).where(ProjectRow.id == project_id)
+            )
+            if project_type is ProjectType.PERSONAL:
+                raise PersonalProjectDeletionError(
+                    f"Personal project is purged with its user: {project_id}"
+                )
             if await self._project_vfolders_mounted_to_active_kernels(sess, group_id):
                 raise ProjectHasVFoldersMountedError(
                     f"error on deleting project {group_id} with vfolders mounted to active kernels"
@@ -524,6 +549,7 @@ class ProjectDBSource:
             return []
 
         async with self._rbac_ops_provider.write_ops() as w:
+            await self._refuse_personal_project(w, project_id)
             # TODO: https://github.com/lablup/backend.ai/issues/10687
             role = await w.query(Querier(row_class=RoleRow, pk_value=role_id))
             if role is None:
@@ -612,6 +638,7 @@ class ProjectDBSource:
         Idempotent: adding an existing member is a no-op.
         """
         async with self._rbac_ops_provider.write_ops() as w:
+            await self._refuse_personal_project(w, project_id)
             await w.add_bulk_members(
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),

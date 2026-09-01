@@ -39,6 +39,7 @@ class ProjectStatus(enum.StrEnum):
 class ProjectType(enum.StrEnum):
     GENERAL = "general"
     MODEL_STORE = "model-store"
+    PERSONAL = "personal"
 
     @classmethod
     @override
@@ -52,6 +53,8 @@ class ProjectType(enum.StrEnum):
                 return cls.GENERAL
             case "MODEL_STORE" | "MODEL-STORE":
                 return cls.MODEL_STORE
+            case "PERSONAL":
+                return cls.PERSONAL
             case _:
                 return None
 

@@ -15894,7 +15894,8 @@
         "description": "Project type determining its purpose and behavior.",
         "enum": [
           "general",
-          "model-store"
+          "model-store",
+          "personal"
         ],
         "title": "ProjectType",
         "type": "string"

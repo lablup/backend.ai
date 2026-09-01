@@ -10551,7 +10551,7 @@ input ProjectFairShareProjectNestedFilter {
   """Filter by project active status."""
   isActive: Boolean = null
 
-  """Filter by project type (GENERAL, MODEL_STORE)."""
+  """Filter by project type (GENERAL, MODEL_STORE, PERSONAL)."""
   type: ProjectFairShareTypeEnumFilter = null
 }
 
@@ -10565,6 +10565,7 @@ input ProjectFairShareScope {
 enum ProjectFairShareTypeEnum {
   GENERAL
   MODEL_STORE
+  PERSONAL
 }
 
 """
@@ -10732,11 +10733,12 @@ type ProjectStorageInfo {
 }
 
 """
-Added in 26.2.0. Project type determining its purpose and behavior. GENERAL: Standard project for general computation. MODEL_STORE: Project for model storage and management.
+Added in 26.2.0. Project type determining its purpose and behavior. GENERAL: Standard project for general computation. MODEL_STORE: Project for model storage and management. PERSONAL: Added in 26.9.0. Project holding one user's own resources, created and removed with that user.
 """
 enum ProjectTypeV2 {
   GENERAL
   MODEL_STORE
+  PERSONAL
 }
 
 """

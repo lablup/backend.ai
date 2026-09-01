@@ -128,8 +128,8 @@ class UserWriteOps(RBACWriteOps):
         project_ids: Collection[ProjectID],
     ) -> None:
         """Enroll the user in each project's virtual scope — the domain's model-store
-        projects always included, and ``project_ids`` narrowed to projects that exist in
-        the domain."""
+        projects always included, ``project_ids`` narrowed to projects that exist in
+        the domain, and personal projects left out."""
         member = ScopeUserMember(user_id=user_id)
         for project_id in await self._domain_member_project_ids(domain_id, project_ids):
             project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
@@ -144,12 +144,14 @@ class UserWriteOps(RBACWriteOps):
         project_ids: Collection[ProjectID],
     ) -> list[ProjectID]:
         """``project_ids`` narrowed to the domain's real projects, plus the domain's
-        model-store projects that every user joins."""
+        model-store projects that every user joins. A personal project is never among
+        them: it takes no member beyond the user it was created with."""
         stmt = (
             sa.select(ProjectRow.id)
             .join(DomainRow, DomainRow.name == ProjectRow.domain_name)
             .where(
                 DomainRow.id == domain_id,
+                ProjectRow.type != ProjectType.PERSONAL,
                 sa.or_(ProjectRow.id.in_(project_ids), ProjectRow.type == ProjectType.MODEL_STORE),
             )
         )
