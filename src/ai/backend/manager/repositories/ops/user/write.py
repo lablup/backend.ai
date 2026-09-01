@@ -113,11 +113,11 @@ class UserWriteOps(RBACWriteOps):
         )
 
     async def _enroll_in_domain(self, user_id: UserID, domain_id: DomainID) -> None:
-        """Enroll the user in its domain's virtual scope, inheriting the domain's
-        permissions over what the user owns."""
+        """Enroll the user in its domain's roster. The domain reaches what the user owns
+        through each entity's own enrollment, not through the user's virtual scope."""
         domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id)
         await self.ensure_scope(domain_scope)
-        await self.add_bulk_inheriting_members(
+        await self.add_bulk_members(
             EntityMembersAddition(scope=domain_scope, members=[ScopeUserMember(user_id=user_id)])
         )
 

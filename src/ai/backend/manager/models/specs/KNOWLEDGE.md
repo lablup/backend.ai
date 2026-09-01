@@ -157,6 +157,9 @@ updater's fields rather than about a column name.
 
 - `member_of(row)` declares ontological belonging at creation time — a project joins
   its domain, a keypair joins its user.
+- A user member is enrolled in the roster alone: no row binds a user's virtual scope
+  into a scope, and a scope reaches what a user owns only through each entity's own
+  enrollment (BEP-1077).
 - It carries no permission caps — cap-bounded access is the object-sharing mechanism
   applied to existing entities and has its own audit trail.
 - Keeping the two separate keeps creation declarative and sharing revocable.

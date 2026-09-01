@@ -96,6 +96,7 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     ScopeDeletion,
     ScopeEntityMember,
     ScopeMember,
+    ScopeUserMember,
 )
 from ai.backend.manager.repositories.permission_controller.role_manager import (
     ScopeSystemRoleData,
@@ -189,6 +190,7 @@ class StubMember(ScopeMember):
     member_id: UUID
     role_user: UserID | None = None
     entity_type: VirtualScopeEntityType = _TEST_MEMBER_ENTITY_TYPE
+    cap: Permission | None = None
 
     @override
     def entity_ref(self) -> EntityRef:
@@ -197,6 +199,10 @@ class StubMember(ScopeMember):
     @override
     def assign_role_on(self) -> UserID | None:
         return self.role_user
+
+    @override
+    def permission_cap(self, scope: ScopeRef) -> Permission | None:
+        return self.cap
 
 
 class RBACOpsTestRow(Base):
@@ -753,9 +759,8 @@ class TestAddBulkMembers:
             await w.add_bulk_members(
                 EntityMembersAddition(
                     scope=scope,
-                    members=[StubMember(member_id=mid) for mid in member_ids],
+                    members=[StubMember(member_id=mid, cap=Permission.READ) for mid in member_ids],
                 ),
-                permission_cap=Permission.READ,
             )
 
         async with database_connection.begin_session_read_committed() as sess:
@@ -855,13 +860,21 @@ class TestAddBulkMembers:
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
         member_id = uuid.uuid4()
         member_scope = ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=member_id)
-        addition = EntityMembersAddition(scope=scope, members=[StubMember(member_id=member_id)])
-
         async with provider.write_ops() as w:
             await w.ensure_scope(scope)
             await w.ensure_scope(member_scope)
-            await w.add_bulk_members(addition, permission_cap=Permission.READ)
-            await w.add_bulk_members(addition, permission_cap=Permission.full())
+            await w.add_bulk_members(
+                EntityMembersAddition(
+                    scope=scope,
+                    members=[StubMember(member_id=member_id, cap=Permission.READ)],
+                )
+            )
+            await w.add_bulk_members(
+                EntityMembersAddition(
+                    scope=scope,
+                    members=[StubMember(member_id=member_id, cap=Permission.full())],
+                )
+            )
 
         async with database_connection.begin_session_read_committed() as sess:
             scope_vs = (
@@ -916,6 +929,84 @@ class TestAddBulkMembers:
         assert binding_count == 1  # the self binding from ensure_scope
 
 
+class TestUserRosterEnrollment:
+    """A user joins a scope's roster only: the enrollment row carries the scope kind's
+    constant cap, and nothing is bound into the user's own VS."""
+
+    @pytest.fixture
+    async def roster_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[None, None]:
+        async with with_tables(
+            database_connection,
+            [
+                *_ENTITY_MEMBER_TABLES,
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+            ],
+        ):
+            yield
+
+    @pytest.mark.parametrize(
+        ("scope_type", "expected_cap"),
+        [
+            pytest.param(PROJECT_SCOPE_TYPE, Permission.READ, id="project-capped-to-read"),
+            pytest.param(DOMAIN_SCOPE_TYPE, None, id="domain-uncapped"),
+        ],
+    )
+    async def test_enrollment_carries_the_scope_kinds_cap(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
+        roster_tables: None,
+        scope_type: ScopeType,
+        expected_cap: Permission | None,
+    ) -> None:
+        scope = ScopeRef(scope_type=scope_type, scope_id=uuid.uuid4())
+        user_id = UserID(uuid.uuid4())
+        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_id)
+
+        async with provider.write_ops() as w:
+            await w.ensure_scope(scope)
+            await w.ensure_scope(user_scope)
+            await w.add_bulk_members(
+                EntityMembersAddition(scope=scope, members=[ScopeUserMember(user_id=user_id)])
+            )
+
+        async with database_connection.begin_session_read_committed() as sess:
+            vs_by_scope = {
+                vs.scope_id: vs.id
+                for vs in (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
+            }
+            cap = await sess.scalar(
+                sa.select(EntityMembershipRow.permission_cap).where(
+                    EntityMembershipRow.virtual_scope_id == vs_by_scope[scope.scope_id],
+                    EntityMembershipRow.entity_id == user_id,
+                )
+            )
+            user_vs_bindings = {
+                (b.scope_type, b.scope_id)
+                for b in (
+                    await sess.execute(
+                        sa.select(ScopeBindingRow).where(
+                            ScopeBindingRow.virtual_scope_id == vs_by_scope[user_id]
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            }
+
+        assert cap == expected_cap
+        assert user_vs_bindings == {(USER_SCOPE_TYPE, user_id)}  # self binding only
+
+
 class TestAddBulkInheritingMembers:
     """add_bulk_inheriting_members writes everything add_bulk_members does and additionally binds
     the scope into the member's own VS — never the reverse binding."""
@@ -926,7 +1017,7 @@ class TestAddBulkInheritingMembers:
         provider: RBACOpsProvider,
         entity_member_tables: None,
     ) -> None:
-        """Each member gets membership, association, and the scope's binding (with cap)
+        """Each member gets membership, association, and the scope's uncapped binding
         in its own VS — and no reverse binding in the scope's VS."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
@@ -939,9 +1030,8 @@ class TestAddBulkInheritingMembers:
             await w.add_bulk_inheriting_members(
                 EntityMembersAddition(
                     scope=scope,
-                    members=[StubMember(member_id=mid) for mid in member_ids],
+                    members=[StubMember(member_id=mid, cap=Permission.READ) for mid in member_ids],
                 ),
-                permission_cap=Permission.READ,
             )
 
         async with database_connection.begin_session_read_committed() as sess:
@@ -980,7 +1070,7 @@ class TestAddBulkInheritingMembers:
             }
             assert member_bindings == {
                 (_TEST_MEMBER_SCOPE_TYPE, mid): None,  # self binding
-                (_TEST_SCOPE_TYPE, scope_id): Permission.READ,
+                (_TEST_SCOPE_TYPE, scope_id): None,
             }
         scope_vs_bindings = {
             (b.scope_type, b.scope_id)
@@ -989,14 +1079,14 @@ class TestAddBulkInheritingMembers:
         }
         assert scope_vs_bindings == {(_TEST_SCOPE_TYPE, scope_id)}  # self binding only
 
-    async def test_readd_is_idempotent_and_keeps_binding_cap(
+    async def test_readd_is_idempotent(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         entity_member_tables: None,
     ) -> None:
-        """Re-adding the same member with a different cap is a no-op — no duplicate
-        membership or association, and the original binding cap is kept."""
+        """Re-adding the same member is a no-op — no duplicate membership, association,
+        or binding."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
         member_id = uuid.uuid4()
@@ -1006,8 +1096,8 @@ class TestAddBulkInheritingMembers:
         async with provider.write_ops() as w:
             await w.ensure_scope(scope)
             await w.ensure_scope(member_scope)
-            await w.add_bulk_inheriting_members(addition, permission_cap=Permission.READ)
-            await w.add_bulk_inheriting_members(addition, permission_cap=Permission.full())
+            await w.add_bulk_inheriting_members(addition)
+            await w.add_bulk_inheriting_members(addition)
 
         async with database_connection.begin_session_read_committed() as sess:
             scope_vs = (
@@ -1048,7 +1138,7 @@ class TestAddBulkInheritingMembers:
         caps_by_scope = {(b.scope_type, b.scope_id): b.permission_cap for b in binding_rows}
         assert caps_by_scope == {
             (_TEST_MEMBER_SCOPE_TYPE, member_id): None,  # self binding
-            (_TEST_SCOPE_TYPE, scope_id): Permission.READ,
+            (_TEST_SCOPE_TYPE, scope_id): None,
         }
 
     async def test_missing_member_vs_fails_the_whole_call(
@@ -1332,8 +1422,8 @@ class TestAddBulkMembersPartial:
         """Members are enrolled whether or not they have a VS of their own, and no
         binding is written into the one that does."""
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=uuid.uuid4())
-        with_vs = StubMember(member_id=uuid.uuid4())
-        without_vs = StubMember(member_id=uuid.uuid4())
+        with_vs = StubMember(member_id=uuid.uuid4(), cap=Permission.READ)
+        without_vs = StubMember(member_id=uuid.uuid4(), cap=Permission.READ)
 
         async with provider.write_ops() as w:
             await w.ensure_scope(scope)
@@ -1341,8 +1431,7 @@ class TestAddBulkMembersPartial:
                 ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=with_vs.member_id)
             )
             result = await w.add_bulk_members_partial(
-                EntityMembersAddition(scope=scope, members=[with_vs, without_vs]),
-                permission_cap=Permission.READ,
+                EntityMembersAddition(scope=scope, members=[with_vs, without_vs])
             )
 
         assert result.successes == [with_vs, without_vs]

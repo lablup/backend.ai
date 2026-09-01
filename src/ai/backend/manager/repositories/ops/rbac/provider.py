@@ -157,7 +157,8 @@ class ScopeCreationResult[TRow: Base]:
 
 class ScopeMember(ABC):
     """A member to attach to a scope; ``assign_role_on`` names the user to grant its
-    auto_assign roles, or ``None`` to skip."""
+    auto_assign roles, or ``None`` to skip, and ``permission_cap`` gives the cap every
+    row of this member kind carries in that scope kind."""
 
     @abstractmethod
     def entity_ref(self) -> EntityRef:
@@ -165,6 +166,10 @@ class ScopeMember(ABC):
 
     @abstractmethod
     def assign_role_on(self) -> UserID | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def permission_cap(self, scope: ScopeRef) -> Permission | None:
         raise NotImplementedError
 
 
@@ -183,6 +188,13 @@ class ScopeUserMember(ScopeMember):
     def assign_role_on(self) -> UserID:
         return self.user_id
 
+    @override
+    def permission_cap(self, scope: ScopeRef) -> Permission | None:
+        """A project roster caps its users to read; a domain roster carries no cap."""
+        if scope.scope_type == PROJECT_SCOPE_TYPE:
+            return Permission.READ
+        return None
+
 
 @dataclass
 class ScopeEntityMember(ScopeMember):
@@ -196,6 +208,10 @@ class ScopeEntityMember(ScopeMember):
 
     @override
     def assign_role_on(self) -> UserID | None:
+        return None
+
+    @override
+    def permission_cap(self, scope: ScopeRef) -> Permission | None:
         return None
 
 
@@ -954,11 +970,10 @@ class RBACWriteOps(WriteOps):
     async def add_bulk_members(
         self,
         addition: EntityMembersAddition,
-        permission_cap: Permission | None = None,
     ) -> None:
-        """Attach each member under the scope: membership in the scope's virtual scope
-        and the legacy scope association. The scope reaches the member entities
-        themselves, not the entities they own — use
+        """Attach each member under the scope: membership in the scope's virtual scope,
+        carrying the member kind's constant cap, and the legacy scope association. The
+        scope reaches the member entities themselves, not the entities they own — use
         :meth:`add_bulk_inheriting_members` when the member must inherit the scope's
         permissions over what it owns. Grants the scope's auto_assign roles to members
         whose ``assign_role_on`` returns a user id.
@@ -971,26 +986,26 @@ class RBACWriteOps(WriteOps):
             return
         scope = addition.scope
         virtual_scope_id = await self._resolve_virtual_scope_id(scope)
-        entity_refs = [member.entity_ref() for member in members]
-        await self._enroll_members_in_scope_vs(virtual_scope_id, entity_refs, permission_cap)
-        await self._associate_entities_with_scope(scope, entity_refs)
+        await self._enroll_members_in_scope_vs(virtual_scope_id, scope, members)
+        await self._associate_entities_with_scope(
+            scope, [member.entity_ref() for member in members]
+        )
         await self._grant_member_auto_assign_roles(scope, members)
 
     async def add_bulk_inheriting_members(
         self,
         addition: EntityMembersAddition,
-        permission_cap: Permission | None = None,
     ) -> None:
         """Attach each member so that it inherits the scope's permissions: everything
         :meth:`add_bulk_members` writes, plus the binding that carries those permissions
         onto every entity the member owns.
 
         Only for relations where that inheritance is intended — a domain over its
-        projects and users, a project over the container registries it contains. A
-        member that merely participates in the scope, such as a user in a project, is an
-        ordinary member: binding its virtual scope would expose everything it owns
-        elsewhere. Inheritance stays unidirectional; the reverse would widen every
-        member-scoped role at once.
+        projects, a project over the container registries it contains. Joining a scope's
+        roster is not such a relation: a user is an ordinary member of both its domain
+        and its projects, and no row ever binds a user's virtual scope into a scope.
+        Inheritance stays unidirectional; the reverse would widen every member-scoped
+        role at once.
 
         Raises :class:`VirtualScopeNotFound` for any missing virtual scope. Idempotent:
         existing rows keep their ``permission_cap``.
@@ -998,14 +1013,13 @@ class RBACWriteOps(WriteOps):
         members = list(addition.members)
         if not members:
             return
-        await self.add_bulk_members(addition, permission_cap)
+        await self.add_bulk_members(addition)
         member_scopes = [self._member_scope_ref(member.entity_ref()) for member in members]
-        await self._bind_scope_to_member_vs(addition.scope, member_scopes, permission_cap)
+        await self._bind_scope_to_member_vs(addition.scope, member_scopes)
 
     async def add_bulk_members_partial(
         self,
         addition: EntityMembersAddition,
-        permission_cap: Permission | None = None,
     ) -> EntityMembersResultWithFailures:
         """Add members as :meth:`add_bulk_members` does, isolating each member in its
         own savepoint: a failed member — including one without a virtual scope — lands
@@ -1023,9 +1037,8 @@ class RBACWriteOps(WriteOps):
             # The handler stays outside the savepoint — see bulk_create_scoped_partial.
             try:
                 async with self.savepoint():
-                    ref = member.entity_ref()
-                    await self._enroll_members_in_scope_vs(virtual_scope_id, [ref], permission_cap)
-                    await self._associate_entities_with_scope(scope, [ref])
+                    await self._enroll_members_in_scope_vs(virtual_scope_id, scope, [member])
+                    await self._associate_entities_with_scope(scope, [member.entity_ref()])
                 successes.append(member)
             except Exception as e:
                 errors.append(EntityMemberCreationError(member=member, exception=e, index=index))
@@ -1035,14 +1048,17 @@ class RBACWriteOps(WriteOps):
     async def _enroll_members_in_scope_vs(
         self,
         virtual_scope_id: VirtualScopeID,
-        refs: Sequence[EntityRef],
-        permission_cap: Permission | None,
+        scope: ScopeRef,
+        members: Sequence[ScopeMember],
     ) -> None:
-        """Enroll each entity in the scope's virtual scope."""
+        """Enroll each member in the scope's virtual scope with its kind's cap."""
         await self._bulk_create_dependent_ignore_conflicts(
             [
-                EntityMembershipCreatorSpec(entity_ref=ref, permission_cap=permission_cap)
-                for ref in refs
+                EntityMembershipCreatorSpec(
+                    entity_ref=member.entity_ref(),
+                    permission_cap=member.permission_cap(scope),
+                )
+                for member in members
             ],
             virtual_scope_id,
         )
@@ -1061,15 +1077,14 @@ class RBACWriteOps(WriteOps):
         self,
         scope: ScopeRef,
         member_scopes: Sequence[ScopeRef],
-        permission_cap: Permission | None,
     ) -> None:
-        """Bind the scope into each member's own virtual scope; raises
+        """Bind the scope into each member's own virtual scope, uncapped; raises
         :class:`VirtualScopeNotFound` for members without one."""
         member_virtual_scope_ids = await self._resolve_virtual_scope_ids(member_scopes)
         await self._bulk_create_dependent_ignore_conflicts(
             [
                 ScopeBindingCreatorSpec(
-                    anchor_scope=member_scope, bound_scope=scope, permission_cap=permission_cap
+                    anchor_scope=member_scope, bound_scope=scope, permission_cap=None
                 )
                 for member_scope in member_scopes
             ],
