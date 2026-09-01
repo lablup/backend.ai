@@ -164,3 +164,4 @@ backup.*.json
 /INSTALL-INFO
 .serena/
 .claude/worktrees/
+scripts/backend-acceptance/run-frozen.sh
