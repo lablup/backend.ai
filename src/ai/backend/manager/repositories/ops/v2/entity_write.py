@@ -27,7 +27,7 @@ from ai.backend.common.data.entity.types import (
     EntityType,
     ScopeType,
 )
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.logging import BraceStyleAdapter
@@ -239,6 +239,10 @@ class V2EntityWriteOps(V2WriteOpsBase):
         virtual scope — permission_cap NULL throughout, since capped sharing is the
         object-sharing mechanism, not creation.
 
+        A user member gets the membership alone: no row binds a user's virtual scope
+        into a scope, so a scope reaches what a user owns through each entity's own
+        enrollment.
+
         Pure graph edges — no role state is touched here; granting a joining
         user the parents' auto_assign roles is the explicit
         :meth:`_grant_auto_assign_roles` primitive, wired by the user domain. A
@@ -249,6 +253,8 @@ class V2EntityWriteOps(V2WriteOpsBase):
         await self._record_memberships([
             EntityMembershipEntry(member=member, parent=parent) for parent in parents
         ])
+        if member.entity_type() == USER_ENTITY_TYPE:
+            return
         member_virtual_scope_id = (await self._resolve_virtual_scope_ids([member]))[
             (member.entity_type(), member)
         ]
