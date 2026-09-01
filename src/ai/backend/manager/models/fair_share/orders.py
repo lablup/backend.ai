@@ -98,6 +98,11 @@ class RGDomainFairShareOrders:
         return col.asc() if ascending else col.desc()
 
     @staticmethod
+    def by_domain_is_active(ascending: bool = True) -> QueryOrder:
+        col = DomainRow.is_active
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
     def by_fair_share_factor(ascending: bool = False) -> QueryOrder:
         col = DomainFairShareRow.fair_share_factor
         return col.asc() if ascending else col.desc()
@@ -111,8 +116,19 @@ class RGDomainFairShareOrders:
 class RGProjectFairShareOrders:
     """Query orders for rg-scoped project fair share queries.
 
-    Uses ProjectFairShareRow (LEFT JOIN'd) for fair-share-specific ordering.
+    Uses ProjectRow (base table) columns for reliable sorting,
+    and ProjectFairShareRow (LEFT JOIN'd) for fair-share-specific ordering.
     """
+
+    @staticmethod
+    def by_project_name(ascending: bool = True) -> QueryOrder:
+        col = ProjectRow.name
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
+    def by_project_is_active(ascending: bool = True) -> QueryOrder:
+        col = ProjectRow.is_active
+        return col.asc() if ascending else col.desc()
 
     @staticmethod
     def by_fair_share_factor(ascending: bool = False) -> QueryOrder:
@@ -128,8 +144,19 @@ class RGProjectFairShareOrders:
 class RGUserFairShareOrders:
     """Query orders for rg-scoped user fair share queries.
 
-    Uses UserFairShareRow (LEFT JOIN'd) for fair-share-specific ordering.
+    Uses UserRow (base table) columns for reliable sorting,
+    and UserFairShareRow (LEFT JOIN'd) for fair-share-specific ordering.
     """
+
+    @staticmethod
+    def by_user_username(ascending: bool = True) -> QueryOrder:
+        col = UserRow.username
+        return col.asc() if ascending else col.desc()
+
+    @staticmethod
+    def by_user_email(ascending: bool = True) -> QueryOrder:
+        col = UserRow.email
+        return col.asc() if ascending else col.desc()
 
     @staticmethod
     def by_fair_share_factor(ascending: bool = False) -> QueryOrder:
