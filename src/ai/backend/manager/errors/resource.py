@@ -61,6 +61,37 @@ class ProjectPurgeInProgress(BackendAIError, web.HTTPConflict):
         )
 
 
+class PersonalProjectMemberAdditionError(BackendAIError, web.HTTPConflict):
+    """Raised when a write would add a member to a personal project."""
+
+    error_type = "https://api.backend.ai/probs/personal-project-member-addition"
+    error_title = "Personal project takes no members beyond its owner."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class PersonalProjectDeletionError(BackendAIError, web.HTTPConflict):
+    """Raised when a personal project is deleted or purged on its own, apart from
+    the user it belongs to."""
+
+    error_type = "https://api.backend.ai/probs/personal-project-deletion"
+    error_title = "Personal project is removed with its user, not on its own."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class ProjectHasActiveKernelsError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/project-has-active-kernels"
     error_title = "Project has active kernels."

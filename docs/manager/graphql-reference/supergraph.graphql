@@ -8472,7 +8472,7 @@ type GroupEdge
 input GroupInput
   @join__type(graph: GRAPHENE)
 {
-  """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
+  """Added in 24.03.0. Available values: GENERAL, MODEL_STORE, PERSONAL"""
   type: String = "GENERAL"
   description: String = ""
   is_active: Boolean = true
@@ -8508,7 +8508,7 @@ type GroupNode implements Node
   integration_id: String @join__field(graph: GRAPHENE)
   resource_policy: String @join__field(graph: GRAPHENE)
 
-  """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
+  """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE', 'PERSONAL']."""
   type: String @join__field(graph: GRAPHENE)
 
   """Added in 24.03.7."""
@@ -15113,7 +15113,7 @@ input ProjectFairShareProjectNestedFilter
   """Filter by project active status."""
   isActive: Boolean = null
 
-  """Filter by project type (GENERAL, MODEL_STORE)."""
+  """Filter by project type (GENERAL, MODEL_STORE, PERSONAL)."""
   type: ProjectFairShareTypeEnumFilter = null
 }
 
@@ -15131,6 +15131,7 @@ enum ProjectFairShareTypeEnum
 {
   GENERAL @join__enumValue(graph: STRAWBERRY)
   MODEL_STORE @join__enumValue(graph: STRAWBERRY)
+  PERSONAL @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -15351,13 +15352,14 @@ type ProjectStorageInfo
 }
 
 """
-Added in 26.2.0. Project type determining its purpose and behavior. GENERAL: Standard project for general computation. MODEL_STORE: Project for model storage and management.
+Added in 26.2.0. Project type determining its purpose and behavior. GENERAL: Standard project for general computation. MODEL_STORE: Project for model storage and management. PERSONAL: Added in 26.9.0. Project holding one user's own resources, created and removed with that user.
 """
 enum ProjectTypeV2
   @join__type(graph: STRAWBERRY)
 {
   GENERAL @join__enumValue(graph: STRAWBERRY)
   MODEL_STORE @join__enumValue(graph: STRAWBERRY)
+  PERSONAL @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -16091,7 +16093,7 @@ type Query
     domain_name: String
     is_active: Boolean
 
-    """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
+    """Added in 24.03.0. Available values: GENERAL, MODEL_STORE, PERSONAL"""
     type: [String] = ["GENERAL"]
   ): [Group] @join__field(graph: GRAPHENE)
   image(

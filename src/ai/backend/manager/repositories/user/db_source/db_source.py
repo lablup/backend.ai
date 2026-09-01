@@ -107,6 +107,7 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
@@ -710,7 +711,8 @@ class UserDBSource:
     ) -> None:
         """Sync the user's project memberships to match ``group_ids`` (the domain's
         model-store projects always included) through the RBAC member ops, in its
-        own transaction.
+        own transaction. Personal projects stand outside the sync — none is joined
+        and the user's own is never left.
 
         Diff-based: only projects entering or leaving the target set are touched,
         preserving existing rows for unchanged memberships. Joining a project
@@ -724,6 +726,7 @@ class UserDBSource:
             target_result = await w.batch_query_in_global(
                 sa.select(ProjectRow.id).where(
                     ProjectRow.domain_name == domain_name,
+                    ProjectRow.type != ProjectType.PERSONAL,
                     sa.or_(
                         ProjectRow.id.in_([UUID(gid) for gid in group_ids]),
                         ProjectRow.type == ProjectType.MODEL_STORE,
@@ -735,7 +738,10 @@ class UserDBSource:
 
             current_result = await w.batch_query_in_global(
                 user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
-                    EntityMembershipRow.entity_id == user_uuid
+                    EntityMembershipRow.entity_id == user_uuid,
+                    VirtualScopeRow.scope_id.not_in(
+                        sa.select(ProjectRow.id).where(ProjectRow.type == ProjectType.PERSONAL)
+                    ),
                 ),
                 BatchQuerier(pagination=NoPagination()),
             )

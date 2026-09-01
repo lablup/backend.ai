@@ -18,8 +18,11 @@ class TestProjectType:
     def test_model_store_value(self) -> None:
         assert ProjectType.MODEL_STORE.value == "model-store"
 
+    def test_personal_value(self) -> None:
+        assert ProjectType.PERSONAL.value == "personal"
+
     def test_enum_members_count(self) -> None:
-        assert len(list(ProjectType)) == 2
+        assert len(list(ProjectType)) == 3
 
     def test_all_values_are_strings(self) -> None:
         for member in ProjectType:
@@ -30,6 +33,9 @@ class TestProjectType:
 
     def test_from_string_model_store(self) -> None:
         assert ProjectType("model-store") is ProjectType.MODEL_STORE
+
+    def test_from_string_personal(self) -> None:
+        assert ProjectType("personal") is ProjectType.PERSONAL
 
 
 class TestOrderDirection:

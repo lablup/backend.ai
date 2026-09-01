@@ -15,6 +15,7 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.errors.resource import PersonalProjectMemberAdditionError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -199,6 +200,46 @@ class TestAssignUsersToProject:
                     integration_id=None,
                     resource_policy=policy_name,
                     type=ProjectType.GENERAL,
+                )
+            )
+            session.add(
+                VirtualScopeRow(
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=project_id,
+                )
+            )
+            await session.commit()
+        return project_id
+
+    @pytest.fixture
+    async def personal_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+    ) -> ProjectID:
+        project_id = ProjectID(uuid.uuid4())
+        policy_name = f"personal-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_network_count=3,
+                )
+            )
+            session.add(
+                ProjectRow(
+                    id=project_id,
+                    name=f"personal-project-{project_id.hex[:8]}",
+                    description="Personal project",
+                    is_active=True,
+                    domain_name=test_domain.domain_name,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                    integration_id=None,
+                    resource_policy=policy_name,
+                    type=ProjectType.PERSONAL,
                 )
             )
             session.add(
@@ -508,6 +549,39 @@ class TestAssignUsersToProject:
 
         assert list(bindings_into_user_scope) == []
         assert list(memberships_in_project_scope) == [same_domain_user_1]
+
+    async def test_assign_users_to_personal_project_refused(
+        self,
+        group_db_source: ProjectDBSource,
+        personal_project: ProjectID,
+        test_role: uuid.UUID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """A personal project keeps its owner as its only member."""
+        with pytest.raises(PersonalProjectMemberAdditionError):
+            await group_db_source.assign_users_to_project(
+                personal_project, [same_domain_user_1], test_role
+            )
+
+    async def test_bind_user_to_personal_project_refused(
+        self,
+        group_db_source: ProjectDBSource,
+        personal_project: ProjectID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """The membership-only write is refused for a personal project too."""
+        with pytest.raises(PersonalProjectMemberAdditionError):
+            await group_db_source.bind_user_to_project(same_domain_user_1, personal_project)
+
+    async def test_update_members_add_to_personal_project_refused(
+        self,
+        group_db_source: ProjectDBSource,
+        personal_project: ProjectID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """The legacy add path is refused for a personal project."""
+        with pytest.raises(PersonalProjectMemberAdditionError):
+            await group_db_source.update_members(personal_project, "add", [same_domain_user_1])
 
 
 class TestUnassignUsersFromProject:

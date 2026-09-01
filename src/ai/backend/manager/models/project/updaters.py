@@ -11,8 +11,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.project.types import ProjectData, ProjectStatus
+from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import negate_conditions
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -121,7 +122,8 @@ class ProjectDotfilesUpdater(DataUpdater[ProjectRow, ProjectData]):
 
 @dataclass
 class ProjectSoftDeleteUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
-    """Retires a project; refuses while a purge is working through it."""
+    """Retires a project; refuses while a purge is working through it, and refuses a
+    personal project, which goes with the user it belongs to."""
 
     project_id: ProjectID
 
@@ -140,7 +142,10 @@ class ProjectSoftDeleteUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
 
     @override
     def guard_conditions(self) -> list[QueryCondition]:
-        return [ProjectConditions.not_being_purged()]
+        return [
+            ProjectConditions.not_being_purged(),
+            negate_conditions([ProjectConditions.by_type_equals(ProjectType.PERSONAL)]),
+        ]
 
     @override
     def build_values(self) -> dict[str, Any]:

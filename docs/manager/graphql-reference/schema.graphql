@@ -121,7 +121,7 @@ type Query {
     domain_name: String
     is_active: Boolean
 
-    """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
+    """Added in 24.03.0. Available values: GENERAL, MODEL_STORE, PERSONAL"""
     type: [String] = ["GENERAL"]
   ): [Group]
   image(
@@ -941,7 +941,7 @@ type GroupNode implements Node @key(fields: "id") {
   integration_id: String
   resource_policy: String
 
-  """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
+  """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE', 'PERSONAL']."""
   type: String
 
   """Added in 24.03.7."""
@@ -2708,7 +2708,7 @@ type CreateGroup {
 }
 
 input GroupInput {
-  """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
+  """Added in 24.03.0. Available values: GENERAL, MODEL_STORE, PERSONAL"""
   type: String = "GENERAL"
   description: String = ""
   is_active: Boolean = true
