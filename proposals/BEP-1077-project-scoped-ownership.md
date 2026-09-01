@@ -79,6 +79,7 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | ✅ | Actual list behavior sits in the legacy path and branches only on three roles. It is cleanup material — `api/gql_legacy/base.py:548` |
 | ✅ | Global search serves superadmin and globally shared values only and skips permissions; that stays. The user data loader also skips permissions; that is to be fixed — `repositories/ops/repository.py:199`, `api/gql/data_loader/data_loaders.py:669` |
 | ➕ | Backfill existing resource entities into the graph and **remove every path that is not `scope -> virtual_scope -> entity`**: the legacy recursive path, `association_scopes_entities`, `object_permissions`, `RBACElementType` (BA-7204) |
+| ➕ | Membership enrollment writes the roster only. No row binds a user's virtual scope into a scope — the existing user bindings are removed. Reaching what a user owns goes only through each entity's own enrollment |
 | ➕ | Add `subject_entity_type` (sub-targets only) to `EntityPermissionCheckKey`, add a `field_permissions` table as a child of permission rows, and declare a catalog (sub-targets, fields, default-visible set) per entity |
 | ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows granted via `EntityGrant` to the accessible set |
 | ➕ | Blank unreadable fields and refuse filtering or sorting by them. Replace the data loaders with permission-aware bulk queries |
@@ -384,6 +385,7 @@ Opening project-folder creation and narrowing user information are the intended 
 | Quota scope | `quota_scope_id` kept; the user quota scope reinterpreted as the personal project's. No physical moves |
 | A user's own information | Not a resource entity; stays under the user |
 | Column vs. graph | The column answers resource policy and quota, permission resolution answers capability, graph enrollment answers view membership |
+| Membership and bindings | A user's virtual scope is never bound into a scope; joining enrolls the user in the roster only. Belongings are reached only through each entity's own enrollment |
 | Business-logic relations | Resource groups, registries, and quota are not expressed through virtual scopes; relation tables answer |
 | Rows from `EntityMembershipEntry` | Cannot be removed by unsharing and carry no `permission_cap` |
 | Sub-targets | `EntityType` + the `subject_entity_type` axis; dot notation (`deployment.token`), colon retired |
