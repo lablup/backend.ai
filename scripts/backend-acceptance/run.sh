@@ -9,7 +9,10 @@ set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 source ./lib.sh
 
-CASES="A1 A2 B1 B2 B3 B4 C1 C2 D1 D2 D4 E1 E2 F1 F3 F5 F6 G1 G2 G3 G4"
+# Order matters: the network cases read the session B2 brought up, and the churn loop needs
+# that session's slots back before it can place its own. B4 then clears everything the
+# lifecycle cases held, and the rest bring up what they need themselves.
+CASES="A1 A2 B1 B2 C1 C2 C3 C4 C5 C6 C7 B3 B4 D1 D2 D4 E1 E2 F1 F3 F5 F6 G1 G2 G3 G4"
 DESCRIBE_A1="대상 백엔드만 두 노드에서 기동"
 DESCRIBE_A2="privnet 소켓과 권한 (rootless)"
 DESCRIBE_B1="단일노드 세션 RUNNING"
@@ -18,6 +21,11 @@ DESCRIBE_B3="연속 기동 (churn)"
 DESCRIBE_B4="종료 후 잔여물 0"
 DESCRIBE_C1="클러스터 DNS 양방향"
 DESCRIBE_C2="노드 간 L3 양방향"
+DESCRIBE_C3="컨테이너 자신의 리졸버로 피어 해석"
+DESCRIBE_C4="노드 간 TCP, 호스트명으로 (양방향)"
+DESCRIBE_C5="오버레이 경로 MTU가 meta 와 일치"
+DESCRIBE_C6="컨테이너 egress (LOCAL NAT)"
+DESCRIBE_C7="세션 간 격리"
 DESCRIBE_D1="seccomp 필터 적용"
 DESCRIBE_D2="cgroup 한도가 요청과 일치"
 DESCRIBE_D4="커널이 에이전트 cgroup 밖"
@@ -48,7 +56,7 @@ mk_request "$REQ-single.json" "acc-$BK-single" 4  no  "$BK"
 mk_request "$REQ-mn.json"     "acc-$BK-mn"     8  yes "$BK"
 
 # state shared between cases so a session is launched once and reused
-MN_SESSION=""; MN_MAIN_PID=""; MN_MAIN_NODE=""; MN_SUB_PID=""; MN_SUB_NODE=""
+MN_SESSION=""; MN_STATUS=""; MN_MAIN_PID=""; MN_MAIN_NODE=""; MN_SUB_PID=""; MN_SUB_NODE=""
 MN_MAIN_CID=""; FILLER=""; SINGLE_SESSION=""; SINGLE_CID=""
 
 banner() { printf '\n\033[1m── %s ─ %s\033[0m\n' "$1" "$2"; }
@@ -132,7 +140,14 @@ _bring_up_multinode() {
     [ "$(wait_session "$FILLER")" = "RUNNING" ] || { info "filler 가 뜨지 않아 분산을 강제할 수 없음"; FILLER=""; return 1; }
   }
   MN_SESSION=$(enqueue "$REQ-mn.json")
-  [ "$(wait_session "$MN_SESSION" 300)" = "RUNNING" ] || return 1
+  # Generous: a node whose agent has just restarted re-checks the image before it creates
+  # anything, and a multi-node start waits for the slowest of two. A short wait here reported a
+  # session that was merely still being created as a placement failure.
+  MN_STATUS=$(wait_session "$MN_SESSION" 480)
+  if [ "$MN_STATUS" != "RUNNING" ]; then
+    teardown_session "$MN_SESSION"; MN_SESSION=""
+    return 1
+  fi
   local pl main_agent sub_agent
   pl=$(placement "$MN_SESSION")
   MN_MAIN_CID=$(echo "$pl" | awk '$1=="main1"{print $3}')
@@ -149,14 +164,22 @@ case_B2() {
   have_peer || { skip "피어 노드가 설정되지 않음 (ACC_PEER_HOST)"; return; }
   if _bring_up_multinode; then
     pass "RUNNING 이고 두 노드에 갈림 (main1@$MN_MAIN_NODE, sub1@$MN_SUB_NODE)"
+  elif [ "${MN_STATUS:-}" != "RUNNING" ]; then
+    # Two different failures used to share one message. They need different actions: this one is
+    # the session never coming up, which says nothing about placement.
+    fail "멀티노드 세션이 RUNNING 에 도달하지 못함 (마지막 상태: ${MN_STATUS:-불명})"
   else
-    [ -n "$MN_SESSION" ] && info "배치: $(placement "$MN_SESSION" | tr '\n' ' ')"
-    fail "멀티노드 세션이 RUNNING 이 아니거나 한 노드에 몰림"
+    info "배치: $(placement "$MN_SESSION" | tr '\n' ' ')"
+    fail "RUNNING 이지만 두 커널이 한 노드에 몰림 — filler 가 분산을 강제하지 못했다"
   fi
 }
 
 case_B3() {
   have_peer || { skip "피어 노드가 설정되지 않음"; return; }
+  # Give back the multi-node session B2 raised: the network cases have read it by now, and its
+  # slots are the ones this loop needs to place a kernel of its own on the local node.
+  teardown_session "$MN_SESSION"; MN_SESSION=""; MN_MAIN_PID=""
+  sleep 10
   local ok=0 bad=0 split=0 n id r pl
   [ -n "$FILLER" ] || {
     local fcpu; fcpu=$(_filler_cpu)
@@ -236,6 +259,99 @@ case_C2() {
   else
     fail "main1→sub1='${fwd:-무응답}' sub1→main1='${rev:-무응답}'"
   fi
+}
+
+_probes_ready() {
+  _need_multinode || return 1
+  [ -n "${PROBE_READY:-}" ] && return 0
+  push_probe "$MN_MAIN_PID" "$MN_MAIN_NODE" >/dev/null 2>&1
+  push_probe "$MN_SUB_PID" "$MN_SUB_NODE" >/dev/null 2>&1
+  PROBE_READY=1
+}
+
+case_C3() {
+  _probes_ready || return
+  local peer self
+  peer=$(in_container "$MN_MAIN_PID" "$MN_MAIN_NODE" resolve sub1)
+  self=$(in_container "$MN_MAIN_PID" "$MN_MAIN_NODE" resolve main1)
+  # C1 asked the resolver directly; this asks the way a workload does, through the container's own
+  # /etc/resolv.conf and /etc/hosts.
+  case "$peer$self" in
+    *FAIL*|"") fail "컨테이너 안에서 이름이 안 풀림 (sub1='$peer' main1='$self')";;
+    *) pass "sub1=$peer main1=$self";;
+  esac
+}
+
+case_C4() {
+  _probes_ready || return
+  local fwd rev
+  in_container_bg "$MN_SUB_PID" "$MN_SUB_NODE" listen 19901 from-sub1
+  sleep 3
+  fwd=$(in_container "$MN_MAIN_PID" "$MN_MAIN_NODE" connect sub1 19901)
+  in_container_bg "$MN_MAIN_PID" "$MN_MAIN_NODE" listen 19902 from-main1
+  sleep 3
+  rev=$(in_container "$MN_SUB_PID" "$MN_SUB_NODE" connect main1 19902)
+  # What a workload actually does: a TCP connection to a peer BY NAME. ICMP passing (C2) does not
+  # imply this -- name resolution, the overlay route and the peer's listener all have to line up.
+  if [ "$fwd" = "from-sub1" ] && [ "$rev" = "from-main1" ]; then
+    pass "main1→sub1 및 sub1→main1 TCP 성립"
+  else
+    fail "main1→sub1='$fwd' sub1→main1='$rev'"
+  fi
+}
+
+case_C5() {
+  _probes_ready || return
+  local peer_ip measured link expected
+  peer_ip=$(in_container "$MN_MAIN_PID" "$MN_MAIN_NODE" resolve sub1)
+  measured=$(in_container "$MN_MAIN_PID" "$MN_MAIN_NODE" pmtu "$peer_ip")
+  # Compare against the overlay NIC's own MTU rather than a number kept here: that is what the
+  # manager's value became by the time the container sees it, and it is the only figure the
+  # workload can be held to. A payload of MTU-28 is what fits after the IP and UDP headers.
+  link=$(on_node "$MN_MAIN_NODE" "sudo -n nsenter -t $MN_MAIN_PID -n ip -o link show $OVERLAY_IF 2>/dev/null | grep -oE 'mtu [0-9]+' | awk '{print \$2}'")
+  [ -n "$link" ] || { fail "컨테이너의 오버레이 인터페이스($OVERLAY_IF) MTU 를 못 읽음"; return; }
+  expected=$(( link - 28 ))
+  if [ "$measured" = "$expected" ]; then
+    pass "무단편 UDP 페이로드 ${measured}B = 오버레이 MTU ${link}B − IP/UDP 28B"
+  else
+    fail "무단편 페이로드 ${measured}B, 인터페이스 MTU ${link}B 기준 기대 ${expected}B — 언더레이가 더 작다는 뜻"
+  fi
+}
+
+case_C6() {
+  _probes_ready || return
+  local r
+  r=$(in_container "$MN_MAIN_PID" "$MN_MAIN_NODE" egress "${ACC_EGRESS_HOST:-1.1.1.1}" "${ACC_EGRESS_PORT:-443}")
+  # Out through the LOCAL bridge's NAT, which carries the default route. Nothing else in the suite
+  # exercises it, and a session that can reach its peers but not a package index is still broken.
+  [ "$r" = "ok" ] && pass "컨테이너에서 바깥으로 TCP 성립" \
+                  || fail "egress 실패: $r (LOCAL 브리지의 기본 경로/NAT 확인)"
+}
+
+case_C7() {
+  _probes_ready || return
+  [ -n "$FILLER" ] || { skip "대조로 쓸 다른 세션이 없음"; return; }
+  local fpl fcid fpid fip self other
+  fpl=$(placement "$FILLER")
+  fcid=$(echo "$fpl" | awk 'NR==1{print $3}')
+  fpid=$(kernel_pid "$BK" "$fcid" local)
+  [ -n "$fpid" ] || { skip "다른 세션의 커널을 로컬에서 찾지 못함"; return; }
+  push_probe "$fpid" local >/dev/null 2>&1
+  fip=$(ns_addr "$fpid" local | tr ' ' '\n' | grep -E "^172\\.30\\." | cut -d/ -f1 | head -1)
+  [ -n "$fip" ] || { skip "다른 세션 컨테이너의 주소를 못 읽음"; return; }
+  in_container_bg "$fpid" local listen 19903 other-session
+  sleep 3
+  # Control first: the listener has to be up, or "unreachable" proves nothing. A reachable host
+  # with no listener answers ConnectionRefused, not a timeout — the two are the whole distinction.
+  self=$(in_container "$fpid" local connect "$fip" 19903)
+  [ "$self" = "other-session" ] || { skip "대조 실패 — 리스너가 안 떴다 ($self)"; return; }
+  in_container_bg "$fpid" local listen 19904 other-session
+  sleep 3
+  other=$(in_container "$MN_MAIN_PID" "$MN_MAIN_NODE" connect "$fip" 19904)
+  case "$other" in
+    FAIL*) pass "다른 세션의 컨테이너($fip)에 닿지 않음 ($other), 그 세션 자신은 닿음";;
+    *) fail "다른 세션의 컨테이너에 닿았다 — 세션 격리 없음 ($other)";;
+  esac
 }
 
 # ---------------------------------------------------------------- D

@@ -15,6 +15,7 @@
 : "${ACC_RESOURCE_GROUP:=default}"
 : "${ACC_CHURN:=5}"                     # B3 repetitions
 : "${ACC_CHURN_GAP:=12}"                # seconds between B3 runs
+OVERLAY_IF=baimulti0   # the overlay NIC name the vxlan backend gives a container
 : "${ACC_WORK:=${TMPDIR:-/tmp}/bai-acceptance}"
 
 mkdir -p "$ACC_WORK"
@@ -47,6 +48,7 @@ result_open() {  # $1 = backend, $2 = selected case ids
     printf '# backend\t%s\n' "$1"
     printf '# started_utc\t%s\n' "$stamp"
     printf '# cases\t%s\n' "$2"
+    printf '# churn\t%s x %ss\n' "$ACC_CHURN" "$ACC_CHURN_GAP"
     printf '# local_host\t%s\n' "$ACC_LOCAL_HOST"
     printf '# peer_host\t%s\n' "${ACC_PEER_HOST:-none}"
     printf '# image_id\t%s\n' "$ACC_IMAGE_ID"
@@ -202,6 +204,32 @@ ns_gw()   { on_node "$2" "sudo -n nsenter -t $1 -n ip -4 route show default 2>/d
 ns_dns()  { on_node "$3" "sudo -n nsenter -t $1 -n dig +short +time=2 +tries=1 $2 @$4 2>/dev/null | head -1"; }
 ns_ping() { on_node "$3" "sudo -n nsenter -t $1 -n ping -c 3 -W 2 -q $2 2>&1 | grep -oE '[0-9]+% packet loss' | head -1"; }
 ns_run()  { on_node "$3" "sudo -n nsenter -t $1 -m -p -u --preserve-credentials -S 0 -G 0 sh -c '$2'"; }
+
+# --- inside the container -----------------------------------------------------
+# The cases above enter the netns and use the HOST's tools, which answers "does the fabric carry
+# this". These run in the container's own mount and pid namespaces instead, which is the only way
+# to ask "can the workload use it": its resolver, its routing view, its addresses. Do not assume a
+# tool is there -- the kernel image has no `ping`, and probing with it reported every packet as
+# dropped when the truth was that the command did not exist. probe.py is stdlib-only for that
+# reason.
+push_probe() {  # $1 = kernel pid, $2 = local|peer
+  if [ "$2" = "local" ]; then
+    sudo -n cp "$(dirname "${BASH_SOURCE[0]}")/probe.py" "/proc/$1/root/tmp/bai-probe.py"
+  else
+    scp -q -o BatchMode=yes "$(dirname "${BASH_SOURCE[0]}")/probe.py" "$ACC_PEER_SSH:/tmp/bai-probe.py" \
+      && on_peer "sudo -n cp /tmp/bai-probe.py /proc/$1/root/tmp/bai-probe.py"
+  fi
+}
+
+in_container() {  # $1 = kernel pid, $2 = local|peer, rest = probe.py args
+  local pid="$1" where="$2"; shift 2
+  on_node "$where" "sudo -n nsenter -t $pid -m -p -u -n --preserve-credentials -S 0 -G 0 -- python3 /tmp/bai-probe.py $*"
+}
+
+in_container_bg() {  # same, detached (for listeners)
+  local pid="$1" where="$2"; shift 2
+  on_node "$where" "setsid sudo -n nsenter -t $pid -m -p -u -n --preserve-credentials -S 0 -G 0 -- python3 /tmp/bai-probe.py $* >/dev/null 2>&1 < /dev/null &"
+}
 
 cgroup_val() { on_node "$3" "sudo -n head -1 /sys/fs/cgroup/backend-ai/$1/$2 2>/dev/null"; }
 repl_sockets() { on_node "$1" "sudo -n ss -tn 2>/dev/null | grep -cE '172\.30\.[0-9]+\.[0-9]+:200[01]'"; }
