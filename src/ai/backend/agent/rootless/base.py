@@ -1,28 +1,33 @@
-"""``RootlessOciRuntime`` — everything a daemonless rootless runtime owes the agent.
+"""``SelfHostedRootlessRuntime`` — the agent itself holding a container that has no monitor.
 
-The containerd backend gets a great deal for free from its daemon: cgroups, a container list that
-survives an agent restart, a log driver with rotation, an event stream for container death. enroot
-and singularity have no daemon, so each of them would otherwise have to provide all of it — and
-none of it depends on how the image is stored or how the runtime binary is spelled.
+enroot and apptainer exec the container in place: there is no daemon, no shim, no conmon. The
+kernel process is a child of the agent, and nothing else knows it exists. So everything containerd
+gets from its daemon has to be done here — journal the PID so an agent restart can find the
+container again, hold the process and reap it, create the cgroup (through the privnet when the
+agent is unprivileged), open and rotate the log, and emulate a start gate.
 
-So it lives here once, and a backend subclasses this and supplies only what genuinely differs:
-
-* ``_runtime_env`` — the runtime's own configuration environment (``ENROOT_*`` / ``APPTAINER_*``).
-* ``_launch_argv`` — the command line that starts one container, running the pause wrapper.
-* ``_discard_container`` — dropping the runtime's own record of a container, on removal.
-* the image surface (``pull_image`` / ``commit_container`` / ``push_image`` / ...), which is where
-  a squashfs archive and a sandbox directory genuinely part ways.
-
-**The two-phase gate** is the load-bearing shared piece. The agent's attach sequence is
+That last one is the load-bearing piece. The agent's attach sequence is
 
     handle = await runtime.create_task(cid)   # netns exists, user command NOT exec'd
     await network.attach(..., task_pid=handle.pid)
     await runtime.start_task(cid)             # release the gate -> exec
 
-which neither runtime has natively — both exec immediately. It is emulated with a small wrapper
+which neither runtime has natively -- both exec immediately. It is emulated with a small wrapper
 that enters the namespaces, signals readiness, blocks on a FIFO, then ``exec``s the real command,
 preserving the PID the network layer attached to. That is the entire runtime-specific contract for
 BEP-1062: *produce an attachable netns and a stable PID*.
+
+A backend subclasses this and supplies only what genuinely differs:
+
+* ``_runtime_env`` -- the runtime's own configuration environment (``ENROOT_*`` / ``APPTAINER_*``).
+* ``_launch_argv`` -- the command line that starts one container, running the pause wrapper.
+* ``_discard_container`` -- dropping the runtime's own record of a container, on removal.
+* the image surface (``pull_image`` / ``commit_container`` / ``push_image`` / ...), which is where
+  a squashfs archive and a sandbox directory genuinely part ways.
+
+None of that machinery is owed to the agent as such -- see
+:mod:`ai.backend.agent.rootless.runtime` for what is, and why a rootless runtime that brings its
+own monitor sits beside this class rather than under it.
 """
 
 from __future__ import annotations
@@ -40,7 +45,7 @@ import time
 from abc import abstractmethod
 from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path
-from typing import IO, Any, ClassVar, Final, cast, override
+from typing import IO, Any, Final, cast, override
 
 import ai.backend.agent.rootless.seccomp_installer
 from ai.backend.agent.containerd.log_writer import (
@@ -52,13 +57,13 @@ from ai.backend.agent.containerd.logs import unlink_log_files
 from ai.backend.agent.containerd.runtime.interface import (
     ContainerInfo,
     ExecResult,
-    OciRuntime,
     TaskEvent,
     TaskHandle,
 )
 from ai.backend.agent.containerd.runtime.spec import container_cgroup_fs_path
 from ai.backend.agent.errors.agent import ContainerConfinementFailedError
 from ai.backend.agent.network.journal_io import atomic_write
+from ai.backend.agent.rootless.runtime import RootlessOciRuntime
 from ai.backend.agent.rootless.seccomp import compile_profile
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.logging import BraceStyleAdapter
@@ -180,32 +185,15 @@ def force_rmtree(path: Path) -> None:
     shutil.rmtree(path, ignore_errors=True)
 
 
-class RootlessOciRuntime(OciRuntime):
-    """Shared implementation for the daemonless rootless backends. See the module docstring."""
+class SelfHostedRootlessRuntime(RootlessOciRuntime):
+    """The agent holds the container itself. See the module docstring."""
 
-    #: Names this backend in log messages. Subclasses set it.
-    backend_name: ClassVar[str] = "rootless"
-
-    _data_path: Path
-    _cache_path: Path
-    _runtime_path: Path
-    # Gate dirs (pause script + go FIFO) and container logs. MUST live outside the runtime's own
-    # paths: a runtime that hides its runtime dir inside the container's mount ns makes a bind
-    # source under it invisible ("No such file or directory").
-    _state_path: Path
-    # When set, cgroup work is delegated here: an unprivileged agent cannot create one
-    # itself and these runtimes have no daemon that would. None = do it locally (agent
-    # runs privileged), which is the historical behaviour.
-    _privnet_socket: str | None
-    # The host's containerd `certs.d` tree (`container.registry-hosts-dir`), consulted to decide
-    # whether a registry is reached over plain HTTP. None = fall back to the reference heuristic.
-    _registry_hosts_dir: Path | None
-    # oci_spec handed in at create_container, kept until the task is built (consumed as
-    # mounts/env/hooks, not as a spec file).
+    # container_id -> the OCI spec handed to create_task (re-read on start/limits).
     _specs: dict[str, Mapping[str, Any]]
-    # container_id -> the real command (kernel entrypoint + args) to exec after the gate opens.
-    _commands: dict[str, Sequence[str]]
-    # container_id -> netns-holder host PID (the container's stable PID), for netns attach + kill.
+    # container_id -> the user command, split out of the spec at create time.
+    _commands: dict[str, list[str]]
+    # container_id -> the PID the network layer attaches to (the pause wrapper, then the exec'd
+    # command: the wrapper execs in place, so the PID never moves).
     _pids: dict[str, int]
     # container_id -> the top launch subprocess (owns the process tree; awaited on exit).
     _procs: dict[str, asyncio.subprocess.Process]
@@ -224,30 +212,9 @@ class RootlessOciRuntime(OciRuntime):
     _rotator_task: asyncio.Task[None] | None
     # This agent's own netns inode, to tell the container's dedicated netns apart from ours.
     _agent_netns: int | None
-    # The work-user uid/gid the kernel-runner drops to (LOCAL_USER_ID/GID), from container config.
-    _kernel_uid: int
-    _kernel_gid: int
 
-    def __init__(
-        self,
-        *,
-        data_path: Path,
-        cache_path: Path,
-        runtime_path: Path,
-        state_path: Path,
-        kernel_uid: int,
-        kernel_gid: int,
-        privnet_socket: str | None = None,
-        registry_hosts_dir: Path | None = None,
-    ) -> None:
-        self._registry_hosts_dir = registry_hosts_dir
-        self._data_path = data_path
-        self._cache_path = cache_path
-        self._runtime_path = runtime_path
-        self._state_path = state_path
-        self._kernel_uid = kernel_uid
-        self._kernel_gid = kernel_gid
-        self._privnet_socket = privnet_socket
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self._specs = {}
         self._commands = {}
         self._pids = {}
@@ -260,11 +227,6 @@ class RootlessOciRuntime(OciRuntime):
         self._agent_netns = None
 
     # ------------------------------------------------------------------ backend hooks
-    @abstractmethod
-    def _runtime_env(self) -> dict[str, str]:
-        """The runtime's own configuration environment (``ENROOT_*`` / ``APPTAINER_*``)."""
-        raise NotImplementedError
-
     @abstractmethod
     def _launch_argv(self, container_id: str, spec: Mapping[str, Any], gate_dir: Path) -> list[str]:
         """The command line that starts one container with the pause wrapper as its command."""
@@ -309,72 +271,6 @@ class RootlessOciRuntime(OciRuntime):
             self._rotator_task = None
 
     # ------------------------------------------------------------------ subprocess plumbing
-    def _process_env(self) -> dict[str, str]:
-        # The environment the runtime itself is launched with. A GPU-enabled fatPod sets
-        # NVIDIA_VISIBLE_DEVICES=all to get the driver injected into *itself*, and a runtime that
-        # forwards its own environment (or a GPU hook that prefers an already-set variable over the
-        # container's env file) would then hand every device to every container. Strip NVIDIA_*
-        # here so the per-kernel allocation the OCI spec carries is authoritative.
-        inherited = {k: v for k, v in os.environ.items() if not k.startswith("NVIDIA_")}
-        return {**inherited, **self._runtime_env()}
-
-    def _launch_env(self, spec: Mapping[str, Any]) -> dict[str, str]:
-        """The environment for *launching one container*, on top of ``_process_env``.
-
-        A backend whose GPU injection is driven by the **runtime's own** environment rather than by
-        the container's needs this seam: `_process_env` deliberately strips ``NVIDIA_*``, which is
-        right for a hook that reads the container's env file and wrong for one that reads the
-        runtime process's. Empty by default.
-        """
-        return {}
-
-    def _uid_drop_prefix(self) -> list[str]:
-        # Run the runtime **as the kernel uid**, not as the (root) agent — as an argv prefix
-        # (`setpriv`) rather than the subprocess user=/group= kwargs, which uvloop (this agent's
-        # event loop) does not accept. Dropping to a non-root uid is what makes the runtime install
-        # a rootless user namespace, so the container's root IS the kernel uid on the host. The
-        # scratch dirs are chowned to the kernel uid, so container-root owns them — everything
-        # aligns with no host privilege and no identity-map/`chmod` workaround. No-op when the
-        # agent already runs as the kernel uid (a non-privileged deployment). Requires the host
-        # prerequisites the krunner entrypoint sets up: /etc/sub{u,g}id for the uid and file caps
-        # on newuidmap/newgidmap.
-        if os.geteuid() == self._kernel_uid:
-            return []
-        return [
-            "setpriv",
-            "--reuid",
-            str(self._kernel_uid),
-            "--regid",
-            str(self._kernel_gid),
-            "--init-groups",
-        ]
-
-    async def _run(
-        self, *argv: str, extra_env: Mapping[str, str] | None = None
-    ) -> tuple[int, bytes, bytes]:
-        env = {**self._process_env(), **(extra_env or {})}
-        proc = await asyncio.create_subprocess_exec(
-            *self._uid_drop_prefix(),
-            *argv,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
-        )
-        stdout, stderr = await proc.communicate()
-        return proc.returncode or 0, stdout, stderr
-
-    async def _run_as_agent(self, *argv: str) -> tuple[int, bytes, bytes]:
-        """Like ``_run`` but WITHOUT the uid drop — for the few steps that need the agent's own
-        privileges (restoring file ownership out of an image archive)."""
-        proc = await asyncio.create_subprocess_exec(
-            *argv,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=self._process_env(),
-        )
-        stdout, stderr = await proc.communicate()
-        return proc.returncode or 0, stdout, stderr
-
     # ------------------------------------------------------------------ container lifecycle
     @override
     async def create_task(self, container_id: str, *, use_logger: bool = True) -> TaskHandle:
@@ -874,7 +770,7 @@ class RootlessOciRuntime(OciRuntime):
         collects its failures and raises; this is the same rule on the local path.
         """
         failed: list[str] = []
-        for name, value in RootlessOciRuntime._cgroup_limits(spec).items():
+        for name, value in SelfHostedRootlessRuntime._cgroup_limits(spec).items():
             try:
                 (cgroup / name).write_text(value)
             except OSError as e:

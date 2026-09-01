@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from ai.backend.agent.errors.agent import ContainerConfinementFailedError
-from ai.backend.agent.rootless.base import RootlessOciRuntime
+from ai.backend.agent.rootless.base import SelfHostedRootlessRuntime
 
 _GIB = 1024**3
 
@@ -34,7 +34,7 @@ def _written(cgroup: Path) -> dict[str, str]:
 
 
 def _apply(cgroup: Path, **spec: Any) -> dict[str, str]:
-    RootlessOciRuntime._write_cgroup_limits(cgroup, spec)
+    SelfHostedRootlessRuntime._write_cgroup_limits(cgroup, spec)
     return _written(cgroup)
 
 
@@ -112,7 +112,9 @@ class TestResilience:
         create_task that returns a handle for a dead container is the worse answer, and the caller
         now reaps and cleans up on the way out."""
         with pytest.raises(ContainerConfinementFailedError, match=r"memory\.max"):
-            RootlessOciRuntime._write_cgroup_limits(tmp_path / "gone", {"memory_limit": _GIB})
+            SelfHostedRootlessRuntime._write_cgroup_limits(
+                tmp_path / "gone", {"memory_limit": _GIB}
+            )
 
     def test_an_empty_spec_writes_nothing(self, cgroup: Path) -> None:
         assert _apply(cgroup) == dict.fromkeys(_written(cgroup), "max")

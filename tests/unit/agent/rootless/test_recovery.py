@@ -16,11 +16,11 @@ from typing import Any
 
 import pytest
 
-from ai.backend.agent.rootless.base import RootlessOciRuntime
+from ai.backend.agent.rootless.base import SelfHostedRootlessRuntime
 
 
 @pytest.fixture
-def journal(runtime: RootlessOciRuntime) -> Path:
+def journal(runtime: SelfHostedRootlessRuntime) -> Path:
     runtime._state_path.mkdir(parents=True, exist_ok=True)
     return runtime._state_path
 
@@ -32,7 +32,7 @@ def _entry(journal: Path, container_id: str, **meta: object) -> Path:
     return path
 
 
-def _second_instance(runtime: RootlessOciRuntime) -> RootlessOciRuntime:
+def _second_instance(runtime: SelfHostedRootlessRuntime) -> SelfHostedRootlessRuntime:
     """Another client over the same roots — what privnet is relative to the agent."""
     return type(runtime)(
         data_path=runtime._data_path,
@@ -45,7 +45,7 @@ def _second_instance(runtime: RootlessOciRuntime) -> RootlessOciRuntime:
 
 
 def _pretend(
-    runtime: RootlessOciRuntime,
+    runtime: SelfHostedRootlessRuntime,
     monkeypatch: pytest.MonkeyPatch,
     *,
     alive: dict[int, bool],
@@ -58,7 +58,7 @@ def _pretend(
 
 class TestRecovery:
     def test_a_live_container_comes_back(
-        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _entry(
             journal,
@@ -77,7 +77,7 @@ class TestRecovery:
         assert runtime._labels["kernel-1"] == {"ai.backend.kernel-id": "k1"}
 
     def test_labels_survive_because_reconciliation_needs_them(
-        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """`enumerate_containers` filters on these to rebuild the resource allocation map — an
         empty set here drops every enroot container from `reconstruct_resource_usage` even though
@@ -92,7 +92,7 @@ class TestRecovery:
 
 class TestStaleEntries:
     def test_a_dead_pid_is_dropped(
-        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         entry = _entry(journal, "kernel-gone", pid=4242, start_time=99)
         _pretend(runtime, monkeypatch, alive={}, start_times={})
@@ -103,7 +103,7 @@ class TestStaleEntries:
         assert not entry.exists()
 
     def test_a_zombie_is_not_alive(
-        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """`os.kill(pid, 0)` succeeds for a zombie, and the pod's supervisor does not reap a dead
         worker's orphans, so zombies genuinely linger here. `_alive` reads the state character for
@@ -116,7 +116,7 @@ class TestStaleEntries:
         assert runtime._pids == {}
 
     def test_a_recycled_pid_is_rejected(
-        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The whole reason the start time is journalled: the kernel reuses PIDs, and matching on
         the number alone would hand a recovered kernel some unrelated process to signal and kill."""
@@ -130,7 +130,7 @@ class TestStaleEntries:
 
 class TestMalformedJournal:
     def test_one_bad_entry_does_not_lose_the_others(
-        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Recovery runs in `open()`. Raising here would fail agent startup outright, and the
         cheapest way to hit it is a journal truncated by a node that lost power."""
@@ -144,7 +144,7 @@ class TestMalformedJournal:
         assert runtime._pids == {"kernel-ok": 1}
 
     def test_a_state_dir_without_a_journal_is_ignored(
-        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The gate dir is created before the journal is written, so a container killed in that
         window leaves a state dir with no `container.json`."""
@@ -156,7 +156,7 @@ class TestMalformedJournal:
         assert runtime._pids == {}
 
     def test_an_entry_without_a_pid_is_ignored(
-        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _entry(journal, "kernel-1", start_time=1, image="x")
         _pretend(runtime, monkeypatch, alive={}, start_times={})
@@ -165,7 +165,7 @@ class TestMalformedJournal:
 
         assert runtime._pids == {}
 
-    def test_no_state_path_at_all(self, runtime: RootlessOciRuntime) -> None:
+    def test_no_state_path_at_all(self, runtime: SelfHostedRootlessRuntime) -> None:
         """First ever start: `open()` calls this before anything has been created."""
         runtime._recover_containers()
 
@@ -174,7 +174,7 @@ class TestMalformedJournal:
 
 class TestRoundTrip:
     def test_what_is_recorded_is_what_comes_back(
-        self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The writer and the reader are the only two users of this format, so pin them together
         rather than to a literal document."""
@@ -201,7 +201,7 @@ class TestASecondProcessCanReadTheJournal:
     to fall back to it rather than answer "no such container"."""
 
     async def test_container_pid_falls_back_to_the_journal_on_a_miss(
-        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         reader = _second_instance(runtime)
         _entry(journal, "c1", pid=4321, start_time=42, image="img:1", labels={})
@@ -211,7 +211,7 @@ class TestASecondProcessCanReadTheJournal:
         assert await reader.container_pid("c1") == 4321
 
     async def test_a_stale_journal_entry_is_still_refused(
-        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The liveness + start-time check is what makes the fallback safe: a recycled PID must not
         be handed out as a live container."""
@@ -222,7 +222,7 @@ class TestASecondProcessCanReadTheJournal:
         assert await reader.container_pid("c1") is None
 
     async def test_list_container_infos_sees_what_arrived_after_open(
-        self, runtime: RootlessOciRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, journal: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _pretend(runtime, monkeypatch, alive={7: True}, start_times={7: 1})
         assert list(await runtime.list_container_infos()) == []
@@ -245,7 +245,7 @@ class TestTheKernelOutlivesTheAgent:
     """
 
     @pytest.fixture
-    def spawner(self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch) -> Any:
+    def spawner(self, runtime: SelfHostedRootlessRuntime, monkeypatch: pytest.MonkeyPatch) -> Any:
         """The real `create_task` spawn, with only the parts that need a live container stubbed."""
         monkeypatch.setattr(runtime, "_launch_argv", lambda *a, **k: ["sleep", "30"])
         monkeypatch.setattr(runtime, "_uid_drop_prefix", list)

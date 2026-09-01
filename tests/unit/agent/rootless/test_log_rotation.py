@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from ai.backend.agent.containerd.log_writer import LOG_FILE_COUNT, max_file_size, rotated_path
-from ai.backend.agent.rootless.base import RootlessOciRuntime
+from ai.backend.agent.rootless.base import SelfHostedRootlessRuntime
 
 # 5 files of 100 bytes each, matching the containerd writer's split.
 _TOTAL = 500
@@ -27,7 +27,7 @@ def active(tmp_path: Path) -> Path:
 
 
 def _rotate(active: Path, total: int = _TOTAL) -> None:
-    RootlessOciRuntime._rotate_log(active, total)
+    SelfHostedRootlessRuntime._rotate_log(active, total)
 
 
 class TestThreshold:

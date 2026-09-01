@@ -22,7 +22,7 @@ from ai.backend.agent.containerd.logs import rotated_paths
 from ai.backend.agent.errors.agent import ContainerConfinementFailedError
 from ai.backend.agent.network.privnet.client import PrivNetClient, PrivNetClientError
 from ai.backend.agent.rootless import base
-from ai.backend.agent.rootless.base import RootlessOciRuntime
+from ai.backend.agent.rootless.base import SelfHostedRootlessRuntime
 
 
 class TestTheDelegationToPrivnet:
@@ -40,7 +40,10 @@ class TestTheDelegationToPrivnet:
         ids=["socket-gone", "timeout", "refused"],
     )
     async def test_every_way_the_privnet_can_fail_refuses_the_kernel(
-        self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch, failure: Exception
+        self,
+        runtime: SelfHostedRootlessRuntime,
+        monkeypatch: pytest.MonkeyPatch,
+        failure: Exception,
     ) -> None:
         async def _fail(*args: Any, **kwargs: Any) -> None:
             raise failure
@@ -52,7 +55,7 @@ class TestTheDelegationToPrivnet:
             await runtime._confine_via_privnet("c1", {"memory_limit": 1024}, 4242)
 
     async def test_a_successful_delegation_passes_the_allocation_through(
-        self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         seen: list[tuple[Any, ...]] = []
 
@@ -72,7 +75,7 @@ class TestTheLocalPath:
     """The agent makes the cgroup itself where it is privileged enough to."""
 
     def test_a_cgroup_that_cannot_be_created_refuses_the_kernel(
-        self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+        self, runtime: SelfHostedRootlessRuntime, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         marker = tmp_path / "cgroup.controllers"
         marker.write_text("cpu memory")
@@ -87,7 +90,7 @@ class TestTheLocalPath:
             runtime._create_cgroup("c1", {"memory_limit": 1024})
 
     def test_a_cgroup_v1_host_is_not_a_failure(
-        self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+        self, runtime: SelfHostedRootlessRuntime, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """Not a failed attempt but a standing property of the node: v1 splits every controller
         into its own hierarchy and this runtime will not half-apply limits across trees. Refusing
@@ -103,7 +106,7 @@ class TestNothingIsLeftBehind:
     """By the time a container is confined it is journalled and in `_pids`, so refusing it has more
     to undo than the reap that covers the earlier steps."""
 
-    def _half_built(self, runtime: RootlessOciRuntime) -> tuple[Path, Path]:
+    def _half_built(self, runtime: SelfHostedRootlessRuntime) -> tuple[Path, Path]:
         container_id = "c1"
         state = runtime._state_path / container_id
         state.mkdir(parents=True, exist_ok=True)
@@ -116,7 +119,7 @@ class TestNothingIsLeftBehind:
         return state, log
 
     async def test_the_journal_entry_the_log_and_the_pid_all_go(
-        self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         state, log = self._half_built(runtime)
         reaped: list[str] = []
@@ -135,7 +138,7 @@ class TestNothingIsLeftBehind:
         assert runtime._pids == {}
 
     async def test_it_is_safe_on_a_container_that_left_nothing(
-        self, runtime: RootlessOciRuntime, monkeypatch: pytest.MonkeyPatch
+        self, runtime: SelfHostedRootlessRuntime, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """It runs from an `except` on any failure in that window, including ones that happen
         before the journal entry exists."""

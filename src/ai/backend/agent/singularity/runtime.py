@@ -2,7 +2,7 @@
 
 Everything a daemonless rootless runtime owes the agent — cgroups, the container journal, log
 rotation, death events, the two-phase attachable-netns gate, seccomp — comes from
-:class:`~ai.backend.agent.rootless.base.RootlessOciRuntime`. What is apptainer's, and so lives
+:class:`~ai.backend.agent.rootless.base.SelfHostedRootlessRuntime`. What is apptainer's, and so lives
 here:
 
 * **Images** are ``--sandbox`` directories (``<slug>.sbx``) rather than a single archive, with the
@@ -35,7 +35,7 @@ from ai.backend.agent.containerd.runtime.interface import ImageInfo
 from ai.backend.agent.rootless.base import (
     GATE_MNT,
     SKIP_MOUNT_TYPES,
-    RootlessOciRuntime,
+    SelfHostedRootlessRuntime,
     force_rmtree,
     write_layer,
 )
@@ -112,7 +112,7 @@ def _copy_entry(src: Path, dst: Path) -> None:
 NVIDIA_CAPABILITIES: Final = "compute,utility"
 
 
-class SingularityRuntime(RootlessOciRuntime):
+class SingularityRuntime(SelfHostedRootlessRuntime):
     backend_name: ClassVar[str] = "singularity"
 
     _binary: str

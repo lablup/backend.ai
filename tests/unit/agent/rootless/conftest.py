@@ -7,10 +7,10 @@ from typing import Any, ClassVar, override
 import pytest
 
 from ai.backend.agent.containerd.runtime.interface import ImageInfo
-from ai.backend.agent.rootless.base import RootlessOciRuntime
+from ai.backend.agent.rootless.base import SelfHostedRootlessRuntime
 
 
-class StubRootlessRuntime(RootlessOciRuntime):
+class StubRootlessRuntime(SelfHostedRootlessRuntime):
     """A backend that supplies nothing but the required hooks.
 
     Everything under test here is the base's, so the concrete backend must not participate. It

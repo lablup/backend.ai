@@ -1,4 +1,4 @@
-"""``EnrootRuntime`` — the **enroot** backend's :class:`~...rootless.base.RootlessOciRuntime`.
+"""``EnrootRuntime`` — the **enroot** backend's :class:`~...rootless.base.SelfHostedRootlessRuntime`.
 
 Everything a daemonless rootless runtime owes the agent — cgroups, the container journal, log
 rotation, death events, the two-phase attachable-netns gate, seccomp — is in the shared base. What
@@ -36,7 +36,7 @@ from ai.backend.agent.rootless.base import (
     DEFAULT_SHM_BYTES,
     GATE_MNT,
     SKIP_MOUNT_TYPES,
-    RootlessOciRuntime,
+    SelfHostedRootlessRuntime,
     write_layer,
 )
 from ai.backend.agent.rootless.registry import fetch_image_metadata, is_insecure_registry
@@ -56,7 +56,7 @@ def _slug(image_ref: str) -> str:
     return _SLUG_RE.sub("+", image_ref)
 
 
-class EnrootRuntime(RootlessOciRuntime):
+class EnrootRuntime(SelfHostedRootlessRuntime):
     backend_name: ClassVar[str] = "enroot"
 
     @override
