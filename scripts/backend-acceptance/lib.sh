@@ -23,11 +23,12 @@ mkdir -p "$ACC_WORK"
 # --- backend-specific facts -------------------------------------------------
 # rpc port, var-base-path and whether the backend needs a privnet. Kept in one place so a new
 # backend is one row rather than a grep across the suite.
-backend_rpc_port() { case "$1" in cd) echo 6211;; en) echo 6011;; sg) echo 6111;; esac; }
-backend_var_base() { case "$1" in cd) echo /var/lib/bai-containerd;; en) echo /var/lib/bai-enroot;; sg) echo /var/lib/bai-singularity;; esac; }
-backend_agent_kind() { case "$1" in cd) echo cd;; en) echo en;; sg) echo sg;; esac; }
-backend_is_rootless() { case "$1" in en|sg) return 0;; *) return 1;; esac; }
-backend_hard_log_cap() { case "$1" in cd) return 0;; *) return 1;; esac; }
+backend_rpc_port() { case "$1" in cd) echo 6211;; en) echo 6011;; sg) echo 6111;; pm) echo 6311;; esac; }
+backend_var_base() { case "$1" in cd) echo /var/lib/bai-containerd;; en) echo /var/lib/bai-enroot;; sg) echo /var/lib/bai-singularity;; pm) echo /var/lib/bai-podman;; esac; }
+backend_agent_kind() { case "$1" in cd) echo cd;; en) echo en;; sg) echo sg;; pm) echo pm;; esac; }
+backend_is_rootless() { case "$1" in en|sg|pm) return 0;; *) return 1;; esac; }
+# podman is rootless but caps the log in conmon, like containerd's log writer does.
+backend_hard_log_cap() { case "$1" in cd|pm) return 0;; *) return 1;; esac; }
 
 agent_id() { echo "i-$(backend_agent_kind "$1")-$2"; }
 log_root() { echo "$(backend_var_base "$1")/containerd-logs"; }

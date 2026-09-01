@@ -119,25 +119,64 @@ class PodmanRuntime(RootlessOciRuntime):
 
     @override
     def _runtime_env(self) -> dict[str, str]:
-        # podman rootless keeps per-user state under $HOME and $XDG_RUNTIME_DIR. Left to the
-        # agent's own environment those would be the agent user's, which is the wrong uid the
-        # moment the launch drops to the kernel uid — and on a containerised agent $HOME may not
-        # be writable at all. Anchor everything to the agent's var-base-path instead.
+        # podman rootless keeps per-user state under $HOME. Left to the agent's own environment
+        # that would be the agent user's, which is the wrong uid the moment the launch drops to
+        # the kernel uid -- and on a containerised agent $HOME may not be writable at all. Anchor
+        # it to the agent's var-base-path instead.
         home = self._state_path / "home"
-        xdg_runtime = self._runtime_path / "xdg"
-        for path, mode in ((home, 0o700), (xdg_runtime, 0o700)):
-            path.mkdir(parents=True, exist_ok=True, mode=mode)
-            if os.geteuid() != self._kernel_uid:
-                try:
-                    os.chown(path, self._kernel_uid, self._kernel_gid)
-                except OSError:
-                    pass
+        home.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if os.geteuid() != self._kernel_uid:
+            try:
+                os.chown(home, self._kernel_uid, self._kernel_gid)
+            except OSError as e:
+                log.warning("[podman] cannot hand {} to the kernel uid: {!r}", home, e)
         return {
             "HOME": str(home),
-            "XDG_RUNTIME_DIR": str(xdg_runtime),
+            "XDG_RUNTIME_DIR": self._xdg_runtime_dir(),
             "XDG_DATA_HOME": str(self._data_path / "share"),
             "XDG_CONFIG_HOME": str(self._data_path / "config"),
         }
+
+    def _xdg_runtime_dir(self) -> str:
+        """The kernel uid's real per-user runtime directory, which podman needs and cannot be
+        given a substitute for.
+
+        Everything else here is anchored to the agent's var-base-path, and this was too until it
+        turned out to break image pulls outright. podman keeps its rootless *userns* there: it
+        joins the user namespace held by the pause process in that directory, and only builds one
+        itself if there is none. Pointed at a directory of ours it finds none and produces a
+        namespace mapping a single uid instead of the /etc/subuid range -- measured as
+        ``uid_map: 0 1000 1`` where the real directory gives ``0 1000 1`` plus ``1 100000 65536``.
+        The first image layer owned by any other id then fails to unpack ("potentially
+        insufficient UIDs or GIDs available in user namespace ... lchown: invalid argument"), so
+        no kernel on the node ever starts.
+
+        That directory exists for a user with a session, and persists for a service account only
+        once the operator runs ``loginctl enable-linger <uid>``. Without it there is nothing to
+        substitute, so say so plainly rather than fall back to a path that fails later and
+        elsewhere.
+        """
+        path = Path(f"/run/user/{self._kernel_uid}")
+        try:
+            if path.stat().st_uid == self._kernel_uid:
+                return str(path)
+        except OSError:
+            pass
+        fallback = self._runtime_path / "xdg"
+        fallback.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if os.geteuid() != self._kernel_uid:
+            try:
+                os.chown(fallback, self._kernel_uid, self._kernel_gid)
+            except OSError:
+                pass
+        log.warning(
+            "[podman] {} is missing, so podman will build its own user namespace and may map only"
+            " one uid -- image layers owned by another id will fail to unpack. Run"
+            " `loginctl enable-linger {}` on this node.",
+            path,
+            self._kernel_uid,
+        )
+        return str(fallback)
 
     def _global_argv(self) -> list[str]:
         return [
@@ -158,6 +197,32 @@ class PodmanRuntime(RootlessOciRuntime):
         self, *args: str, extra_env: Mapping[str, str] | None = None
     ) -> tuple[int, bytes, bytes]:
         return await self._run(*self._global_argv(), *args, extra_env=extra_env)
+
+    async def _podman_detached(self, *args: str) -> tuple[int, str]:
+        """Run a podman command that leaves a monitor behind, collecting its output through a file.
+
+        ``podman start`` forks conmon and exits, and conmon inherits whatever stdio it was handed
+        and keeps it for the container's whole life. Read through a pipe that means EOF never
+        arrives: ``podman start`` returns, the container reaches its gate, and the agent sits in
+        ``communicate()`` forever with no error, no timeout and no child process left to point at
+        it. A file has an end whether or not conmon still holds it open.
+        """
+        sink = self._runtime_path / f"{args[-1]}.{args[0]}.out"
+        sink.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with sink.open("wb") as f:
+                proc = await asyncio.create_subprocess_exec(
+                    *self._uid_drop_prefix(),
+                    *self._global_argv(),
+                    *args,
+                    stdout=f,
+                    stderr=asyncio.subprocess.STDOUT,
+                    env=self._process_env(),
+                )
+                rc = await proc.wait()
+            return rc, sink.read_text(errors="replace")
+        finally:
+            sink.unlink(missing_ok=True)
 
     async def _podman_json(self, *args: str) -> Any:
         rc, out, err = await self._podman(*args)
@@ -323,6 +388,17 @@ class PodmanRuntime(RootlessOciRuntime):
         # has nobody to start it here and no rotator is needed on our side. Measured: a 1 MB cap
         # held a container that wrote 4 MiB to 842 KB. conmon caps the single active file rather
         # than keeping rotated siblings, so the whole budget goes to it.
+        #
+        # The directory has to exist first, and be the kernel uid's: conmon opens the log from
+        # inside the rootless launch and will not create it, so a missing root fails the *start*
+        # ("Failed to open log file"), after the image is pulled and the container built. The
+        # containerd backend never had to do this -- its daemon runs as root and makes the path.
+        log_root.mkdir(parents=True, exist_ok=True)
+        if os.geteuid() != self._kernel_uid:
+            try:
+                os.chown(log_root, self._kernel_uid, self._kernel_gid)
+            except OSError as e:
+                log.warning("[podman] cannot hand the log root to the kernel uid: {!r}", e)
         self._log_root = log_root
         self._log_max_bytes = max_total_bytes
 
@@ -445,11 +521,9 @@ class PodmanRuntime(RootlessOciRuntime):
     async def create_task(self, container_id: str, *, use_logger: bool = True) -> TaskHandle:
         """Start the container and hold it at its gate, confined, with an attachable netns."""
         gate_dir = self._gate_dir(container_id)
-        rc, _out, err = await self._podman("start", container_id)
+        rc, output = await self._podman_detached("start", container_id)
         if rc != 0:
-            raise RuntimeError(
-                f"podman start failed for {container_id}: {err.decode(errors='replace')}"
-            )
+            raise RuntimeError(f"podman start failed for {container_id}: {output}")
         try:
             async with asyncio.timeout(TASK_START_TIMEOUT_SEC):
                 await wait_ready(gate_dir, failure=lambda: None)
