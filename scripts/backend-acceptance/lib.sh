@@ -13,6 +13,7 @@
 : "${ACC_IMAGE_ID:=}"                   # required: the image to launch
 : "${ACC_PROJECT_ID:=}"                 # required
 : "${ACC_RESOURCE_GROUP:=default}"
+: "${ACC_LOG_BUDGET_BYTES:=10485760}"  # container_logs.max_length on the node under test
 : "${ACC_CHURN:=5}"                     # B3 repetitions
 : "${ACC_CHURN_GAP:=12}"                # seconds between B3 runs
 OVERLAY_IF=baimulti0   # the overlay NIC name the vxlan backend gives a container
@@ -26,9 +27,15 @@ mkdir -p "$ACC_WORK"
 backend_rpc_port() { case "$1" in cd) echo 6211;; en) echo 6011;; sg) echo 6111;; pm) echo 6311;; esac; }
 backend_var_base() { case "$1" in cd) echo /var/lib/bai-containerd;; en) echo /var/lib/bai-enroot;; sg) echo /var/lib/bai-singularity;; pm) echo /var/lib/bai-podman;; esac; }
 backend_agent_kind() { case "$1" in cd) echo cd;; en) echo en;; sg) echo sg;; pm) echo pm;; esac; }
+# The agent's own HTTP service (service-addr), which is where /metrics is scraped.
+backend_metrics_port() { case "$1" in cd) echo 6203;; en) echo 6003;; sg) echo 6103;; pm) echo 6303;; esac; }
 backend_is_rootless() { case "$1" in en|sg|pm) return 0;; *) return 1;; esac; }
 # podman is rootless but caps the log in conmon, like containerd's log writer does.
 backend_hard_log_cap() { case "$1" in cd|pm) return 0;; *) return 1;; esac; }
+# How many files the backend's writer spreads container_logs.max_length across. Docker's shape
+# (max-file 5) for the ones that rotate; conmon caps a single file instead, so podman spends the
+# whole budget on one -- same total, less history.
+backend_log_files() { case "$1" in pm) echo 1;; *) echo 5;; esac; }
 
 agent_id() { echo "i-$(backend_agent_kind "$1")-$2"; }
 log_root() { echo "$(backend_var_base "$1")/containerd-logs"; }

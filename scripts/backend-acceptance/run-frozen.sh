@@ -434,7 +434,7 @@ case_D4() {
 case_E1() {
   _single_kernel || { skip "커널을 띄우지 못함"; return; }
   local port metrics missing="" deadline
-  case "$BK" in cd) port=6203;; en) port=6003;; sg) port=6103;; esac
+  port=$(backend_metrics_port "$BK")
   # The collector runs on a cycle, so a kernel that has just started has no series yet. Wait for
   # them rather than reporting an empty scrape as a missing metric.
   deadline=$(( $(date +%s) + 90 ))
@@ -478,10 +478,13 @@ case_F1() {
   files=$(on_node local "sudo -n ls $(log_root "$BK") 2>/dev/null | grep -c $K_CID")
   largest=$(on_node local "sudo -n ls -l $(log_root "$BK") 2>/dev/null | grep $K_CID | awk '{print \$5}' | sort -n | tail -1")
   total=$(on_node local "sudo -n ls -l $(log_root "$BK") 2>/dev/null | grep $K_CID | awk '{s+=\$5} END{print s+0}'")
-  if [ "${files:-9}" -le 5 ] && [ "${largest:-0}" -le 2097152 ]; then
+  local want_files want_each
+  want_files=$(backend_log_files "$BK")
+  want_each=$(( ACC_LOG_BUDGET_BYTES / want_files ))
+  if [ "${files:-9}" -le "$want_files" ] && [ "${largest:-0}" -le "$want_each" ]; then
     pass "파일 $files 개, 최대 $largest B, 총 $total B (48 MiB 를 쏟은 뒤)"
   else
-    fail "파일 $files 개, 최대 $largest B (기대: ≤5 개, 개당 ≤2097152 B)"
+    fail "파일 $files 개, 최대 $largest B (기대: ≤$want_files 개, 개당 ≤$want_each B)"
   fi
 }
 

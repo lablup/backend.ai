@@ -35,6 +35,7 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, ClassVar, Final, override
 
+from ai.backend.agent.containerd.logs import unlink_log_files
 from ai.backend.agent.containerd.runtime.interface import (
     ContainerInfo,
     ExecResult,
@@ -617,6 +618,10 @@ class PodmanRuntime(RootlessOciRuntime):
     @override
     async def remove_container(self, container_id: str) -> None:
         await self._podman("rm", "--force", container_id)
+        # conmon wrote the log and podman does not own it (we named the path), so removing the
+        # container leaves it behind -- and it is the terminated kernel's log, which the agent
+        # promises not to keep. The whole set goes, rotated siblings included.
+        await asyncio.to_thread(unlink_log_files, self._log_path(container_id))
         if self._privnet_socket:
             await self._release_via_privnet(container_id)
         else:

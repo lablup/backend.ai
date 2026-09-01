@@ -110,3 +110,27 @@ class TestConfinement:
 
         with pytest.raises(ContainerConfinementFailedError):
             await runtime._confine("c1", {"memory_limit": 1024}, 4242)
+
+
+class TestTeardown:
+    async def test_a_terminated_kernels_log_does_not_outlive_it(
+        self, runtime: PodmanRuntime, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """podman does not own the log -- we named the path and conmon wrote it -- so removing the
+        container leaves the terminated kernel's output on disk unless we take it."""
+        logs = tmp_path / "logs"
+        runtime.configure_logging(tmp_path / "writer", logs, 5_000_000)
+        active = logs / "c1.log"
+        active.write_text("output")
+        rotated = logs / "c1.log.1"
+        rotated.write_text("older output")
+
+        async def _ran(*args: str, **kwargs: Any) -> tuple[int, bytes, bytes]:
+            return 0, b"", b""
+
+        monkeypatch.setattr(runtime, "_podman", _ran)
+
+        await runtime.remove_container("c1")
+
+        assert not active.exists()
+        assert not rotated.exists()
