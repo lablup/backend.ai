@@ -271,15 +271,26 @@ _probes_ready() {
 
 case_C3() {
   _probes_ready || return
-  local peer self
+  local peer self actual
   peer=$(in_container "$MN_MAIN_PID" "$MN_MAIN_NODE" resolve sub1)
   self=$(in_container "$MN_MAIN_PID" "$MN_MAIN_NODE" resolve main1)
   # C1 asked the resolver directly; this asks the way a workload does, through the container's own
   # /etc/resolv.conf and /etc/hosts.
   case "$peer$self" in
-    *FAIL*|"") fail "컨테이너 안에서 이름이 안 풀림 (sub1='$peer' main1='$self')";;
-    *) pass "sub1=$peer main1=$self";;
+    *FAIL*|"") fail "컨테이너 안에서 이름이 안 풀림 (sub1='$peer' main1='$self')"; return;;
   esac
+  # ...and its own name must resolve to the address it actually holds. `/etc/hosts` carries only
+  # this kernel's own entry, written from the IP the agent was told to use, while the address on
+  # the NIC is what CNI attached. Observed once with those two disagreeing — the file named the
+  # previous session's address — and the session then sent peer traffic out of the default route
+  # instead of the overlay, which surfaced as three unrelated-looking failures (no ping, no TCP,
+  # and a path MTU of the LOCAL link). One assertion here names it directly.
+  actual=$(on_node "$MN_MAIN_NODE" "sudo -n nsenter -t $MN_MAIN_PID -n ip -4 -o addr show $OVERLAY_IF 2>/dev/null | grep -oE 'inet [0-9.]+' | awk '{print \$2}'")
+  if [ -n "$actual" ] && [ "$self" != "$actual" ]; then
+    fail "자기 이름이 $self 로 풀리는데 오버레이 NIC 은 $actual — /etc/hosts 와 실제 주소가 어긋남"
+    return
+  fi
+  pass "sub1=$peer main1=$self (NIC 주소와 일치)"
 }
 
 case_C4() {
