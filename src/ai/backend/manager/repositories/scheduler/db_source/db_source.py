@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack
+<<<<<<< HEAD
 from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
@@ -30,6 +31,14 @@ from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import (
+=======
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.network import NetworkID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import (
+>>>>>>> 1f0563a6 (fix(BA-7600): address a persistent network by its ref_name (#14133))
     ResourceGroupID,
     ResourceGroupName,
 )
@@ -54,7 +63,11 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, SSHKeypair
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
+<<<<<<< HEAD
 from ai.backend.manager.data.permission.types import RBACElementRef
+=======
+from ai.backend.manager.data.network.types import NetworkData
+>>>>>>> 1f0563a6 (fix(BA-7600): address a persistent network by its ref_name (#14133))
 from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
@@ -64,6 +77,7 @@ from ai.backend.manager.data.session.creation import (
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ScalingGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
@@ -78,6 +92,12 @@ from ai.backend.manager.models.kernel import (
 )
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+<<<<<<< HEAD
+=======
+from ai.backend.manager.models.network import NetworkRow
+from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
+from ai.backend.manager.models.resource_group import ResourceGroupRow, query_allowed_sgroups
+>>>>>>> 1f0563a6 (fix(BA-7600): address a persistent network by its ref_name (#14133))
 from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
     KeyPairResourcePolicyRow,
@@ -3849,6 +3869,22 @@ class ScheduleDBSource:
             sftp_count = sftp_result.scalar() or 0
 
             return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
+
+    async def get_attached_network(self, network_id: NetworkID) -> NetworkData:
+        """
+        Fetch the network a session attaches to.
+
+        Only a persistent session attaches to a pre-created network; the other types
+        name a network they own, which ``SessionRow.get_network_ref()`` returns as-is.
+
+        :param network_id: The ``networks.id`` held by ``sessions.network_id``
+        :return: The network, whose ``ref_name`` is the container network name
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            row = await db_sess.scalar(sa.select(NetworkRow).where(NetworkRow.id == network_id))
+            if row is None:
+                raise ObjectNotFound(object_name="network")
+            return row.to_data()
 
     async def update_session_network_id(
         self,
