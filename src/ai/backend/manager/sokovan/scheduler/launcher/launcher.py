@@ -15,7 +15,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
-from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AgentId,
@@ -472,10 +471,9 @@ class SessionLauncher:
         if network_type == NetworkType.PERSISTENT:
             # For persistent networks, use pre-created network
             if session.network_id:
-                network = await self._repository.get_attached_network(
-                    NetworkID(UUID(session.network_id))
+                network_name = await self._repository.get_attached_network_ref(
+                    UUID(session.network_id)
                 )
-                network_name = network.ref_name
                 network_config = {"mode": "bridge", "network_name": network_name}
         elif network_type == NetworkType.VOLATILE:
             if session.cluster_mode == ClusterMode.SINGLE_NODE and len(session.kernels) > 1:

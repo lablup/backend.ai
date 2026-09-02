@@ -4,19 +4,13 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 
-<<<<<<< HEAD
 from ai.backend.common.identifier.architecture import ArchName
-=======
-from ai.backend.common.data.entity.network import NetworkID
-from ai.backend.common.data.entity.project import ProjectID
->>>>>>> 1f0563a6 (fix(BA-7600): address a persistent network by its ref_name (#14133))
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -27,7 +21,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
@@ -47,7 +40,7 @@ _IMAGE_ID_2 = UUID("00000000-0000-0000-0000-000000000003")
 
 # A persistent network row: the id stored on the session and the plugin-generated
 # container network name are unrelated values.
-_PERSISTENT_NETWORK_ID = NetworkID(UUID("00000000-0000-0000-0000-0000000000a1"))
+_PERSISTENT_NETWORK_ID = UUID("00000000-0000-0000-0000-0000000000a1")
 _PERSISTENT_NETWORK_REF_NAME = "bai-multinode-00000000-0000-0000-0000-0000000000b2-nw"
 
 # =============================================================================
@@ -62,19 +55,7 @@ def mock_repository() -> AsyncMock:
     repository.update_session_error_info = AsyncMock(return_value=None)
     repository.update_session_network_id = AsyncMock(return_value=None)
 
-    persistent_network = NetworkData(
-        id=_PERSISTENT_NETWORK_ID,
-        name="testnet",
-        ref_name=_PERSISTENT_NETWORK_REF_NAME,
-        driver="overlay",
-        project_id=ProjectID(uuid4()),
-        domain_name="default",
-        options={},
-        created_at=datetime(2026, 1, 1, tzinfo=UTC),
-        updated_at=None,
-    )
-
-    repository.get_attached_network = AsyncMock(return_value=persistent_network)
+    repository.get_attached_network_ref = AsyncMock(return_value=_PERSISTENT_NETWORK_REF_NAME)
     return repository
 
 
