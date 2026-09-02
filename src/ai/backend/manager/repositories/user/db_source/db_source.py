@@ -105,7 +105,6 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
@@ -737,8 +736,7 @@ class UserDBSource:
             target_project_ids = {row.id for row in target_result.rows}
 
             current_result = await w.batch_query_in_global(
-                user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
-                    EntityMembershipRow.entity_id == user_uuid,
+                user_scope_membership_query(PROJECT_SCOPE_TYPE, user_uuid).where(
                     VirtualEntityRow.entity_id.not_in(
                         sa.select(ProjectRow.id).where(ProjectRow.type == ProjectType.PERSONAL)
                     ),

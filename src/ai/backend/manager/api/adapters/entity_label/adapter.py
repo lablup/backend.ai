@@ -138,8 +138,8 @@ class EntityLabelAdapter(BaseAdapter):
     def _data_to_node(data: EntityLabelData) -> EntityLabelNode:
         return EntityLabelNode(
             id=data.id,
-            entity_type=data.entity_type,
-            entity_id=data.entity_id,
+            entity_type=data.entity.entity_type(),
+            entity_id=data.entity,
             key=data.key,
             value=data.value,
             created_at=data.created_at,

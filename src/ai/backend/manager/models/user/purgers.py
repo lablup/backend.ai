@@ -8,7 +8,7 @@ from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.orm import InstrumentedAttribute
+from sqlalchemy.orm import InstrumentedAttribute, aliased
 
 from ai.backend.common.data.entity.error_log import ErrorLogID
 from ai.backend.common.data.entity.keypair import KeyPairID
@@ -157,13 +157,15 @@ class UserProjectRolePurger(FieldBatchPurger[UserID, UserRoleRow, RoleID]):
 
     @override
     def build_subquery(self, owner_id: UserID) -> sa.sql.Select[Any]:
+        role_node = aliased(VirtualEntityRow, name="role_virtual_entity")
         project_role_ids = (
-            sa.select(EntityMembershipRow.entity_id)
+            sa.select(role_node.entity_id)
+            .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == role_node.id)
             .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
             .where(
                 VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
                 VirtualEntityRow.entity_id == self.project_id,
-                EntityMembershipRow.entity_type == ROLE_ENTITY_TYPE,
+                role_node.entity_type == ROLE_ENTITY_TYPE,
             )
         )
         return sa.select(UserRoleRow).where(

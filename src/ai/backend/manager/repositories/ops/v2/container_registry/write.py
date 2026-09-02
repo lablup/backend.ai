@@ -16,7 +16,6 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 
@@ -46,27 +45,17 @@ class ContainerRegistryWriteOps(V2WriteOps):
         Matches through the virtual entity nodes rather than resolving them first, so a
         project or registry that never had one is a no-op instead of a failure.
         """
+        project_node = self._virtual_entity_ids_query([project_id])
+        registry_node = self._virtual_entity_ids_query([registry_id])
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
-                EntityMembershipRow.virtual_entity_id.in_(
-                    sa.select(VirtualEntityRow.id).where(
-                        VirtualEntityRow.entity_type == project_id.entity_type(),
-                        VirtualEntityRow.entity_id == project_id,
-                    )
-                ),
-                EntityMembershipRow.entity_type == registry_id.entity_type(),
-                EntityMembershipRow.entity_id == registry_id,
+                EntityMembershipRow.virtual_entity_id.in_(project_node),
+                EntityMembershipRow.member_entity_id.in_(registry_node),
             )
         )
         await self._sess.execute(
             sa.delete(ScopeBindingRow).where(
-                ScopeBindingRow.virtual_entity_id.in_(
-                    sa.select(VirtualEntityRow.id).where(
-                        VirtualEntityRow.entity_type == registry_id.entity_type(),
-                        VirtualEntityRow.entity_id == registry_id,
-                    )
-                ),
-                ScopeBindingRow.scope_type == project_id.entity_type(),
-                ScopeBindingRow.scope_id == project_id,
+                ScopeBindingRow.virtual_entity_id.in_(registry_node),
+                ScopeBindingRow.scope_entity_id.in_(project_node),
             )
         )

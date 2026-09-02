@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, ClassVar
 import jinja2
 import jinja2.sandbox
 import sqlalchemy as sa
+from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
@@ -255,15 +256,12 @@ class V2EntityWriteOps(V2WriteOpsBase):
         ])
         if member.entity_type() == USER_ENTITY_TYPE:
             return
-        member_virtual_entity_id = (await self._resolve_virtual_entity_ids([member]))[
-            (member.entity_type(), member)
-        ]
+        node_ids = await self._resolve_virtual_entity_ids([member, *parents])
         await self._bulk_insert_ignore_conflicts(
             [
                 ScopeBindingRow(
-                    virtual_entity_id=member_virtual_entity_id,
-                    scope_type=parent.entity_type(),
-                    scope_id=parent,
+                    virtual_entity_id=node_ids[(member.entity_type(), member)],
+                    scope_entity_id=node_ids[(parent.entity_type(), parent)],
                     permission_cap=None,
                 )
                 for parent in parents
@@ -280,10 +278,12 @@ class V2EntityWriteOps(V2WriteOpsBase):
         Not called by the generic entity paths: whether (and for which scopes — the
         joined ones, the user's own) a creation grants roles is the user domain's
         decision, wired explicitly during its migration."""
+        role_node = aliased(VirtualEntityRow, name="role_virtual_entity")
         role_ids = (
             await self._sess.scalars(
                 sa.select(RoleRow.id)
-                .join(EntityMembershipRow, EntityMembershipRow.entity_id == RoleRow.id)
+                .join(role_node, role_node.entity_id == RoleRow.id)
+                .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == role_node.id)
                 .join(
                     VirtualEntityRow,
                     EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id,
@@ -292,7 +292,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
                     sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
                         (e.entity_type(), e) for e in entities
                     ]),
-                    EntityMembershipRow.entity_type == self._ROLE_ENTITY_TYPE,
+                    role_node.entity_type == self._ROLE_ENTITY_TYPE,
                     RoleRow.auto_assign.is_(True),
                     RoleRow.status == RoleStatus.ACTIVE,
                 )
@@ -333,6 +333,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         ]
         self._sess.add_all(role_rows)
         await self._sess.flush()
+        await self._provision_entities([RoleID(row.id) for row in role_rows])
         await self._record_memberships([
             EntityMembershipEntry(
                 member=RoleID(row.id),

@@ -82,6 +82,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
     BulkCreatorResultWithFailures,
@@ -1301,26 +1302,30 @@ class PermissionDBSource:
         """
         em = EntityMembershipRow.__table__
         sb = ScopeBindingRow.__table__
+        member = VirtualEntityRow.__table__.alias("member_virtual_entity")
+        scope = VirtualEntityRow.__table__.alias("scope_virtual_entity")
         perm = PermissionRow.__table__
         roles = RoleRow.__table__
         user_roles = UserRoleRow.__table__
 
         query = (
             sa.select(
-                em.c.entity_id,
+                member.c.entity_id,
                 perm.c.permission,
                 sb.c.permission_cap.label("scope_cap"),
                 em.c.permission_cap.label("entity_cap"),
             )
             .select_from(
-                em.join(sb, sb.c.virtual_entity_id == em.c.virtual_entity_id)
+                em.join(member, member.c.id == em.c.member_entity_id)
+                .join(sb, sb.c.virtual_entity_id == em.c.virtual_entity_id)
+                .join(scope, scope.c.id == sb.c.scope_entity_id)
                 .join(
                     perm,
                     sa.and_(
-                        perm.c.scope_type == sb.c.scope_type,
-                        # scope_bindings.scope_id is a native UUID; permissions.scope_id
+                        perm.c.scope_type == scope.c.entity_type,
+                        # virtual_entities.entity_id is a native UUID; permissions.scope_id
                         # stores its canonical string form. Cast to compare.
-                        perm.c.scope_id == sa.cast(sb.c.scope_id, sa.String),
+                        perm.c.scope_id == sa.cast(scope.c.entity_id, sa.String),
                         perm.c.entity_type == group_key.subject_entity_type,
                     ),
                 )
@@ -1328,8 +1333,8 @@ class PermissionDBSource:
                 .join(user_roles, user_roles.c.role_id == roles.c.id)
             )
             .where(
-                em.c.entity_type == group_key.entity_type,
-                em.c.entity_id.in_(entity_ids),
+                member.c.entity_type == group_key.entity_type,
+                member.c.entity_id.in_(entity_ids),
                 user_roles.c.user_id == group_key.user_id,
                 roles.c.status == RoleStatus.ACTIVE,
             )

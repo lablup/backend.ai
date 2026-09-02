@@ -14,6 +14,7 @@ from typing import NamedTuple
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
@@ -61,6 +62,7 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderInvitationRow, VFolderPermissionRow, VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
@@ -85,6 +87,7 @@ async def _membership_cap(
     permission rows: owning it is a membership with no cap, being shared it is the same
     membership under one.
     """
+    member = aliased(VirtualEntityRow, name="member_virtual_entity")
     async with db.begin_readonly_session() as db_sess:
         row = (
             await db_sess.execute(
@@ -93,11 +96,12 @@ async def _membership_cap(
                     VirtualEntityRow,
                     VirtualEntityRow.id == EntityMembershipRow.virtual_entity_id,
                 )
+                .join(member, member.id == EntityMembershipRow.member_entity_id)
                 .where(
                     VirtualEntityRow.entity_type == USER_SCOPE_TYPE,
                     VirtualEntityRow.entity_id == user_id,
-                    EntityMembershipRow.entity_type == VFOLDER_ENTITY_TYPE,
-                    EntityMembershipRow.entity_id == vfolder_id,
+                    member.entity_type == VFOLDER_ENTITY_TYPE,
+                    member.entity_id == vfolder_id,
                 )
             )
         ).first()
@@ -135,6 +139,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 PermissionRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
                 EntityLabelRow,
             ],
         ):

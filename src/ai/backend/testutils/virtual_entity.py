@@ -15,7 +15,7 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -45,16 +45,14 @@ class VirtualEntitySeeder:
         sess.add(
             EntityMembershipRow(
                 virtual_entity_id=scope_id,
-                entity_type=EntityType.USER,
-                entity_id=user_id,
+                member_entity_id=scope_id,
                 permission_cap=None,
             )
         )
         sess.add(
             ScopeBindingRow(
                 virtual_entity_id=scope_id,
-                scope_type=ScopeType.USER,
-                scope_id=user_id,
+                scope_entity_id=scope_id,
                 permission_cap=None,
             )
         )
@@ -68,11 +66,11 @@ class VirtualEntitySeeder:
         into the user's own virtual entity — a member does not hand the project its
         personal entities."""
         project_scope_id = await self.get_or_create_scope(sess, ScopeType.PROJECT, group_id)
+        user_scope_id = await self.get_or_create_scope(sess, ScopeType.USER, user_id)
         sess.add(
             EntityMembershipRow(
                 virtual_entity_id=project_scope_id,
-                entity_type=EntityType.USER,
-                entity_id=user_id,
+                member_entity_id=user_scope_id,
                 permission_cap=None,
             )
         )

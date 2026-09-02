@@ -20,7 +20,7 @@ from ai.backend.common.data.entity.usage_bucket import (
     PROJECT_USAGE_BUCKET_FIELD_TYPE,
     USER_USAGE_BUCKET_FIELD_TYPE,
 )
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     Concern,
@@ -151,16 +151,14 @@ async def group_fixture(
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=group_id,
+                member_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )

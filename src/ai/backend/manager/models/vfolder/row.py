@@ -95,7 +95,6 @@ from ai.backend.manager.models.utils import (
     execute_with_txn_retry,
     sql_json_merge,
 )
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,
@@ -683,9 +682,7 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.id for g in grps]
         else:
-            query = user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
-                EntityMembershipRow.entity_id == user_uuid
-            )
+            query = user_scope_membership_query(PROJECT_SCOPE_TYPE, user_uuid)
             result = await conn.execute(query)
             grps = result.fetchall()
             group_ids = [g.scope_id for g in grps]

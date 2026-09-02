@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import RBACElementType
@@ -150,17 +150,17 @@ class AssociationScopesEntitiesCreatorSpec(CreatorSpec[AssociationScopesEntities
 
 @dataclass
 class EntityMembershipCreatorSpec(DependentCreatorSpec[VirtualEntityID, EntityMembershipRow]):
-    """Membership of an entity in the virtual entity given as the dependency."""
+    """Membership of the entity behind ``member_entity_id`` in the virtual entity given
+    as the dependency."""
 
-    entity_ref: EntityRef
+    member_entity_id: VirtualEntityID
     permission_cap: Permission | None = None
 
     @override
     def build_row(self, dependency: VirtualEntityID) -> EntityMembershipRow:
         return EntityMembershipRow(
             virtual_entity_id=dependency,
-            entity_type=self.entity_ref.entity_type,
-            entity_id=self.entity_ref.entity_id,
+            member_entity_id=self.member_entity_id,
             permission_cap=self.permission_cap,
         )
 
@@ -169,7 +169,8 @@ class EntityMembershipCreatorSpec(DependentCreatorSpec[VirtualEntityID, EntityMe
 class ScopeBindingCreatorSpec(
     DependentCreatorSpec[Mapping[ScopeRef, VirtualEntityID], ScopeBindingRow]
 ):
-    """Binding of ``bound_scope`` into ``anchor_scope``'s virtual entity."""
+    """Binding of ``bound_scope`` into ``anchor_scope``'s virtual entity; the dependency
+    maps both scopes to their virtual entity ids."""
 
     anchor_scope: ScopeRef
     bound_scope: ScopeRef
@@ -179,7 +180,6 @@ class ScopeBindingCreatorSpec(
     def build_row(self, dependency: Mapping[ScopeRef, VirtualEntityID]) -> ScopeBindingRow:
         return ScopeBindingRow(
             virtual_entity_id=dependency[self.anchor_scope],
-            scope_type=self.bound_scope.scope_type,
-            scope_id=self.bound_scope.scope_id,
+            scope_entity_id=dependency[self.bound_scope],
             permission_cap=self.permission_cap,
         )

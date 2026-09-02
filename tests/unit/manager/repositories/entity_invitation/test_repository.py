@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.entity_invitation import EntityInvitationID
@@ -172,6 +173,7 @@ async def _status(
 
 async def _cap(database: ExtendedAsyncSAEngine, grantee: UserID) -> tuple[bool, Permission | None]:
     """Whether the invitee holds the target at all, and under what ceiling."""
+    target = aliased(VirtualEntityRow, name="target_virtual_entity")
     async with database.begin_readonly_session() as session:
         rows = (
             await session.execute(
@@ -180,11 +182,12 @@ async def _cap(database: ExtendedAsyncSAEngine, grantee: UserID) -> tuple[bool, 
                     VirtualEntityRow,
                     VirtualEntityRow.id == EntityMembershipRow.virtual_entity_id,
                 )
+                .join(target, target.id == EntityMembershipRow.member_entity_id)
                 .where(
                     VirtualEntityRow.entity_type == USER_ENTITY_TYPE,
                     VirtualEntityRow.entity_id == grantee,
-                    EntityMembershipRow.entity_type == _TARGET_TYPE,
-                    EntityMembershipRow.entity_id == _TARGET_ID,
+                    target.entity_type == _TARGET_TYPE,
+                    target.entity_id == _TARGET_ID,
                 )
             )
         ).all()
@@ -340,11 +343,16 @@ class TestCreate:
         ops: OpsRepository[EntityInvitationData],
     ) -> None:
         created = await ops.create_entity(_creator())
+        member = aliased(VirtualEntityRow, name="member_virtual_entity")
         async with database.begin_readonly_session() as session:
             joined: list[UUID] = list(
                 (
                     await session.execute(
-                        sa.select(EntityMembershipRow.entity_id)
+                        sa.select(member.entity_id)
+                        .join(
+                            EntityMembershipRow,
+                            EntityMembershipRow.member_entity_id == member.id,
+                        )
                         .join(
                             VirtualEntityRow,
                             VirtualEntityRow.id == EntityMembershipRow.virtual_entity_id,
@@ -352,7 +360,7 @@ class TestCreate:
                         .where(
                             VirtualEntityRow.entity_type == _TARGET_TYPE,
                             VirtualEntityRow.entity_id == _TARGET_ID,
-                            EntityMembershipRow.entity_type == "entity_invitation",
+                            member.entity_type == "entity_invitation",
                         )
                     )
                 ).scalars()

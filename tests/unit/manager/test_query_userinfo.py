@@ -237,19 +237,24 @@ class TestQueryUserinfo:
             # Membership read model: the project's virtual entity with the user
             # enrolled in it.
             project_ve_id = uuid.uuid4()
-            sess.add(
+            user_ve_id = uuid.uuid4()
+            sess.add_all([
                 VirtualEntityRow(
                     id=project_ve_id,
                     entity_type=ScopeType.PROJECT.value,
                     entity_id=group_id,
-                )
-            )
+                ),
+                VirtualEntityRow(
+                    id=user_ve_id,
+                    entity_type=EntityType.USER.value,
+                    entity_id=user_uuid,
+                ),
+            ])
             await sess.flush()
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=project_ve_id,
-                    entity_type=EntityType.USER.value,
-                    entity_id=user_uuid,
+                    member_entity_id=user_ve_id,
                 )
             )
             await sess.commit()
@@ -636,19 +641,24 @@ class TestQueryUserinfoFromSession:
             # Membership read model: the project's virtual entity with the user
             # enrolled in it.
             project_ve_id = uuid.uuid4()
-            sess.add(
+            user_ve_id = uuid.uuid4()
+            sess.add_all([
                 VirtualEntityRow(
                     id=project_ve_id,
                     entity_type=ScopeType.PROJECT.value,
                     entity_id=group_id,
-                )
-            )
+                ),
+                VirtualEntityRow(
+                    id=user_ve_id,
+                    entity_type=EntityType.USER.value,
+                    entity_id=user_uuid,
+                ),
+            ])
             await sess.flush()
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=project_ve_id,
-                    entity_type=EntityType.USER.value,
-                    entity_id=user_uuid,
+                    member_entity_id=user_ve_id,
                 )
             )
             await sess.commit()

@@ -71,8 +71,7 @@ class V2WriteOpsBase(V2OpsBase):
             .values([
                 {
                     "virtual_entity_id": row.id,
-                    "entity_type": row.entity_type,
-                    "entity_id": row.entity_id,
+                    "member_entity_id": row.id,
                     "permission_cap": None,
                 }
                 for row in inserted
@@ -85,8 +84,7 @@ class V2WriteOpsBase(V2OpsBase):
             .values([
                 {
                     "virtual_entity_id": row.id,
-                    "scope_type": row.entity_type,
-                    "scope_id": row.entity_id,
+                    "scope_entity_id": row.id,
                     "permission_cap": None,
                 }
                 for row in inserted
@@ -96,8 +94,8 @@ class V2WriteOpsBase(V2OpsBase):
         await self._sess.execute(binding_stmt)
 
     async def _teardown_entity(self, entity: EntityIdentifier) -> None:
-        """Remove what the entity left: permissions granted on it, its virtual entity node
-        if it provisioned one, its membership edges, and the labels put on it.
+        """Remove what the entity left: permissions granted on it, its virtual entity
+        node (every edge naming the node goes with it by FK), and the labels put on it.
 
         The permission delete keys on the id alone, which is a UUID and so already
         names one entity; the type would only narrow it to what it already is.
@@ -109,18 +107,6 @@ class V2WriteOpsBase(V2OpsBase):
             sa.delete(VirtualEntityRow).where(
                 VirtualEntityRow.entity_type == entity.entity_type(),
                 VirtualEntityRow.entity_id == entity,
-            )
-        )
-        await self._sess.execute(
-            sa.delete(ScopeBindingRow).where(
-                ScopeBindingRow.scope_type == entity.entity_type(),
-                ScopeBindingRow.scope_id == entity,
-            )
-        )
-        await self._sess.execute(
-            sa.delete(EntityMembershipRow).where(
-                EntityMembershipRow.entity_type == entity.entity_type(),
-                EntityMembershipRow.entity_id == entity,
             )
         )
         await self._sess.execute(
@@ -382,16 +368,18 @@ class V2WriteOpsBase(V2OpsBase):
 
     async def _record_memberships(self, entries: Sequence[EntityMembershipEntry]) -> None:
         """Record declared memberships in the parents' virtual entities, idempotently;
-        a declared parent without a virtual entity fails (resolve-or-fail)."""
+        a parent or member without a virtual entity fails (resolve-or-fail)."""
         if not entries:
             return
-        scope_ids = await self._resolve_virtual_entity_ids([e.parent for e in entries])
+        node_ids = await self._resolve_virtual_entity_ids([
+            *(e.parent for e in entries),
+            *(e.member for e in entries),
+        ])
         await self._bulk_insert_ignore_conflicts(
             [
                 EntityMembershipRow(
-                    virtual_entity_id=scope_ids[(entry.parent.entity_type(), entry.parent)],
-                    entity_type=entry.member.entity_type(),
-                    entity_id=entry.member,
+                    virtual_entity_id=node_ids[(entry.parent.entity_type(), entry.parent)],
+                    member_entity_id=node_ids[(entry.member.entity_type(), entry.member)],
                     permission_cap=None,
                 )
                 for entry in entries
@@ -405,10 +393,19 @@ class V2WriteOpsBase(V2OpsBase):
             return
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
-                sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
-                    (m.entity_type(), m) for m in members
-                ])
+                EntityMembershipRow.member_entity_id.in_(self._virtual_entity_ids_query(members))
             )
+        )
+
+    def _virtual_entity_ids_query(
+        self, entities: Sequence[EntityIdentifier]
+    ) -> sa.Select[tuple[VirtualEntityID]]:
+        """The ids of the entities' virtual entity nodes; an entity without one
+        contributes nothing, so a delete keyed on it matches nothing."""
+        return sa.select(VirtualEntityRow.id).where(
+            sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
+                (e.entity_type(), e) for e in entities
+            ])
         )
 
     async def _resolve_virtual_entity_ids(

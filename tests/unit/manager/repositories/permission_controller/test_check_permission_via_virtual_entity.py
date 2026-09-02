@@ -93,7 +93,11 @@ class VSChainFixture:
     )
     owner_scope_id: uuid.UUID = field(default_factory=uuid.uuid4)
     bound_scope_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    bound_scope_node_id: VirtualEntityID = field(
+        default_factory=lambda: VirtualEntityID(uuid.uuid4())
+    )
     entity_id: EntityID = field(default_factory=uuid.uuid4)
+    entity_node_id: VirtualEntityID = field(default_factory=lambda: VirtualEntityID(uuid.uuid4()))
 
 
 @dataclass
@@ -186,6 +190,32 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add(UserRoleRow(user_id=ids.user_id, role_id=ids.role_id))
             await db_sess.flush()
 
+    def _chain_nodes(
+        self,
+        ids: VSChainFixture,
+        scope_type: ScopeType,
+        entity_type: EntityType,
+    ) -> list[VirtualEntityRow]:
+        """The three nodes a chain names: the owner scope (the virtual entity itself),
+        the bound scope, and the member entity."""
+        return [
+            VirtualEntityRow(
+                id=ids.virtual_entity_id,
+                entity_type=scope_type,
+                entity_id=ids.owner_scope_id,
+            ),
+            VirtualEntityRow(
+                id=ids.bound_scope_node_id,
+                entity_type=scope_type,
+                entity_id=ids.bound_scope_id,
+            ),
+            VirtualEntityRow(
+                id=ids.entity_node_id,
+                entity_type=entity_type,
+                entity_id=ids.entity_id,
+            ),
+        ]
+
     async def _build_chain(
         self,
         db: ExtendedAsyncSAEngine,
@@ -200,20 +230,15 @@ class TestCheckPermissionViaVirtualEntity:
             db_sess.add(
                 DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
             )
-            db_sess.add(
-                VirtualEntityRow(
-                    id=ids.virtual_entity_id,
-                    entity_type=ScopeType(EntityType("project")),
-                    entity_id=ids.owner_scope_id,
-                )
+            db_sess.add_all(
+                self._chain_nodes(ids, ScopeType(EntityType("project")), _TARGET_ENTITY_TYPE)
             )
             await db_sess.flush()
 
             db_sess.add(
                 ScopeBindingRow(
                     virtual_entity_id=ids.virtual_entity_id,
-                    scope_type=ScopeType(EntityType("project")),
-                    scope_id=ids.bound_scope_id,
+                    scope_entity_id=ids.bound_scope_node_id,
                     permission_cap=spec.scope_cap,
                 )
             )
@@ -221,8 +246,7 @@ class TestCheckPermissionViaVirtualEntity:
                 db_sess.add(
                     EntityMembershipRow(
                         virtual_entity_id=ids.virtual_entity_id,
-                        entity_type=_TARGET_ENTITY_TYPE,
-                        entity_id=ids.entity_id,
+                        member_entity_id=ids.entity_node_id,
                         permission_cap=spec.entity_cap,
                     )
                 )
@@ -478,26 +502,20 @@ class TestCheckPermissionViaVirtualEntity:
         """The chain of :meth:`_build_chain`, over an entity type the legacy enum
         does not name."""
         async with db.begin_session() as db_sess:
-            db_sess.add(
-                VirtualEntityRow(
-                    id=ids.virtual_entity_id,
-                    entity_type=ScopeType(EntityType("project")),
-                    entity_id=ids.owner_scope_id,
-                )
+            db_sess.add_all(
+                self._chain_nodes(ids, ScopeType(EntityType("project")), _UNMAPPED_ENTITY_TYPE)
             )
             await db_sess.flush()
             db_sess.add(
                 ScopeBindingRow(
                     virtual_entity_id=ids.virtual_entity_id,
-                    scope_type=ScopeType(EntityType("project")),
-                    scope_id=ids.bound_scope_id,
+                    scope_entity_id=ids.bound_scope_node_id,
                 )
             )
             db_sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=ids.virtual_entity_id,
-                    entity_type=_UNMAPPED_ENTITY_TYPE,
-                    entity_id=ids.entity_id,
+                    member_entity_id=ids.entity_node_id,
                 )
             )
             db_sess.add(
@@ -680,10 +698,17 @@ class TestUserRosterEnrollment:
                 )
             )
             db_sess.add(
-                EntityMembershipRow(
-                    virtual_entity_id=user_vs_id,
+                VirtualEntityRow(
+                    id=ids.entity_node_id,
                     entity_type=_TARGET_ENTITY_TYPE,
                     entity_id=ids.entity_id,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                EntityMembershipRow(
+                    virtual_entity_id=user_vs_id,
+                    member_entity_id=ids.entity_node_id,
                     permission_cap=None,
                 )
             )
@@ -704,11 +729,13 @@ class TestUserRosterEnrollment:
                     VirtualEntityRow.entity_id == project_id,
                 )
             )
+            session_node = VirtualEntityRow(entity_type=SESSION_ENTITY_TYPE, entity_id=session_id)
+            db_sess.add(session_node)
+            await db_sess.flush()
             db_sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=project_ve_id,
-                    entity_type=SESSION_ENTITY_TYPE,
-                    entity_id=session_id,
+                    member_entity_id=session_node.id,
                     permission_cap=None,
                 )
             )

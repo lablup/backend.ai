@@ -399,23 +399,23 @@ class TestRoleAssignment:
             )
             bindings_into_user_scope = (
                 await session.scalars(
-                    sa.select(ScopeBindingRow.scope_id).where(
+                    sa.select(ScopeBindingRow.scope_entity_id).where(
                         ScopeBindingRow.virtual_entity_id == user_vs_id,
-                        ScopeBindingRow.scope_id == test_project,
+                        ScopeBindingRow.scope_entity_id == project_vs_id,
                     )
                 )
             ).all()
             memberships_in_project_scope = (
                 await session.scalars(
-                    sa.select(EntityMembershipRow.entity_id).where(
+                    sa.select(EntityMembershipRow.member_entity_id).where(
                         EntityMembershipRow.virtual_entity_id == project_vs_id,
-                        EntityMembershipRow.entity_id == user_1,
+                        EntityMembershipRow.member_entity_id == user_vs_id,
                     )
                 )
             ).all()
 
         assert list(bindings_into_user_scope) == []
-        assert list(memberships_in_project_scope) == [user_1]
+        assert list(memberships_in_project_scope) == [user_vs_id]
 
     async def test_bind_user_to_project_skips_if_already_bound(
         self,
