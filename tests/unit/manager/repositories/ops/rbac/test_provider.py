@@ -11,6 +11,7 @@ from uuid import UUID
 import aiohttp.web
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
@@ -183,6 +184,27 @@ class OpsRBACScopeCreation(ScopeCreation[OpsRBACScopeRow]):
 
 def make_scope_creation(scope_id: UUID, name: str) -> ScopeCreation[OpsRBACScopeRow]:
     return OpsRBACScopeCreation(spec=ScopeRowCreatorSpec(scope_id=scope_id, name=name))
+
+
+async def _entity_by_node(sess: SASession) -> dict[UUID, UUID]:
+    """Virtual entity id -> the entity id it stands for."""
+    rows = (await sess.execute(sa.select(VirtualEntityRow.id, VirtualEntityRow.entity_id))).all()
+    return {row.id: row.entity_id for row in rows}
+
+
+async def _member_ids_of(
+    sess: SASession, virtual_entity_id: UUID, *, any_type: bool = False
+) -> set[UUID]:
+    """Entity ids enrolled in the virtual entity; members of ``_TEST_MEMBER_ENTITY_TYPE``
+    unless ``any_type``."""
+    query = (
+        sa.select(VirtualEntityRow.entity_id)
+        .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == VirtualEntityRow.id)
+        .where(EntityMembershipRow.virtual_entity_id == virtual_entity_id)
+    )
+    if not any_type:
+        query = query.where(VirtualEntityRow.entity_type == _TEST_MEMBER_ENTITY_TYPE)
+    return set((await sess.scalars(query)).all())
 
 
 @dataclass
@@ -401,15 +423,13 @@ class TestScopeCreationVirtualEntity:
         assert len(membership_rows) == 1
         membership = membership_rows[0]
         assert membership.virtual_entity_id == ve.id
-        assert membership.entity_type == _TEST_ENTITY_TYPE
-        assert membership.entity_id == scope_id
+        assert membership.member_entity_id == ve.id
         assert membership.permission_cap is None
 
         assert len(binding_rows) == 1
         binding = binding_rows[0]
         assert binding.virtual_entity_id == ve.id
-        assert binding.scope_type == _TEST_SCOPE_TYPE
-        assert binding.scope_id == scope_id
+        assert binding.scope_entity_id == ve.id
         assert binding.permission_cap is None
 
     async def test_bulk_create_scopes_adds_vs_membership_and_self_binding_per_scope(
@@ -432,20 +452,18 @@ class TestScopeCreationVirtualEntity:
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
 
         assert {ve.entity_id for ve in ve_rows} == set(scope_ids)
-        ve_by_scope = {ve.entity_id: ve for ve in ve_rows}
+        node_ids = {ve.id for ve in ve_rows}
 
         assert len(membership_rows) == 3
         for membership in membership_rows:
-            assert membership.entity_type == _TEST_ENTITY_TYPE
-            assert membership.entity_id in scope_ids
-            assert membership.virtual_entity_id == ve_by_scope[membership.entity_id].id
+            assert membership.virtual_entity_id in node_ids
+            assert membership.member_entity_id == membership.virtual_entity_id
             assert membership.permission_cap is None
 
         assert len(binding_rows) == 3
         for binding in binding_rows:
-            assert binding.scope_type == _TEST_SCOPE_TYPE
-            assert binding.scope_id in scope_ids
-            assert binding.virtual_entity_id == ve_by_scope[binding.scope_id].id
+            assert binding.virtual_entity_id in node_ids
+            assert binding.scope_entity_id == binding.virtual_entity_id
             assert binding.permission_cap is None
 
 
@@ -481,11 +499,11 @@ class TestEnsureScope:
 
         assert len(membership_rows) == 1
         assert membership_rows[0].virtual_entity_id == ve.id
-        assert membership_rows[0].entity_id == scope_id
+        assert membership_rows[0].member_entity_id == ve.id
 
         assert len(binding_rows) == 1
         assert binding_rows[0].virtual_entity_id == ve.id
-        assert binding_rows[0].scope_id == scope_id
+        assert binding_rows[0].scope_entity_id == ve.id
         assert binding_rows[0].permission_cap is None
 
         assert real_row_count == 0
@@ -767,16 +785,7 @@ class TestAddBulkMembers:
             ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
             ve_by_scope = {ve.entity_id: ve.id for ve in ve_rows}
-            membership_ids = set(
-                (
-                    await sess.scalars(
-                        sa.select(EntityMembershipRow.entity_id).where(
-                            EntityMembershipRow.virtual_entity_id == ve_by_scope[scope_id],
-                            EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
-                        )
-                    )
-                ).all()
-            )
+            membership_ids = await _member_ids_of(sess, ve_by_scope[scope_id])
             assoc_ids = set(
                 (
                     await sess.scalars(
@@ -793,35 +802,34 @@ class TestAddBulkMembers:
 
         for mid in member_ids:
             member_bindings = {
-                (b.scope_type, b.scope_id)
-                for b in binding_rows
-                if b.virtual_entity_id == ve_by_scope[mid]
+                b.scope_entity_id for b in binding_rows if b.virtual_entity_id == ve_by_scope[mid]
             }
-            assert member_bindings == {(_TEST_MEMBER_SCOPE_TYPE, mid)}  # self binding only
+            assert member_bindings == {ve_by_scope[mid]}  # self binding only
         scope_ve_bindings = {
-            (b.scope_type, b.scope_id)
-            for b in binding_rows
-            if b.virtual_entity_id == ve_by_scope[scope_id]
+            b.scope_entity_id for b in binding_rows if b.virtual_entity_id == ve_by_scope[scope_id]
         }
-        assert scope_ve_bindings == {(_TEST_SCOPE_TYPE, scope_id)}  # self binding only
+        assert scope_ve_bindings == {ve_by_scope[scope_id]}  # self binding only
 
-    async def test_member_without_own_virtual_entity_is_added(
+    async def test_member_without_own_virtual_entity_fails(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         entity_member_tables: None,
     ) -> None:
-        """Only the scope's virtual entity is required: a member that has none of its own is still
-        enrolled, since nothing is written on the member side."""
+        """The membership edge names the member's own virtual entity, so a member without
+        one raises VirtualEntityNotFound and nothing is written."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
         member_id = uuid.uuid4()
 
         async with provider.write_ops() as w:
             await w.ensure_scope(scope)
-            await w.add_bulk_members(
-                EntityMembersAddition(scope=scope, members=[StubMember(member_id=member_id)])
-            )
+
+        with pytest.raises(VirtualEntityNotFound):
+            async with provider.write_ops() as w:
+                await w.add_bulk_members(
+                    EntityMembersAddition(scope=scope, members=[StubMember(member_id=member_id)])
+                )
 
         async with database_connection.begin_session_read_committed() as sess:
             scope_ve = (
@@ -829,24 +837,15 @@ class TestAddBulkMembers:
                     sa.select(VirtualEntityRow).where(VirtualEntityRow.entity_id == scope_id)
                 )
             ).scalar_one()
-            membership_ids = set(
-                (
-                    await sess.scalars(
-                        sa.select(EntityMembershipRow.entity_id).where(
-                            EntityMembershipRow.virtual_entity_id == scope_ve.id,
-                            EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
-                        )
-                    )
-                ).all()
-            )
-            member_vs_count = await sess.scalar(
+            membership_ids = await _member_ids_of(sess, scope_ve.id)
+            assoc_count = await sess.scalar(
                 sa.select(sa.func.count())
-                .select_from(VirtualEntityRow)
-                .where(VirtualEntityRow.entity_id == member_id)
+                .select_from(AssociationScopesEntitiesRow)
+                .where(AssociationScopesEntitiesRow.entity_id == str(member_id))
             )
 
-        assert membership_ids == {member_id}
-        assert member_vs_count == 0
+        assert membership_ids == set()
+        assert assoc_count == 0
 
     async def test_readd_is_idempotent(
         self,
@@ -893,6 +892,7 @@ class TestAddBulkMembers:
                 .scalars()
                 .all()
             )
+            entity_by_node = await _entity_by_node(sess)
             assoc_count = await sess.scalar(
                 sa.select(sa.func.count())
                 .select_from(AssociationScopesEntitiesRow)
@@ -902,10 +902,12 @@ class TestAddBulkMembers:
         # the scope's self membership and the member's
         assert len(membership_rows) == 2
         assert assoc_count == 1
-        caps_by_entity = {(m.entity_type, m.entity_id): m.permission_cap for m in membership_rows}
+        caps_by_entity = {
+            entity_by_node[m.member_entity_id]: m.permission_cap for m in membership_rows
+        }
         assert caps_by_entity == {
-            (_TEST_ENTITY_TYPE, scope_id): None,  # self membership
-            (_TEST_MEMBER_ENTITY_TYPE, member_id): Permission.READ,
+            scope_id: None,  # self membership
+            member_id: Permission.READ,
         }
 
     async def test_empty_members_is_noop(
@@ -987,11 +989,11 @@ class TestUserRosterEnrollment:
             cap = await sess.scalar(
                 sa.select(EntityMembershipRow.permission_cap).where(
                     EntityMembershipRow.virtual_entity_id == ve_by_scope[scope.scope_id],
-                    EntityMembershipRow.entity_id == user_id,
+                    EntityMembershipRow.member_entity_id == ve_by_scope[user_id],
                 )
             )
             user_vs_bindings = {
-                (b.scope_type, b.scope_id)
+                b.scope_entity_id
                 for b in (
                     await sess.execute(
                         sa.select(ScopeBindingRow).where(
@@ -1004,7 +1006,7 @@ class TestUserRosterEnrollment:
             }
 
         assert cap == expected_cap
-        assert user_vs_bindings == {(USER_SCOPE_TYPE, user_id)}  # self binding only
+        assert user_vs_bindings == {ve_by_scope[user_id]}  # self binding only
 
 
 class TestAddBulkInheritingMembers:
@@ -1038,16 +1040,7 @@ class TestAddBulkInheritingMembers:
             ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
             ve_by_scope = {ve.entity_id: ve.id for ve in ve_rows}
-            membership_ids = set(
-                (
-                    await sess.scalars(
-                        sa.select(EntityMembershipRow.entity_id).where(
-                            EntityMembershipRow.virtual_entity_id == ve_by_scope[scope_id],
-                            EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
-                        )
-                    )
-                ).all()
-            )
+            membership_ids = await _member_ids_of(sess, ve_by_scope[scope_id])
             assoc_ids = set(
                 (
                     await sess.scalars(
@@ -1064,20 +1057,18 @@ class TestAddBulkInheritingMembers:
 
         for mid in member_ids:
             member_bindings = {
-                (b.scope_type, b.scope_id): b.permission_cap
+                b.scope_entity_id: b.permission_cap
                 for b in binding_rows
                 if b.virtual_entity_id == ve_by_scope[mid]
             }
             assert member_bindings == {
-                (_TEST_MEMBER_SCOPE_TYPE, mid): None,  # self binding
-                (_TEST_SCOPE_TYPE, scope_id): None,
+                ve_by_scope[mid]: None,  # self binding
+                ve_by_scope[scope_id]: None,
             }
         scope_ve_bindings = {
-            (b.scope_type, b.scope_id)
-            for b in binding_rows
-            if b.virtual_entity_id == ve_by_scope[scope_id]
+            b.scope_entity_id for b in binding_rows if b.virtual_entity_id == ve_by_scope[scope_id]
         }
-        assert scope_ve_bindings == {(_TEST_SCOPE_TYPE, scope_id)}  # self binding only
+        assert scope_ve_bindings == {ve_by_scope[scope_id]}  # self binding only
 
     async def test_readd_is_idempotent(
         self,
@@ -1135,10 +1126,10 @@ class TestAddBulkInheritingMembers:
         # the scope's self membership and the member's
         assert membership_count == 2
         assert assoc_count == 1
-        caps_by_scope = {(b.scope_type, b.scope_id): b.permission_cap for b in binding_rows}
+        caps_by_scope = {b.scope_entity_id: b.permission_cap for b in binding_rows}
         assert caps_by_scope == {
-            (_TEST_MEMBER_SCOPE_TYPE, member_id): None,  # self binding
-            (_TEST_SCOPE_TYPE, scope_id): None,
+            member_vs.id: None,  # self binding
+            scope_ve.id: None,
         }
 
     async def test_missing_member_vs_fails_the_whole_call(
@@ -1171,15 +1162,15 @@ class TestAddBulkInheritingMembers:
         async with database_connection.begin_session_read_committed() as sess:
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
             membership_rows = (await sess.execute(sa.select(EntityMembershipRow))).scalars().all()
+            entity_by_node = await _entity_by_node(sess)
 
-        assert {(b.scope_type, b.scope_id) for b in binding_rows} == {
-            (_TEST_SCOPE_TYPE, scope.scope_id),  # self bindings only
-            (_TEST_MEMBER_SCOPE_TYPE, present_id),
-        }
-        assert {(m.entity_type, m.entity_id) for m in membership_rows} == {
-            (_TEST_ENTITY_TYPE, scope.scope_id),  # self memberships only
-            (_TEST_MEMBER_ENTITY_TYPE, present_id),
-        }
+        assert {(b.virtual_entity_id, b.scope_entity_id) for b in binding_rows} == {
+            (node, node) for node in entity_by_node
+        }  # self bindings only
+        assert {(m.virtual_entity_id, m.member_entity_id) for m in membership_rows} == {
+            (node, node) for node in entity_by_node
+        }  # self memberships only
+        assert set(entity_by_node.values()) == {scope.scope_id, present_id}
 
     async def test_empty_members_is_noop(
         self,
@@ -1238,16 +1229,7 @@ class TestRemoveBulkMembers:
             ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             ve_by_scope = {ve.entity_id: ve.id for ve in ve_rows}
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
-            membership_ids = set(
-                (
-                    await sess.scalars(
-                        sa.select(EntityMembershipRow.entity_id).where(
-                            EntityMembershipRow.virtual_entity_id == ve_by_scope[scope_id],
-                            EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
-                        )
-                    )
-                ).all()
-            )
+            membership_ids = await _member_ids_of(sess, ve_by_scope[scope_id])
             assoc_ids = set(
                 (
                     await sess.scalars(
@@ -1261,29 +1243,24 @@ class TestRemoveBulkMembers:
         assert membership_ids == {kept_id}
         assert assoc_ids == {str(kept_id)}
         removed_bindings = {
-            (b.scope_type, b.scope_id)
+            b.scope_entity_id
             for b in binding_rows
             if b.virtual_entity_id == ve_by_scope[removed_id]
         }
-        assert removed_bindings == {(_TEST_MEMBER_SCOPE_TYPE, removed_id)}  # self binding only
+        assert removed_bindings == {ve_by_scope[removed_id]}  # self binding only
         kept_bindings = {
-            (b.scope_type, b.scope_id)
-            for b in binding_rows
-            if b.virtual_entity_id == ve_by_scope[kept_id]
+            b.scope_entity_id for b in binding_rows if b.virtual_entity_id == ve_by_scope[kept_id]
         }
-        assert kept_bindings == {
-            (_TEST_MEMBER_SCOPE_TYPE, kept_id),
-            (_TEST_SCOPE_TYPE, scope_id),
-        }
+        assert kept_bindings == {ve_by_scope[kept_id], ve_by_scope[scope_id]}
 
-    async def test_remove_without_member_vs_still_deletes(
+    async def test_remove_without_member_self_edges_still_deletes(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         entity_member_tables: None,
     ) -> None:
-        """A member without a virtual entity (legacy data) still loses its membership and
-        association — the removal does not raise."""
+        """A member whose node carries no self edges or binding (legacy data) still loses its
+        membership and association — the removal does not raise."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
         member_id = uuid.uuid4()
@@ -1297,11 +1274,15 @@ class TestRemoveBulkMembers:
                     sa.select(VirtualEntityRow).where(VirtualEntityRow.entity_id == scope_id)
                 )
             ).scalar_one()
+            member_node = VirtualEntityRow(
+                entity_type=_TEST_MEMBER_ENTITY_TYPE, entity_id=member_id
+            )
+            sess.add(member_node)
+            await sess.flush()
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=scope_ve.id,
-                    entity_type=_TEST_MEMBER_ENTITY_TYPE,
-                    entity_id=member_id,
+                    member_entity_id=member_node.id,
                     permission_cap=None,
                 )
             )
@@ -1325,7 +1306,8 @@ class TestRemoveBulkMembers:
             membership_count = await sess.scalar(
                 sa.select(sa.func.count())
                 .select_from(EntityMembershipRow)
-                .where(EntityMembershipRow.entity_id == member_id)
+                .join(VirtualEntityRow, VirtualEntityRow.id == EntityMembershipRow.member_entity_id)
+                .where(VirtualEntityRow.entity_id == member_id)
             )
             assoc_count = await sess.scalar(
                 sa.select(sa.func.count())
@@ -1386,17 +1368,7 @@ class TestAddBulkMembersPartial:
                     sa.select(VirtualEntityRow).where(VirtualEntityRow.entity_id == scope.scope_id)
                 )
             ).scalar_one()
-            membership_rows = (
-                (
-                    await sess.execute(
-                        sa.select(EntityMembershipRow).where(
-                            EntityMembershipRow.virtual_entity_id == scope_ve.id
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
+            membership_ids = await _member_ids_of(sess, scope_ve.id, any_type=True)
             assoc_ids = set(
                 (
                     await sess.scalars(
@@ -1407,20 +1379,20 @@ class TestAddBulkMembersPartial:
                 ).all()
             )
 
-        assert {(m.entity_type, m.entity_id) for m in membership_rows} == {
-            (_TEST_ENTITY_TYPE, scope.scope_id),  # self membership
-            (_TEST_MEMBER_ENTITY_TYPE, valid.member_id),
+        assert membership_ids == {
+            scope.scope_id,  # self membership
+            valid.member_id,
         }
         assert assoc_ids == {str(valid.member_id)}
 
-    async def test_members_without_own_vs_are_added(
+    async def test_member_without_own_vs_fails_alone(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         entity_member_tables: None,
     ) -> None:
-        """Members are enrolled whether or not they have a virtual entity of their own, and no
-        binding is written into the one that does."""
+        """A member without a virtual entity of its own lands in the errors while the one
+        with a node is enrolled, and no binding is written into that node."""
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=uuid.uuid4())
         with_ve = StubMember(member_id=uuid.uuid4(), cap=Permission.READ)
         without_ve = StubMember(member_id=uuid.uuid4(), cap=Permission.READ)
@@ -1434,32 +1406,24 @@ class TestAddBulkMembersPartial:
                 EntityMembersAddition(scope=scope, members=[with_ve, without_ve])
             )
 
-        assert result.successes == [with_ve, without_ve]
-        assert result.errors == []
+        assert result.successes == [with_ve]
+        assert [error.member for error in result.errors] == [without_ve]
+        assert isinstance(result.errors[0].exception, VirtualEntityNotFound)
 
         async with database_connection.begin_session_read_committed() as sess:
             ve_rows = (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
             ve_by_scope = {ve.entity_id: ve.id for ve in ve_rows}
-            membership_ids = set(
-                (
-                    await sess.scalars(
-                        sa.select(EntityMembershipRow.entity_id).where(
-                            EntityMembershipRow.virtual_entity_id == ve_by_scope[scope.scope_id],
-                            EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
-                        )
-                    )
-                ).all()
-            )
+            membership_ids = await _member_ids_of(sess, ve_by_scope[scope.scope_id])
 
         assert without_ve.member_id not in ve_by_scope
-        assert membership_ids == {with_ve.member_id, without_ve.member_id}
+        assert membership_ids == {with_ve.member_id}
         member_bindings = {
-            (b.scope_type, b.scope_id)
+            b.scope_entity_id
             for b in binding_rows
             if b.virtual_entity_id == ve_by_scope[with_ve.member_id]
         }
-        assert member_bindings == {(_TEST_MEMBER_SCOPE_TYPE, with_ve.member_id)}  # self only
+        assert member_bindings == {ve_by_scope[with_ve.member_id]}  # self only
 
 
 # =============================================================================
@@ -1588,14 +1552,13 @@ class TestScopeDeletionVirtualEntityCleanup:
             membership_rows = (await sess.execute(sa.select(EntityMembershipRow))).scalars().all()
 
         assert {ve.entity_id for ve in ve_rows} == {other.scope_id}
-        assert {(b.scope_type, b.scope_id) for b in binding_rows} == {
-            (
-                _TEST_SCOPE_TYPE,
-                other.scope_id,
-            ),  # the other virtual entity keeps only its self binding
+        other_node = ve_rows[0].id
+        # the other virtual entity keeps only its self binding and self membership
+        assert {(b.virtual_entity_id, b.scope_entity_id) for b in binding_rows} == {
+            (other_node, other_node)
         }
-        assert {(m.entity_type, m.entity_id) for m in membership_rows} == {
-            (_TEST_ENTITY_TYPE, other.scope_id),  # and only its self membership
+        assert {(m.virtual_entity_id, m.member_entity_id) for m in membership_rows} == {
+            (other_node, other_node)
         }
 
     async def test_batch_delete_scopes_removes_edges_in_other_virtual_entities(
@@ -1660,11 +1623,12 @@ class TestScopeDeletionVirtualEntityCleanup:
 
         assert real_row_count == 0
         assert {ve.entity_id for ve in ve_rows} == {other.scope_id}
-        assert {(b.scope_type, b.scope_id) for b in binding_rows} == {
-            (_TEST_SCOPE_TYPE, other.scope_id),
+        other_node = ve_rows[0].id
+        assert {(b.virtual_entity_id, b.scope_entity_id) for b in binding_rows} == {
+            (other_node, other_node)
         }
-        assert {(m.entity_type, m.entity_id) for m in membership_rows} == {
-            (_TEST_ENTITY_TYPE, other.scope_id),
+        assert {(m.virtual_entity_id, m.member_entity_id) for m in membership_rows} == {
+            (other_node, other_node)
         }
 
 

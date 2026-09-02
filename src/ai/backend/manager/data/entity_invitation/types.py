@@ -7,12 +7,7 @@ from functools import lru_cache
 from typing import override
 
 from ai.backend.common.data.entity.entity_invitation import EntityInvitationID
-from ai.backend.common.data.entity.types import (
-    EntityData,
-    EntityID,
-    EntityType,
-    RuntimeEntityID,
-)
+from ai.backend.common.data.entity.types import EntityData, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 
@@ -45,8 +40,7 @@ class EntityInvitationData(EntityData):
     id: EntityInvitationID
     inviter_user_id: UserID
     invitee_email: str
-    target_entity_type: EntityType
-    target_entity_id: EntityID
+    target: RuntimeEntityID
     permission_cap: Permission | None
     status: EntityInvitationStatus
     created_at: datetime
@@ -55,7 +49,3 @@ class EntityInvitationData(EntityData):
     @override
     def entity_id(self) -> EntityInvitationID:
         return self.id
-
-    def target(self) -> RuntimeEntityID:
-        """The entity the invitation offers, as an id that answers its own type."""
-        return RuntimeEntityID(self.target_entity_type, self.target_entity_id)

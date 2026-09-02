@@ -155,16 +155,14 @@ async def signup_default_project(
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=data.project_id,
+                member_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=data.project_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -334,16 +332,14 @@ async def cross_domain_fixture(
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=group_id,
+                member_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )

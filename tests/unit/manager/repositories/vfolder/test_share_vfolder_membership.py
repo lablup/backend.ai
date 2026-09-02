@@ -307,11 +307,19 @@ class TestShareVfolderWithUsersMembership:
                     domain_id=domain_fixture.domain_id,
                 )
             )
+            user_ve_id = uuid4()
+            sess.add(
+                VirtualEntityRow(
+                    id=user_ve_id,
+                    entity_type=PermissionEntityType.USER.value,
+                    entity_id=user_uuid,
+                )
+            )
+            await sess.flush()
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=project_scope_id,
-                    entity_type=PermissionEntityType.USER.value,
-                    entity_id=user_uuid,
+                    member_entity_id=user_ve_id,
                 )
             )
             sess.add(
@@ -382,11 +390,19 @@ class TestShareVfolderWithUsersMembership:
                     domain_id=domain_fixture.domain_id,
                 )
             )
+            user_ve_id = uuid4()
+            sess.add(
+                VirtualEntityRow(
+                    id=user_ve_id,
+                    entity_type=PermissionEntityType.USER.value,
+                    entity_id=user_uuid,
+                )
+            )
+            await sess.flush()
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=project_scope_id,
-                    entity_type=PermissionEntityType.USER.value,
-                    entity_id=user_uuid,
+                    member_entity_id=user_ve_id,
                 )
             )
             sess.add(
@@ -473,11 +489,19 @@ class TestShareVfolderWithUsersMembership:
                     domain_id=domain_fixture.domain_id,
                 )
             )
+            user_ve_id = uuid4()
+            sess.add(
+                VirtualEntityRow(
+                    id=user_ve_id,
+                    entity_type=PermissionEntityType.USER.value,
+                    entity_id=user_uuid,
+                )
+            )
+            await sess.flush()
             sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=other_project_scope_id,
-                    entity_type=PermissionEntityType.USER.value,
-                    entity_id=user_uuid,
+                    member_entity_id=user_ve_id,
                 )
             )
             sess.add(

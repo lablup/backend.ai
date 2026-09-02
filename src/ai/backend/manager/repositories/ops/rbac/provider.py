@@ -453,8 +453,7 @@ class RBACWriteOps(WriteOps):
             .values([
                 {
                     "virtual_entity_id": row.id,
-                    "entity_type": row.entity_type,
-                    "entity_id": row.entity_id,
+                    "member_entity_id": row.id,
                     "permission_cap": None,
                 }
                 for row in inserted
@@ -467,8 +466,7 @@ class RBACWriteOps(WriteOps):
             .values([
                 {
                     "virtual_entity_id": row.id,
-                    "scope_type": row.entity_type,
-                    "scope_id": row.entity_id,
+                    "scope_entity_id": row.id,
                     "permission_cap": None,
                 }
                 for row in inserted
@@ -478,28 +476,15 @@ class RBACWriteOps(WriteOps):
         await self._sess.execute(binding_stmt)
 
     async def _delete_virtual_entities(self, scopes: Sequence[ScopeRef]) -> None:
-        """Delete the virtual entity nodes for ``scopes`` (FK CASCADE removes the edges
-        inside them), plus the edges the scopes left in other virtual entities — bindings
-        where a deleted scope is the reaching side and memberships where it is enrolled
-        as an entity — which no FK covers."""
+        """Delete the virtual entity nodes for ``scopes``; every edge naming a node at
+        either end goes with it by FK."""
         if not scopes:
             return
-        scope_keys = [(s.scope_type, s.scope_id) for s in scopes]
         await self._sess.execute(
             sa.delete(VirtualEntityRow).where(
-                sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_(scope_keys)
-            )
-        )
-        await self._sess.execute(
-            sa.delete(ScopeBindingRow).where(
-                sa.tuple_(ScopeBindingRow.scope_type, ScopeBindingRow.scope_id).in_(scope_keys)
-            )
-        )
-        await self._sess.execute(
-            sa.delete(EntityMembershipRow).where(
-                sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_(
-                    scope_keys
-                )
+                sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
+                    (s.scope_type, s.scope_id) for s in scopes
+                ])
             )
         )
 
@@ -1049,14 +1034,17 @@ class RBACWriteOps(WriteOps):
         scope: ScopeRef,
         members: Sequence[ScopeMember],
     ) -> None:
-        """Enroll each member in the scope's virtual entity with its kind's cap."""
+        """Enroll each member in the scope's virtual entity with its kind's cap; raises
+        :class:`VirtualEntityNotFound` for members without a virtual entity."""
+        member_scopes = [self._member_scope_ref(member.entity_ref()) for member in members]
+        member_virtual_entity_ids = await self._resolve_virtual_entity_ids(member_scopes)
         await self._bulk_create_dependent_ignore_conflicts(
             [
                 EntityMembershipCreatorSpec(
-                    entity_ref=member.entity_ref(),
+                    member_entity_id=member_virtual_entity_ids[member_scope],
                     permission_cap=member.permission_cap(scope),
                 )
-                for member in members
+                for member, member_scope in zip(members, member_scopes, strict=True)
             ],
             virtual_entity_id,
         )
@@ -1077,8 +1065,8 @@ class RBACWriteOps(WriteOps):
         member_scopes: Sequence[ScopeRef],
     ) -> None:
         """Bind the scope into each member's own virtual entity, uncapped; raises
-        :class:`VirtualEntityNotFound` for members without one."""
-        member_virtual_entity_ids = await self._resolve_virtual_entity_ids(member_scopes)
+        :class:`VirtualEntityNotFound` for a scope or member without one."""
+        virtual_entity_ids = await self._resolve_virtual_entity_ids([*member_scopes, scope])
         await self._bulk_create_dependent_ignore_conflicts(
             [
                 ScopeBindingCreatorSpec(
@@ -1086,7 +1074,7 @@ class RBACWriteOps(WriteOps):
                 )
                 for member_scope in member_scopes
             ],
-            member_virtual_entity_ids,
+            virtual_entity_ids,
         )
 
     @staticmethod
@@ -1140,13 +1128,14 @@ class RBACWriteOps(WriteOps):
         if not entity_refs:
             return
         virtual_entity_id = await self._find_virtual_entity_id(scope)
-        if virtual_entity_id is not None:
+        member_virtual_entity_ids = await self._find_virtual_entity_ids([
+            self._member_scope_ref(ref) for ref in entity_refs
+        ])
+        if virtual_entity_id is not None and member_virtual_entity_ids:
             await self._sess.execute(
                 sa.delete(EntityMembershipRow).where(
                     EntityMembershipRow.virtual_entity_id == virtual_entity_id,
-                    sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
-                        (ref.entity_type, ref.entity_id) for ref in entity_refs
-                    ]),
+                    EntityMembershipRow.member_entity_id.in_(member_virtual_entity_ids.values()),
                 )
             )
         await self._sess.execute(
@@ -1161,15 +1150,11 @@ class RBACWriteOps(WriteOps):
                 ]),
             )
         )
-        member_virtual_entity_ids = await self._find_virtual_entity_ids([
-            self._member_scope_ref(ref) for ref in entity_refs
-        ])
-        if member_virtual_entity_ids:
+        if virtual_entity_id is not None and member_virtual_entity_ids:
             await self._sess.execute(
                 sa.delete(ScopeBindingRow).where(
                     ScopeBindingRow.virtual_entity_id.in_(member_virtual_entity_ids.values()),
-                    ScopeBindingRow.scope_type == scope.scope_type,
-                    ScopeBindingRow.scope_id == scope.scope_id,
+                    ScopeBindingRow.scope_entity_id == virtual_entity_id,
                 )
             )
 

@@ -60,6 +60,8 @@ grows a branch; the generic services take no hook or callback to hide one in.
   However, when it is entangled with another layer, it is allowed to perform some other action in the service and then call a repository.
 - Service methods must NOT create DB sessions/transactions — delegate to the repository.
 - Each method takes an Action and returns an ActionResult — no other return type is allowed.
+- A result never carries a virtual entity id. It names a graph node, not an entity;
+  a result names entities as `EntityIdentifier`s.
 
 ## Processor rules
 

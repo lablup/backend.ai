@@ -18,6 +18,8 @@ from typing import override
 from unittest.mock import MagicMock
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
@@ -341,38 +343,50 @@ async def _seed_vs_chain(
     entity_cap: Permission | None = None,
 ) -> None:
     """Materialize the owner's virtual entity with a self scope_binding and one
-    entity membership per id: ``owner scope -> VS(owner) -> entities``."""
-    ve_id = VirtualEntityID(uuid.uuid4())
+    entity membership per id: ``owner scope -> VS(owner) -> entities``. Each member
+    entity gets its own node, which the membership names."""
     async with db.begin_session() as db_sess:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())
         db_sess.add(DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot()))
-        db_sess.add(
-            VirtualEntityRow(
-                id=ve_id,
-                entity_type=ScopeType(EntityType(owner_scope_type)),
-                entity_id=owner_scope_id,
-            )
-        )
-        await db_sess.flush()
+        ve_id = await _node_id(db_sess, EntityType(owner_scope_type), owner_scope_id)
+        member_node_ids = [
+            await _node_id(db_sess, EntityType(entity_type), entity_id) for entity_id in entity_ids
+        ]
         db_sess.add(
             ScopeBindingRow(
                 virtual_entity_id=ve_id,
-                scope_type=ScopeType(EntityType(owner_scope_type)),
-                scope_id=owner_scope_id,
+                scope_entity_id=ve_id,
                 permission_cap=scope_cap,
             )
         )
-        for entity_id in entity_ids:
+        for node_id in member_node_ids:
             db_sess.add(
                 EntityMembershipRow(
                     virtual_entity_id=ve_id,
-                    entity_type=EntityType(entity_type),
-                    entity_id=entity_id,
+                    member_entity_id=node_id,
                     permission_cap=entity_cap,
                 )
             )
         await db_sess.flush()
+
+
+async def _node_id(
+    db_sess: SASession, entity_type: EntityType, entity_id: uuid.UUID
+) -> VirtualEntityID:
+    """The entity's virtual entity node id, created if it has none."""
+    existing = await db_sess.scalar(
+        sa.select(VirtualEntityRow.id).where(
+            VirtualEntityRow.entity_type == entity_type,
+            VirtualEntityRow.entity_id == entity_id,
+        )
+    )
+    if existing is not None:
+        return VirtualEntityID(existing)
+    node = VirtualEntityRow(entity_type=entity_type, entity_id=entity_id)
+    db_sess.add(node)
+    await db_sess.flush()
+    return VirtualEntityID(node.id)
 
 
 async def _seed_granted_user(

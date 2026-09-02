@@ -31,23 +31,16 @@ class V2GrantWriteOps(V2WriteOpsBase):
 
         Re-granting rewrites the cap rather than keeping the earlier one: a grant
         states the ceiling that holds now, so a widened or narrowed one has to win.
-        A grantee with no virtual entity fails, as every membership write does.
+        A grantee with no virtual entity fails, as every membership write does; the
+        entity's node is provisioned if it is missing, since entities created before
+        the virtual-entity rollout have none.
         """
         if not grants:
             return
-        scope_ids = await self._resolve_virtual_entity_ids([g.grantee for g in grants])
-        stmt = pg_insert(EntityMembershipRow).values([
-            {
-                "virtual_entity_id": scope_ids[(g.grantee.entity_type(), g.grantee)],
-                "entity_type": g.entity.entity_type(),
-                "entity_id": g.entity,
-                "permission_cap": g.permission_cap,
-            }
-            for g in grants
-        ])
+        stmt = pg_insert(EntityMembershipRow).values(await self._grant_values(grants))
         await self._sess.execute(
             stmt.on_conflict_do_update(
-                index_elements=["virtual_entity_id", "entity_type", "entity_id"],
+                index_elements=["virtual_entity_id", "member_entity_id"],
                 set_={"permission_cap": stmt.excluded.permission_cap},
             )
         )
@@ -62,21 +55,12 @@ class V2GrantWriteOps(V2WriteOpsBase):
         """
         if not grants:
             return
-        scope_ids = await self._resolve_virtual_entity_ids([g.grantee for g in grants])
-        stmt = pg_insert(EntityMembershipRow).values([
-            {
-                "virtual_entity_id": scope_ids[(g.grantee.entity_type(), g.grantee)],
-                "entity_type": g.entity.entity_type(),
-                "entity_id": g.entity,
-                "permission_cap": g.permission_cap,
-            }
-            for g in grants
-        ])
+        stmt = pg_insert(EntityMembershipRow).values(await self._grant_values(grants))
         existing = EntityMembershipRow.permission_cap
         offered = stmt.excluded.permission_cap
         await self._sess.execute(
             stmt.on_conflict_do_update(
-                index_elements=["virtual_entity_id", "entity_type", "entity_id"],
+                index_elements=["virtual_entity_id", "member_entity_id"],
                 set_={
                     "permission_cap": sa.case(
                         (
@@ -88,6 +72,21 @@ class V2GrantWriteOps(V2WriteOpsBase):
                 },
             )
         )
+
+    async def _grant_values(self, grants: Sequence[EntityGrant]) -> list[dict[str, object]]:
+        await self._provision_entities([g.entity for g in grants])
+        node_ids = await self._resolve_virtual_entity_ids([
+            *(g.grantee for g in grants),
+            *(g.entity for g in grants),
+        ])
+        return [
+            {
+                "virtual_entity_id": node_ids[(g.grantee.entity_type(), g.grantee)],
+                "member_entity_id": node_ids[(g.entity.entity_type(), g.entity)],
+                "permission_cap": g.permission_cap,
+            }
+            for g in grants
+        ]
 
     async def revoke_entities(
         self, entities: Sequence[EntityIdentifier], grantee: EntityIdentifier
@@ -104,9 +103,7 @@ class V2GrantWriteOps(V2WriteOpsBase):
             sa.delete(EntityMembershipRow).where(
                 EntityMembershipRow.virtual_entity_id
                 == scope_ids[(grantee.entity_type(), grantee)],
-                sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
-                    (e.entity_type(), e) for e in entities
-                ]),
+                EntityMembershipRow.member_entity_id.in_(self._virtual_entity_ids_query(entities)),
             )
         )
 
@@ -137,7 +134,7 @@ class V2GrantWriteOps(V2WriteOpsBase):
         data = updater.to_data(row)
         await self.widen_entity_grants([
             EntityGrant(
-                entity=data.target(),
+                entity=data.target,
                 grantee=updater.invitee_user_id,
                 permission_cap=data.permission_cap,
             )

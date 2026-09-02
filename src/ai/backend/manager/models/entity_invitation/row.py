@@ -4,7 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.entity_invitation import EntityInvitationID
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityID, EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.entity_invitation.types import (
@@ -21,8 +21,9 @@ class EntityInvitationRow(LifecycleTimestampsMixin, Base):
     """An offer of one existing entity to one person, settled by their answer.
 
     The target is a polymorphic ``(target_entity_type, target_entity_id)`` pair with no
-    foreign key, as the RBAC graph rows are. Accepting writes the entity membership the
-    ``permission_cap`` bounds.
+    foreign key; the invitation is not a graph edge, so it does not name the target's
+    virtual entity node. Accepting writes the entity membership the ``permission_cap``
+    bounds.
 
     The invitee is an email rather than a user id: an invitation may name someone who
     has no account yet. Reads resolve the requester's own email instead
@@ -82,8 +83,7 @@ class EntityInvitationRow(LifecycleTimestampsMixin, Base):
             id=self.id,
             inviter_user_id=self.inviter_user_id,
             invitee_email=self.invitee_email,
-            target_entity_type=self.target_entity_type,
-            target_entity_id=self.target_entity_id,
+            target=RuntimeEntityID(self.target_entity_type, self.target_entity_id),
             permission_cap=self.permission_cap,
             status=self.status,
             created_at=self.created_at,

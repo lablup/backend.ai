@@ -21,6 +21,13 @@ live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
 - Do NOT add new `relationship()` definitions — fetch related rows in `repositories/db_source/` queries. Existing relationships are being phased out; remove them (with their `back_populates` pair) once nothing references them.
 - Inter-entity relationships: keep related Row imports inside a `TYPE_CHECKING` block only.
 
+## Virtual entity references
+
+- Only graph edge rows (`entity_memberships`, `scope_bindings`) reference `virtual_entities.id`
+  by foreign key. A row attached to an entity (`entity_labels`, `entity_invitations`) carries the
+  `(entity_type, entity_id)` pair.
+- A node id never goes on a `data/` type. A Row's `to_data()` names the entity as an `EntityIdentifier`.
+
 ## No logic in Row classes
 
 - Do NOT add query-builder methods to Row classes — that belongs to `repositories/db_source/`.

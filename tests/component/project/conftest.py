@@ -390,16 +390,14 @@ async def target_project_fixture(
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=project_id,
+                member_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=project_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -446,16 +444,14 @@ async def other_project_fixture(
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=project_id,
+                member_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=project_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -662,12 +658,6 @@ async def assigned_users(
                     AssociationScopesEntitiesRow.scope_id == str(group_fixture),
                     AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     AssociationScopesEntitiesRow.entity_id == str(uid),
-                )
-            )
-            await conn.execute(
-                EntityMembershipRow.__table__.delete().where(
-                    EntityMembershipRow.__table__.c.entity_type == EntityType.USER,
-                    EntityMembershipRow.__table__.c.entity_id == str(uid),
                 )
             )
             await conn.execute(

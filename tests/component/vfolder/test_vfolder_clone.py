@@ -174,15 +174,18 @@ async def _fetch_scope_graph(
                 )
             )
         ).scalar_one()
+        members = VirtualEntityRow.__table__.alias("member_virtual_entity")
         owner_memberships = (
             await conn.execute(
                 sa.select(sa.func.count())
                 .select_from(
-                    memberships.join(scopes, scopes.c.id == memberships.c.virtual_entity_id)
+                    memberships.join(scopes, scopes.c.id == memberships.c.virtual_entity_id).join(
+                        members, members.c.id == memberships.c.member_entity_id
+                    )
                 )
                 .where(
-                    memberships.c.entity_type == VFOLDER_ENTITY_TYPE,
-                    memberships.c.entity_id == vfolder_id,
+                    members.c.entity_type == VFOLDER_ENTITY_TYPE,
+                    members.c.entity_id == vfolder_id,
                     scopes.c.entity_type == USER_SCOPE_TYPE,
                     scopes.c.entity_id == owner_id,
                 )

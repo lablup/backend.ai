@@ -28,7 +28,7 @@ from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
-from sqlalchemy.orm import InstrumentedAttribute, Mapped, mapped_column
+from sqlalchemy.orm import InstrumentedAttribute, Mapped, aliased, mapped_column
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
@@ -381,18 +381,26 @@ async def _virtual_entity_id(
         return result.scalar_one_or_none()
 
 
+def _node_id(scope_type: ScopeType, scope_id: UUID) -> sa.ScalarSelect[Any]:
+    return (
+        sa.select(VirtualEntityRow.id)
+        .where(
+            VirtualEntityRow.entity_type == scope_type,
+            VirtualEntityRow.entity_id == scope_id,
+        )
+        .scalar_subquery()
+    )
+
+
 async def _self_membership_exists(
     database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: ScopeType = _SCOPE_TYPE
 ) -> bool:
     async with database.begin_readonly_session() as sess:
+        node = _node_id(scope_type, scope_id)
         row = await sess.scalar(
-            sa.select(EntityMembershipRow.entity_id)
-            .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
-            .where(
-                VirtualEntityRow.entity_type == scope_type,
-                VirtualEntityRow.entity_id == scope_id,
-                EntityMembershipRow.entity_type == scope_type,
-                EntityMembershipRow.entity_id == scope_id,
+            sa.select(EntityMembershipRow.member_entity_id).where(
+                EntityMembershipRow.virtual_entity_id == node,
+                EntityMembershipRow.member_entity_id == node,
             )
         )
         return row is not None
@@ -402,14 +410,11 @@ async def _self_binding_exists(
     database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: ScopeType = _SCOPE_TYPE
 ) -> bool:
     async with database.begin_readonly_session() as sess:
+        node = _node_id(scope_type, scope_id)
         row = await sess.scalar(
-            sa.select(ScopeBindingRow.scope_id)
-            .join(VirtualEntityRow, ScopeBindingRow.virtual_entity_id == VirtualEntityRow.id)
-            .where(
-                VirtualEntityRow.entity_type == scope_type,
-                VirtualEntityRow.entity_id == scope_id,
-                ScopeBindingRow.scope_type == scope_type,
-                ScopeBindingRow.scope_id == scope_id,
+            sa.select(ScopeBindingRow.scope_entity_id).where(
+                ScopeBindingRow.virtual_entity_id == node,
+                ScopeBindingRow.scope_entity_id == node,
             )
         )
         return row is not None
@@ -419,14 +424,14 @@ async def _parent_membership_entity_ids(
     database: ExtendedAsyncSAEngine, parent_id: UUID
 ) -> set[UUID]:
     """Entity ids enrolled in the parent scope's virtual entity."""
+    member = aliased(VirtualEntityRow)
     async with database.begin_readonly_session() as sess:
         rows = await sess.scalars(
-            sa.select(EntityMembershipRow.entity_id)
-            .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
+            sa.select(member.entity_id)
+            .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == member.id)
             .where(
-                VirtualEntityRow.entity_type == _PARENT_SCOPE_TYPE,
-                VirtualEntityRow.entity_id == parent_id,
-                EntityMembershipRow.entity_type == _SCOPE_TYPE,
+                EntityMembershipRow.virtual_entity_id == _node_id(_PARENT_SCOPE_TYPE, parent_id),
+                member.entity_type == _SCOPE_TYPE,
             )
         )
         return set(rows.all())
@@ -438,13 +443,9 @@ async def _parent_binding_exists(
     """Whether the parent scope is bound into the new entity's virtual entity."""
     async with database.begin_readonly_session() as sess:
         row = await sess.scalar(
-            sa.select(ScopeBindingRow.scope_id)
-            .join(VirtualEntityRow, ScopeBindingRow.virtual_entity_id == VirtualEntityRow.id)
-            .where(
-                VirtualEntityRow.entity_type == _SCOPE_TYPE,
-                VirtualEntityRow.entity_id == scope_id,
-                ScopeBindingRow.scope_type == _PARENT_SCOPE_TYPE,
-                ScopeBindingRow.scope_id == parent_id,
+            sa.select(ScopeBindingRow.scope_entity_id).where(
+                ScopeBindingRow.virtual_entity_id == _node_id(_SCOPE_TYPE, scope_id),
+                ScopeBindingRow.scope_entity_id == _node_id(_PARENT_SCOPE_TYPE, parent_id),
             )
         )
         return row is not None
@@ -460,21 +461,18 @@ class _RoleProbe:
 
 async def _scope_roles(database: ExtendedAsyncSAEngine, scope_id: UUID) -> dict[str, _RoleProbe]:
     """The roles enrolled in the scope's virtual entity, by name."""
+    role_node = aliased(VirtualEntityRow)
     async with database.begin_readonly_session() as sess:
         rows = (
             await sess.execute(
                 sa.select(
                     RoleRow.name, RoleRow.id, RoleRow.source, RoleRow.status, RoleRow.auto_assign
                 )
-                .join(EntityMembershipRow, EntityMembershipRow.entity_id == RoleRow.id)
-                .join(
-                    VirtualEntityRow,
-                    EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id,
-                )
+                .join(role_node, role_node.entity_id == RoleRow.id)
+                .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == role_node.id)
                 .where(
-                    VirtualEntityRow.entity_type == _SCOPE_TYPE,
-                    VirtualEntityRow.entity_id == scope_id,
-                    EntityMembershipRow.entity_type == EntityType("role"),
+                    EntityMembershipRow.virtual_entity_id == _node_id(_SCOPE_TYPE, scope_id),
+                    role_node.entity_type == EntityType("role"),
                 )
             )
         ).all()

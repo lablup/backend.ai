@@ -612,16 +612,14 @@ async def domain_fixture(
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                entity_type=EntityType.DOMAIN,
-                entity_id=row.id,
+                member_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                scope_type=ScopeType.DOMAIN,
-                scope_id=row.id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -821,16 +819,14 @@ async def group_fixture(
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=group_id,
+                member_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -870,16 +866,14 @@ class VirtualEntitySeeder:
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                entity_type=EntityType.USER,
-                entity_id=str(user_uuid),
+                member_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -899,11 +893,18 @@ class VirtualEntitySeeder:
                 )
             )
         ).scalar_one()
+        user_scope_id = (
+            await conn.execute(
+                sa.select(VirtualEntityRow.__table__.c.id).where(
+                    VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+                    VirtualEntityRow.__table__.c.entity_id == str(user_uuid),
+                )
+            )
+        ).scalar_one()
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=project_scope_id,
-                entity_type=EntityType.USER,
-                entity_id=str(user_uuid),
+                member_entity_id=user_scope_id,
                 permission_cap=None,
             )
         )
@@ -1006,12 +1007,6 @@ async def admin_user_fixture(
             )
         )
         await conn.execute(
-            EntityMembershipRow.__table__.delete().where(
-                EntityMembershipRow.__table__.c.entity_type == EntityType.USER,
-                EntityMembershipRow.__table__.c.entity_id == str(data.user_uuid),
-            )
-        )
-        await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
         )
         # The entity-membership and scope-binding rows cascade from the virtual entity.
@@ -1110,12 +1105,6 @@ async def regular_user_fixture(
         await conn.execute(
             AssociationScopesEntitiesRow.__table__.delete().where(
                 AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
-            )
-        )
-        await conn.execute(
-            EntityMembershipRow.__table__.delete().where(
-                EntityMembershipRow.__table__.c.entity_type == EntityType.USER,
-                EntityMembershipRow.__table__.c.entity_id == str(data.user_uuid),
             )
         )
         await conn.execute(

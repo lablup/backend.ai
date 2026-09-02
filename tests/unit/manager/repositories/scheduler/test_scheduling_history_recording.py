@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from sqlalchemy.orm import aliased
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -570,18 +571,20 @@ class TestEnqueueSessionSchedulingHistory:
                 )
                 is not None
             )
+            scope = aliased(VirtualEntityRow, name="scope_virtual_entity")
             parents = (
                 await db_sess.execute(
-                    sa.select(ScopeBindingRow.scope_type, ScopeBindingRow.scope_id)
+                    sa.select(scope.entity_type, scope.entity_id)
                     .select_from(ScopeBindingRow)
                     .join(
                         VirtualEntityRow,
                         VirtualEntityRow.id == ScopeBindingRow.virtual_entity_id,
                     )
+                    .join(scope, scope.id == ScopeBindingRow.scope_entity_id)
                     .where(VirtualEntityRow.entity_id == session_id)
                 )
             ).all()
-            assert {(row.scope_type, row.scope_id) for row in parents} == {
+            assert {(row.entity_type, row.entity_id) for row in parents} == {
                 ("session", session_id),
                 ("user", UserID(test_user_uuid)),
                 ("project", ProjectID(test_group_id)),

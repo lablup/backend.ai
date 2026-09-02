@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.group.handler import GroupHandler
@@ -163,16 +163,14 @@ async def target_group(
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=group_id,
+                member_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
