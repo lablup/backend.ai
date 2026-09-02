@@ -6,7 +6,12 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.config import DEFAULT_SHELL, PresetModelDefinition, PreStartAction
+from ai.backend.common.config import (
+    DEFAULT_SHELL,
+    PresetModelDefinition,
+    PresetModelDefinitionDraft,
+    PreStartAction,
+)
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -173,6 +178,68 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     )
 
 
+class UpdatePresetModelHealthCheckInput(BaseRequestModel):
+    """Patch for a preset model's health check. Omit a field to keep its current stored value."""
+
+    enable: bool | None = Field(default=None)
+    interval: float | None = Field(default=None)
+    path: str | None = Field(default=None)
+    max_retries: int | None = Field(default=None)
+    max_wait_time: float | None = Field(default=None)
+    expected_status_code: int | None = Field(default=None, gt=100)
+    initial_delay: float | None = Field(default=None, ge=0)
+
+
+class UpdatePresetModelMetadataInput(BaseRequestModel):
+    """Patch for a preset model's metadata. Omit a field to keep its current stored value."""
+
+    author: str | None = Field(default=None)
+    title: str | None = Field(default=None)
+    version: str | None = Field(default=None)
+    created: str | None = Field(default=None)
+    last_modified: str | None = Field(default=None)
+    description: str | None = Field(default=None)
+    task: str | None = Field(default=None)
+    category: str | None = Field(default=None)
+    architecture: str | None = Field(default=None)
+    framework: list[str] | None = Field(default=None)
+    label: list[str] | None = Field(default=None)
+    license: str | None = Field(default=None)
+    min_resource: dict[str, Any] | None = Field(default=None)
+
+
+class UpdatePresetModelServiceConfigInput(BaseRequestModel):
+    """Patch for a preset model's service config. Omit a field to keep its current stored value."""
+
+    pre_start_actions: list[PreStartAction] | None = Field(default=None)
+    command: str | None = Field(default=None)
+    start_command: list[str] | None = Field(default=None)
+    shell: str | None = Field(default=None)
+    port: int | None = Field(default=None, gt=1)
+    health_check: UpdatePresetModelHealthCheckInput | None = Field(default=None)
+
+
+class UpdatePresetModelConfigInput(BaseRequestModel):
+    """Patch for a single preset model entry. Omit a field to keep its current stored value."""
+
+    name: str | None = Field(default=None, min_length=1)
+    model_path: str | None = Field(default=None, min_length=1)
+    service: UpdatePresetModelServiceConfigInput | None = Field(default=None)
+    metadata: UpdatePresetModelMetadataInput | None = Field(default=None)
+
+
+class UpdatePresetModelDefinitionInput(BaseRequestModel):
+    """Patch for a preset's model definition. Omit `models` to keep the current model entry."""
+
+    models: list[UpdatePresetModelConfigInput] | None = Field(default=None, max_length=1)
+
+    def to_draft(self) -> PresetModelDefinitionDraft:
+        # exclude_unset keeps the resulting draft's model_fields_set aligned with what the
+        # caller actually provided, so merging onto the stored preset doesn't clobber fields
+        # the caller didn't touch.
+        return PresetModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
+
+
 class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     id: UUID = Field(description="Preset ID.")
     runtime_variant_id: RuntimeVariantID | None = Field(default=None)
@@ -180,7 +247,7 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     description: str | Sentinel | None = Field(default=SENTINEL)
     rank: int | None = Field(default=None, ge=0)
     image_id: ImageID | Sentinel | None = Field(default=SENTINEL)
-    model_definition: PresetModelDefinitionInput | Sentinel | None = Field(default=SENTINEL)
+    model_definition: UpdatePresetModelDefinitionInput | Sentinel | None = Field(default=SENTINEL)
     resource_slots: list[ResourceSlotEntryInput] | None = Field(default=None)
     resource_opts: list[ResourceOptsEntryDTO] | None = Field(default=None)
     cluster_mode: str | None = Field(default=None, max_length=16)

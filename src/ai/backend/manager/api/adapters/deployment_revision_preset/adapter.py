@@ -9,6 +9,7 @@ from ai.backend.common.config import (
     ModelMetadata,
     PresetModelConfig,
     PresetModelDefinition,
+    PresetModelDefinitionDraft,
     PresetModelServiceConfig,
     PreStartAction,
 )
@@ -24,9 +25,9 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
     DeploymentRevisionPresetOrder,
-    PresetModelDefinitionInput,
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
+    UpdatePresetModelDefinitionInput,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     CreateDeploymentRevisionPresetPayload,
@@ -285,6 +286,12 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         self,
         input: UpdateDeploymentRevisionPresetInput,
     ) -> UpdateDeploymentRevisionPresetPayload:
+        # A model_definition patch merges onto the currently stored preset, so fetch it
+        # upfront when it's being patched (SENTINEL/None need no current value).
+        current: DeploymentRevisionPresetNode | None = None
+        if input.model_definition not in (SENTINEL, None):
+            current = await self.get(input.id)
+
         slot_creators: list[PresetResourceSlotCreator] | None = (
             [
                 PresetResourceSlotCreator(entry=entry)
@@ -304,7 +311,8 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             else OptionalState.nop()
         )
         model_def_state: TriState[PresetModelDefinition] = self._convert_model_definition_state(
-            input.model_definition
+            input.model_definition,
+            current.model_definition if current is not None else None,
         )
 
         updater = DeploymentPresetUpdater(
@@ -558,13 +566,18 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
 
     @staticmethod
     def _convert_model_definition_state(
-        value: PresetModelDefinitionInput | Sentinel | None,
+        value: UpdatePresetModelDefinitionInput | Sentinel | None,
+        current: PresetModelDefinitionInfoDTO | None,
     ) -> TriState[PresetModelDefinition]:
         if value is SENTINEL:
             return TriState.nop()
         if value is None:
             return TriState.nullify()
-        return TriState.update(value.to_model_definition())
+        base_draft = PresetModelDefinitionDraft()
+        if current is not None:
+            base_draft = PresetModelDefinitionDraft.model_validate(current.model_dump())
+        merged = base_draft.merge(value.to_draft())
+        return TriState.update(merged.to_resolved())
 
     @staticmethod
     def _convert_tri_state(value: Any) -> TriState[Any]:
