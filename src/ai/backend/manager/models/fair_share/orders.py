@@ -122,12 +122,12 @@ class RGProjectFairShareOrders:
 
     @staticmethod
     def by_project_name(ascending: bool = True) -> QueryOrder:
-        col = ProjectRow.name
+        col = GroupRow.name
         return col.asc() if ascending else col.desc()
 
     @staticmethod
     def by_project_is_active(ascending: bool = True) -> QueryOrder:
-        col = ProjectRow.is_active
+        col = GroupRow.is_active
         return col.asc() if ascending else col.desc()
 
     @staticmethod
