@@ -42,7 +42,6 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
-from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
@@ -717,15 +716,15 @@ class SchedulerRepository:
         self,
         network_type: NetworkType | None,
         network_id: str | None,
-    ) -> NetworkData | None:
+    ) -> str | None:
         """
-        Resolve a session's network reference to the network row behind it.
+        Resolve a session's container network name.
 
         The scheduler-side counterpart of ``SessionRow.get_network_ref()``.
 
         :param network_type: The ``sessions.network_type`` value
         :param network_id: The ``sessions.network_id`` value
-        :return: The network data, or None when no row backs the reference
+        :return: The container network name, or None when the session has no network
         """
         return await self._db_source.get_network_ref(network_type, network_id)
 

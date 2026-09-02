@@ -463,20 +463,22 @@ class SessionLauncher:
         :param session: Session data containing network type and configuration
         :return: NetworkSetup with network config and SSH port mapping
         """
-        network_name: str | None = None
         network_config: dict[str, Any] = {}
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None
 
         network_type = session.network_type or NetworkType.VOLATILE
+        # The name a session already has; the branches below create one where it has none.
+        network_name = await self._repository.get_network_ref(network_type, session.network_id)
 
         if network_type == NetworkType.PERSISTENT:
-            network = await self._repository.get_network_ref(network_type, session.network_id)
-            if network is None:
+            if network_name is None:
                 raise ServerMisconfiguredError(
                     f"Session {session.session_id} uses a persistent network but has no network ID."
                 )
-            network_name = network.ref_name
-            network_config = {"mode": network.driver, "network_name": network.ref_name}
+            driver = self._config_provider.config.network.inter_container.default_driver
+            if driver is None:
+                raise ValueError("No inter-container network driver is configured.")
+            network_config = {"mode": driver, "network_name": network_name}
         elif network_type == NetworkType.VOLATILE:
             if session.cluster_mode == ClusterMode.SINGLE_NODE and len(session.kernels) > 1:
                 # Create single-node network for multi-kernel sessions

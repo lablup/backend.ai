@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
@@ -12,7 +11,6 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.data.entity.network import NetworkID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -24,7 +22,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
@@ -58,28 +55,17 @@ def mock_repository() -> AsyncMock:
     repository = AsyncMock()
     repository.update_session_error_info = AsyncMock(return_value=None)
     repository.update_session_network_id = AsyncMock(return_value=None)
-    persistent_network = NetworkData(
-        id=_PERSISTENT_NETWORK_ID,
-        name="testnet",
-        ref_name=_PERSISTENT_NETWORK_REF_NAME,
-        driver="overlay",
-        project_id=ProjectID(uuid4()),
-        domain_name="default",
-        options={
-            "mode": "overlay",
-            "network_name": _PERSISTENT_NETWORK_REF_NAME,
-            "network_id": "swarm-scoped-id",
-        },
-        created_at=datetime(2026, 1, 1, tzinfo=UTC),
-        updated_at=None,
-    )
 
     async def get_network_ref(
         network_type: NetworkType | None, network_id: str | None
-    ) -> NetworkData | None:
-        if not network_id or network_type != NetworkType.PERSISTENT:
+    ) -> str | None:
+        if not network_id or not network_type:
             return None
-        return persistent_network
+        match network_type:
+            case NetworkType.VOLATILE | NetworkType.HOST:
+                return network_id
+            case NetworkType.PERSISTENT:
+                return _PERSISTENT_NETWORK_REF_NAME
 
     repository.get_network_ref = AsyncMock(side_effect=get_network_ref)
     return repository

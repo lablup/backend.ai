@@ -55,7 +55,6 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, SSHKeypair
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
-from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
@@ -3876,31 +3875,31 @@ class ScheduleDBSource:
         self,
         network_type: NetworkType | None,
         network_id: str | None,
-    ) -> NetworkData | None:
+    ) -> str | None:
         """
-        Resolve a session's network reference to the network row behind it.
+        Resolve a session's container network name.
 
-        The scheduler-side counterpart of ``SessionRow.get_network_ref()``: that method
-        resolves the same two columns to a container network name, this one to the row
-        that names it. Only a persistent network is backed by a row.
+        The scheduler-side counterpart of ``SessionRow.get_network_ref()``, resolving
+        the same two columns by the same rule. The launcher writes the value this
+        returns, so the two must agree.
 
         :param network_type: The ``sessions.network_type`` value
         :param network_id: The ``sessions.network_id`` value
-        :return: The network data, or None when no row backs the reference
+        :return: The container network name, or None when the session has no network
         """
         if not network_id or not network_type:
             return None
         match network_type:
             case NetworkType.VOLATILE | NetworkType.HOST:
-                return None
+                return network_id
             case NetworkType.PERSISTENT:
                 async with self._db.begin_readonly_session() as db_sess:
-                    row = await db_sess.scalar(
-                        sa.select(NetworkRow).where(NetworkRow.id == UUID(network_id))
+                    ref_name = await db_sess.scalar(
+                        sa.select(NetworkRow.ref_name).where(NetworkRow.id == UUID(network_id))
                     )
-                    if row is None:
+                    if ref_name is None:
                         raise ObjectNotFound(object_name="network")
-                    return row.to_data()
+                    return ref_name
 
     async def update_session_network_id(
         self,
