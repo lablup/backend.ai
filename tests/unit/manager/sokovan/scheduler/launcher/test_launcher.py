@@ -392,7 +392,7 @@ class TestSessionLauncherNetworkSetup:
         mock_client = mock_agent_client_pool._mock_client
         cluster_info = mock_client.create_kernels.call_args[0][3]
         assert cluster_info["network_config"] == {
-            "mode": "overlay",
+            "mode": "bridge",
             "network_name": "bai-multinode-00000000-0000-0000-0000-0000000000b2-nw",
         }
 

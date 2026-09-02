@@ -475,10 +475,7 @@ class SessionLauncher:
                 raise ServerMisconfiguredError(
                     f"Session {session.session_id} uses a persistent network but has no network ID."
                 )
-            driver = self._config_provider.config.network.inter_container.default_driver
-            if driver is None:
-                raise ValueError("No inter-container network driver is configured.")
-            network_config = {"mode": driver, "network_name": network_name}
+            network_config = {"mode": "bridge", "network_name": network_name}
         elif network_type == NetworkType.VOLATILE:
             if session.cluster_mode == ClusterMode.SINGLE_NODE and len(session.kernels) > 1:
                 # Create single-node network for multi-kernel sessions
