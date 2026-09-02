@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
 from itertools import groupby
+from typing import Any
 from uuid import UUID
 
 import async_timeout
@@ -463,138 +464,110 @@ class SessionLauncher:
         :param session: Session data containing network type and configuration
         :return: NetworkSetup with network config and SSH port mapping
         """
-        setup = await self._resolve_network(session)
-        await self._repository.update_session_network_id(
-            session.session_id,
-            setup.session_network_id,
-        )
-        return setup
+        network_name: str | None = None
+        network_config: dict[str, Any] = {}
+        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None
 
-    async def _resolve_network(self, session: SessionDataForStart) -> NetworkSetup:
-        """
-        Resolve the container network a session runs on, creating it when the session
-        owns it.
+        network_type = session.network_type or NetworkType.VOLATILE
 
-        The launch-time counterpart of ``SessionRow.get_network_ref()``: that method
-        reads a session's network reference back out of ``sessions.network_id``, this
-        one decides what goes in.
-        """
-        match session.network_type or NetworkType.VOLATILE:
-            case NetworkType.PERSISTENT:
-                return await self._attach_persistent_network(session)
-            case NetworkType.VOLATILE:
-                return await self._create_volatile_network(session)
-            case NetworkType.HOST:
-                return await self._setup_host_network(session)
-
-    async def _attach_persistent_network(self, session: SessionDataForStart) -> NetworkSetup:
-        """
-        Resolve a pre-created network the session attaches to.
-
-        ``sessions.network_id`` holds ``networks.id`` here, so the reference stays as
-        it is and the container network name comes off the row.
-        """
-        if not session.network_id:
-            raise ServerMisconfiguredError(
-                f"Session {session.session_id} uses a persistent network but has no network ID."
-            )
-        network = await self._repository.get_network(NetworkID(UUID(session.network_id)))
-        return NetworkSetup(
-            network_name=network.ref_name,
-            network_config={
+        if network_type == NetworkType.PERSISTENT:
+            # sessions.network_id holds networks.id; the actual container network name
+            # is the plugin-generated networks.ref_name.
+            if not session.network_id:
+                raise ServerMisconfiguredError(
+                    f"Session {session.session_id} uses a persistent network but has no network ID."
+                )
+            network = await self._repository.get_network(NetworkID(UUID(session.network_id)))
+            network_name = network.ref_name
+            network_config = {
                 **network.options,
                 "mode": network.driver,
                 "network_name": network.ref_name,
-            },
-            session_network_id=session.network_id,
-        )
-
-    async def _create_volatile_network(self, session: SessionDataForStart) -> NetworkSetup:
-        """Create the network a multi-kernel session owns for its own lifetime."""
-        if session.cluster_mode == ClusterMode.SINGLE_NODE and len(session.kernels) > 1:
-            # Create single-node network for multi-kernel sessions
-            network_name = f"bai-singlenode-{session.session_id}"
-            first_kernel = session.kernels[0]
-            if not first_kernel.agent_id:
-                raise ValueError(f"No agent assigned for kernel {first_kernel.kernel_id}")
-            try:
-                async with self._agent_client_pool.acquire(first_kernel.agent_id) as client:
-                    await client.create_local_network(network_name)
-            except Exception:
-                log.exception("Failed to create agent-local network {}", network_name)
-                raise
-            return NetworkSetup(
-                network_name=network_name,
-                network_config={
+            }
+        elif network_type == NetworkType.VOLATILE:
+            if session.cluster_mode == ClusterMode.SINGLE_NODE and len(session.kernels) > 1:
+                # Create single-node network for multi-kernel sessions
+                network_name = f"bai-singlenode-{session.session_id}"
+                first_kernel = session.kernels[0]
+                if not first_kernel.agent_id:
+                    raise ValueError(f"No agent assigned for kernel {first_kernel.kernel_id}")
+                try:
+                    async with self._agent_client_pool.acquire(first_kernel.agent_id) as client:
+                        await client.create_local_network(network_name)
+                except Exception:
+                    log.exception("Failed to create agent-local network {}", network_name)
+                    raise
+                network_config = {
                     "mode": "bridge",
                     "network_name": network_name,
-                },
-                session_network_id=network_name,
-            )
-        if session.cluster_mode == ClusterMode.MULTI_NODE:
-            # Create overlay network for multi-node sessions
-            driver = self._config_provider.config.network.inter_container.default_driver
-            if driver is None:
-                raise ValueError("No inter-container network driver is configured.")
+                }
+            elif session.cluster_mode == ClusterMode.MULTI_NODE:
+                # Create overlay network for multi-node sessions
+                driver = self._config_provider.config.network.inter_container.default_driver
+                if driver is None:
+                    raise ValueError("No inter-container network driver is configured.")
 
-            # Check if plugin is available
-            if driver not in self._network_plugin_ctx.plugins:
-                available_plugins = list(self._network_plugin_ctx.plugins.keys())
-                log.error(
-                    "Network plugin '{}' not found. Available plugins: {}. For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'.",
-                    driver,
-                    available_plugins,
-                )
-                raise KeyError(
-                    f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
-                    f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
-                )
-
-            network_plugin = self._network_plugin_ctx.plugins[driver]
-            try:
-                network_info = await network_plugin.create_network(
-                    identifier=str(session.session_id)
-                )
-            except Exception:
-                log.exception("Failed to create the inter-container network (plugin: {})", driver)
-                raise
-            return NetworkSetup(
-                network_name=network_info.network_id,
-                network_config=dict(network_info.options),
-                session_network_id=network_info.network_id,
-            )
-        return NetworkSetup()
-
-    async def _setup_host_network(self, session: SessionDataForStart) -> NetworkSetup:
-        """Put the session on the host network, mapping SSH ports across its kernels."""
-        cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None
-        # Setup SSH port mapping for multi-kernel sessions in host mode
-        if len(session.kernels) > 1:
-            port_mapping: dict[str, tuple[str, int]] = {}
-            for kernel in session.kernels:
-                if not kernel.agent_id:
-                    log.warning(
-                        "No agent assigned for kernel {}, skipping port mapping",
-                        kernel.kernel_id,
+                # Check if plugin is available
+                if driver not in self._network_plugin_ctx.plugins:
+                    available_plugins = list(self._network_plugin_ctx.plugins.keys())
+                    log.error(
+                        "Network plugin '{}' not found. Available plugins: {}. For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'.",
+                        driver,
+                        available_plugins,
                     )
-                    continue
-                async with self._agent_client_pool.acquire(kernel.agent_id) as client:
-                    port = await client.assign_port()
-                # Extract host from agent_addr
-                agent_addr = kernel.agent_addr or ""
-                agent_host = (
-                    agent_addr.replace("tcp://", "").split(":", maxsplit=1)[0]
-                    if agent_addr
-                    else "localhost"
-                )
-                cluster_hostname = f"node-{kernel.kernel_id}"
-                port_mapping[cluster_hostname] = (agent_host, port)
-            cluster_ssh_port_mapping = ClusterSSHPortMapping(port_mapping)
+                    raise KeyError(
+                        f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
+                        f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
+                    )
+
+                network_plugin = self._network_plugin_ctx.plugins[driver]
+                try:
+                    network_info = await network_plugin.create_network(
+                        identifier=str(session.session_id)
+                    )
+                    network_config = dict(network_info.options)
+                    network_name = network_info.network_id
+                except Exception:
+                    log.exception(
+                        "Failed to create the inter-container network (plugin: {})", driver
+                    )
+                    raise
+        elif network_type == NetworkType.HOST:
+            network_config = {"mode": "host"}
+            network_name = "host"
+
+            # Setup SSH port mapping for multi-kernel sessions in host mode
+            if len(session.kernels) > 1:
+                port_mapping: dict[str, tuple[str, int]] = {}
+                for kernel in session.kernels:
+                    if not kernel.agent_id:
+                        log.warning(
+                            "No agent assigned for kernel {}, skipping port mapping",
+                            kernel.kernel_id,
+                        )
+                        continue
+                    async with self._agent_client_pool.acquire(kernel.agent_id) as client:
+                        port = await client.assign_port()
+                    # Extract host from agent_addr
+                    agent_addr = kernel.agent_addr or ""
+                    agent_host = (
+                        agent_addr.replace("tcp://", "").split(":", maxsplit=1)[0]
+                        if agent_addr
+                        else "localhost"
+                    )
+                    cluster_hostname = f"node-{kernel.kernel_id}"
+                    port_mapping[cluster_hostname] = (agent_host, port)
+                cluster_ssh_port_mapping = ClusterSSHPortMapping(port_mapping)
+
+        if network_type != NetworkType.PERSISTENT:
+            await self._repository.update_session_network_id(
+                session.session_id,
+                network_name,
+            )
         return NetworkSetup(
-            network_name="host",
-            network_config={"mode": "host"},
+            network_name=network_name,
+            network_config=network_config,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
-            session_network_id="host",
         )
 
     async def _create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
