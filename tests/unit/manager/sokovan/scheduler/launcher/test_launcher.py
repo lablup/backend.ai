@@ -408,7 +408,7 @@ class TestSessionLauncherNetworkSetup:
 
         Given: Session whose network_id points at a networks row
         When: Start session
-        Then: The reference is left alone, so teardown can still resolve it
+        Then: The stored reference still resolves to the same network
         """
         session_ids = [session_for_start_persistent_network.session_id]
         with RecorderContext.scope("test", entity_ids=session_ids):
@@ -417,7 +417,10 @@ class TestSessionLauncherNetworkSetup:
                 image_config_default,
             )
 
-        mock_repository.update_session_network_id.assert_not_awaited()
+        mock_repository.update_session_network_id.assert_awaited_once_with(
+            session_for_start_persistent_network.session_id,
+            session_for_start_persistent_network.network_id,
+        )
 
     async def test_persistent_network_without_id_reports_error(
         self,
