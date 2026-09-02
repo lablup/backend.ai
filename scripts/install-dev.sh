@@ -48,10 +48,9 @@ trim() {
 }
 
 example_keypair_field() {
-  # Read one field of the example keypair owned by a user, addressed by e-mail.
-  # The keypair fixture references its owner by UUID, so the e-mail has to be
-  # resolved through the user fixture first.
   # $1: user e-mail, $2: keypair field name
+  # The keypair fixture references its owner by UUID, so the e-mail is
+  # resolved through the user fixture first.
   local value
   value=$(jq -r \
     --arg email "$1" \
@@ -61,7 +60,7 @@ example_keypair_field() {
      | .keypairs[] | select(.user as $owner | $uuids | index($owner)) | .[$field]' \
     fixtures/manager/example-keypairs.json)
   if [ -z "${value}" ] || [ "${value}" = "null" ]; then
-    show_error "No example keypair ${2} found for ${1}."
+    show_error "No example keypair ${2} found for ${1}." >&2
     return 1
   fi
   echo "${value}"
