@@ -56,18 +56,12 @@ def mock_repository() -> AsyncMock:
     repository.update_session_error_info = AsyncMock(return_value=None)
     repository.update_session_network_id = AsyncMock(return_value=None)
 
-    async def get_network_ref(
-        network_type: NetworkType | None, network_id: str | None
-    ) -> str | None:
-        if not network_id or not network_type:
-            return None
-        match network_type:
-            case NetworkType.VOLATILE | NetworkType.HOST:
-                return network_id
-            case NetworkType.PERSISTENT:
-                return _PERSISTENT_NETWORK_REF_NAME
+    async def get_attached_network_ref(network_id: str) -> str | None:
+        if network_id == str(_PERSISTENT_NETWORK_ID):
+            return _PERSISTENT_NETWORK_REF_NAME
+        return None
 
-    repository.get_network_ref = AsyncMock(side_effect=get_network_ref)
+    repository.get_attached_network_ref = AsyncMock(side_effect=get_attached_network_ref)
     return repository
 
 

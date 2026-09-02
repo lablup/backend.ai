@@ -69,7 +69,6 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
@@ -84,7 +83,7 @@ from ai.backend.manager.models.kernel import (
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
-from ai.backend.manager.models.network import NetworkRow, NetworkType
+from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
 from ai.backend.manager.models.resource_group import ResourceGroupRow, query_allowed_sgroups
 from ai.backend.manager.models.resource_policy import (
@@ -3871,35 +3870,21 @@ class ScheduleDBSource:
 
             return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
 
-    async def get_network_ref(
-        self,
-        network_type: NetworkType | None,
-        network_id: str | None,
-    ) -> str | None:
+    async def get_attached_network_ref(self, network_id: str) -> str | None:
         """
-        Resolve a session's container network name.
+        Fetch the container network name of the network a session attaches to.
 
-        The scheduler-side counterpart of ``SessionRow.get_network_ref()``, resolving
-        the same two columns by the same rule. The launcher writes the value this
-        returns, so the two must agree.
+        Only a persistent session attaches to a pre-created network; the other types
+        name a network they own, which ``SessionRow.get_network_ref()`` returns as-is.
 
-        :param network_type: The ``sessions.network_type`` value
-        :param network_id: The ``sessions.network_id`` value
-        :return: The container network name, or None when the session has no network
+        :param network_id: The ``networks.id`` held by ``sessions.network_id``
+        :return: The plugin-generated ``ref_name``, or None when no such network exists
         """
-        if not network_id or not network_type:
-            return None
-        match network_type:
-            case NetworkType.VOLATILE | NetworkType.HOST:
-                return network_id
-            case NetworkType.PERSISTENT:
-                async with self._db.begin_readonly_session() as db_sess:
-                    ref_name = await db_sess.scalar(
-                        sa.select(NetworkRow.ref_name).where(NetworkRow.id == UUID(network_id))
-                    )
-                    if ref_name is None:
-                        raise ObjectNotFound(object_name="network")
-                    return ref_name
+        async with self._db.begin_readonly_session() as db_sess:
+            ref_name: str | None = await db_sess.scalar(
+                sa.select(NetworkRow.ref_name).where(NetworkRow.id == UUID(network_id))
+            )
+            return ref_name
 
     async def update_session_network_id(
         self,

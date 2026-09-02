@@ -46,7 +46,6 @@ from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
-from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -712,21 +711,14 @@ class SchedulerRepository:
         await self._cache_source.invalidate_kernel_related_cache(access_keys)
 
     @scheduler_repository_resilience.apply()
-    async def get_network_ref(
-        self,
-        network_type: NetworkType | None,
-        network_id: str | None,
-    ) -> str | None:
+    async def get_attached_network_ref(self, network_id: str) -> str | None:
         """
-        Resolve a session's container network name.
+        Fetch the container network name of the network a session attaches to.
 
-        The scheduler-side counterpart of ``SessionRow.get_network_ref()``.
-
-        :param network_type: The ``sessions.network_type`` value
-        :param network_id: The ``sessions.network_id`` value
-        :return: The container network name, or None when the session has no network
+        :param network_id: The ``networks.id`` held by ``sessions.network_id``
+        :return: The plugin-generated ``ref_name``, or None when no such network exists
         """
-        return await self._db_source.get_network_ref(network_type, network_id)
+        return await self._db_source.get_attached_network_ref(network_id)
 
     @scheduler_repository_resilience.apply()
     async def update_session_network_id(
