@@ -33,6 +33,7 @@ class RateLimitExceedCase:
 
     rate_limit: int | None
     rolling_count: int
+    expected_limit: str
     description: str = ""
 
 
@@ -176,16 +177,19 @@ class TestRlimMiddleware:
             RateLimitExceedCase(
                 rate_limit=30000,
                 rolling_count=30001,
+                expected_limit="30000",
                 description="exceeds by 1",
             ),
             RateLimitExceedCase(
                 rate_limit=30000,
                 rolling_count=50000,
+                expected_limit="30000",
                 description="far exceeds limit",
             ),
             RateLimitExceedCase(
                 rate_limit=0,
                 rolling_count=1,
+                expected_limit="0",
                 description="zero limit always exceeds",
             ),
         ],
@@ -207,8 +211,11 @@ class TestRlimMiddleware:
         )
 
         # Act & Assert
-        with pytest.raises(RateLimitExceeded):
+        with pytest.raises(RateLimitExceeded) as exc_info:
             await middleware(mock_request_authorized, mock_handler)
+        assert exc_info.value.headers["X-RateLimit-Limit"] == test_case.expected_limit
+        assert exc_info.value.headers["X-RateLimit-Remaining"] == "0"
+        assert exc_info.value.headers["X-RateLimit-Window"] == str(_rlim_window)
 
         # Handler should not be called when rate limit exceeded
         mock_handler.assert_not_called()

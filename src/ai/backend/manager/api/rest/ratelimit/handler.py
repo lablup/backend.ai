@@ -25,6 +25,14 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _rlim_window: Final = 60 * 15
 
 
+def _rlim_headers(rate_limit: int | None, remaining: int) -> dict[str, str]:
+    return {
+        "X-RateLimit-Limit": str(rate_limit),
+        "X-RateLimit-Remaining": str(remaining),
+        "X-RateLimit-Window": str(_rlim_window),
+    }
+
+
 def make_rlim_middleware(
     valkey_client: ValkeyRateLimitClient,
 ) -> Middleware:
@@ -43,12 +51,10 @@ def make_rlim_middleware(
                 window=_rlim_window,
             )
             if rate_limit is not None and rolling_count > rate_limit:
-                raise RateLimitExceeded
+                raise RateLimitExceeded(headers=_rlim_headers(rate_limit, 0))
             remaining = rate_limit - rolling_count if rate_limit is not None else rolling_count
             response = await handler(request)
-            response.headers["X-RateLimit-Limit"] = str(rate_limit)
-            response.headers["X-RateLimit-Remaining"] = str(remaining)
-            response.headers["X-RateLimit-Window"] = str(_rlim_window)
+            response.headers.update(_rlim_headers(rate_limit, remaining))
             return response
         # No checks for rate limiting for non-authorized queries.
         response = await handler(request)
