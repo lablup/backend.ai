@@ -1,4 +1,4 @@
-.TH ALL-SMI 1 "July 2026" "all-smi 0.25.0" "User Commands"
+.TH ALL-SMI 1 "September 2026" "all-smi 0.26.3" "User Commands"
 .SH NAME
 all-smi \- Command-line utility for monitoring GPU hardware
 .SH SYNOPSIS
@@ -10,6 +10,9 @@ all-smi \- Command-line utility for monitoring GPU hardware
 .br
 .B all-smi
 \fBapi\fR [\fIOPTIONS\fR]
+.br
+.B all-smi
+\fBservice\fR \fISUBCOMMAND\fR [\fIOPTIONS\fR]
 .br
 .B all-smi
 \fBhelp\fR [\fICOMMAND\fR]
@@ -62,6 +65,13 @@ Manage the optional TOML configuration file. Subcommands:
 \(em print the active config-file path and the candidate search order. Read-only; supports \fB--json\fR for scripts.
 .RE
 .TP
+.B service \fISUBCOMMAND\fR
+Install and control \fBall\-smi api\fR as a supervised background service.
+Subcommands: \fBinstall\fR, \fBuninstall\fR, \fBstart\fR, \fBstop\fR,
+\fBrestart\fR, \fBstatus\fR. See
+.B RUNNING AS A SERVICE
+below.
+.TP
 .B help
 Display help information about all-smi or a specific command.
 .SH OPTIONS
@@ -80,7 +90,7 @@ Default: 1 second (Apple Silicon) or 2 seconds (others)
 .SS View Mode Options (Remote Monitoring)
 .TP
 .B \-\-hosts \fIURL\fR...
-(Required) A list of host addresses to connect to for remote monitoring. Multiple hosts can be specified.
+(Required) A list of host addresses to connect to for remote monitoring. Separate endpoints with spaces, commas, or a mixture of both. Explicit HTTP and HTTPS schemes are preserved, and invalid endpoint syntax is rejected before the terminal interface starts.
 Format: http://hostname:port or https://hostname:port
 .TP
 .B \-\-hostfile \fIFILE\fR
@@ -122,6 +132,292 @@ macOS: /tmp/all-smi.sock
 .RS
 Socket permissions are set to 0600 (owner-only access) for security.
 Can be used together with --port for simultaneous TCP and Unix socket listeners.
+.RE
+.SS Service Subcommand Options
+.TP
+.B \-\-user
+Operate on the per\-user service instead of the system\-wide one. Accepted by
+every \fBservice\fR subcommand. Refused on Windows, where the Service Control
+Manager has no per\-user scope. The system scope is the default and requires
+root for every mutating action.
+.TP
+.B \-\-service\-user \fINAME\fR
+(\fBinstall\fR only) Run the service as \fINAME\fR instead of root, setting the
+service definition's user and group fields. Ignored in \fB\-\-user\fR scope.
+.TP
+.B \-\-now
+(\fBinstall\fR only) Start the service immediately in addition to enabling it at
+boot.
+.TP
+.B \-\-force
+(\fBinstall\fR and \fBuninstall\fR) Proceed when a package manager already owns
+the binary, or when the existing service definition lacks the
+\fB# Managed by 'all\-smi service'\fR marker.
+.TP
+.B \-\-json
+(\fBstatus\fR only) Emit a machine\-readable object instead of the human summary.
+Schema: \fB{ "installed": bool, "enabled": bool|null, "running": bool, "pid":
+number|null, "scope": "system"|"user", "detail": string }\fR.
+.SH RUNNING AS A SERVICE
+.B all\-smi api
+is the data source behind
+.B all\-smi view \-\-hosts/\-\-hostfile,
+so on a cluster it wants to start at boot, restart on failure, and log to the
+platform journal. The
+.B service
+subcommand installs and controls it. Runtime configuration deliberately stays
+out of the service definition: there are no \fB\-\-port\fR or
+\fB\-\-interval\fR flags on \fBinstall\fR, because settings live in the
+environment file and the TOML config, so changing one never means regenerating
+the service definition.
+.PP
+Exit codes:
+.B 0
+on success and for a running service,
+.B 3
+for a
+.B status
+query on a stopped or absent service, and
+.B 1
+for every failure.
+.\" Additional platform subsections (macOS launchd, Windows Service Control
+.\" Manager) are appended below the Linux subsection as they land.
+.SS Linux (systemd)
+The canonical unit is \fIpackaging/systemd/all\-smi.service\fR in the source
+tree. Both installation paths use it: the Debian package ships it verbatim, and
+.B all\-smi service install
+embeds the same file and rewrites \fBExecStart=\fR plus the account directives
+for the requested scope.
+.PP
+The Debian package installs the unit
+.B disabled
+and creates a dedicated \fIall\-smi\fR system account. Opening a listening port
+as a side effect of \fBapt install\fR would surprise operators who installed
+all\-smi purely as a CLI tool, so enabling is an explicit step:
+.RS
+.nf
+sudo systemctl enable \-\-now all\-smi
+curl \-s localhost:9090/metrics | head
+journalctl \-u all\-smi \-f
+.fi
+.RE
+.PP
+For a tarball, \fBcargo install\fR, or a local build, use the subcommand:
+.RS
+.nf
+sudo all\-smi service install \-\-now
+all\-smi service status
+sudo all\-smi service uninstall
+
+all\-smi service install \-\-user \-\-now
+loginctl enable\-linger "$USER"   # boot persistence for a user service
+.fi
+.RE
+.PP
+The subcommand default is root rather than a dedicated account, because vendor
+CLIs (\fBhl\-smi\fR, \fBrbln\-stat\fR, \fBfuriosa\-smi\fR,
+\fBtegrastats\fR) differ in the permissions they require and a wrong guess
+yields a silently empty metrics page. Pass \fB\-\-service\-user\fR where your
+vendor stack permits a dedicated account.
+.PP
+.B install
+refuses to run when a package manager already owns the binary (dpkg at
+\fI/usr/bin/all\-smi\fR, or a Homebrew prefix) and names that package manager's
+own command instead. Both \fBinstall\fR and \fBuninstall\fR also refuse to
+touch a unit file lacking the \fB# Managed by 'all\-smi service'\fR marker.
+\fB\-\-force\fR overrides either refusal.
+.PP
+The unit enables \fBNoNewPrivileges\fR, \fBProtectSystem=strict\fR,
+\fBProtectHome\fR, \fBPrivateTmp\fR, \fBProtectKernelModules\fR,
+\fBProtectControlGroups\fR, and \fBRestrictSUIDSGID\fR. \fBPrivateDevices=\fR
+and \fBProtectProc=\fR are deliberately absent: the former would hide
+\fI/dev/nvidia*\fR and \fI/dev/dri/*\fR from NVML and the AMD/Intel readers,
+the latter would hide the processes the process\-metrics reader enumerates.
+.PP
+A user\-scope unit keeps only the hardening that needs no privilege,
+\fBNoNewPrivileges=\fR and \fBRestrictSUIDSGID=\fR, and drops
+\fBSupplementaryGroups=\fR, \fBProtectKernelModules=\fR, \fBProtectSystem=\fR,
+\fBProtectHome=\fR, \fBPrivateTmp=\fR, and \fBProtectControlGroups=\fR. A
+per\-user manager runs unprivileged, and a directive whose setup it cannot
+perform makes the unit fail before \fBExecStart\fR, so the service never starts:
+\fBSupplementaryGroups=\fR exits \fB216/GROUP\fR, and the rest need a user
+namespace, which Ubuntu 24.04 and later restrict through AppArmor, giving
+\fB218/CAPABILITIES\fR or \fB226/NAMESPACE\fR. \fBProtectKernelModules=\fR is
+the surprising member: it also strips \fBCAP_SYS_MODULE\fR from the capability
+bounding set, which needs a user namespace. Dropping it costs nothing, because a
+user service never holds that capability anyway. \fBProtectHome=\fR is dropped
+for a second reason as well, since it would hide the operator's own
+\fI~/.config/all\-smi/config.toml\fR from their own service.
+.PP
+Because \fBPrivateTmp=true\fR namespaces \fI/tmp\fR, the default
+\fI/tmp/all\-smi.sock\fR fallback is unreachable from outside the service. Set
+\fBALL_SMI_API_SOCKET=/run/all\-smi/all\-smi.sock\fR in the environment file
+instead; \fBRuntimeDirectory=\fR provides \fI/run/all\-smi\fR.
+.PP
+OpenRC, runit, and sysvinit are not supported by the subcommand. It detects the
+absence of systemd and points at the canonical unit for manual adaptation.
+.SS macOS (launchd)
+The canonical job definition is
+\fIpackaging/launchd/com.lablup.all\-smi.plist\fR in the source tree, a
+self\-contained system LaunchDaemon.
+.B all\-smi service install
+embeds the same file and rewrites \fBProgramArguments\fR, the log paths, and
+the account keys for the requested scope. The launchd label is
+\fBcom.lablup.all\-smi\fR in both scopes; they occupy different domains, so it
+never collides.
+.PP
+Homebrew installs ship a service block, and the subcommand refuses to install
+alongside it. The two \fBbrew services\fR invocations are not interchangeable:
+.RS
+.nf
+brew services start all\-smi        # gui/$UID, stops at logout
+sudo brew services start all\-smi   # system domain, starts at boot
+.fi
+.RE
+A rack\-mounted Mac that reboots unattended needs the elevated form; the
+unelevated one leaves it with no exporter after a power cycle.
+.PP
+For a zip archive, \fBcargo install\fR, or a local build, use the subcommand:
+.RS
+.nf
+sudo all\-smi service install \-\-now   # /Library/LaunchDaemons
+all\-smi service status
+sudo all\-smi service uninstall
+
+all\-smi service install \-\-user \-\-now  # ~/Library/LaunchAgents
+.fi
+.RE
+.PP
+launchd has no separate enabled state. A plist in \fILaunchDaemons\fR or
+\fILaunchAgents\fR is bootstrapped automatically at boot or login, and
+\fBRunAtLoad\fR starts it from there, so
+.B install
+without \fB\-\-now\fR writes the plist and stops, which is exactly "enabled at
+boot, not running yet".
+.B install \-\-now
+additionally boots the job out and back in, because launchd caches a loaded
+job's definition and bootstrapping over it fails rather than replacing it.
+.B stop
+boots the job out and leaves the plist, so the service returns at the next
+boot.
+.B install
+also runs \fBlaunchctl enable\fR to clear a persistent disable override, which
+outlives both the plist and a reboot;
+.B uninstall
+deliberately does not disable, for the same reason, and leaves the log file in
+place.
+.PP
+launchd has no \fBEnvironmentFile=\fR equivalent, so there is no
+\fI/etc/default/all\-smi\fR analogue on macOS: the TOML config is the only
+settings surface. A LaunchDaemon runs outside any login session, which makes
+\fI~/Library/Application Support\fR resolve to root's home rather than the
+administrator's;
+\fI/Library/Application Support/all\-smi/config.toml\fR is a discovery
+candidate for exactly that case, ordered after every per\-user candidate.
+.PP
+A user\-scope render drops \fBUserName\fR, \fBGroupName\fR, and
+\fBInitGroups\fR, all of which need root. launchd does not reject them the way
+systemd rejects an unprivileged user unit: on macOS 26.6, bootstrapping a
+LaunchAgent carrying \fBUserName root\fR succeeds and the job still runs as the
+invoking user, with the key silently ignored. They are dropped because keeping
+them would ship a plist that reads as a root job to anyone auditing the
+machine when it is not one, and because Apple documents the keys as requiring
+root without documenting that fallback. \fBSoftResourceLimits\fR is kept in
+both scopes, since raising a soft rlimit up to the inherited hard limit needs
+no privilege.
+.PP
+\fB\-\-service\-user\fR sets \fBUserName\fR in system scope and drops
+\fBGroupName\fR rather than mirroring the account name the way the systemd
+renderer does, because macOS has no convention that an account owns an
+eponymous group; omitting the key makes launchd use the account's primary
+group from the password database. Such an account needs a writable home
+directory, or an explicit \fB[energy] wal_path\fR, or the energy WAL degrades
+to in\-memory with a warning.
+.PP
+The Apple Silicon native readers (IOReport, the SMC,
+\fBNSProcessInfo.thermalState\fR) need neither sudo nor a GUI session, and a
+LaunchAgent exports the same metric set a foreground \fBall\-smi api\fR does.
+The plist sets \fBProcessType\fR to \fBBackground\fR so the exporter runs at
+background QoS on the efficiency cores rather than competing with the workload
+it monitors, which costs a few seconds of extra startup while the IOReport
+channel list is enumerated.
+.SS Windows (Service Control Manager)
+.B all\-smi service
+registers a native Windows service through the Service Control Manager, without
+shelling out to \fBsc.exe\fR. The signed release archive needs no extra files:
+the same \fIall\-smi.exe\fR is both the CLI and the service host.
+.PP
+Every mutating action requires Administrator rights; run them from an elevated
+terminal. An unelevated attempt exits
+.B 1
+with an explanation rather than a bare \fBos error 5\fR.
+.B status
+works unelevated.
+.RS
+.nf
+all\-smi service install \-\-now
+all\-smi service status
+all\-smi service restart
+all\-smi service stop
+all\-smi service uninstall
+.fi
+.RE
+.PP
+The service is named \fIall\-smi\fR and shown in \fBservices.msc\fR as
+\fBall\-smi GPU/NPU Metrics Exporter\fR. It runs as \fBLocalSystem\fR, because
+NVML, the WMI thermal\-zone classes under \fIroot\\cimv2\fR and
+\fIroot\\wmi\fR, the AMD Ryzen Master interface, and LibreHardwareMonitor\-style
+sensor access all require it. The start type is plain automatic rather than
+delayed, so metrics exist early in boot. On failure the SCM restarts the
+process after 5 seconds, up to three times before the failure counter resets a
+day later.
+.PP
+.B \-\-user
+is not supported on Windows: the Service Control Manager has no per\-user
+service scope, so this is a platform limit rather than a missing feature.
+Register a Task Scheduler task for a per\-login exporter instead, for example
+\fBschtasks /create /tn all\-smi /tr "<path>\\all\-smi.exe api" /sc onlogon\fR.
+.PP
+.B all\-smi service run
+is a hidden subcommand: it is the Service Control Manager entry point, not a
+way to start the exporter by hand. Run from a console it explains itself and
+exits
+.B 1.
+Use
+.B all\-smi api
+for a foreground server.
+.PP
+Re\-running
+.B install
+over a service that already points at the same \fIall\-smi.exe\fR updates its
+configuration in place. A service of the same name pointing elsewhere is
+refused, with both paths named; \fB\-\-force\fR repoints it anyway, and
+.B uninstall
+applies the same guard. The registered binary path is the Windows counterpart
+of the Linux managed\-by marker, because the SCM offers nowhere to stamp one.
+Reconfiguring a running service does not restart it, matching
+\fBsystemctl enable \-\-now\fR; run
+.B all\-smi service restart
+to pick up a new binary path or configuration.
+.PP
+The service reads \fI%PROGRAMDATA%\\all\-smi\\config.toml\fR. A service running
+as LocalSystem resolves \fI%APPDATA%\fR into the systemprofile directory, which
+no operator will ever edit, so the machine\-wide path is the one that matters
+here. Environment variables such as \fBRUST_LOG\fR are set for the service
+through the \fBEnvironment\fR value (\fBREG_MULTI_SZ\fR) under
+\fIHKLM\\SYSTEM\\CurrentControlSet\\Services\\all\-smi\fR.
+.PP
+Because stdout is void under the Service Control Manager, the service logs to
+\fI%PROGRAMDATA%\\all\-smi\\logs\\all\-smi.<date>.log\fR, rotated daily and
+pruned to the last 14 files. The default level is \fBinfo\fR.
+.PP
+The firewall is never modified automatically. To let other hosts scrape the
+exporter, run from an elevated prompt:
+.RS
+.nf
+netsh advfirewall firewall add rule name="all\-smi" dir=in action=allow protocol=TCP localport=9090
+netsh advfirewall firewall delete rule name="all\-smi"
+.fi
 .RE
 .SH INTERACTIVE CONTROLS (LOCAL/VIEW MODE)
 .TP
@@ -172,17 +468,20 @@ Quit the application
 Full support via nvidia-smi, including CUDA information, PCIe status, and performance states
 .TP
 .B AMD GPUs
-Support for Radeon and Instinct GPUs via ROCm/libamdgpu_top, including VRAM/GTT memory tracking and fdinfo-based process monitoring
+Support for Radeon and Instinct GPUs via ROCm/libamdgpu_top, including VRAM/GTT memory tracking and fdinfo-based process monitoring. On glibc Linux, libamdgpu_top is isolated in the runtime-loaded
+.I liball_smi_amd.so
+companion, so missing AMD userspace libraries never prevent the main program from starting. Release archives place the companion beside the executable; Debian packages install it in
+.IR /usr/lib/all-smi .
 .TP
 .B Intel Arc / Iris Xe / Xe client GPUs
 Support for Arc A/B-series discrete GPUs and Iris Xe/Xe-LPG integrated GPUs via i915/xe sysfs (Linux) and WMI (Windows), including architecture classification, SYCL/oneAPI capability detection, engine-busy utilization computed from sysfs per-engine monotonic counters (Linux; max of render and compute engines reported as primary utilization), and per-process GPU memory tracking via /proc fdinfo (Linux; dedupes shared DRM file descriptors by drm-client-id).
-Optional Intel Level Zero (oneAPI) augmentation is available when the binary is built with
+Intel Level Zero (oneAPI) augmentation is compiled into every Linux and Windows build; the
 .B \-\-features level_zero
-(default: off). When enabled and
+flag it used to require is now an accepted no-op. When
 .I libze_loader.so.1
 (Linux) or
 .I ze_loader.dll
-(Windows) is present at runtime, additional per-engine activity metrics (including the XMX
+(Windows, installed with the Intel graphics driver) is present at runtime, additional per-engine activity metrics (including the XMX
 .B COMPUTE_SINGLE
 class not reachable via sysfs), energy-counter-derived power, temperature, dedicated/local memory state, frequency, and fan readings are surfaced when the corresponding Sysman domains are available and fresh. Seeded power and engine samples do not overwrite sysfs/WMI fallbacks. Missing loaders, missing optional symbols, unsupported domains, and permission failures degrade silently to the sysfs/WMI baseline, and per-field detail entries identify mixed metric sources.
 .TP
@@ -209,10 +508,39 @@ Intel and AMD CPU monitoring on Linux systems
 .SH API ENDPOINTS (API MODE)
 .TP
 .B /metrics
-Prometheus-compatible metrics endpoint with hardware statistics
+Prometheus-compatible metrics endpoint with hardware statistics. Always answers
+.BR "200 OK" ,
+including before the first collection cycle has completed. The body is never
+empty: every response carries
+.B all_smi_up
+(0 until the first collection cycle lands, 1 afterwards) and
+.BR all_smi_build_info ,
+so a scrape taken during startup is distinguishable from a scrape of a host
+with no devices.
 .TP
-.B /health
-Health check endpoint returning "OK"
+.B /-/ready
+Readiness probe. Returns
+.B 503 Service Unavailable
+with
+.B Retry-After: 1
+until the first collection cycle has populated the exporter, and
+.B 200 OK
+afterwards. Use this, not
+.BR /metrics ,
+for a Kubernetes
+.BR readinessProbe ,
+a load-balancer health check, or a startup gate. The
+.B /-/
+prefix follows the Prometheus-ecosystem convention.
+.TP
+.B /snapshot
+One-shot JSON dump of the latest collection cycle. Accepts
+.B ?include=
+and
+.BR ?pretty= .
+.TP
+.B /events
+Server-Sent Events stream, one JSON frame per collection cycle.
 .SH EXAMPLES
 .TP
 Monitor local hardware in interactive TUI:
@@ -246,6 +574,12 @@ Monitor local hardware with custom interval:
 Monitor remote hosts (requires API endpoints):
 .B all-smi view --hosts http://node1:9090 http://node2:9090
 .TP
+Monitor remote hosts with comma-separated endpoints:
+.B all-smi view --hosts http://node1:9090,http://node2:9090
+.TP
+Record remote hosts (the same space/comma separator rules apply):
+.B all-smi record --source=remote --hosts http://node1:9090,http://node2:9090 --output cluster.ndjson.zst
+.TP
 Monitor hosts from file:
 .B all-smi view --hostfile cluster_hosts.csv
 .TP
@@ -267,11 +601,24 @@ https://node003:9443
 Optional TOML configuration file. Per-platform canonical paths:
 .RS
 .IP \(bu 3
-Linux: \fI$XDG_CONFIG_HOME/all-smi/config.toml\fR (fallback \fI~/.config/all-smi/config.toml\fR)
+Linux: \fI$XDG_CONFIG_HOME/all-smi/config.toml\fR (fallback \fI~/.config/all-smi/config.toml\fR), then \fI/etc/all-smi/config.toml\fR
 .IP \(bu 3
-macOS: \fI~/Library/Application Support/all-smi/config.toml\fR (also accepts \fI~/.config/all-smi/config.toml\fR)
+macOS: \fI~/Library/Application Support/all-smi/config.toml\fR (also accepts \fI~/.config/all-smi/config.toml\fR, then \fI/Library/Application Support/all-smi/config.toml\fR)
 .IP \(bu 3
-Windows: \fI%APPDATA%\\all-smi\\config.toml\fR
+Windows: \fI%APPDATA%\\all-smi\\config.toml\fR, then
+\fI%PROGRAMDATA%\\all-smi\\config.toml\fR
+.RE
+.RS
+Candidates are probed in order and the first existing file wins, so a
+per-user file always beats the machine-wide one. The machine-wide paths exist
+for daemons. On Linux, a service running as a dedicated account has no home
+directory and the shipped unit sets \fBProtectHome=true\fR, so no per-user
+candidate resolves for it. On macOS, a launchd LaunchDaemon runs outside any
+login session, so \fI~/Library/Application Support\fR resolves to root's home
+rather than the administrator's, and launchd offers no environment-file
+mechanism to work around it. On Windows, a service running as LocalSystem
+resolves \fI%APPDATA%\fR into the systemprofile directory that no operator will
+ever edit. \fBall-smi config init\fR only ever writes the per-user path.
 .RE
 .RS
 The active path for the current user is printed by
@@ -303,6 +650,56 @@ See
 .B ENERGY ACCOUNTING
 below for the \fBALL_SMI_ENERGY_WAL_PATH\fR / \fBALL_SMI_ENERGY_NO_WAL\fR
 overrides.
+.TP
+.I all-smi.service
+systemd unit for API mode. The system-scope unit lives at
+\fI/etc/systemd/system/all-smi.service\fR (installed there by
+.B all-smi service install
+or by the Debian package); a user-scope unit lives at
+\fI$XDG_CONFIG_HOME/systemd/user/all-smi.service\fR (fallback
+\fI~/.config/systemd/user/all-smi.service\fR). Units written by the subcommand
+carry \fB# Managed by 'all-smi service'\fR as their first line; the subcommand
+refuses to overwrite or remove a unit without it unless \fB--force\fR is
+passed. The canonical source is \fIpackaging/systemd/all-smi.service\fR in the
+all-smi source tree.
+.TP
+.I com.lablup.all-smi.plist
+launchd job definition for API mode on macOS. The system-scope LaunchDaemon
+lives at \fI/Library/LaunchDaemons/com.lablup.all-smi.plist\fR; a user-scope
+LaunchAgent lives at \fI~/Library/LaunchAgents/com.lablup.all-smi.plist\fR.
+Both are written by
+.B all-smi service install
+and carry \fB<!-- Managed by 'all-smi service' -->\fR after the DOCTYPE (an XML
+declaration has to stay on line 1, so unlike a systemd unit the marker cannot
+be the first line); the subcommand refuses to overwrite or remove a plist
+without it unless \fB--force\fR is passed. The canonical source is
+\fIpackaging/launchd/com.lablup.all-smi.plist\fR in the all-smi source tree.
+Logs go to \fI/var/log/all-smi/all-smi.log\fR and
+\fI~/Library/Logs/all-smi/all-smi.log\fR respectively;
+.B uninstall
+leaves them in place.
+.TP
+.I all-smi (Windows service)
+Service Control Manager registration for API mode, created by
+.B all-smi service install
+and shown in \fBservices.msc\fR as \fBall\-smi GPU/NPU Metrics Exporter\fR. It
+runs \fI<install path>\\all\-smi.exe service run\fR as LocalSystem at automatic
+start. The subcommand refuses to reconfigure or remove a service of that name
+whose registered binary path is not the running executable, unless
+\fB\-\-force\fR is passed. Environment overrides live in the \fBEnvironment\fR
+value (\fBREG_MULTI_SZ\fR) under
+\fIHKLM\\SYSTEM\\CurrentControlSet\\Services\\all\-smi\fR.
+.TP
+.I %PROGRAMDATA%\\all-smi\\logs\\all-smi.<date>.log
+Rolling log written by the Windows service, because stdout is void under the
+Service Control Manager. Daily rotation, last 14 files retained, \fBinfo\fR
+level unless \fBRUST_LOG\fR says otherwise.
+.TP
+.I /etc/default/all-smi
+Environment file read by the systemd unit through
+\fBEnvironmentFile=-/etc/default/all-smi\fR. Plain \fBKEY=VALUE\fR lines, no
+shell expansion. Installed as a conffile by the Debian package. Environment
+variables set here take precedence over \fI/etc/all-smi/config.toml\fR.
 .SH ENERGY ACCOUNTING
 The Energy Session panel integrates instantaneous power draw over time
 to report cumulative energy consumption (kWh) and an optional cost
@@ -357,6 +754,9 @@ above which the integrator switches from trapezoidal to hold-last
 integration. Default: 10.
 .SH ENVIRONMENT
 .TP
+.B ALL_SMI_AMD_PLUGIN
+Absolute path to the glibc Linux AMD companion library. When unset, all-smi searches beside the current executable, then ../lib/all-smi relative to it, then /usr/local/lib/all-smi and /usr/lib/all-smi. Relative overrides and world-writable plugin paths are refused; the current working directory is never searched.
+.TP
 .B RUST_LOG
 Set logging level (e.g., debug, info, warn, error)
 .SH NOTES
@@ -375,6 +775,15 @@ Successful execution
 .TP
 .B 1
 General error or invalid arguments
+.TP
+.B 2
+Malformed or missing configuration file passed explicitly with \fB--config\fR,
+or a \fBconfig validate\fR failure
+.TP
+.B 3
+.B all-smi service status
+only: the service is installed but stopped, or not installed at all. Mirrors the
+\fBsystemctl is-active\fR convention.
 .TP
 .B 130
 Interrupted by Ctrl+C (SIGINT)
