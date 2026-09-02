@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
@@ -11,6 +12,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.data.entity.network import NetworkID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -22,6 +24,8 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.manager.data.network.types import NetworkData
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
@@ -56,12 +60,24 @@ def mock_repository() -> AsyncMock:
     repository.update_session_error_info = AsyncMock(return_value=None)
     repository.update_session_network_id = AsyncMock(return_value=None)
 
-    async def get_attached_network_ref(network_id: str) -> str | None:
-        if network_id == str(_PERSISTENT_NETWORK_ID):
-            return _PERSISTENT_NETWORK_REF_NAME
-        return None
+    persistent_network = NetworkData(
+        id=_PERSISTENT_NETWORK_ID,
+        name="testnet",
+        ref_name=_PERSISTENT_NETWORK_REF_NAME,
+        driver="overlay",
+        project_id=ProjectID(uuid4()),
+        domain_name="default",
+        options={"mode": "overlay", "network_name": _PERSISTENT_NETWORK_REF_NAME},
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        updated_at=None,
+    )
 
-    repository.get_attached_network_ref = AsyncMock(side_effect=get_attached_network_ref)
+    async def get_attached_network(network_id: str) -> NetworkData:
+        if network_id != str(_PERSISTENT_NETWORK_ID):
+            raise ObjectNotFound(object_name="network")
+        return persistent_network
+
+    repository.get_attached_network = AsyncMock(side_effect=get_attached_network)
     return repository
 
 

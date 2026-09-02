@@ -55,6 +55,7 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, SSHKeypair
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
+from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
@@ -69,6 +70,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
@@ -3870,21 +3872,23 @@ class ScheduleDBSource:
 
             return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
 
-    async def get_attached_network_ref(self, network_id: str) -> str | None:
+    async def get_attached_network(self, network_id: str) -> NetworkData:
         """
-        Fetch the container network name of the network a session attaches to.
+        Fetch the network a session attaches to.
 
         Only a persistent session attaches to a pre-created network; the other types
         name a network they own, which ``SessionRow.get_network_ref()`` returns as-is.
 
         :param network_id: The ``networks.id`` held by ``sessions.network_id``
-        :return: The plugin-generated ``ref_name``, or None when no such network exists
+        :return: The network, whose ``ref_name`` is the container network name
         """
         async with self._db.begin_readonly_session() as db_sess:
-            ref_name: str | None = await db_sess.scalar(
-                sa.select(NetworkRow.ref_name).where(NetworkRow.id == UUID(network_id))
+            row = await db_sess.scalar(
+                sa.select(NetworkRow).where(NetworkRow.id == UUID(network_id))
             )
-            return ref_name
+            if row is None:
+                raise ObjectNotFound(object_name="network")
+            return row.to_data()
 
     async def update_session_network_id(
         self,

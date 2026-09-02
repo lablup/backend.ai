@@ -42,6 +42,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
+from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
@@ -711,14 +712,14 @@ class SchedulerRepository:
         await self._cache_source.invalidate_kernel_related_cache(access_keys)
 
     @scheduler_repository_resilience.apply()
-    async def get_attached_network_ref(self, network_id: str) -> str | None:
+    async def get_attached_network(self, network_id: str) -> NetworkData:
         """
-        Fetch the container network name of the network a session attaches to.
+        Fetch the network a session attaches to.
 
         :param network_id: The ``networks.id`` held by ``sessions.network_id``
-        :return: The plugin-generated ``ref_name``, or None when no such network exists
+        :return: The network, whose ``ref_name`` is the container network name
         """
-        return await self._db_source.get_attached_network_ref(network_id)
+        return await self._db_source.get_attached_network(network_id)
 
     @scheduler_repository_resilience.apply()
     async def update_session_network_id(

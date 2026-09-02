@@ -429,7 +429,7 @@ class TestSessionLauncherNetworkSetup:
 
         Given: Session declaring a persistent network but naming none
         When: Start session
-        Then: Kernels start with a bridge config naming no network
+        Then: Kernels start with no network configuration
         """
         session_ids = [session_for_start_persistent_network_unset.session_id]
         with RecorderContext.scope("test", entity_ids=session_ids):
@@ -440,7 +440,7 @@ class TestSessionLauncherNetworkSetup:
 
         mock_client = mock_agent_client_pool._mock_client
         cluster_info = mock_client.create_kernels.call_args[0][3]
-        assert cluster_info["network_config"] == {"mode": "bridge", "network_name": None}
+        assert cluster_info["network_config"] == {}
 
     async def test_no_network_plugin_error(
         self,
