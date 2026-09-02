@@ -462,14 +462,14 @@ class SessionLauncher:
         :param session: Session data containing network type and configuration
         :return: NetworkSetup with network config and SSH port mapping
         """
+        network_name: str | None = None
         network_config: dict[str, Any] = {}
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None
 
         network_type = session.network_type or NetworkType.VOLATILE
-        # The name a session already has; the branches below create one where it has none.
-        network_name = await self._repository.get_network_ref(network_type, session.network_id)
 
         if network_type == NetworkType.PERSISTENT:
+            network_name = await self._repository.get_network_ref(network_type, session.network_id)
             if network_name is not None:
                 network_config = {"mode": "bridge", "network_name": network_name}
         elif network_type == NetworkType.VOLATILE:
