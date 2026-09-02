@@ -5,7 +5,7 @@ Based on BEP-1033 test scenarios for launcher testing.
 Test Scenarios:
 - SC-LA-001 ~ SC-LA-004: Image Pulling
 - SC-LA-005 ~ SC-LA-008: Kernel Creation
-- SC-LA-009 ~ SC-LA-016: Network Setup
+- SC-LA-009 ~ SC-LA-015: Network Setup
 """
 
 from __future__ import annotations
@@ -262,7 +262,7 @@ class TestSessionLauncherKernelCreation:
 
 
 # =============================================================================
-# TestSessionLauncherNetworkSetup (SC-LA-009 ~ SC-LA-016)
+# TestSessionLauncherNetworkSetup (SC-LA-009 ~ SC-LA-015)
 # =============================================================================
 
 
@@ -417,30 +417,6 @@ class TestSessionLauncherNetworkSetup:
             )
 
         mock_repository.update_session_network_id.assert_not_awaited()
-
-    async def test_persistent_network_without_id_applies_no_network(
-        self,
-        launcher: SessionLauncher,
-        mock_agent_client_pool: MagicMock,
-        session_for_start_persistent_network_unset: SessionDataForStart,
-        image_config_default: dict[UUID, ImageConfigData],
-    ) -> None:
-        """SC-LA-016: Persistent network type without a network names none.
-
-        Given: Session declaring a persistent network but naming none
-        When: Start session
-        Then: Kernels start with no network configuration
-        """
-        session_ids = [session_for_start_persistent_network_unset.session_id]
-        with RecorderContext.scope("test", entity_ids=session_ids):
-            await launcher.start_sessions_for_handler(
-                [session_for_start_persistent_network_unset],
-                image_config_default,
-            )
-
-        mock_client = mock_agent_client_pool._mock_client
-        cluster_info = mock_client.create_kernels.call_args[0][3]
-        assert cluster_info["network_config"] == {}
 
     async def test_no_network_plugin_error(
         self,

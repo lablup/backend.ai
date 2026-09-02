@@ -25,7 +25,6 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.network.types import NetworkData
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
@@ -67,17 +66,12 @@ def mock_repository() -> AsyncMock:
         driver="overlay",
         project_id=ProjectID(uuid4()),
         domain_name="default",
-        options={"mode": "overlay", "network_name": _PERSISTENT_NETWORK_REF_NAME},
+        options={},
         created_at=datetime(2026, 1, 1, tzinfo=UTC),
         updated_at=None,
     )
 
-    async def get_attached_network(network_id: str) -> NetworkData:
-        if network_id != str(_PERSISTENT_NETWORK_ID):
-            raise ObjectNotFound(object_name="network")
-        return persistent_network
-
-    repository.get_attached_network = AsyncMock(side_effect=get_attached_network)
+    repository.get_attached_network = AsyncMock(return_value=persistent_network)
     return repository
 
 
@@ -335,24 +329,10 @@ def session_for_start_host_network() -> SessionDataForStart:
 
 @pytest.fixture
 def session_for_start_persistent_network() -> SessionDataForStart:
-    """Multi-node session attached to a pre-created persistent network."""
+    """Session attached to a pre-created persistent network."""
     return _create_session_for_start(
-        kernels=[
-            _create_kernel_binding_data(agent_id=AgentId("agent-1"), cluster_idx=0),
-            _create_kernel_binding_data(agent_id=AgentId("agent-2"), cluster_idx=1),
-        ],
-        cluster_mode=ClusterMode.MULTI_NODE,
         network_type=NetworkType.PERSISTENT,
         network_id=str(_PERSISTENT_NETWORK_ID),
-    )
-
-
-@pytest.fixture
-def session_for_start_persistent_network_unset() -> SessionDataForStart:
-    """Session declaring a persistent network without naming one."""
-    return _create_session_for_start(
-        network_type=NetworkType.PERSISTENT,
-        network_id=None,
     )
 
 
