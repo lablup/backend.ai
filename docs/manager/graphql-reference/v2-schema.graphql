@@ -16332,10 +16332,10 @@ input UpdateResourcePresetV2Input {
   resourceSlots: [ResourceSlotEntryInput!] = null
 
   """Updated shared memory. Use null to clear."""
-  sharedMemory: BinarySizeInput = null
+  sharedMemory: BinarySizeInput
 
   """Updated resource group name. Use null to make global."""
-  resourceGroupName: String = null
+  resourceGroupName: String
 }
 
 """
