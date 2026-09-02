@@ -15,7 +15,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
-from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AgentId,
@@ -471,13 +470,11 @@ class SessionLauncher:
         network_type = session.network_type or NetworkType.VOLATILE
 
         if network_type == NetworkType.PERSISTENT:
-            # sessions.network_id holds networks.id; the actual container network name
-            # is the plugin-generated networks.ref_name.
-            if not session.network_id:
+            network = await self._repository.get_network_ref(network_type, session.network_id)
+            if network is None:
                 raise ServerMisconfiguredError(
                     f"Session {session.session_id} uses a persistent network but has no network ID."
                 )
-            network = await self._repository.get_network(NetworkID(UUID(session.network_id)))
             network_name = network.ref_name
             network_config = {
                 **network.options,

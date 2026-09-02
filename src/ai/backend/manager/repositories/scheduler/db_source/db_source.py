@@ -25,7 +25,6 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
-from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import (
     ResourceGroupID,
@@ -86,7 +85,7 @@ from ai.backend.manager.models.kernel import (
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
-from ai.backend.manager.models.network import NetworkRow
+from ai.backend.manager.models.network import NetworkRow, NetworkType
 from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
 from ai.backend.manager.models.resource_group import ResourceGroupRow, query_allowed_sgroups
 from ai.backend.manager.models.resource_policy import (
@@ -3873,18 +3872,35 @@ class ScheduleDBSource:
 
             return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
 
-    async def get_network(self, network_id: NetworkID) -> NetworkData:
+    async def get_network_ref(
+        self,
+        network_type: NetworkType | None,
+        network_id: str | None,
+    ) -> NetworkData | None:
         """
-        Fetch a persistent network row.
+        Resolve a session's network reference to the network row behind it.
 
-        :param network_id: The ``networks.id`` value stored in ``sessions.network_id``
-        :return: The network data including the plugin-generated ``ref_name``
+        The scheduler-side counterpart of ``SessionRow.get_network_ref()``: that method
+        resolves the same two columns to a container network name, this one to the row
+        that names it. Only a persistent network is backed by a row.
+
+        :param network_type: The ``sessions.network_type`` value
+        :param network_id: The ``sessions.network_id`` value
+        :return: The network data, or None when no row backs the reference
         """
-        async with self._db.begin_readonly_session() as db_sess:
-            row = await db_sess.scalar(sa.select(NetworkRow).where(NetworkRow.id == network_id))
-            if row is None:
-                raise ObjectNotFound(object_name="network")
-            return row.to_data()
+        if not network_id or not network_type:
+            return None
+        match network_type:
+            case NetworkType.VOLATILE | NetworkType.HOST:
+                return None
+            case NetworkType.PERSISTENT:
+                async with self._db.begin_readonly_session() as db_sess:
+                    row = await db_sess.scalar(
+                        sa.select(NetworkRow).where(NetworkRow.id == UUID(network_id))
+                    )
+                    if row is None:
+                        raise ObjectNotFound(object_name="network")
+                    return row.to_data()
 
     async def update_session_network_id(
         self,

@@ -18,7 +18,6 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
@@ -48,6 +47,7 @@ from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
+from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -713,14 +713,21 @@ class SchedulerRepository:
         await self._cache_source.invalidate_kernel_related_cache(access_keys)
 
     @scheduler_repository_resilience.apply()
-    async def get_network(self, network_id: NetworkID) -> NetworkData:
+    async def get_network_ref(
+        self,
+        network_type: NetworkType | None,
+        network_id: str | None,
+    ) -> NetworkData | None:
         """
-        Fetch a persistent network by its row ID.
+        Resolve a session's network reference to the network row behind it.
 
-        :param network_id: The ``networks.id`` value stored in ``sessions.network_id``
-        :return: The network data including the plugin-generated ``ref_name``
+        The scheduler-side counterpart of ``SessionRow.get_network_ref()``.
+
+        :param network_type: The ``sessions.network_type`` value
+        :param network_id: The ``sessions.network_id`` value
+        :return: The network data, or None when no row backs the reference
         """
-        return await self._db_source.get_network(network_id)
+        return await self._db_source.get_network_ref(network_type, network_id)
 
     @scheduler_repository_resilience.apply()
     async def update_session_network_id(

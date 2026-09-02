@@ -58,23 +58,30 @@ def mock_repository() -> AsyncMock:
     repository = AsyncMock()
     repository.update_session_error_info = AsyncMock(return_value=None)
     repository.update_session_network_id = AsyncMock(return_value=None)
-    repository.get_network = AsyncMock(
-        return_value=NetworkData(
-            id=_PERSISTENT_NETWORK_ID,
-            name="testnet",
-            ref_name=_PERSISTENT_NETWORK_REF_NAME,
-            driver="overlay",
-            project_id=ProjectID(uuid4()),
-            domain_name="default",
-            options={
-                "mode": "overlay",
-                "network_name": _PERSISTENT_NETWORK_REF_NAME,
-                "network_id": "swarm-scoped-id",
-            },
-            created_at=datetime(2026, 1, 1, tzinfo=UTC),
-            updated_at=None,
-        )
+    persistent_network = NetworkData(
+        id=_PERSISTENT_NETWORK_ID,
+        name="testnet",
+        ref_name=_PERSISTENT_NETWORK_REF_NAME,
+        driver="overlay",
+        project_id=ProjectID(uuid4()),
+        domain_name="default",
+        options={
+            "mode": "overlay",
+            "network_name": _PERSISTENT_NETWORK_REF_NAME,
+            "network_id": "swarm-scoped-id",
+        },
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        updated_at=None,
     )
+
+    async def get_network_ref(
+        network_type: NetworkType | None, network_id: str | None
+    ) -> NetworkData | None:
+        if not network_id or network_type != NetworkType.PERSISTENT:
+            return None
+        return persistent_network
+
+    repository.get_network_ref = AsyncMock(side_effect=get_network_ref)
     return repository
 
 
