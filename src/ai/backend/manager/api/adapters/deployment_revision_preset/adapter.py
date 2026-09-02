@@ -7,13 +7,17 @@ from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.config import (
     ModelConfig,
     ModelDefinition,
+    ModelDefinitionDraft,
     ModelHealthCheck,
     ModelMetadata,
     ModelServiceConfig,
     PreStartAction,
 )
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentStrategyInput,
+    ModelDefinitionInput,
+)
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelConfigInfoDTO,
     ModelDefinitionInfoDTO,
@@ -229,6 +233,9 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         )
 
     async def get(self, preset_id: UUID) -> DeploymentRevisionPresetNode:
+        return self._data_to_node(await self._get_preset_data(preset_id))
+
+    async def _get_preset_data(self, preset_id: UUID) -> DeploymentRevisionPresetData:
         conditions: list[QueryCondition] = [lambda: DeploymentRevisionPresetRow.id == preset_id]
         querier = self._build_querier(
             conditions=conditions,
@@ -241,7 +248,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         )
         if not result.items:
             raise DeploymentRevisionPresetNotFound()
-        return self._data_to_node(result.items[0])
+        return result.items[0]
 
     async def create(
         self,
@@ -307,8 +314,8 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if input.preset_values is not None
             else OptionalState.nop()
         )
-        model_def_state: TriState[ModelDefinition] = self._convert_model_definition_state(
-            input.model_definition
+        model_def_state: TriState[ModelDefinition] = await self._merge_model_definition_update(
+            input.id, input.model_definition
         )
 
         spec = DeploymentRevisionPresetUpdaterSpec(
@@ -558,15 +565,22 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             for pv in preset_values
         ]
 
-    @staticmethod
-    def _convert_model_definition_state(
-        value: ModelDefinition | Sentinel | None,
+    async def _merge_model_definition_update(
+        self,
+        preset_id: UUID,
+        value: ModelDefinitionInput | Sentinel | None,
     ) -> TriState[ModelDefinition]:
+        """Merge a partial model_definition update onto the preset's stored value."""
         if value is SENTINEL:
             return TriState.nop()
         if value is None:
             return TriState.nullify()
-        return TriState.update(value)
+        existing = await self._get_preset_data(preset_id)
+        base_draft = ModelDefinitionDraft()
+        if existing.model_definition is not None:
+            base_draft = ModelDefinitionDraft.model_validate(existing.model_definition)
+        merged = base_draft.merge(value.to_draft())
+        return TriState.update(merged.to_resolved())
 
     @staticmethod
     def _convert_tri_state(value: Any) -> TriState[Any]:

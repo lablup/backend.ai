@@ -25,7 +25,12 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
-from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentStrategyInput,
+    ModelConfigInput,
+    ModelDefinitionInput,
+    ModelServiceConfigInput,
+)
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
@@ -86,6 +91,44 @@ async def other_runtime_variant_id(
     """Create a second runtime variant to move a preset into."""
     async with _runtime_variant(db_engine) as variant_id:
         yield variant_id
+
+
+@pytest.fixture()
+async def preset_with_model_definition_id(
+    admin_v2_registry: V2ClientRegistry,
+    runtime_variant_id: RuntimeVariantID,
+) -> AsyncIterator[uuid.UUID]:
+    """Create a preset with a fully populated model_definition (custom shell)."""
+    create_result = await admin_v2_registry.deployment_revision_preset.create(
+        CreateDeploymentRevisionPresetInput(
+            runtime_variant_id=runtime_variant_id,
+            name="partial-update-preset",
+            image_id=ImageID(uuid.uuid4()),
+            model_definition=PresetModelDefinitionInput(
+                models=[
+                    PresetModelConfigInput(
+                        name="llama",
+                        model_path="/models/llama",
+                        service=PresetModelServiceConfigInput(
+                            port=8080,
+                            start_command=["python", "server.py"],
+                            shell="/bin/zsh",
+                        ),
+                    ),
+                ],
+            ),
+            resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+            cluster_mode="single-node",
+            cluster_size=1,
+            replica_count=1,
+            deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
+        )
+    )
+    preset_id = create_result.preset.id
+    try:
+        yield preset_id
+    finally:
+        await admin_v2_registry.deployment_revision_preset.delete(preset_id)
 
 
 class TestDeploymentRevisionPresetCRUD:
@@ -260,6 +303,67 @@ class TestDeploymentRevisionPresetCRUD:
 
         get_result = await admin_v2_registry.deployment_revision_preset.get(preset_id)
         assert get_result.runtime_variant_id == other_runtime_variant_id
+
+    async def test_update_model_definition_partial(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        preset_with_model_definition_id: uuid.UUID,
+    ) -> None:
+        preset_id = preset_with_model_definition_id
+
+        # Omitting service.shell must not crash and must preserve the stored
+        # shell (and name/model_path) -- the update is merged onto the
+        # preset's existing model_definition, not a plain replace.
+        update_result = await admin_v2_registry.deployment_revision_preset.update(
+            preset_id,
+            UpdateDeploymentRevisionPresetInput(
+                id=preset_id,
+                model_definition=ModelDefinitionInput(
+                    models=[
+                        ModelConfigInput(
+                            service=ModelServiceConfigInput(
+                                start_command=["python", "server_v2.py"],
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        )
+        assert update_result.preset.model_definition is not None
+        updated_config = update_result.preset.model_definition.models[0]
+        assert updated_config.name == "llama"
+        assert updated_config.model_path == "/models/llama"
+        service = updated_config.service
+        assert service is not None
+        assert service.shell == "/bin/zsh"
+        assert service.start_command == ["python", "server_v2.py"]
+
+        # Explicitly setting shell applies the new value.
+        update_result = await admin_v2_registry.deployment_revision_preset.update(
+            preset_id,
+            UpdateDeploymentRevisionPresetInput(
+                id=preset_id,
+                model_definition=ModelDefinitionInput(
+                    models=[
+                        ModelConfigInput(service=ModelServiceConfigInput(shell="/bin/bash")),
+                    ],
+                ),
+            ),
+        )
+        assert update_result.preset.model_definition is not None
+        service = update_result.preset.model_definition.models[0].service
+        assert service is not None
+        assert service.shell == "/bin/bash"
+
+        # Omitting model_definition entirely leaves the stored value untouched.
+        update_result = await admin_v2_registry.deployment_revision_preset.update(
+            preset_id,
+            UpdateDeploymentRevisionPresetInput(id=preset_id, description="unrelated change"),
+        )
+        assert update_result.preset.model_definition is not None
+        service = update_result.preset.model_definition.models[0].service
+        assert service is not None
+        assert service.shell == "/bin/bash"
 
     async def test_delete(
         self,

@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.config import DEFAULT_SHELL, ModelDefinition, PreStartAction
+from ai.backend.common.config import DEFAULT_SHELL, PreStartAction
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     EnvironmentVariableEntryInput,
@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.common import (
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput,
+    ModelDefinitionInput,
     PresetValueInput,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
@@ -151,7 +152,7 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     description: str | Sentinel | None = Field(default=SENTINEL)
     rank: int | None = Field(default=None, ge=0)
     image_id: ImageID | Sentinel | None = Field(default=SENTINEL)
-    model_definition: ModelDefinition | Sentinel | None = Field(default=SENTINEL)
+    model_definition: ModelDefinitionInput | Sentinel | None = Field(default=SENTINEL)
     resource_slots: list[ResourceSlotEntryInput] | None = Field(default=None)
     resource_opts: list[ResourceOptsEntryDTO] | None = Field(default=None)
     cluster_mode: str | None = Field(default=None, max_length=16)
