@@ -16,6 +16,38 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.8.2 (2026-09-02)
+
+### Fixes
+* Fix the TUI installer to register the local Harbor container registry under its reachable `host:port` instead of the unresolvable `local-harbor` label, which docker parsed as a Docker Hub namespace and failed pushes with `insufficient_scope: authorization failed` ([#13288](https://github.com/lablup/backend.ai/issues/13288))
+* Fix the shared HTTP client pool closing a session while one of its requests is still streaming a response. ([#13425](https://github.com/lablup/backend.ai/issues/13425))
+* Honor the `X-Forwarded-URL` header when deriving the HMAC signature host and path only for requests coming from `manager.trusted-proxies`, and resolve the client IP across any number of proxy hops instead of rejecting requests whose `X-Forwarded-For` hop count does not match. ([#13663](https://github.com/lablup/backend.ai/issues/13663))
+* Fix interactive app launches (jupyter, vscode, ...) intermittently failing with HTTP 500 when the app took more than 10 seconds to open its port, by making the agent wait for the kernel runner's verdict rather than giving up before the runner does. ([#13684](https://github.com/lablup/backend.ai/issues/13684))
+* Fix `alembic upgrade` aborting at the RBAC global-role migration with `CompileError: Unconsumed column names: status`, which blocked upgrades of any database created before that revision ([#13695](https://github.com/lablup/backend.ai/issues/13695))
+* Stop scheduling sessions behind one whose resource group ran out of resources, so lower-priority sessions no longer take what a blocked higher-priority session is waiting for ([#13707](https://github.com/lablup/backend.ai/issues/13707))
+* Fix session creation failing with `Could not determine the C library variant.` when an image's `ldd --version` output does not start with the libc banner ([#13719](https://github.com/lablup/backend.ai/issues/13719))
+* Fix app proxy circuit creation to pick the least-loaded worker instead of the most occupied one, so circuits are distributed evenly across multiple workers ([#13723](https://github.com/lablup/backend.ai/issues/13723))
+* Disable the unreleased idle-check reconciler stages ([#13734](https://github.com/lablup/backend.ai/issues/13734))
+* Stop migrations from depending on live ORM model definitions by declaring the session_dependencies table locally in the add_session_table revision. ([#13785](https://github.com/lablup/backend.ai/issues/13785))
+* Fix the agent failing to identify and restore running kernel containers on Podman, which aborted agent startup with a `KeyError` and silently dropped kernels from the registry. ([#13793](https://github.com/lablup/backend.ai/issues/13793))
+* Fix container-level metrics and container-PID mapping failing on Podman by resolving cgroup paths from the container process rather than assuming Docker's cgroup layout. ([#13796](https://github.com/lablup/backend.ai/issues/13796))
+* Respond to a streaming request with an empty body instead of a 500 error when the source produces no data, such as downloading a zero-byte file ([#13801](https://github.com/lablup/backend.ai/issues/13801))
+* Fix compute session creation failing on container runtimes that read the seccomp profile option as a file path instead of an inline document. ([#13805](https://github.com/lablup/backend.ai/issues/13805))
+* Allow configuring the kernel container log driver instead of hardcoding the Docker-only `local` driver. ([#13817](https://github.com/lablup/backend.ai/issues/13817))
+* Pass an explicit `--pids-limit` when extracting the krunner environment so the extractor can fork under Podman's Docker-compatible API. ([#13821](https://github.com/lablup/backend.ai/issues/13821))
+* Attach GPUs via CDI device requests on Podman, whose Docker-compatible API silently ignores both the nvidia runtime and nvidia device requests. ([#13829](https://github.com/lablup/backend.ai/issues/13829))
+* Seed the virtual-scope chain in the example fixtures so session creation works on a fresh development install. ([#13835](https://github.com/lablup/backend.ai/issues/13835))
+* Skip the Podman graph root when collecting node disk statistics, which otherwise double-counts the underlying filesystem. ([#13843](https://github.com/lablup/backend.ai/issues/13843))
+* Fix sessions requesting a zero-quantity resource slot (e.g. cuda.device: 0) staying PENDING forever when scheduled onto agents that don't serve that slot ([#13992](https://github.com/lablup/backend.ai/issues/13992))
+* Restart the agent when its worker process dies unexpectedly, instead of leaving the supervisor running with the service manager reporting the unit as active, and record a crash dump for native faults that leave no Python traceback. ([#14003](https://github.com/lablup/backend.ai/issues/14003))
+* Release glide client resources when `GlideClient.create()` fails, so failed Valkey reconnects no longer leak sockets and connections. ([#14008](https://github.com/lablup/backend.ai/issues/14008))
+* Provision the RBAC scope graph for a cloned virtual folder so it is bound to its owner like a newly created one ([#14016](https://github.com/lablup/backend.ai/issues/14016))
+* Fix `GET /resource/presets` returning 500 on a preset-list cache hit ([#14025](https://github.com/lablup/backend.ai/issues/14025))
+* Fix the halfstack GraphQL gateway binding only to loopback inside its container on WSL2, which made web login fail with "No healthy Manager endpoint is available" ([#14029](https://github.com/lablup/backend.ai/issues/14029))
+* Order fair shares by the project name, project active state, user name and user email that the order-field enums advertise; these were accepted but silently ignored since 26.4.0. ([#14076](https://github.com/lablup/backend.ai/issues/14076))
+* Fix multi-node sessions attached to a persistent inter-container network failing to start, because the launcher addressed the network by a fabricated name instead of the one the network plugin created. ([#14133](https://github.com/lablup/backend.ai/issues/14133))
+
+
 ## 26.8.1 (2026-08-10)
 
 ### Features
