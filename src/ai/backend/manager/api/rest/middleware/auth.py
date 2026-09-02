@@ -520,8 +520,6 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         prefix = _resolve_forwarded_prefix(request)
         if prefix is not None:
             path = prefix + request.raw_path
-            if upstream_url:
-                _warn_forwarded_url_path_deprecated()
         elif upstream_url:
             path = urlparse(upstream_url).path
             _warn_forwarded_url_path_deprecated()

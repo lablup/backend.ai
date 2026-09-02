@@ -196,19 +196,32 @@ async def test_no_warning_when_forwarded_url_is_absent(
 
 class TestSignRequestForwardedPrefix:
     @pytest.mark.parametrize(
-        ("peer", "expected_path"),
+        ("peer", "trusted_proxies", "expected_path"),
         [
             pytest.param(
-                TRUSTED_PROXY, FORWARDED_PREFIX + DEFAULT_PATH, id="honored_from_trusted_peer"
+                TRUSTED_PROXY,
+                ["10.0.0.0/8"],
+                FORWARDED_PREFIX + DEFAULT_PATH,
+                id="honored_from_trusted_peer",
             ),
-            pytest.param(UNTRUSTED_PEER, DEFAULT_PATH, id="ignored_from_untrusted_peer"),
+            pytest.param(
+                UNTRUSTED_PEER, ["10.0.0.0/8"], DEFAULT_PATH, id="ignored_from_untrusted_peer"
+            ),
+            pytest.param(
+                TRUSTED_PROXY,
+                [],
+                DEFAULT_PATH,
+                id="ignored_without_trusted_proxies_configured",
+            ),
         ],
     )
-    async def test_is_honored_based_on_trust(self, peer: str, expected_path: str) -> None:
+    async def test_is_honored_based_on_trust(
+        self, peer: str, trusted_proxies: list[str], expected_path: str
+    ) -> None:
         prefixed = _make_request(
-            forwarded_prefix=FORWARDED_PREFIX, peer=peer, trusted_proxies=["10.0.0.0/8"]
+            forwarded_prefix=FORWARDED_PREFIX, peer=peer, trusted_proxies=trusted_proxies
         )
-        literal = _make_request(raw_path=expected_path, peer=peer, trusted_proxies=["10.0.0.0/8"])
+        literal = _make_request(raw_path=expected_path, peer=peer, trusted_proxies=trusted_proxies)
 
         assert await sign_request(SIGN_METHOD, prefixed, SECRET_KEY) == await sign_request(
             SIGN_METHOD, literal, SECRET_KEY
