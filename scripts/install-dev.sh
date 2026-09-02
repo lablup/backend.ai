@@ -47,35 +47,6 @@ trim() {
   echo "$1" | sed -e 's/^[[:space:]]*//g' -e 's/[[:space:]]*$//g'
 }
 
-example_keypair_field() {
-  # $1: user e-mail, $2: keypair field name
-  # The keypair fixture references its owner by UUID, so the e-mail is
-  # resolved through the user fixture first.
-  local value
-  value=$(jq -r \
-    --arg email "$1" \
-    --arg field "$2" \
-    --slurpfile users fixtures/manager/example-users.json \
-    '($users[0].users | map(select(.email == $email) | .uuid)) as $uuids
-     | .keypairs[] | select(.user as $owner | $uuids | index($owner)) | .[$field]' \
-    fixtures/manager/example-keypairs.json)
-  if [ -z "${value}" ] || [ "${value}" = "null" ]; then
-    show_error "No example keypair ${2} found for ${1}." >&2
-    return 1
-  fi
-  echo "${value}"
-}
-
-write_api_keypair_env() {
-  # Append the API keypair of a fixture user to a generated client env script.
-  # $1: target file, $2: user e-mail
-  local access_key secret_key
-  access_key=$(example_keypair_field "$2" "access_key") || exit 1
-  secret_key=$(example_keypair_field "$2" "secret_key") || exit 1
-  echo "export BACKEND_ACCESS_KEY=${access_key}" >> "$1"
-  echo "export BACKEND_SECRET_KEY=${secret_key}" >> "$1"
-}
-
 enable_observability_in_toml() {
   # Flip "enabled = false" to "enabled = true" inside observability sections of
   # a component config. Sections enabled depend on the active flags:
@@ -1394,7 +1365,9 @@ configure_backendai() {
   CLIENT_ADMIN_CONF_FOR_SESSION="env-local-admin-session.sh"
   echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_ADMIN_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-  write_api_keypair_env "${CLIENT_ADMIN_CONF_FOR_API}" "admin@lablup.com"
+  ADMIN_UUID=$(jq -r '.users[] | select(.email=="admin@lablup.com") | .uuid' fixtures/manager/example-users.json)
+  echo "export BACKEND_ACCESS_KEY=$(jq -r --arg u "$ADMIN_UUID" '.keypairs[] | select(.user==$u) | .access_key' fixtures/manager/example-keypairs.json)" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(jq -r --arg u "$ADMIN_UUID" '.keypairs[] | select(.user==$u) | .secret_key' fixtures/manager/example-keypairs.json)" >> "${CLIENT_ADMIN_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_ADMIN_CONF_FOR_API}"
   chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_ADMIN_CONF_FOR_SESSION}"
@@ -1420,7 +1393,9 @@ configure_backendai() {
   CLIENT_DOMAINADMIN_CONF_FOR_SESSION="env-local-domainadmin-session.sh"
   echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-  write_api_keypair_env "${CLIENT_DOMAINADMIN_CONF_FOR_API}" "domain-admin@lablup.com"
+  DOMAINADMIN_UUID=$(jq -r '.users[] | select(.email=="domain-admin@lablup.com") | .uuid' fixtures/manager/example-users.json)
+  echo "export BACKEND_ACCESS_KEY=$(jq -r --arg u "$DOMAINADMIN_UUID" '.keypairs[] | select(.user==$u) | .access_key' fixtures/manager/example-keypairs.json)" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(jq -r --arg u "$DOMAINADMIN_UUID" '.keypairs[] | select(.user==$u) | .secret_key' fixtures/manager/example-keypairs.json)" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server using a cookie-based login session (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
@@ -1446,16 +1421,24 @@ configure_backendai() {
   CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
   echo "# Directly access to the manager using API keypair (user)" > "${CLIENT_USER_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER_CONF_FOR_API}"
-  write_api_keypair_env "${CLIENT_USER_CONF_FOR_API}" "user@lablup.com"
+  USER_UUID=$(jq -r '.users[] | select(.email=="user@lablup.com") | .uuid' fixtures/manager/example-users.json)
+  echo "export BACKEND_ACCESS_KEY=$(jq -r --arg u "$USER_UUID" '.keypairs[] | select(.user==$u) | .access_key' fixtures/manager/example-keypairs.json)" >> "${CLIENT_USER_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(jq -r --arg u "$USER_UUID" '.keypairs[] | select(.user==$u) | .secret_key' fixtures/manager/example-keypairs.json)" >> "${CLIENT_USER_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER_CONF_FOR_API}"
   chmod +x "${CLIENT_USER_CONF_FOR_API}"
   CLIENT_USER2_CONF_FOR_API="env-local-user2-api.sh"
   CLIENT_USER2_CONF_FOR_SESSION="env-local-user2-session.sh"
   echo "# Directly access to the manager using API keypair (user2)" > "${CLIENT_USER2_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER2_CONF_FOR_API}"
-  write_api_keypair_env "${CLIENT_USER2_CONF_FOR_API}" "user2@lablup.com"
+  USER2_UUID=$(jq -r '.users[] | select(.email=="user2@lablup.com") | .uuid' fixtures/manager/example-users.json)
+  echo "export BACKEND_ACCESS_KEY=$(jq -r --arg u "$USER2_UUID" '.keypairs[] | select(.user==$u) | .access_key' fixtures/manager/example-keypairs.json)" >> "${CLIENT_USER2_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(jq -r --arg u "$USER2_UUID" '.keypairs[] | select(.user==$u) | .secret_key' fixtures/manager/example-keypairs.json)" >> "${CLIENT_USER2_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER2_CONF_FOR_API}"
   chmod +x "${CLIENT_USER2_CONF_FOR_API}"
+  if grep -q '_KEY=$' env-local-*-api.sh; then
+    show_error "Empty API keypair in the generated env-local-*-api.sh; check fixtures/manager/example-keypairs.json"
+    exit 1
+  fi
   echo "# Indirectly access to the manager via the web server using a cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 
