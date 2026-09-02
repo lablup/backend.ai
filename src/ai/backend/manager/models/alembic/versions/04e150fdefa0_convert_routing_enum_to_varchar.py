@@ -78,6 +78,9 @@ def downgrade() -> None:
         existing_nullable=False,
         postgresql_using="status::routestatus",
     )
+    op.execute(
+        sa.text("ALTER TABLE routings ALTER COLUMN status SET DEFAULT 'provisioning'::routestatus")
+    )
     # Drop the VARCHAR default before altering the type, otherwise Postgres
     # cannot automatically cast the existing default ('active'::text) to the
     # new enum type and raises DatatypeMismatchError.
