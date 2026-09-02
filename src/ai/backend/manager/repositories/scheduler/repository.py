@@ -18,6 +18,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
@@ -712,7 +713,7 @@ class SchedulerRepository:
         await self._cache_source.invalidate_kernel_related_cache(access_keys)
 
     @scheduler_repository_resilience.apply()
-    async def get_attached_network(self, network_id: str) -> NetworkData:
+    async def get_attached_network(self, network_id: NetworkID) -> NetworkData:
         """
         Fetch the network a session attaches to.
 

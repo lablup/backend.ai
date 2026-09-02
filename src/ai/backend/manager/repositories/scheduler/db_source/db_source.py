@@ -25,6 +25,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import (
     ResourceGroupID,
@@ -3872,7 +3873,7 @@ class ScheduleDBSource:
 
             return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
 
-    async def get_attached_network(self, network_id: str) -> NetworkData:
+    async def get_attached_network(self, network_id: NetworkID) -> NetworkData:
         """
         Fetch the network a session attaches to.
 
@@ -3883,9 +3884,7 @@ class ScheduleDBSource:
         :return: The network, whose ``ref_name`` is the container network name
         """
         async with self._db.begin_readonly_session() as db_sess:
-            row = await db_sess.scalar(
-                sa.select(NetworkRow).where(NetworkRow.id == UUID(network_id))
-            )
+            row = await db_sess.scalar(sa.select(NetworkRow).where(NetworkRow.id == network_id))
             if row is None:
                 raise ObjectNotFound(object_name="network")
             return row.to_data()
