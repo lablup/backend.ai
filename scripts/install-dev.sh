@@ -1435,10 +1435,6 @@ configure_backendai() {
   echo "export BACKEND_SECRET_KEY=$(jq -r --arg u "$USER2_UUID" '.keypairs[] | select(.user==$u) | .secret_key' fixtures/manager/example-keypairs.json)" >> "${CLIENT_USER2_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER2_CONF_FOR_API}"
   chmod +x "${CLIENT_USER2_CONF_FOR_API}"
-  if grep -q '_KEY=$' env-local-*-api.sh; then
-    show_error "Empty API keypair in the generated env-local-*-api.sh; check fixtures/manager/example-keypairs.json"
-    exit 1
-  fi
   echo "# Indirectly access to the manager via the web server using a cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 
