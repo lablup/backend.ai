@@ -3883,7 +3883,7 @@ class ScheduleDBSource:
         :param network_id: The ``networks.id`` held by ``sessions.network_id``
         :return: The network, whose ``ref_name`` is the container network name
         """
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             row = await db_sess.scalar(sa.select(NetworkRow).where(NetworkRow.id == network_id))
             if row is None:
                 raise ObjectNotFound(object_name="network")
