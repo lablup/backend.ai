@@ -476,11 +476,7 @@ class SessionLauncher:
                     f"Session {session.session_id} uses a persistent network but has no network ID."
                 )
             network_name = network.ref_name
-            network_config = {
-                **network.options,
-                "mode": network.driver,
-                "network_name": network.ref_name,
-            }
+            network_config = {"mode": network.driver, "network_name": network.ref_name}
         elif network_type == NetworkType.VOLATILE:
             if session.cluster_mode == ClusterMode.SINGLE_NODE and len(session.kernels) > 1:
                 # Create single-node network for multi-kernel sessions

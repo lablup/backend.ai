@@ -394,7 +394,6 @@ class TestSessionLauncherNetworkSetup:
         assert cluster_info["network_config"] == {
             "mode": "overlay",
             "network_name": "bai-multinode-00000000-0000-0000-0000-0000000000b2-nw",
-            "network_id": "swarm-scoped-id",
         }
 
     async def test_persistent_network_id_not_overwritten(
