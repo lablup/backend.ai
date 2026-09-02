@@ -468,7 +468,10 @@ def user_get(name: str) -> None:
     "--max-api-requests-per-window",
     type=int,
     default=None,
-    help="Maximum API requests per user within the rate limit window (NULL = unlimited).",
+    help=(
+        "Maximum API requests per user within the rate limit window,"
+        " a fixed 15-minute sliding window (NULL = unlimited)."
+    ),
 )
 @click.option("--json", "json_str", default=None, help="Full input as JSON string.")
 @click.option(
@@ -554,7 +557,10 @@ def user_create(
     "--max-api-requests-per-window",
     type=int,
     default=None,
-    help="Maximum API requests per user within the rate limit window (NULL = unlimited).",
+    help=(
+        "Maximum API requests per user within the rate limit window,"
+        " a fixed 15-minute sliding window (NULL = unlimited)."
+    ),
 )
 @click.option("--json", "json_str", default=None, help="Full update input as JSON string.")
 @click.option(

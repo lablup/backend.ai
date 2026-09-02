@@ -3550,7 +3550,7 @@ input CreateUserResourcePolicyInputV2 {
   maxConcurrentLogins: Int = null
 
   """
-  Added in 26.9.0. Maximum number of API requests allowed per user within the rate limit window. Null means unlimited.
+  Added in 26.9.0. Maximum number of API requests allowed per user within the rate limit window: a fixed 15-minute (900-second) sliding window that ends at each request and is reported in the X-RateLimit-Window response header. Null means unlimited.
   """
   maxApiRequestsPerWindow: Int = null
 
@@ -16530,7 +16530,7 @@ input UpdateUserResourcePolicyInput {
   maxConcurrentLogins: Int
 
   """
-  Added in 26.9.0. Updated maximum number of API requests allowed per user within the rate limit window. Set to null to clear (unlimited).
+  Added in 26.9.0. Updated maximum number of API requests allowed per user within the rate limit window: a fixed 15-minute (900-second) sliding window that ends at each request and is reported in the X-RateLimit-Window response header. Set to null to clear (unlimited).
   """
   maxApiRequestsPerWindow: Int
 
@@ -16988,7 +16988,7 @@ type UserResourcePolicyV2 implements Node {
   maxConcurrentLogins: Int
 
   """
-  Added in 26.9.0. Maximum number of API requests allowed per user within the rate limit window. Null means unlimited.
+  Added in 26.9.0. Maximum number of API requests allowed per user within the rate limit window: a fixed 15-minute (900-second) sliding window that ends at each request and is reported in the X-RateLimit-Window response header. Null means unlimited.
   """
   maxApiRequestsPerWindow: Int
 
@@ -17030,7 +17030,9 @@ input UserResourcePolicyV2Filter {
   maxVfolderCount: IntFilter = null
   maxConcurrentLogins: IntFilter = null
 
-  """Added in 26.9.0. Filter by max API requests per rate limit window."""
+  """
+  Added in 26.9.0. Filter by max API requests per rate limit window (a fixed 15-minute sliding window).
+  """
   maxApiRequestsPerWindow: IntFilter = null
   maxQuotaScopeSize: IntFilter = null
   maxSessionCountPerModelSession: IntFilter = null

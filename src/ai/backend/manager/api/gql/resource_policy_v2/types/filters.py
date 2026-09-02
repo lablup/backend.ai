@@ -162,7 +162,10 @@ class UserResourcePolicyV2Filter(PydanticInputMixin[UserResourcePolicyFilterDTO]
     max_api_requests_per_window: IntFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="Filter by max API requests per rate limit window.",
+            description=(
+                "Filter by max API requests per rate limit window"
+                " (a fixed 15-minute sliding window)."
+            ),
         ),
         default=None,
     )

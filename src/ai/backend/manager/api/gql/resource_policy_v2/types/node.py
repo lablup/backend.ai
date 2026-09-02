@@ -211,7 +211,9 @@ class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
             added_version=NEXT_RELEASE_VERSION,
             description=(
                 "Maximum number of API requests allowed per user within the rate limit"
-                " window. Null means unlimited."
+                " window: a fixed 15-minute (900-second) sliding window that ends at each"
+                " request and is reported in the X-RateLimit-Window response header."
+                " Null means unlimited."
             ),
         ),
     )

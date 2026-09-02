@@ -191,7 +191,9 @@ class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePoli
             added_version=NEXT_RELEASE_VERSION,
             description=(
                 "Maximum number of API requests allowed per user within the rate limit"
-                " window. Null means unlimited."
+                " window: a fixed 15-minute (900-second) sliding window that ends at each"
+                " request and is reported in the X-RateLimit-Window response header."
+                " Null means unlimited."
             ),
         ),
         default=None,
@@ -235,7 +237,9 @@ class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePoli
             added_version=NEXT_RELEASE_VERSION,
             description=(
                 "Updated maximum number of API requests allowed per user within the rate"
-                " limit window. Set to null to clear (unlimited)."
+                " limit window: a fixed 15-minute (900-second) sliding window that ends at"
+                " each request and is reported in the X-RateLimit-Window response header."
+                " Set to null to clear (unlimited)."
             ),
         ),
         default=UNSET,

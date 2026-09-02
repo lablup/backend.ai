@@ -185,8 +185,9 @@ class CreateUserResourcePolicyInput(BaseRequestModel):
         default=None,
         ge=0,
         description=(
-            "Maximum number of API requests allowed per user within the rate limit window."
-            " Null means unlimited."
+            "Maximum number of API requests allowed per user within the rate limit window:"
+            " a fixed 15-minute (900-second) sliding window that ends at each request and is"
+            " reported in the X-RateLimit-Window response header. Null means unlimited."
         ),
     )
     max_quota_scope_size: BinarySizeInput = Field(
@@ -230,7 +231,9 @@ class UpdateUserResourcePolicyInput(BaseRequestModel):
         ge=0,
         description=(
             "Updated maximum number of API requests allowed per user within the rate limit"
-            " window. Set to null to clear (unlimited)."
+            " window: a fixed 15-minute (900-second) sliding window that ends at each"
+            " request and is reported in the X-RateLimit-Window response header."
+            " Set to null to clear (unlimited)."
         ),
     )
     max_quota_scope_size: BinarySizeInput | Sentinel | None = Field(
@@ -367,7 +370,10 @@ class UserResourcePolicyFilter(BaseRequestModel):
         default=None, description="Filter by max concurrent logins."
     )
     max_api_requests_per_window: IntFilter | None = Field(
-        default=None, description="Filter by max API requests per rate limit window."
+        default=None,
+        description=(
+            "Filter by max API requests per rate limit window (a fixed 15-minute sliding window)."
+        ),
     )
     max_quota_scope_size: IntFilter | None = Field(
         default=None, description="Filter by max quota scope size."

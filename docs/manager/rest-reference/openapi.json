@@ -22594,7 +22594,7 @@
               }
             ],
             "default": null,
-            "description": "Filter by max API requests per rate limit window."
+            "description": "Filter by max API requests per rate limit window (a fixed 15-minute sliding window)."
           },
           "max_quota_scope_size": {
             "anyOf": [
@@ -22871,7 +22871,7 @@
               }
             ],
             "default": null,
-            "description": "Maximum number of API requests allowed per user within the rate limit window. Null means unlimited.",
+            "description": "Maximum number of API requests allowed per user within the rate limit window: a fixed 15-minute (900-second) sliding window that ends at each request and is reported in the X-RateLimit-Window response header. Null means unlimited.",
             "title": "Max Api Requests Per Window"
           },
           "max_quota_scope_size": {
@@ -22957,7 +22957,7 @@
               }
             ],
             "default": 1,
-            "description": "Updated maximum number of API requests allowed per user within the rate limit window. Set to null to clear (unlimited).",
+            "description": "Updated maximum number of API requests allowed per user within the rate limit window: a fixed 15-minute (900-second) sliding window that ends at each request and is reported in the X-RateLimit-Window response header. Set to null to clear (unlimited).",
             "title": "Max Api Requests Per Window"
           },
           "max_quota_scope_size": {
