@@ -25,6 +25,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import (
     ResourceGroupID,
@@ -55,6 +56,7 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, SSHKeypair
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
+from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
@@ -69,6 +71,7 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
@@ -83,6 +86,7 @@ from ai.backend.manager.models.kernel import (
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.project import ProjectRow, query_group_dotfiles
 from ai.backend.manager.models.resource_group import ResourceGroupRow, query_allowed_sgroups
 from ai.backend.manager.models.resource_policy import (
@@ -3868,6 +3872,19 @@ class ScheduleDBSource:
             sftp_count = sftp_result.scalar() or 0
 
             return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
+
+    async def get_network(self, network_id: NetworkID) -> NetworkData:
+        """
+        Fetch a persistent network row.
+
+        :param network_id: The ``networks.id`` value stored in ``sessions.network_id``
+        :return: The network data including the plugin-generated ``ref_name``
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            row = await db_sess.scalar(sa.select(NetworkRow).where(NetworkRow.id == network_id))
+            if row is None:
+                raise ObjectNotFound(object_name="network")
+            return row.to_data()
 
     async def update_session_network_id(
         self,

@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AgentId,
@@ -32,6 +33,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
@@ -469,11 +471,19 @@ class SessionLauncher:
         network_type = session.network_type or NetworkType.VOLATILE
 
         if network_type == NetworkType.PERSISTENT:
-            # For persistent networks, use pre-created network
-            if session.network_id:
-                # In production, would look up network details from database
-                network_name = f"persistent-{session.network_id}"
-                network_config = {"mode": "bridge", "network_name": network_name}
+            # sessions.network_id holds networks.id; the actual container network name
+            # is the plugin-generated networks.ref_name.
+            if not session.network_id:
+                raise ServerMisconfiguredError(
+                    f"Session {session.session_id} uses a persistent network but has no network ID."
+                )
+            network = await self._repository.get_network(NetworkID(UUID(session.network_id)))
+            network_name = network.ref_name
+            network_config = {
+                **network.options,
+                "mode": network.driver,
+                "network_name": network.ref_name,
+            }
         elif network_type == NetworkType.VOLATILE:
             if session.cluster_mode == ClusterMode.SINGLE_NODE and len(session.kernels) > 1:
                 # Create single-node network for multi-kernel sessions
@@ -549,10 +559,11 @@ class SessionLauncher:
                     port_mapping[cluster_hostname] = (agent_host, port)
                 cluster_ssh_port_mapping = ClusterSSHPortMapping(port_mapping)
 
-        await self._repository.update_session_network_id(
-            session.session_id,
-            network_name,
-        )
+        if network_type != NetworkType.PERSISTENT:
+            await self._repository.update_session_network_id(
+                session.session_id,
+                network_name,
+            )
         return NetworkSetup(
             network_name=network_name,
             network_config=network_config,

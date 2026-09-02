@@ -18,6 +18,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
@@ -42,6 +43,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
+from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
@@ -709,6 +711,16 @@ class SchedulerRepository:
         :param access_keys: List of access keys whose related caches should be invalidated
         """
         await self._cache_source.invalidate_kernel_related_cache(access_keys)
+
+    @scheduler_repository_resilience.apply()
+    async def get_network(self, network_id: NetworkID) -> NetworkData:
+        """
+        Fetch a persistent network by its row ID.
+
+        :param network_id: The ``networks.id`` value stored in ``sessions.network_id``
+        :return: The network data including the plugin-generated ``ref_name``
+        """
+        return await self._db_source.get_network(network_id)
 
     @scheduler_repository_resilience.apply()
     async def update_session_network_id(
