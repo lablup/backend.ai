@@ -47,7 +47,9 @@ from ai.backend.client.v2.config import ClientConfig as V2ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
@@ -107,6 +109,7 @@ from .proxy import (
 from .proxy import (
     pipeline_handler as pipeline_request_handler,
 )
+from .ratelimit import proxy_rate_limit_middleware
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
@@ -1203,6 +1206,7 @@ async def server_main(
                 track_active_handlers,
                 security_policy_middleware,
                 general_exception_middleware,
+                proxy_rate_limit_middleware,
             ],
         )
         app["config"] = config
@@ -1219,6 +1223,7 @@ async def server_main(
             no_auth_client_registries_ctx(app["manager_pool"], config.api.ssl_verify)
         )
         await web_init_stack.enter_async_context(redis_ctx(config, app, pidx))
+        app["rate_limit_client"] = ValkeyRateLimitClient(client=app["redis"])
 
         # Initialize health probe
         health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
