@@ -64,6 +64,7 @@ from ai.backend.manager.data.session.creation import (
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ScalingGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
@@ -78,6 +79,7 @@ from ai.backend.manager.models.kernel import (
 )
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
     KeyPairResourcePolicyRow,
@@ -3849,6 +3851,24 @@ class ScheduleDBSource:
             sftp_count = sftp_result.scalar() or 0
 
             return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
+
+    async def get_attached_network_ref(self, network_id: UUID) -> str:
+        """
+        Fetch the container network name of the network a session attaches to.
+
+        Only a persistent session attaches to a pre-created network; the other types
+        name a network they own, which ``SessionRow.get_network_ref()`` returns as-is.
+
+        :param network_id: The ``networks.id`` held by ``sessions.network_id``
+        :return: The plugin-generated ``networks.ref_name``
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            ref_name: str | None = await db_sess.scalar(
+                sa.select(NetworkRow.ref_name).where(NetworkRow.id == network_id)
+            )
+            if ref_name is None:
+                raise ObjectNotFound(object_name="network")
+            return ref_name
 
     async def update_session_network_id(
         self,

@@ -709,6 +709,16 @@ class SchedulerRepository:
         await self._cache_source.invalidate_kernel_related_cache(access_keys)
 
     @scheduler_repository_resilience.apply()
+    async def get_attached_network_ref(self, network_id: UUID) -> str:
+        """
+        Fetch the container network name of the network a session attaches to.
+
+        :param network_id: The ``networks.id`` held by ``sessions.network_id``
+        :return: The plugin-generated ``networks.ref_name``
+        """
+        return await self._db_source.get_attached_network_ref(network_id)
+
+    @scheduler_repository_resilience.apply()
     async def update_session_network_id(
         self,
         session_id: SessionId,
