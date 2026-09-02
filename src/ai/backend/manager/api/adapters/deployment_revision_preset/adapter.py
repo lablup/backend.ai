@@ -314,7 +314,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if input.preset_values is not None
             else OptionalState.nop()
         )
-        model_def_state: TriState[ModelDefinition] = await self._resolve_model_definition_state(
+        model_def_state: TriState[ModelDefinition] = await self._merge_model_definition_update(
             input.id, input.model_definition
         )
 
@@ -565,7 +565,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             for pv in preset_values
         ]
 
-    async def _resolve_model_definition_state(
+    async def _merge_model_definition_update(
         self,
         preset_id: UUID,
         value: ModelDefinitionInput | Sentinel | None,
