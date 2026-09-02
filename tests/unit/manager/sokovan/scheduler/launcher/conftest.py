@@ -37,11 +37,6 @@ _DEFAULT_IMAGE_ID = UUID("00000000-0000-0000-0000-000000000001")
 _IMAGE_ID_1 = UUID("00000000-0000-0000-0000-000000000002")
 _IMAGE_ID_2 = UUID("00000000-0000-0000-0000-000000000003")
 
-# A persistent network row: the id stored on the session and the plugin-generated
-# container network name are unrelated values.
-_PERSISTENT_NETWORK_ID = UUID("00000000-0000-0000-0000-0000000000a1")
-_PERSISTENT_NETWORK_REF_NAME = "bai-multinode-00000000-0000-0000-0000-0000000000b2-nw"
-
 # =============================================================================
 # Mock Dependencies
 # =============================================================================
@@ -53,8 +48,6 @@ def mock_repository() -> AsyncMock:
     repository = AsyncMock()
     repository.update_session_error_info = AsyncMock(return_value=None)
     repository.update_session_network_id = AsyncMock(return_value=None)
-
-    repository.get_attached_network_ref = AsyncMock(return_value=_PERSISTENT_NETWORK_REF_NAME)
     return repository
 
 
@@ -240,7 +233,6 @@ def _create_session_for_start(
     kernels: list[KernelBindingData] | None = None,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
     network_type: NetworkType | None = None,
-    network_id: str | None = None,
 ) -> SessionDataForStart:
     """Create SessionDataForStart for session start tests."""
     if kernels is None:
@@ -257,7 +249,7 @@ def _create_session_for_start(
         user_name="testuser",
         cluster_mode=cluster_mode,
         network_type=network_type or NetworkType.VOLATILE,
-        network_id=network_id,
+        network_id=None,
         kernels=kernels,
         environ={},
     )
@@ -307,15 +299,6 @@ def session_for_start_host_network() -> SessionDataForStart:
             _create_kernel_binding_data(cluster_idx=1),
         ],
         network_type=NetworkType.HOST,
-    )
-
-
-@pytest.fixture
-def session_for_start_persistent_network() -> SessionDataForStart:
-    """Session attached to a pre-created persistent network."""
-    return _create_session_for_start(
-        network_type=NetworkType.PERSISTENT,
-        network_id=str(_PERSISTENT_NETWORK_ID),
     )
 
 
