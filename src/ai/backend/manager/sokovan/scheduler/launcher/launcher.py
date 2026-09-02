@@ -32,7 +32,6 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
-from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
@@ -471,11 +470,8 @@ class SessionLauncher:
         network_name = await self._repository.get_network_ref(network_type, session.network_id)
 
         if network_type == NetworkType.PERSISTENT:
-            if network_name is None:
-                raise ServerMisconfiguredError(
-                    f"Session {session.session_id} uses a persistent network but has no network ID."
-                )
-            network_config = {"mode": "bridge", "network_name": network_name}
+            if network_name is not None:
+                network_config = {"mode": "bridge", "network_name": network_name}
         elif network_type == NetworkType.VOLATILE:
             if session.cluster_mode == ClusterMode.SINGLE_NODE and len(session.kernels) > 1:
                 # Create single-node network for multi-kernel sessions
