@@ -74,7 +74,6 @@ def _make_request(
 @pytest.fixture(autouse=True)
 def reset_deprecation_warning() -> None:
     auth_module._warn_forwarded_url_without_trusted_proxies.cache_clear()
-    auth_module._warn_forwarded_url_path_deprecated.cache_clear()
 
 
 def test_parse_trusted_proxy_networks_accepts_bare_addresses_cidrs_and_wildcards() -> None:

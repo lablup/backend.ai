@@ -446,14 +446,6 @@ def _resolve_forwarded_url(request: web.Request) -> str | None:
     return upstream_url
 
 
-@functools.cache
-def _warn_forwarded_url_path_deprecated() -> None:
-    log.warning(
-        "Deriving the signed path from the X-Forwarded-URL header is deprecated; "
-        "configure the reverse proxy to send X-Forwarded-Prefix instead."
-    )
-
-
 def _resolve_forwarded_prefix(request: web.Request) -> str | None:
     """Return the ``X-Forwarded-Prefix`` value only when its origin may be trusted.
 
@@ -522,7 +514,6 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
             path = prefix + request.raw_path
         elif upstream_url:
             path = urlparse(upstream_url).path
-            _warn_forwarded_url_path_deprecated()
 
         sign_bytes = "{0}\n{1}\n{2}\nhost:{3}\ncontent-type:{4}\nx-{name}-version:{5}\n{6}".format(
             request.method,
