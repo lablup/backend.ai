@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any
 
+import pytest
 from aiohttp import web
 
 from ai.backend.common.web.deferred_response_headers import (
@@ -9,51 +12,67 @@ from ai.backend.common.web.deferred_response_headers import (
     setup_deferred_response_headers,
 )
 
+_HEADER = "X-Deferred"
 
-async def _ok(request: web.Request) -> web.Response:
-    deferred_response_headers(request)["X-Pending"] = "ok"
+
+async def _returns_with_header(request: web.Request) -> web.Response:
+    deferred_response_headers(request)[_HEADER] = "set"
     return web.Response(text="ok")
 
 
-async def _rejected(request: web.Request) -> web.Response:
-    deferred_response_headers(request)["X-Pending"] = "rejected"
+async def _raises_with_header(request: web.Request) -> web.Response:
+    deferred_response_headers(request)[_HEADER] = "set"
     raise web.HTTPTooManyRequests()
 
 
-async def _silent(request: web.Request) -> web.Response:
-    return web.Response(text="silent")
+async def _returns_without_header(request: web.Request) -> web.Response:
+    return web.Response(text="ok")
 
 
-async def test_deferred_headers_reach_the_response(aiohttp_client: Any) -> None:
+@dataclass(frozen=True)
+class _Case:
+    id: str
+    handler: Callable[[web.Request], Awaitable[web.Response]]
+    expected_status: int
+    expected_header: str | None
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        # Header set by the handler lands on its normal response.
+        _Case(
+            id="returned-response",
+            handler=_returns_with_header,
+            expected_status=200,
+            expected_header="set",
+        ),
+        # Header set before an error is raised lands on the error response too.
+        _Case(
+            id="raised-error",
+            handler=_raises_with_header,
+            expected_status=429,
+            expected_header="set",
+        ),
+        # Nothing set: the hook adds nothing.
+        _Case(
+            id="no-deferred-header",
+            handler=_returns_without_header,
+            expected_status=200,
+            expected_header=None,
+        ),
+    ],
+    ids=lambda case: case.id,
+)
+async def test_deferred_headers_land_on_the_prepared_response(
+    case: _Case, aiohttp_client: Any
+) -> None:
     app = web.Application()
     setup_deferred_response_headers(app)
-    app.router.add_get("/ok", _ok)
+    app.router.add_get("/", case.handler)
     client = await aiohttp_client(app)
 
-    response = await client.get("/ok")
+    response = await client.get("/")
 
-    assert response.status == 200
-    assert response.headers["X-Pending"] == "ok"
-
-
-async def test_deferred_headers_reach_an_error_raised_later(aiohttp_client: Any) -> None:
-    app = web.Application()
-    setup_deferred_response_headers(app)
-    app.router.add_get("/rejected", _rejected)
-    client = await aiohttp_client(app)
-
-    response = await client.get("/rejected")
-
-    assert response.status == 429
-    assert response.headers["X-Pending"] == "rejected"
-
-
-async def test_response_without_deferred_headers_is_untouched(aiohttp_client: Any) -> None:
-    app = web.Application()
-    setup_deferred_response_headers(app)
-    app.router.add_get("/silent", _silent)
-    client = await aiohttp_client(app)
-
-    response = await client.get("/silent")
-
-    assert "X-Pending" not in response.headers
+    assert response.status == case.expected_status
+    assert response.headers.get(_HEADER) == case.expected_header
