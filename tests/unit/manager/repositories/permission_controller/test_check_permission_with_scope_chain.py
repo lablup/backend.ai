@@ -325,6 +325,48 @@ class TestCheckPermissionWithScopeChain:
         assert result is expected
 
     @pytest.mark.parametrize(
+        ("permission_setup", "expected"),
+        [
+            pytest.param(
+                [PermissionEntry("project", OperationType.CREATE)],
+                False,
+                id="create-only-does-not-cover-upsert",
+            ),
+            pytest.param(
+                [
+                    PermissionEntry("project", OperationType.CREATE),
+                    PermissionEntry("project", OperationType.UPDATE),
+                ],
+                True,
+                id="create-and-update-cover-upsert",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_mask_requires_every_bit(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_auto: None,
+        permission_setup: None,
+        expected: bool,
+    ) -> None:
+        """A multi-bit requirement (UPSERT = CREATE|UPDATE) holds only with every bit."""
+        fixture = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            ScopeChainPermissionCheckInput(
+                key=PermissionResolutionKey(
+                    user_id=fixture.user_id,
+                    element_type=RBACElementType.VFOLDER,
+                    entity_id=fixture.vfolder_id,
+                    subject_entity_type=RBACElementType.VFOLDER,
+                ),
+                permission=Permission.CREATE | Permission.UPDATE,
+            )
+        )
+        assert result is expected
+
+    @pytest.mark.parametrize(
         ("permission_setup", "check_op", "expected"),
         [
             pytest.param(

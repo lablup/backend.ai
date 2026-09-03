@@ -970,11 +970,11 @@ class PermissionDBSource:
         self,
         data: ScopeChainPermissionCheckInput,
     ) -> bool:
-        """Return whether the user holds *operation* on the target element."""
+        """Return whether the user holds every bit of ``permission`` on the target."""
         granted = await self._resolve_permissions_via_direct_scope_walk(
             [data.key], permission_filter=data.permission
         )
-        return bool(granted.get(data.key, Permission.NONE) & data.permission)
+        return granted.get(data.key, Permission.NONE).covers(data.permission)
 
     async def check_bulk_permission_with_scope_chain(
         self,
@@ -982,15 +982,15 @@ class PermissionDBSource:
     ) -> Mapping[PermissionResolutionKey, bool]:
         """Check whether the user holds *operation* on each target key in one go.
 
-        Returns a mapping from each input key to a boolean indicating whether
-        the operation is granted.
+        Returns a mapping from each input key to whether every bit of
+        ``permission`` is granted.
         """
         if not data.keys:
             return {}
         granted = await self._resolve_permissions_via_direct_scope_walk(
             data.keys, permission_filter=data.permission
         )
-        return {key: bool(granted.get(key, Permission.NONE) & data.permission) for key in data.keys}
+        return {key: granted.get(key, Permission.NONE).covers(data.permission) for key in data.keys}
 
     async def _resolve_permissions_via_direct_scope_walk(
         self,
@@ -1007,8 +1007,8 @@ class PermissionDBSource:
         Returns a mapping keyed by the original ``PermissionResolutionKey``
         objects. Keys that received no grant map to ``Permission.NONE``.
 
-        When ``permission_filter`` is set, only that bit is considered;
-        otherwise every granted bit is returned.
+        When ``permission_filter`` is set, only the bits of that mask are
+        considered; otherwise every granted bit is returned.
         """
         if not keys:
             return {}
@@ -1088,7 +1088,7 @@ class PermissionDBSource:
             perm.c.entity_type == group_key.subject_entity_type.to_entity_type(),
         ]
         if permission_filter is not None:
-            filters.append(perm.c.permission == permission_filter)
+            filters.append(perm.c.permission.op("&")(permission_filter) != 0)
 
         return (
             sa.select(
@@ -1137,7 +1137,7 @@ class PermissionDBSource:
             perm.c.entity_type == group_key.subject_entity_type.to_entity_type(),
         ]
         if permission_filter is not None:
-            filters.append(perm.c.permission == permission_filter)
+            filters.append(perm.c.permission.op("&")(permission_filter) != 0)
 
         return (
             sa.select(

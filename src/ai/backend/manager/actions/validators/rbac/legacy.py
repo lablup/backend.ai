@@ -9,7 +9,6 @@ import logging
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.metrics.safe import SafeCounter
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -71,7 +70,7 @@ class LegacySingleEntityActionRBACValidator(SingleEntityActionValidator):
                     entity_id=target.element_id,
                     subject_entity_type=target.element_type,
                 ),
-                permission=Permission.from_operation(operation),
+                permission=action.operation_type().to_permission(),
             )
         )
         if not allowed:
@@ -116,7 +115,7 @@ class LegacyScopeActionRBACValidator(ScopeActionValidator):
                     entity_id=target.element_id,
                     subject_entity_type=entity_type.to_element(),
                 ),
-                permission=Permission.from_operation(operation),
+                permission=action.operation_type().to_permission(),
             )
         )
         if not allowed:
