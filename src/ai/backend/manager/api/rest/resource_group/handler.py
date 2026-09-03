@@ -77,12 +77,6 @@ class ResourceGroupHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        log.info(
-            "SGROUPS.LIST(ak:{}, g:{}, d:{})",
-            ctx.access_key,
-            params.group,
-            ctx.user_domain,
-        )
         domain_lookup = await self._domain.lookup.run(
             LookupDomainAction(name=DomainName(ctx.user_domain))
         )
@@ -121,12 +115,6 @@ class ResourceGroupHandler:
         query_params = query.parsed
         resource_group_name = path_params.scaling_group
         group_id_or_name = query_params.group
-        log.info(
-            "SGROUPS.LIST(ak:{}, g:{}, d:{})",
-            ctx.access_key,
-            group_id_or_name,
-            ctx.user_domain,
-        )
         action = GetWsproxyVersionAction(
             resource_group_name=resource_group_name,
             domain_name=ctx.user_domain,

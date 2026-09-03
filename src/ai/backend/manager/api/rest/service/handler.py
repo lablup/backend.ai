@@ -256,7 +256,6 @@ class ServiceHandler:
         self, query: QueryParam[ListServeRequestModel], ctx: UserContext
     ) -> APIResponse | web.StreamResponse:
         params = query.parsed
-        log.info("SERVE.LIST (email:{}, ak:{})", ctx.user_email, ctx.access_key)
 
         action = ListModelServiceAction(session_owener_id=ctx.user_uuid, name=params.name)
         result: ListModelServiceActionResult = await self._model_serving.list_model_service.run(
@@ -288,7 +287,6 @@ class ServiceHandler:
         self, body: BodyParam[SearchServicesRequestModel], ctx: UserContext
     ) -> APIResponse:
         params = body.parsed
-        log.info("SERVE.SEARCH (email:{}, ak:{})", ctx.user_email, ctx.access_key)
 
         adapter = ServiceSearchAdapter()
         conditions = adapter.convert_filter(params.filter) if params.filter else []
@@ -330,12 +328,6 @@ class ServiceHandler:
 
     async def get_info(self, path: PathParam[ServiceIdPathParam], ctx: UserContext) -> APIResponse:
         params = path.parsed
-        log.info(
-            "SERVE.GET_INFO (email:{}, ak:{}, s:{})",
-            ctx.user_email,
-            ctx.access_key,
-            params.service_id,
-        )
 
         action = GetModelServiceInfoAction(deployment_id=DeploymentID(params.service_id))
         result: GetModelServiceInfoActionResult = (
@@ -432,12 +424,6 @@ class ServiceHandler:
 
     async def delete(self, path: PathParam[ServiceIdPathParam], ctx: UserContext) -> APIResponse:
         params = path.parsed
-        log.info(
-            "SERVE.DELETE (email:{}, ak:{}, s:{})",
-            ctx.user_email,
-            ctx.access_key,
-            params.service_id,
-        )
 
         deployment_action = DestroyDeploymentAction(deployment_id=DeploymentID(params.service_id))
         deployment_result: DestroyDeploymentActionResult = (
@@ -452,12 +438,6 @@ class ServiceHandler:
 
     async def sync(self, path: PathParam[ServiceIdPathParam], ctx: UserContext) -> APIResponse:
         params = path.parsed
-        log.info(
-            "SERVE.SYNC (email:{}, ak:{}, s:{})",
-            ctx.user_email,
-            ctx.access_key,
-            params.service_id,
-        )
 
         action = ForceSyncAction(deployment_id=DeploymentID(params.service_id))
         result = await self._model_serving.force_sync.run(action)
@@ -478,12 +458,6 @@ class ServiceHandler:
         path_params = path.parsed
         params = body.parsed
         request = req.request
-        log.info(
-            "SERVE.SCALE (email:{}, ak:{}, s:{})",
-            request["user"]["email"],
-            request["keypair"]["access_key"],
-            path_params.service_id,
-        )
 
         action = ScaleServiceReplicasAction(
             max_session_count_per_model_session=request["user"]["resource_policy"][
@@ -513,13 +487,6 @@ class ServiceHandler:
     ) -> APIResponse:
         path_params = path.parsed
         params = body.parsed
-        log.info(
-            "SERVE.UPDATE_ROUTE (email:{}, ak:{}, s:{}, r:{})",
-            ctx.user_email,
-            ctx.access_key,
-            path_params.service_id,
-            path_params.route_id,
-        )
 
         action = UpdateRouteAction(
             deployment_id=DeploymentID(path_params.service_id),
@@ -540,12 +507,6 @@ class ServiceHandler:
         self, path: PathParam[ServiceRouteIdPathParam], ctx: UserContext
     ) -> APIResponse:
         path_params = path.parsed
-        log.info(
-            "SERVE.DELETE_ROUTE (email:{}, ak:{}, s:{})",
-            ctx.user_email,
-            ctx.access_key,
-            path_params.service_id,
-        )
 
         action = DeleteRouteAction(
             deployment_id=DeploymentID(path_params.service_id),
@@ -569,12 +530,6 @@ class ServiceHandler:
     ) -> APIResponse:
         path_params = path.parsed
         params = body.parsed
-        log.info(
-            "SERVE.GENERATE_TOKEN (email:{}, ak:{}, s:{})",
-            ctx.user_email,
-            ctx.access_key,
-            path_params.service_id,
-        )
 
         action = GenerateTokenAction(
             deployment_id=DeploymentID(path_params.service_id),
@@ -596,12 +551,6 @@ class ServiceHandler:
         self, path: PathParam[ServiceIdPathParam], ctx: UserContext
     ) -> APIResponse:
         path_params = path.parsed
-        log.info(
-            "SERVE.LIST_ERRORS (email:{}, ak:{}, s:{})",
-            ctx.user_email,
-            ctx.access_key,
-            path_params.service_id,
-        )
 
         action = ListErrorsAction(deployment_id=DeploymentID(path_params.service_id))
         result = await self._model_serving.list_errors.run(action)
@@ -623,12 +572,6 @@ class ServiceHandler:
         self, path: PathParam[ServiceIdPathParam], ctx: UserContext
     ) -> APIResponse:
         path_params = path.parsed
-        log.info(
-            "SERVE.CLEAR_ERROR (email:{}, ak:{}, s:{})",
-            ctx.user_email,
-            ctx.access_key,
-            path_params.service_id,
-        )
 
         action = ClearErrorAction(deployment_id=DeploymentID(path_params.service_id))
         await self._model_serving.clear_error.run(action)

@@ -74,7 +74,6 @@ class GroupConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info("GROUPCONFIG.CREATE(group:{})", params.group)
         project_id = await self._resolve(params.group, params.domain, ctx)
         await self._project.create_dotfile.run(
             CreateProjectDotfileAction(
@@ -90,7 +89,6 @@ class GroupConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        log.info("GROUPCONFIG.LIST_OR_GET(group:{})", params.group)
         project_id = await self._resolve(params.group, params.domain, ctx)
         project = await self._project.get_project.run(GetProjectAction(project_id=project_id))
         entries = DotfileEntries.unpack(project.data.dotfiles)
@@ -111,7 +109,6 @@ class GroupConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info("GROUPCONFIG.UPDATE(group:{})", params.group)
         project_id = await self._resolve(params.group, params.domain, ctx)
         await self._project.update_dotfile.run(
             UpdateProjectDotfileAction(
@@ -127,7 +124,6 @@ class GroupConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        log.info("GROUPCONFIG.DELETE(group:{})", params.group)
         project_id = await self._resolve(params.group, params.domain, ctx)
         await self._project.delete_dotfile.run(
             DeleteProjectDotfileAction(project_id=project_id, path=params.path)

@@ -95,7 +95,6 @@ class ResourceHandler:
         query: QueryParam[ListPresetsQuery],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("LIST_PRESETS (ak:{})", ctx.access_key)
         params = query.parsed
         result = await self._resource_preset.list_presets.run(
             ListResourcePresetsAction(
@@ -117,12 +116,6 @@ class ResourceHandler:
     ) -> APIResponse:
         params = body.parsed
         resource_policy = req.request["keypair"]["resource_policy"]
-        log.info(
-            "CHECK_PRESETS (ak:{}, g:{}, sg:{})",
-            ctx.access_key,
-            params.group,
-            params.scaling_group,
-        )
         result = await self._resource_preset.check_presets.run(
             CheckResourcePresetsAction(
                 access_key=AccessKey(ctx.access_key),
@@ -159,7 +152,6 @@ class ResourceHandler:
     # ------------------------------------------------------------------
 
     async def recalculate_usage(self, ctx: UserContext) -> APIResponse:
-        log.info("RECALCULATE_USAGE ()")
         await self._agent.recalculate_usage.run(RecalculateUsageAction())
         return APIResponse.build(HTTPStatus.OK, EmptyResponse())
 
@@ -173,11 +165,6 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        log.info(
-            "USAGE_PER_MONTH (g:[{}], month:{})",
-            ",".join(str(gid) for gid in params.group_ids) if params.group_ids else "",
-            params.month,
-        )
         result = await self._project.usage_per_month.run(
             UsagePerMonthAction(
                 group_ids=params.group_ids,
@@ -210,7 +197,6 @@ class ResourceHandler:
     # ------------------------------------------------------------------
 
     async def user_month_stats(self, ctx: UserContext) -> APIResponse:
-        log.info("USER_LAST_MONTH_STATS (ak:{}, u:{})", ctx.access_key, ctx.user_uuid)
         result = await self._user.user_month_stats.run(
             UserMonthStatsAction(user_id=UserID(ctx.user_uuid))
         )
@@ -221,7 +207,6 @@ class ResourceHandler:
     # ------------------------------------------------------------------
 
     async def admin_month_stats(self, ctx: UserContext) -> APIResponse:
-        log.info("ADMIN_LAST_MONTH_STATS ()")
         result = await self._user.admin_month_stats.run(AdminMonthStatsAction())
         return APIResponse.build(HTTPStatus.OK, RawListResponse(root=result.stats))
 
@@ -235,7 +220,6 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        log.info("GET_WATCHER_STATUS (ag:{})", params.agent_id)
         result = await self._agent.get_watcher_status.run(
             GetWatcherStatusAction(agent_id=AgentId(params.agent_id))
         )
@@ -251,7 +235,6 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info("WATCHER_AGENT_START (ag:{})", params.agent_id)
         result = await self._agent.watcher_agent_start.run(
             WatcherAgentStartAction(agent_id=AgentId(params.agent_id))
         )
@@ -267,7 +250,6 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info("WATCHER_AGENT_STOP (ag:{})", params.agent_id)
         result = await self._agent.watcher_agent_stop.run(
             WatcherAgentStopAction(agent_id=AgentId(params.agent_id))
         )
@@ -283,7 +265,6 @@ class ResourceHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info("WATCHER_AGENT_RESTART (ag:{})", params.agent_id)
         result = await self._agent.watcher_agent_restart.run(
             WatcherAgentRestartAction(agent_id=AgentId(params.agent_id))
         )

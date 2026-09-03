@@ -99,7 +99,6 @@ class UserHandler:
         body: BodyParam[CreateUserRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("CREATE_USER (ak:{})", ctx.access_key)
         password_info = PasswordInfo(
             password=body.parsed.password,
             algorithm=self._config_provider.config.auth.password_hash_algorithm,
@@ -152,7 +151,6 @@ class UserHandler:
         path: PathParam[GetUserPathParam],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("GET_USER (ak:{}, u:{})", ctx.access_key, path.parsed.user_id)
         action_result = await self._user.get_user.run(
             GetUserAction(user_id=UserID(path.parsed.user_id))
         )
@@ -169,7 +167,6 @@ class UserHandler:
         body: BodyParam[SearchUsersRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("SEARCH_USERS (ak:{})", ctx.access_key)
         searcher = self._adapter.build_searcher(body.parsed)
 
         action_result = await self._user.global_search.run(
@@ -196,8 +193,6 @@ class UserHandler:
         body: BodyParam[UpdateUserRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("UPDATE_USER (ak:{}, u:{})", ctx.access_key, path.parsed.user_id)
-
         # Build password info if password is being updated
         password_info: PasswordInfo | None = None
         if body.parsed.password is not None:
@@ -234,8 +229,6 @@ class UserHandler:
         body: BodyParam[DeleteUserRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("DELETE_USER (ak:{}, u:{})", ctx.access_key, body.parsed.user_id)
-
         await self._user.delete_user.run(DeleteUserAction(user_id=UserID(body.parsed.user_id)))
 
         resp = DeleteUserResponse(success=True)
@@ -250,8 +243,6 @@ class UserHandler:
         body: BodyParam[PurgeUserRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("PURGE_USER (ak:{}, u:{})", ctx.access_key, body.parsed.user_id)
-
         purge_shared = OptionalState[bool].nop()
         delegate_endpoint = OptionalState[bool].nop()
         if body.parsed.purge_shared_vfolders:

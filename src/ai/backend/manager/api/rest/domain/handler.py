@@ -73,7 +73,6 @@ class DomainHandler:
         body: BodyParam[CreateDomainRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("CREATE_DOMAIN (ak:{})", ctx.access_key)
         creator = DomainCreator(
             name=body.parsed.name,
             description=body.parsed.description,
@@ -110,7 +109,6 @@ class DomainHandler:
         path: PathParam[GetDomainPathParam],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("GET_DOMAIN (ak:{}, d:{})", ctx.access_key, path.parsed.domain_name)
         resolved = await self._domain.lookup.run(
             LookupDomainAction(name=DomainName(path.parsed.domain_name))
         )
@@ -128,7 +126,6 @@ class DomainHandler:
         body: BodyParam[SearchDomainsRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("SEARCH_DOMAINS (ak:{})", ctx.access_key)
         searcher = self._adapter.build_searcher(body.parsed)
 
         action_result = await self._domain.global_search.run(
@@ -156,7 +153,6 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         domain_name = path.parsed.domain_name
-        log.info("UPDATE_DOMAIN (ak:{}, d:{})", ctx.access_key, domain_name)
         target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
         updater = self._adapter.build_updater(body.parsed, target.entity_id())
 
@@ -174,7 +170,6 @@ class DomainHandler:
         body: BodyParam[DeleteDomainRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("DELETE_DOMAIN (ak:{}, d:{})", ctx.access_key, body.parsed.name)
         target = await self._domain.lookup.run(
             LookupDomainAction(name=DomainName(body.parsed.name))
         )
@@ -196,7 +191,6 @@ class DomainHandler:
         body: BodyParam[PurgeDomainRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("PURGE_DOMAIN (ak:{}, d:{})", ctx.access_key, body.parsed.name)
         target = await self._domain.lookup.run(
             LookupDomainAction(name=DomainName(body.parsed.name))
         )

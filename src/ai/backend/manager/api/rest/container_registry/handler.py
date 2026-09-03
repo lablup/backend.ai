@@ -93,7 +93,6 @@ class ContainerRegistryHandler:
         body: BodyParam[CreateContainerRegistryRequestModel],
     ) -> APIResponse:
         params = body.parsed
-        log.info("CREATE_CONTAINER_REGISTRY (registry_name:{})", params.registry_name)
 
         creator = ContainerRegistryCreator(
             url=params.url,
@@ -134,7 +133,6 @@ class ContainerRegistryHandler:
         path: PathParam[RegistryIdPath],
     ) -> APIResponse:
         registry_id = path.parsed.registry_id
-        log.info("DELETE_CONTAINER_REGISTRY (registry:{})", registry_id)
 
         await self._container_registry.delete_container_registry.run(
             DeleteContainerRegistryAction(
@@ -148,8 +146,6 @@ class ContainerRegistryHandler:
     # ------------------------------------------------------------------
 
     async def list_all(self) -> APIResponse:
-        log.info("LIST_ALL_CONTAINER_REGISTRIES")
-
         result = await self._container_registry.load_all_container_registries.run(
             LoadAllContainerRegistriesAction()
         )
@@ -182,11 +178,6 @@ class ContainerRegistryHandler:
         query: QueryParam[LoadContainerRegistriesQueryModel],
     ) -> APIResponse:
         params = query.parsed
-        log.info(
-            "LOAD_CONTAINER_REGISTRIES (registry:{}, project:{})",
-            params.registry,
-            params.project,
-        )
 
         result = await self._container_registry.load_container_registries.run(
             LoadContainerRegistriesAction(registry=params.registry, project=params.project)
@@ -221,7 +212,6 @@ class ContainerRegistryHandler:
         path: PathParam[RegistryIdPath],
     ) -> APIResponse:
         registry_id = path.parsed.registry_id
-        log.info("PATCH_CONTAINER_REGISTRY (registry:{})", registry_id)
         params = body.parsed
 
         updater = ContainerRegistryUpdater(
@@ -290,7 +280,6 @@ class ContainerRegistryHandler:
         body: BodyParam[ImageOperationRequestModel],
     ) -> APIResponse:
         params = body.parsed
-        log.info("RESCAN_IMAGES (registry:{}, project:{})", params.registry, params.project)
 
         await self._container_registry.rescan_images.run(
             RescanImagesAction(
@@ -310,7 +299,6 @@ class ContainerRegistryHandler:
         body: BodyParam[ImageOperationRequestModel],
     ) -> APIResponse:
         params = body.parsed
-        log.info("CLEAR_IMAGES (registry:{}, project:{})", params.registry, params.project)
 
         await self._container_registry.clear_images.run(
             ClearImagesAction(registry=params.registry, project=params.project)
@@ -331,7 +319,6 @@ class ContainerRegistryHandler:
         event_type = params.type
         project = params.event_data.repository.namespace
         img_name = params.event_data.repository.name
-        log.info("HARBOR_WEBHOOK_HANDLER (event_type:{})", event_type)
 
         resources = [
             HarborWebhookResourceInput(

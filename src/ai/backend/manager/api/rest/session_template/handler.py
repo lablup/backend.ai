@@ -99,11 +99,6 @@ class SessionTemplateHandler:
         params = body.parsed
         domain = params.domain or ctx.user_domain
         owner_access_key = params.owner_access_key
-        log.info(
-            "SESSION_TEMPLATE.CREATE (ak:{0}/{1})",
-            ctx.access_key,
-            owner_access_key if owner_access_key and owner_access_key != ctx.access_key else "*",
-        )
 
         try:
             payload = load_json(params.payload)
@@ -147,8 +142,6 @@ class SessionTemplateHandler:
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
-        log.info("SESSION_TEMPLATE.LIST (ak:{})", ctx.access_key)
-
         action = ListTaskTemplatesAction(user_uuid=UserID(ctx.user_uuid))
         result = await self._template.list_task.run(action)
 
@@ -183,13 +176,6 @@ class SessionTemplateHandler:
         params = query.parsed
         if params.format not in ("yaml", "json"):
             raise InvalidAPIParameters('format should be "yaml" or "json"')
-        log.info(
-            "SESSION_TEMPLATE.GET (ak:{0}/{1})",
-            ctx.access_key,
-            params.owner_access_key
-            if params.owner_access_key and params.owner_access_key != ctx.access_key
-            else "*",
-        )
 
         template_id = path.parsed.template_id
         action = GetTaskTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
@@ -216,11 +202,6 @@ class SessionTemplateHandler:
         template_id = path.parsed.template_id
         domain = params.domain or ctx.user_domain
         owner_access_key = params.owner_access_key
-        log.info(
-            "SESSION_TEMPLATE.PUT (ak:{0}/{1})",
-            ctx.access_key,
-            owner_access_key if owner_access_key and owner_access_key != ctx.access_key else "*",
-        )
 
         try:
             payload = load_json(params.payload)
@@ -266,14 +247,6 @@ class SessionTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         template_id = path.parsed.template_id
-        params = query.parsed
-        log.info(
-            "SESSION_TEMPLATE.DELETE (ak:{0}/{1})",
-            ctx.access_key,
-            params.owner_access_key
-            if params.owner_access_key and params.owner_access_key != ctx.access_key
-            else "*",
-        )
 
         action = DeleteTaskTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
         await self._template.delete_task.run(action)

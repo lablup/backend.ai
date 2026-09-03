@@ -97,8 +97,6 @@ class VFSStorageHandler:
         filepath = req.filepath
         storage_name = path.parsed.storage_name
 
-        log.info("Download request for file: {} from storage: {}", filepath, storage_name)
-
         resolved = await self._vfs_storage.lookup.run(LookupVFSStorageAction(name=storage_name))
         action_result = await self._vfs_storage.get.run(
             GetVFSStorageAction(storage_id=resolved.entity_id())
@@ -134,8 +132,6 @@ class VFSStorageHandler:
         """Get VFS storage information by storage name."""
         storage_name = path.parsed.storage_name
 
-        log.info("Get storage request for storage: {}", storage_name)
-
         resolved = await self._vfs_storage.lookup.run(LookupVFSStorageAction(name=storage_name))
         action_result = await self._vfs_storage.get.run(
             GetVFSStorageAction(storage_id=resolved.entity_id())
@@ -156,7 +152,6 @@ class VFSStorageHandler:
         self,
     ) -> APIResponse:
         """List all VFS storages."""
-        log.info("List all VFS storages.")
 
         action_result = await self._vfs_storage.global_list_storages.run(
             ListVFSStorageAction(searcher=VFSStorageSearcher(pagination=NoPagination()))
@@ -183,10 +178,7 @@ class VFSStorageHandler:
     ) -> APIResponse:
         """List files recursively in a VFS storage directory via storage proxy."""
         req = body.parsed
-        directory = req.directory
         storage_name = path.parsed.storage_name
-
-        log.info("List files request for directory: {} from storage: {}", directory, storage_name)
 
         resolved = await self._vfs_storage.lookup.run(LookupVFSStorageAction(name=storage_name))
         action_result = await self._vfs_storage.get.run(
