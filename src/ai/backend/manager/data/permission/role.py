@@ -19,6 +19,7 @@ from .types import (
 )
 from .types import (
     OperationType,
+    Permission,
     RBACElementType,
     RoleSource,
 )
@@ -79,7 +80,7 @@ class ScopePermissionCheckInput:
     user_id: uuid.UUID
     target_entity_type: LegacyEntityType
     target_scope_id: ScopeId
-    operation: OperationType
+    permission: Permission
 
 
 @dataclass(frozen=True)
@@ -118,13 +119,13 @@ class PermissionResolutionKey:
 @dataclass(frozen=True)
 class ScopeChainPermissionCheckInput:
     key: PermissionResolutionKey
-    operation: OperationType
+    permission: Permission
 
 
 @dataclass(frozen=True)
 class BulkPermissionCheckInput:
     keys: list[PermissionResolutionKey]
-    operation: OperationType
+    permission: Permission
 
 
 @dataclass(frozen=True)
@@ -263,7 +264,7 @@ class BulkRolePermissionAddFailure:
     scope_type: ScopeType
     scope_id: str
     entity_type: EntityType
-    operation: OperationType
+    permission: Permission
     message: str
 
 

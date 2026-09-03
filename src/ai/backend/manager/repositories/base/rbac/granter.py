@@ -7,7 +7,6 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import (
-    OperationType,
     Permission,
     RBACElementType,
     RelationType,
@@ -42,14 +41,14 @@ class RBACGranter:
         granted_entity_scope_type: The scope_type for entity-as-scope in permissions table.
         target_scope_id: The scope to associate the entity with (e.g., invitee's User scope).
         target_role_ids: The role ID(s) to grant permissions to.
-        operations: The operations to grant on the entity.
+        permission: The operation bits to grant on the entity.
     """
 
     granted_entity_id: ObjectId
     granted_entity_scope_type: RBACElementType
     target_scope_id: ScopeId
     target_role_ids: list[UUID]
-    operations: list[OperationType]
+    permission: Permission
 
 
 # =============================================================================
@@ -75,7 +74,7 @@ async def execute_rbac_granter(
     role_ids = granter.target_role_ids
     entity_id = granter.granted_entity_id
 
-    if not role_ids or not granter.operations:
+    if not role_ids or not granter.permission:
         return
 
     # 1. Insert ref edge in association_scopes_entities (visibility)
@@ -96,7 +95,7 @@ async def execute_rbac_granter(
 
     # 2. Insert entity-scope permissions (access control)
     #    Use ON CONFLICT DO NOTHING to safely handle repeated grants for the
-    #    same (role_id, scope_type, scope_id, entity_type, operation) tuple.
+    #    same (role_id, scope_type, scope_id, entity_type, permission) tuple.
     scope_type = granter.granted_entity_scope_type.to_scope_type()
     perm_values = [
         {
@@ -104,15 +103,15 @@ async def execute_rbac_granter(
             "scope_type": scope_type,
             "scope_id": entity_id.entity_id,
             "entity_type": entity_id.entity_type,
-            "operation": operation,
-            "permission": Permission.from_operation(operation),
+            "permission": bit,
         }
         for role_id in role_ids
-        for operation in granter.operations
+        for bit in Permission
+        if bit and granter.permission & bit
     ]
     perm_stmt = (
         pg_insert(PermissionRow)
         .values(perm_values)
-        .on_conflict_do_nothing(constraint="uq_permissions_role_scope_entity_op")
+        .on_conflict_do_nothing(constraint="uq_permissions_role_scope_entity_permission")
     )
     await db_sess.execute(perm_stmt)

@@ -14,7 +14,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.permission.types import Permission, RBACElementType
 from ai.backend.common.dto.manager.rbac import (
     OrderDirection,
     RoleDTO,
@@ -144,6 +144,7 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesData,
 )
+from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import PermissionData
@@ -878,7 +879,7 @@ class RBACAdapter(BaseAdapter):
                 scope_type=ScopeType(EntityType(scope_type)),
                 scope_id=input.scope_id,
                 entity_type=EntityType(RBACElementType(input.entity_type)),
-                operation=InternalOperationType(input.operation),
+                permission=self._permission_bit(input.operation),
             )
         )
         action_result = (
@@ -908,8 +909,8 @@ class RBACAdapter(BaseAdapter):
                 if input.entity_type is not None
                 else OptionalState.nop()
             ),
-            operation=(
-                OptionalState.update(InternalOperationType(input.operation))
+            permission=(
+                OptionalState.update(self._permission_bit(input.operation))
                 if input.operation is not None
                 else OptionalState.nop()
             ),
@@ -1009,7 +1010,7 @@ class RBACAdapter(BaseAdapter):
                     scope_type=f.scope_type,
                     scope_id=f.scope_id,
                     entity_type=f.entity_type,
-                    operation=f.operation.value,
+                    operation=f.permission.to_operation().value,
                     message=f.message,
                 )
                 for f in result.failures
@@ -1067,7 +1068,7 @@ class RBACAdapter(BaseAdapter):
                     scope_type=f.scope_type,
                     scope_id=f.scope_id,
                     entity_type=f.entity_type,
-                    operation=f.operation.value,
+                    operation=f.permission.to_operation().value,
                     message=f.message,
                 )
                 for f in result.failures
@@ -1082,7 +1083,7 @@ class RBACAdapter(BaseAdapter):
             scope_type=ScopeType(EntityType(scope_type)),
             scope_id=entry.scope_id,
             entity_type=EntityType(RBACElementType(entry.entity_type)),
-            operation=InternalOperationType(entry.operation),
+            permission=self._permission_bit(entry.operation),
         )
 
     async def bulk_revoke_role(self, input: BulkRevokeRoleInputDTO) -> BulkRevokeRoleResultPayload:
@@ -1187,6 +1188,32 @@ class RBACAdapter(BaseAdapter):
             conditions.append(in_factory([RBACElementType(v.value) for v in f.in_]))
         if f.not_in:
             conditions.append(not_in_factory([RBACElementType(v.value) for v in f.not_in]))
+        return conditions
+
+    def _permission_bit(self, operation: OperationTypeDTO | str) -> Permission:
+        """The permission bit an API operation names; grant operations name none."""
+        value = operation.value if isinstance(operation, OperationTypeDTO) else operation
+        return single_bit(Permission.from_operation(InternalOperationType(value)))
+
+    def _convert_operation_bit_filter(
+        self,
+        f: OperationTypeFilter,
+        *,
+        equals_factory: Callable[[Permission], QueryCondition],
+        not_equals_factory: Callable[[Permission], QueryCondition],
+        in_factory: Callable[[Collection[Permission]], QueryCondition],
+        not_in_factory: Callable[[Collection[Permission]], QueryCondition],
+    ) -> list[QueryCondition]:
+        """Translate an ``OperationTypeFilter`` into conditions on the permission bit."""
+        conditions: list[QueryCondition] = []
+        if f.equals is not None:
+            conditions.append(equals_factory(self._permission_bit(f.equals)))
+        if f.not_equals is not None:
+            conditions.append(not_equals_factory(self._permission_bit(f.not_equals)))
+        if f.in_:
+            conditions.append(in_factory([self._permission_bit(v) for v in f.in_]))
+        if f.not_in:
+            conditions.append(not_in_factory([self._permission_bit(v) for v in f.not_in]))
         return conditions
 
     @staticmethod
@@ -1564,12 +1591,12 @@ class RBACAdapter(BaseAdapter):
             )
         if f.operation is not None:
             raw_conditions.extend(
-                self._convert_operation_type_filter(
+                self._convert_operation_bit_filter(
                     f.operation,
-                    equals_factory=ScopedPermissionConditions.by_operation_equals,
-                    not_equals_factory=ScopedPermissionConditions.by_operation_not_equals,
-                    in_factory=ScopedPermissionConditions.by_operation_in,
-                    not_in_factory=ScopedPermissionConditions.by_operation_not_in,
+                    equals_factory=ScopedPermissionConditions.by_permission_equals,
+                    not_equals_factory=ScopedPermissionConditions.by_permission_not_equals,
+                    in_factory=ScopedPermissionConditions.by_permission_in,
+                    not_in_factory=ScopedPermissionConditions.by_permission_not_in,
                 )
             )
         conditions: list[QueryCondition] = []
@@ -1789,7 +1816,7 @@ class RBACAdapter(BaseAdapter):
             scope_type=RBACElementTypeDTO(data.scope_type),
             scope_id=data.scope_id,
             entity_type=RBACElementTypeDTO(data.entity_type),
-            operation=OperationTypeDTO(data.operation.value),
+            operation=OperationTypeDTO(data.permission.to_operation().value),
             created_at=data.created_at,
         )
 

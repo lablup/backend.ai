@@ -174,7 +174,7 @@ class PermissionControllerRepository:
                 scope_type=spec.scope_type,
                 scope_id=spec.scope_id,
                 entity_type=spec.entity_type,
-                operation=spec.operation,
+                permission=spec.permission,
                 message=str(error.exception),
             )
             for error in result.errors
@@ -215,7 +215,7 @@ class PermissionControllerRepository:
                 scope_type=spec.scope_type,
                 scope_id=spec.scope_id,
                 entity_type=spec.entity_type,
-                operation=spec.operation,
+                permission=spec.permission,
                 message=str(error.exception),
             )
             for error in result.errors
@@ -288,7 +288,7 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def check_permission_in_scope(self, data: ScopePermissionCheckInput) -> bool:
         return await self._db_source.check_scope_permission_exist(
-            data.user_id, data.target_scope_id, data.operation
+            data.user_id, data.target_scope_id, data.permission
         )
 
     @permission_controller_repository_resilience.apply()
@@ -485,4 +485,8 @@ class PermissionControllerRepository:
         chain (AUTO edges) and self-scope permissions to collect all operations
         the user can perform.
         """
-        return await self._db_source.resolve_effective_permissions(keys)
+        granted = await self._db_source.resolve_effective_permissions(keys)
+        return {
+            key: frozenset(bit.to_operation() for bit in Permission if bit and bits & bit)
+            for key, bits in granted.items()
+        }

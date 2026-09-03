@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.status import PermissionStatus, RoleStatus
 from ai.backend.manager.data.permission.types import (
@@ -66,7 +67,7 @@ class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
     scope_type: ScopeType
     scope_id: str
     entity_type: EntityType
-    operation: OperationType
+    permission: Permission
 
     @override
     def build_row(self) -> PermissionRow:
@@ -75,8 +76,7 @@ class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
             scope_type=self.scope_type,
             scope_id=self.scope_id,
             entity_type=self.entity_type,
-            operation=self.operation,
-            permission=Permission.from_operation(self.operation),
+            permission=single_bit(self.permission),
         )
 
 

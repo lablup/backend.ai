@@ -79,7 +79,7 @@ def _spec(
         scope_type=ScopeType(EntityType(scope_type)),
         scope_id=scope_id,
         entity_type=EntityType(entity_type),
-        operation=operation,
+        permission=Permission.from_operation(operation),
     )
 
 
@@ -119,8 +119,7 @@ class TestBulkRolePermissions:
                         scope_type=seed_permission.scope_type,
                         scope_id=seed_permission.scope_id,
                         entity_type=seed_permission.entity_type,
-                        operation=seed_permission.operation,
-                        permission=Permission.from_operation(seed_permission.operation),
+                        permission=seed_permission.permission,
                     )
                 )
             await session.commit()
@@ -140,8 +139,7 @@ class TestBulkRolePermissions:
                     scope_type=spec.scope_type,
                     scope_id=spec.scope_id,
                     entity_type=spec.entity_type,
-                    operation=spec.operation,
-                    permission=Permission.from_operation(spec.operation),
+                    permission=spec.permission,
                 )
             )
             await session.commit()
@@ -169,13 +167,13 @@ class TestBulkRolePermissions:
         role_id: uuid.UUID,
         entity_type: EntityType,
     ) -> set[OperationType]:
-        stmt = sa.select(PermissionRow.operation).where(
+        stmt = sa.select(PermissionRow.permission).where(
             PermissionRow.role_id == role_id,
             PermissionRow.entity_type == entity_type,
         )
         async with db.begin_readonly_session() as session:
             rows = (await session.execute(stmt)).scalars().all()
-        return set(rows)
+        return {permission.to_operation() for permission in rows}
 
     # ---------- bulk_add_role_permissions ----------
 

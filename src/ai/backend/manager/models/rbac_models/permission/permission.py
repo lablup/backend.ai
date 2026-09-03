@@ -8,16 +8,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
-from ai.backend.manager.data.permission.types import (
-    OperationType,
-    Permission,
-)
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     IntFlagType,
-    StrEnumType,
 )
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
@@ -38,8 +35,12 @@ class PermissionRow(CreatedAtMixin, Base):
             "scope_type",
             "scope_id",
             "entity_type",
-            "operation",
-            name="uq_permissions_role_scope_entity_op",
+            "permission",
+            name="uq_permissions_role_scope_entity_permission",
+        ),
+        sa.CheckConstraint(
+            "permission > 0 AND (permission & (permission - 1)) = 0",
+            name="single_bit",
         ),
     )
 
@@ -59,9 +60,7 @@ class PermissionRow(CreatedAtMixin, Base):
     entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", sa.String(length=32), nullable=False
     )
-    operation: Mapped[OperationType] = mapped_column(
-        "operation", StrEnumType(OperationType, length=32), nullable=False
-    )
+    # One row per operation bit; the bit is the row's identity.
     permission: Mapped[Permission] = mapped_column(
         "permission", IntFlagType(Permission), nullable=False
     )
@@ -73,8 +72,7 @@ class PermissionRow(CreatedAtMixin, Base):
             scope_type=input.scope_type,
             scope_id=input.scope_id,
             entity_type=input.entity_type,
-            operation=input.operation,
-            permission=input.permission,
+            permission=single_bit(input.permission),
         )
 
     def to_data(self) -> PermissionData:
@@ -84,7 +82,6 @@ class PermissionRow(CreatedAtMixin, Base):
             scope_type=self.scope_type,
             scope_id=self.scope_id,
             entity_type=self.entity_type,
-            operation=self.operation,
             permission=self.permission,
             created_at=self.created_at,
         )

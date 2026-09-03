@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
-    OperationType,
+    Permission,
     RoleSource,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -48,7 +49,7 @@ class PermissionUpdaterSpec(UpdaterSpec[PermissionRow]):
     scope_type: OptionalState[ScopeType] = field(default_factory=OptionalState.nop)
     scope_id: OptionalState[str] = field(default_factory=OptionalState.nop)
     entity_type: OptionalState[EntityType] = field(default_factory=OptionalState.nop)
-    operation: OptionalState[OperationType] = field(default_factory=OptionalState.nop)
+    permission: OptionalState[Permission] = field(default_factory=OptionalState.nop)
 
     @property
     @override
@@ -61,5 +62,6 @@ class PermissionUpdaterSpec(UpdaterSpec[PermissionRow]):
         self.scope_type.update_dict(to_update, "scope_type")
         self.scope_id.update_dict(to_update, "scope_id")
         self.entity_type.update_dict(to_update, "entity_type")
-        self.operation.update_dict(to_update, "operation")
+        if (permission := self.permission.optional_value()) is not None:
+            to_update["permission"] = single_bit(permission)
         return to_update

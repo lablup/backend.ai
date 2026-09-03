@@ -19,7 +19,7 @@ from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
-    OperationType,
+    Permission,
     RoleSource,
     ScopeType,
 )
@@ -271,9 +271,9 @@ class PermissionConditions:
         return inner
 
     @staticmethod
-    def by_operations(operations: list[OperationType]) -> QueryCondition:
+    def by_permissions(permissions: list[Permission]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.operation.in_(operations)
+            return PermissionRow.permission.in_(permissions)
 
         return inner
 
@@ -1034,9 +1034,9 @@ class ScopedPermissionConditions:
         return inner
 
     @staticmethod
-    def by_operation(operation: str) -> QueryCondition:
+    def by_permission(permission: Permission) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.operation == operation
+            return PermissionRow.permission == permission
 
         return inner
 
@@ -1272,30 +1272,30 @@ class ScopedPermissionConditions:
         return inner
 
     @staticmethod
-    def by_operation_equals(operation: OperationType) -> QueryCondition:
+    def by_permission_equals(permission: Permission) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.operation == operation
+            return PermissionRow.permission == permission
 
         return inner
 
     @staticmethod
-    def by_operation_not_equals(operation: OperationType) -> QueryCondition:
+    def by_permission_not_equals(permission: Permission) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.operation != operation
+            return PermissionRow.permission != permission
 
         return inner
 
     @staticmethod
-    def by_operation_in(operations: Collection[OperationType]) -> QueryCondition:
+    def by_permission_in(permissions: Collection[Permission]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.operation.in_(list(operations))
+            return PermissionRow.permission.in_(list(permissions))
 
         return inner
 
     @staticmethod
-    def by_operation_not_in(operations: Collection[OperationType]) -> QueryCondition:
+    def by_permission_not_in(permissions: Collection[Permission]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.operation.not_in(list(operations))
+            return PermissionRow.permission.not_in(list(permissions))
 
         return inner
 

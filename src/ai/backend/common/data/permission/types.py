@@ -599,6 +599,23 @@ class Permission(enum.IntFlag):
         """
         return (required & ~self) == Permission.NONE
 
+    def to_operation(self) -> OperationType:
+        """The :class:`OperationType` of a single-bit mask — the inverse of
+        :meth:`from_operation` for the bits that have one."""
+        match self:
+            case Permission.READ:
+                return OperationType.READ
+            case Permission.UPDATE:
+                return OperationType.UPDATE
+            case Permission.CREATE:
+                return OperationType.CREATE
+            case Permission.SOFT_DELETE:
+                return OperationType.SOFT_DELETE
+            case Permission.HARD_DELETE:
+                return OperationType.HARD_DELETE
+            case _:
+                raise ValueError(f"{self!r} is not a single operation bit")
+
     @classmethod
     def from_operation(cls, operation: OperationType) -> Permission:
         """Map a single :class:`OperationType` to its corresponding bit.

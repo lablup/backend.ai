@@ -349,12 +349,12 @@ class V2EntityWriteOps(V2WriteOpsBase):
                 ).to_scope_type(),
                 scope_id=str(spec.entity),
                 entity_type=entity_type.to_entity_type(),
-                operation=operation,
                 permission=Permission.from_operation(operation),
             )
             for spec, row in zip(specs, role_rows, strict=True)
             for entity_type, operations in spec.entity_operations.items()
             for operation in operations
+            if Permission.from_operation(operation) != Permission.NONE
         ]
         if permission_rows:
             self._sess.add_all(permission_rows)

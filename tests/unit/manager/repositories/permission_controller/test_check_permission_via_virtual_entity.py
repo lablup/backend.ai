@@ -111,6 +111,28 @@ class VSChainSpec:
     role_status: RoleStatus = RoleStatus.ACTIVE
 
 
+def _single_bit_rows(
+    *,
+    role_id: uuid.UUID,
+    scope_type: object,
+    scope_id: str,
+    entity_type: object,
+    permission: Permission,
+) -> list[PermissionRow]:
+    """One permissions row per bit of ``permission`` — the row is keyed by its bit."""
+    return [
+        PermissionRow(
+            role_id=role_id,
+            scope_type=scope_type,
+            scope_id=scope_id,
+            entity_type=entity_type,
+            permission=bit,
+        )
+        for bit in Permission
+        if bit and permission & bit
+    ]
+
+
 class TestCheckPermissionViaVirtualEntity:
     @pytest.fixture
     async def db_with_rbac_tables(
@@ -250,13 +272,12 @@ class TestCheckPermissionViaVirtualEntity:
                         permission_cap=spec.entity_cap,
                     )
                 )
-            db_sess.add(
-                PermissionRow(
+            db_sess.add_all(
+                _single_bit_rows(
                     role_id=ids.role_id,
                     scope_type=PermScopeType.PROJECT,
                     scope_id=str(ids.bound_scope_id),
                     entity_type=PermEntityType.VFOLDER,
-                    operation=OperationType.READ,
                     permission=spec.granted,
                 )
             )
@@ -524,7 +545,6 @@ class TestCheckPermissionViaVirtualEntity:
                     scope_type=ScopeType(EntityType("project")),
                     scope_id=str(ids.bound_scope_id),
                     entity_type=_UNMAPPED_ENTITY_TYPE,
-                    operation=OperationType.READ,
                     permission=Permission.READ,
                 )
             )
@@ -559,16 +579,15 @@ class TestCheckPermissionViaVirtualEntity:
             await db_sess.execute(
                 sa.text(
                     "INSERT INTO permissions"
-                    " (role_id, scope_type, scope_id, entity_type, operation, permission)"
+                    " (role_id, scope_type, scope_id, entity_type, permission)"
                     " VALUES"
-                    " (:role_id, :scope_type, :scope_id, :entity_type, :operation, :permission)"
+                    " (:role_id, :scope_type, :scope_id, :entity_type, :permission)"
                 ),
                 {
                     "role_id": fixture_ids.role_id,
                     "scope_type": str(ScopeType(EntityType("project"))),
                     "scope_id": str(fixture_ids.bound_scope_id),
                     "entity_type": str(_UNMAPPED_ENTITY_TYPE),
-                    "operation": OperationType.READ.value,
                     "permission": int(Permission.READ),
                 },
             )
@@ -671,13 +690,12 @@ class TestUserRosterEnrollment:
             db_sess.add(RoleRow(id=ids.role_id, name="project-role", status=RoleStatus.ACTIVE))
             await db_sess.flush()
             db_sess.add(UserRoleRow(user_id=ids.user_id, role_id=ids.role_id))
-            db_sess.add(
-                PermissionRow(
+            db_sess.add_all(
+                _single_bit_rows(
                     role_id=ids.role_id,
                     scope_type=PermScopeType.PROJECT,
                     scope_id=str(project_id),
                     entity_type=entity_type,
-                    operation=operation,
                     permission=permission,
                 )
             )

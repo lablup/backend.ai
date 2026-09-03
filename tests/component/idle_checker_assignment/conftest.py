@@ -325,7 +325,6 @@ async def project_read_permission(
                 scope_type=ScopeType.PROJECT,
                 scope_id=str(assignment_seed.project_id),
                 entity_type=EntityType.PROJECT,
-                operation=OperationType.READ,
                 permission=Permission.from_operation(OperationType.READ),
             )
         )
@@ -371,7 +370,6 @@ async def project_assignment_manage_permission(
                     scope_type=ScopeType.PROJECT,
                     scope_id=str(assignment_seed.project_id),
                     entity_type=EntityType.IDLE_CHECKER_ASSIGNMENT,
-                    operation=operation,
                     permission=Permission.from_operation(operation),
                 )
             )
@@ -415,7 +413,6 @@ async def user_self_scope_permission(
                     scope_type=ScopeType.USER,
                     scope_id=str(regular_user_fixture.user_uuid),
                     entity_type=EntityType.USER,
-                    operation=operation,
                     permission=Permission.from_operation(operation),
                 )
             )

@@ -420,7 +420,7 @@ class PermissionDBSource:
                         scope_type=scoped_perm_input.scope_type,
                         scope_id=scoped_perm_input.scope_id,
                         entity_type=scoped_perm_input.entity_type,
-                        operation=scoped_perm_input.operation,
+                        permission=scoped_perm_input.permission,
                     )
                 )
                 await self._add_permission_to_group(db_session, perm_creator)
@@ -535,7 +535,7 @@ class PermissionDBSource:
         self,
         user_id: uuid.UUID,
         scope_id: ScopeId,
-        operation: OperationType,
+        permission: Permission,
     ) -> bool:
         inner_query = (
             sa.select(sa.literal(1))
@@ -552,7 +552,7 @@ class PermissionDBSource:
                         PermissionRow.scope_type == LegacyScopeType.GLOBAL,
                         PermissionRow.scope_id == scope_id.scope_id,
                     ),
-                    PermissionRow.operation == operation,
+                    PermissionRow.permission == permission,
                 )
             )
         )
@@ -590,11 +590,11 @@ class PermissionDBSource:
                     sa.or_(
                         sa.and_(
                             PermissionRow.scope_type == LegacyScopeType.GLOBAL,
-                            PermissionRow.operation == operation,
+                            PermissionRow.permission == Permission.from_operation(operation),
                         ),
                         sa.and_(
                             AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
-                            PermissionRow.operation == operation,
+                            PermissionRow.permission == Permission.from_operation(operation),
                         ),
                         sa.and_(
                             ObjectPermissionRow.entity_id.in_(object_id_for_cond),
@@ -970,11 +970,11 @@ class PermissionDBSource:
         self,
         data: ScopeChainPermissionCheckInput,
     ) -> bool:
-        """Return whether the user holds *operation* on the target element."""
+        """Return whether the user holds every bit of ``permission`` on the target."""
         granted = await self._resolve_permissions_via_direct_scope_walk(
-            [data.key], operation_filter=data.operation
+            [data.key], permission_filter=data.permission
         )
-        return data.operation in granted.get(data.key, frozenset())
+        return granted.get(data.key, Permission.NONE).covers(data.permission)
 
     async def check_bulk_permission_with_scope_chain(
         self,
@@ -982,22 +982,22 @@ class PermissionDBSource:
     ) -> Mapping[PermissionResolutionKey, bool]:
         """Check whether the user holds *operation* on each target key in one go.
 
-        Returns a mapping from each input key to a boolean indicating whether
-        the operation is granted.
+        Returns a mapping from each input key to whether every bit of
+        ``permission`` is granted.
         """
         if not data.keys:
             return {}
         granted = await self._resolve_permissions_via_direct_scope_walk(
-            data.keys, operation_filter=data.operation
+            data.keys, permission_filter=data.permission
         )
-        return {key: data.operation in granted.get(key, frozenset()) for key in data.keys}
+        return {key: granted.get(key, Permission.NONE).covers(data.permission) for key in data.keys}
 
     async def _resolve_permissions_via_direct_scope_walk(
         self,
         keys: Collection[PermissionResolutionKey],
         *,
-        operation_filter: OperationType | None = None,
-    ) -> Mapping[PermissionResolutionKey, frozenset[OperationType]]:
+        permission_filter: Permission | None = None,
+    ) -> Mapping[PermissionResolutionKey, Permission]:
         """Resolve granted operations for a collection of per-target keys.
 
         Groups input keys by ``(user_id, element_type, subject_entity_type)``
@@ -1005,10 +1005,10 @@ class PermissionDBSource:
         a scope-chain branch (walks parent AUTO scopes upward from each entity)
         and a self-scope branch (permission whose scope IS the entity itself).
         Returns a mapping keyed by the original ``PermissionResolutionKey``
-        objects. Keys that received no grant map to an empty frozenset.
+        objects. Keys that received no grant map to ``Permission.NONE``.
 
-        When ``operation_filter`` is set, only that operation is considered;
-        otherwise every granted operation is returned.
+        When ``permission_filter`` is set, only the bits of that mask are
+        considered; otherwise every granted bit is returned.
         """
         if not keys:
             return {}
@@ -1023,7 +1023,7 @@ class PermissionDBSource:
                 )
             ].append(key)
 
-        result: dict[PermissionResolutionKey, frozenset[OperationType]] = {}
+        result: dict[PermissionResolutionKey, Permission] = {}
         async with self._db.begin_readonly_session_read_committed() as db_session:
             for group_key, members in groups.items():
                 entity_ids = [k.entity_id for k in members]
@@ -1031,10 +1031,10 @@ class PermissionDBSource:
                     db_session=db_session,
                     group_key=group_key,
                     entity_ids=entity_ids,
-                    operation_filter=operation_filter,
+                    permission_filter=permission_filter,
                 )
                 for key in members:
-                    result[key] = frozenset(granted.get(key.entity_id, ()))
+                    result[key] = granted.get(key.entity_id, Permission.NONE)
         return result
 
     async def _resolve_permissions_for_group(
@@ -1043,13 +1043,13 @@ class PermissionDBSource:
         db_session: SASession,
         group_key: _PermissionGroupKey,
         entity_ids: Sequence[str],
-        operation_filter: OperationType | None,
-    ) -> Mapping[str, set[OperationType]]:
+        permission_filter: Permission | None,
+    ) -> Mapping[str, Permission]:
         """Run the scope-chain + self-scope query for a single
         ``(user_id, element_type, subject_entity_type)`` group with N entity_ids.
 
-        Returns a mapping from entity_id to the set of granted operations.
-        Entities that received no grant are absent from the returned mapping.
+        Returns a mapping from entity_id to the granted bits. Entities that
+        received no grant are absent from the returned mapping.
         """
         direct_scopes_cte = self._build_direct_scopes_cte(
             group_key.element_type.to_entity_type(), entity_ids
@@ -1057,15 +1057,15 @@ class PermissionDBSource:
         scope_walk_cte = self._build_scope_walk_cte(direct_scopes_cte)
 
         scope_chain_query = self._build_scope_chain_query(
-            direct_scopes_cte, scope_walk_cte, group_key, operation_filter
+            direct_scopes_cte, scope_walk_cte, group_key, permission_filter
         )
-        self_scope_query = self._build_self_scope_query(group_key, entity_ids, operation_filter)
+        self_scope_query = self._build_self_scope_query(group_key, entity_ids, permission_filter)
         combined_query = sa.union_all(scope_chain_query, self_scope_query)
 
-        granted: defaultdict[str, set[OperationType]] = defaultdict(set)
+        granted: defaultdict[str, Permission] = defaultdict(lambda: Permission.NONE)
         result = await db_session.execute(combined_query)
         for row in result:
-            granted[row.entity_id].add(row.operation)
+            granted[row.entity_id] |= Permission(row.permission)
         return granted
 
     def _build_scope_chain_query(
@@ -1073,7 +1073,7 @@ class PermissionDBSource:
         direct_scopes_cte: sa.CTE,
         scope_walk_cte: sa.CTE,
         group_key: _PermissionGroupKey,
-        operation_filter: OperationType | None,
+        permission_filter: Permission | None,
     ) -> sa.Select[Any]:
         """Build the scope-chain branch: walk parent AUTO scopes upward from
         each entity's direct scope and pick up permissions along the way.
@@ -1087,13 +1087,13 @@ class PermissionDBSource:
             roles.c.status == RoleStatus.ACTIVE,
             perm.c.entity_type == group_key.subject_entity_type.to_entity_type(),
         ]
-        if operation_filter is not None:
-            filters.append(perm.c.operation == operation_filter)
+        if permission_filter is not None:
+            filters.append(perm.c.permission.op("&")(permission_filter) != 0)
 
         return (
             sa.select(
                 direct_scopes_cte.c.entity_id,
-                perm.c.operation,
+                perm.c.permission,
             )
             .select_from(
                 direct_scopes_cte.join(
@@ -1120,7 +1120,7 @@ class PermissionDBSource:
         self,
         group_key: _PermissionGroupKey,
         entity_ids: Sequence[str],
-        operation_filter: OperationType | None,
+        permission_filter: Permission | None,
     ) -> sa.Select[Any]:
         """Build the self-scope branch: pick up permissions whose scope IS
         the target entity itself.
@@ -1136,13 +1136,13 @@ class PermissionDBSource:
             perm.c.scope_id.in_(entity_ids),
             perm.c.entity_type == group_key.subject_entity_type.to_entity_type(),
         ]
-        if operation_filter is not None:
-            filters.append(perm.c.operation == operation_filter)
+        if permission_filter is not None:
+            filters.append(perm.c.permission.op("&")(permission_filter) != 0)
 
         return (
             sa.select(
                 perm.c.scope_id.label("entity_id"),
-                perm.c.operation,
+                perm.c.permission,
             )
             .select_from(
                 perm.join(roles, roles.c.id == perm.c.role_id).join(
@@ -1155,17 +1155,17 @@ class PermissionDBSource:
     async def resolve_effective_permissions(
         self,
         keys: Collection[PermissionResolutionKey],
-    ) -> Mapping[PermissionResolutionKey, frozenset[OperationType]]:
+    ) -> Mapping[PermissionResolutionKey, Permission]:
         """Resolve the effective permissions for a collection of per-target keys.
 
         Each input key represents one ``(user_id, element_type, entity_id,
         subject_entity_type)`` combination. The result is a mapping keyed by
-        the same key object, with values being the set of operations the user
-        is authorized to perform on that entity.
+        the same key object, with values being the bits the user holds on that
+        entity.
 
         Keys sharing the same ``(user_id, element_type, subject_entity_type)``
         share one SQL round-trip; distinct groups dispatch separately. Keys
-        that received no grant map to an empty frozenset.
+        that received no grant map to ``Permission.NONE``.
         """
         return await self._resolve_permissions_via_direct_scope_walk(keys)
 
