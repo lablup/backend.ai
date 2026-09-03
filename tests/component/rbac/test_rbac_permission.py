@@ -8,6 +8,7 @@ import pytest
 from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.common.data.permission.types import (
     OperationType,
+    Permission,
     RBACElementType,
 )
 from ai.backend.common.data.permission.types import (
@@ -73,7 +74,7 @@ class TestPermissionCreate:
                 scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
                 scope_id=domain_fixture.domain_name,
                 entity_type=EntityType(RBACElementType.SESSION),
-                operation=OperationType.READ,
+                permission=Permission.READ,
             )
         )
         result = await permission_controller_processors.create_permission.wait_for_complete(
@@ -84,7 +85,7 @@ class TestPermissionCreate:
         assert result.data.role_id == target_role.role.id
         assert result.data.scope_type == LegacyScopeType.DOMAIN.value
         assert result.data.entity_type == LegacyEntityType.SESSION.value
-        assert result.data.operation == OperationType.READ
+        assert result.data.permission == Permission.READ
 
         # Cleanup
         await permission_controller_processors.delete_permission.wait_for_complete(
@@ -131,13 +132,13 @@ class TestPermissionCreate:
                             scope_type=ScopeType(EntityType(scope_type)),
                             scope_id=scope_id,
                             entity_type=EntityType(entity_type),
-                            operation=operation,
+                            permission=Permission.from_operation(operation),
                         )
                     )
                 )
             )
             assert result.data.entity_type == entity_type.value
-            assert result.data.operation == operation
+            assert result.data.permission == Permission.from_operation(operation)
             assert result.data.role_id == target_role.role.id
             created_ids.append(result.data.id)
 
@@ -161,7 +162,7 @@ class TestPermissionCreate:
             scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
             scope_id=domain_fixture.domain_name,
             entity_type=EntityType(RBACElementType.VFOLDER),
-            operation=OperationType.READ,
+            permission=Permission.READ,
         )
 
         result = await permission_controller_processors.create_permission.wait_for_complete(
@@ -200,7 +201,7 @@ class TestPermissionDelete:
                         scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
                         scope_id=domain_fixture.domain_name,
                         entity_type=EntityType(RBACElementType.SESSION),
-                        operation=OperationType.HARD_DELETE,
+                        permission=Permission.HARD_DELETE,
                     )
                 )
             )
@@ -229,7 +230,7 @@ class TestPermissionDelete:
                         scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
                         scope_id=domain_fixture.domain_name,
                         entity_type=EntityType(RBACElementType.IMAGE),
-                        operation=OperationType.SOFT_DELETE,
+                        permission=Permission.SOFT_DELETE,
                     )
                 )
             )
@@ -305,7 +306,7 @@ class TestCheckPermissionInScope:
                         scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
                         scope_id=domain_fixture.domain_name,
                         entity_type=EntityType(RBACElementType.SESSION),
-                        operation=OperationType.READ,
+                        permission=Permission.READ,
                     )
                 )
             )
@@ -323,7 +324,7 @@ class TestCheckPermissionInScope:
                     target_scope_id=ScopeId(
                         scope_type=LegacyScopeType.DOMAIN, scope_id=domain_fixture.domain_name
                     ),
-                    operation=OperationType.READ,
+                    permission=Permission.READ,
                 )
             )
             assert has_perm is True
@@ -350,7 +351,7 @@ class TestCheckPermissionInScope:
                 target_scope_id=ScopeId(
                     scope_type=LegacyScopeType.DOMAIN, scope_id=domain_fixture.domain_name
                 ),
-                operation=OperationType.READ,
+                permission=Permission.READ,
             )
         )
         assert has_perm is False

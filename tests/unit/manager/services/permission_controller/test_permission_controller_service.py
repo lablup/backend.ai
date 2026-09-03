@@ -692,7 +692,6 @@ class TestCreatePermission:
             scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
             scope_id="test-domain",
             entity_type=EntityType(LegacyEntityType.USER),
-            operation=OperationType.READ,
             permission=Permission.READ,
             created_at=datetime.now(UTC),
         )
@@ -716,7 +715,6 @@ class TestCreatePermission:
             scope_type=ScopeType(EntityType(LegacyScopeType.GLOBAL)),
             scope_id="global",
             entity_type=EntityType(LegacyEntityType.USER),
-            operation=OperationType.CREATE,
             permission=Permission.CREATE,
             created_at=datetime.now(UTC),
         )
@@ -756,7 +754,6 @@ class TestDeletePermission:
             scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
             scope_id="test-domain",
             entity_type=EntityType(LegacyEntityType.USER),
-            operation=OperationType.READ,
             permission=Permission.READ,
             created_at=datetime.now(UTC),
         )
@@ -798,7 +795,6 @@ class TestSearchPermissions:
             scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
             scope_id="test-domain",
             entity_type=EntityType(LegacyEntityType.USER),
-            operation=OperationType.READ,
             permission=Permission.READ,
             created_at=datetime.now(UTC),
         )
