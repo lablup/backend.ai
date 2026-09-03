@@ -182,7 +182,7 @@ async def setup(
                 samesite="Lax",
                 max_age=604800,  # 7 days
             )
-            return response
+            raise response
         case ProxyProtocol.TCP:
             protocol = "tcp"
             queryparams = {
