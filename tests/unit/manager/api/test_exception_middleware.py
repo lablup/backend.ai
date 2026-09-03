@@ -122,6 +122,24 @@ class TestExceptionMiddleware:
             INCREMENT, f"ai.backend.manager.api.status.{case.expected_status}"
         )
 
+    async def test_unauthorized_passes_through(
+        self,
+        aiohttp_client: Any,
+        middleware: Middleware,
+    ) -> None:
+        app = web.Application(middlewares=[middleware])
+
+        async def handler(request: web.Request) -> web.Response:
+            raise web.HTTPUnauthorized(reason="Not authenticated")
+
+        app.router.add_get("/test", handler)
+        client = await aiohttp_client(app)
+
+        resp = await client.get("/test")
+
+        assert resp.status == 401
+        assert resp.reason == "Not authenticated"
+
     async def test_unsupported_api_version_is_counted_as_failure(
         self,
         aiohttp_client: Any,
