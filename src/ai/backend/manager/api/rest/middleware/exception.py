@@ -45,7 +45,7 @@ def _debug_error_response(
         status_code = e.status_code
         error_code = e.error_code()
 
-    response = web.json_response(
+    return web.json_response(
         {
             "type": error_type,
             "title": error_title,
@@ -56,11 +56,6 @@ def _debug_error_response(
         status=status_code,
         dumps=dump_json_str,
     )
-    if isinstance(e, web.HTTPException):
-        for name, value in e.headers.items():
-            if name.lower() not in ("content-type", "content-length"):
-                response.headers[name] = value
-    return response
 
 
 def build_exception_middleware(
