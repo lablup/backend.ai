@@ -153,17 +153,17 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
     file_path = (static_path / request_path).resolve()
     try:
         file_path.relative_to(static_path)
-    except (ValueError, FileNotFoundError):
-        return web.HTTPNotFound(
+    except (ValueError, FileNotFoundError) as e:
+        raise web.HTTPNotFound(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/generic-not-found",
                 "title": "Not Found",
             }),
             content_type="application/problem+json",
-        )
+        ) from e
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
-    return web.HTTPNotFound(
+    raise web.HTTPNotFound(
         text=json.dumps({
             "type": "https://api.backend.ai/probs/generic-not-found",
             "title": "Not Found",
@@ -248,20 +248,18 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         log.error("Login: JSON decoding error: {}", e)
         creds = {}
 
-    def _check_params(param_names: list[str]) -> web.Response | None:
+    def _check_params(param_names: list[str]) -> None:
         for param in param_names:
             if creds.get(param) is None:
-                return web.HTTPBadRequest(
+                raise web.HTTPBadRequest(
                     text=json.dumps({
                         "type": "https://api.backend.ai/probs/invalid-api-params",
                         "title": f"You must provide the {param} field.",
                     }),
                     content_type="application/problem+json",
                 )
-        return None
 
-    if (fail_resp := _check_params(["username", "current_password", "new_password"])) is not None:
-        return fail_resp
+    _check_params(["username", "current_password", "new_password"])
 
     result: dict[str, Any] = {
         "data": None,
@@ -293,14 +291,14 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        return web.HTTPBadGateway(
+        raise web.HTTPBadGateway(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/bad-gateway",
                 "title": "The proxy target server is inaccessible.",
                 "details": str(e),
             }),
             content_type="application/problem+json",
-        )
+        ) from e
     except BackendAPIError as e:
         log.info(
             "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
@@ -548,14 +546,14 @@ async def login_handler(request: web.Request) -> web.Response:
                 )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
-        return web.HTTPBadGateway(
+        raise web.HTTPBadGateway(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/bad-gateway",
                 "title": "The proxy target server is inaccessible.",
                 "details": str(e),
             }),
             content_type="application/problem+json",
-        )
+        ) from e
     except BackendAPIError as e:
         log.info(
             "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
@@ -601,7 +599,7 @@ async def logout_handler(request: web.Request) -> web.Response:
                 "Failed to invalidate login session in Manager DB (token={})", session_token
             )
 
-    return web.HTTPOk()
+    raise web.HTTPOk()
 
 
 async def extend_login_session(request: web.Request) -> web.Response:
@@ -687,7 +685,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
     # Check browser session exists.
     session = await get_session(request)
     if session.get("authenticated", False):
-        return web.HTTPBadRequest(
+        raise web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/generic-bad-request",
                 "title": "You have already logged in.",
@@ -702,7 +700,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
     if not auth_token:
         auth_token = request.cookies.get(auth_token_name)
     if not auth_token:
-        return web.HTTPBadRequest(
+        raise web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/invalid-api-params",
                 "title": "You must provide cookie-based authentication token",
@@ -781,14 +779,14 @@ async def token_login_handler(request: web.Request) -> web.Response:
         result["authenticated"] = True
         result["data"] = public_return  # store public info from token
     except BackendClientError as e:
-        return web.HTTPBadGateway(
+        raise web.HTTPBadGateway(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/bad-gateway",
                 "title": "The proxy target server is inaccessible.",
                 "details": str(e),
             }),
             content_type="application/problem+json",
-        )
+        ) from e
     except BackendAPIError as e:
         log.info("Authorization failed for token {}: {}", auth_token, e)
         result["authenticated"] = False
