@@ -26,6 +26,7 @@ from ai.backend.manager.models.specs.permission import (
     PermissionKey,
     PermissionRevocation,
 )
+from ai.backend.manager.repositories.ops.v2.cap import V2CapOps
 from ai.backend.manager.repositories.ops.v2.permission.read import PermissionReadOps
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
@@ -41,7 +42,7 @@ class _BitRow:
     paths: frozenset[FieldPath]
 
 
-class PermissionWriteOps(V2WriteOps, PermissionReadOps):
+class PermissionWriteOps(V2WriteOps, PermissionReadOps, V2CapOps):
     """The general v2 write ops plus the role permission writes."""
 
     async def set_permissions(self, role_id: RoleID, entries: Sequence[PermissionEntry]) -> None:

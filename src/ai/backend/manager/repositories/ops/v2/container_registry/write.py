@@ -1,35 +1,29 @@
-"""Container registry writes: the edges that let a project reach a registry.
+"""Container registry writes: what lets a project reach a registry.
 
-A registry is reachable from the projects it is allowed in, and that reach is graph
-edges rather than a row of its own — the registry joins each project's virtual entity
-and each project is bound into the registry's, so project-scoped permissions carry
-onto the images the registry owns. Only this domain has that relation, so the
-primitives sit here: :class:`ContainerRegistryWriteOps` extends the general write ops,
-and a repository handed the general ones never sees them.
+A registry is reachable from the projects it is allowed in: each such project owns
+and governs the registry, so project-scoped permissions carry onto the images the
+registry owns. Only this domain has that relation, so the primitives sit here:
+:class:`ContainerRegistryWriteOps` extends the general write ops, and a repository
+handed the general ones never sees them.
 """
 
 from __future__ import annotations
 
-import sqlalchemy as sa
-
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.manager.models.specs.membership import EntityMembershipEntry
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 
 class ContainerRegistryWriteOps(V2WriteOps):
-    """The general v2 write ops plus the registry-project reach edges."""
+    """The general v2 write ops plus the registry-project reach."""
 
     async def provision_registry(self, registry_id: ContainerRegistryID) -> None:
         """Put the registry into the RBAC graph if it is not there yet.
 
         Registries created before the virtual-entity rollout have no node, and every
-        edge written against one resolves-or-fails.
+        relation written against one resolves-or-fails.
         """
-        await self._provision_entities([registry_id])
+        await self._provision([registry_id])
 
     async def enroll_registry_in_project(
         self, registry_id: ContainerRegistryID, project_id: ProjectID
@@ -37,38 +31,15 @@ class ContainerRegistryWriteOps(V2WriteOps):
         """Let the project reach the registry and the entities it owns: the project
         owns and governs the registry. A reach past the entity itself, which the
         mutual-read relation (``create_relation``) does not give."""
-        await self._provision_entities([project_id])
-        await self._record_memberships([
-            EntityMembershipEntry(member=registry_id, parent=project_id)
-        ])
-        node_ids = await self._resolve_virtual_entity_ids([registry_id, project_id])
-        await self._bulk_insert_ignore_conflicts([
-            ScopeBindingRow(
-                virtual_entity_id=node_ids[(registry_id.entity_type(), registry_id)],
-                scope_entity_id=node_ids[(project_id.entity_type(), project_id)],
-                permission_cap=None,
-            )
-        ])
+        await self._provision([project_id])
+        await self._created_in(registry_id, [project_id])
 
     async def withdraw_registry_from_project(
         self, registry_id: ContainerRegistryID, project_id: ProjectID
     ) -> None:
         """Reverse :meth:`enroll_registry_in_project`.
 
-        Matches through the virtual entity nodes rather than resolving them first, so a
-        project or registry that never had one is a no-op instead of a failure.
+        Silent for a project or registry that never had a virtual entity.
         """
-        project_node = self._virtual_entity_ids_query([project_id])
-        registry_node = self._virtual_entity_ids_query([registry_id])
-        await self._sess.execute(
-            sa.delete(EntityMembershipRow).where(
-                EntityMembershipRow.virtual_entity_id.in_(project_node),
-                EntityMembershipRow.member_entity_id.in_(registry_node),
-            )
-        )
-        await self._sess.execute(
-            sa.delete(ScopeBindingRow).where(
-                ScopeBindingRow.virtual_entity_id.in_(registry_node),
-                ScopeBindingRow.scope_entity_id.in_(project_node),
-            )
-        )
+        await self._disown(registry_id, [project_id])
+        await self._ungovern(registry_id, [project_id])

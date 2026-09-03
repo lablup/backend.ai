@@ -14,10 +14,10 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.purger import EntityBatchPurger
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
-from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
+from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOps
 
 
-class V2BatchWriteOps(V2WriteOpsBase):
+class V2BatchWriteOps(V2GraphWriteOps):
     """Batch writes over scope-restricted or global selections."""
 
     async def batch_update_in_scopes[TRow: Base, TData](
@@ -86,7 +86,7 @@ class V2BatchWriteOps(V2WriteOpsBase):
             scope_condition, purger.build_subquery, purger.conflict_checks(), collect
         )
         for entity_id in entity_ids:
-            await self._teardown_entity(entity_id)
+            await self._teardown(entity_id)
         return removed
 
     async def _batch_update_returning[TRow: Base, TData](

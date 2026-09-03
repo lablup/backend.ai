@@ -41,7 +41,8 @@ from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
 from ai.backend.manager.models.virtual_entity.entity_membership_field import (
     EntityMembershipFieldRow,
 )
-from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
+from ai.backend.manager.repositories.ops.v2.cap import V2CapOps
+from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOps
 
 _PATH_PATTERN = re.compile(r"^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$")
 
@@ -65,7 +66,7 @@ class _Edge:
     caps: Mapping[Permission, _CapRow]
 
 
-class V2GrantWriteOps(V2WriteOpsBase):
+class V2GrantWriteOps(V2GraphWriteOps, V2CapOps):
     """Grants over existing entities, bound to a single session."""
 
     async def grant_entities(self, grants: Sequence[EntityGrant]) -> None:
@@ -163,12 +164,12 @@ class V2GrantWriteOps(V2WriteOpsBase):
         """
         if not entities:
             return
-        scope_ids = await self._resolve_virtual_entity_ids([grantee])
+        scope_ids = await self._node_ids([grantee])
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
                 EntityMembershipRow.virtual_entity_id
                 == scope_ids[(grantee.entity_type(), grantee)],
-                EntityMembershipRow.member_entity_id.in_(self._virtual_entity_ids_query(entities)),
+                EntityMembershipRow.member_entity_id.in_(self._node_ids_query(entities)),
             )
         )
 
@@ -216,8 +217,8 @@ class V2GrantWriteOps(V2WriteOpsBase):
     ) -> list[_EdgeKey]:
         """(parent node, member node) per pair, provisioning the members' missing
         nodes; a parent without a node fails."""
-        await self._provision_entities([member for _, member in pairs])
-        node_ids = await self._resolve_virtual_entity_ids([
+        await self._provision([member for _, member in pairs])
+        node_ids = await self._node_ids([
             *(parent for parent, _ in pairs),
             *(member for _, member in pairs),
         ])

@@ -58,14 +58,12 @@ from ai.backend.manager.models.specs.creator import (
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
-from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
+from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOps
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -83,7 +81,7 @@ class _PresetRoleSpec:
     entity_operations: Mapping[RBACElementType, Sequence[OperationType]]
 
 
-class V2EntityWriteOps(V2WriteOpsBase):
+class V2EntityWriteOps(V2GraphWriteOps):
     """Entity writes, bound to a single session."""
 
     # Rendered role names are stored in ``roles.name`` (sa.String(64)).
@@ -107,9 +105,8 @@ class V2EntityWriteOps(V2WriteOpsBase):
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         entity = creator.entity_id(row)
-        await self._provision_entities([entity])
-        await self._own(entity, creator.created_in(row))
-        await self._govern(entity, creator.created_in(row))
+        await self._provision([entity])
+        await self._created_in(entity, creator.created_in(row))
         return creator.to_data(row)
 
     async def create_role_managed_global_entity[TRow: Base, TData](
@@ -121,7 +118,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         entity = creator.entity_id(row)
-        await self._provision_entities([entity])
+        await self._provision([entity])
         await self._create_preset_roles({entity: creator.template_value(row)})
         return creator.to_data(row)
 
@@ -133,10 +130,9 @@ class V2EntityWriteOps(V2WriteOpsBase):
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         entity = creator.entity_id(row)
-        await self._provision_entities([entity])
+        await self._provision([entity])
         await self._create_preset_roles({entity: creator.template_value(row)})
-        await self._own(entity, creator.created_in(row))
-        await self._govern(entity, creator.created_in(row))
+        await self._created_in(entity, creator.created_in(row))
         return creator.to_data(row)
 
     async def atomic_create_entities[TRow: Base, TData](
@@ -149,10 +145,9 @@ class V2EntityWriteOps(V2WriteOpsBase):
         rows = [creator.build_row() for creator in creators]
         await self._insert_rows(rows, creators[0].integrity_error_checks())
         entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
-        await self._provision_entities(entities)
+        await self._provision(entities)
         for creator, row, entity in zip(creators, rows, entities, strict=True):
-            await self._own(entity, creator.created_in(row))
-        await self._govern(entity, creator.created_in(row))
+            await self._created_in(entity, creator.created_in(row))
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def atomic_create_role_managed_global_entities[TRow: Base, TData](
@@ -166,7 +161,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         rows = [creator.build_row() for creator in creators]
         await self._insert_rows(rows, creators[0].integrity_error_checks())
         entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
-        await self._provision_entities(entities)
+        await self._provision(entities)
         await self._create_preset_roles({
             entity: creator.template_value(row)
             for creator, row, entity in zip(creators, rows, entities, strict=True)
@@ -184,14 +179,13 @@ class V2EntityWriteOps(V2WriteOpsBase):
         rows = [creator.build_row() for creator in creators]
         await self._insert_rows(rows, creators[0].integrity_error_checks())
         entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
-        await self._provision_entities(entities)
+        await self._provision(entities)
         await self._create_preset_roles({
             entity: creator.template_value(row)
             for creator, row, entity in zip(creators, rows, entities, strict=True)
         })
         for creator, row, entity in zip(creators, rows, entities, strict=True):
-            await self._own(entity, creator.created_in(row))
-            await self._govern(entity, creator.created_in(row))
+            await self._created_in(entity, creator.created_in(row))
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def purge_entity[TRow: Base, TData](
@@ -204,7 +198,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         )
         if row is None:
             return None
-        await self._teardown_entity(purger.entity_id())
+        await self._teardown(purger.entity_id())
         return purger.to_data(row)
 
     async def partial_bulk_purge_entities[TRow: Base, TData](
@@ -241,9 +235,8 @@ class V2EntityWriteOps(V2WriteOpsBase):
             upserter.integrity_error_checks(),
         )
         entity = upserter.entity_id(row)
-        await self._provision_entities([entity])
-        await self._own(entity, upserter.created_in(row))
-        await self._govern(entity, upserter.created_in(row))
+        await self._provision([entity])
+        await self._created_in(entity, upserter.created_in(row))
         return upserter.to_data(row)
 
     async def atomic_upsert_entities[TRow: Base, TData](
@@ -268,33 +261,10 @@ class V2EntityWriteOps(V2WriteOpsBase):
             for upserter in upserters
         ]
         entities = [upserter.entity_id(row) for upserter, row in zip(upserters, rows, strict=True)]
-        await self._provision_entities(entities)
+        await self._provision(entities)
         for upserter, row, entity in zip(upserters, rows, entities, strict=True):
-            await self._own(entity, upserter.created_in(row))
-        await self._govern(entity, upserter.created_in(row))
+            await self._created_in(entity, upserter.created_in(row))
         return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
-
-    async def _own(self, entity: EntityIdentifier, owners: Collection[EntityIdentifier]) -> None:
-        """Put the entity into each owner's virtual entity, uncapped. An owner without
-        a virtual entity raises :class:`VirtualEntityNotFound`."""
-        await self._record_memberships([
-            EntityMembershipEntry(member=entity, parent=owner) for owner in owners
-        ])
-
-    async def _govern(self, entity: EntityIdentifier, scopes: Collection[EntityIdentifier]) -> None:
-        """Bind the entity's virtual entity into each scope, so the scope's roles reach
-        the entity and everything under it."""
-        if not scopes:
-            return
-        node_ids = await self._resolve_virtual_entity_ids([entity, *scopes])
-        await self._bulk_insert_ignore_conflicts([
-            ScopeBindingRow(
-                virtual_entity_id=node_ids[(entity.entity_type(), entity)],
-                scope_entity_id=node_ids[(scope.entity_type(), scope)],
-                permission_cap=None,
-            )
-            for scope in scopes
-        ])
 
     async def _grant_auto_assign_roles(
         self, entities: Collection[EntityIdentifier], user_id: UserID
@@ -361,14 +331,9 @@ class V2EntityWriteOps(V2WriteOpsBase):
         ]
         self._sess.add_all(role_rows)
         await self._sess.flush()
-        await self._provision_entities([RoleID(row.id) for row in role_rows])
-        await self._record_memberships([
-            EntityMembershipEntry(
-                member=RoleID(row.id),
-                parent=spec.entity,
-            )
-            for spec, row in zip(specs, role_rows, strict=True)
-        ])
+        await self._provision([RoleID(row.id) for row in role_rows])
+        for spec, row in zip(specs, role_rows, strict=True):
+            await self._own(RoleID(row.id), [spec.entity])
         permission_rows = [
             PermissionRow(
                 role_id=row.id,
