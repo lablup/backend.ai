@@ -13,6 +13,7 @@ from ai.backend.common.exception import (
 )
 
 __all__ = (
+    "InvalidFieldPermission",
     "InvalidPermissionOperation",
     "NotEnoughPermission",
     "ObjectPermissionNotFound",
@@ -82,6 +83,22 @@ class RoleNotAssigned(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.ROLE,
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class InvalidFieldPermission(BackendAIError, web.HTTPBadRequest):
+    """A field scope the ops refuse: a malformed path, a bit outside READ|UPDATE,
+    or a bit stated both on every field and on a path."""
+
+    error_type = "https://api.backend.ai/probs/invalid-field-permission"
+    error_title = "The field scope is invalid."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 

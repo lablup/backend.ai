@@ -591,6 +591,11 @@ class Permission(enum.IntFlag):
         """The full permission cap — every operation allowed."""
         return cls.READ | cls.UPDATE | cls.CREATE | cls.SOFT_DELETE | cls.HARD_DELETE
 
+    @classmethod
+    def field_bearing(cls) -> Permission:
+        """The operations that state a field scope — read and update."""
+        return cls.READ | cls.UPDATE
+
     def covers(self, required: Permission) -> bool:
         """Whether this mask holds *every* bit of ``required``.
 

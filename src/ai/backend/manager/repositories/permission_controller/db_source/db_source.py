@@ -553,6 +553,7 @@ class PermissionDBSource:
                         PermissionRow.scope_id == scope_id.scope_id,
                     ),
                     PermissionRow.permission == permission,
+                    PermissionRow.all_fields.is_(True),
                 )
             )
         )
@@ -591,10 +592,12 @@ class PermissionDBSource:
                         sa.and_(
                             PermissionRow.scope_type == LegacyScopeType.GLOBAL,
                             PermissionRow.permission == Permission.from_operation(operation),
+                            PermissionRow.all_fields.is_(True),
                         ),
                         sa.and_(
                             AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
                             PermissionRow.permission == Permission.from_operation(operation),
+                            PermissionRow.all_fields.is_(True),
                         ),
                         sa.and_(
                             ObjectPermissionRow.entity_id.in_(object_id_for_cond),
@@ -1086,6 +1089,7 @@ class PermissionDBSource:
             user_roles.c.user_id == group_key.user_id,
             roles.c.status == RoleStatus.ACTIVE,
             perm.c.entity_type == group_key.subject_entity_type.to_entity_type(),
+            perm.c.all_fields.is_(True),
         ]
         if permission_filter is not None:
             filters.append(perm.c.permission.op("&")(permission_filter) != 0)
@@ -1135,6 +1139,7 @@ class PermissionDBSource:
             perm.c.scope_type == group_key.element_type.to_scope_type(),
             perm.c.scope_id.in_(entity_ids),
             perm.c.entity_type == group_key.subject_entity_type.to_entity_type(),
+            perm.c.all_fields.is_(True),
         ]
         if permission_filter is not None:
             filters.append(perm.c.permission.op("&")(permission_filter) != 0)
@@ -1327,6 +1332,7 @@ class PermissionDBSource:
                         # stores its canonical string form. Cast to compare.
                         perm.c.scope_id == sa.cast(scope.c.entity_id, sa.String),
                         perm.c.entity_type == group_key.subject_entity_type,
+                        perm.c.all_fields.is_(True),
                     ),
                 )
                 .join(roles, roles.c.id == perm.c.role_id)
