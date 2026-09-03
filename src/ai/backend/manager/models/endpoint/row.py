@@ -169,7 +169,7 @@ class EndpointRow(Base):
     )
 
     id: Mapped[DeploymentID] = mapped_column(
-        "id", GUID(DeploymentID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(DeploymentID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=512), nullable=False)
     created_user: Mapped[UUID] = mapped_column("created_user", GUID, nullable=False)

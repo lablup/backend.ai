@@ -361,7 +361,7 @@ def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
 class SessionRow(CreatedAtMixin, Base):
     __tablename__ = "sessions"
     id: Mapped[SessionId] = mapped_column(
-        "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     creation_id: Mapped[str | None] = mapped_column(
         "creation_id", sa.String(length=32), unique=False, index=False

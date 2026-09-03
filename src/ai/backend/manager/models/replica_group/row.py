@@ -45,7 +45,7 @@ class ReplicaGroupRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(ReplicaGroupID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     deployment_id: Mapped[DeploymentID] = mapped_column(
         "deployment_id",
