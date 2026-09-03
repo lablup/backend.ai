@@ -1,3 +1,5 @@
+from typing import override
+
 import strawberry
 from graphql import GraphQLError
 from graphql.pyutils.undefined import Undefined as GraphQLUndefined
@@ -911,8 +913,6 @@ class Subscription:
 
 
 class CustomizedSchema(Schema):
-<<<<<<< HEAD
-=======
     @override
     def process_errors(
         self,
@@ -923,8 +923,6 @@ class CustomizedSchema(Schema):
         # already logs every resolver error at the right level.
         pass
 
-    @override
->>>>>>> a13923d5 (fix(BA-7641): stop double-logging GraphQL client errors as ERROR in admin v2 handler (#14200))
     def as_str(self) -> str:
         # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
         # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so
