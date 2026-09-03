@@ -16,6 +16,8 @@ _DEFERRED_RESPONSE_HEADERS_KEY: Final = "deferred_response_headers"
 
 
 def deferred_response_headers(request: web.Request) -> CIMultiDict[str]:
+    """Use this instead of writing to the response a middleware gets back: a raised
+    HTTPException never passes through the middleware, so headers set there are lost."""
     headers: CIMultiDict[str] | None = request.get(_DEFERRED_RESPONSE_HEADERS_KEY)
     if headers is None:
         headers = CIMultiDict()
