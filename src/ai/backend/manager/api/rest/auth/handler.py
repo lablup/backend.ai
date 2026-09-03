@@ -80,7 +80,6 @@ class AuthHandler:
     # ------------------------------------------------------------------
 
     async def test_get(self, ctx: UserContext) -> APIResponse:
-        log.info("AUTH.TEST(ak:{})", ctx.access_key)
         resp = VerifyAuthResponse(authorized="yes", echo="")
         return APIResponse.build(HTTPStatus.OK, resp)
 
@@ -89,7 +88,6 @@ class AuthHandler:
     # ------------------------------------------------------------------
 
     async def get_my_ip(self, request_ctx: RequestCtx) -> APIResponse:
-        log.info("AUTH.GET_MY_IP()")
         client_ip = extract_client_ip(request_ctx.request) or ""
         return APIResponse.build(HTTPStatus.OK, MyIpResponse(client_ip=client_ip))
 
@@ -98,7 +96,6 @@ class AuthHandler:
     # ------------------------------------------------------------------
 
     async def test_post(self, body: BodyParam[VerifyAuthRequest], ctx: UserContext) -> APIResponse:
-        log.info("AUTH.TEST(ak:{})", ctx.access_key)
         params = body.parsed
         resp = VerifyAuthResponse(authorized="yes", echo=params.echo)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -109,12 +106,6 @@ class AuthHandler:
 
     async def get_role(self, query: QueryParam[GetRoleRequest], ctx: UserContext) -> APIResponse:
         params = query.parsed
-        log.info(
-            "AUTH.ROLES(ak:{}, d:{}, g:{})",
-            ctx.access_key,
-            ctx.user_domain,
-            params.group,
-        )
         action = PublicGetRoleAction(
             user_id=ctx.user_uuid,
             group_id=params.group,
@@ -137,12 +128,6 @@ class AuthHandler:
         self, body: BodyParam[AuthorizeRequest], ctx: RequestCtx
     ) -> APIResponse | web.StreamResponse:
         params = body.parsed
-        log.info(
-            "AUTH.AUTHORIZE(d:{}, u:{}, passwd:****, type:{})",
-            params.domain,
-            params.username,
-            params.type,
-        )
         action = AuthorizeAction(
             request=ctx.request,
             type=AuthTokenType(params.type),
@@ -180,7 +165,6 @@ class AuthHandler:
 
     async def logout(self, body: BodyParam[LogoutRequest], ctx: UserContext) -> APIResponse:
         params = body.parsed
-        log.info("AUTH.LOGOUT(session_token:{}...)", params.session_token[:8])
         action = LogoutAction(
             user_id=UserID(ctx.user_uuid),
             session_token=params.session_token,
@@ -194,7 +178,6 @@ class AuthHandler:
 
     async def signup(self, body: BodyParam[SignupRequest], ctx: RequestCtx) -> APIResponse:
         params = body.parsed
-        log.info("AUTH.SIGNUP(d:{}, email:{}, passwd:****)", params.domain, params.email)
         action = SignupAction(
             request=ctx.request,
             domain_name=params.domain,
@@ -217,7 +200,6 @@ class AuthHandler:
 
     async def signout(self, body: BodyParam[SignoutRequest], ctx: UserContext) -> APIResponse:
         params = body.parsed
-        log.info("AUTH.SIGNOUT(d:{}, email:{})", ctx.user_domain, params.email)
         await self._auth.signout.run(
             SignoutAction(
                 user_id=UserID(ctx.user_uuid),
@@ -237,7 +219,6 @@ class AuthHandler:
         self, body: BodyParam[UpdateFullNameRequest], ctx: UserContext
     ) -> APIResponse:
         params = body.parsed
-        log.info("AUTH.UPDATE_FULL_NAME(d:{}, email:{})", ctx.user_domain, ctx.user_email)
         await self._auth.update_full_name.run(
             UpdateFullNameAction(
                 user_id=UserID(ctx.user_uuid),
@@ -259,7 +240,6 @@ class AuthHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
-        log.info("AUTH.UPDATE_PASSWORD(d:{}, email:{})", ctx.user_domain, ctx.user_email)
         action = UpdatePasswordAction(
             request=req.request,
             user_id=UserID(ctx.user_uuid),
@@ -283,11 +263,6 @@ class AuthHandler:
         self, body: BodyParam[UpdatePasswordNoAuthRequest], ctx: RequestCtx
     ) -> APIResponse:
         params = body.parsed
-        log.info(
-            "AUTH.UPDATE_PASSWORD_NO_AUTH(d:{}, u:{}, passwd:****)",
-            params.domain,
-            params.username,
-        )
         action = UpdatePasswordNoAuthAction(
             request=ctx.request,
             domain_name=params.domain,
@@ -306,7 +281,6 @@ class AuthHandler:
     # ------------------------------------------------------------------
 
     async def get_ssh_keypair(self, ctx: UserContext) -> APIResponse:
-        log.info("AUTH.GET_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
         result = await self._auth.get_ssh_keypair.run(
             GetSSHKeypairAction(
                 user_id=UserID(ctx.user_uuid),
@@ -321,7 +295,6 @@ class AuthHandler:
     # ------------------------------------------------------------------
 
     async def generate_ssh_keypair(self, ctx: UserContext) -> APIResponse:
-        log.info("AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
         result = await self._auth.generate_ssh_keypair.run(
             GenerateSSHKeypairAction(
                 user_id=UserID(ctx.user_uuid),
@@ -344,7 +317,6 @@ class AuthHandler:
         params = body.parsed
         pubkey = f"{params.pubkey.rstrip()}\n"
         privkey = f"{params.privkey.rstrip()}\n"
-        log.info("AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})", ctx.user_domain, ctx.access_key)
         result = await self._auth.upload_ssh_keypair.run(
             UploadSSHKeypairAction(
                 user_id=UserID(ctx.user_uuid),

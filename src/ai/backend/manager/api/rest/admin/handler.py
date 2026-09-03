@@ -54,20 +54,6 @@ class GQLMutationUnfrozenRequiredMiddleware:
         return next(root, info, **args)
 
 
-class GQLLoggingMiddleware:
-    def resolve(self, next: Any, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
-        if info.path.prev is None:
-            graph_ctx = info.context
-            log.debug(
-                "ADMIN.GQL (ak:{}, {}:{}, op:{})",
-                graph_ctx.access_key,
-                info.operation.operation,
-                info.field_name,
-                info.operation.name,
-            )
-        return next(root, info, **args)
-
-
 class AdminHandler:
     """Admin API handler with constructor-injected dependencies."""
 
@@ -150,7 +136,6 @@ class AdminHandler:
                     GQLMutationUnfrozenRequiredMiddleware(manager_status),
                     GQLMetricMiddleware(),
                     GQLExceptionMiddleware(),
-                    GQLLoggingMiddleware(),
                 ],
             ),
         )

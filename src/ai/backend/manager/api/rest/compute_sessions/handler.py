@@ -44,7 +44,6 @@ class ComputeSessionsHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search compute sessions with nested container data."""
-        log.info("SEARCH_SESSIONS (ak:{})", ctx.access_key)
 
         user = current_user()
         if user is None:

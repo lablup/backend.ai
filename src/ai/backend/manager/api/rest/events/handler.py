@@ -86,7 +86,6 @@ class EventsHandler:
         request = ctx.request
         params = query.parsed
         session_name = params.session_name
-        session_id = params.session_id
         scope = params.scope
         user_role = request["user"]["role"]
         user_uuid = user_ctx.user_uuid
@@ -100,14 +99,6 @@ class EventsHandler:
         if scope == "*":
             scope = "session,kernel"
 
-        log.info(
-            "PUSH_SESSION_EVENTS (ak:{}, s:{} / s:{}, g:{}, scope:{})",
-            access_key,
-            session_name,
-            session_id,
-            group_name,
-            scope,
-        )
         priv_ctx = self._ctx
         current_task = asyncio.current_task()
         if current_task is None:
@@ -199,8 +190,6 @@ class EventsHandler:
         request = ctx.request
         priv_ctx = self._ctx
         task_id = query.parsed.task_id
-        access_key = user_ctx.access_key
-        log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
         current_task = asyncio.current_task()
         if current_task is None:
             raise NoCurrentTaskContext(

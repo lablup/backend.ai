@@ -57,7 +57,6 @@ class GroupHandler:
         body: BodyParam[RegistryQuotaModifyRequest],
     ) -> APIResponse:
         params = body.parsed
-        log.info("CREATE_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
         await self._container_registry.create_registry_quota.run(
             CreateRegistryQuotaAction(scope_id=scope_id, quota=params.quota)
@@ -73,7 +72,6 @@ class GroupHandler:
         query: QueryParam[RegistryQuotaRequest],
     ) -> APIResponse:
         params = query.parsed
-        log.info("READ_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
         result = await self._container_registry.read_registry_quota.run(
             ReadRegistryQuotaAction(scope_id=scope_id)
@@ -90,7 +88,6 @@ class GroupHandler:
         body: BodyParam[RegistryQuotaModifyRequest],
     ) -> APIResponse:
         params = body.parsed
-        log.info("UPDATE_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
         await self._container_registry.update_registry_quota.run(
             UpdateRegistryQuotaAction(scope_id=scope_id, quota=params.quota)
@@ -106,7 +103,6 @@ class GroupHandler:
         body: BodyParam[RegistryQuotaRequest],
     ) -> APIResponse:
         params = body.parsed
-        log.info("DELETE_REGISTRY_QUOTA (group:{})", params.group_id)
         scope_id = ProjectScope(project_id=uuid.UUID(params.group_id), domain_name=None)
         await self._container_registry.delete_registry_quota.run(
             DeleteRegistryQuotaAction(scope_id=scope_id)

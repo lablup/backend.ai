@@ -33,7 +33,6 @@ class AgentHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search agents with filters, orders, and pagination."""
-        log.info("SEARCH_AGENTS (ak:{})", ctx.access_key)
 
         querier = self._adapter.build_querier(body.parsed)
 

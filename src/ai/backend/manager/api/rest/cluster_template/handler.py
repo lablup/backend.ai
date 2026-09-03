@@ -98,11 +98,6 @@ class ClusterTemplateHandler:
         params = body.parsed
         domain = params.domain or ctx.user_domain
         owner_access_key = params.owner_access_key
-        log.info(
-            "CLUSTER_TEMPLATE.CREATE (ak:{0}/{1})",
-            ctx.access_key,
-            owner_access_key if owner_access_key and owner_access_key != ctx.access_key else "*",
-        )
 
         try:
             payload = load_json(params.payload)
@@ -137,8 +132,6 @@ class ClusterTemplateHandler:
     ) -> APIResponse:
         params = query.parsed
         user_role = req.request["user"]["role"]
-
-        log.info("CLUSTER_TEMPLATE.LIST (ak:{})", ctx.access_key)
 
         raw_group_id = params.group_id if hasattr(params, "group_id") else None
         group_id_filter = uuid.UUID(raw_group_id) if raw_group_id is not None else None
@@ -181,13 +174,6 @@ class ClusterTemplateHandler:
         params = query.parsed
         if params.format not in ("yaml", "json"):
             raise InvalidAPIParameters('format should be "yaml" or "json"')
-        log.info(
-            "CLUSTER_TEMPLATE.GET (ak:{0}/{1})",
-            ctx.access_key,
-            params.owner_access_key
-            if params.owner_access_key and params.owner_access_key != ctx.access_key
-            else "*",
-        )
 
         template_id = path.parsed.template_id
         action = GetClusterTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
@@ -206,13 +192,6 @@ class ClusterTemplateHandler:
     ) -> APIResponse:
         template_id = path.parsed.template_id
         params = body.parsed
-        log.info(
-            "CLUSTER_TEMPLATE.PUT (ak:{0}/{1})",
-            ctx.access_key,
-            params.owner_access_key
-            if params.owner_access_key and params.owner_access_key != ctx.access_key
-            else "*",
-        )
 
         try:
             payload = load_json(params.payload)
@@ -240,14 +219,6 @@ class ClusterTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         template_id = path.parsed.template_id
-        params = query.parsed
-        log.info(
-            "CLUSTER_TEMPLATE.DELETE (ak:{0}/{1})",
-            ctx.access_key,
-            params.owner_access_key
-            if params.owner_access_key and params.owner_access_key != ctx.access_key
-            else "*",
-        )
 
         action = DeleteClusterTemplateAction(template_id=SessionTemplateID(UUID(template_id)))
         await self._template.delete_cluster.run(action)

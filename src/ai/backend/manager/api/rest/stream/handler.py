@@ -165,7 +165,6 @@ class StreamHandler:
         result = await self._stream.get_streaming_session.run(
             GetStreamingSessionAction(session_id=session_id),
         )
-        log.info("STREAM_PTY(s:{0})", session_name)
         stream_key = result.kernel_id
         kernel_host: str
         if result.kernel_host is None:
@@ -355,7 +354,6 @@ class StreamHandler:
         session_name_or_id = path.parsed.session_name
         session_name = await self._resolve_session_name(session_name_or_id)
         api_version = request["api_version"]
-        log.info("STREAM_EXECUTE(s:{0})", session_name)
         session_id = await self._resolve_session_id(session_name, user_id)
         session_result = await self._stream.get_streaming_session.run(
             GetStreamingSessionAction(session_id=session_id),
@@ -514,13 +512,6 @@ class StreamHandler:
         else:
             raise AppNotFound(f"{session_name}:{service}")
 
-        log.info(
-            "STREAM_WSPROXY (s:{}): tunneling {}:{} to {}",
-            session_name,
-            service,
-            sport["protocol"],
-            "{}:{}".format(*dest),
-        )
         if sport["protocol"] == "tcp":
             proxy_cls = TCPProxy
         elif sport["protocol"] == "pty":

@@ -100,7 +100,6 @@ class UserConfigHandler:
     ) -> APIResponse:
         params = body.parsed
         access_key = await self._owner_access_key(ctx, params.owner_access_key)
-        log.info("USERCONFIG.CREATE(ak:{})", access_key)
         await self._user.create_dotfile.run(
             CreateKeypairDotfileAction(
                 user_id=await self._owner(access_key),
@@ -117,7 +116,6 @@ class UserConfigHandler:
     ) -> APIResponse:
         params = query.parsed
         access_key = await self._owner_access_key(ctx, params.owner_access_key)
-        log.info("USERCONFIG.LIST_OR_GET(ak:{})", access_key)
         keypair = await self._user.get_keypair.run(
             GetKeypairAction(keypair_id=await self._keypair_id(access_key))
         )
@@ -140,7 +138,6 @@ class UserConfigHandler:
     ) -> APIResponse:
         params = body.parsed
         access_key = await self._owner_access_key(ctx, params.owner_access_key)
-        log.info("USERCONFIG.UPDATE(ak:{})", access_key)
         await self._user.update_dotfile.run(
             UpdateKeypairDotfileAction(
                 user_id=await self._owner(access_key),
@@ -157,7 +154,6 @@ class UserConfigHandler:
     ) -> APIResponse:
         params = query.parsed
         access_key = await self._owner_access_key(ctx, params.owner_access_key)
-        log.info("USERCONFIG.DELETE(ak:{})", access_key)
         await self._user.delete_dotfile.run(
             DeleteKeypairDotfileAction(
                 user_id=await self._owner(access_key),
@@ -173,7 +169,6 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         access_key = AccessKey(ctx.access_key)
-        log.info("USERCONFIG.UPDATE_BOOTSTRAP_SCRIPT(ak:{})", access_key)
         await self._user.update_bootstrap_script.run(
             UpdateBootstrapScriptAction(
                 user_id=await self._owner(access_key),
@@ -188,7 +183,6 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         access_key = AccessKey(ctx.access_key)
-        log.info("USERCONFIG.GET_BOOTSTRAP_SCRIPT(ak:{})", access_key)
         result = await self._user.get_bootstrap_script.run(
             GetBootstrapScriptAction(user_id=await self._owner(access_key), access_key=access_key)
         )
