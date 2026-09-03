@@ -63,6 +63,7 @@ from ai.backend.manager.errors.storage import (
     VFolderInvalidParameter,
     VFolderNotFound,
     VFolderOperationFailed,
+    VFolderPermissionError,
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import agents
@@ -215,6 +216,59 @@ class VfolderRepository:
 
             if not vfolder_dicts:
                 raise VFolderNotFound()
+
+            return self._vfolder_row_to_data(vfolder_row)
+
+    @vfolder_repository_resilience.apply()
+    async def get_by_id_for_operation(
+        self,
+        vfolder_id: uuid.UUID,
+        user_id: uuid.UUID,
+        domain_name: str | None,
+        *,
+        required: VFolderPermissionSetAlias,
+    ) -> VFolderData:
+        """
+        Get a VFolder by ID, requiring the caller's effective mount permission to be in
+        ``required``. Owners and admins always pass.
+        Raises VFolderNotFound if unreachable, VFolderPermissionError if under-permitted.
+        """
+        async with self._db.begin_readonly_session() as session:
+            vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
+            if not vfolder_row:
+                raise VFolderNotFound()
+
+            if vfolder_row.user == user_id:
+                return self._vfolder_row_to_data(vfolder_row)
+
+            user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
+            if not user_row:
+                raise ObjectNotFound(object_name="User")
+
+            allowed_vfolder_types = ["user", "group"]  # TODO: get from config
+            conn = await session.connection()
+            vfolder_dicts = await query_accessible_vfolders(
+                conn,
+                user_id,
+                allow_privileged_access=True,
+                user_role=user_row.role,
+                domain_name=domain_name,
+                allowed_vfolder_types=allowed_vfolder_types,
+                extra_vf_conds=(VFolderRow.id == vfolder_id),
+            )
+
+            if not vfolder_dicts:
+                raise VFolderNotFound()
+
+            # One folder can surface through several scans (owned, invited, group);
+            # any entry that satisfies the requirement grants the operation.
+            if not any(
+                entry.get("is_owner", False) or entry.get("permission") in required.value
+                for entry in vfolder_dicts
+            ):
+                raise VFolderPermissionError(
+                    f"Requires `{required.name.lower()}` permission on the folder."
+                )
 
             return self._vfolder_row_to_data(vfolder_row)
 
@@ -1561,15 +1615,18 @@ class VfolderRepository:
         permission: VFolderHostPermission,
         allowed_vfolder_types: Sequence[str],
         resource_policy: Mapping[str, Any],
+        required: VFolderPermissionSetAlias,
     ) -> ValidatedVFolderInfo:
         """
-        Resolve user from context, validate vfolder access, check host permission,
-        and return validated VFolderID with storage info.
+        Resolve user from context, validate vfolder access, check the share and host
+        permissions, and return validated VFolderID with storage info.
         """
         user = current_user()
         if user is None:
             raise AuthorizationFailed("User context is not available")
-        vfolder_data = await self.get_by_id_validated(vfolder_uuid, user.user_id, user.domain_name)
+        vfolder_data = await self.get_by_id_for_operation(
+            vfolder_uuid, user.user_id, user.domain_name, required=required
+        )
         await self.ensure_host_permission_allowed(
             vfolder_data.host,
             permission=permission,

@@ -9,6 +9,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.storage import VFolderInvalidParameter
 from ai.backend.manager.models.vfolder import (
+    VFolderPermissionSetAlias,
     is_unmanaged,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -73,8 +74,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.WRITABLE,
         )
 
         # Check host permissions
@@ -121,8 +125,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.READABLE,
         )
 
         # Check host permissions
@@ -175,6 +182,7 @@ class VFolderFileService:
             permission=VFolderHostPermission.DOWNLOAD_FILE,
             allowed_vfolder_types=allowed_vfolder_types,
             resource_policy=action.keypair_resource_policy,
+            required=VFolderPermissionSetAlias.READABLE,
         )
         if is_unmanaged(info.unmanaged_path):
             raise VFolderInvalidParameter(
@@ -201,8 +209,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.READABLE,
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -241,8 +252,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.WRITABLE,
         )
 
         # Check host permissions
@@ -282,8 +296,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.WRITABLE,
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -312,8 +329,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.WRITABLE,
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -350,8 +370,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_id)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.WRITABLE,
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -383,8 +406,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.WRITABLE,
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -408,8 +434,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_id)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.READABLE,
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -447,8 +476,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_id)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.WRITABLE,
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -473,8 +505,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_id)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.WRITABLE,
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -498,8 +533,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_id)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.WRITABLE,
         )
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -526,8 +564,11 @@ class VFolderFileService:
         user = await self._user_repository.get_user_by_uuid(action.user_id)
         if not user.domain_name:
             raise VFolderInvalidParameter("User has no domain assigned")
-        vfolder_data = await self._vfolder_repository.get_by_id_validated(
-            action.vfolder_uuid, user.id, user.domain_name
+        vfolder_data = await self._vfolder_repository.get_by_id_for_operation(
+            action.vfolder_uuid,
+            user.id,
+            user.domain_name,
+            required=VFolderPermissionSetAlias.READABLE,
         )
 
         # Host permission check — resolved from user_id

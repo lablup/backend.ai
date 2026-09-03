@@ -144,7 +144,7 @@ class TestCreateUploadSessionAction:
         vfolder_uuid: uuid.UUID,
         keypair_resource_policy: dict[str, str],
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
 
         action = CreateUploadSessionAction(
@@ -168,7 +168,7 @@ class TestCreateUploadSessionAction:
         vfolder_uuid: uuid.UUID,
         keypair_resource_policy: dict[str, str],
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(side_effect=VFolderNotFound())
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(side_effect=VFolderNotFound())
 
         action = CreateUploadSessionAction(
             keypair_resource_policy=keypair_resource_policy,
@@ -189,7 +189,7 @@ class TestCreateUploadSessionAction:
         vfolder_uuid: uuid.UUID,
         keypair_resource_policy: dict[str, str],
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock(
             side_effect=VFolderInvalidParameter("No permission")
         )
@@ -215,7 +215,7 @@ class TestCreateDownloadSessionAction:
         vfolder_uuid: uuid.UUID,
         keypair_resource_policy: dict[str, str],
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
 
         action = CreateDownloadSessionAction(
@@ -241,7 +241,7 @@ class TestCreateDownloadSessionAction:
         vfolder_uuid: uuid.UUID,
         keypair_resource_policy: dict[str, str],
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
 
         action = CreateDownloadSessionAction(
@@ -268,7 +268,7 @@ class TestCreateDownloadSessionAction:
         vfolder_uuid: uuid.UUID,
         keypair_resource_policy: dict[str, str],
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock(
             side_effect=VFolderInvalidParameter("No permission")
         )
@@ -293,7 +293,7 @@ class TestListFilesAction:
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
 
         action = ListFilesAction(
             user_uuid=user_uuid,
@@ -320,7 +320,7 @@ class TestListFilesAction:
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
 
         action = ListFilesAction(
             user_uuid=user_uuid,
@@ -346,7 +346,7 @@ class TestRenameFileAction:
         vfolder_uuid: uuid.UUID,
         keypair_resource_policy: dict[str, str],
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
 
         action = RenameFileAction(
@@ -371,7 +371,7 @@ class TestRenameFileAction:
         vfolder_uuid: uuid.UUID,
         keypair_resource_policy: dict[str, str],
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
         mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock(
             side_effect=VFolderInvalidParameter("No permission")
         )
@@ -397,7 +397,7 @@ class TestDeleteFilesAction:
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
 
         action = DeleteFilesAction(
             user_uuid=user_uuid,
@@ -420,7 +420,7 @@ class TestDeleteFilesAction:
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
 
         action = DeleteFilesAction(
             user_uuid=user_uuid,
@@ -446,7 +446,7 @@ class TestDeleteFilesAsyncAction:
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
 
         action = DeleteFilesAsyncAction(
             user_uuid=user_uuid,
@@ -466,7 +466,7 @@ class TestDeleteFilesAsyncAction:
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(side_effect=VFolderNotFound())
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(side_effect=VFolderNotFound())
 
         action = DeleteFilesAsyncAction(
             user_uuid=user_uuid,
@@ -487,7 +487,7 @@ class TestMkdirAction:
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
 
         action = MkdirAction(
             user_id=user_uuid,
@@ -511,7 +511,7 @@ class TestMkdirAction:
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=mock_vfolder_data)
+        mock_vfolder_repository.get_by_id_for_operation = AsyncMock(return_value=mock_vfolder_data)
 
         action = MkdirAction(
             user_id=user_uuid,
