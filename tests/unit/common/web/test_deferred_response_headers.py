@@ -8,7 +8,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.web.deferred_response_headers import (
-    deferred_response_headers,
+    defer_response_headers,
     setup_deferred_response_headers,
 )
 
@@ -16,12 +16,12 @@ _HEADER = "X-Deferred"
 
 
 async def _returns_with_header(request: web.Request) -> web.Response:
-    deferred_response_headers(request)[_HEADER] = "set"
+    defer_response_headers(request, {_HEADER: "set"})
     return web.Response(text="ok")
 
 
 async def _raises_with_header(request: web.Request) -> web.Response:
-    deferred_response_headers(request)[_HEADER] = "set"
+    defer_response_headers(request, {_HEADER: "set"})
     raise web.HTTPTooManyRequests()
 
 
