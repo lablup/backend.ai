@@ -1,14 +1,15 @@
 ---
 name: models-schema-declaration
 type: design-rationale
-description: models as the schema-declaration layer (per-domain row packages), why Rows carry no implementation, why models/specs specs are preferred over direct db-object manipulation (RBAC side effects), the rationale for avoiding direct session use and keeping implementation in repositories
+description: models as the schema-declaration layer (per-domain row packages), why Rows carry no implementation, why models/specs specs are preferred over direct db-object manipulation (RBAC side effects), the rationale for avoiding direct session use and keeping implementation in repositories, why id defaults split between UUIDv7 and UUIDv4
 scope: src/ai/backend/manager/models
-keywords: [Row, ORM, specs, RBAC, session, repository, schema, alembic]
+keywords: [Row, ORM, specs, RBAC, session, repository, schema, alembic, uuid_generate_v7, server_default]
 sources:
   - src/ai/backend/manager/models/specs
+  - src/ai/backend/manager/models/uuid7.py
 generated:
-  by: claude-code/fable-5
-  at: 2026-08-10
+  by: claude-code/opus-5
+  at: 2026-09-03
 status: stable
 ---
 
@@ -39,3 +40,19 @@ no implementation".
 - Avoid code that opens a db session and manipulates Rows directly — implementation belongs in the repository.
 - Reason one: transaction boundaries are the repository's responsibility, so scattered direct sessions break atomicity guarantees.
 - Reason two: direct sessions become the channel through which Rows leak into layers above the repository — a bypass of the layering rule that Rows do not rise above `repositories/`.
+
+## Why id defaults split between v7 and v4
+
+- The leading 60 bits of a UUIDv7 are the generation time, so a new row's id lands at the
+  right edge of the primary key index instead of scattering across it the way v4 does.
+  The busier the table is written, the more this is worth.
+- The price is that the id reveals when it was made. That is harmless for an internal
+  identifier, but an id handed to an untrusted holder leaks its issue time on its own.
+  Tokens and invitations therefore stay on v4.
+- v4 and v7 are both the `uuid` type, so a column may hold a mix. Existing rows never need
+  to be rewritten.
+- The function is strictly increasing within a session: it remembers the last value it
+  handed out in a session setting and steps up by the smallest unit when the clock has not
+  advanced. This matches PostgreSQL 18's built-in `uuidv7()`; once 18 is the minimum, the
+  body becomes `RETURN uuidv7();`.
+- Because it mutates session state, it is not marked parallel safe.

@@ -41,6 +41,26 @@ live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
   by the spec's type (rationale: `KNOWLEDGE.md`).
 - Do NOT open a db session to manipulate Rows directly — the implementation belongs in a repository.
 
+## Id column defaults
+
+- Give every id column a `server_default`. Do not mint the value in Python.
+- The default generator is `uuid_generate_v7()`. Use it for a new table and whenever
+  you revisit an existing table's default.
+- Use `uuid_generate_v4()` in the cases below. When you cannot tell which applies, use v4.
+
+| Use v4 when | Examples |
+|---|---|
+| The id reaches an untrusted holder | `endpoint_tokens`, `login_sessions`, `entity_invitations`, `vfolder_invitations` |
+| Knowing the id is itself what grants access | an unsigned share link |
+
+- Never read an id as a time. Ordering and creation time belong to the `created_at` columns.
+- Changing a default changes two places: the Row declaration and an
+  `ALTER COLUMN ... SET DEFAULT` in the migration. Editing only the Python declaration
+  leaves a freshly created database and a migrated one with different schemas.
+- A foreign key column naming an owner or a parent gets no default. An INSERT that omits
+  the value must be rejected.
+- The function DDL lives in `models/uuid7.py`. Execute that string rather than copying it.
+
 ## Custom column types
 
 - Where possible, reuse the existing `TypeDecorator` wrappers in `models/base.py`.

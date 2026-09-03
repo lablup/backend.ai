@@ -144,7 +144,7 @@ class KernelRow(CreatedAtMixin, Base):
     # The Backend.AI-side UUID for each kernel
     # (mapped to a container in the docker backend and a pod in the k8s backend)
     id: Mapped[KernelId] = mapped_column(
-        "id", KernelIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", KernelIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     # session_id == id when the kernel is the main container in a multi-container session or a
     # single-container session.

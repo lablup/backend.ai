@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.sql.ddl import SchemaGenerator
 from sqlalchemy.sql.schema import ForeignKeyConstraint
 
+from ai.backend.manager.models.uuid7 import UUID_GENERATE_V7_DDL
+
 
 class HasTable(Protocol):
     """Protocol for SQLAlchemy ORM model classes with __table__ attribute."""
@@ -112,6 +114,7 @@ async def with_tables(
     async with engine.begin() as conn:
         # Create uuid-ossp extension for uuid_generate_v4()
         await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+        await conn.execute(text(UUID_GENERATE_V7_DDL))
         await conn.run_sync(_create_tables_sync, tables)
 
     try:
