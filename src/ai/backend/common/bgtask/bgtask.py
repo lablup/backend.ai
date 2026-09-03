@@ -258,7 +258,10 @@ def _exception_to_task_result[**P](
             log.warning("Task cancelled")
             return TaskCancelledResult()
         except BackendAIError as e:
-            log.exception("BackendAIError in task: {}", e)
+            if e.status_code // 100 == 4:
+                log.warning("BackendAIError in task: {}", repr(e))
+            else:
+                log.exception("BackendAIError in task: {}", e)
             return TaskFailedResult(e)
         except Exception as e:
             log.exception("Unhandled error in task: {}", e)
@@ -403,7 +406,10 @@ class BackgroundTaskManager:
         except BackendAIError as e:
             status = BgtaskStatus.FAILED
             error_code = e.error_code()
-            log.exception("Task {} ({}): BackendAIError: {}", task_id, task_name, e)
+            if e.status_code // 100 == 4:
+                log.warning("Task {} ({}): BackendAIError: {}", task_id, task_name, repr(e))
+            else:
+                log.exception("Task {} ({}): BackendAIError: {}", task_id, task_name, e)
             msg = repr(e)
             return BgtaskFailedEvent(task_id, msg)
         except Exception as e:
