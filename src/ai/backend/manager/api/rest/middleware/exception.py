@@ -109,7 +109,10 @@ def build_exception_middleware(
             await stats_monitor.report_metric(
                 INCREMENT, f"ai.backend.manager.api.status.{ex.status_code}"
             )
-            if ex.status_code // 100 == 4:
+            if request.match_info.http_exception is not None and ex.status_code == 404:
+                # No route matched; the client probed a path this server does not serve.
+                log.debug("no route matched: ({} {}): {}", method, endpoint, ex)
+            elif ex.status_code // 100 == 4:
                 log.warning(
                     "client error raised inside handlers: ({} {}): {}", method, endpoint, ex
                 )
