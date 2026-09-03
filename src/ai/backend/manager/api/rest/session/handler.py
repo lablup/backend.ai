@@ -80,8 +80,12 @@ from ai.backend.common.dto.manager.session.types import (
     CreationConfigV6Template,
     CreationConfigV7,
 )
+<<<<<<< HEAD
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.identifier.session import SessionID
+=======
+from ai.backend.common.exception import UnreachableError
+>>>>>>> 9d26ea39 (fix(BA-7639): stop logging a request failure twice (#14190))
 from ai.backend.common.types import (
     AgentId,
     KernelId,
@@ -871,16 +875,22 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
+<<<<<<< HEAD
         try:
             result = await self._session.get_session_info.wait_for_complete(
                 GetSessionInfoAction(
                     session_name=session_name,
                     owner_access_key=owner_access_key,
                 )
+=======
+        result = await self._session.get_session_info.run(
+            GetSessionInfoAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
+                session_name=session_name,
+                owner_access_key=owner_access_key,
+>>>>>>> 9d26ea39 (fix(BA-7639): stop logging a request failure twice (#14190))
             )
-        except BackendAIError:
-            log.exception("GET_INFO: exception")
-            raise
+        )
         resp = GetSessionInfoResponse(root=result.session_info.asdict())
         return APIResponse.build(
             HTTPStatus.OK,
@@ -1020,16 +1030,22 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
+<<<<<<< HEAD
         try:
             await self._session.interrupt.wait_for_complete(
                 InterruptSessionAction(
                     session_name=session_name,
                     owner_access_key=owner_access_key,
                 )
+=======
+        await self._session.interrupt.run(
+            InterruptSessionAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
+                session_name=session_name,
+                owner_access_key=owner_access_key,
+>>>>>>> 9d26ea39 (fix(BA-7639): stop logging a request failure twice (#14190))
             )
-        except BackendAIError:
-            log.exception("INTERRUPT: exception")
-            raise
+        )
         return web.Response(status=HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
@@ -1134,6 +1150,7 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
+<<<<<<< HEAD
         try:
             await self._session.shutdown_service.wait_for_complete(
                 ShutdownServiceAction(
@@ -1141,10 +1158,16 @@ class SessionHandler:
                     owner_access_key=owner_access_key,
                     service_name=params.service_name,
                 )
+=======
+        await self._session.shutdown_service.run(
+            ShutdownServiceAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
+                session_name=session_name,
+                owner_access_key=owner_access_key,
+                service_name=params.service_name,
+>>>>>>> 9d26ea39 (fix(BA-7639): stop logging a request failure twice (#14190))
             )
-        except BackendAIError:
-            log.exception("SHUTDOWN_SERVICE: exception")
-            raise
+        )
         return web.Response(status=HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
@@ -1170,6 +1193,7 @@ class SessionHandler:
             owner_access_key,
             session_name,
         )
+<<<<<<< HEAD
         try:
             await self._session.upload_files.wait_for_complete(
                 UploadFilesAction(
@@ -1177,10 +1201,16 @@ class SessionHandler:
                     owner_access_key=owner_access_key,
                     reader=reader,
                 )
+=======
+        await self._session.upload_files.run(
+            UploadFilesAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
+                session_name=session_name,
+                owner_access_key=owner_access_key,
+                reader=reader,
+>>>>>>> 9d26ea39 (fix(BA-7639): stop logging a request failure twice (#14190))
             )
-        except BackendAIError:
-            log.exception("UPLOAD_FILES: exception")
-            raise
+        )
         return web.Response(status=HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
@@ -1592,6 +1622,7 @@ class SessionHandler:
             session_name,
             kernel_id,
         )
+<<<<<<< HEAD
         try:
             result = await self._session.get_container_logs.wait_for_complete(
                 GetContainerLogsAction(
@@ -1599,16 +1630,16 @@ class SessionHandler:
                     owner_access_key=owner_access_key,
                     kernel_id=kernel_id,
                 )
+=======
+        result = await self._session.get_container_logs.run(
+            GetContainerLogsAction(
+                session_id=await self._resolve_session_id(owner_access_key, session_name),
+                session_name=session_name,
+                owner_access_key=owner_access_key,
+                kernel_id=kernel_id,
+>>>>>>> 9d26ea39 (fix(BA-7639): stop logging a request failure twice (#14190))
             )
-        except BackendAIError:
-            log.exception(
-                "GET_CONTAINER_LOG(ak:{}/{}, kernel_id: {}, s:{}): unexpected error",
-                requester_access_key,
-                owner_access_key,
-                kernel_id,
-                session_name,
-            )
-            raise
+        )
         return APIResponse.build(
             HTTPStatus.OK,
             GetContainerLogsResponse(result.result),
