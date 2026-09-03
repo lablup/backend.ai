@@ -186,16 +186,8 @@ class TestRuntimeVariantPresetServiceUpdateDefaultValueValidation:
         return MagicMock(spec=RuntimeVariantPresetRepository)
 
     @pytest.fixture
-    def mock_ops_repository(self) -> MagicMock:
-        return MagicMock(spec=OpsRepository)
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: MagicMock, mock_ops_repository: MagicMock
-    ) -> RuntimeVariantPresetService:
-        return RuntimeVariantPresetService(
-            repository=mock_repository, ops_repository=mock_ops_repository
-        )
+    def service(self, mock_repository: MagicMock) -> RuntimeVariantPresetService:
+        return RuntimeVariantPresetService(repository=mock_repository)
 
     @pytest.fixture
     def preset_id(self) -> uuid.UUID:
@@ -205,8 +197,8 @@ class TestRuntimeVariantPresetServiceUpdateDefaultValueValidation:
     def int_preset(self, preset_id: uuid.UUID) -> RuntimeVariantPresetData:
         """Existing preset with value_type=int."""
         return RuntimeVariantPresetData(
-            id=RuntimeVariantPresetID(preset_id),
-            runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
+            id=preset_id,
+            runtime_variant_id=uuid.uuid4(),
             name="test",
             description=None,
             rank=0,
@@ -231,11 +223,11 @@ class TestRuntimeVariantPresetServiceUpdateDefaultValueValidation:
         int_preset: RuntimeVariantPresetData,
     ) -> None:
         mock_repository.get_by_id = AsyncMock(return_value=int_preset)
-        updater = RuntimeVariantPresetUpdater(
-            preset_id=RuntimeVariantPresetID(preset_id),
+        spec = RuntimeVariantPresetUpdaterSpec(
             default_value=TriState.update("abc"),
         )
-        action = UpdateRuntimeVariantPresetAction(updater=updater)
+        updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=preset_id)
+        action = UpdateRuntimeVariantPresetAction(id=preset_id, updater=updater)
 
         with pytest.raises(InvalidAPIParameters, match="not a valid"):
             await service.update(action)
@@ -244,14 +236,13 @@ class TestRuntimeVariantPresetServiceUpdateDefaultValueValidation:
         self,
         service: RuntimeVariantPresetService,
         mock_repository: MagicMock,
-        mock_ops_repository: MagicMock,
         preset_id: uuid.UUID,
         int_preset: RuntimeVariantPresetData,
     ) -> None:
         """default_value="abc" is invalid for the stored INT type but valid for the
-        incoming STR type — the effective (new) type must be used, not the stored one."""
+        incoming STR type - the effective (new) type must be used, not the stored one."""
         updated_data = RuntimeVariantPresetData(
-            id=RuntimeVariantPresetID(preset_id),
+            id=preset_id,
             runtime_variant_id=int_preset.runtime_variant_id,
             name="test",
             description=None,
@@ -269,13 +260,13 @@ class TestRuntimeVariantPresetServiceUpdateDefaultValueValidation:
             updated_at=datetime(2024, 1, 2, tzinfo=UTC),
         )
         mock_repository.get_by_id = AsyncMock(return_value=int_preset)
-        mock_ops_repository.update = AsyncMock(return_value=updated_data)
-        updater = RuntimeVariantPresetUpdater(
-            preset_id=RuntimeVariantPresetID(preset_id),
+        mock_repository.update = AsyncMock(return_value=updated_data)
+        spec = RuntimeVariantPresetUpdaterSpec(
             value_type=OptionalState.update(PresetValueType.STR),
             default_value=TriState.update("abc"),
         )
-        action = UpdateRuntimeVariantPresetAction(updater=updater)
+        updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=preset_id)
+        action = UpdateRuntimeVariantPresetAction(id=preset_id, updater=updater)
 
         result = await service.update(action)
         assert result.preset.default_value == "abc"
