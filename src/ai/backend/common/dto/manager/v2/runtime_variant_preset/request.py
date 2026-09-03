@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Self
 from uuid import UUID
 
@@ -10,34 +9,12 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    VALUE_TYPE_VALIDATORS,
     PresetTarget,
     PresetValueType,
     RuntimeVariantPresetOrderField,
     UIOption,
 )
-
-_VALID_BOOL_VALUES = ("true", "false", "1", "0")
-
-
-def _validate_bool(v: str) -> bool:
-    if v.lower() not in _VALID_BOOL_VALUES:
-        raise ValueError(f"expected one of {_VALID_BOOL_VALUES}, got '{v}'")
-    return v.lower() in ("true", "1")
-
-
-def _validate_flag(v: str) -> bool:
-    if v.lower() not in _VALID_BOOL_VALUES:
-        raise ValueError(f"expected one of {_VALID_BOOL_VALUES}, got '{v}'")
-    return v.lower() in ("true", "1")
-
-
-VALUE_TYPE_VALIDATORS: dict[PresetValueType, Callable[[str], object]] = {
-    PresetValueType.STR: str,
-    PresetValueType.INT: int,
-    PresetValueType.FLOAT: float,
-    PresetValueType.BOOL: _validate_bool,
-    PresetValueType.FLAG: _validate_flag,
-}
 
 
 class CreateRuntimeVariantPresetInput(BaseRequestModel):
@@ -106,6 +83,21 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
             and self.preset_target != PresetTarget.ARGS
         ):
             raise ValueError("value_type 'flag' is only valid with preset_target 'args'.")
+        return self
+
+    @model_validator(mode="after")
+    def validate_default_value(self) -> Self:
+        if self.value_type is None or self.default_value is SENTINEL or self.default_value is None:
+            return self
+        validator = VALUE_TYPE_VALIDATORS.get(self.value_type)
+        if validator is None:
+            return self
+        try:
+            validator(self.default_value)
+        except (ValueError, TypeError) as e:
+            raise ValueError(
+                f"default_value '{self.default_value}' is not a valid {self.value_type}: {e}"
+            ) from e
         return self
 
 
