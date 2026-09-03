@@ -224,3 +224,19 @@ def test_csp_policy_without_nonce_keeps_directives_clean() -> None:
     policy = csp_policy_builder({"script-src": ["'self'"]})
     response = policy(web.Response())
     assert response.headers["Content-Security-Policy"] == "script-src 'self';"
+
+
+async def test_response_policies_apply_to_raised_exception() -> None:
+    test_app = web.Application()
+    test_app["security_policy"] = SecurityPolicy(
+        request_policies=[], response_policies=[set_content_type_nosniff_policy]
+    )
+    request = make_mocked_request("GET", "/", app=test_app)
+
+    async def handler(request: web.Request) -> web.Response:
+        raise web.HTTPFound("/elsewhere")
+
+    with pytest.raises(web.HTTPFound) as exc_info:
+        await security_policy_middleware(request, handler)
+
+    assert exc_info.value.headers["X-Content-Type-Options"] == "nosniff"
