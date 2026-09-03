@@ -340,7 +340,11 @@ async def server_main(
         _error_monitor_ref = dep_resources.monitoring.error_monitor
 
         # Insert DI-based middlewares now that dependencies are available.
+<<<<<<< HEAD
         # Maintain order: request_id(0) → exception(1) → auth(2) → api → metric
+=======
+        # Maintain order: request_id(0) → client_ip(1) → exception(2) → auth(3) → metric → api
+>>>>>>> 05ae645f (fix(BA-7638): count unmatched-route requests and log them at debug (#14187))
         root_app.middlewares.insert(
             1,
             build_exception_middleware(

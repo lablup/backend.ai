@@ -183,8 +183,11 @@ def build_root_app(
             request_id_middleware,
             # exception_middleware and auth_middleware are inserted later
             # in server_main() after dependencies are available.
-            api_middleware,
+            # The metric middleware wraps api_middleware so that requests to
+            # unregistered paths, which api_middleware rejects with 404 before
+            # reaching a handler, are still counted.
             build_api_metric_middleware(metrics.api),
+            api_middleware,
         ]
     )
     if loop_error_handler is not None:
