@@ -921,9 +921,10 @@ class ManagerConfig(BaseConfigSchema):
                 "When configured, the client IP is resolved by walking the X-Forwarded-For chain "
                 "inwards from the peer of the connection and taking the first address that is not "
                 "one of these proxies, so any number of proxy hops is supported. "
-                "The X-Forwarded-URL header, which overrides the host and path used for HMAC "
-                "signature verification, is honored only when the request comes directly from one "
-                "of these proxies. "
+                "The X-Forwarded-URL and X-Forwarded-Prefix headers, which override the host and "
+                "path used for HMAC signature verification, are honored only when the request "
+                "comes directly from one of these proxies; X-Forwarded-Prefix is ignored entirely "
+                "when this list is empty. "
                 "If empty (default), the manager falls back to manual X-Forwarded-For parsing and "
                 "accepts X-Forwarded-URL from any client, which is deprecated."
             ),

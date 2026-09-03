@@ -77,6 +77,7 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 TRUSTED_PROXY_NETWORKS_KEY: Final = "_trusted_proxy_networks"
 FORWARDED_URL_HEADER: Final = "X-Forwarded-URL"
+FORWARDED_PREFIX_HEADER: Final = "X-Forwarded-Prefix"
 
 _whois_timezone_info: Final = {
     "A": 1 * 3600,
@@ -445,6 +446,23 @@ def _resolve_forwarded_url(request: web.Request) -> str | None:
     return upstream_url
 
 
+def _resolve_forwarded_prefix(request: web.Request) -> str | None:
+    """Return the ``X-Forwarded-Prefix`` value only when its origin may be trusted.
+
+    Unlike ``X-Forwarded-URL``, there is no untrusted-origin fallback for this header.
+    """
+    raw_prefix = request.headers.get(FORWARDED_PREFIX_HEADER)
+    if raw_prefix is None:
+        return None
+    if not is_from_trusted_proxy(request):
+        log.debug(
+            "ignored the X-Forwarded-Prefix header sent from an untrusted peer (peer:{})",
+            _peer_address(request),
+        )
+        return None
+    return raw_prefix.rstrip("/")
+
+
 def check_date(request: web.Request) -> bool:
     raw_date = request.headers.get("Date")
     if not raw_date:
@@ -487,10 +505,15 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         body_hash = hashlib.new(hash_type, body).hexdigest()
         path = request.raw_path
         host = request.host
-        if upstream_url := _resolve_forwarded_url(request):
-            parsed_url = urlparse(upstream_url)
-            path = parsed_url.path
-            host = parsed_url.netloc
+        upstream_url = _resolve_forwarded_url(request)
+        if upstream_url:
+            host = urlparse(upstream_url).netloc
+
+        prefix = _resolve_forwarded_prefix(request)
+        if prefix is not None:
+            path = prefix + request.raw_path
+        elif upstream_url:
+            path = urlparse(upstream_url).path
 
         sign_bytes = "{0}\n{1}\n{2}\nhost:{3}\ncontent-type:{4}\nx-{name}-version:{5}\n{6}".format(
             request.method,
