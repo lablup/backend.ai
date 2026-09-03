@@ -478,9 +478,7 @@ class SessionRow(CreatedAtMixin, Base):
         "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
     group: Mapped[ProjectRow] = relationship("ProjectRow")
-    user_uuid: Mapped[UserID] = mapped_column(
-        "user_uuid", GUID(UserID), server_default=sa.text("uuid_generate_v4()"), nullable=False
-    )
+    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False)
     user: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,

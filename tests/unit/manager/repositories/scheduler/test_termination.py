@@ -348,6 +348,7 @@ class TestKernelTermination:
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
     ) -> AsyncGenerator[SessionId, None]:
         """Create test session in TERMINATING status and return session ID"""
         session_id = SessionId(uuid.uuid4())
@@ -360,6 +361,7 @@ class TestKernelTermination:
                 domain_id=test_domain_id,
                 domain_name=test_domain.domain_name,
                 group_id=test_group_id,
+                user_uuid=test_user_uuid,
                 resource_group_id=test_scaling_group_id,
                 scaling_group_name=test_scaling_group_name,
                 status=SessionStatus.TERMINATING,

@@ -356,6 +356,7 @@ class TestCancelFreesResourceAllocations:
                     domain_name=domain_name,
                     domain_id=domain_id,
                     group_id=group_id,
+                    user_uuid=user_uuid,
                     scaling_group_name=resource_group_name,
                     resource_group_id=resource_group_id,
                     status=session_status,

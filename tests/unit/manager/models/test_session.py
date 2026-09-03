@@ -65,7 +65,7 @@ class TestConfig:
     second_session_status: SessionStatus
 
 
-class TestSessionUniqueNamePerUser:
+class SessionFixtures:
     @pytest.fixture
     async def database_with_tables(
         self, database_connection: ExtendedAsyncSAEngine
@@ -238,6 +238,8 @@ class TestSessionUniqueNamePerUser:
 
         yield group
 
+
+class TestSessionUniqueNamePerUser(SessionFixtures):
     @pytest.fixture
     async def prepared_first_session(
         self,
@@ -387,3 +389,28 @@ class TestSessionUniqueNamePerUser:
             # This should succeed without IntegrityError
             db_sess.add(duplicate_session)
             await db_sess.flush()
+
+
+class TestSessionOwnerRequired(SessionFixtures):
+    async def test_session_without_owner_is_rejected(
+        self,
+        database_with_tables: ExtendedAsyncSAEngine,
+        group: ProjectRow,
+        domain: DomainRow,
+        resource_group: ResourceGroupRow,
+    ) -> None:
+        session = SessionRow(
+            name=f"test-{uuid.uuid4()!s}",
+            group_id=group.id,
+            domain_id=domain.id,
+            domain_name=domain.name,
+            resource_group_id=resource_group.id,
+            scaling_group_name=resource_group.name,
+            status=SessionStatus.PENDING,
+            vfolder_mounts=[],
+        )
+
+        with pytest.raises(IntegrityError):
+            async with database_with_tables.begin_session() as db_sess:
+                db_sess.add(session)
+                await db_sess.flush()

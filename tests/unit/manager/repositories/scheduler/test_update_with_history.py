@@ -295,6 +295,7 @@ class TestUpdateWithHistory:
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
     ) -> AsyncGenerator[SessionId, None]:
         """Create test session in PREPARING status and return session ID."""
         session_id = SessionId(uuid.uuid4())
@@ -308,6 +309,7 @@ class TestUpdateWithHistory:
                 domain_id=test_domain_id,
                 domain_name=test_domain.domain_name,
                 group_id=test_group_id,
+                user_uuid=test_user_uuid,
                 resource_group_id=test_scaling_group_id,
                 scaling_group_name=test_scaling_group_name,
                 status=SessionStatus.PREPARING,
@@ -451,6 +453,7 @@ class TestUpdateWithHistory:
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
     ) -> None:
         """Test update_with_history handles multiple sessions."""
         # Create multiple sessions
@@ -468,6 +471,7 @@ class TestUpdateWithHistory:
                     domain_id=test_domain_id,
                     domain_name=test_domain.domain_name,
                     group_id=test_group_id,
+                    user_uuid=test_user_uuid,
                     resource_group_id=test_scaling_group_id,
                     scaling_group_name=test_scaling_group_name,
                     status=SessionStatus.PREPARING,
@@ -969,6 +973,7 @@ class TestUpdateWithHistory:
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
     ) -> None:
         """Test merge logic works correctly with multiple sessions in batch."""
         # Create multiple sessions
@@ -985,6 +990,7 @@ class TestUpdateWithHistory:
                     domain_id=test_domain_id,
                     domain_name=test_domain.domain_name,
                     group_id=test_group_id,
+                    user_uuid=test_user_uuid,
                     resource_group_id=test_scaling_group_id,
                     scaling_group_name=test_scaling_group_name,
                     status=SessionStatus.PREPARING,
@@ -1073,6 +1079,7 @@ class TestUpdateWithHistory:
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
     ) -> None:
         """The RUNNING transition writes starts_at without touching the
         reserved start time recorded at enqueue."""
@@ -1088,6 +1095,7 @@ class TestUpdateWithHistory:
                 domain_id=test_domain_id,
                 domain_name=test_domain.domain_name,
                 group_id=test_group_id,
+                user_uuid=test_user_uuid,
                 resource_group_id=test_scaling_group_id,
                 scaling_group_name=test_scaling_group_name,
                 status=SessionStatus.CREATING,

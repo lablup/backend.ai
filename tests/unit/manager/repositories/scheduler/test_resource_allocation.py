@@ -402,6 +402,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     domain_id=domain_id,
                     domain_name=domain_name,
                     group_id=group_id,
+                    user_uuid=user_uuid,
                     resource_group_id=resource_group_id,
                     scaling_group_name=resource_group_name,
                     status=SessionStatus.CREATING,
