@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 from aiohttp import web
+from multidict import CIMultiDict
 
 from ai.backend.common.web.reserved_response_headers import (
     reserve_response_headers,
@@ -15,13 +16,21 @@ from ai.backend.common.web.reserved_response_headers import (
 _HEADER = "X-Reserved"
 
 
+@dataclass(frozen=True)
+class _Reserved:
+    value: str
+
+    def apply_to(self, headers: CIMultiDict[str]) -> None:
+        headers[_HEADER] = self.value
+
+
 async def _returns_with_header(request: web.Request) -> web.Response:
-    reserve_response_headers(request, {_HEADER: "set"})
+    reserve_response_headers(request, _Reserved("set"))
     return web.Response(text="ok")
 
 
 async def _raises_with_header(request: web.Request) -> web.Response:
-    reserve_response_headers(request, {_HEADER: "set"})
+    reserve_response_headers(request, _Reserved("set"))
     raise web.HTTPTooManyRequests()
 
 

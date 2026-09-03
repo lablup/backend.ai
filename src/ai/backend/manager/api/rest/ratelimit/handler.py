@@ -8,9 +8,11 @@ limiting is applied transparently to all authorized requests.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from aiohttp import web
+from multidict import CIMultiDict
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.web.reserved_response_headers import reserve_response_headers
@@ -26,12 +28,16 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _RATELIMIT_WINDOW: Final = 60 * 15
 
 
-def _rlim_headers(rate_limit: int | None, remaining: int) -> dict[str, str]:
-    return {
-        "X-RateLimit-Limit": str(rate_limit),
-        "X-RateLimit-Remaining": str(remaining),
-        "X-RateLimit-Window": str(_RATELIMIT_WINDOW),
-    }
+@dataclass(frozen=True)
+class RateLimitQuota:
+    limit: int | None
+    remaining: int
+    window: int = _RATELIMIT_WINDOW
+
+    def apply_to(self, headers: CIMultiDict[str]) -> None:
+        headers["X-RateLimit-Limit"] = str(self.limit)
+        headers["X-RateLimit-Remaining"] = str(self.remaining)
+        headers["X-RateLimit-Window"] = str(self.window)
 
 
 def make_rlim_middleware(
@@ -52,13 +58,13 @@ def make_rlim_middleware(
                 window=_RATELIMIT_WINDOW,
             )
             if rate_limit is not None and rolling_count > rate_limit:
-                reserve_response_headers(request, _rlim_headers(rate_limit, 0))
+                reserve_response_headers(request, RateLimitQuota(limit=rate_limit, remaining=0))
                 raise RateLimitExceeded
             remaining = rate_limit - rolling_count if rate_limit is not None else rolling_count
-            reserve_response_headers(request, _rlim_headers(rate_limit, remaining))
+            reserve_response_headers(request, RateLimitQuota(limit=rate_limit, remaining=remaining))
             return await handler(request)
         # No checks for rate limiting for non-authorized queries.
-        reserve_response_headers(request, _rlim_headers(1000, 1000))
+        reserve_response_headers(request, RateLimitQuota(limit=1000, remaining=1000))
         return await handler(request)
 
     return rlim_middleware
