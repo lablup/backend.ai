@@ -192,7 +192,7 @@ async def setup(
                 "gateway": generate_proxy_url(port_config, protocol, circuit, redirect_path=None),
             }
             if jwt_body["redirect"]:
-                return web.HTTPFound(
+                raise web.HTTPFound(
                     f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
                     headers=cors_headers,
                 )
