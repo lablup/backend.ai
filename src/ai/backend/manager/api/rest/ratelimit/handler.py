@@ -23,6 +23,7 @@ from ai.backend.manager.errors.api import RateLimitExceeded
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _RATELIMIT_WINDOW: Final = 60 * 15
+_RATELIMIT_HEADERS_KEY: Final = "ratelimit_headers"
 
 
 def _rlim_headers(rate_limit: int | None, remaining: int) -> dict[str, str]:
@@ -51,16 +52,20 @@ def make_rlim_middleware(
                 window=_RATELIMIT_WINDOW,
             )
             if rate_limit is not None and rolling_count > rate_limit:
-                raise RateLimitExceeded(headers=_rlim_headers(rate_limit, 0))
+                request[_RATELIMIT_HEADERS_KEY] = _rlim_headers(rate_limit, 0)
+                raise RateLimitExceeded
             remaining = rate_limit - rolling_count if rate_limit is not None else rolling_count
-            response = await handler(request)
-            response.headers.update(_rlim_headers(rate_limit, remaining))
-            return response
+            request[_RATELIMIT_HEADERS_KEY] = _rlim_headers(rate_limit, remaining)
+            return await handler(request)
         # No checks for rate limiting for non-authorized queries.
-        response = await handler(request)
-        response.headers["X-RateLimit-Limit"] = "1000"
-        response.headers["X-RateLimit-Remaining"] = "1000"
-        response.headers["X-RateLimit-Window"] = str(_RATELIMIT_WINDOW)
-        return response
+        request[_RATELIMIT_HEADERS_KEY] = _rlim_headers(1000, 1000)
+        return await handler(request)
 
     return rlim_middleware
+
+
+async def apply_rlim_headers(request: web.Request, response: web.StreamResponse) -> None:
+    """``on_response_prepare`` hook: copy the headers set by ``rlim_middleware`` onto any response."""
+    headers = request.get(_RATELIMIT_HEADERS_KEY)
+    if headers is not None:
+        response.headers.update(headers)

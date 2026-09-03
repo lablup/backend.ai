@@ -23,6 +23,7 @@ from ai.backend.manager.errors.common import (
 )
 
 from .middleware import build_api_metric_middleware, client_ip_middleware, request_id_middleware
+from .ratelimit.handler import apply_rlim_headers
 from .routing import RouteRegistry
 
 if TYPE_CHECKING:
@@ -146,6 +147,7 @@ def mount_registries(
     rlim_reg = root_registry.find_subregistry("ratelimit")
     if rlim_reg is not None and rlim_reg.rlim_middleware is not None:
         root_app.middlewares.append(rlim_reg.rlim_middleware)
+        root_app.on_response_prepare.append(apply_rlim_headers)
 
 
 def build_root_app(
