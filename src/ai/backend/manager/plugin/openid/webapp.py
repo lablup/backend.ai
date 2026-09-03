@@ -28,6 +28,7 @@ from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
+from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.lookups import ProjectNameInDomainLookup
@@ -284,7 +285,7 @@ class OIDCWebAppPlugin(WebappPlugin):
             redirect_uri=str(redirect_uri.with_path("/func/openid/redirect")),
         )
 
-        return web.HTTPFound(uri)
+        raise web.HTTPFound(uri)
 
     async def redirect(self, request: web.Request) -> web.Response:
         root_app = request.app["_root_app"]
@@ -324,7 +325,7 @@ class OIDCWebAppPlugin(WebappPlugin):
         except Exception as e:
             log.exception("Failed to handle token: %s", e)
             log.info("OPENID.WEBAPP: request not authenticated")
-            return web.HTTPUnauthorized(reason="Not authenticated by OpenID Provider")
+            raise AuthorizationFailed("Not authenticated by OpenID Provider") from e
 
         log.info("OPENID.WEBAPP: authorized ({})", json.dumps(claims))
         config = config_provider.config
@@ -349,7 +350,7 @@ class OIDCWebAppPlugin(WebappPlugin):
             "force": force,
         }
         token = encode_jwt_token(token_data, self._config.secret)
-        return web.HTTPFound(redirect_uri.update_query({"sToken": token}))
+        raise web.HTTPFound(redirect_uri.update_query({"sToken": token}))
 
     @override
     async def create_app(
