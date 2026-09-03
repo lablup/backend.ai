@@ -1,6 +1,7 @@
 from typing import Any, override
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import BaseBulkAction
@@ -71,7 +72,9 @@ class BulkActionRBACValidator(BulkActionValidator):
         permission_map = await self._repository.check_bulk_permission_with_scope_chain(
             BulkPermissionCheckInput(
                 keys=keys,
-                operation=action.operation_type().to_permission_operation(),
+                permission=Permission.from_operation(
+                    action.operation_type().to_permission_operation()
+                ),
             )
         )
 

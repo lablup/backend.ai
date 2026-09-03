@@ -11,7 +11,12 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType, RelationType
+from ai.backend.common.data.permission.types import (
+    OperationType,
+    Permission,
+    RBACElementType,
+    RelationType,
+)
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -36,6 +41,14 @@ if TYPE_CHECKING:
 # =============================================================================
 # Tables List
 # =============================================================================
+
+
+def _mask(operations: list[OperationType]) -> Permission:
+    mask = Permission.NONE
+    for operation in operations:
+        mask |= Permission.from_operation(operation)
+    return mask
+
 
 GRANTER_TABLES = [
     RoleRow,
@@ -152,7 +165,7 @@ class TestGranterBasic:
                 granted_entity_scope_type=ctx.entity_scope_type,
                 target_scope_id=ctx.target_scope_id,
                 target_role_ids=[ctx.role_id],
-                operations=[OperationType.READ, OperationType.UPDATE],
+                permission=Permission.READ | Permission.UPDATE,
             )
             await execute_rbac_granter(db_sess, granter)
 
@@ -170,7 +183,7 @@ class TestGranterBasic:
 
             # Verify permission details
             perms = (await db_sess.scalars(sa.select(PermissionRow))).all()
-            operations = {perm.operation for perm in perms}
+            operations = {perm.permission.to_operation() for perm in perms}
             assert operations == {OperationType.READ, OperationType.UPDATE}
             for perm in perms:
                 assert perm.role_id == ctx.role_id
@@ -192,7 +205,7 @@ class TestGranterBasic:
                 granted_entity_scope_type=ctx.entity_scope_type,
                 target_scope_id=ctx.target_scope_id,
                 target_role_ids=[],
-                operations=[OperationType.READ],
+                permission=Permission.READ,
             )
             await execute_rbac_granter(db_sess, granter)
 
@@ -252,7 +265,7 @@ class TestGranterMultipleRoles:
                 granted_entity_scope_type=ctx.entity_scope_type,
                 target_scope_id=ctx.target_scope_id,
                 target_role_ids=ctx.role_ids,
-                operations=[OperationType.READ],
+                permission=Permission.READ,
             )
             await execute_rbac_granter(db_sess, granter)
 
@@ -322,14 +335,14 @@ class TestGranterMultipleOperations:
                 granted_entity_scope_type=ctx.entity_scope_type,
                 target_scope_id=ctx.target_scope_id,
                 target_role_ids=[ctx.role_id],
-                operations=all_operations,
+                permission=_mask(all_operations),
             )
             await execute_rbac_granter(db_sess, granter)
 
             # Verify all operations were granted
             perms = (await db_sess.scalars(sa.select(PermissionRow))).all()
             assert len(perms) == len(all_operations)
-            granted_ops = {perm.operation for perm in perms}
+            granted_ops = {perm.permission.to_operation() for perm in perms}
             assert granted_ops == set(all_operations)
 
     async def test_granter_with_empty_operations(
@@ -346,7 +359,7 @@ class TestGranterMultipleOperations:
                 granted_entity_scope_type=ctx.entity_scope_type,
                 target_scope_id=ctx.target_scope_id,
                 target_role_ids=[ctx.role_id],
-                operations=[],
+                permission=Permission.NONE,
             )
             await execute_rbac_granter(db_sess, granter)
 
@@ -412,7 +425,7 @@ class TestGranterIdempotency:
                 granted_entity_scope_type=ctx.entity_scope_type,
                 target_scope_id=ctx.target_scope_id,
                 target_role_ids=[ctx.role_id],
-                operations=[OperationType.READ, OperationType.UPDATE],
+                permission=Permission.READ | Permission.UPDATE,
             )
 
         async with database_connection.begin_session_read_committed() as db_sess:
@@ -447,7 +460,7 @@ class TestGranterIdempotency:
                     granted_entity_scope_type=ctx.entity_scope_type,
                     target_scope_id=ctx.target_scope_id,
                     target_role_ids=[ctx.role_id],
-                    operations=[OperationType.READ],
+                    permission=Permission.READ,
                 ),
             )
 
@@ -459,14 +472,14 @@ class TestGranterIdempotency:
                     granted_entity_scope_type=ctx.entity_scope_type,
                     target_scope_id=ctx.target_scope_id,
                     target_role_ids=[ctx.role_id],
-                    operations=[OperationType.READ, OperationType.UPDATE],
+                    permission=Permission.READ | Permission.UPDATE,
                 ),
             )
 
         async with database_connection.begin_session_read_committed() as db_sess:
             perms = (await db_sess.scalars(sa.select(PermissionRow))).all()
             assert len(perms) == 2
-            assert {perm.operation for perm in perms} == {
+            assert {perm.permission.to_operation() for perm in perms} == {
                 OperationType.READ,
                 OperationType.UPDATE,
             }

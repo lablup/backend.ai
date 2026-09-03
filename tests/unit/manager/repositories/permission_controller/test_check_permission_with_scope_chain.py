@@ -272,7 +272,6 @@ class TestCheckPermissionWithScopeChain:
                     scope_type=scope_type,
                     scope_id=scope_id,
                     entity_type=entry.entity_type,
-                    operation=entry.operation,
                     permission=Permission.from_operation(entry.operation),
                 )
                 db_sess.add(perm)
@@ -293,7 +292,7 @@ class TestCheckPermissionWithScopeChain:
                 entity_id=fixture.vfolder_id,
                 subject_entity_type=subject_entity_type,
             ),
-            operation=operation,
+            permission=Permission.from_operation(operation),
         )
 
     @pytest.mark.parametrize(
@@ -712,7 +711,6 @@ class TestCheckPermissionWithScopeChain:
                 scope_type=ScopeType.PROJECT,
                 scope_id=fixture_ids.project_id,
                 entity_type=EntityType.VFOLDER,
-                operation=OperationType.READ,
                 permission=Permission.READ,
             )
             db_sess.add(perm)
@@ -828,7 +826,6 @@ class TestCheckPermissionWithScopeChain:
                     scope_type=scope_type,
                     scope_id=scope_id,
                     entity_type=EntityType.VFOLDER,
-                    operation=operation,
                     permission=Permission.from_operation(operation),
                 )
                 db_sess.add(perm)
@@ -1098,7 +1095,6 @@ class TestCheckPermissionWithScopeChain:
                 scope_type=ScopeType.PROJECT,
                 scope_id=fixture_ids.project_id,
                 entity_type=EntityType.VFOLDER,
-                operation=OperationType.READ,
                 permission=Permission.READ,
             )
             db_sess.add(perm)

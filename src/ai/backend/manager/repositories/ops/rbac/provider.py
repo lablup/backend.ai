@@ -829,11 +829,12 @@ class RBACWriteOps(WriteOps):
                 scope_type=ScopeType(EntityType(self._scope_element_type(spec.scope))),
                 scope_id=str(spec.scope.scope_id),
                 entity_type=EntityType(entity_type),
-                operation=operation,
+                permission=Permission.from_operation(operation),
             )
             for spec, row in zip(specs, roles.rows, strict=True)
             for entity_type, operations in spec.entity_operations.items()
             for operation in operations
+            if Permission.from_operation(operation) != Permission.NONE
         ]
         if permissions:
             await self.bulk_create(BulkCreator(specs=permissions))

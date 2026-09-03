@@ -7,7 +7,7 @@ from datetime import datetime
 from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.manager.data.common.types import SearchResult
 
-from .types import OperationType, Permission
+from .types import Permission
 
 
 @dataclass
@@ -16,7 +16,6 @@ class PermissionCreator:
     scope_type: ScopeType
     scope_id: str
     entity_type: EntityType
-    operation: OperationType
     permission: Permission
 
 
@@ -27,7 +26,6 @@ class PermissionData:
     scope_type: EntityType
     scope_id: str
     entity_type: EntityType
-    operation: OperationType
     permission: Permission
     created_at: datetime
 
@@ -42,7 +40,7 @@ class ScopedPermissionCreateInput:
     scope_type: ScopeType
     scope_id: str
     entity_type: EntityType
-    operation: OperationType
+    permission: Permission
 
 
 @dataclass(frozen=True)

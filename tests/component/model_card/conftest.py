@@ -20,7 +20,7 @@ from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.permission.types import EntityType, OperationType, Permission, ScopeType
+from ai.backend.common.data.permission.types import EntityType, Permission, ScopeType
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
@@ -431,7 +431,6 @@ async def _grant_model_card_read_permission(
                 scope_type=ScopeType.PROJECT,
                 scope_id=str(model_store_project_fixture),
                 entity_type=EntityType.MODEL_CARD,
-                operation=OperationType.READ,
                 permission=Permission.READ,
             )
         )

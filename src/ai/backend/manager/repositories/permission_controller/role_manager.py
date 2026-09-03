@@ -141,12 +141,13 @@ class RoleManager:
         permission_rows: list[PermissionRow] = []
         for element_type, operations in data.entity_operations().items():
             for operation in operations:
+                if Permission.from_operation(operation) == Permission.NONE:
+                    continue
                 creator = PermissionCreator(
                     role_id=role_id,
                     scope_type=ScopeType(EntityType(data.scope_id().scope_type)),
                     scope_id=data.scope_id().scope_id,
                     entity_type=EntityType(element_type),
-                    operation=operation,
                     permission=Permission.from_operation(operation),
                 )
                 permission_rows.append(PermissionRow.from_input(creator))
@@ -240,11 +241,11 @@ class RoleManager:
                     scope_type=ScopeType(EntityType(scope_id.scope_type)),
                     scope_id=scope_id.scope_id,
                     entity_type=EntityType(preset_permission.entity_type),
-                    operation=preset_permission.operation,
                     permission=Permission.from_operation(preset_permission.operation),
                 )
             )
             for preset_permission in permission_presets
+            if Permission.from_operation(preset_permission.operation) != Permission.NONE
         ]
         db_session.add_all(permission_rows)
         await db_session.flush()

@@ -13,6 +13,7 @@ from ai.backend.common.exception import (
 )
 
 __all__ = (
+    "InvalidPermissionOperation",
     "NotEnoughPermission",
     "ObjectPermissionNotFound",
     "PermissionNotFound",
@@ -81,6 +82,22 @@ class RoleNotAssigned(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.ROLE,
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class InvalidPermissionOperation(BackendAIError, web.HTTPBadRequest):
+    """An operation with no permission bit — a grant operation — cannot be stored
+    as a permission; sharing is judged from entity shares and scope CREATE."""
+
+    error_type = "https://api.backend.ai/probs/invalid-permission-operation"
+    error_title = "The operation cannot be stored as a permission."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 

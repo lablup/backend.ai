@@ -487,9 +487,9 @@ async def _scope_roles(database: ExtendedAsyncSAEngine, scope_id: UUID) -> dict[
 async def _role_permissions(database: ExtendedAsyncSAEngine, role_id: UUID) -> set[OperationType]:
     async with database.begin_readonly_session() as sess:
         rows = await sess.scalars(
-            sa.select(PermissionRow.operation).where(PermissionRow.role_id == role_id)
+            sa.select(PermissionRow.permission).where(PermissionRow.role_id == role_id)
         )
-        return set(rows.all())
+        return {permission.to_operation() for permission in rows.all()}
 
 
 async def _row_count(database: ExtendedAsyncSAEngine) -> int:

@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.group.request import PurgeProjectInput
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
-    OperationType,
     Permission,
     ScopeType,
 )
@@ -133,7 +132,6 @@ async def project_with_rbac_rows(
                     "scope_type": ScopeType.PROJECT,
                     "scope_id": scope_id,
                     "entity_type": EntityType.PROJECT,
-                    "operation": OperationType.UPDATE,
                     "permission": Permission.UPDATE,
                 },
                 {
@@ -141,7 +139,6 @@ async def project_with_rbac_rows(
                     "scope_type": ScopeType.PROJECT,
                     "scope_id": scope_id,
                     "entity_type": EntityType.PROJECT,
-                    "operation": OperationType.READ,
                     "permission": Permission.READ,
                 },
             ])

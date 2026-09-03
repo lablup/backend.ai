@@ -40,7 +40,6 @@ from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
-    OperationType,
     Permission,
     ScopeType,
 )
@@ -235,7 +234,6 @@ async def regular_user_vfolder_create_permission(
                 scope_type=ScopeType.PROJECT,
                 scope_id=str(group_fixture),
                 entity_type=EntityType.VFOLDER,
-                operation=OperationType.CREATE,
                 permission=Permission.CREATE,
             )
         )

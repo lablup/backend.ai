@@ -205,7 +205,9 @@ class TestCreatePresetRoles:
             for row in permission_rows:
                 assert row.scope_type == ScopeType.DOMAIN.value
                 assert row.scope_id == domain_id
-            assert {(row.entity_type, row.operation) for row in permission_rows} == {
+            assert {
+                (row.entity_type, row.permission.to_operation()) for row in permission_rows
+            } == {
                 (entity_type.value, operation)
                 for entity_type, operation in domain_preset.permissions
             }

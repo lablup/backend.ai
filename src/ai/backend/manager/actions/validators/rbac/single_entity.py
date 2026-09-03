@@ -1,6 +1,7 @@
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.single_entity import BaseSingleEntityAction
@@ -45,7 +46,9 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
                     entity_id=target.element_id,
                     subject_entity_type=target.element_type,
                 ),
-                operation=action.operation_type().to_permission_operation(),
+                permission=Permission.from_operation(
+                    action.operation_type().to_permission_operation()
+                ),
             )
         )
         if not allowed:

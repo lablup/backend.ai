@@ -124,7 +124,6 @@ class TestSearchPermissions:
                     scope_type=ScopeType.DOMAIN,
                     scope_id="test-domain",
                     entity_type=entity_type,
-                    operation=operation,
                     permission=Permission.from_operation(operation),
                 )
                 db_sess.add(perm)

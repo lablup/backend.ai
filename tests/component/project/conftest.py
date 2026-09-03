@@ -53,7 +53,6 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
-    OperationType,
     Permission,
     ScopeType,
 )
@@ -285,7 +284,6 @@ async def rbac_permission_fixture(
                 scope_type=ScopeType.PROJECT,
                 scope_id=str(group_fixture),
                 entity_type=EntityType.PROJECT,
-                operation=OperationType.UPDATE,
                 permission=Permission.UPDATE,
             )
         )
@@ -339,7 +337,6 @@ async def admin_target_project_permission(
                 scope_type=ScopeType.PROJECT,
                 scope_id=str(target_project_fixture),
                 entity_type=EntityType.PROJECT,
-                operation=OperationType.UPDATE,
                 permission=Permission.UPDATE,
             )
         )
@@ -503,7 +500,6 @@ async def member_role_fixture(
                 scope_type=ScopeType.PROJECT,
                 scope_id=str(target_project_fixture),
                 entity_type=EntityType.USER,
-                operation=OperationType.READ,
                 permission=Permission.READ,
             )
         )
