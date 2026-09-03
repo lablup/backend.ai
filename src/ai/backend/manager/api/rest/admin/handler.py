@@ -220,10 +220,6 @@ class AdminHandler:
             operation_name=params.operation_name,
             context_value=gql_ctx,
         )
-        if result.errors:
-            for e in result.errors:
-                log.error("ADMIN.GQL.V2 Exception: {}", e.formatted)
-                log.debug("{}", repr(e))
         resp = GraphQLResponse(
             data=result.data,
             errors=[dict(e.formatted) for e in result.errors] if result.errors else None,
