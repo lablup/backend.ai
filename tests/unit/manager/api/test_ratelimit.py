@@ -11,7 +11,7 @@ from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.web.deferred_response_headers import apply_deferred_response_headers
+from ai.backend.common.web.reserved_response_headers import apply_reserved_response_headers
 from ai.backend.manager.api.rest.ratelimit.handler import (
     _RATELIMIT_WINDOW,
     make_rlim_middleware,
@@ -88,7 +88,7 @@ class TestRlimMiddleware:
         """Anonymous requests get default rate limit headers without Valkey check."""
         # Act
         response = await middleware(mock_request_anonymous, mock_handler)
-        await apply_deferred_response_headers(mock_request_anonymous, response)
+        await apply_reserved_response_headers(mock_request_anonymous, response)
 
         # Assert
         assert response.headers["X-RateLimit-Limit"] == "1000"
@@ -150,7 +150,7 @@ class TestRlimMiddleware:
 
         # Act
         response = await middleware(mock_request_authorized, mock_handler)
-        await apply_deferred_response_headers(mock_request_authorized, response)
+        await apply_reserved_response_headers(mock_request_authorized, response)
 
         # Assert headers
         assert response.headers["X-RateLimit-Limit"] == test_case.expected_limit
@@ -209,7 +209,7 @@ class TestRlimMiddleware:
         with pytest.raises(RateLimitExceeded):
             await middleware(mock_request_authorized, mock_handler)
         response = web.Response(status=429)
-        await apply_deferred_response_headers(mock_request_authorized, response)
+        await apply_reserved_response_headers(mock_request_authorized, response)
         assert response.headers["X-RateLimit-Limit"] == test_case.expected_limit
         assert response.headers["X-RateLimit-Remaining"] == "0"
         assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW)

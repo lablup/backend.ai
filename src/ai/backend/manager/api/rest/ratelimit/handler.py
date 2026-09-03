@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Final
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
-from ai.backend.common.web.deferred_response_headers import defer_response_headers
+from ai.backend.common.web.reserved_response_headers import reserve_response_headers
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import WebRequestHandler
 
@@ -52,13 +52,13 @@ def make_rlim_middleware(
                 window=_RATELIMIT_WINDOW,
             )
             if rate_limit is not None and rolling_count > rate_limit:
-                defer_response_headers(request, _rlim_headers(rate_limit, 0))
+                reserve_response_headers(request, _rlim_headers(rate_limit, 0))
                 raise RateLimitExceeded
             remaining = rate_limit - rolling_count if rate_limit is not None else rolling_count
-            defer_response_headers(request, _rlim_headers(rate_limit, remaining))
+            reserve_response_headers(request, _rlim_headers(rate_limit, remaining))
             return await handler(request)
         # No checks for rate limiting for non-authorized queries.
-        defer_response_headers(request, _rlim_headers(1000, 1000))
+        reserve_response_headers(request, _rlim_headers(1000, 1000))
         return await handler(request)
 
     return rlim_middleware

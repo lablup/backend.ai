@@ -7,21 +7,21 @@ from typing import Any
 import pytest
 from aiohttp import web
 
-from ai.backend.common.web.deferred_response_headers import (
-    defer_response_headers,
-    setup_deferred_response_headers,
+from ai.backend.common.web.reserved_response_headers import (
+    reserve_response_headers,
+    setup_reserved_response_headers,
 )
 
-_HEADER = "X-Deferred"
+_HEADER = "X-Reserved"
 
 
 async def _returns_with_header(request: web.Request) -> web.Response:
-    defer_response_headers(request, {_HEADER: "set"})
+    reserve_response_headers(request, {_HEADER: "set"})
     return web.Response(text="ok")
 
 
 async def _raises_with_header(request: web.Request) -> web.Response:
-    defer_response_headers(request, {_HEADER: "set"})
+    reserve_response_headers(request, {_HEADER: "set"})
     raise web.HTTPTooManyRequests()
 
 
@@ -56,7 +56,7 @@ class _Case:
         ),
         # Nothing set: the hook adds nothing.
         _Case(
-            id="no-deferred-header",
+            id="no-reserved-header",
             handler=_returns_without_header,
             expected_status=200,
             expected_header=None,
@@ -64,11 +64,11 @@ class _Case:
     ],
     ids=lambda case: case.id,
 )
-async def test_deferred_headers_land_on_the_prepared_response(
+async def test_reserved_headers_land_on_the_prepared_response(
     case: _Case, aiohttp_client: Any
 ) -> None:
     app = web.Application()
-    setup_deferred_response_headers(app)
+    setup_reserved_response_headers(app)
     app.router.add_get("/", case.handler)
     client = await aiohttp_client(app)
 
