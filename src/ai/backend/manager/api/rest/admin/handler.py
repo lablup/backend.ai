@@ -58,7 +58,7 @@ class GQLLoggingMiddleware:
     def resolve(self, next: Any, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
         if info.path.prev is None:
             graph_ctx = info.context
-            log.info(
+            log.debug(
                 "ADMIN.GQL (ak:{}, {}:{}, op:{})",
                 graph_ctx.access_key,
                 info.operation.operation,
