@@ -38,6 +38,12 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.session import SessionRow, SessionStatus, SessionTypes
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -63,6 +69,8 @@ class TestDomainPurgersIntegration:
                 PermissionRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
                 ScopeBindingRow,
                 EntityLabelRow,
                 DomainRow,

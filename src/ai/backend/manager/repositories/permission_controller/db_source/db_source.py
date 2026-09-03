@@ -81,6 +81,9 @@ from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base.creator import (
@@ -1229,7 +1232,7 @@ class PermissionDBSource:
 
         Walks ``entity -> entity_memberships -> scope_bindings -> scope`` and
         OR-combines the granted bitmask at each resolved scope, clipping every
-        path by both hop caps (``granted & scope_cap & entity_cap``; ``None`` = no
+        path by both hop caps (``granted & scope_cap``, then the edge's cap rows; ``None`` = no
         ceiling). Permission rows are matched on the entity's own type. Keys
         sharing ``(user_id, entity_type)`` share one round-trip; keys with no
         reachable grant map to :attr:`Permission.NONE`.
@@ -1306,6 +1309,7 @@ class PermissionDBSource:
         :class:`Permission`. Entities with no reachable grant are absent from the map.
         """
         em = EntityMembershipRow.__table__
+        emc = EntityMembershipCapRow.__table__
         sb = ScopeBindingRow.__table__
         member = VirtualEntityRow.__table__.alias("member_virtual_entity")
         scope = VirtualEntityRow.__table__.alias("scope_virtual_entity")
@@ -1318,7 +1322,6 @@ class PermissionDBSource:
                 member.c.entity_id,
                 perm.c.permission,
                 sb.c.permission_cap.label("scope_cap"),
-                em.c.permission_cap.label("entity_cap"),
             )
             .select_from(
                 em.join(member, member.c.id == em.c.member_entity_id)
@@ -1337,12 +1340,24 @@ class PermissionDBSource:
                 )
                 .join(roles, roles.c.id == perm.c.role_id)
                 .join(user_roles, user_roles.c.role_id == roles.c.id)
+                # A share lets a bit through only with a cap row on every field; a
+                # belonging edge is not capped. Path-capped bits wait for a
+                # field-aware reader.
+                .outerjoin(
+                    emc,
+                    sa.and_(
+                        emc.c.membership_id == em.c.id,
+                        emc.c.permission == perm.c.permission,
+                        emc.c.all_fields.is_(True),
+                    ),
+                )
             )
             .where(
                 member.c.entity_type == group_key.entity_type,
                 member.c.entity_id.in_(entity_ids),
                 user_roles.c.user_id == group_key.user_id,
                 roles.c.status == RoleStatus.ACTIVE,
+                sa.or_(em.c.capped.is_(False), emc.c.id.is_not(None)),
             )
         )
 
@@ -1351,8 +1366,7 @@ class PermissionDBSource:
         result = await db_session.execute(query)
         for row in result:
             scope_cap = row.scope_cap if row.scope_cap is not None else full_cap
-            entity_cap = row.entity_cap if row.entity_cap is not None else full_cap
-            granted[row.entity_id] |= row.permission & scope_cap & entity_cap
+            granted[row.entity_id] |= row.permission & scope_cap
         return granted
 
     async def bulk_assign_role(

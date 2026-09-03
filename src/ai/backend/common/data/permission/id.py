@@ -2,6 +2,8 @@ from typing import NewType
 from uuid import UUID
 
 __all__ = (
+    "EntityMembershipCapID",
+    "EntityMembershipID",
     "FieldPath",
     "PermissionID",
 )
@@ -11,3 +13,5 @@ __all__ = (
 FieldPath = NewType("FieldPath", str)
 
 PermissionID = NewType("PermissionID", UUID)
+EntityMembershipID = NewType("EntityMembershipID", UUID)
+EntityMembershipCapID = NewType("EntityMembershipCapID", UUID)

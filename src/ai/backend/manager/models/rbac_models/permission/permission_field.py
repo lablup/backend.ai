@@ -13,7 +13,7 @@ class PermissionFieldRow(Base):
     here; one without covers exactly these paths and their descendants."""
 
     __tablename__ = "permission_fields"
-    __table_args__ = (sa.CheckConstraint("path <> ''", name="ck_permission_fields_path"),)
+    __table_args__ = (sa.CheckConstraint("path <> ''", name="path"),)
 
     permission_id: Mapped[PermissionID] = mapped_column(
         "permission_id",

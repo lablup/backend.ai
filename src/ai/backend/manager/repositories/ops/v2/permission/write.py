@@ -9,7 +9,7 @@ Storage is one ``permissions`` row per operation bit. A READ or UPDATE row with
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 import sqlalchemy as sa
@@ -216,19 +216,6 @@ class PermissionWriteOps(V2WriteOps, PermissionReadOps):
             raise InvalidFieldPermission(
                 f"Field {path!r} carries {bits!r}; a field scope holds READ|UPDATE bits only."
             )
-
-    def _scoped_paths(
-        self, fields: Mapping[FieldPath, Permission]
-    ) -> dict[Permission, frozenset[FieldPath]]:
-        scoped: dict[Permission, set[FieldPath]] = {}
-        for path, bits in fields.items():
-            for bit in self._bits_of(bits):
-                scoped.setdefault(bit, set()).add(path)
-        return {bit: frozenset(paths) for bit, paths in scoped.items()}
-
-    def _bits_of(self, mask: Permission) -> list[Permission]:
-        """The single-bit rows a mask spans."""
-        return [bit for bit in Permission if bit and mask & bit]
 
     def _covers(self, ancestor: FieldPath, path: FieldPath) -> bool:
         return ancestor == path or path.startswith(ancestor + ".")

@@ -40,6 +40,12 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
 )
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -73,6 +79,8 @@ class TestVFolderPurgersIntegration:
                 # An entity batch purge tears the graph down with each row.
                 VirtualEntityRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
                 ScopeBindingRow,
                 EntityLabelRow,
                 RoleRow,

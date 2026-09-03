@@ -41,10 +41,10 @@ class EntityMembershipData:
     virtual entity node, that is a member of a virtual entity. Attaching one entity
     here exposes it to every scope bound to the same virtual entity.
 
-    ``permission_cap`` is the ceiling this hop grants (``None`` = no ceiling);
-    effective permission is clipped by a bitwise AND with the cap.
+    A belonging edge is not capped. A share is capped: what it lets through is
+    the edge's cap rows, per operation bit and field path.
     """
 
     virtual_entity_id: VirtualEntityID
     member_entity_id: VirtualEntityID
-    permission_cap: Permission | None
+    capped: bool

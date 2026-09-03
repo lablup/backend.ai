@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 
 
@@ -22,9 +24,12 @@ class EntityGrant:
 
     Where :class:`EntityMembershipEntry` states belonging settled at creation, this
     states access handed out afterwards and taken back later. ``permission_cap`` is
-    the ceiling the grantee's own permissions are clipped to; ``None`` clips nothing.
+    the ceiling on every field; a share always states one, zero included. A path
+    in ``fields`` carrying a READ or UPDATE bit caps that operation on the path
+    and its descendants, so its bits never appear in ``permission_cap``.
     """
 
     entity: EntityIdentifier
     grantee: EntityIdentifier
-    permission_cap: Permission | None = None
+    permission_cap: Permission
+    fields: Mapping[FieldPath, Permission] = field(default_factory=dict)

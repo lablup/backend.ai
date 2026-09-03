@@ -70,6 +70,12 @@ if TYPE_CHECKING:
 from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
@@ -133,6 +139,8 @@ class TestModelCardDelete:
                 ScopeBindingRow,
                 EntityLabelRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
                 RoleRow,
                 PermissionRow,
                 UserRoleRow,

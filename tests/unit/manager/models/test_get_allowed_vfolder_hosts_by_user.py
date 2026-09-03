@@ -51,6 +51,12 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import get_allowed_vfolder_hosts_by_user
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import with_tables
@@ -111,6 +117,8 @@ class TestGetAllowedVFolderHostsByUserMembership:
                 ScopeBindingRow,
                 EntityLabelRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection

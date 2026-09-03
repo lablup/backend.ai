@@ -34,7 +34,6 @@ from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import (
     EntityType,
-    OperationType,
     Permission,
     RelationType,
     RoleStatus,
@@ -286,20 +285,21 @@ async def user_system_role(
         )
         # Grant owner permissions for all owner-accessible entity types in user scope
         for entity_type in EntityType.owner_accessible_entity_types_in_user():
-            for operation in OperationType.owner_operations():
+            for bit in Permission:
+                if not bit:
+                    continue
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
                         scope_type=ScopeType.USER,
                         scope_id=str(user_uuid),
                         entity_type=entity_type,
-                        operation=operation,
-                        permission=Permission.from_operation(operation),
+                        permission=bit,
                     )
                 )
         # USER entity type permissions (excluding CREATE)
-        for operation in OperationType.owner_operations():
-            if operation == OperationType.CREATE:
+        for bit in Permission:
+            if not bit or bit == Permission.CREATE:
                 continue
             await conn.execute(
                 sa.insert(PermissionRow.__table__).values(
@@ -307,8 +307,7 @@ async def user_system_role(
                     scope_type=ScopeType.USER,
                     scope_id=str(user_uuid),
                     entity_type=EntityType.USER,
-                    operation=operation,
-                    permission=Permission.from_operation(operation),
+                    permission=bit,
                 )
             )
 

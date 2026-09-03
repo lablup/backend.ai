@@ -14,7 +14,6 @@ from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder_invitation import VFOLDER_INVITATION_ENTITY_TYPE
 from ai.backend.common.data.permission.types import (
     EntityType,
-    OperationType,
     Permission,
     RelationType,
     RoleStatus,
@@ -430,15 +429,16 @@ async def user_system_role(
             )
         )
         for entity_type in EntityType.owner_accessible_entity_types_in_user():
-            for operation in OperationType.owner_operations():
+            for bit in Permission:
+                if not bit:
+                    continue
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
                         scope_type=ScopeType.USER,
                         scope_id=str(user_uuid),
                         entity_type=entity_type,
-                        operation=operation,
-                        permission=Permission.from_operation(operation),
+                        permission=bit,
                     )
                 )
 

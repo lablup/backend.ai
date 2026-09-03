@@ -71,7 +71,7 @@ from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
-from ai.backend.manager.models.specs.membership import EntityGrant
+from ai.backend.manager.models.specs.membership import EntityGrant, EntityMembershipEntry
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
@@ -2192,13 +2192,13 @@ class VfolderRepository:
 
             await execute_with_retry(_cleanup_old_owner_rbac)
 
-        # Step 6: Hand the vfolder to the new owner, uncapped
+        # Step 6: The vfolder now belongs to the new owner — no cap
         async def _grant_new_owner_rbac() -> None:
             async with self._v2_ops.write_ops() as w:
-                await w.grant_entities([
-                    EntityGrant(
-                        entity=VFolderUUID(vfolder_id),
-                        grantee=UserID(user_info.uuid),
+                await w.enroll_entities([
+                    EntityMembershipEntry(
+                        member=VFolderUUID(vfolder_id),
+                        parent=UserID(user_info.uuid),
                     )
                 ])
 

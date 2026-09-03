@@ -22,6 +22,8 @@ from ai.backend.common.data.entity.types import (
     EntityType,
 )
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
+from ai.backend.common.data.permission.id import FieldPath
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import (
     CheckConstraintViolationError,
@@ -48,7 +50,8 @@ class V2WriteOpsBase(V2OpsBase):
 
     async def _provision_entities(self, entities: Sequence[EntityIdentifier]) -> None:
         """Put each entity into the RBAC graph: its virtual entity node, its self
-        entity-membership and its self scope-binding (permission_cap NULL). The reverse
+        entity-membership (not capped) and its self scope-binding (permission_cap
+        NULL). The reverse
         of :meth:`_teardown_entity`. Idempotent: an existing node is a no-op."""
         if not entities:
             return
@@ -72,7 +75,7 @@ class V2WriteOpsBase(V2OpsBase):
                 {
                     "virtual_entity_id": row.id,
                     "member_entity_id": row.id,
-                    "permission_cap": None,
+                    "capped": False,
                 }
                 for row in inserted
             ])
@@ -380,7 +383,7 @@ class V2WriteOpsBase(V2OpsBase):
                 EntityMembershipRow(
                     virtual_entity_id=node_ids[(entry.parent.entity_type(), entry.parent)],
                     member_entity_id=node_ids[(entry.member.entity_type(), entry.member)],
-                    permission_cap=None,
+                    capped=False,
                 )
                 for entry in entries
             ],
@@ -407,6 +410,20 @@ class V2WriteOpsBase(V2OpsBase):
                 (e.entity_type(), e) for e in entities
             ])
         )
+
+    def _bits_of(self, mask: Permission) -> list[Permission]:
+        """The single bits a mask spans — one row each."""
+        return [bit for bit in Permission if bit and mask & bit]
+
+    def _scoped_paths(
+        self, fields: Mapping[FieldPath, Permission]
+    ) -> dict[Permission, frozenset[FieldPath]]:
+        """The field scope regrouped per bit: which paths each bit is scoped to."""
+        scoped: dict[Permission, set[FieldPath]] = {}
+        for path, bits in fields.items():
+            for bit in self._bits_of(bits):
+                scoped.setdefault(bit, set()).add(path)
+        return {bit: frozenset(paths) for bit, paths in scoped.items()}
 
     async def _resolve_virtual_entity_ids(
         self, entities: Sequence[EntityIdentifier]

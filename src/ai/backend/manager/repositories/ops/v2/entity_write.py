@@ -237,8 +237,8 @@ class V2EntityWriteOps(V2WriteOpsBase):
     ) -> None:
         """Enroll the new entity as a member of each parent scope: membership in
         the parent's virtual entity, and the parent's binding into the member's own
-        virtual entity — permission_cap NULL throughout, since capped sharing is the
-        object-sharing mechanism, not creation.
+        virtual entity — nothing capped, since capped sharing is the object-sharing
+        mechanism, not creation.
 
         A user member gets the membership alone: no row binds a user's virtual entity
         into a scope, so a scope reaches what a user owns through each entity's own

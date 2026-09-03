@@ -15,8 +15,11 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import Permission, ScopeType
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
@@ -46,7 +49,7 @@ class VirtualEntitySeeder:
             EntityMembershipRow(
                 virtual_entity_id=scope_id,
                 member_entity_id=scope_id,
-                permission_cap=None,
+                capped=False,
             )
         )
         sess.add(
@@ -71,7 +74,59 @@ class VirtualEntitySeeder:
             EntityMembershipRow(
                 virtual_entity_id=project_scope_id,
                 member_entity_id=user_scope_id,
-                permission_cap=None,
+                capped=False,
             )
         )
         await sess.flush()
+
+    async def cap_edge(
+        self,
+        sess: AsyncSession,
+        virtual_entity_id: uuid.UUID,
+        member_entity_id: uuid.UUID,
+        cap: Permission | None,
+    ) -> None:
+        """Write a membership edge as a share capped to ``cap`` on every field
+        (one cap row per bit; zero rows for a zero cap), or as belonging for ``None``."""
+        edge = EntityMembershipRow(
+            virtual_entity_id=virtual_entity_id,
+            member_entity_id=member_entity_id,
+            capped=cap is not None,
+        )
+        sess.add(edge)
+        await sess.flush()
+        if cap is None:
+            return
+        sess.add_all([
+            EntityMembershipCapRow(membership_id=edge.id, permission=bit, all_fields=True)
+            for bit in Permission
+            if bit and cap & bit
+        ])
+        await sess.flush()
+
+    async def edge_cap(
+        self, sess: AsyncSession, virtual_entity_id: uuid.UUID, member_entity_id: uuid.UUID
+    ) -> Permission | None:
+        """The every-field cap of an edge as a mask; ``None`` for a belonging edge."""
+        edge = (
+            await sess.execute(
+                sa.select(EntityMembershipRow.id, EntityMembershipRow.capped).where(
+                    EntityMembershipRow.virtual_entity_id == virtual_entity_id,
+                    EntityMembershipRow.member_entity_id == member_entity_id,
+                )
+            )
+        ).one_or_none()
+        if edge is None or not edge.capped:
+            return None
+        bits = (
+            await sess.scalars(
+                sa.select(EntityMembershipCapRow.permission).where(
+                    EntityMembershipCapRow.membership_id == edge.id,
+                    EntityMembershipCapRow.all_fields.is_(True),
+                )
+            )
+        ).all()
+        mask = Permission.NONE
+        for bit in bits:
+            mask |= bit
+        return mask

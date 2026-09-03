@@ -59,6 +59,12 @@ from ai.backend.manager.models.vfolder import (
     VFolderRow,
 )
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.vfolder import repository as vfolder_repo_module
@@ -117,6 +123,8 @@ class TestShareVfolderWithUsersMembership:
                 AssociationScopesEntitiesRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
                 EntityLabelRow,
             ],
         ):

@@ -60,6 +60,12 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.rbac.provider import (
@@ -71,6 +77,7 @@ from ai.backend.manager.repositories.permission_controller.db_source.db_source i
     PermissionDBSource,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 _ORM_CLUSTER = (
     AgentRow,
@@ -156,6 +163,8 @@ class TestCheckPermissionViaVirtualEntity:
                 ScopeBindingRow,
                 EntityLabelRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -265,12 +274,8 @@ class TestCheckPermissionViaVirtualEntity:
                 )
             )
             if spec.attach_membership:
-                db_sess.add(
-                    EntityMembershipRow(
-                        virtual_entity_id=ids.virtual_entity_id,
-                        member_entity_id=ids.entity_node_id,
-                        permission_cap=spec.entity_cap,
-                    )
+                await VirtualEntitySeeder().cap_edge(
+                    db_sess, ids.virtual_entity_id, ids.entity_node_id, spec.entity_cap
                 )
             db_sess.add_all(
                 _single_bit_rows(
@@ -624,6 +629,8 @@ class TestUserRosterEnrollment:
                 VirtualEntityRow,
                 ScopeBindingRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -727,7 +734,7 @@ class TestUserRosterEnrollment:
                 EntityMembershipRow(
                     virtual_entity_id=user_vs_id,
                     member_entity_id=ids.entity_node_id,
-                    permission_cap=None,
+                    capped=False,
                 )
             )
             await db_sess.flush()
@@ -754,7 +761,7 @@ class TestUserRosterEnrollment:
                 EntityMembershipRow(
                     virtual_entity_id=project_ve_id,
                     member_entity_id=session_node.id,
-                    permission_cap=None,
+                    capped=False,
                 )
             )
             await db_sess.flush()

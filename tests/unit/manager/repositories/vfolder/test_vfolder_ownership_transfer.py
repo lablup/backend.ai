@@ -62,6 +62,12 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderInvitationRow, VFolderPermissionRow, VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -69,6 +75,7 @@ from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 VFOLDER_HOST = "local:volume1"
 
@@ -91,7 +98,9 @@ async def _membership_cap(
     async with db.begin_readonly_session() as db_sess:
         row = (
             await db_sess.execute(
-                sa.select(EntityMembershipRow.permission_cap)
+                sa.select(
+                    EntityMembershipRow.virtual_entity_id, EntityMembershipRow.member_entity_id
+                )
                 .join(
                     VirtualEntityRow,
                     VirtualEntityRow.id == EntityMembershipRow.virtual_entity_id,
@@ -105,9 +114,12 @@ async def _membership_cap(
                 )
             )
         ).first()
-    if row is None:
-        return False, None
-    return True, row.permission_cap
+        if row is None:
+            return False, None
+        cap = await VirtualEntitySeeder().edge_cap(
+            db_sess, row.virtual_entity_id, row.member_entity_id
+        )
+    return True, cap
 
 
 class TestVFolderOwnershipTransferRBACCleanup:
@@ -139,6 +151,8 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 PermissionRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
                 ScopeBindingRow,
                 EntityLabelRow,
             ],

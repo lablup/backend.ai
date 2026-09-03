@@ -67,6 +67,9 @@ from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import (
@@ -107,7 +110,6 @@ from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_confl
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
-    EntityMembershipCreatorSpec,
     PermissionCreatorSpec,
     RoleCreatorSpec,
     ScopeBindingCreatorSpec,
@@ -454,7 +456,7 @@ class RBACWriteOps(WriteOps):
                 {
                     "virtual_entity_id": row.id,
                     "member_entity_id": row.id,
-                    "permission_cap": None,
+                    "capped": False,
                 }
                 for row in inserted
             ])
@@ -963,7 +965,7 @@ class RBACWriteOps(WriteOps):
         whose ``assign_role_on`` returns a user id.
 
         Raises :class:`VirtualEntityNotFound` if the scope has no virtual entity.
-        Idempotent: existing rows keep their ``permission_cap``.
+        Idempotent: existing rows keep their cap.
         """
         members = list(addition.members)
         if not members:
@@ -992,7 +994,7 @@ class RBACWriteOps(WriteOps):
         role at once.
 
         Raises :class:`VirtualEntityNotFound` for any missing virtual entity. Idempotent:
-        existing rows keep their ``permission_cap``.
+        existing rows keep their cap.
         """
         members = list(addition.members)
         if not members:
@@ -1039,16 +1041,35 @@ class RBACWriteOps(WriteOps):
         :class:`VirtualEntityNotFound` for members without a virtual entity."""
         member_scopes = [self._member_scope_ref(member.entity_ref()) for member in members]
         member_virtual_entity_ids = await self._resolve_virtual_entity_ids(member_scopes)
-        await self._bulk_create_dependent_ignore_conflicts(
-            [
-                EntityMembershipCreatorSpec(
-                    member_entity_id=member_virtual_entity_ids[member_scope],
-                    permission_cap=member.permission_cap(scope),
-                )
-                for member, member_scope in zip(members, member_scopes, strict=True)
-            ],
-            virtual_entity_id,
-        )
+        caps = {
+            member_virtual_entity_ids[member_scope]: member.permission_cap(scope)
+            for member, member_scope in zip(members, member_scopes, strict=True)
+        }
+        # Only an edge written here gets its cap rows: an existing edge keeps its cap.
+        inserted = (
+            await self._sess.execute(
+                pg_insert(EntityMembershipRow)
+                .values([
+                    {
+                        "virtual_entity_id": virtual_entity_id,
+                        "member_entity_id": member_node_id,
+                        "capped": cap is not None,
+                    }
+                    for member_node_id, cap in caps.items()
+                ])
+                .on_conflict_do_nothing(index_elements=["virtual_entity_id", "member_entity_id"])
+                .returning(EntityMembershipRow.id, EntityMembershipRow.member_entity_id)
+            )
+        ).all()
+        cap_values = [
+            {"membership_id": row.id, "permission": bit, "all_fields": True}
+            for row in inserted
+            if (cap := caps[row.member_entity_id]) is not None
+            for bit in Permission
+            if bit and cap & bit
+        ]
+        if cap_values:
+            await self._sess.execute(pg_insert(EntityMembershipCapRow).values(cap_values))
 
     async def _associate_entities_with_scope(
         self,

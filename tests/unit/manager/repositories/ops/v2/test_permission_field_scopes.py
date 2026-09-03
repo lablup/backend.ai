@@ -346,7 +346,7 @@ async def test_revoke_leaves_graph_edges(
             EntityMembershipRow(
                 virtual_entity_id=scope_node.id,
                 member_entity_id=member_node.id,
-                permission_cap=Permission.NONE,
+                capped=True,
             )
         )
     async with provider.write_ops() as ops:
@@ -362,4 +362,4 @@ async def test_revoke_leaves_graph_edges(
             )
         ).all()
     assert len(edges) == 1
-    assert edges[0].permission_cap == Permission.NONE
+    assert edges[0].capped is True
