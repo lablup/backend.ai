@@ -49,7 +49,7 @@ async def auth_middleware(
             log.exception(repr(e))
             raise
     log.info("invalid requested token")
-    raise web.HTTPForbidden()
+    return web.HTTPForbidden()
 
 
 async def handle_status(request: web.Request) -> web.Response:
