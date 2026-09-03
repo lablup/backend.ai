@@ -10,7 +10,7 @@ from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.api.rest.ratelimit.handler import _rlim_window, make_rlim_middleware
+from ai.backend.manager.api.rest.ratelimit.handler import _RATELIMIT_WINDOW, make_rlim_middleware
 from ai.backend.manager.errors.api import RateLimitExceeded
 
 _USER_ID = UserID(uuid.UUID("12345678-1234-5678-1234-567812345678"))
@@ -99,7 +99,7 @@ class TestRlimMiddleware:
         # Assert
         assert response.headers["X-RateLimit-Limit"] == "1000"
         assert response.headers["X-RateLimit-Remaining"] == "1000"
-        assert response.headers["X-RateLimit-Window"] == str(_rlim_window)
+        assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW)
         mock_handler.assert_called_once_with(mock_request_anonymous)
 
         # Valkey should not be called for anonymous requests
@@ -160,7 +160,7 @@ class TestRlimMiddleware:
         # Assert headers
         assert response.headers["X-RateLimit-Limit"] == test_case.expected_limit
         assert response.headers["X-RateLimit-Remaining"] == test_case.expected_remaining
-        assert response.headers["X-RateLimit-Window"] == str(_rlim_window)
+        assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW)
 
         # Handler should be called
         mock_handler.assert_called_once_with(mock_request_authorized)
@@ -168,7 +168,7 @@ class TestRlimMiddleware:
         # Valkey should be called for authorized requests
         mock_valkey_client.execute_rate_limit_logic.assert_called_once_with(
             user_id=_USER_ID,
-            window=_rlim_window,
+            window=_RATELIMIT_WINDOW,
         )
 
     @pytest.mark.parametrize(
@@ -215,7 +215,7 @@ class TestRlimMiddleware:
             await middleware(mock_request_authorized, mock_handler)
         assert exc_info.value.headers["X-RateLimit-Limit"] == test_case.expected_limit
         assert exc_info.value.headers["X-RateLimit-Remaining"] == "0"
-        assert exc_info.value.headers["X-RateLimit-Window"] == str(_rlim_window)
+        assert exc_info.value.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW)
 
         # Handler should not be called when rate limit exceeded
         mock_handler.assert_not_called()
@@ -223,5 +223,5 @@ class TestRlimMiddleware:
         # Valkey should still be called
         mock_valkey_client.execute_rate_limit_logic.assert_called_once_with(
             user_id=_USER_ID,
-            window=_rlim_window,
+            window=_RATELIMIT_WINDOW,
         )

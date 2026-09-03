@@ -22,14 +22,14 @@ from ai.backend.manager.errors.api import RateLimitExceeded
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_rlim_window: Final = 60 * 15
+_RATELIMIT_WINDOW: Final = 60 * 15
 
 
 def _rlim_headers(rate_limit: int | None, remaining: int) -> dict[str, str]:
     return {
         "X-RateLimit-Limit": str(rate_limit),
         "X-RateLimit-Remaining": str(remaining),
-        "X-RateLimit-Window": str(_rlim_window),
+        "X-RateLimit-Window": str(_RATELIMIT_WINDOW),
     }
 
 
@@ -48,7 +48,7 @@ def make_rlim_middleware(
             rate_limit = request["keypair"]["rate_limit"]
             rolling_count = await valkey_client.execute_rate_limit_logic(
                 user_id=request["user"]["uuid"],
-                window=_rlim_window,
+                window=_RATELIMIT_WINDOW,
             )
             if rate_limit is not None and rolling_count > rate_limit:
                 raise RateLimitExceeded(headers=_rlim_headers(rate_limit, 0))
@@ -60,7 +60,7 @@ def make_rlim_middleware(
         response = await handler(request)
         response.headers["X-RateLimit-Limit"] = "1000"
         response.headers["X-RateLimit-Remaining"] = "1000"
-        response.headers["X-RateLimit-Window"] = str(_rlim_window)
+        response.headers["X-RateLimit-Window"] = str(_RATELIMIT_WINDOW)
         return response
 
     return rlim_middleware
