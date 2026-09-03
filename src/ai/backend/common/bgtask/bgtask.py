@@ -445,7 +445,10 @@ class BackgroundTaskManager:
             cache_id = EventCacheDomain.BGTASK.cache_id(str(task_id))
             await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
             log.info(
-                "Task {} ({}): {}", task_id, task_name or "", bgtask_result_event.__class__.__name__
+                "Task {} ({}): {}",
+                task_id,
+                task_name or func.__name__,
+                bgtask_result_event.__class__.__name__,
             )
         finally:
             self._ongoing_tasks.pop(TaskID(task_id), None)
