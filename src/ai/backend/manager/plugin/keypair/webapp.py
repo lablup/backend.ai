@@ -60,7 +60,7 @@ async def login(request: web.Request) -> web.Response:
         secret=token_secret,
     )
     redirect_location = redirect_uri.update_query({"sToken": token})
-    return web.HTTPFound(redirect_location)
+    raise web.HTTPFound(redirect_location)
 
 
 async def _webapp_init(app: web.Application) -> None:
