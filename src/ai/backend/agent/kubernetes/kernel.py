@@ -17,7 +17,11 @@ from kubernetes_asyncio import config as kube_config
 from kubernetes_asyncio import watch
 
 from ai.backend.agent.errors import KernelRunnerNotInitializedError
-from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
+from ai.backend.agent.kernel import (
+    SERVICE_REPLY_TIMEOUT_MARGIN_SEC,
+    AbstractCodeRunner,
+    AbstractKernel,
+)
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.agent.utils import get_arch_name
@@ -220,13 +224,18 @@ class KubernetesKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        return await self.runner.feed_start_service({
-            "name": service,
-            "port": sport["container_ports"][0],  # primary port
-            "ports": sport["container_ports"],
-            "protocol": sport["protocol"],
-            "options": opts,
-        })
+        launch_timeout: float = self.agent_config["kernel-lifecycles"]["service-launch-timeout-sec"]
+        return await self.runner.feed_start_service(
+            {
+                "name": service,
+                "port": sport["container_ports"][0],  # primary port
+                "ports": sport["container_ports"],
+                "protocol": sport["protocol"],
+                "options": opts,
+                "launch_timeout": launch_timeout,
+            },
+            reply_timeout=launch_timeout + SERVICE_REPLY_TIMEOUT_MARGIN_SEC,
+        )
 
     @override
     async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:

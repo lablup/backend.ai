@@ -52,6 +52,9 @@ log = BraceStyleAdapter(logger)
 
 TReturn = TypeVar("TReturn")
 
+# Used only when the start-service payload carries no "launch_timeout", which happens for
+# containers created by an agent that predates that key: this package ships bind-mounted from
+# the agent's own venv, and the mount is fixed at container creation.
 DEFAULT_SERVICE_LAUNCH_TIMEOUT_SEC = 30.0
 
 
@@ -861,7 +864,10 @@ class BaseRunner(metaclass=ABCMeta):
                 await asyncio.sleep(adjusted_interval)
 
     async def _start_service_and_feed_result(self, service_info: Mapping[str, Any]) -> None:
-        result = await self._start_service(service_info)
+        result = await self._start_service(
+            service_info,
+            launch_timeout=service_info.get("launch_timeout", DEFAULT_SERVICE_LAUNCH_TIMEOUT_SEC),
+        )
         await self.outsock.send_multipart([
             b"service-result",
             json.dumps(result).encode("utf8"),

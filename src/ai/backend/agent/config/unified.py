@@ -2092,6 +2092,29 @@ class KernelLifecyclesConfig(BaseConfigSchema):
             example=ConfigExample(local="60.0", prod="120.0"),
         ),
     ]
+    service_launch_timeout_sec: Annotated[
+        float,
+        Field(
+            default=30.0,
+            validation_alias=AliasChoices(
+                "service-launch-timeout-sec", "service_launch_timeout_sec"
+            ),
+            serialization_alias="service-launch-timeout-sec",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "How long in seconds a service app (jupyter, vscode, ...) may take to open its "
+                "port after the kernel runner spawns it. The kernel runner terminates the app "
+                "process once this expires, and the agent waits this long plus a fixed margin "
+                "for the runner's reply, so the two sides cannot disagree on how long that is. "
+                "Raise it for images whose apps bind slowly under CPU or IO contention; the "
+                "effective ceiling is the calling client's own request timeout. "
+                "Applies to containers created after the change."
+            ),
+            added_version="26.8.0",
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
 
 
 class DockerExtraConfig(BaseConfigSchema):

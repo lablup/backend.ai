@@ -76,9 +76,9 @@ __all__ = ["KernelOwnershipData"]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Must exceed the launch timeout that ai.backend.kernel.base grants a service port, which cannot
-# be imported here because that package runs inside the container.
-SERVICE_START_REPLY_TIMEOUT_SEC = 35.0
+# Added to the launch timeout the agent grants the kernel runner, so that a runner giving up
+# exactly on time still gets its reply delivered instead of racing the agent.
+SERVICE_REPLY_TIMEOUT_MARGIN_SEC = 5.0
 
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'
@@ -966,14 +966,19 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         except TimeoutError:
             return {"status": "failed", "error": "timeout"}
 
-    async def feed_start_service(self, service_info: Mapping[str, Any]) -> dict[str, Any]:
+    async def feed_start_service(
+        self,
+        service_info: Mapping[str, Any],
+        *,
+        reply_timeout: float,
+    ) -> dict[str, Any]:
         sock = await self._get_socket_pair()
         await sock.send_multipart([
             b"start-service",
             _dump_json_bytes(service_info),
         ])
         try:
-            with timeout(SERVICE_START_REPLY_TIMEOUT_SEC):
+            with timeout(reply_timeout):
                 result = await self.service_queue.get()
             self.service_queue.task_done()
             return cast(dict[str, Any], load_json(result))
