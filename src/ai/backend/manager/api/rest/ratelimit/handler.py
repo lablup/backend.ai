@@ -8,11 +8,14 @@ limiting is applied transparently to all authorized requests.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from aiohttp import web
+from multidict import CIMultiDict
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
+from ai.backend.common.web.reserved_response_headers import reserve_response_headers
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import WebRequestHandler
 
@@ -22,7 +25,19 @@ from ai.backend.manager.errors.api import RateLimitExceeded
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_rlim_window: Final = 60 * 15
+_RATELIMIT_WINDOW: Final = 60 * 15
+
+
+@dataclass(frozen=True)
+class RateLimitQuota:
+    limit: int | None
+    remaining: int
+    window: int = _RATELIMIT_WINDOW
+
+    def apply_to(self, headers: CIMultiDict[str]) -> None:
+        headers["X-RateLimit-Limit"] = str(self.limit)
+        headers["X-RateLimit-Remaining"] = str(self.remaining)
+        headers["X-RateLimit-Window"] = str(self.window)
 
 
 def make_rlim_middleware(
@@ -40,21 +55,16 @@ def make_rlim_middleware(
             rate_limit = request["keypair"]["rate_limit"]
             rolling_count = await valkey_client.execute_rate_limit_logic(
                 user_id=request["user"]["uuid"],
-                window=_rlim_window,
+                window=_RATELIMIT_WINDOW,
             )
             if rate_limit is not None and rolling_count > rate_limit:
+                reserve_response_headers(request, RateLimitQuota(limit=rate_limit, remaining=0))
                 raise RateLimitExceeded
             remaining = rate_limit - rolling_count if rate_limit is not None else rolling_count
-            response = await handler(request)
-            response.headers["X-RateLimit-Limit"] = str(rate_limit)
-            response.headers["X-RateLimit-Remaining"] = str(remaining)
-            response.headers["X-RateLimit-Window"] = str(_rlim_window)
-            return response
+            reserve_response_headers(request, RateLimitQuota(limit=rate_limit, remaining=remaining))
+            return await handler(request)
         # No checks for rate limiting for non-authorized queries.
-        response = await handler(request)
-        response.headers["X-RateLimit-Limit"] = "1000"
-        response.headers["X-RateLimit-Remaining"] = "1000"
-        response.headers["X-RateLimit-Window"] = str(_rlim_window)
-        return response
+        reserve_response_headers(request, RateLimitQuota(limit=1000, remaining=1000))
+        return await handler(request)
 
     return rlim_middleware

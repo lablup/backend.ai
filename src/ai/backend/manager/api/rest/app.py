@@ -13,6 +13,7 @@ from aiohttp import web
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.types import AgentSelectionStrategy
+from ai.backend.common.web.reserved_response_headers import setup_reserved_response_headers
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
 from ai.backend.manager.config.bootstrap import BootstrapConfig
@@ -188,6 +189,7 @@ def build_root_app(
             build_api_metric_middleware(metrics.api),
         ]
     )
+    setup_reserved_response_headers(app)
     if loop_error_handler is not None:
         loop = asyncio.get_running_loop()
         loop.set_exception_handler(loop_error_handler)
