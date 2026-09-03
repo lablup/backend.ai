@@ -169,13 +169,30 @@ updater's fields rather than about a column name.
   만든다. user 의 ve 는 자기 domain 만 govern 한다 — project 가 govern 하면 user 가 own 한 것이
   project 로 샌다(BEP-1077).
 - 예전 `member_of` 도 둘을 한꺼번에 썼다. 이름이 own 하나만 말해서 govern 이 숨어 있었다.
-- 공유(`EntityGrant`)는 cap 이 붙은 own 이고 govern 이 없다. 그래서 공유받은 entity 가 own 한
-  것에는 닿지 않고, 해석기는 공유를 공유된 entity 의 타입에 대해서만 통과시킨다(공유받은 vfolder
-  를 scope 로 삼아 초대를 읽을 수 없다).
-- relation(`create_relation`): project 와 resource group 이 서로를 READ cap 으로 own 한다. govern 이
-  없으니 상대가 own 한 것에는 닿지 않는다.
+- 공유(`share` / `share_fields`)는 cap 이 붙은 own 이고, 받은 scope 에 빌려준 것이다. own 은 ve 에 넣는 것이라
+  ve 를 govern 하는 모든 scope 의 것이 되지만, 공유는 그 ve 의 scope 하나에 준 것이라 그 scope 의 자기
+  govern 으로만 답한다. 해석기는 그래서 공유를 (1) 공유된 entity 의 타입에 대해서만, (2) 자기 govern
+  을 통해서만 통과시킨다. 공유받은 vfolder 를 scope 로 삼아 초대를 읽을 수 없고, resource group 에
+  공유된 project 를 그 resource group 을 govern 하는 다른 project 가 읽을 수 없다.
+- relation(`create_relation(scope, target)`): scope 가 target 을 READ cap 으로 govern 하고, target 은
+  scope 를 READ cap 으로 공유받는다. project 는 resource group 과 그것이 own 한 agent 를 읽고,
+  resource group 은 project 자신만 읽는다 — project 가 own 한 user·session·vfolder 는 드러나지
+  않는다. govern 쪽 cap(`scope_bindings.permission_cap`)을 쓰는 것은 relation 뿐이다; 자기 govern 과
+  `created_in` 의 govern 은 cap 이 없다.
+- resource group 이 session·deployment 를 보는 것은 relation 이 아니라 스케줄 시 그 session 을
+  resource group 에 READ 로 공유하는 것으로 답한다(후속). 다른 project 가 resource group 을 govern
+  해도 공유는 그쪽에 답하지 않으므로 새지 않는다.
 - 두 축으로 root 넷: `created_in` 유무(Global / Entity) × preset 역할 유무(plain / RoleManaged).
   role-managed 는 preset 을 만드는 것 외에 plain 과 같은 관계를 맺는다.
+- 전 필드 공유와 필드 경로 공유는 뜻이 달라 메소드도 다르다. `share(scope, entity, cap)` 는
+  "이 entity 를 cap 까지" 이고, `share_fields(scope, entity, fields)` 는 "이 entity 의 이 필드들만" 이다.
+  저장은 같은 cap 행 트리(비트별 행, 경로 행)이지만 선언에서 섞지 않는다.
+- 관계 ops 의 배치: private 프리미티브(`_provision` / `_teardown`, `_own` / `_disown`, `_govern` /
+  `_ungovern`, `_created_in` / `_withdraw` — 마지막 쌍은 own 과 govern 을 노드 조회 한 번으로 같이
+  쓰고 거둔다)는 `V2GraphWriteOpsBase` 에 있고 entity 쓰기 ops 가 상속한다. public
+  관계 ops(`share` / `share_fields` / `widen_*` / `unshare` / `own` / `create_relation` /
+  `purge_relation`)는 `V2GraphWriteOps` 하나에 있고 provider 의 `graph_ops()` 로만 받는다. "grant" 는
+  role 의 permission 을 주는 뜻과 겹쳐 쓰지 않는다.
 - 한계: govern 은 한 홉이라 domain → user → session → 초대 처럼 세 단계면 domain 이 초대에 못 닿는다.
   필요해지면 govern 을 쓸 때 상위 scope 의 govern 을 함께 복사하는 방식으로 닫는다.
 

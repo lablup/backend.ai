@@ -106,7 +106,7 @@ class V2EntityWriteOps(V2GraphWriteOps):
         await self._insert_row(row, creator.integrity_error_checks())
         entity = creator.entity_id(row)
         await self._provision([entity])
-        await self._created_in(entity, creator.created_in(row))
+        await self._created_in(creator.created_in(row), entity)
         return creator.to_data(row)
 
     async def create_role_managed_global_entity[TRow: Base, TData](
@@ -132,7 +132,7 @@ class V2EntityWriteOps(V2GraphWriteOps):
         entity = creator.entity_id(row)
         await self._provision([entity])
         await self._create_preset_roles({entity: creator.template_value(row)})
-        await self._created_in(entity, creator.created_in(row))
+        await self._created_in(creator.created_in(row), entity)
         return creator.to_data(row)
 
     async def atomic_create_entities[TRow: Base, TData](
@@ -147,7 +147,7 @@ class V2EntityWriteOps(V2GraphWriteOps):
         entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
         await self._provision(entities)
         for creator, row, entity in zip(creators, rows, entities, strict=True):
-            await self._created_in(entity, creator.created_in(row))
+            await self._created_in(creator.created_in(row), entity)
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def atomic_create_role_managed_global_entities[TRow: Base, TData](
@@ -185,7 +185,7 @@ class V2EntityWriteOps(V2GraphWriteOps):
             for creator, row, entity in zip(creators, rows, entities, strict=True)
         })
         for creator, row, entity in zip(creators, rows, entities, strict=True):
-            await self._created_in(entity, creator.created_in(row))
+            await self._created_in(creator.created_in(row), entity)
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def purge_entity[TRow: Base, TData](
@@ -236,7 +236,7 @@ class V2EntityWriteOps(V2GraphWriteOps):
         )
         entity = upserter.entity_id(row)
         await self._provision([entity])
-        await self._created_in(entity, upserter.created_in(row))
+        await self._created_in(upserter.created_in(row), entity)
         return upserter.to_data(row)
 
     async def atomic_upsert_entities[TRow: Base, TData](
@@ -263,7 +263,7 @@ class V2EntityWriteOps(V2GraphWriteOps):
         entities = [upserter.entity_id(row) for upserter, row in zip(upserters, rows, strict=True)]
         await self._provision(entities)
         for upserter, row, entity in zip(upserters, rows, entities, strict=True):
-            await self._created_in(entity, upserter.created_in(row))
+            await self._created_in(upserter.created_in(row), entity)
         return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
 
     async def _grant_auto_assign_roles(
@@ -333,7 +333,7 @@ class V2EntityWriteOps(V2GraphWriteOps):
         await self._sess.flush()
         await self._provision([RoleID(row.id) for row in role_rows])
         for spec, row in zip(specs, role_rows, strict=True):
-            await self._own(RoleID(row.id), [spec.entity])
+            await self._own([spec.entity], RoleID(row.id))
         permission_rows = [
             PermissionRow(
                 role_id=row.id,

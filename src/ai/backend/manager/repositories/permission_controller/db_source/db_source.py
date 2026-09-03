@@ -1233,8 +1233,9 @@ class PermissionDBSource:
         Walks ``entity -> entity_memberships -> scope_bindings -> scope`` and
         OR-combines the granted bitmask at each resolved scope, clipping every
         path by both hop caps (``granted & scope_cap``, then the edge's cap rows; ``None`` = no
-        ceiling). A share answers only for the shared entity's own type, so it never
-        makes the shared entity a scope for what it owns. Permission rows are matched on the entity's own type. Keys
+        ceiling). A share answers only for the shared entity's own type and only to
+        the scope it was shared to, so it never makes the shared entity a scope for
+        what it owns and never leaks to the scopes governing the grantee. Permission rows are matched on the entity's own type. Keys
         sharing ``(user_id, entity_type)`` share one round-trip; keys with no
         reachable grant map to :attr:`Permission.NONE`.
         """
@@ -1341,10 +1342,12 @@ class PermissionDBSource:
                 )
                 .join(roles, roles.c.id == perm.c.role_id)
                 .join(user_roles, user_roles.c.role_id == roles.c.id)
-                # A share lets a bit through only with a cap row on every field, and
-                # only for the shared entity itself; an owned entity is not capped and
-                # answers for whatever the permission names. Path-capped bits wait
-                # for a field-aware reader.
+                # A share lets a bit through only with a cap row on every field, only
+                # for the shared entity itself, and only to the scope it was shared
+                # to (the virtual entity's own govern); an owned entity is not capped
+                # and answers for whatever the permission names, to every scope that
+                # governs its virtual entity. Path-capped bits wait for a field-aware
+                # reader.
                 .outerjoin(
                     emc,
                     sa.and_(
@@ -1364,6 +1367,7 @@ class PermissionDBSource:
                     sa.and_(
                         emc.c.id.is_not(None),
                         member.c.entity_type == group_key.subject_entity_type,
+                        sb.c.scope_entity_id == sb.c.virtual_entity_id,
                     ),
                 ),
             )

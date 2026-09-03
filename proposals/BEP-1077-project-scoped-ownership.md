@@ -81,7 +81,7 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | ➕ | Backfill existing resource entities into the graph and **remove every path that is not `scope -> virtual_scope -> entity`**: the legacy recursive path, `association_scopes_entities`, `object_permissions`, `RBACElementType` (BA-7204) |
 | ➕ | 그래프 관계는 own 과 govern 둘이다. 생성(`created_in`)은 둘 다 쓰고, 공유는 cap 이 붙은 own 만 쓴다. project·user 는 domain 안에서 만들어진다. user VE 는 자기 domain 만 govern 한다; project 로스터의 user 는 READ cap 공유다 |
 | ➕ | Add a `field_permissions` table as a child of permission rows, and declare a catalog (fields, default-visible set) per entity. Checks always name the owning entity — the former colon sub-target names are fields |
-| ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows granted via `EntityGrant` to the accessible set |
+| ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows shared via `share` to the accessible set |
 | ➕ | Blank unreadable fields and refuse filtering or sorting by them. Replace the data loaders with permission-aware bulk queries |
 
 ### 4.3 Reaching an entity from another scope
@@ -91,7 +91,7 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | | Content |
 |---|---|
 | ✅ | Only virtual-folder invitations exist, on two legacy tables. Sessions, deployments, images, and model cards have none |
-| ✅ | The grant primitive takes the recipient as an entity identifier. The invitation table assumes an email recipient and has no expiry — `models/specs/membership.py:21`, `models/entity_invitation/row.py:32` |
+| ✅ | The share primitive takes the recipient as an entity identifier. The invitation table assumes an email recipient and has no expiry — `models/specs/membership.py:21`, `models/entity_invitation/row.py:32` |
 | ✅ | `permission_cap` carries only operation bits, so it cannot express which fields are handed over |
 | ➕ | A sharing-record table and named caps carrying a field axis |
 | ➕ | Add sessions, deployments, images, and model cards as sharing targets |
@@ -140,11 +140,11 @@ Sharing puts an entity into a virtual scope, not a person into a project. Sharin
 
 | 선언 | own | govern | 규칙 |
 |---|---|---|---|
-| 생성 시 `created_in` | 있음 | 있음 | session 은 project·user 안에서, project·user 는 domain 안에서 만들어진다. 만든 곳의 명단에 오르고, 만든 곳의 role 이 그 아래(초대)까지 닿는다. unsharing 으로 지워지지 않는다. 소유권 이동은 `enroll_entities`. user 의 ve 는 자기 domain 만 govern 하고 project 는 govern 하지 않는다 — user 가 own 한 것이 project 로 새지 않도록 |
-| relation `create_relation` | READ cap, 양방향 | 없음 | project 와 resource group 은 서로를 읽기만 한다 |
-| 공유 `EntityGrant` | cap 있음 | 없음 | cap 은 항상 명시, 0 포함. READ/UPDATE 는 필드 경로로 좁힌다(5.2). revoke 로 지워진다. 공유는 공유된 entity 자신에게만 답하고, 그 entity 를 scope 로 쓰지 못한다 |
+| 생성 시 `created_in` | 있음 | 있음 | session 은 project·user 안에서, project·user 는 domain 안에서 만들어진다. 만든 곳의 명단에 오르고, 만든 곳의 role 이 그 아래(초대)까지 닿는다. unsharing 으로 지워지지 않는다. 소유권 이동은 `own(owner, entity)`. user 의 ve 는 자기 domain 만 govern 하고 project 는 govern 하지 않는다 — user 가 own 한 것이 project 로 새지 않도록 |
+| relation `create_relation(scope, target)` | target 이 scope 를 READ cap 으로 | scope 가 target 을 READ cap 으로 | project 는 resource group·registry 와 그것이 own 한 agent·image 를 읽고, resource group·registry 는 project 자신만 읽는다. govern 쪽 cap 을 쓰는 유일한 곳 |
+| 공유 `share(scope, entity, cap)` / `share_fields(scope, entity, fields)` | cap 있음 | 없음 | `share` 는 전 필드에 cap 까지 — cap 은 항상 명시, 0 포함. `share_fields` 는 READ/UPDATE 를 필드 경로에만(5.2). `unshare` 로 지워진다. 공유는 받은 scope 에 빌려준 것이라 그 scope 의 자기 govern 으로만 답하고, 공유된 entity 자신에게만 답한다 |
 
-project 로스터의 user 는 공유다: `EntityGrant(entity=user, grantee=project, permission_cap=READ, fields=기본 공개 필드)`. domain 로스터는 따로 없다 — user 는 domain 안에서 만들어진다. 가입 시 auto_assign 역할 부여는 별도 프리미티브다.
+project 로스터의 user 는 공유다: `share_fields(project, user, {기본 공개 필드: READ})`. domain 로스터는 따로 없다 — user 는 domain 안에서 만들어진다. 가입 시 auto_assign 역할 부여는 별도 프리미티브다.
 
 | Question | Answered by |
 |---|---|
@@ -152,7 +152,7 @@ project 로스터의 user 는 공유다: `EntityGrant(entity=user, grantee=proje
 | What can be done with it | Permission resolution walking `scope -> virtual_scope -> entity` |
 | Which view does it appear in | Graph enrollment: the union of creation enrollment and share enrollment (5.4) |
 
-resource group 과의 relation 은 위 표대로 양방향 READ 공유로 그래프에 오른다. container registry 는 project 가 registry 가 own 한 image 까지 닿아야 해서 project 가 registry 를 own 하고 govern 하는 지금 모양을 유지하고, relation 으로 옮길지는 후속으로 정한다. quota 와 resource-policy 적용 여부는 그래프가 아니라 relation 테이블과 entity 행이 답한다.
+resource group·container registry 와의 relation 은 위 표대로 그래프에 오른다. session·deployment 를 resource group 이 보는 것은 스케줄 시 그 session 을 resource group 에 READ 로 공유하는 것으로 답한다(후속). quota 와 resource-policy 적용 여부는 그래프가 아니라 relation 테이블과 entity 행이 답한다.
 
 ### 5.2 FieldPermission
 
@@ -232,14 +232,14 @@ Project-view query = entities enrolled in that project  AND  entities accessible
 
 Membership judgment moves from the owner column to graph enrollment — the union of creation enrollment and share enrollment. The view filter and permission resolution walk the same graph, so the two criteria cannot diverge. The owner column remains dedicated to resource-policy and quota judgment.
 
-The accessible set has three sources: self-ownership, scope permission, and individual grants. Scope permission does not vary per row and is a constant; only individual grants vary per row.
+The accessible set has three sources: self-ownership, scope permission, and individual shares. Scope permission does not vary per row and is a constant; only individual shares vary per row.
 
 Every resource-entity query is a project view. The only difference is whether one looks at their own personal project or another project.
 
 | View | Condition |
 |---|---|
 | Project view | Enrollment AND accessible |
-| Shared with me | Individual grants only |
+| Shared with me | Individual shares only |
 
 Conditions attach in exactly one place: scoped search. Global search remains dedicated to superadmin and globally shared values and skips permissions. It does not enter the searcher specs. Input names only the scope; whether the requester holds permission is fixed internally. User data loaders are replaced with permission-aware bulk queries.
 
@@ -278,7 +278,7 @@ An invisible target cannot be named.
 
 To give to an outside team, give to a person on that team who then puts it into their own team. What is given to a person lands in that person's personal project.
 
-Caps are named references. A named cap carries operation bits and a field list, and a grant row references a cap by name instead of holding an inline bitmask — sharing a deployment without its token is a cap whose field list excludes it. Effective fields are the role's field list intersected with the field lists of the caps along the path.
+cap 은 공유 행마다 붙는 비트별 행이다. `share(scope, entity, cap)` 는 cap 의 비트마다 "전 필드" 행 하나를 쓰고, `share_fields(scope, entity, fields)` 는 READ/UPDATE 비트에 "경로" 행들을 쓴다 — token 없이 deployment 를 공유하는 것은 token 경로를 뺀 `share_fields` 다. 경로는 자손을 덮고, deny 는 없다. 유효 필드는 role 의 필드 범위와 경로에 있는 cap 들의 필드 범위의 교집합이다. 이름 붙인 cap(preset)은 이 두 호출을 묶어 부르는 편의이지 저장 단위가 아니다.
 
 | Place | Meaning | Composition |
 |---|---|---|
@@ -295,9 +295,9 @@ A shareable kind must exist in the recipient's own-scope role. Caps only narrow,
 
 Re-sharing is expressed by the cap's create bit and defaults to closed. Opening it requires cascading revocation, which requires recording the parent share. No combination opens re-sharing without the cascade. Fields one does not hold cannot be passed on.
 
-Revocation can be done both by anyone who can grant and by the recipient, and is not retroactive on running work.
+Revocation can be done both by anyone who can share and by the recipient, and is not retroactive on running work.
 
-Invitations, grants, and revocations live in one table, separate from `entity_memberships`.
+Invitations, shares, and revocations live in one table, separate from `entity_memberships`.
 
 | State | Graph row |
 |---|---|
@@ -306,7 +306,7 @@ Invitations, grants, and revocations live in one table, separate from `entity_me
 | Declined, expired | None |
 | Revoked | Deleted |
 
-A direct grant skips the invited state and starts active. Nothing about the recipient is exposed beyond what the inviter already knows. The recipient's user identifier is not recorded; email reuse is blocked by expiry and cleanup at user purge.
+A direct share skips the invited state and starts active. Nothing about the recipient is exposed beyond what the inviter already knows. The recipient's user identifier is not recorded; email reuse is blocked by expiry and cleanup at user purge.
 
 Deletion is defined by BEP-1069. The sharing side decides three things.
 
@@ -387,7 +387,7 @@ Opening project-folder creation and narrowing user information are the intended 
 | 로스터 | project 로스터의 user 는 READ cap 공유(기본 공개 필드). domain → user 는 관할 |
 | Joining a project | Project admins invite, with the invitee's acceptance; direct registration is a domain-admin operation (BEP-1076) |
 | Credential secrets | Never readable by any administrator; administration is reissue and disable. The secret is shown once to its owner at issuance |
-| relation | resource group 은 양방향 READ 공유. container registry 는 project 가 own 하고 govern 하는 지금 모양 유지, 이관은 후속. quota 는 relation 테이블이 답한다 |
+| relation | scope 가 target 을 READ 로 govern, target 은 scope 를 READ 로 공유받음. resource group·container registry 둘 다. quota 는 relation 테이블이 답한다 |
 | `created_in` 의 행 | unsharing 으로 지워지지 않고 cap 이 없다 |
 | Former colon sub-targets | Fields of their owning entity — none is promoted to an entity type; the colon declarations retire with `RBACElementType` |
 | Fields | `FieldPermission` — child of a permission row, read and update. Absent means all fields; present means only the list |
@@ -395,7 +395,7 @@ Opening project-folder creation and narrowing user information are the intended 
 | Visibility | Roles answer. Resource entities use the permission axis only; person fields use permission or the subject's disclosure range |
 | Member default preset | All operations on project folders; create-only for sessions and deployments; none for images and model cards |
 | Person-field disclosure | self / project / domain / authenticated users. The project policy sets the minimum; subjects can only widen |
-| Queries | Graph enrollment AND accessible (self-owned / scope permission / individual grant), in one scoped-search spot. Every query is a project view |
+| Queries | Graph enrollment AND accessible (self-owned / scope permission / individual share), in one scoped-search spot. Every query is a project view |
 | Global search and data loaders | Global search stays superadmin- and global-share-only; data loaders replaced with permission-aware bulk queries |
 | Where resolution runs | Only the admission decision at the API boundary; internal calls run no permission queries |
 | Cap-0 sharing | Leaves enrollment only and grants nothing; for surfacing in the owner's project view |
@@ -403,7 +403,7 @@ Opening project-folder creation and narrowing user information are the intended 
 | Scoped reads | Filter instead of rejecting; write actions keep rejecting |
 | Sharing address | Invisible targets cannot be named. People by email, projects only those I am a member of |
 | Share acceptance | Unneeded when only capability grows; projects answer with an acceptance setting |
-| Share caps | Named references carrying operation bits and a field list; grant rows reference them instead of an inline bitmask |
+| Share caps | 공유 행마다 비트별 cap 행. `share` 는 전 필드, `share_fields` 는 필드 경로. 이름 붙인 cap 은 둘을 묶어 부르는 편의 |
 | Re-sharing | Closed by default; opening requires cascading revocation |
 | Sharing records | Separate from `entity_memberships`; the invited state has no graph row |
 | Non-owning projects | No delete operation, only unshare |

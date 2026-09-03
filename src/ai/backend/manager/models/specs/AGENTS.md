@@ -75,19 +75,33 @@ is created in no scope.
 | 훅 | own | govern | 뜻 |
 |---|---|---|---|
 | `EntityCreator.created_in(row)` / `EntityUpserter.created_in(row)` / `RoleManagedEntityCreator.created_in(row)` | 있음 | 있음 | session 은 project 와 user 안에서, project 와 user 는 domain 안에서 만들어진다. 만든 곳이 own 하고 govern 한다. 대상이 없으면 쓰기가 실패한다. `GlobalEntityCreator` / `RoleManagedGlobalEntityCreator` 는 이 훅이 없다 |
-| (훅 없음) preset role, `grant_entities` | 있음 | 없음 | role 은 scope 가 own 만 한다. 공유는 cap 이 붙은 own 이다 |
-| `create_relation(creator, left, right)` / `purge_relation` | cap 있음, 양방향 | 없음 | project 와 resource group 은 서로를 READ 로만 own 한다 |
+| (훅 없음) preset role | 있음 | 없음 | role 은 scope 가 own 만 한다 |
+| `share(scope, entity, cap)` / `share_fields(scope, entity, fields)` | cap 있음 | 없음 | 공유: cap 이 붙은 own. 받은 scope 에 빌려준 것 |
+| `own(owner, entity)` | 있음 | 없음 | 생성 뒤의 소유(소유권 이동). 공유가 있던 자리면 own 으로 바꾼다 |
+| `create_relation(creator, scope, target)` / `purge_relation` | target 이 scope 를 cap READ 로 | scope 가 target 을 cap READ 로 | project 는 resource group 과 그것이 own 한 것(agent)을 READ 하고, resource group 은 project 자신만 READ 한다 |
 
-- own 과 govern 에는 cap 이 없다. cap 은 공유(`EntityGrant`)에만 있고, 공유는 공유된 entity 자신에게만
-  답한다: 공유받은 vfolder 를 scope 로 삼아 그 아래 초대를 읽을 수 없다.
-- Sharing after creation is an `EntityGrant`, executed by `grant_entities` /
-  `widen_entity_grants` / `revoke_entities`. `permission_cap` is the ceiling and is
-  always stated; zero is a ceiling too. READ/UPDATE narrow further to paths through
-  `fields` (a path covers its descendants). Granting again overwrites the ceiling. Do
-  NOT use a creator to share what already exists.
-- Belonging after creation (ownership transfer) is an `EntityMembershipEntry`, executed
-  by `enroll_entities`. An owned entity has no ceiling; where a share stands, it becomes
-  owned.
+- cap 이 붙는 자리는 둘이고, 한 경로에 하나만 걸린다.
+
+| entity → ve (own 쪽) | ve → scope (govern 쪽) | 허용 |
+|---|---|---|
+| own, cap 없음 | 자기 govern 또는 타 govern, cap 없음 | 예 (생성) |
+| own, cap 없음 | 타 govern, cap 있음 | 예 (relation 의 scope 쪽) |
+| 공유, cap 있음 | 자기 govern | 예 (공유, relation 의 target 쪽) |
+| 공유, cap 있음 | 타 govern | **아니오** |
+
+- 공유는 받은 scope 에 빌려준 것이다. 그 scope 의 자기 govern 으로만 답하고, 그 ve 를 govern 하는
+  다른 scope 에는 답하지 않으며, 공유된 entity 자신에게만 답한다: 공유받은 vfolder 를 scope 로
+  삼아 그 아래 초대를 읽을 수 없고, resource group 에 공유된 project 를 그 resource group 을
+  govern 하는 다른 project 가 읽을 수 없다.
+- 공유는 둘로 나뉘고 메소드도 둘이다. `share(scope, entity, cap)` 는 **전 필드**에 cap 까지
+  빌려준다 — cap 은 항상 적고 0 도 cap 이다. `share_fields(scope, entity, fields)` 는
+  READ/UPDATE 를 **필드 경로**에만 빌려준다 — 경로는 자손을 덮고, 전 필드로 이미 빌려준 비트는
+  적지 않는다. 다시 share 하면 cap 을 덮어쓰고, `widen_share` / `widen_share_fields` 는 더하기만
+  하며, `unshare(scope, entities)` 가 거둔다. 이미 있는 것을 공유하려고 creator 를 쓰지 않는다.
+- 생성 뒤의 소유(소유권 이동)는 `own(owner, entity)` 다. own 에는 cap 이 없고, 공유가 있던 자리면
+  own 으로 바뀐다.
+- 관계를 다루는 public ops 는 전부 `V2GraphWriteOps` 에 있고 provider 의 `graph_ops()` 로 받는다.
+  entity 쓰기 ops(`V2WriteOps`)에는 섞이지 않는다.
 - Entity types are open strings: types outside the RBAC element enum are accepted, and
   permission-carrying paths convert lazily.
 - Do NOT keep module-level declaration instances (no `X_MEMBERSHIP = ...()`).

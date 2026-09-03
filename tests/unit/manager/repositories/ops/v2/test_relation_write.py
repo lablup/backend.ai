@@ -2,10 +2,11 @@
 
 What these tests pin down:
 
-- Linking writes the relation row and makes each entity own the other under a READ
-  cap, so each entity's scope sees the other and nothing more.
-- Linking again restates the grants: a cap narrowed in between comes back to READ.
-- Unlinking removes the row and both shares, and is silent on a pair never linked.
+- Linking writes the relation row, has the scope govern the target under READ, and
+  shares the scope to the target under READ.
+- Linking again restates the share: a cap narrowed in between comes back to READ.
+- Unlinking removes the row, the govern and the share, and is silent on a pair never
+  linked.
 """
 
 from __future__ import annotations
@@ -38,31 +39,31 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
-_LEFT_TYPE = EntityType("project")
-_RIGHT_TYPE = EntityType("resource_group")
+_SCOPE_TYPE = EntityType("project")
+_TARGET_TYPE = EntityType("resource_group")
 
 
-class _LeftID(EntityIdentifier):
+class _ScopeID(EntityIdentifier):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return _LEFT_TYPE
+        return _SCOPE_TYPE
 
 
-class _RightID(EntityIdentifier):
+class _TargetID(EntityIdentifier):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return _RIGHT_TYPE
+        return _TARGET_TYPE
 
 
 class RelationTestRow(Base):
     __tablename__ = "relation_write_test"
-    __table_args__ = (sa.UniqueConstraint("left_id", "right_id", name="uq_relation_write_test"),)
+    __table_args__ = (sa.UniqueConstraint("scope_id", "target_id", name="uq_relation_write_test"),)
 
     id: Mapped[uuid.UUID] = mapped_column(sa.Uuid, primary_key=True, default=uuid.uuid4)
-    left_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid, nullable=False)
-    right_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid, nullable=False)
+    scope_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid, nullable=False)
+    target_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid, nullable=False)
 
 
 class _Creator(RelationCreator[RelationTestRow]):
@@ -71,14 +72,14 @@ class _Creator(RelationCreator[RelationTestRow]):
         return RelationTestRow
 
     @override
-    def build_row(self, left: EntityIdentifier, right: EntityIdentifier) -> RelationTestRow:
+    def build_row(self, scope: EntityIdentifier, target: EntityIdentifier) -> RelationTestRow:
         return RelationTestRow(
-            id=uuid.uuid4(), left_id=uuid.UUID(str(left)), right_id=uuid.UUID(str(right))
+            id=uuid.uuid4(), scope_id=uuid.UUID(str(scope)), target_id=uuid.UUID(str(target))
         )
 
     @override
     def index_elements(self) -> list[str]:
-        return ["left_id", "right_id"]
+        return ["scope_id", "target_id"]
 
     @override
     def build_conflict_values(self) -> dict[str, Any] | None:
@@ -96,11 +97,11 @@ class _Purger(RelationPurger[RelationTestRow]):
 
     @override
     def conditions(
-        self, left: EntityIdentifier, right: EntityIdentifier
+        self, scope: EntityIdentifier, target: EntityIdentifier
     ) -> Sequence[QueryCondition]:
         return (
-            lambda: RelationTestRow.left_id == uuid.UUID(str(left)),
-            lambda: RelationTestRow.right_id == uuid.UUID(str(right)),
+            lambda: RelationTestRow.scope_id == uuid.UUID(str(scope)),
+            lambda: RelationTestRow.target_id == uuid.UUID(str(target)),
         )
 
     @override
@@ -132,13 +133,13 @@ def provider(database: ExtendedAsyncSAEngine) -> V2DBOpsProvider:
 
 
 @pytest.fixture
-async def pair(database: ExtendedAsyncSAEngine) -> tuple[_LeftID, _RightID]:
-    left = _LeftID(uuid.uuid4())
-    right = _RightID(uuid.uuid4())
+async def pair(database: ExtendedAsyncSAEngine) -> tuple[_ScopeID, _TargetID]:
+    scope = _ScopeID(uuid.uuid4())
+    target = _TargetID(uuid.uuid4())
     async with database.begin_session() as sess:
-        sess.add(VirtualEntityRow(entity_type=_LEFT_TYPE, entity_id=left))
-        sess.add(VirtualEntityRow(entity_type=_RIGHT_TYPE, entity_id=right))
-    return left, right
+        sess.add(VirtualEntityRow(entity_type=_SCOPE_TYPE, entity_id=scope))
+        sess.add(VirtualEntityRow(entity_type=_TARGET_TYPE, entity_id=target))
+    return scope, target
 
 
 async def _row_count(database: ExtendedAsyncSAEngine) -> int:
@@ -146,7 +147,34 @@ async def _row_count(database: ExtendedAsyncSAEngine) -> int:
         return (await sess.scalar(sa.select(sa.func.count()).select_from(RelationTestRow))) or 0
 
 
-async def _cap(
+def _node(entity: EntityIdentifier) -> sa.ScalarSelect[Any]:
+    return (
+        sa.select(VirtualEntityRow.id)
+        .where(
+            VirtualEntityRow.entity_type == entity.entity_type(),
+            VirtualEntityRow.entity_id == entity,
+        )
+        .scalar_subquery()
+    )
+
+
+async def _govern_cap(
+    database: ExtendedAsyncSAEngine, scope: EntityIdentifier, entity: EntityIdentifier
+) -> Permission | None | bool:
+    """The cap under which the scope governs the entity; ``False`` when it does not."""
+    async with database.begin_readonly_session() as sess:
+        row = (
+            await sess.execute(
+                sa.select(ScopeBindingRow.permission_cap).where(
+                    ScopeBindingRow.virtual_entity_id == _node(entity),
+                    ScopeBindingRow.scope_entity_id == _node(scope),
+                )
+            )
+        ).one_or_none()
+        return False if row is None else row.permission_cap
+
+
+async def _share_cap(
     database: ExtendedAsyncSAEngine, scope: EntityIdentifier, member: EntityIdentifier
 ) -> Permission | None:
     """The cap under which the scope owns the member; ``None`` when it does not."""
@@ -187,63 +215,64 @@ async def _cap(
 
 
 class TestCreateRelation:
-    async def test_link_writes_the_row_and_read_each_way(
+    async def test_link_writes_the_row_the_govern_and_the_share(
         self,
         database: ExtendedAsyncSAEngine,
         provider: V2DBOpsProvider,
-        pair: tuple[_LeftID, _RightID],
+        pair: tuple[_ScopeID, _TargetID],
     ) -> None:
-        left, right = pair
+        scope, target = pair
         async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), left, right)
+            await ops.create_relation(_Creator(), scope, target)
 
         assert await _row_count(database) == 1
-        assert await _cap(database, left, right) == Permission.READ
-        assert await _cap(database, right, left) == Permission.READ
+        assert await _govern_cap(database, scope, target) == Permission.READ
+        assert await _share_cap(database, target, scope) == Permission.READ
+        assert await _share_cap(database, scope, target) is None
 
     async def test_linking_again_keeps_one_row_and_restates_read(
         self,
         database: ExtendedAsyncSAEngine,
         provider: V2DBOpsProvider,
-        pair: tuple[_LeftID, _RightID],
+        pair: tuple[_ScopeID, _TargetID],
     ) -> None:
-        left, right = pair
+        scope, target = pair
         async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), left, right)
+            await ops.create_relation(_Creator(), scope, target)
             await ops.grant_entities([
-                EntityGrant(entity=right, grantee=left, permission_cap=Permission.NONE)
+                EntityGrant(entity=scope, grantee=target, permission_cap=Permission.NONE)
             ])
-            await ops.create_relation(_Creator(), left, right)
+            await ops.create_relation(_Creator(), scope, target)
 
         assert await _row_count(database) == 1
-        assert await _cap(database, left, right) == Permission.READ
+        assert await _share_cap(database, target, scope) == Permission.READ
 
 
 class TestPurgeRelation:
-    async def test_unlink_removes_the_row_and_both_shares(
+    async def test_unlink_removes_the_row_the_govern_and_the_share(
         self,
         database: ExtendedAsyncSAEngine,
         provider: V2DBOpsProvider,
-        pair: tuple[_LeftID, _RightID],
+        pair: tuple[_ScopeID, _TargetID],
     ) -> None:
-        left, right = pair
+        scope, target = pair
         async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), left, right)
+            await ops.create_relation(_Creator(), scope, target)
         async with provider.write_ops() as ops:
-            await ops.purge_relation(_Purger(), left, right)
+            await ops.purge_relation(_Purger(), scope, target)
 
         assert await _row_count(database) == 0
-        assert await _cap(database, left, right) is None
-        assert await _cap(database, right, left) is None
+        assert await _govern_cap(database, scope, target) is False
+        assert await _share_cap(database, target, scope) is None
 
     async def test_unlinking_a_pair_never_linked_is_silent(
         self,
         database: ExtendedAsyncSAEngine,
         provider: V2DBOpsProvider,
-        pair: tuple[_LeftID, _RightID],
+        pair: tuple[_ScopeID, _TargetID],
     ) -> None:
-        left, right = pair
+        scope, target = pair
         async with provider.write_ops() as ops:
-            await ops.purge_relation(_Purger(), left, right)
+            await ops.purge_relation(_Purger(), scope, target)
 
         assert await _row_count(database) == 0

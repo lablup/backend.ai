@@ -83,7 +83,7 @@ class V2GraphWriteOps(V2WriteOpsBase):
             )
         )
 
-    async def _own(self, entity: EntityIdentifier, owners: Collection[EntityIdentifier]) -> None:
+    async def _own(self, owners: Collection[EntityIdentifier], entity: EntityIdentifier) -> None:
         """Each owner's virtual entity owns the entity, uncapped. Idempotent."""
         if not owners:
             return
@@ -104,8 +104,8 @@ class V2GraphWriteOps(V2WriteOpsBase):
 
     async def _govern(
         self,
-        entity: EntityIdentifier,
         scopes: Collection[EntityIdentifier],
+        entity: EntityIdentifier,
         cap: Permission | None = None,
     ) -> None:
         """Each scope governs the entity's virtual entity, bounded by ``cap`` (``None``
@@ -128,7 +128,7 @@ class V2GraphWriteOps(V2WriteOpsBase):
         )
 
     async def _created_in(
-        self, entity: EntityIdentifier, scopes: Collection[EntityIdentifier]
+        self, scopes: Collection[EntityIdentifier], entity: EntityIdentifier
     ) -> None:
         """Each scope owns and governs the entity — one node lookup for both."""
         if not scopes:
@@ -153,7 +153,7 @@ class V2GraphWriteOps(V2WriteOpsBase):
             .on_conflict_do_nothing()
         )
 
-    async def _disown(self, entity: EntityIdentifier, owners: Collection[EntityIdentifier]) -> None:
+    async def _disown(self, owners: Collection[EntityIdentifier], entity: EntityIdentifier) -> None:
         """Each owner's virtual entity stops owning the entity. Silent where it never
         did, or where either side has no virtual entity."""
         if not owners:
@@ -166,7 +166,7 @@ class V2GraphWriteOps(V2WriteOpsBase):
         )
 
     async def _ungovern(
-        self, entity: EntityIdentifier, scopes: Collection[EntityIdentifier]
+        self, scopes: Collection[EntityIdentifier], entity: EntityIdentifier
     ) -> None:
         """Each scope stops governing the entity's virtual entity. Silent where it
         never did, or where either side has no virtual entity."""

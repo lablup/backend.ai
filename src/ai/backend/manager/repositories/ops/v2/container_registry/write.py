@@ -32,7 +32,7 @@ class ContainerRegistryWriteOps(V2WriteOps):
         owns and governs the registry. A reach past the entity itself, which the
         mutual-read relation (``create_relation``) does not give."""
         await self._provision([project_id])
-        await self._created_in(registry_id, [project_id])
+        await self._created_in([project_id], registry_id)
 
     async def withdraw_registry_from_project(
         self, registry_id: ContainerRegistryID, project_id: ProjectID
@@ -41,5 +41,5 @@ class ContainerRegistryWriteOps(V2WriteOps):
 
         Silent for a project or registry that never had a virtual entity.
         """
-        await self._disown(registry_id, [project_id])
-        await self._ungovern(registry_id, [project_id])
+        await self._disown([project_id], registry_id)
+        await self._ungovern([project_id], registry_id)

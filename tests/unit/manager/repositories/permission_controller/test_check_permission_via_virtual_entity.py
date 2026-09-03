@@ -15,7 +15,8 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
 from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE, RolePresetID
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
@@ -357,8 +358,8 @@ class TestCheckPermissionViaVirtualEntity:
                     entity_cap=Permission.READ,
                 ),
                 Permission.READ,
-                True,
-                id="entity-cap-keeps-read",
+                False,
+                id="share-not-reached-through-another-scope-s-govern",
             ),
             pytest.param(
                 VSChainSpec(granted=Permission.READ | Permission.UPDATE),
@@ -438,8 +439,8 @@ class TestCheckPermissionViaVirtualEntity:
                     scope_cap=Permission.READ | Permission.UPDATE,
                     entity_cap=Permission.READ,
                 ),
-                Permission.READ,
-                id="clipped-by-both-hops",
+                Permission.NONE,
+                id="share-answers-nothing-through-another-scope-s-govern",
             ),
         ],
         indirect=["chain"],
@@ -905,6 +906,86 @@ class TestUserRosterEnrollment:
         )
         result = await db_source.check_scope_permission_via_virtual_entity([key], Permission.READ)
         assert result[key] is reaches
+
+    async def _govern_resource_group_from_project(
+        self,
+        db: ExtendedAsyncSAEngine,
+        project_id: uuid.UUID,
+        other_project_id: uuid.UUID,
+        cap: Permission | None,
+    ) -> None:
+        """A resource group the project governs under READ, holding another project:
+        owned for ``None``, shared under ``cap`` otherwise."""
+        async with db.begin_session() as db_sess:
+            project_ve_id = await db_sess.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_id == project_id,
+                )
+            )
+            assert project_ve_id is not None
+            rg_node = VirtualEntityRow(
+                entity_type=RESOURCE_GROUP_ENTITY_TYPE, entity_id=uuid.uuid4()
+            )
+            other_node = VirtualEntityRow(
+                entity_type=PROJECT_ENTITY_TYPE, entity_id=other_project_id
+            )
+            db_sess.add_all([rg_node, other_node])
+            await db_sess.flush()
+            db_sess.add(
+                ScopeBindingRow(
+                    virtual_entity_id=rg_node.id,
+                    scope_entity_id=rg_node.id,
+                    permission_cap=None,
+                )
+            )
+            db_sess.add(
+                ScopeBindingRow(
+                    virtual_entity_id=rg_node.id,
+                    scope_entity_id=project_ve_id,
+                    permission_cap=Permission.READ,
+                )
+            )
+            await VirtualEntitySeeder().cap_edge(db_sess, rg_node.id, other_node.id, cap)
+
+    @pytest.mark.parametrize(
+        ("cap", "reaches"),
+        [
+            pytest.param(None, True, id="owned"),
+            pytest.param(Permission.READ, False, id="shared"),
+        ],
+    )
+    async def test_a_share_answers_only_to_the_scope_it_was_shared_to(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        db_source: PermissionDBSource,
+        ops_provider: RBACOpsProvider,
+        ids: VSChainFixture,
+        cap: Permission | None,
+        reaches: bool,
+    ) -> None:
+        """A project governing a resource group under READ reaches what the resource
+        group owns, and not what was merely shared to the resource group: a share
+        answers to the resource group's own scope only."""
+        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
+        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        other_project_id = uuid.uuid4()
+        await self._grant_on_project(
+            db_with_rbac_tables,
+            ids,
+            ids.owner_scope_id,
+            entity_type=PermEntityType.PROJECT,
+        )
+        await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
+        await self._govern_resource_group_from_project(
+            db_with_rbac_tables, ids.owner_scope_id, other_project_id, cap
+        )
+
+        key = EntityPermissionCheckKey(user_id=ids.user_id, entity=ProjectID(other_project_id))
+        result = await db_source.check_single_entity_permission_via_virtual_entity(
+            key, Permission.READ
+        )
+        assert result is reaches
 
     async def test_roster_cap_clips_the_grant_over_the_member_user(
         self,
