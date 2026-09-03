@@ -214,7 +214,7 @@ class _PresetCreator(EntityCreator[RolePresetRow, _PresetData]):
         return _EntityID(row.id)
 
     @override
-    def member_of(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
         return ()
 
     @override
@@ -236,7 +236,7 @@ class _PresetRoleManagedCreator(RoleManagedEntityCreator[RolePresetRow, _PresetD
         return _EntityID(row.id)
 
     @override
-    def member_of(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
         return ()
 
     @override
@@ -390,7 +390,7 @@ class _PresetUpserter(EntityUpserter[RolePresetRow, _PresetData]):
         return _EntityID(row.id)
 
     @override
-    def member_of(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
         return ()
 
     @override
@@ -1224,6 +1224,7 @@ def repository(stored: _PresetData) -> MagicMock:
         "lookup",
         "create_entity",
         "create_role_managed_entity",
+        "create_role_managed_global_entity",
         "upsert_field_entity",
         "upsert_global_entity",
         "update",
@@ -1235,6 +1236,7 @@ def repository(stored: _PresetData) -> MagicMock:
     for operation in (
         "atomic_create_entities",
         "atomic_create_role_managed_entities",
+        "atomic_create_role_managed_global_entities",
         "atomic_create_global_entities",
         "atomic_create_field_entities",
         "batch_update_in_scopes",

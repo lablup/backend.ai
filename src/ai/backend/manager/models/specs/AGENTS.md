@@ -39,7 +39,7 @@ and is read through an entity's permission like a field, while belonging to neit
 
 | Operation | Roots | Why |
 |---|---|---|
-| creator | `GlobalEntityCreator` / `EntityCreator` / `RoleManagedEntityCreator` / `FieldCreator` / `SidecarCreator` | only a create settles what a row belongs to |
+| creator | `GlobalEntityCreator` / `EntityCreator` / `RoleManagedGlobalEntityCreator` / `RoleManagedEntityCreator` / `FieldCreator` / `SidecarCreator` | only a create settles what a row belongs to |
 | purger | `EntityPurger` / `EntityBatchPurger` / `FieldPurger` / `GuardedFieldPurger` / `FieldBatchPurger` | removing an entity removes what it left in the graph; a field row splits further on how it is picked: by id, or by id behind a precondition; the batch roots pick by subquery instead of by id |
 | updater | `DataUpdater` / `GuardedDataUpdater` | an update never changes what a row belongs to, so the roots split on how the row is picked: by id, or by id behind a precondition |
 
@@ -63,38 +63,49 @@ values (`row_class`, `pk_value`, ...).
 `GlobalEntityCreator` merely does not go under another entity; it provisions its own
 virtual entity node exactly as `EntityCreator` does. Rows are created under a global
 entity too — an image under its container registry — so it has to be namable in the
-graph. What it does not have is `member_of`, and the missing hook is what says it
-joins nothing.
+graph. What it does not have is `created_in`, and the missing hook is what says it
+is created in no scope.
 
-## Membership declarations
+## 관계 선언
 
-- `member_of(row)` declares which existing entities the new one joins as a member; a
-  target without a virtual entity node fails the write. It never carries a permission
-  cap (membership vs sharing: `KNOWLEDGE.md`).
+- 그래프의 관계는 둘이다. **own**: ve 가 entity 를 소유한다 — entity 가 그 ve 의 명단에 오르고 한
+  홉에 닿는다. **govern**: scope 가 ve 를 다스린다 — scope 의 role 이 그 ve 가 own 한 것 전부에
+  닿는다. govern 이 own 의 상위 개념이다.
+
+| 훅 | own | govern | 뜻 |
+|---|---|---|---|
+| `EntityCreator.created_in(row)` / `EntityUpserter.created_in(row)` / `RoleManagedEntityCreator.created_in(row)` | 있음 | 있음 | session 은 project 와 user 안에서, project 와 user 는 domain 안에서 만들어진다. 만든 곳이 own 하고 govern 한다. 대상이 없으면 쓰기가 실패한다. `GlobalEntityCreator` / `RoleManagedGlobalEntityCreator` 는 이 훅이 없다 |
+| (훅 없음) preset role, `grant_entities` | 있음 | 없음 | role 은 scope 가 own 만 한다. 공유는 cap 이 붙은 own 이다 |
+| `create_relation(creator, left, right)` / `purge_relation` | cap 있음, 양방향 | 없음 | project 와 resource group 은 서로를 READ 로만 own 한다 |
+
+- own 과 govern 에는 cap 이 없다. cap 은 공유(`EntityGrant`)에만 있고, 공유는 공유된 entity 자신에게만
+  답한다: 공유받은 vfolder 를 scope 로 삼아 그 아래 초대를 읽을 수 없다.
 - Sharing after creation is an `EntityGrant`, executed by `grant_entities` /
   `widen_entity_grants` / `revoke_entities`. `permission_cap` is the ceiling and is
   always stated; zero is a ceiling too. READ/UPDATE narrow further to paths through
   `fields` (a path covers its descendants). Granting again overwrites the ceiling. Do
   NOT use a creator to share what already exists.
 - Belonging after creation (ownership transfer) is an `EntityMembershipEntry`, executed
-  by `enroll_entities`. A belonging edge has no ceiling (`capped = false`); where a
-  shared edge stands, it becomes a belonging one.
+  by `enroll_entities`. An owned entity has no ceiling; where a share stands, it becomes
+  owned.
 - Entity types are open strings: types outside the RBAC element enum are accepted, and
   permission-carrying paths convert lazily.
 - Do NOT keep module-level declaration instances (no `X_MEMBERSHIP = ...()`).
 
 ## Role-managed entities
 
-- Entities that allow role presets (domain/project/user) implement
-  `RoleManagedEntityCreator` and are executed through the role-managed ops methods.
-  The type decides the path; there is NO runtime capability check (`isinstance`).
-- That root is deliberately NOT a subtype of `EntityCreator`. `RoleTemplateSource` is
-  the only shared base; no write path accepts that type bare.
+- Entities that allow role presets implement `RoleManagedGlobalEntityCreator` (domain,
+  resource group: created in no scope) or `RoleManagedEntityCreator` (project, user:
+  `created_in` a domain) and are executed through the matching ops methods, as the
+  plain `GlobalEntityCreator` / `EntityCreator` pair is. The type decides the path;
+  there is NO runtime capability check (`isinstance`).
+- Neither role-managed root is a subtype of its plain counterpart. `RoleTemplateSource`
+  is the only shared base; no write path accepts that type bare.
 - Entity specs declare NO roles — the spec contributes only `template_value(row)` for
   the presets' name templates. Restricting which types may carry presets is the
   preset-creation service's validation.
 - The plain entity paths never touch roles, even when matching presets exist.
-- Enrollment writes graph edges only. Granting a joining user the target's auto_assign
+- Enrollment writes graph relations only. Granting a joining user the target's auto_assign
   roles is an explicit ops primitive — never an implicit side effect keyed on the type.
 
 ## A batch purge says which kind it removes, and what bounds it

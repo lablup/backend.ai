@@ -50,7 +50,7 @@ class SessionCreator(EntityCreator[SessionRow, SessionEntityData]):
         return SessionID(row.id)
 
     @override
-    def member_of(self, row: SessionRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: SessionRow) -> Collection[EntityIdentifier]:
         return [UserID(row.user_uuid), ProjectID(row.group_id)]
 
     @override

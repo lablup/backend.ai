@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
@@ -16,12 +16,12 @@ from ai.backend.manager.data.resource_group.types import (
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
+from ai.backend.manager.models.specs.creator import RoleManagedGlobalEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class ResourceGroupCreator(RoleManagedEntityCreator[ResourceGroupRow, ResourceGroupData]):
+class ResourceGroupCreator(RoleManagedGlobalEntityCreator[ResourceGroupRow, ResourceGroupData]):
     """Registers a resource group, the scope its agents and sessions are created under.
 
     Joins nothing: the domain and project associations are written by the allow and
@@ -45,10 +45,6 @@ class ResourceGroupCreator(RoleManagedEntityCreator[ResourceGroupRow, ResourceGr
     @override
     def entity_id(self, row: ResourceGroupRow) -> EntityIdentifier:
         return ResourceGroupID(row.id)
-
-    @override
-    def member_of(self, row: ResourceGroupRow) -> Collection[EntityIdentifier]:
-        return ()
 
     @override
     def template_value(self, row: ResourceGroupRow) -> ScopeTemplateValue:

@@ -14,6 +14,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
@@ -33,9 +34,21 @@ class ContainerRegistryWriteOps(V2WriteOps):
     async def enroll_registry_in_project(
         self, registry_id: ContainerRegistryID, project_id: ProjectID
     ) -> None:
-        """Let the project reach the registry and the entities it owns."""
+        """Let the project reach the registry and the entities it owns: the project
+        owns and governs the registry. A reach past the entity itself, which the
+        mutual-read relation (``create_relation``) does not give."""
         await self._provision_entities([project_id])
-        await self._enroll_member(registry_id, [project_id])
+        await self._record_memberships([
+            EntityMembershipEntry(member=registry_id, parent=project_id)
+        ])
+        node_ids = await self._resolve_virtual_entity_ids([registry_id, project_id])
+        await self._bulk_insert_ignore_conflicts([
+            ScopeBindingRow(
+                virtual_entity_id=node_ids[(registry_id.entity_type(), registry_id)],
+                scope_entity_id=node_ids[(project_id.entity_type(), project_id)],
+                permission_cap=None,
+            )
+        ])
 
     async def withdraw_registry_from_project(
         self, registry_id: ContainerRegistryID, project_id: ProjectID

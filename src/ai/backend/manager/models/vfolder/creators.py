@@ -57,7 +57,7 @@ class VFolderCreator(EntityCreator[VFolderRow, VFolderData]):
         return VFolderUUID(row.id)
 
     @override
-    def member_of(self, row: VFolderRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: VFolderRow) -> Collection[EntityIdentifier]:
         match self.ownership_type:
             case VFolderOwnershipType.USER if self.user is not None:
                 return (UserID(self.user),)

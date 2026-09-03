@@ -56,7 +56,7 @@ class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
         return ProjectID(row.id)
 
     @override
-    def member_of(self, row: ProjectRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: ProjectRow) -> Collection[EntityIdentifier]:
         return (self.domain_id,)
 
     @override

@@ -20,7 +20,7 @@ from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE, R
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
-from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE, VFolderUUID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
@@ -34,7 +34,10 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as PermScopeType,
 )
-from ai.backend.manager.data.permission.virtual_entity import EntityPermissionCheckKey
+from ai.backend.manager.data.permission.virtual_entity import (
+    EntityPermissionCheckKey,
+    ScopePermissionCheckKey,
+)
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 
@@ -839,6 +842,69 @@ class TestUserRosterEnrollment:
             key, Permission.READ
         )
         assert result is True
+
+    async def _put_vfolder_in_project_vs(
+        self,
+        db: ExtendedAsyncSAEngine,
+        project_id: uuid.UUID,
+        vfolder_id: uuid.UUID,
+        cap: Permission | None,
+    ) -> None:
+        """Put a vfolder into the project's virtual entity: shared under ``cap``, or
+        owned for ``None``."""
+        async with db.begin_session() as db_sess:
+            project_ve_id = await db_sess.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_id == project_id,
+                )
+            )
+            assert project_ve_id is not None
+            vfolder_node = VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id)
+            db_sess.add(vfolder_node)
+            await db_sess.flush()
+            await VirtualEntitySeeder().cap_edge(db_sess, project_ve_id, vfolder_node.id, cap)
+
+    @pytest.mark.parametrize(
+        ("cap", "reaches"),
+        [
+            pytest.param(None, True, id="owned"),
+            pytest.param(Permission.READ, False, id="shared"),
+        ],
+    )
+    async def test_a_share_never_makes_the_shared_entity_a_scope(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        db_source: PermissionDBSource,
+        ops_provider: RBACOpsProvider,
+        ids: VSChainFixture,
+        cap: Permission | None,
+        reaches: bool,
+    ) -> None:
+        """A project role holding session READ reaches sessions under a vfolder the
+        project owns, and not under one merely shared into it: a share answers for
+        the shared entity's own type only."""
+        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
+        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        vfolder_id = uuid.uuid4()
+        await self._grant_on_project(
+            db_with_rbac_tables,
+            ids,
+            ids.owner_scope_id,
+            entity_type=PermEntityType.SESSION,
+        )
+        await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
+        await self._put_vfolder_in_project_vs(
+            db_with_rbac_tables, ids.owner_scope_id, vfolder_id, cap
+        )
+
+        key = ScopePermissionCheckKey(
+            user_id=ids.user_id,
+            scope=ScopeRef(scope_type=ScopeType(VFOLDER_ENTITY_TYPE), scope_id=vfolder_id),
+            entity_type=SESSION_ENTITY_TYPE,
+        )
+        result = await db_source.check_scope_permission_via_virtual_entity([key], Permission.READ)
+        assert result[key] is reaches
 
     async def test_roster_cap_clips_the_grant_over_the_member_user(
         self,

@@ -76,7 +76,7 @@ class DeploymentCreator(EntityCreator[EndpointRow, DeploymentInfo]):
         return DeploymentID(row.id)
 
     @override
-    def member_of(self, row: EndpointRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: EndpointRow) -> Collection[EntityIdentifier]:
         return (self.metadata.project_id, self.metadata.session_owner_id)
 
     @override

@@ -1,8 +1,9 @@
 """Entity writes of the v2 ops: every entity doubles as a scope.
 
-Creating always provisions the row's virtual entity node with its self edges and
-joins the scopes the spec's ``member_of`` declares; purging tears the same
-things down. The role-managed variants — typed against the combined spec — also
+Creating always provisions the row's virtual entity node, which owns and governs
+itself, and writes the relations the spec declares — each ``created_in`` scope owns
+it and governs it;
+purging tears the same things down. The role-managed variants — typed against the combined spec — also
 provision the roles the scope type's active presets call for; the plain paths
 never touch roles at all.
 """
@@ -28,7 +29,7 @@ from ai.backend.common.data.entity.types import (
     EntityType,
     ScopeType,
 )
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.logging import BraceStyleAdapter
@@ -52,7 +53,11 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.specs.creator import EntityCreator, RoleManagedEntityCreator
+from ai.backend.manager.models.specs.creator import (
+    EntityCreator,
+    RoleManagedEntityCreator,
+    RoleManagedGlobalEntityCreator,
+)
 from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
@@ -97,27 +102,41 @@ class V2EntityWriteOps(V2WriteOpsBase):
 
     async def create_entity[TRow: Base, TData](self, creator: EntityCreator[TRow, TData]) -> TData:
         """Insert one entity row: the row, its virtual entity node (self membership
-        and self binding), and its membership in each ``member_of`` scope — one
+        which owns and governs itself), owned and governed by each ``created_in`` scope — one
         transaction. No roles are involved on this path."""
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         entity = creator.entity_id(row)
         await self._provision_entities([entity])
-        await self._enroll_member(entity, creator.member_of(row))
+        await self._own(entity, creator.created_in(row))
+        await self._govern(entity, creator.created_in(row))
         return creator.to_data(row)
 
-    async def create_role_managed_entity[TRow: Base, TData](
-        self, creator: RoleManagedEntityCreator[TRow, TData]
+    async def create_role_managed_global_entity[TRow: Base, TData](
+        self, creator: RoleManagedGlobalEntityCreator[TRow, TData]
     ) -> TData:
-        """Insert one role-managed entity row, additionally provisioning the roles
-        the scope type's active presets call for — the spec's ``template_value``
-        feeds the presets' name templates."""
+        """Insert one role-managed entity row created in no scope, additionally
+        provisioning the roles the scope type's active presets call for — the spec's
+        ``template_value`` feeds the presets' name templates."""
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         entity = creator.entity_id(row)
         await self._provision_entities([entity])
         await self._create_preset_roles({entity: creator.template_value(row)})
-        await self._enroll_member(entity, creator.member_of(row))
+        return creator.to_data(row)
+
+    async def create_role_managed_entity[TRow: Base, TData](
+        self, creator: RoleManagedEntityCreator[TRow, TData]
+    ) -> TData:
+        """Insert one role-managed entity row: owned and governed by each
+        ``created_in`` scope as :meth:`create_entity` does, plus its preset roles."""
+        row = creator.build_row()
+        await self._insert_row(row, creator.integrity_error_checks())
+        entity = creator.entity_id(row)
+        await self._provision_entities([entity])
+        await self._create_preset_roles({entity: creator.template_value(row)})
+        await self._own(entity, creator.created_in(row))
+        await self._govern(entity, creator.created_in(row))
         return creator.to_data(row)
 
     async def atomic_create_entities[TRow: Base, TData](
@@ -132,14 +151,34 @@ class V2EntityWriteOps(V2WriteOpsBase):
         entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
         await self._provision_entities(entities)
         for creator, row, entity in zip(creators, rows, entities, strict=True):
-            await self._enroll_member(entity, creator.member_of(row))
+            await self._own(entity, creator.created_in(row))
+        await self._govern(entity, creator.created_in(row))
+        return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
+
+    async def atomic_create_role_managed_global_entities[TRow: Base, TData](
+        self, creators: Sequence[RoleManagedGlobalEntityCreator[TRow, TData]]
+    ) -> list[TData]:
+        """Insert role-managed rows created in no scope atomically, provisioning each
+        row's scope and preset roles as :meth:`create_role_managed_global_entity` does
+        for one."""
+        if not creators:
+            return []
+        rows = [creator.build_row() for creator in creators]
+        await self._insert_rows(rows, creators[0].integrity_error_checks())
+        entities = [creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)]
+        await self._provision_entities(entities)
+        await self._create_preset_roles({
+            entity: creator.template_value(row)
+            for creator, row, entity in zip(creators, rows, entities, strict=True)
+        })
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def atomic_create_role_managed_entities[TRow: Base, TData](
         self, creators: Sequence[RoleManagedEntityCreator[TRow, TData]]
     ) -> list[TData]:
         """Insert role-managed entity rows atomically, provisioning each row's
-        scope and preset roles as :meth:`create_role_managed_entity` does for one."""
+        scope, preset roles and relations as :meth:`create_role_managed_entity` does
+        for one."""
         if not creators:
             return []
         rows = [creator.build_row() for creator in creators]
@@ -151,7 +190,8 @@ class V2EntityWriteOps(V2WriteOpsBase):
             for creator, row, entity in zip(creators, rows, entities, strict=True)
         })
         for creator, row, entity in zip(creators, rows, entities, strict=True):
-            await self._enroll_member(entity, creator.member_of(row))
+            await self._own(entity, creator.created_in(row))
+            await self._govern(entity, creator.created_in(row))
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def purge_entity[TRow: Base, TData](
@@ -192,7 +232,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
     ) -> TData:
         """Insert or update an entity row on conflict; the scope stays provisioned
         idempotently — the virtual entity node is get-or-create, and the declared
-        memberships are registered idempotently."""
+        own and govern relations are registered idempotently."""
         row = await self._upsert_row_returning(
             upserter.row_class(),
             upserter.index_elements(),
@@ -202,7 +242,8 @@ class V2EntityWriteOps(V2WriteOpsBase):
         )
         entity = upserter.entity_id(row)
         await self._provision_entities([entity])
-        await self._enroll_member(entity, upserter.member_of(row))
+        await self._own(entity, upserter.created_in(row))
+        await self._govern(entity, upserter.created_in(row))
         return upserter.to_data(row)
 
     async def atomic_upsert_entities[TRow: Base, TData](
@@ -229,44 +270,31 @@ class V2EntityWriteOps(V2WriteOpsBase):
         entities = [upserter.entity_id(row) for upserter, row in zip(upserters, rows, strict=True)]
         await self._provision_entities(entities)
         for upserter, row, entity in zip(upserters, rows, entities, strict=True):
-            await self._enroll_member(entity, upserter.member_of(row))
+            await self._own(entity, upserter.created_in(row))
+        await self._govern(entity, upserter.created_in(row))
         return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
 
-    async def _enroll_member(
-        self, member: EntityIdentifier, parents: Collection[EntityIdentifier]
-    ) -> None:
-        """Enroll the new entity as a member of each parent scope: membership in
-        the parent's virtual entity, and the parent's binding into the member's own
-        virtual entity — nothing capped, since capped sharing is the object-sharing
-        mechanism, not creation.
-
-        A user member gets the membership alone: no row binds a user's virtual entity
-        into a scope, so a scope reaches what a user owns through each entity's own
-        enrollment.
-
-        Pure graph edges — no role state is touched here; granting a joining
-        user the parents' auto_assign roles is the explicit
-        :meth:`_grant_auto_assign_roles` primitive, wired by the user domain. A
-        parent without a virtual entity raises :class:`VirtualEntityNotFound`.
-        """
-        if not parents:
-            return
+    async def _own(self, entity: EntityIdentifier, owners: Collection[EntityIdentifier]) -> None:
+        """Put the entity into each owner's virtual entity, uncapped. An owner without
+        a virtual entity raises :class:`VirtualEntityNotFound`."""
         await self._record_memberships([
-            EntityMembershipEntry(member=member, parent=parent) for parent in parents
+            EntityMembershipEntry(member=entity, parent=owner) for owner in owners
         ])
-        if member.entity_type() == USER_ENTITY_TYPE:
+
+    async def _govern(self, entity: EntityIdentifier, scopes: Collection[EntityIdentifier]) -> None:
+        """Bind the entity's virtual entity into each scope, so the scope's roles reach
+        the entity and everything under it."""
+        if not scopes:
             return
-        node_ids = await self._resolve_virtual_entity_ids([member, *parents])
-        await self._bulk_insert_ignore_conflicts(
-            [
-                ScopeBindingRow(
-                    virtual_entity_id=node_ids[(member.entity_type(), member)],
-                    scope_entity_id=node_ids[(parent.entity_type(), parent)],
-                    permission_cap=None,
-                )
-                for parent in parents
-            ],
-        )
+        node_ids = await self._resolve_virtual_entity_ids([entity, *scopes])
+        await self._bulk_insert_ignore_conflicts([
+            ScopeBindingRow(
+                virtual_entity_id=node_ids[(entity.entity_type(), entity)],
+                scope_entity_id=node_ids[(scope.entity_type(), scope)],
+                permission_cap=None,
+            )
+            for scope in scopes
+        ])
 
     async def _grant_auto_assign_roles(
         self, entities: Collection[EntityIdentifier], user_id: UserID

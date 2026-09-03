@@ -26,7 +26,7 @@ class GlobalEntityCreator[TRow: Base, TData](ABC):
     Creating a row provisions its virtual entity node exactly as :class:`EntityCreator`
     does — rows are created under a global entity too (an image under its container
     registry), so it has to be namable in the graph. What it does not have is
-    ``member_of``: it joins nothing, and the missing hook is what says so.
+    ``created_in``: it is created in no scope, and the missing hook is what says so.
     """
 
     @abstractmethod
@@ -51,8 +51,8 @@ class GlobalEntityCreator[TRow: Base, TData](ABC):
 
 class EntityCreator[TRow: Base, TData](ABC):
     """Insert spec of an entity: creating a row always provisions it in the RBAC graph
-    (its virtual entity node, self membership and self binding) and joins the entities
-    ``member_of`` declares.
+    (its virtual entity node, which owns and governs itself) and puts it under the
+    scopes ``created_in`` declares: each owns it and governs it.
 
     The spec knows nothing about roles; entities that allow role presets use
     :class:`RoleManagedEntityCreator`.
@@ -66,10 +66,40 @@ class EntityCreator[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def member_of(self, row: TRow) -> Collection[EntityIdentifier]:
-        """The existing entities the new one joins as a member (a project joins its
-        domain; a keypair joins its user). Empty for a top-level entity. Carries no
-        permission cap: capped sharing is the object-sharing mechanism, not creation."""
+    def created_in(self, row: TRow) -> Collection[EntityIdentifier]:
+        """The scopes the new entity is created in (a session's project and user). Each
+        owns it and governs it. Empty for a top-level entity."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_row(self) -> TRow:
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        raise NotImplementedError
+
+
+class RoleManagedGlobalEntityCreator[TRow: Base, TData](RoleTemplateSource[TRow], ABC):
+    """Insert spec of a role-managed entity created in no scope (domain, resource
+    group): what :class:`GlobalEntityCreator` writes, plus the preset roles the
+    role-template declares.
+
+    Deliberately NOT a :class:`GlobalEntityCreator` subtype — the entity hooks are
+    duplicated instead — so a role-managed spec cannot flow through the plain
+    ``create_global_entity`` path and silently skip its preset roles; only the
+    role-managed ops methods accept this type.
+    """
+
+    @abstractmethod
+    def entity_id(self, row: TRow) -> EntityIdentifier:
+        """The entity's id, read off the settled row; not necessarily the primary key.
+
+        Answers the type too, so nothing declares it separately."""
         raise NotImplementedError
 
     @abstractmethod
@@ -86,13 +116,11 @@ class EntityCreator[TRow: Base, TData](ABC):
 
 
 class RoleManagedEntityCreator[TRow: Base, TData](RoleTemplateSource[TRow], ABC):
-    """Insert spec of a role-managed entity (domain/project/user): the entity
-    creation plus the role-preset declaration.
+    """Insert spec of a role-managed entity created in a scope (project, user): what
+    :class:`EntityCreator` writes, plus the preset roles the role-template declares.
 
-    Deliberately NOT an :class:`EntityCreator` subtype — the entity hooks are
-    duplicated instead — so a role-managed spec cannot flow through the plain
-    ``create_entity`` path and silently skip its preset roles; only the
-    role-managed ops methods accept this type.
+    Deliberately NOT an :class:`EntityCreator` subtype, for the same reason
+    :class:`RoleManagedGlobalEntityCreator` is not a global one.
     """
 
     @abstractmethod
@@ -103,9 +131,9 @@ class RoleManagedEntityCreator[TRow: Base, TData](RoleTemplateSource[TRow], ABC)
         raise NotImplementedError
 
     @abstractmethod
-    def member_of(self, row: TRow) -> Collection[EntityIdentifier]:
-        """The existing entities the new one joins as a member; empty for a top-level
-        entity. Carries no permission cap."""
+    def created_in(self, row: TRow) -> Collection[EntityIdentifier]:
+        """The scopes the new entity is created in (a project's domain); each owns it
+        and governs it, as for :class:`EntityCreator`."""
         raise NotImplementedError
 
     @abstractmethod

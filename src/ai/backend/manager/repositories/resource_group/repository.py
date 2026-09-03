@@ -87,7 +87,7 @@ class ResourceGroupRepository:
         Raises ResourceGroupConflict if a resource group with the same name already exists.
         """
         async with self._v2_ops.write_ops() as w:
-            return await w.create_role_managed_entity(creator)
+            return await w.create_role_managed_global_entity(creator)
 
     @resource_group_repository_resilience.apply()
     async def search_resource_groups(

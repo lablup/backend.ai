@@ -13,12 +13,14 @@ from ai.backend.manager.repositories.ops.v2.field_write import V2FieldWriteOps
 from ai.backend.manager.repositories.ops.v2.global_write import V2GlobalWriteOps
 from ai.backend.manager.repositories.ops.v2.grant_write import V2GrantWriteOps
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
+from ai.backend.manager.repositories.ops.v2.relation_write import V2RelationWriteOps
 from ai.backend.manager.repositories.ops.v2.update_write import V2UpdateWriteOps
 
 
 class V2WriteOps(
     V2EntityWriteOps,
     V2GlobalWriteOps,
+    V2RelationWriteOps,
     V2GrantWriteOps,
     V2FieldWriteOps,
     V2DanglingFieldWriteOps,
@@ -30,7 +32,8 @@ class V2WriteOps(
 
     Composed by inheritance from the per-concern ops — entity writes (the
     role-managed variants included), global, field and sidecar writes, the
-    updates, batch writes and the grants over existing entities — on top of the
+    updates, batch writes, the grants over existing entities and the relations
+    between them — on top of the
     read ops; each concern lives in its own module and shares the primitives of
     ``V2WriteOpsBase``.
 

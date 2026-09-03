@@ -66,7 +66,7 @@ class DomainRepository:
         side of the pair, so the v2 ops layer has no primitive that writes one.
         """
         async with self._v2_ops.write_ops() as w:
-            data = await w.create_role_managed_entity(creator)
+            data = await w.create_role_managed_global_entity(creator)
         if resource_group_ids:
             async with self._db.begin_session() as session:
                 await session.execute(

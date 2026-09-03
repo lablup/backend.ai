@@ -57,7 +57,7 @@ class UserCreator(RoleManagedEntityCreator[UserRow, UserData]):
         return UserID(row.uuid)
 
     @override
-    def member_of(self, row: UserRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: UserRow) -> Collection[EntityIdentifier]:
         return (self.domain_id,)
 
     @override

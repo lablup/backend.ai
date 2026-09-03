@@ -79,7 +79,7 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | ✅ | Actual list behavior sits in the legacy path and branches only on three roles. It is cleanup material — `api/gql_legacy/base.py:548` |
 | ✅ | Global search serves superadmin and globally shared values only and skips permissions; that stays. The user data loader also skips permissions; that is to be fixed — `repositories/ops/repository.py:199`, `api/gql/data_loader/data_loaders.py:669` |
 | ➕ | Backfill existing resource entities into the graph and **remove every path that is not `scope -> virtual_scope -> entity`**: the legacy recursive path, `association_scopes_entities`, `object_permissions`, `RBACElementType` (BA-7204) |
-| ➕ | Membership enrollment writes the roster only. No row binds a user's virtual scope into a scope — the existing user bindings are removed. Reaching what a user owns goes only through each entity's own enrollment |
+| ➕ | 그래프 관계는 own 과 govern 둘이다. 생성(`created_in`)은 둘 다 쓰고, 공유는 cap 이 붙은 own 만 쓴다. project·user 는 domain 안에서 만들어진다. user VE 는 자기 domain 만 govern 한다; project 로스터의 user 는 READ cap 공유다 |
 | ➕ | Add a `field_permissions` table as a child of permission rows, and declare a catalog (fields, default-visible set) per entity. Checks always name the owning entity — the former colon sub-target names are fields |
 | ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows granted via `EntityGrant` to the accessible set |
 | ➕ | Blank unreadable fields and refuse filtering or sorting by them. Replace the data loaders with permission-aware bulk queries |
@@ -136,14 +136,15 @@ Quota scope keeps the folder row's `quota_scope_id` as is. The existing user quo
 
 Sharing puts an entity into a virtual scope, not a person into a project. Sharing into someone else's personal project adds no member to it. Sharing only adds rows to `entity_memberships` and never changes the project column, so the target of resource policies never changes.
 
-Two invariants:
+그래프의 관계는 둘이다. **own** 은 ve 가 entity 를 소유하는 것: entity 가 그 ve 의 명단에 오르고 한 홉에 닿는다. **govern** 은 scope 가 ve 를 다스리는 것: scope 의 role 이 그 ve 가 own 한 것 전부에 닿는다. govern 이 own 의 상위 개념이다. 생성과 공유는 이 둘을 조합한다.
 
-`entity_memberships` rows arise on two paths: written at creation via `EntityMembershipEntry`, or granted later via `EntityGrant`. For the former, two rules hold.
+| 선언 | own | govern | 규칙 |
+|---|---|---|---|
+| 생성 시 `created_in` | 있음 | 있음 | session 은 project·user 안에서, project·user 는 domain 안에서 만들어진다. 만든 곳의 명단에 오르고, 만든 곳의 role 이 그 아래(초대)까지 닿는다. unsharing 으로 지워지지 않는다. 소유권 이동은 `enroll_entities`. user 의 ve 는 자기 domain 만 govern 하고 project 는 govern 하지 않는다 — user 가 own 한 것이 project 로 새지 않도록 |
+| relation `create_relation` | READ cap, 양방향 | 없음 | project 와 resource group 은 서로를 읽기만 한다 |
+| 공유 `EntityGrant` | cap 있음 | 없음 | cap 은 항상 명시, 0 포함. READ/UPDATE 는 필드 경로로 좁힌다(5.2). revoke 로 지워진다. 공유는 공유된 entity 자신에게만 답하고, 그 entity 를 scope 로 쓰지 못한다 |
 
-- It cannot be removed by unsharing.
-- It carries no `permission_cap`. Permissions do not vary per row within one scope.
-
-A scope-membership enrollment (a user joining a scope's roster) may carry a per-scope-kind constant cap, identical on every member row: user-to-project enrollments are capped to read, user-to-domain enrollments carry none. Per-row variance stays forbidden either way.
+project 로스터의 user 는 공유다: `EntityGrant(entity=user, grantee=project, permission_cap=READ, fields=기본 공개 필드)`. domain 로스터는 따로 없다 — user 는 domain 안에서 만들어진다. 가입 시 auto_assign 역할 부여는 별도 프리미티브다.
 
 | Question | Answered by |
 |---|---|
@@ -151,7 +152,7 @@ A scope-membership enrollment (a user joining a scope's roster) may carry a per-
 | What can be done with it | Permission resolution walking `scope -> virtual_scope -> entity` |
 | Which view does it appear in | Graph enrollment: the union of creation enrollment and share enrollment (5.4) |
 
-Business-logic relations — resource groups, container registries — plus quota and resource-policy applicability are not expressed through virtual scopes. Relation tables and entity rows answer them.
+resource group 과의 relation 은 위 표대로 양방향 READ 공유로 그래프에 오른다. container registry 는 project 가 registry 가 own 한 image 까지 닿아야 해서 project 가 registry 를 own 하고 govern 하는 지금 모양을 유지하고, relation 으로 옮길지는 후속으로 정한다. quota 와 resource-policy 적용 여부는 그래프가 아니라 relation 테이블과 entity 행이 답한다.
 
 ### 5.2 FieldPermission
 
@@ -382,12 +383,12 @@ Opening project-folder creation and narrowing user information are the intended 
 | Quota scope | `quota_scope_id` kept; the user quota scope reinterpreted as the personal project's. No physical moves |
 | A user's own information | Not a resource entity; stays under the user |
 | Column vs. graph | The column answers resource policy and quota, permission resolution answers capability, graph enrollment answers view membership |
-| Membership and bindings | A user's virtual scope is never bound into a scope; joining enrolls the user in the roster only. Belongings are reached only through each entity's own enrollment |
-| Roster caps | Per-scope-kind constants: user-to-project enrollment capped to read, user-to-domain uncapped. Field narrowing stays with FieldPermission |
+| 관계 | own·govern 둘. `created_in` 은 둘 다, 공유·relation 은 cap 이 붙은 own 만. user 의 ve 는 자기 domain 만 govern 한다 |
+| 로스터 | project 로스터의 user 는 READ cap 공유(기본 공개 필드). domain → user 는 관할 |
 | Joining a project | Project admins invite, with the invitee's acceptance; direct registration is a domain-admin operation (BEP-1076) |
 | Credential secrets | Never readable by any administrator; administration is reissue and disable. The secret is shown once to its owner at issuance |
-| Business-logic relations | Resource groups, registries, and quota are not expressed through virtual scopes; relation tables answer |
-| Rows from `EntityMembershipEntry` | Cannot be removed by unsharing and carry no `permission_cap` |
+| relation | resource group 은 양방향 READ 공유. container registry 는 project 가 own 하고 govern 하는 지금 모양 유지, 이관은 후속. quota 는 relation 테이블이 답한다 |
+| `created_in` 의 행 | unsharing 으로 지워지지 않고 cap 이 없다 |
 | Former colon sub-targets | Fields of their owning entity — none is promoted to an entity type; the colon declarations retire with `RBACElementType` |
 | Fields | `FieldPermission` — child of a permission row, read and update. Absent means all fields; present means only the list |
 | Catalog | Declared per entity; unlisted names get no permission and unlisted fields are invisible |

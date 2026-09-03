@@ -33,7 +33,7 @@ class NetworkCreator(EntityCreator[NetworkRow, NetworkData]):
         return NetworkID(row.id)
 
     @override
-    def member_of(self, row: NetworkRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: NetworkRow) -> Collection[EntityIdentifier]:
         return (ProjectID(self.project_id),)
 
     @override
