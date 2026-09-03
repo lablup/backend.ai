@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.8.3 (2026-09-03)
+
+### Fixes
+* Terminate a model service route as soon as its bound session ends, instead of waiting out the health check initial delay. ([#14145](https://github.com/lablup/backend.ai/issues/14145))
+
+
 ## 26.8.2 (2026-09-02)
 
 ### Fixes
