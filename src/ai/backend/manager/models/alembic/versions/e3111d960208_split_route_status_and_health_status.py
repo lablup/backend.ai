@@ -16,10 +16,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # 1. Add 'running' to the routestatus enum
-    op.execute("ALTER TYPE routestatus ADD VALUE IF NOT EXISTS 'running'")
-    # Commit so the new enum value is visible in the same transaction
-    op.execute("COMMIT")
+    # 1. Add 'running' to the routestatus enum. Use autocommit_block() (not a
+    # raw "COMMIT") so Alembic's own transaction tracking stays in sync.
+    with op.get_context().autocommit_block():
+        op.execute("ALTER TYPE routestatus ADD VALUE IF NOT EXISTS 'running'")
 
     # 2. Add health_status column to routings
     op.execute("""
