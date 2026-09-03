@@ -7,6 +7,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -58,6 +59,15 @@ progress_reporter: ContextVar[ProgressReporter | None] = ContextVar(
     "progress_reporter", default=None
 )
 all_updates: ContextVar[dict[ImageIdentifier, dict[str, Any]]] = ContextVar("all_updates")
+
+
+@dataclass
+class RescanCounts:
+    scanned: int = 0
+    skipped: int = 0
+
+
+rescan_counts: ContextVar[RescanCounts] = ContextVar("rescan_counts")
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -123,10 +133,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         reporter: ProgressReporter | None = None,
     ) -> RescanImagesResult:
-        log.info("rescan_single_registry()")
+        log.debug("rescan_single_registry()")
         errors: list[str] = []
 
         all_updates_token = all_updates.set({})
+        counts_token = rescan_counts.set(RescanCounts())
         concurrency_sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
         progress_reporter.set(reporter)
         try:
@@ -151,8 +162,18 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         errors.append(f"Failed to scan image! Detail: {e!s}")
 
             scanned_images = await self.commit_rescan_result()
+            counts = rescan_counts.get()
+            log.info(
+                "Rescanned registry {} - scanned:{} skipped:{} updated:{} errors:{}",
+                self.registry_name,
+                counts.scanned,
+                counts.skipped,
+                len(scanned_images),
+                len(errors),
+            )
             return RescanImagesResult(images=scanned_images, errors=errors)
         finally:
+            rescan_counts.reset(counts_token)
             all_updates.reset(all_updates_token)
 
     async def commit_rescan_result(self) -> list[ImageData]:
@@ -203,6 +224,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         skip_reason = str(e)
                         progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
                         log.warning(progress_msg)
+                        rescan_counts.get().skipped += 1
                         if (reporter := progress_reporter.get()) is not None:
                             await reporter.update(1, message=progress_msg)
                         continue
@@ -253,6 +275,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def scan_single_ref(self, image: str) -> RescanImagesResult:
         all_updates_token = all_updates.set({})
+        counts_token = rescan_counts.set(RescanCounts())
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
             username = self.registry_info.username
@@ -274,6 +297,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             return RescanImagesResult(images=scanned_images)
         finally:
             concurrency_sema.reset(sema_token)
+            rescan_counts.reset(counts_token)
             all_updates.reset(all_updates_token)
 
     async def _scan_image(
@@ -281,7 +305,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         sess: aiohttp.ClientSession,
         image: str,
     ) -> None:
-        log.info("_scan_image()")
+        log.debug("_scan_image()")
         rqst_args = await registry_login(
             sess,
             self.registry_url,
@@ -655,6 +679,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             if not skip_reason:
                 skip_reason = "missing/deleted"
             log.warning("Skipped image - {}:{} ({})", image, tag, skip_reason)
+            rescan_counts.get().skipped += 1
             progress_msg = f"Skipped {image}:{tag} ({skip_reason})"
             if (reporter := progress_reporter.get()) is not None:
                 await reporter.update(1, message=progress_msg)
@@ -709,15 +734,17 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         architecture,
                         skip_reason,
                     )
+                    rescan_counts.get().skipped += 1
                     progress_msg = f"Skipped {image}:{tag}/{architecture} ({skip_reason})"
                 else:
-                    log.info(
+                    log.debug(
                         "Scanned image - {0}:{1}/{2} ({3})",
                         image,
                         tag,
                         architecture,
                         manifest["digest"],
                     )
+                    rescan_counts.get().scanned += 1
                     progress_msg = f"Updated {image}:{tag}/{architecture} ({manifest['digest']})"
                 if (reporter := progress_reporter.get()) is not None:
                     await reporter.update(1, message=progress_msg)
