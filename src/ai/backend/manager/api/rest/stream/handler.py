@@ -419,7 +419,6 @@ class StreamHandler:
                     "msg": f"Invalid API parameters: {e!r}",
                 })
         except BackendAIError as e:
-            log.exception("STREAM_EXECUTE: exception")
             if not ws.closed:
                 await ws.send_json({
                     "status": "error",
