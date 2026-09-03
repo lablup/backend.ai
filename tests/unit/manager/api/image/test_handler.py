@@ -63,6 +63,7 @@ def create_image_data(
         image="python",
         created_at=datetime(2024, 6, 1, 12, 0, 0, tzinfo=UTC),
         tag="3.11",
+        version="3.11",
         registry=registry,
         registry_id=uuid4(),
         architecture=architecture,
