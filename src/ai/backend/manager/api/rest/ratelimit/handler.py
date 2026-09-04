@@ -55,7 +55,7 @@ def make_rlim_middleware(
         """Global middleware implementing a fixed-window rate limiter."""
         if request["is_authorized"]:
             rate_limit = request["keypair"]["rate_limit"]
-            state = await valkey_client.count_request(
+            state = await valkey_client.consume(
                 user_id=request["user"]["uuid"],
                 window=_RATELIMIT_WINDOW,
             )

@@ -96,13 +96,13 @@ class ValkeyRateLimitClient:
         await self._client.disconnect()
 
     @valkey_rate_limit_resilience.apply()
-    async def count_request(
+    async def consume(
         self,
         user_id: UserID,
         window: int = _DEFAULT_RATE_LIMIT_WINDOW,
     ) -> RateLimitState:
         """
-        Count a request against the user's current window and return its state.
+        Consume one request of the user's current window and return its state.
 
         :param user_id: The user the counter is keyed by.
         :param window: The window length in seconds, applied when the request opens a window.

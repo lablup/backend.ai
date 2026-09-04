@@ -15,7 +15,7 @@ async def test_first_request_opens_the_window(
 ) -> None:
     user_id = UserID(uuid.uuid4())
 
-    state = await test_valkey_rate_limit.count_request(user_id, window=60)
+    state = await test_valkey_rate_limit.consume(user_id, window=60)
 
     assert state == RateLimitState(count=1, reset=60)
 
@@ -24,10 +24,10 @@ async def test_later_requests_keep_the_window(
     test_valkey_rate_limit: ValkeyRateLimitClient,
 ) -> None:
     user_id = UserID(uuid.uuid4())
-    await test_valkey_rate_limit.count_request(user_id, window=60)
+    await test_valkey_rate_limit.consume(user_id, window=60)
     await asyncio.sleep(1.1)
 
-    state = await test_valkey_rate_limit.count_request(user_id, window=60)
+    state = await test_valkey_rate_limit.consume(user_id, window=60)
 
     assert state == RateLimitState(count=2, reset=59)
 
@@ -36,10 +36,10 @@ async def test_new_window_after_expiry(
     test_valkey_rate_limit: ValkeyRateLimitClient,
 ) -> None:
     user_id = UserID(uuid.uuid4())
-    await test_valkey_rate_limit.count_request(user_id, window=1)
+    await test_valkey_rate_limit.consume(user_id, window=1)
     await asyncio.sleep(1.1)
 
-    state = await test_valkey_rate_limit.count_request(user_id, window=60)
+    state = await test_valkey_rate_limit.consume(user_id, window=60)
 
     assert state == RateLimitState(count=1, reset=60)
 
@@ -48,8 +48,8 @@ async def test_get_state_reads_the_window_without_counting(
     test_valkey_rate_limit: ValkeyRateLimitClient,
 ) -> None:
     user_id = UserID(uuid.uuid4())
-    await test_valkey_rate_limit.count_request(user_id, window=60)
-    await test_valkey_rate_limit.count_request(user_id, window=60)
+    await test_valkey_rate_limit.consume(user_id, window=60)
+    await test_valkey_rate_limit.consume(user_id, window=60)
 
     state = await test_valkey_rate_limit.get_state(user_id)
 
@@ -68,6 +68,6 @@ async def test_windows_are_keyed_by_user(
 ) -> None:
     counted_user = UserID(uuid.uuid4())
     other_user = UserID(uuid.uuid4())
-    await test_valkey_rate_limit.count_request(counted_user, window=60)
+    await test_valkey_rate_limit.consume(counted_user, window=60)
 
     assert await test_valkey_rate_limit.get_state(other_user) is None

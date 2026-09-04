@@ -46,7 +46,7 @@ class TestRlimMiddleware:
     @pytest.fixture
     def mock_valkey_client(self) -> MagicMock:
         client = MagicMock(spec=ValkeyRateLimitClient)
-        client.count_request = AsyncMock()
+        client.consume = AsyncMock()
         return client
 
     @pytest.fixture
@@ -88,7 +88,7 @@ class TestRlimMiddleware:
         assert response.headers["X-RateLimit-Reset"] == str(_RATELIMIT_WINDOW)
         assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW)
         mock_handler.assert_called_once_with(mock_request_anonymous)
-        mock_valkey_client.count_request.assert_not_called()
+        mock_valkey_client.consume.assert_not_called()
 
     @pytest.mark.parametrize(
         "test_case",
@@ -126,7 +126,7 @@ class TestRlimMiddleware:
         test_case: RateLimitSuccessCase,
     ) -> None:
         mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
-        mock_valkey_client.count_request = AsyncMock(
+        mock_valkey_client.consume = AsyncMock(
             return_value=RateLimitState(count=test_case.count, reset=_RESET)
         )
 
@@ -138,7 +138,7 @@ class TestRlimMiddleware:
         assert response.headers["X-RateLimit-Reset"] == str(_RESET)
         assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW)
         mock_handler.assert_called_once_with(mock_request_authorized)
-        mock_valkey_client.count_request.assert_called_once_with(
+        mock_valkey_client.consume.assert_called_once_with(
             user_id=_USER_ID,
             window=_RATELIMIT_WINDOW,
         )
@@ -176,7 +176,7 @@ class TestRlimMiddleware:
         test_case: RateLimitExceedCase,
     ) -> None:
         mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
-        mock_valkey_client.count_request = AsyncMock(
+        mock_valkey_client.consume = AsyncMock(
             return_value=RateLimitState(count=test_case.count, reset=_RESET)
         )
 
@@ -190,7 +190,7 @@ class TestRlimMiddleware:
         assert response.headers["X-RateLimit-Reset"] == str(_RESET)
         assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW)
         mock_handler.assert_not_called()
-        mock_valkey_client.count_request.assert_called_once_with(
+        mock_valkey_client.consume.assert_called_once_with(
             user_id=_USER_ID,
             window=_RATELIMIT_WINDOW,
         )
