@@ -40,7 +40,7 @@ class NotificationChannelRow(Base):
     __tablename__ = "notification_channels"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
@@ -102,7 +102,7 @@ class NotificationRuleRow(Base):
     __tablename__ = "notification_rules"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)

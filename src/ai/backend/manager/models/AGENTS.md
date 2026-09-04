@@ -44,22 +44,23 @@ live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
 ## Id column defaults
 
 - Give every id column a `server_default`. Do not mint the value in Python.
-- The default generator is `uuid_generate_v7()`. Use it for a new table and whenever
-  you revisit an existing table's default.
-- Use `uuid_generate_v4()` in the cases below. When you cannot tell which applies, use v4.
-
-| Use v4 when | Examples |
-|---|---|
-| The id reaches an untrusted holder | `endpoint_tokens`, `login_sessions`, `entity_invitations`, `vfolder_invitations` |
-| Knowing the id is itself what grants access | an unsigned share link |
-
+- The generator is `uuid_generate_v7()`. No table departs from this today.
+- Use `uuid_generate_v4()` only for **an id that is relied on to be unguessable**, such as
+  an unsigned share link. The deciding number is the count of random bits: 62 for v7,
+  122 for v4.
+- Do not make a secret out of an id. Put it in its own column, the way
+  `login_sessions.session_token`, `endpoint_tokens.token` and `keypairs.secret_key` do.
 - Never read an id as a time. Ordering and creation time belong to the `created_at` columns.
+- v7 tells the holder of an id when it was made. When a new id goes to an unauthenticated
+  party, confirm that its creation time may be known.
 - Changing a default changes two places: the Row declaration and an
   `ALTER COLUMN ... SET DEFAULT` in the migration. Editing only the Python declaration
   leaves a freshly created database and a migrated one with different schemas.
 - A foreign key column naming an owner or a parent gets no default. An INSERT that omits
   the value must be rejected.
 - The function DDL lives in `models/uuid7.py`. Execute that string rather than copying it.
+- `IDColumn()`, `SessionIDColumn()` and `KernelIDColumn()` in `models/base.py` stay on v4:
+  old migrations reproduce past schemas through them. Do not use them for a new table.
 
 ## Custom column types
 

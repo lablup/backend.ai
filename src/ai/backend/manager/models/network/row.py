@@ -46,7 +46,7 @@ class NetworkRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "networks"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
 
     name: Mapped[str] = mapped_column("name", sa.String(length=128), nullable=False)

@@ -161,7 +161,7 @@ class ImageRow(CreatedAtMixin, Base):
     )
 
     id: Mapped[ImageID] = mapped_column(
-        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String, nullable=False, index=True)
     project: Mapped[str | None] = mapped_column("project", sa.String, nullable=True)
@@ -854,7 +854,7 @@ async def bulk_get_image_configs(
 class ImageAliasRow(Base):
     __tablename__ = "image_aliases"
     id: Mapped[ImageID] = mapped_column(
-        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     alias: Mapped[str | None] = mapped_column("alias", sa.String, unique=True, index=True)
     image_id: Mapped[ImageID] = mapped_column(

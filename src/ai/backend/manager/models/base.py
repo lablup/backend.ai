@@ -1102,6 +1102,8 @@ class ResourceOptsEntry(BackendAISchema):
     value: str
 
 
+# The three helpers below stay on uuid_generate_v4(): old migrations reproduce past
+# schemas through them. New tables declare their own column; see AGENTS.md.
 def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 

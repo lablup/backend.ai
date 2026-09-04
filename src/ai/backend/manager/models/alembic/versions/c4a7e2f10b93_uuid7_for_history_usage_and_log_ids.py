@@ -1,7 +1,7 @@
 """use uuid_generate_v7 for history, usage and log ids
 
 Revision ID: c4a7e2f10b93
-Revises: a4c1d9b5e207
+Revises: c1d7a3e9f5b2
 Create Date: 2026-09-03
 
 """
@@ -13,7 +13,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "c4a7e2f10b93"
-down_revision = "a4c1d9b5e207"
+down_revision = "c1d7a3e9f5b2"
 branch_labels = None
 depends_on = None
 

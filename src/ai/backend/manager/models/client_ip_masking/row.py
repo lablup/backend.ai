@@ -42,7 +42,7 @@ class ClientIPMaskingPolicyRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(ClientIPMaskingPolicyID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     target_type: Mapped[ClientIPMaskingTarget] = mapped_column(
         "target_type", StrEnumType(ClientIPMaskingTarget), nullable=False

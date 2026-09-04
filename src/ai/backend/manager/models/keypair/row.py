@@ -69,7 +69,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
         GUID(KeyPairID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     access_key: Mapped[AccessKey] = mapped_column(
         "access_key", sa.String(length=20), primary_key=True

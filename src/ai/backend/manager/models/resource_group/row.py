@@ -141,7 +141,7 @@ class ResourceGroupOpts(BackendAISchema):
 class ResourceGroupForDomainRow(Base):
     __tablename__ = "sgroups_for_domains"
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
@@ -171,7 +171,7 @@ sgroups_for_domains = ResourceGroupForDomainRow.__table__
 class ResourceGroupForProjectRow(Base):
     __tablename__ = "sgroups_for_groups"
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
@@ -202,7 +202,7 @@ sgroups_for_groups = ResourceGroupForProjectRow.__table__
 class ResourceGroupForKeypairsRow(Base):
     __tablename__ = "sgroups_for_keypairs"
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
@@ -247,7 +247,7 @@ class ResourceGroupRow(CreatedAtMixin, Base):
         GUID(ResourceGroupID),
         nullable=False,
         unique=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool | None] = mapped_column(

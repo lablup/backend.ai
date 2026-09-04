@@ -1,7 +1,7 @@
 ---
 name: models-schema-declaration
 type: design-rationale
-description: models as the schema-declaration layer (per-domain row packages), why Rows carry no implementation, why models/specs specs are preferred over direct db-object manipulation (RBAC side effects), the rationale for avoiding direct session use and keeping implementation in repositories, why id defaults split between UUIDv7 and UUIDv4
+description: models as the schema-declaration layer (per-domain row packages), why Rows carry no implementation, why models/specs specs are preferred over direct db-object manipulation (RBAC side effects), the rationale for avoiding direct session use and keeping implementation in repositories, why every id default is UUIDv7
 scope: src/ai/backend/manager/models
 keywords: [Row, ORM, specs, RBAC, session, repository, schema, alembic, uuid_generate_v7, server_default]
 sources:
@@ -9,7 +9,7 @@ sources:
   - src/ai/backend/manager/models/uuid7.py
 generated:
   by: claude-code/opus-5
-  at: 2026-09-03
+  at: 2026-09-05
 status: stable
 ---
 
@@ -41,14 +41,24 @@ no implementation".
 - Reason one: transaction boundaries are the repository's responsibility, so scattered direct sessions break atomicity guarantees.
 - Reason two: direct sessions become the channel through which Rows leak into layers above the repository — a bypass of the layering rule that Rows do not rise above `repositories/`.
 
-## Why id defaults split between v7 and v4
+## Why every id default is v7
 
 - The leading 60 bits of a UUIDv7 are the generation time, so a new row's id lands at the
-  right edge of the primary key index instead of scattering across it the way v4 does.
-  The busier the table is written, the more this is worth.
-- The price is that the id reveals when it was made. That is harmless for an internal
-  identifier, but an id handed to an untrusted holder leaks its issue time on its own.
-  Tokens and invitations therefore stay on v4.
+  right edge of the primary key index instead of scattering across it the way v4 does. Two
+  things follow. An insert always touches one page that is already cached, and reading
+  recent rows keeps the hot index pages down to a few. Heap page placement is decided by
+  insert order, so it is not part of this gain.
+- The size of the gain is the product of how far the index exceeds the cache and how often
+  the table is written. On a table of a few thousand rows the whole index stays resident and
+  the difference is not measurable; on a table of millions it shows up directly as random
+  disk reads.
+- One generator for every table. Letting it vary per table forces the next person to make
+  the judgement again.
+- What v7 costs is that the holder of an id learns when it was made. In this schema whoever
+  can see an id can also see the row's `created_at`, so nothing new leaks.
+- 62 bits are random. The leading 48 hold a millisecond timestamp and the next 12 a
+  sub-millisecond tick, leaving the rest. That is fewer than v4's 122, so a value that is
+  relied on to be unguessable belongs in its own column rather than in the id.
 - v4 and v7 are both the `uuid` type, so a column may hold a mix. Existing rows never need
   to be rewritten.
 - The function is strictly increasing within a session: it remembers the last value it

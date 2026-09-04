@@ -24,7 +24,7 @@ class AppConfigDefinitionRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(AppConfigDefinitionID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     config_name: Mapped[str] = mapped_column(
         "config_name", sa.String(length=128), nullable=False, unique=True

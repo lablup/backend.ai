@@ -123,7 +123,7 @@ class AssocGroupUserRow(Base):
     )
 
     id: Mapped[ProjectID] = mapped_column(
-        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     user_id: Mapped[UserID] = mapped_column(
         "user_id",
@@ -151,7 +151,7 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     )
 
     id: Mapped[ProjectID] = mapped_column(
-        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column(
         "name", SlugType(length=64, allow_unicode=True, allow_dot=True), nullable=False

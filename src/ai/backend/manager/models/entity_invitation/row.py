@@ -52,7 +52,7 @@ class EntityInvitationRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(EntityInvitationID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     inviter_user_id: Mapped[UserID] = mapped_column(
         "inviter_user_id",

@@ -38,7 +38,7 @@ class AppConfigAllowListRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(AppConfigAllowListID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     config_name: Mapped[str] = mapped_column(
         "config_name",

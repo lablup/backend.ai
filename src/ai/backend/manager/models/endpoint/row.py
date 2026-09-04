@@ -903,7 +903,7 @@ class EndpointTokenRow(Base):
         "id",
         GUID(DeploymentTokenID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     token: Mapped[str] = mapped_column("token", sa.String(), nullable=False)
     endpoint: Mapped[DeploymentID | None] = mapped_column(
@@ -1026,7 +1026,7 @@ class EndpointAutoScalingRuleRow(Base):
     __tablename__ = "endpoint_auto_scaling_rules"
 
     id: Mapped[UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     metric_source: Mapped[AutoScalingMetricSource] = mapped_column(
         "metric_source", StrEnumType(AutoScalingMetricSource, use_name=False), nullable=False

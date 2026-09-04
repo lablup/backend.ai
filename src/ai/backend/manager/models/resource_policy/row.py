@@ -66,7 +66,7 @@ class KeyPairResourcePolicyRow(CreatedAtMixin, Base):
         GUID(KeyPairResourcePolicyUUID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     is_default: Mapped[bool] = mapped_column(
         "is_default", sa.Boolean, nullable=False, server_default=sa.false()
@@ -145,7 +145,7 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):
         GUID(UserResourcePolicyUUID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     max_vfolder_count: Mapped[int] = mapped_column(
         "max_vfolder_count", sa.Integer(), nullable=False
@@ -217,7 +217,7 @@ class ProjectResourcePolicyRow(CreatedAtMixin, Base):
         GUID(ProjectResourcePolicyUUID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     max_vfolder_count: Mapped[int] = mapped_column(
         "max_vfolder_count", sa.Integer(), nullable=False
