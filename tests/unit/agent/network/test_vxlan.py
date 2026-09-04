@@ -717,7 +717,7 @@ class TestPlaintextDrop:
         args = plaintext_drop_add_args(4097, 4789)
         # In a chain this backend owns, so a co-tenant's `-F INPUT` cannot take it and its
         # position is ours to keep (see TestOwnedChains).
-        assert args[:3] == ["iptables", "-A", CHAIN_IN]
+        assert args[:3] == ["iptables", "-I", CHAIN_IN]
         assert args[args.index("--dport") + 1] == "4789"
         # the VNI word sits 12 bytes into the UDP header (8 UDP + 4 VXLAN flags/reserved)
         assert args[args.index("--u32") + 1] == "0>>22&0x3C@12>>8=4097"
@@ -739,7 +739,7 @@ class TestPlaintextDrop:
 
     def test_output_rule_marks_only_the_selected_vni(self) -> None:
         args = output_mark_add_args(4097, 4789)
-        assert args[:5] == ["iptables", "-t", "mangle", "-A", CHAIN_MARK]
+        assert args[:5] == ["iptables", "-t", "mangle", "-I", CHAIN_MARK]
         assert args[args.index("--u32") + 1] == "0>>22&0x3C@12>>8=4097"
         assert args[-4:] == ["-j", "MARK", "--set-mark", f"{XFRM_MARK:#x}"]
 
@@ -2410,7 +2410,7 @@ class TestEgressGuard:
 
     def test_the_guard_drops_only_unprotected_egress_of_this_vni(self) -> None:
         args = egress_guard_add_args(4097, 4789)
-        assert args[:3] == ["iptables", "-A", CHAIN_GUARD]
+        assert args[:3] == ["iptables", "-I", CHAIN_GUARD]
         assert args[args.index("--u32") + 1] == "0>>22&0x3C@12>>8=4097"
         assert args[args.index("--dir") + 1] == "out"
         assert args[args.index("--pol") + 1] == "none"
@@ -2433,7 +2433,7 @@ class TestEgressGuard:
             @override
             async def __call__(self, argv: Sequence[str]) -> None:
                 await super().__call__(argv)
-                if CHAIN_GUARD in argv and argv[1] in ("-C", "-A"):
+                if CHAIN_GUARD in argv and argv[1] in ("-C", "-A", "-I"):
                     raise RuntimeError("iptables: No chain/target/match by that name")
 
         rec = _NoGuard()
