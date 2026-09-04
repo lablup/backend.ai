@@ -79,7 +79,7 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | ✅ | Actual list behavior sits in the legacy path and branches only on three roles. It is cleanup material — `api/gql_legacy/base.py:548` |
 | ✅ | Global search serves superadmin and globally shared values only and skips permissions; that stays. The user data loader also skips permissions; that is to be fixed — `repositories/ops/repository.py:199`, `api/gql/data_loader/data_loaders.py:669` |
 | ➕ | Backfill existing resource entities into the graph and **remove every path that is not `scope -> virtual_scope -> entity`**: the legacy recursive path, `association_scopes_entities`, `object_permissions`, `RBACElementType` (BA-7204) |
-| ➕ | 그래프 관계는 own 과 govern 둘이다. 생성(`created_in`)은 둘 다 쓰고, 공유는 cap 이 붙은 own 만 쓴다. project·user 는 domain 안에서 만들어진다. user VE 는 자기 domain 만 govern 한다; project 로스터의 user 는 READ cap 공유다 |
+| ➕ | The graph has two relations, own and govern. Creation (`created_in`) writes both; a share writes a capped own only. Projects and users are created in their domain. A user's virtual entity is governed by its domain only; a user on a project roster is a READ-capped share |
 | ➕ | Add a `field_permissions` table as a child of permission rows, and declare a catalog (fields, default-visible set) per entity. Checks always name the owning entity — the former colon sub-target names are fields |
 | ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows shared via `replace_share` to the accessible set |
 | ➕ | Blank unreadable fields and refuse filtering or sorting by them. Replace the data loaders with permission-aware bulk queries |
@@ -136,15 +136,15 @@ Quota scope keeps the folder row's `quota_scope_id` as is. The existing user quo
 
 Sharing puts an entity into a virtual scope, not a person into a project. Sharing into someone else's personal project adds no member to it. Sharing only adds rows to `entity_memberships` and never changes the project column, so the target of resource policies never changes.
 
-그래프의 관계는 둘이다. **own** 은 ve 가 entity 를 소유하는 것: entity 가 그 ve 의 명단에 오르고 한 홉에 닿는다. **govern** 은 scope 가 ve 를 다스리는 것: scope 의 role 이 그 ve 가 own 한 것 전부에 닿는다. govern 이 own 의 상위 개념이다. 생성과 공유는 이 둘을 조합한다.
+The graph has two relations. **own** is a virtual entity holding an entity: the entity is on that virtual entity's list and one hop away. **govern** is a scope ruling a virtual entity: the scope's roles reach everything that virtual entity owns. govern is the wider of the two. Creation and sharing compose them.
 
-| 선언 | own | govern | 규칙 |
+| Declaration | own | govern | Rule |
 |---|---|---|---|
-| 생성 시 `created_in` | 있음 | 있음 | session 은 project·user 안에서, project·user 는 domain 안에서 만들어진다. 만든 곳의 명단에 오르고, 만든 곳의 role 이 그 아래(초대)까지 닿는다. unsharing 으로 지워지지 않는다. 소유권 이동은 `transfer(from_scopes, to_scopes, entity)`. user 의 ve 는 자기 domain 만 govern 하고 project 는 govern 하지 않는다 — user 가 own 한 것이 project 로 새지 않도록 |
-| relation `create_relation(scope, target)` | target 이 scope 를 READ cap 으로 | scope 가 target 을 READ cap 으로 | project 는 resource group·registry 와 그것이 own 한 agent·image 를 읽고, resource group·registry 는 project 자신만 읽는다. govern 쪽 cap 을 쓰는 유일한 곳 |
-| 공유 `replace_share(scope, entity, cap)` / `replace_share_fields(scope, entity, {READ: paths, UPDATE: paths})` | cap 있음 | 없음 | `replace_share` 는 전 필드에 cap 까지 — cap 은 항상 명시, 0 포함. `replace_share_fields` 는 READ/UPDATE 를 필드 경로에만(5.2). `unshare` 로 지워진다. 공유는 받은 scope 에 빌려준 것이라 그 scope 의 자기 govern 으로만 답하고, 공유된 entity 자신에게만 답한다 |
+| `created_in` at creation | yes | yes | A session is created in its project and user, a project and a user in their domain. It is on the creator's list, and the creator's roles reach what is under it (invitations). Not removed by unsharing. Ownership moves with `transfer(from_scopes, to_scopes, entity)`. A user's virtual entity is governed by its domain only, never by a project — so what the user owns does not leak into the project |
+| relation `create_relation(scope, target)` | the target holds the scope under cap READ | the scope governs the target under cap READ | A project reads a resource group or registry and the agents or images it owns; the resource group or registry reads the project itself only. The only place a govern-side cap is written |
+| share `replace_share(scope, entity, cap)` / `replace_share_fields(scope, entity, {READ: paths, UPDATE: paths})` | yes, capped | no | `replace_share` covers every field up to the cap — the cap is always explicit, 0 included. `replace_share_fields` puts READ/UPDATE on field paths only (5.2). Removed by `unshare`. A share is lent to the receiving scope, so it answers through that scope's own govern only and for the shared entity itself only |
 
-project 로스터의 user 는 공유다: `replace_share_fields(project, user, {READ: 기본 공개 필드})`. domain 로스터는 따로 없다 — user 는 domain 안에서 만들어진다. 가입 시 auto_assign 역할 부여는 별도 프리미티브다.
+A user on a project roster is a share: `replace_share_fields(project, user, {READ: the default public fields})`. There is no domain roster — a user is created in its domain. Granting auto_assign roles on joining is a separate primitive.
 
 | Question | Answered by |
 |---|---|
@@ -152,7 +152,7 @@ project 로스터의 user 는 공유다: `replace_share_fields(project, user, {R
 | What can be done with it | Permission resolution walking `scope -> virtual_scope -> entity` |
 | Which view does it appear in | Graph enrollment: the union of creation enrollment and share enrollment (5.4) |
 
-resource group·container registry 와의 relation 은 위 표대로 그래프에 오른다. session·deployment 를 resource group 이 보는 것은 스케줄 시 그 session 을 resource group 에 READ 로 공유하는 것으로 답한다(후속). quota 와 resource-policy 적용 여부는 그래프가 아니라 relation 테이블과 entity 행이 답한다.
+Relations with resource groups and container registries go on the graph per the table above. A resource group seeing sessions and deployments is answered by sharing the session to the resource group under READ at scheduling (follow-up). Whether quota and resource policies apply is answered by the relation tables and the entity row, not by the graph.
 
 ### 5.2 FieldPermission
 
@@ -278,7 +278,7 @@ An invisible target cannot be named.
 
 To give to an outside team, give to a person on that team who then puts it into their own team. What is given to a person lands in that person's personal project.
 
-cap 은 공유 행마다 붙는 비트별 행이다. `replace_share(scope, entity, cap)` 는 cap 의 비트마다 "전 필드" 행 하나를 쓰고, `replace_share_fields(scope, entity, fields)` 는 READ/UPDATE 비트에 "경로" 행들을 쓴다 — token 없이 deployment 를 공유하는 것은 token 경로를 뺀 `replace_share_fields` 다. 경로는 자손을 덮고, deny 는 없다. 유효 필드는 role 의 필드 범위와 경로에 있는 cap 들의 필드 범위의 교집합이다. 이름 붙인 cap(preset)은 이 두 호출을 묶어 부르는 편의이지 저장 단위가 아니다.
+A cap is a row per bit on each share row. `replace_share(scope, entity, cap)` writes one "every field" row per bit of the cap; `replace_share_fields(scope, entity, fields)` writes "path" rows on the READ/UPDATE bits — sharing a deployment without its token is `replace_share_fields` with the token path left out. A path covers its descendants, and there is no deny. The effective fields are the intersection of the role's field scope and the field scopes of the caps on the path. A named cap (a preset) is a convenience calling these two; it is not a stored unit.
 
 | Place | Meaning | Composition |
 |---|---|---|
@@ -383,12 +383,12 @@ Opening project-folder creation and narrowing user information are the intended 
 | Quota scope | `quota_scope_id` kept; the user quota scope reinterpreted as the personal project's. No physical moves |
 | A user's own information | Not a resource entity; stays under the user |
 | Column vs. graph | The column answers resource policy and quota, permission resolution answers capability, graph enrollment answers view membership |
-| 관계 | own·govern 둘. `created_in` 은 둘 다, 공유·relation 은 cap 이 붙은 own 만. user 의 ve 는 자기 domain 만 govern 한다 |
-| 로스터 | project 로스터의 user 는 READ cap 공유(기본 공개 필드). domain → user 는 관할 |
+| Relations | own and govern. `created_in` writes both; a share and a relation write a capped own only. A user's virtual entity is governed by its domain only |
+| Rosters | A user on a project roster is a READ-capped share (the default public fields). domain → user is govern |
 | Joining a project | Project admins invite, with the invitee's acceptance; direct registration is a domain-admin operation (BEP-1076) |
 | Credential secrets | Never readable by any administrator; administration is reissue and disable. The secret is shown once to its owner at issuance |
-| relation | scope 가 target 을 READ 로 govern, target 은 scope 를 READ 로 공유받음. resource group·container registry 둘 다. quota 는 relation 테이블이 답한다 |
-| `created_in` 의 행 | unsharing 으로 지워지지 않고 cap 이 없다 |
+| relation | The scope governs the target under READ; the target holds the scope under a READ share. Resource groups and container registries alike. Quota is answered by the relation table |
+| The `created_in` rows | Not removed by unsharing, and carry no cap |
 | Former colon sub-targets | Fields of their owning entity — none is promoted to an entity type; the colon declarations retire with `RBACElementType` |
 | Fields | `FieldPermission` — child of a permission row, read and update. Absent means all fields; present means only the list |
 | Catalog | Declared per entity; unlisted names get no permission and unlisted fields are invisible |
@@ -403,7 +403,7 @@ Opening project-folder creation and narrowing user information are the intended 
 | Scoped reads | Filter instead of rejecting; write actions keep rejecting |
 | Sharing address | Invisible targets cannot be named. People by email, projects only those I am a member of |
 | Share acceptance | Unneeded when only capability grows; projects answer with an acceptance setting |
-| Share caps | 공유 행마다 비트별 cap 행. `replace_share` 는 전 필드, `replace_share_fields` 는 필드 경로. 이름 붙인 cap 은 둘을 묶어 부르는 편의 |
+| Share caps | One cap row per bit on each share row. `replace_share` covers every field, `replace_share_fields` field paths. A named cap is a convenience calling both |
 | Re-sharing | Closed by default; opening requires cascading revocation |
 | Sharing records | Separate from `entity_memberships`; the invited state has no graph row |
 | Non-owning projects | No delete operation, only unshare |

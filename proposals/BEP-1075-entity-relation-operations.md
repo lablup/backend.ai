@@ -117,16 +117,17 @@ The middle two are wired only for relations that declare a lifecycle column. Who
 permission on both scopes may turn a relation off and back on — turning it off is the same
 permission as unlinking.
 
-### spec 이 정하는 것
+### What the spec decides
 
-- create 는 새 행만 넣는다. 이미 맺어진 쌍은 꺼져 있어도 unique 위반이고, spec 의
-  `integrity_error_checks` 가 도메인 오류로 바꾼다. 되살리기는 restore 의 일이므로 create 에 upsert
-  는 없다.
-- 끄기 / 되살리기는 lifecycle 컬럼만 바꾼다. 서로를 읽는 관계(scope 의 govern READ, target 의 share
-  READ)는 그대로다 — 꺼진 relation 도 양쪽 목록에 "꺼짐" 으로 보이고, 그래서 다시 켤 수 있다.
-  접근을 지우는 것은 purge 뿐이다. 꺼짐을 반영하는 것은 그 relation 을 읽는 쪽(스케줄러의 resource
-  group 선택, idle checker 적용)이다.
-- lifecycle 컬럼이 없는 relation 은 create 와 purge 만 갖는다.
+- Create inserts a new row only. A pair already linked, switched off or not, is a
+  unique violation the spec's `integrity_error_checks` maps to a domain error. Restore
+  is what switches it back on, so create has no upsert.
+- Switching off / restoring writes the lifecycle column alone. What each side reads of
+  the other (the scope's govern READ, the target's share READ) stays — a relation
+  switched off is still listed on both sides as off, which is what lets it be switched
+  back on. Only purge removes access. Honouring the off state is the reader's job (the
+  scheduler picking resource groups, the idle checker applying).
+- A relation without a lifecycle column has create and purge only.
 
 ### The relation value is not exposed
 

@@ -51,10 +51,11 @@ execution path.
 - The relation roots therefore name the pair, never a row id. Nothing outside the layer
   that wrote the row holds that id, and a read answers with the entities the relation
   reaches rather than the row between them.
-- 끄기는 접근이 아니라 상태다. project 에서 resource group 을 임시 제외해도 양쪽이 서로를 읽는
-  관계는 남아야 "제외됨" 을 보여주고 다시 켤 수 있다(Kubernetes cordon, GitLab archive 와 같은
-  선택). 그래서 lifecycle 전이는 행만 바꾸고, 그래프는 create 와 purge 만 움직인다. create 가 꺼진
-  행을 되살리는 upsert 를 갖지 않는 이유도 같다 — 되살리기는 restore 하나의 일이다.
+- Switching off is state, not access. A resource group excluded from a project for a
+  while must still be read by both sides, so the exclusion shows and can be undone (the
+  choice Kubernetes cordon and GitLab archive make). So a lifecycle transition writes
+  the row alone, and the graph moves on create and purge only. That is also why create
+  has no upsert reviving a row switched off — reviving is restore's alone.
 - Full rationale: `proposals/BEP-1075-entity-relation-operations.md`.
 
 ## A sidecar belongs to neither position
@@ -153,88 +154,117 @@ Which column carries the state is domain knowledge and varies (`deleted` on a ro
 preset, `status` on a vfolder or user), which is why this is a rule about the general
 updater's fields rather than about a column name.
 
-## own 과 govern 은 다른 관계이고, 생성은 둘을 조합한다
+## own and govern are different relations, and creation composes them
 
-- own: ve 가 entity 를 소유한다. entity 가 그 ve 의 명단에 오르고("조회 = 등재") 한 홉에 닿는다.
-- govern: scope 가 ve 를 다스린다. scope 의 role 이 그 ve 가 own 한 것 전부에 닿는다. own 보다
-  큰 관계다.
-- 해석기는 `entity → 그 entity 를 own 한 ve → 그 ve 를 govern 한 scope → role` 로 한 홉 걷는다.
-  판정도 ops 에 있다(`PermissionReadOps`, `PermissionOpsProvider` 의 read 쪽). `PermissionDBSource`
-  는 거기에 위임만 한다 — 그래프는 ops 로만 쓰고 읽는다.
-- 판정은 둘이고 이름이 관계 이름과 같다. repository 는 키마다 마스크를 답하고, 판정
-  (`mask.covers(bits)`)은 validator 가 한다.
+- own: a virtual entity holds an entity. The entity is on that virtual entity's list
+  ("listing = enrollment") and one hop away.
+- govern: a scope rules a virtual entity. The scope's roles reach everything that
+  virtual entity owns. The wider relation of the two.
+- The resolver walks one hop: `entity → the virtual entity owning it → the scope
+  governing that → role`. The checks live in the ops too (`PermissionReadOps`, the read
+  side of `PermissionOpsProvider`); `PermissionDBSource` delegates — the graph is
+  written and read through the ops only.
+- There are two checks, named after the relations. The repository answers a mask per
+  key; the check (`mask.covers(bits)`) is the validator's.
 
-| 판정 | 질문 | repository 가 답하는 마스크 |
+| Check | Question | The mask the repository answers |
 |---|---|---|
-| own 판정 | 내 role 이 있는 scope 가 govern 하는 ve 가 이 entity 를 own(cap 포함) 하는가 — "내가 이 entity 를 이 비트로 own 하는가" | `owned_permissions(keys)`: 키마다 경로들의 `permission & govern cap & share cap` 을 OR 한 것 |
-| govern 판정 | 내 role 이 있는 scope 가 이 scope 의 ve 를 govern 하는가(자기 govern 포함), 그 안의 entity 종류에 이 비트를 주는가 — "내가 이 scope 를 이 종류·이 비트로 govern 하는가" | `governed_permissions(keys)` |
+| own check | Does a virtual entity governed by a scope my role is in own this entity (caps included) — "do I own this entity with these bits" | `owned_permissions(keys)`: per key, the OR of `permission & govern cap & share cap` over the paths |
+| govern check | Does a scope my role is in govern this scope's virtual entity (its own govern included), and give these bits on this entity type within it — "do I govern this scope for this type and these bits" | `governed_permissions(keys)` |
 
-  entity 생성·검색은 govern 판정(만들면 그 scope 가 own 하게 된다), 개별 entity 동작·bulk·relation
-  은 own 판정, global 은 그래프 밖(superadmin)이다. 필드 판정과 목록 필터(BEP-1077 5.2, 5.4)는 후속.
-- own 판정 쿼리의 비용은 홉당 인덱스 조회이고, 결과는 entity 당 한 행이다.
+  Entity create and search take the govern check (what is created becomes owned by the
+  scope); single-entity, bulk and relation actions take the own check; global is outside
+  the graph (superadmin). The field check and the list filter (BEP-1077 5.2, 5.4) are
+  follow-ups.
+- The own check costs one index lookup per hop and answers one row per entity.
 
-| 측정 | 방법 |
+| Measurement | How |
 |---|---|
-| 동일성 | `tests/unit/manager/repositories/permission_controller/test_own_check_query.py` — 옛 쿼리(경로·비트마다 한 행, 파이썬에서 OR)를 함수로 보존해 세 모양(own 사슬, share, role 많음)에서 같은 답인지 CI 마다 확인 |
-| 벤치마크 | 같은 파일. `BAI_BENCHMARK=1 … -s` 는 entity 1,000개, `BAI_BENCHMARK_SCALE=1 … -s` 는 COPY 로 시드한 규모(domain 10, project 1,000, user 10,000, session 100만, vfolder 100만, 공유 30만, role 10,000, permission 10만, user_role 10만; 관계 행 약 1,300만, 시드 약 4분, pants 는 `--test-timeout-default=3600 --test-attempts-default=1`). 워밍업 뒤 두 쿼리를 번갈아 돌려 min / median / p95 와 `EXPLAIN (ANALYZE, BUFFERS)` 를 찍는다 |
+| Equivalence | `tests/unit/manager/repositories/permission_controller/test_own_check_query.py` — the old query (one row per path and bit, OR-ed in Python) is kept as a function and checked on every CI run to answer the same as the new one in three shapes (an own chain, a share, many roles) |
+| Benchmark | Same file. `BAI_BENCHMARK=1 … -s` runs 1,000 entities; `BAI_BENCHMARK_SCALE=1 … -s` runs a COPY-seeded scale (10 domains, 1,000 projects, 10,000 users, 1M sessions, 1M vfolders, 300k shares, 10,000 roles, 100k permissions, 100k user roles; about 13M relation rows, about 4 minutes to seed; pants needs `--test-timeout-default=3600 --test-attempts-default=1`). After a warm-up the two queries alternate, printing min / median / p95 and `EXPLAIN (ANALYZE, BUFFERS)` |
 
-| 규모 측정 (로컬 컨테이너, 세 번 실행 중 정상 두 번의 범위) | 옛 쿼리 median | 지금 median | DB 안 실행 시간 |
+| Scale run (local container, the range of the two normal runs out of three) | Old query median | New median | Execution inside the DB |
 |---|---|---|---|
-| session 2,000개 (own 1,000 + 남의 것 1,000, 전부 도달) | 71 ~ 74 ms | 56 ~ 59 ms | 41 ms vs 42 ms |
-| vfolder 500개 (도달 261개) | 13 ms | 13 ms | 6.7 ms vs 7.2 ms |
+| 2,000 sessions (1,000 owned + 1,000 someone else's, all reached) | 71 ~ 74 ms | 56 ~ 59 ms | 41 ms vs 42 ms |
+| 500 vfolders (261 reached) | 13 ms | 13 ms | 6.7 ms vs 7.2 ms |
 
-- plan 은 두 쿼리가 같다: entity unique 인덱스 → own 인덱스 → govern index-only → governor PK → user 의 permission(수십 행) hash join. 홉마다 인덱스 조회라 seq scan 은 없고, 41 ms 중 31 ms 가 2,000 entity × 경로 약 7개의 중첩 루프다.
-- 벽시계 차이는 전부 결과 행 수(5,260 → 2,000)와 파이썬 OR 루프가 없어진 몫이다. `bit_or … GROUP BY` 가 그 대가로 Sort + GroupAggregate 약 1 ms 를 더한다. user 의 permission 을 CTE 로 앞세우는 것은 planner 가 이미 그렇게 하고 있어 이득이 없었고 넣지 않았다.
-- 한 번은 같은 데이터에서 두 쿼리 모두 median 29 초가 나왔다(COPY 직후 컨테이너 DB 상태로 추정). 재현되지 않았지만, 운영 규모 판단은 운영 통계로 plan 을 다시 봐야 한다.
-  모든 entity 는 자기 ve 가 자기를 own 하고 자기 scope 가 자기 ve 를 govern 한다(`_provision_entities`).
-- `created_in`(session → project·user): 만든 곳이 own 하고 govern 한다. own 으로 project role 이
-  session 에 닿고 목록에 오르며, govern 으로 session 이 own 한 것(초대)에도 닿는다. domain 은 user
-  ve 를 govern 하므로 user 가 own 한 session 에 닿는다.
-- project·user 도 `created_in`(domain) 이다. domain 이 own 하고 govern 한다. own 은 해석에 더해
-  주는 것이 없지만(자기 own + govern 으로 이미 닿음) 무해하고, scope 와 리소스 entity 를 한 규칙으로
-  만든다. user 의 ve 는 자기 domain 만 govern 한다 — project 가 govern 하면 user 가 own 한 것이
-  project 로 샌다(BEP-1077).
-- 예전 `member_of` 도 둘을 한꺼번에 썼다. 이름이 own 하나만 말해서 govern 이 숨어 있었다.
-- 공유(`replace_share` / `replace_share_fields`)는 cap 이 붙은 own 이고, 받은 scope 에 빌려준 것이다. own 은 ve 에 넣는 것이라
-  ve 를 govern 하는 모든 scope 의 것이 되지만, 공유는 그 ve 의 scope 하나에 준 것이라 그 scope 의 자기
-  govern 으로만 답한다. 해석기는 그래서 공유를 (1) 공유된 entity 의 타입에 대해서만, (2) 자기 govern
-  을 통해서만 통과시킨다. 공유받은 vfolder 를 scope 로 삼아 초대를 읽을 수 없고, resource group 에
-  공유된 project 를 그 resource group 을 govern 하는 다른 project 가 읽을 수 없다.
-- relation(`create_relation(scope, target)`): scope 가 target 을 READ cap 으로 govern 하고, target 은
-  scope 를 READ cap 으로 공유받는다. project 는 resource group 과 그것이 own 한 agent 를 읽고,
-  resource group 은 project 자신만 읽는다 — project 가 own 한 user·session·vfolder 는 드러나지
-  않는다. govern 쪽 cap(`scope_bindings.permission_cap`)을 쓰는 것은 relation 뿐이다; 자기 govern 과
-  `created_in` 의 govern 은 cap 이 없다.
-- resource group 이 session·deployment 를 보는 것은 relation 이 아니라 스케줄 시 그 session 을
-  resource group 에 READ 로 공유하는 것으로 답한다(후속). 다른 project 가 resource group 을 govern
-  해도 공유는 그쪽에 답하지 않으므로 새지 않는다.
-- 두 축으로 root 넷: `created_in` 유무(Global / Entity) × preset 역할 유무(plain / RoleManaged).
-  role-managed 는 preset 을 만드는 것 외에 plain 과 같은 관계를 맺는다.
-- 전 필드 공유와 필드 경로 공유는 뜻이 달라 메소드도 다르다. 저장은 같은 cap 행 트리(비트별 행,
-  경로 행)이지만 선언에서 섞지 않는다. replace 는 이전 것을 전부 대체하고(조회 없이 지우고 붙임), widen 은 있는 것을 읽어 더하기만,
-  narrow 는 빼기만 한다. 섞인 공유는 replace 뒤 widen 으로 적는다.
-- 관계 ops 의 배치. private 프리미티브는 `V2GraphWriteOpsBase` 하나에 있고 어떤 provider 도 내주지
-  않는다. public 은 세 provider / ops 쌍이다.
+- The plan is the same for both: entity unique index → own index → govern index-only →
+  governor PK → hash join with the user's permissions (tens of rows). Every hop is an
+  index lookup, no seq scan; 31 of the 41 ms is the nested loop over 2,000 entities ×
+  about 7 paths.
+- The wall-clock gap is all rows returned (5,260 → 2,000) and the Python OR loop gone.
+  `bit_or … GROUP BY` adds about 1 ms of Sort + GroupAggregate for it. Leading with the
+  user's permissions in a CTE gained nothing — the planner already does — and was left
+  out.
+- One run put both queries at a median of 29 seconds on the same data (a container DB
+  right after COPY, most likely). It did not reproduce; a production-scale call needs
+  the plan re-read under production statistics.
+- Every entity's own virtual entity owns it and its own scope governs it
+  (`_provision`).
+- `created_in` (session → project and user): where it is created owns and governs it.
+  Through own the project's roles reach the session and list it; through govern they
+  reach what the session owns (invitations). The domain governs the user's virtual
+  entity, so it reaches the sessions the user owns.
+- Projects and users are `created_in` their domain too: the domain owns and governs
+  them. The own adds nothing to resolution (self own + govern already reach) but is
+  harmless and puts scopes and resource entities under one rule. A user's virtual entity
+  is governed by its domain only — governed by a project, what the user owns would leak
+  into the project (BEP-1077).
+- The former `member_of` wrote both as well. Its name said own only, so govern was
+  hidden.
+- A share (`replace_share` / `replace_share_fields`) is a capped own, lent to the
+  receiving scope. An own goes on the virtual entity, so it belongs to every scope
+  governing it; a share is given to one scope of that virtual entity, so it answers
+  through that scope's own govern only. The resolver therefore passes a share (1) for the
+  shared entity's type only and (2) through the own govern only. A shared vfolder taken
+  as a scope does not read its invitations, and a project shared to a resource group is
+  not read by another project governing that resource group.
+- A relation (`create_relation(scope, target)`): the scope governs the target under cap
+  READ, and the target holds the scope under a READ share. A project reads a resource
+  group and the agents it owns; the resource group reads the project itself only — the
+  users, sessions and vfolders the project owns stay hidden. The govern-side cap
+  (`scope_bindings.permission_cap`) is written by relations only; the self govern and
+  the `created_in` govern carry none.
+- A relation table carries foreign keys with cascade on both sides
+  (`association_container_registries_groups`, `sgroups_for_groups`), so an entity going
+  away takes its rows with it and no ops method names a whole side. The relation specs
+  are typed by the pair's id types, so a spec reads each id as what it is.
+- A resource group seeing sessions and deployments is not a relation: it is answered by
+  sharing the session to the resource group under READ at scheduling (follow-up).
+  Another project governing the resource group is not answered by the share, so nothing
+  leaks.
+- Four roots along two axes: with or without `created_in` (Entity / Global) × with or
+  without preset roles (plain / RoleManaged). Role-managed writes the same relations as
+  plain, plus the presets.
+- Every-field shares and field-path shares mean different things and are different
+  methods. Storage is one cap row tree (rows per bit, path rows) but the declarations
+  never mix them. replace drops everything before it (delete and insert, no read); widen
+  reads what is there and only adds; narrow only removes. A mixed share is written as
+  replace then widen.
+- Where the relation ops sit. The private primitives are on `V2GraphWriteOpsBase`
+  alone, and no provider hands it out. The public surface is three provider / ops
+  pairs.
 
-| 관계 | 쓰기 | 되돌리기 | 쓰는 곳 |
+| Relation | Write | Reverse | Written by |
 |---|---|---|---|
-| 노드 | `_provision(entities)` — 노드 + 자기 own + 자기 govern | `_teardown(entity)` — 나머지 관계는 FK cascade | 생성 / purge |
-| own | `_own(owners, entity)` — 공유가 있던 자리면 own 으로 | `_disown(owners, entity)` | preset role |
+| node | `_provision(entities)` — node + self own + self govern | `_teardown(entity)` — the rest goes by FK cascade | create / purge |
+| own | `_own(owners, entity)` — a share in its place becomes own | `_disown(owners, entity)` | preset role |
 | govern | `_govern(scopes, entity, cap)` | `_ungovern(scopes, entity)` | relation (cap READ) |
-| own + govern | `_created_in(scopes, entity)` — 노드 조회 한 번 | `_removed_from(scopes, entity)` | 생성, 소유권 이동 |
-| 공유 (cap own) | `_share(scope, entity, cap)` — 전 필드 | `_unshare(scope, entities)` | relation, share write |
+| own + govern | `_created_in(scopes, entity)` — one node lookup | `_removed_from(scopes, entity)` | create, transfer |
+| share (capped own) | `_reset_share(scope, entity)` / `_widen_share(scope, entity, {bit: paths})` / `_narrow_share` | `_unshare(scope, entities)` | relation, share write |
 
-| 쌍 | provider / ops | 메소드 |
+| Pair | provider / ops | Methods |
 |---|---|---|
-| entity write | `V2DBOpsProvider` / `V2WriteOps` | create / upsert / purge / update / field / batch. 생성 시 `_created_in`, purge 시 `_teardown` |
-| relation write | `RelationOpsProvider` / `V2RelationWriteOps` | `create_relation(creator, scope, target)` / `purge_relation` — `_govern(cap READ)` + `_share(READ)` |
+| entity write | `V2DBOpsProvider` / `V2WriteOps` | create / upsert / purge / update / field / batch. `_created_in` at create, `_teardown` at purge |
+| relation write | `RelationOpsProvider` / `V2RelationWriteOps` | `create_relation(creator, scope, target)` / `delete_relation` / `restore_relation` / `purge_relation` — `_govern(cap READ)` + `_widen_share(READ)` |
 | share write | `ShareOpsProvider` / `V2ShareWriteOps` | `replace_share` / `replace_share_fields` / `widen_*` / `narrow_*` / `unshare` / `transfer` / `accept_invitation` |
 
-  두 쌍의 ops 는 `V2WriteOps` 를 상속하므로 행 쓰기와 관계 쓰기가 한 트랜잭션에 놓인다(vfolder 의
-  permission 행 + share, 초대 행 갱신 + share). "grant" 는 role 의 permission 을 주는 뜻과 겹쳐 쓰지
-  않는다.
-- 한계: govern 은 한 홉이라 domain → user → session → 초대 처럼 세 단계면 domain 이 초대에 못 닿는다.
-  필요해지면 govern 을 쓸 때 상위 scope 의 govern 을 함께 복사하는 방식으로 닫는다.
+  The latter two ops extend `V2WriteOps`, so a row write and a relation write share one
+  transaction (a vfolder's permission row + share, an invitation row's update + share).
+  "grant" is not used: it collides with granting a role its permissions.
+- Limit: govern is one hop, so three levels like domain → user → session → invitation
+  leave the domain short of the invitation. If needed, close it by copying the upper
+  scope's govern along when writing a govern.
 
 ## Entity type is an open string
 

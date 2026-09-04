@@ -21,11 +21,14 @@ only; do not declare a new spec there.
 - Its specs are `RelationCreator` / `RelationLifecycleUpdater` / `RelationPurger`
   (`relation.py`), and they name the pair rather than a row id — a relation row's id
   never leaves the layer that wrote it.
-- create 는 새 행만 넣는다. 이미 맺어진 쌍(꺼진 것 포함)은 unique 위반이고, spec 의
-  `integrity_error_checks` 가 도메인 오류로 바꾼다. 되살리기는 restore updater 의 일이다.
-- 끄기 / 되살리기(`RelationLifecycleUpdater`)는 행의 lifecycle 컬럼만 바꾼다. 서로를 읽는 관계는
-  그대로라 꺼진 relation 도 양쪽 목록에 보이고 다시 켤 수 있다. 접근을 지우는 것은 purge 뿐이다.
-  lifecycle 컬럼이 있는 relation 만 이 updater 를 선언하고, 방향마다 한 클래스가 상수를 돌려준다.
+- Create inserts a new row only. A pair already linked, switched off or not, is a
+  unique violation the spec's `integrity_error_checks` maps to a domain error;
+  switching it back on is the restore updater's.
+- Switching off / restoring (`RelationLifecycleUpdater`) writes the row's lifecycle
+  column alone. What each side reads of the other stays, so a relation switched off is
+  still listed on both sides and can be switched back on. Only purge removes access.
+  Only relations carrying a lifecycle column declare this updater, one class per
+  direction, each answering a constant.
 - Do NOT carry a relation as a field on a `DataUpdater`. A value whose change drags
   other writes along does not belong on the general edit path — the same rule soft
   delete follows.
@@ -66,48 +69,51 @@ entity too — an image under its container registry — so it has to be namable
 graph. What it does not have is `created_in`, and the missing hook is what says it
 is created in no scope.
 
-## 관계 선언
+## Declaring a relation in the graph
 
-- 그래프의 관계는 둘이다. **own**: ve 가 entity 를 소유한다 — entity 가 그 ve 의 명단에 오르고 한
-  홉에 닿는다. **govern**: scope 가 ve 를 다스린다 — scope 의 role 이 그 ve 가 own 한 것 전부에
-  닿는다. govern 이 own 의 상위 개념이다.
+- The graph has two relations. **own**: a virtual entity holds an entity, so the entity
+  is on that virtual entity's list and one hop away. **govern**: a scope rules a virtual
+  entity, so the scope's roles reach everything that virtual entity owns. govern is the
+  wider of the two.
 
-| 훅 | own | govern | 뜻 |
+| Hook | own | govern | Meaning |
 |---|---|---|---|
-| `EntityCreator.created_in(row)` / `EntityUpserter.created_in(row)` / `RoleManagedEntityCreator.created_in(row)` | 있음 | 있음 | session 은 project 와 user 안에서, project 와 user 는 domain 안에서 만들어진다. 만든 곳이 own 하고 govern 한다. 대상이 없으면 쓰기가 실패한다. `GlobalEntityCreator` / `RoleManagedGlobalEntityCreator` 는 이 훅이 없다 |
-| (훅 없음) preset role | 있음 | 없음 | role 은 scope 가 own 만 한다 |
-| share write: `replace_share` / `replace_share_fields` … | cap 있음 | 없음 | 공유: cap 이 붙은 own. 받은 scope 에 빌려준 것 |
-| share write: `transfer(from_scopes, to_scopes, entity)` | 있음 | 있음 | 소유권 이동: 옛 scope 에서 빠지고 새 scope 에서 만들어진 것처럼 own·govern. 공유가 있던 자리면 own 으로 바뀐다 |
-| relation write: `create_relation(creator, scope, target)` / `purge_relation` | target 이 scope 를 cap READ 로 | scope 가 target 을 cap READ 로 | project 는 resource group 과 그것이 own 한 것(agent)을 READ 하고, resource group 은 project 자신만 READ 한다 |
+| `EntityCreator.created_in(row)` / `EntityUpserter.created_in(row)` / `RoleManagedEntityCreator.created_in(row)` | yes | yes | A session is created in its project and user, a project and a user in their domain. Where it is created owns and governs it. A missing target fails the write. `GlobalEntityCreator` / `RoleManagedGlobalEntityCreator` have no such hook |
+| (no hook) preset role | yes | no | A role is owned by its scope and governed by nothing |
+| share write: `replace_share` / `replace_share_fields` … | yes, capped | no | A share is own under a cap, lent to the receiving scope |
+| share write: `transfer(from_scopes, to_scopes, entity)` | yes | yes | Ownership moves: as if removed from the old scopes and created in the new. A share in the new scope's place becomes own |
+| relation write: `create_relation(creator, scope, target)` / `purge_relation` | the target holds the scope under cap READ | the scope governs the target under cap READ | A project reads a resource group and what it owns (agents); the resource group reads the project itself only |
 
-- cap 이 붙는 자리는 둘이고, 한 경로에 하나만 걸린다.
+- A cap sits in one of two places, and only one on any path.
 
-| entity → ve (own 쪽) | ve → scope (govern 쪽) | 허용 |
+| entity → virtual entity (own side) | virtual entity → scope (govern side) | Allowed |
 |---|---|---|
-| own, cap 없음 | 자기 govern 또는 타 govern, cap 없음 | 예 (생성) |
-| own, cap 없음 | 타 govern, cap 있음 | 예 (relation 의 scope 쪽) |
-| 공유, cap 있음 | 자기 govern | 예 (공유, relation 의 target 쪽) |
-| 공유, cap 있음 | 타 govern | **아니오** |
+| own, no cap | its own govern or another's, no cap | yes (creation) |
+| own, no cap | another's govern, capped | yes (the scope side of a relation) |
+| share, capped | its own govern | yes (a share, the target side of a relation) |
+| share, capped | another's govern | **no** |
 
-- 공유는 받은 scope 에 빌려준 것이다. 그 scope 의 자기 govern 으로만 답하고, 그 ve 를 govern 하는
-  다른 scope 에는 답하지 않으며, 공유된 entity 자신에게만 답한다: 공유받은 vfolder 를 scope 로
-  삼아 그 아래 초대를 읽을 수 없고, resource group 에 공유된 project 를 그 resource group 을
-  govern 하는 다른 project 가 읽을 수 없다.
-- 공유는 전 필드와 필드 경로로 나뉘고, 각각 replace / 부분 추가 / 부분 제거를 갖는다.
+- A share is lent to the receiving scope. It answers through that scope's own govern
+  only, not to other scopes governing that virtual entity, and only for the shared
+  entity itself: a shared vfolder taken as a scope does not read the invitations under
+  it, and a project shared to a resource group is not read by another project governing
+  that resource group.
+- A share is either every field or field paths, and each has replace / widen / narrow.
 
-| | 전 필드 cap | 필드 경로 (READ/UPDATE, 자손 포함) |
+| | Every-field cap | Field paths (READ/UPDATE, descendants included) |
 |---|---|---|
-| replace (이전 것 **전부** 대체) | `replace_share(scope, entity, cap)` — 0 도 cap | `replace_share_fields(scope, entity, {READ: paths, UPDATE: paths})` |
-| 부분 추가 | `widen_share` | `widen_share_fields` |
-| 부분 제거 | `narrow_share` — 비트의 행을 지움 | `narrow_share_fields` — 경로와 자손을 지우고 빈 행은 삭제 |
-| 전부 제거 | `unshare(scope, entities)` — own 은 남긴다 | |
+| replace (**everything** before it goes) | `replace_share(scope, entity, cap)` — 0 is a cap too | `replace_share_fields(scope, entity, {READ: paths, UPDATE: paths})` |
+| widen | `widen_share` | `widen_share_fields` |
+| narrow | `narrow_share` — removes the bit's rows | `narrow_share_fields` — removes the path and its descendants, an emptied row too |
+| remove | `unshare(scope, entities)` — own stays | |
 
-- 전 필드 비트와 경로가 섞인 공유는 replace 하나로 못 적는다: `replace_share(cap)` 뒤에 `widen_share_fields`.
-
-- 초대 수락은 `accept_invitation(updater)`: 초대 행 갱신과 `widen_share` 가 한 트랜잭션. 초대는
-  제안 중인 공유이므로 share write 에 있다.
-- 세 쌍은 `repositories/AGENTS.md` 의 규칙대로 provider 로만 받는다. 이미 있는 것을 공유하려고
-  creator 를 쓰지 않는다.
+- A share mixing every-field bits and paths is not one replace: `replace_share(cap)`
+  then `widen_share_fields`.
+- Accepting an invitation is `accept_invitation(updater)`: the invitation row's update
+  and `widen_share` in one transaction. An invitation is a share on offer, so it lives
+  with the share writes.
+- The three pairs come in through a provider only, per `repositories/AGENTS.md`. Never
+  use a creator to share what already exists.
 - Entity types are open strings: types outside the RBAC element enum are accepted, and
   permission-carrying paths convert lazily.
 - Do NOT keep module-level declaration instances (no `X_MEMBERSHIP = ...()`).
