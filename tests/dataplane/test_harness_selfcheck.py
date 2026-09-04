@@ -139,6 +139,17 @@ IPTABLES_FILTER = """\
 COMMIT
 """
 
+IPTABLES_MANGLE = """\
+*mangle
+:PREROUTING ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:BAI-VXLAN-MARK - [0:0]
+-A OUTPUT -j BAI-VXLAN-MARK
+-A BAI-VXLAN-MARK -p udp -m udp --dport 4789 -m u32 --u32 "0>>22&0x3C@12>>8=4097" -j MARK --set-xmark 0xba100001/0xffffffff
+-A OUTPUT -p tcp -j TOS --set-tos 0x10
+COMMIT
+"""
+
 IPTABLES_NAT = """\
 *nat
 :POSTROUTING ACCEPT [3062607:185414194]
@@ -259,15 +270,24 @@ class TestIptablesRuleCollector:
         assert not any("172.17.0.0/16" in r.ident for r in found)
 
     async def test_reads_every_configured_table(self) -> None:
+        # mangle included: it is where the XFRM mark lives, and a leaked mark rule was invisible
+        # to every leak check while the collector only looked at filter and nat.
         node = FakeNode(
             "n1",
             {
                 ("iptables-save", "-t", "filter"): IPTABLES_FILTER,
                 ("iptables-save", "-t", "nat"): IPTABLES_NAT,
+                ("iptables-save", "-t", "mangle"): IPTABLES_MANGLE,
             },
         )
         found = await IptablesRuleCollector(node).collect()
-        assert {r.detail for r in found if r.detail} == {"filter", "nat"}
+        assert {r.detail for r in found if r.detail} == {"filter", "nat", "mangle"}
+
+    def test_the_owned_chains_are_collected(self) -> None:
+        # Their names carry no device prefix, so without an explicit rule they were invisible.
+        found = IptablesRuleCollector(FakeNode("n1", {})).parse("mangle", IPTABLES_MANGLE)
+        assert any("BAI-VXLAN-MARK" in r.ident for r in found)
+        assert any("chain BAI-VXLAN-MARK" in r.ident for r in found)
 
 
 # --- state files, mounts, neighbours ------------------------------------------------------------
