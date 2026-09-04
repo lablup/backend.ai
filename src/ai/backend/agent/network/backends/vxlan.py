@@ -1600,6 +1600,15 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             " shared port (the manager's `vxlan-port`) or out of the VNI range."
         )
 
+    async def prune_pair_claims(self, live_sessions: Collection[str]) -> int:
+        """Drop this node's ESP pair claims for sessions it no longer has.
+
+        Deferred until every surviving tunnel is actually down: a claim is what stops another
+        agent removing the SAs of a pair still in use, so pruning one whose device is still UP is
+        the same hazard the recovery preflight exists to avoid.
+        """
+        return await self._pair_journal.prune(self._journal_owner, live_sessions)
+
     def unclosed_devices(self) -> frozenset[str]:
         """Surviving tunnels this node has not managed to bring down, for diagnostics."""
         return frozenset(self._unclosed_devices)

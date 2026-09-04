@@ -37,6 +37,15 @@ class SessionContainerTracker:
         self._session_containers = {}
         self._session_pending = {}
 
+    def sessions(self) -> frozenset[str]:
+        """Every session this node currently holds a network open for.
+
+        Both halves: a kernel that has claimed the session network but has no container yet holds
+        it exactly as a running one does, so leaving it out would let a stale-claim sweep count a
+        session that is mid-creation as dead.
+        """
+        return frozenset(self._session_containers) | frozenset(self._session_pending)
+
     def reserve(self, session_id: str, kernel_id: str) -> None:
         """Claim the session network for a kernel whose container does not exist yet. Idempotent."""
         self._kernel_session[kernel_id] = session_id
