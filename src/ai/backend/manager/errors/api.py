@@ -106,3 +106,16 @@ class InvalidCursor(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class ResolverFieldShadowsDTOFieldError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/resolver-field-shadows-dto-field"
+    error_title = "A GraphQL resolver field shares its name with a field on the backing DTO."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
