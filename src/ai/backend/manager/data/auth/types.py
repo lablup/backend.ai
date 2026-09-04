@@ -79,6 +79,7 @@ class AuthenticatedUser:
     sudo_session_enabled: bool
     allowed_client_ip: list[ReadableCIDR[IPv4Network | IPv6Network]] | None
     resource_policy: UserResourcePolicyData
+    default_keypair_rate_limit: int | None
 
 
 @dataclass(frozen=True)
