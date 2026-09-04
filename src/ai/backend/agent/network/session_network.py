@@ -244,6 +244,19 @@ class SessionNetwork:
         if self._runtime is not None:
             await self._runtime.open()
         await self._locator.open()
+        # Same reason the privnet does it before recovery: a backend's host-global setup (the
+        # protection chains) belongs to the process's lifetime, and creating it lazily on the
+        # first session makes it look like state that appeared from nowhere.
+        for backend in self._backends.values():
+            try:
+                await backend.init()
+            except Exception:
+                log.warning(
+                    "network backend {} could not complete its startup setup; a session that"
+                    " needs it will retry and refuse if it still cannot",
+                    type(backend).__name__,
+                    exc_info=True,
+                )
 
     async def close(self) -> None:
         retry_tasks = tuple(self._teardown_retry_tasks.values())
