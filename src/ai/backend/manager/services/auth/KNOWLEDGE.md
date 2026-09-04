@@ -39,12 +39,14 @@ status: draft
 라우트가 인증을 요구하고, 액션은 그 사용자를 지목한다. 세션 토큰은 그대로 어느 세션을
 끝낼지 고르는 값으로 남는다.
 
-## 인증만 요구하는 세 읽기
+## 인증만 요구하는 네 읽기
 
-`public_get_role`, `public_resolve_access_key_scope`, `public_resolve_user_scope` 는
-호출자 맥락에서 대상이 정해진다. 호출자가 지목할 수 있는 대상이 자기 자신뿐이므로
-권한 확인이 더할 것이 없고, 인증만 확인한다. 위임 대상을 지목하는 경우는 서비스가
-요청자와 대상의 역할·도메인을 비교해 판정한다.
+`public_get_role`, `public_resolve_access_key_scope`, `public_resolve_user_scope`,
+`public_resolve_default_keypair_rate_limit` 는 호출자 맥락에서 대상이 정해진다. 호출자가
+지목할 수 있는 대상이 자기 자신뿐이므로 권한 확인이 더할 것이 없고, 인증만 확인한다.
+위임 대상을 지목하는 경우는 서비스가 요청자와 대상의 역할·도메인을 비교해 판정한다.
+`public_resolve_default_keypair_rate_limit` 는 핸들러가 아니라 rate limit 미들웨어가
+부르며, 사용자의 window가 한도 없이 열렸을 때 한 번 default 키페어의 한도를 읽는다.
 
 ## 로그인 세션과 SSH 키페어는 사용자로 기록된다
 
