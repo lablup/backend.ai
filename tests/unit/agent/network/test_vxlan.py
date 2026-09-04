@@ -2,6 +2,7 @@ import asyncio
 import inspect
 import logging
 from collections.abc import Awaitable, Callable, Collection, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast, override
 
@@ -11,22 +12,32 @@ from ai.backend.agent.errors.network import (
     OverlayAddressNotAssigned,
     OverlayEncryptionUnavailable,
     OverlayMtuTooLarge,
+    OverlayTeardownIncomplete,
 )
 from ai.backend.agent.network.backends import vxlan as vx
 from ai.backend.agent.network.backends.vxlan import (
+    CHAIN_GUARD,
+    CHAIN_IN,
+    CHAIN_MARK,
     OVERLAY_IFNAME,
+    OWNED_CHAINS,
     XFRM_MARK,
+    XFRM_REPLAY_WINDOW,
     XFRM_REQID,
     VxlanNetworkPlugin,
     _pair_key,
     bridge_dev,
     bridge_link_add_args,
+    egress_guard_add_args,
+    egress_guard_del_args,
     fdb_append_args,
     fdb_del_args,
     fdb_replace_args,
     forward_accept_add_args,
     forward_accept_check_args,
     forward_accept_del_args,
+    is_absent_error,
+    jump_is_first,
     link_down_args,
     link_up_args,
     local_bridge_dev,
@@ -151,6 +162,26 @@ class _ReachRecorder:
         return self.answer
 
 
+class _Listing:
+    """Stands in for ``iptables -S``. Defaults to a built-in chain whose first rule is our jump,
+    so tests unrelated to rule order neither shell out to the host nor see spurious drift."""
+
+    def __init__(self, listing: Callable[[Sequence[str]], str] | None = None) -> None:
+        self.calls: list[list[str]] = []
+        self._listing = listing
+
+    async def __call__(self, argv: Sequence[str]) -> str:
+        self.calls.append(list(argv))
+        if self._listing is not None:
+            return self._listing(argv)
+        table = argv[argv.index("-t") + 1] if "-t" in argv else "filter"
+        builtin = argv[argv.index("-S") + 1]
+        for owned_table, owned_builtin, chain in OWNED_CHAINS:
+            if (owned_table, owned_builtin) == (table, builtin):
+                return f"-P {builtin} ACCEPT\n-A {builtin} -j {chain}\n"
+        return f"-P {builtin} ACCEPT\n"
+
+
 def _plugin(
     recorder: Recorder,
     *,
@@ -159,12 +190,14 @@ def _plugin(
     reach: _ReachRecorder | None = None,
     vxlans: Collection[str] | None = None,
     key_generation: Callable[[], int] | None = None,
+    reader: _Listing | None = None,
 ) -> VxlanNetworkPlugin:
     return VxlanNetworkPlugin(
         {},
         {},
         uplink=uplink,
         runner=recorder,
+        reader=reader or _Listing(),
         mtu_probe=_mtu_probe(underlay),
         # Default to a probe that answers, so tests unrelated to reachability neither spawn a real
         # AF_PACKET probe nor leave a retry loop running.
@@ -595,7 +628,9 @@ class TestPlaintextDrop:
 
     def test_rule_selects_the_vni_and_only_unprotected_frames(self) -> None:
         args = plaintext_drop_add_args(4097, 4789)
-        assert args[:3] == ["iptables", "-I", "INPUT"]
+        # In a chain this backend owns, so a co-tenant's `-F INPUT` cannot take it and its
+        # position is ours to keep (see TestOwnedChains).
+        assert args[:3] == ["iptables", "-A", CHAIN_IN]
         assert args[args.index("--dport") + 1] == "4789"
         # the VNI word sits 12 bytes into the UDP header (8 UDP + 4 VXLAN flags/reserved)
         assert args[args.index("--u32") + 1] == "0>>22&0x3C@12>>8=4097"
@@ -617,7 +652,7 @@ class TestPlaintextDrop:
 
     def test_output_rule_marks_only_the_selected_vni(self) -> None:
         args = output_mark_add_args(4097, 4789)
-        assert args[:5] == ["iptables", "-t", "mangle", "-I", "OUTPUT"]
+        assert args[:5] == ["iptables", "-t", "mangle", "-A", CHAIN_MARK]
         assert args[args.index("--u32") + 1] == "0>>22&0x3C@12>>8=4097"
         assert args[-4:] == ["-j", "MARK", "--set-mark", f"{XFRM_MARK:#x}"]
 
@@ -646,7 +681,9 @@ class TestPlaintextDrop:
             @override
             async def __call__(self, argv: Sequence[str]) -> None:
                 await super().__call__(argv)
-                if list(argv[:2]) in (["iptables", "-C"], ["iptables", "-I"]) and "--u32" in argv:
+                # The match module is missing, so every rule that needs it fails -- whichever
+                # chain it is being added to and whichever table it is in.
+                if argv[0] == "iptables" and "--u32" in argv:
                     raise RuntimeError("iptables: No chain/target/match by that name")
 
         rec = _NoU32()
@@ -2191,3 +2228,224 @@ class TestAPartiallyProgrammedPeerIsStillRecorded:
         assert plugin._encrypted_peers.get("s1") == {"10.0.0.2"}, (
             "teardown must still know to unprogram what did get installed"
         )
+
+
+class TestAntiReplay:
+    """A fresh SA has no replay window and a 32-bit sequence. The window means a captured ESP
+    packet is accepted again; the sequence means a busy tunnel STOPS -- a non-ESN SA does not wrap,
+    it errors. At 100k packet/s that ceiling arrives in ~11.9 hours, inside the rotation interval,
+    and GSO spends one number per segment."""
+
+    def test_the_sa_carries_a_replay_window(self) -> None:
+        out, inn = xfrm_state_add_args("10.0.0.1", "10.0.0.2", _KEY)
+        for args in (out, inn):
+            assert args[args.index("replay-window") + 1] == str(XFRM_REPLAY_WINDOW)
+
+    def test_the_sa_uses_extended_sequence_numbers(self) -> None:
+        out, inn = xfrm_state_add_args("10.0.0.1", "10.0.0.2", _KEY)
+        for args in (out, inn):
+            assert args[args.index("flag") + 1] == "esn"
+
+    def test_the_window_is_a_multiple_of_32(self) -> None:
+        # The kernel keeps the ESN window as a bitmap of 32-bit words.
+        assert XFRM_REPLAY_WINDOW % 32 == 0
+
+    def test_replay_settings_precede_the_key(self) -> None:
+        # `ip xfrm state add ... aead ALG KEY ICV` takes the rest of the line, so anything after
+        # `aead` is read as part of the algorithm arguments and silently changes nothing.
+        out, _ = xfrm_state_add_args("10.0.0.1", "10.0.0.2", _KEY)
+        assert out.index("replay-window") < out.index("aead")
+        assert out.index("flag") < out.index("aead")
+
+
+class TestOwnedChains:
+    """The rules live in chains this backend owns. `iptables -C` answers "is the rule present",
+    which is not the question that decides whether it runs -- an ACCEPT inserted above a bare
+    INPUT rule bypasses it while the check still passes."""
+
+    def test_jump_is_first_reads_the_head_of_the_builtin(self) -> None:
+        listing = f"-P INPUT ACCEPT\n-A INPUT -j {CHAIN_IN}\n-A INPUT -j DOCKER-USER\n"
+        assert jump_is_first(listing, "INPUT", CHAIN_IN) is True
+
+    def test_a_displaced_jump_is_not_first(self) -> None:
+        listing = f"-P INPUT ACCEPT\n-A INPUT -j DOCKER-USER\n-A INPUT -j {CHAIN_IN}\n"
+        assert jump_is_first(listing, "INPUT", CHAIN_IN) is False
+
+    def test_a_missing_jump_is_not_first(self) -> None:
+        assert jump_is_first("-P INPUT ACCEPT\n", "INPUT", CHAIN_IN) is False
+
+    def test_other_chains_in_the_listing_are_ignored(self) -> None:
+        listing = f"-N {CHAIN_IN}\n-A {CHAIN_IN} -j DROP\n-A INPUT -j {CHAIN_IN}\n"
+        assert jump_is_first(listing, "INPUT", CHAIN_IN) is True
+
+    async def test_setup_installs_every_chain_and_its_jump(self) -> None:
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec, reader=_Listing(lambda argv: ""))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        for table, builtin, chain in OWNED_CHAINS:
+            assert ["iptables", "-t", table, "-N", chain] in rec.calls
+            assert ["iptables", "-t", table, "-I", builtin, "1", "-j", chain] in rec.calls
+
+    async def test_a_displaced_jump_is_moved_back_to_the_head(self) -> None:
+        displaced = _Listing(
+            lambda argv: "-P INPUT ACCEPT\n-A INPUT -j SOMEONE-ELSE\n-A INPUT -j BAI-VXLAN-IN\n"
+        )
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec, reader=displaced)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        # Removed before being re-inserted, so restoring the order does not leave a duplicate.
+        assert ["iptables", "-t", "filter", "-D", "INPUT", "-j", CHAIN_IN] in rec.calls
+        assert ["iptables", "-t", "filter", "-I", "INPUT", "1", "-j", CHAIN_IN] in rec.calls
+
+    async def test_a_jump_already_at_the_head_is_left_alone(self) -> None:
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec)  # the default listing already has our jump first
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        assert ["iptables", "-t", "filter", "-D", "INPUT", "-j", CHAIN_IN] not in rec.calls
+
+    async def test_teardown_withdraws_the_chains_when_the_last_session_goes(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        for table, builtin, chain in OWNED_CHAINS:
+            assert ["iptables", "-t", table, "-X", chain] in rec.calls
+
+    async def test_the_chains_survive_while_another_encrypted_session_runs(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        second = replace(_ENC_META, session_id="s2", vni=4098)
+        await plugin.setup_session_network(second, _SELF)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        # Removing them here would strip s2's protection while it is still carrying traffic.
+        assert ["iptables", "-t", "filter", "-X", CHAIN_IN] not in rec.calls
+
+
+class TestEgressGuard:
+    """MARK is not a terminating target: any later rule in the same hook can clear it, after which
+    the XFRM policy no longer matches and the frame leaves in CLEAR TEXT with nothing reporting it.
+    Measured in a pair of namespaces -- with the mark rule removed, 8 of 8 VXLAN frames left
+    unencrypted; with this guard installed, 0 left and 0 were encrypted."""
+
+    def test_the_guard_drops_only_unprotected_egress_of_this_vni(self) -> None:
+        args = egress_guard_add_args(4097, 4789)
+        assert args[:3] == ["iptables", "-A", CHAIN_GUARD]
+        assert args[args.index("--u32") + 1] == "0>>22&0x3C@12>>8=4097"
+        assert args[args.index("--dir") + 1] == "out"
+        assert args[args.index("--pol") + 1] == "none"
+        assert args[-2:] == ["-j", "DROP"]
+
+    async def test_setup_installs_it_for_an_encrypted_session(self) -> None:
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        assert egress_guard_add_args(4097, 4789) in rec.calls
+
+    async def test_setup_leaves_an_unencrypted_session_alone(self) -> None:
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_META, _SELF)
+        assert egress_guard_add_args(4097, 4789) not in rec.calls
+
+    async def test_setup_refuses_the_session_when_it_cannot_be_installed(self) -> None:
+        class _NoGuard(Recorder):
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                await super().__call__(argv)
+                if CHAIN_GUARD in argv and argv[1] in ("-C", "-A"):
+                    raise RuntimeError("iptables: No chain/target/match by that name")
+
+        rec = _NoGuard()
+        plugin = _plugin(rec)
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(_ENC_META, _SELF)
+
+    async def test_the_drift_check_reasserts_it(self) -> None:
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.ensure_session_security("s1", [])
+        assert egress_guard_add_args(4097, 4789) in rec.calls
+
+    async def test_teardown_removes_it(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert egress_guard_del_args(4097, 4789) in rec.calls
+
+
+class TestTeardownKeepsOwnership:
+    """ "Already gone" is the only failure teardown may call success. A permission error, a held
+    xtables lock or an EBUSY device leaves real state on the host, and reporting that as done is
+    what makes it permanent -- the caller drops its record and the manager hands the VNI on."""
+
+    def test_absent_errors_are_classified(self) -> None:
+        for text in (
+            "command failed (rc=1): iptables -D: Bad rule (does a matching rule exist?)",
+            "command failed (rc=1): iptables -X: No chain/target/match by that name",
+            'command failed (rc=1): ip link del: Cannot find device "baivx4097"',
+            "command failed (rc=2): ip xfrm state del: No such process",
+        ):
+            assert is_absent_error(RuntimeError(text)) is True
+
+    def test_real_failures_are_not_classified_as_absent(self) -> None:
+        for text in (
+            "command failed (rc=4): iptables: Another app is currently holding the xtables lock",
+            "command failed (rc=1): ip link del: Operation not permitted",
+            "command failed (rc=1): ip link del: Device or resource busy",
+            "command failed (rc=1): iptables: Permission denied (you must be root)",
+        ):
+            assert is_absent_error(RuntimeError(text)) is False
+
+    def test_a_missing_tool_counts_as_absent(self) -> None:
+        # Nothing it would have created is on the host either.
+        assert is_absent_error(FileNotFoundError("iptables")) is True
+
+    async def test_a_failed_removal_raises_instead_of_reporting_success(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.fail_on = lambda argv: list(argv[:3]) == ["ip", "link", "del"]
+        with pytest.raises(OverlayTeardownIncomplete):
+            await plugin.teardown_session_network("s1")
+
+    async def test_the_session_is_still_owned_after_a_failed_teardown(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.fail_on = lambda argv: list(argv[:3]) == ["ip", "link", "del"]
+        with pytest.raises(OverlayTeardownIncomplete):
+            await plugin.teardown_session_network("s1")
+        # Retryable: the record the retry needs is still here.
+        assert plugin.security_state("s1") is not None
+
+    async def test_a_retry_after_the_fault_clears_completes(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.fail_on = lambda argv: list(argv[:3]) == ["ip", "link", "del"]
+        with pytest.raises(OverlayTeardownIncomplete):
+            await plugin.teardown_session_network("s1")
+        rec.fail_on = None
+        await plugin.teardown_session_network("s1")
+        assert plugin.security_state("s1") is None
+
+    async def test_an_already_absent_object_does_not_block_teardown(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+
+        async def _gone(argv: Sequence[str]) -> None:
+            rec.calls.append(list(argv))
+            if list(argv[:3]) == ["ip", "link", "del"]:
+                raise RuntimeError('Cannot find device "baivx4097"')
+
+        plugin._runner = _gone
+        await plugin.teardown_session_network("s1")
+        assert plugin.security_state("s1") is None
