@@ -338,6 +338,20 @@ class PrivNetServer:
                 continue
             prepared.add(identity)
             try:
+                # Before recovery, so the protection chains exist from the moment this process
+                # does. Created lazily by the first session instead, they show up as state that
+                # appeared from nowhere -- which is what a leak looks like, and they are not one:
+                # their lifetime is this process's (see `_remove_owned_chains`).
+                #
+                # In its own guard: this is preparation, and the fail-close preflight below is the
+                # step that must not be skipped. Letting a failed setup carry it away would leave
+                # every surviving tunnel UP for the reason the chains could not be built.
+                await backend.init()
+            except Exception:
+                log.exception(
+                    "network backend startup setup failed; continuing to the recovery preflight"
+                )
+            try:
                 await backend.prepare_recovery()
             except Exception:
                 # A backend preflight attempts every owned device before it raises. Keep the
