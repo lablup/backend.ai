@@ -2303,16 +2303,8 @@ class TestOwnedChains:
         await plugin.setup_session_network(_ENC_META, _SELF)
         assert ["iptables", "-t", "filter", "-D", "INPUT", "-j", CHAIN_IN] not in rec.calls
 
-    async def test_teardown_withdraws_the_chains_when_the_last_session_goes(self) -> None:
-        rec = Recorder()
-        plugin = _plugin(rec)
-        await plugin.setup_session_network(_ENC_META, _SELF)
-        rec.calls.clear()
-        await plugin.teardown_session_network("s1")
-        for table, builtin, chain in OWNED_CHAINS:
-            assert ["iptables", "-t", table, "-X", chain] in rec.calls
-
-    async def test_the_chains_survive_while_another_encrypted_session_runs(self) -> None:
+    async def test_the_chains_survive_a_session_ending(self) -> None:
+        # Their lifetime is the process's, not a session's -- see TestChainsAreProcessScoped.
         rec = Recorder()
         plugin = _plugin(rec)
         await plugin.setup_session_network(_ENC_META, _SELF)
@@ -2320,7 +2312,6 @@ class TestOwnedChains:
         await plugin.setup_session_network(second, _SELF)
         rec.calls.clear()
         await plugin.teardown_session_network("s1")
-        # Removing them here would strip s2's protection while it is still carrying traffic.
         assert ["iptables", "-t", "filter", "-X", CHAIN_IN] not in rec.calls
 
 
@@ -2403,9 +2394,10 @@ class TestTeardownKeepsOwnership:
         ):
             assert is_absent_error(RuntimeError(text)) is False
 
-    def test_a_missing_tool_counts_as_absent(self) -> None:
-        # Nothing it would have created is on the host either.
-        assert is_absent_error(FileNotFoundError("iptables")) is True
+    def test_a_missing_tool_is_a_failure_not_an_absence(self) -> None:
+        # `iptables` leaving PATH says nothing about whether the rules are still installed; it
+        # says this node can no longer clean up, which is a failure to report.
+        assert is_absent_error(FileNotFoundError("iptables")) is False
 
     async def test_a_failed_removal_raises_instead_of_reporting_success(self) -> None:
         rec = Recorder()
@@ -2449,3 +2441,98 @@ class TestTeardownKeepsOwnership:
         plugin._runner = _gone
         await plugin.teardown_session_network("s1")
         assert plugin.security_state("s1") is None
+
+
+class TestTeardownRetryFindsThePairAgain:
+    """A failed XFRM delete is only retryable if the retry can still find the pair. The
+    bookkeeping the retry reads (`_encrypted_peers`) must therefore outlive the failure --
+    otherwise the retry finds nothing to do, succeeds, and the manager releases the VNI over an
+    SA and policy still on the host."""
+
+    async def test_a_failed_xfrm_delete_keeps_the_peer_for_the_retry(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.fail_on = lambda argv: list(argv[:4]) == ["ip", "xfrm", "state", "del"]
+        with pytest.raises(OverlayTeardownIncomplete):
+            await plugin.teardown_session_network("s1")
+        assert plugin.encrypted_peers("s1") == frozenset({_PEER.vtep_ip})
+
+    async def test_the_retry_reissues_the_same_deletes(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.fail_on = lambda argv: list(argv[:4]) == ["ip", "xfrm", "state", "del"]
+        with pytest.raises(OverlayTeardownIncomplete):
+            await plugin.teardown_session_network("s1")
+        rec.fail_on = None
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert any(list(c[:4]) == ["ip", "xfrm", "state", "del"] for c in rec.calls), (
+            "the retry did not attempt the XFRM deletes again; it would have reported success"
+            " over an SA and policy still on this host"
+        )
+        assert plugin.encrypted_peers("s1") == frozenset()
+
+    async def test_a_missing_tool_is_not_treated_as_already_cleaned_up(self) -> None:
+        # `ip` disappearing from PATH says nothing about whether the devices are still there.
+        assert is_absent_error(FileNotFoundError("ip")) is False
+
+
+class TestChainsAreProcessScoped:
+    """The chains are host-global and shared, but the only record of who needs them is this
+    process's `_sessions`, which a session joins AFTER its rules are installed. Deciding to
+    remove them from that record can therefore look during the gap and strip a session that had
+    just finished protecting itself."""
+
+    async def test_teardown_does_not_remove_the_chains(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        for table, _builtin, chain in OWNED_CHAINS:
+            assert ["iptables", "-t", table, "-X", chain] not in rec.calls
+
+    async def test_init_installs_them(self) -> None:
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec, reader=_Listing(lambda argv: ""))
+        await plugin.init()
+        for table, builtin, chain in OWNED_CHAINS:
+            assert ["iptables", "-t", table, "-N", chain] in rec.calls
+            assert ["iptables", "-t", table, "-I", builtin, "1", "-j", chain] in rec.calls
+
+    async def test_cleanup_removes_them(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.cleanup()
+        for table, _builtin, chain in OWNED_CHAINS:
+            assert ["iptables", "-t", table, "-X", chain] in rec.calls
+
+
+class TestUnclosedSurvivors:
+    """`prepare_recovery` raising does not stop the privnet -- it continues in degraded mode so
+    live sessions can retry their own transitions. A tunnel it could not bring down is then an
+    open path that nothing owns, and the VNI naming it must not be built on."""
+
+    async def test_setup_refuses_a_vni_whose_survivor_is_still_up(self) -> None:
+        rec = Recorder(fail_on=lambda argv: list(argv[:3]) == ["ip", "link", "set"])
+        plugin = _plugin(rec, vxlans={vxlan_dev(4097)})
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.prepare_recovery()
+        assert plugin.unclosed_devices() == frozenset({vxlan_dev(4097)})
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(_ENC_META, _SELF)
+
+    async def test_setup_proceeds_once_the_survivor_is_finally_down(self) -> None:
+        rec = Recorder(fail_on=lambda argv: list(argv[:3]) == ["ip", "link", "set"])
+        plugin = _plugin(rec, vxlans={vxlan_dev(4097)})
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.prepare_recovery()
+        rec.fail_on = None
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        assert plugin.unclosed_devices() == frozenset()

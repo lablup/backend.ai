@@ -6,6 +6,7 @@ agent falls back to a node-local bridge, so a multi-node session comes up with k
 reach each other — and nothing anywhere says so.
 """
 
+import json
 from typing import Any, cast
 
 import pytest
@@ -15,6 +16,7 @@ from ai.backend.common.network.keys import agent_backend_key
 from ai.backend.manager.errors.network import NetworkBackendMismatch
 from ai.backend.manager.network.pairing import (
     require_members_can_serve_driver,
+    require_members_overlay_ready,
     resolve_driver_for_agents,
 )
 
@@ -155,3 +157,48 @@ class TestTheDriverFollowsTheAgentsBackend:
             await resolve_driver_for_agents(
                 cast(AsyncEtcd, etcd), ["a", "b"], configured_driver="overlay"
             )
+
+
+class _CapsEtcd:
+    """Serves whatever a test puts in ``store``, for the capability records."""
+
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+
+    async def get(self, key: str, *, scope: Any = None) -> str | None:
+        return self.store.get(key)
+
+
+class TestOverlayReadinessGate:
+    """The node already knows it cannot serve the backend -- it probes at startup and publishes
+    the answer. Without this the answer went nowhere: the session was scheduled anyway and failed
+    on that one node at create time."""
+
+    async def test_a_node_that_dropped_vxlan_is_refused(self) -> None:
+        etcd = _CapsEtcd()
+        etcd.store["network/agent/a1/caps"] = json.dumps({
+            "tunnel_offload": False,
+            "backends": [],
+            "readiness": ["iptables has no `u32` match (xt_u32)."],
+        })
+        with pytest.raises(NetworkBackendMismatch) as excinfo:
+            await require_members_overlay_ready(cast(AsyncEtcd, etcd), ["a1"])
+        assert "xt_u32" in str(excinfo.value)
+
+    async def test_a_ready_node_passes(self) -> None:
+        etcd = _CapsEtcd()
+        etcd.store["network/agent/a1/caps"] = json.dumps({
+            "tunnel_offload": False,
+            "backends": ["vxlan"],
+            "readiness": [],
+        })
+        await require_members_overlay_ready(cast(AsyncEtcd, etcd), ["a1"])
+
+    async def test_a_node_that_published_nothing_is_allowed(self) -> None:
+        # Refusing on absence would take out every deployment whose agents predate the probe.
+        await require_members_overlay_ready(cast(AsyncEtcd, _CapsEtcd()), ["a1"])
+
+    async def test_an_unreadable_record_is_not_evidence(self) -> None:
+        etcd = _CapsEtcd()
+        etcd.store["network/agent/a1/caps"] = "not json"
+        await require_members_overlay_ready(cast(AsyncEtcd, etcd), ["a1"])
