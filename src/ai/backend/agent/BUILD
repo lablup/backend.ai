@@ -61,6 +61,9 @@ python_distribution(
             "overlay": "ai.backend.agent.docker.intrinsic:OverlayNetworkPlugin",
             "host": "ai.backend.agent.docker.intrinsic:HostNetworkPlugin",
         },
+        "backendai_network_agent_v2": {
+            "vxlan": "ai.backend.agent.network.backends.vxlan:VxlanNetworkPlugin",
+        },
     },
     generate_setup=True,
     tags=["wheel"],
