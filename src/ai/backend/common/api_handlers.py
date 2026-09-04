@@ -24,14 +24,15 @@ from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 from multidict import CIMultiDictProxy, MultiMapping
 from pydantic import (
     AliasChoices,
+    BaseModel,
     ConfigDict,
+    GetCoreSchemaHandler,
     RootModel,
     SerializerFunctionWrapHandler,
-    model_serializer,
 )
 from pydantic.fields import FieldInfo
 from pydantic.json_schema import GenerateJsonSchema, JsonSchemaMode, JsonSchemaValue
-from pydantic_core import CoreSchema
+from pydantic_core import CoreSchema, core_schema
 from pydantic_core._pydantic_core import ValidationError
 
 from ai.backend.common.types import BackendAISchema, StreamReader
@@ -126,29 +127,43 @@ class _UndefinedFreeJsonSchema(GenerateJsonSchema):
                 cls._strip(child)
 
 
+def _drop_undefined_fields(model: BaseModel, handler: SerializerFunctionWrapHandler) -> Any:
+    """Exclude ``UNDEFINED``-valued fields from every ``model_dump`` / ``model_dump_json``."""
+    data = handler(model)
+    if not isinstance(data, dict):
+        return data
+    skipped_keys: set[str] = set()
+    for name, field_info in type(model).model_fields.items():
+        if getattr(model, name, None) is UNDEFINED:
+            skipped_keys.add(name)
+            if field_info.alias:
+                skipped_keys.add(field_info.alias)
+            if field_info.serialization_alias:
+                skipped_keys.add(field_info.serialization_alias)
+    if not skipped_keys:
+        return data
+    return {k: v for k, v in data.items() if k not in skipped_keys}
+
+
 class BaseRequestModel(BackendAISchema):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_by_name=True,
     )
 
-    @model_serializer(mode="wrap")
-    def _drop_undefined_fields(self, handler: SerializerFunctionWrapHandler) -> Any:
-        """Exclude ``UNDEFINED``-valued fields from every ``model_dump`` / ``model_dump_json``."""
-        data = handler(self)
-        if not isinstance(data, dict):
-            return data
-        skipped_keys: set[str] = set()
-        for name, field_info in type(self).model_fields.items():
-            if getattr(self, name, None) is UNDEFINED:
-                skipped_keys.add(name)
-                if field_info.alias:
-                    skipped_keys.add(field_info.alias)
-                if field_info.serialization_alias:
-                    skipped_keys.add(field_info.serialization_alias)
-        if not skipped_keys:
-            return data
-        return {k: v for k, v in data.items() if k not in skipped_keys}
+    @classmethod
+    @override
+    def __get_pydantic_core_schema__(
+        cls, source: type[Any], handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        schema = handler(source)
+        if schema["type"] == "model":
+            model_schema = cast(core_schema.ModelSchema, schema)
+            if "serialization" not in model_schema:
+                model_schema["serialization"] = core_schema.wrap_serializer_function_ser_schema(
+                    _drop_undefined_fields, info_arg=False
+                )
+        return schema
 
     @classmethod
     @override
