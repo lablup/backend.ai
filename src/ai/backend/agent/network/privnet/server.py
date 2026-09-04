@@ -281,6 +281,11 @@ class PrivNetServer:
     ) -> None:
         self._socket_path = socket_path
         self._allowed_uid = allowed_uid
+        if not agent_id.strip():
+            # It is the owner half of every node-wide claim this process makes. An empty one
+            # writes claims no reader can attribute, and an unattributable claim on a VNI reads as
+            # nobody -- after which the next setup deletes the devices behind it.
+            raise ValueError("network privnet requires a non-empty agent id")
         self._agent_id = agent_id
         self._host_ip = host_ip
         # Validated by the entry point (__main__), like the agent validates its own before handing
@@ -767,11 +772,13 @@ class PrivNetServer:
                         # Its devices are known to exist, which is what recovery is about to
                         # adopt. Nothing to change.
                         pass
-                    else:
-                        # Bound but not marked built: this agent journalled the session, so its
-                        # devices were built under this record. Say so, or the next setup of it
-                        # would rebuild the very devices this recovery is adopting.
-                        bound.mark_built()
+                    elif not bound.mark_built():
+                        # Bound but not marked built, and it would not take the mark: the next
+                        # setup of this session would read "not built" and rebuild the very
+                        # devices this recovery is about to adopt.
+                        unbound[session_id] = (
+                            f"this node's binding on VNI {vni} could not be marked built"
+                        )
             except VniConflict as e:
                 # Someone else has this VNI now. Adopting anyway would take THEIR data plane down:
                 # an encrypted adopt holds the VXLAN of that name down, and a reclaim deletes it.
@@ -1160,7 +1167,21 @@ class PrivNetServer:
                     # behind, the next setup of this session adopts devices that do not exist.
                     bound.abandon()
                     raise
-                bound.mark_built()
+                if not bound.mark_built():
+                    # The devices exist and the store will not say so. Left there, a co-located
+                    # agent's setup of this same session reads "not built", takes the build path,
+                    # and deletes these devices out from under whatever is already on them. Give
+                    # them back instead and let the agent retry the whole thing.
+                    await self._teardown_data_plane(
+                        session_id, self._sessions.get(session_id), raw_config
+                    )
+                    await self._journal.forget_session(session_id)
+                    bound.abandon()
+                    raise PrivNetError(
+                        f"session {session_id} was built but its VNI {cfg.vni} could not be"
+                        " recorded as built in the node-wide registry; the data plane has been"
+                        " removed again rather than left for a co-located agent to rebuild"
+                    )
         except VniConflict as e:
             # The declaration names a VNI this node has already given to something else. Setup
             # deletes `baivx<vni>` and its bridges before rebuilding them, so accepting this is
@@ -1270,9 +1291,13 @@ class PrivNetServer:
         )
         if (entry := self._sessions.get(session_id)) is not None:
             entry.digest = digest
-        if binding is not None:
-            # This agent now serves a data plane that exists, whoever built it.
-            binding.mark_built()
+        if binding is not None and not binding.mark_built():
+            # This agent now serves a data plane that exists, and the store will not say so. A
+            # co-located agent would then read "not built" and rebuild these very devices.
+            raise PrivNetError(
+                f"session {session_id} was adopted but this node could not record its VNI as"
+                " built in the node-wide registry"
+            )
 
     async def _withdraw(self, session_id: str) -> None:
         """Drop this node's ownership of a session whose devices must stay.
