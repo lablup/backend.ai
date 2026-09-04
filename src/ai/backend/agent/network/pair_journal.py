@@ -18,6 +18,7 @@ never removed, opened read-only: `flock` needs no write access, only a file desc
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import errno
 import fcntl
 import logging
@@ -41,19 +42,20 @@ DEFAULT_PAIR_JOURNAL_DIR: Final = Path("/var/lib/backend.ai/net-esp-pair")
 #: unlink and recreate the `.lock` inside -- after which a second holder locks the NEW inode while
 #: the first still holds the old one, and both are in the critical section at once. Reproduced.
 #:
-#: So the namespace is closed instead, and the deployment contract is that every agent sharing a
-#: host runs as the same user (or shares a group with write access to this tree). Its parent,
+#: So the namespace is closed instead. The mode carries GROUP write on purpose: the deployment
+#: contract is that every agent sharing a host runs as the same user OR shares a group, and 0o755
+#: would have made the second half of that a promise the permissions did not keep. Its parent,
 #: /var/lib/backend.ai, is already owner-writable only, so no unprivileged user can create the
-#: root either.
-_JOURNAL_DIR_MODE: Final = 0o755
+#: root either. `unusable_reason` probes an actual write rather than trusting any of this.
+_JOURNAL_DIR_MODE: Final = 0o2775
 #: The lock is only ever opened read-only, but it must be readable by every agent on the node --
 #: and `os.open`'s mode is masked by umask, which is 0o077 on a hardened host. It is set
 #: explicitly with `fchmod` after creation, on the descriptor, so no name is re-resolved.
-_LOCK_MODE: Final = 0o644
+_LOCK_MODE: Final = 0o664
 _LOCK_NAME: Final = ".lock"
 #: Claim files are readable by every agent so they can count each other's; only their owner ever
 #: creates or removes one.
-_CLAIM_MODE: Final = 0o644
+_CLAIM_MODE: Final = 0o664
 #: Separates the two halves of a claim's filename. Neither an agent id nor a session id contains
 #: it, and it cannot be confused with the path separator they are sanitised of.
 _CLAIM_SEP: Final = "~"
@@ -111,6 +113,11 @@ class PairJournal:
         agent's claims cannot be counted, and every encrypted peer is refused (`claiming` returns
         False and the caller fails closed) -- which is correct, and useless to debug from a
         per-session error.
+
+        It WRITES, rather than only opening the root. Opening proves the directory is there; it
+        does not prove this process can create a claim in it, which is the operation everything
+        depends on -- and on a host where the agents run as different users under a shared group,
+        those are different questions.
         """
         fd = self._open_root()
         if fd is None:
@@ -121,7 +128,46 @@ class PairJournal:
                 " agent runs as, and every agent on this host must share that user or a group"
                 " with write access to the tree."
             )
-        os.close(fd)
+        try:
+            mode = stat.S_IMODE(os.fstat(fd).st_mode)
+            if mode & stat.S_IWOTH:
+                # An older version created this tree world-writable. A local user who owns a pair
+                # directory inside it can unlink and recreate the lock, which puts two holders in
+                # the critical section at once -- so it is refused rather than silently used.
+                return (
+                    f"the ESP pair journal {self._root} is world-writable ({mode:04o}). A local"
+                    " user can then own a pair's directory and replace the lock inside it, which"
+                    f" defeats the lock entirely. Remove it (it is rebuilt empty) or chmod it to"
+                    f" {_JOURNAL_DIR_MODE:04o}."
+                )
+            if (unwritable := self._probe_write(fd)) is not None:
+                return unwritable
+        finally:
+            os.close(fd)
+        return None
+
+    def _probe_write(self, root_fd: int) -> str | None:
+        """Create and remove a file in the journal root; the reason it could not, or None.
+
+        Opening the root proves it is there, not that this process can create a claim in it --
+        which is the operation everything depends on, and a different question on a host where
+        the agents run as different users under a shared group.
+        """
+        probe = f".probe.{os.getpid()}"
+        try:
+            probe_fd = os.open(
+                probe, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=root_fd
+            )
+        except OSError as e:
+            return (
+                f"the ESP pair journal {self._root} cannot be written by this agent ({e}), so it"
+                " cannot record which peers it is using and every encrypted peer is refused."
+                " Every agent on this host must run as the user that owns this tree, or share a"
+                " group with write access to it."
+            )
+        os.close(probe_fd)
+        with contextlib.suppress(OSError):
+            os.unlink(probe, dir_fd=root_fd)
         return None
 
     def _open_root(self) -> int | None:
@@ -143,8 +189,10 @@ class PairJournal:
             return None
         try:
             os.fchmod(fd, _JOURNAL_DIR_MODE)
-        except OSError:
-            pass  # created by the peer agent this host shares a user with; already correct
+        except OSError as e:
+            # Not "already correct": it may be somebody else's, with a mode we would not have
+            # chosen. `unusable_reason` is what decides, by looking and by writing.
+            log.debug("could not set the mode of the ESP pair journal root: {}", e)
         return fd
 
     def _open_pair(self, root_fd: int, key: str) -> int | None:
@@ -170,8 +218,8 @@ class PairJournal:
             return None
         try:
             os.fchmod(fd, _JOURNAL_DIR_MODE)
-        except OSError:
-            pass  # created by the peer agent; already correct
+        except OSError as e:
+            log.debug("could not set the mode of the ESP pair directory {}: {}", key, e)
         return fd
 
     @asynccontextmanager

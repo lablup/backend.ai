@@ -25,6 +25,7 @@ from ai.backend.agent.network.backends.vxlan import (
     XFRM_REPLAY_WINDOW,
     XFRM_REQID,
     VxlanNetworkPlugin,
+    _esp_spi,
     _pair_key,
     bridge_dev,
     bridge_link_add_args,
@@ -50,9 +51,12 @@ from ai.backend.agent.network.backends.vxlan import (
     output_mark_del_args,
     overlay_cni_config,
     overlay_mac_capability_args,
+    parse_owned_policies,
+    parse_owned_sa_spis,
     plaintext_drop_add_args,
     plaintext_drop_check_args,
     plaintext_drop_del_args,
+    vnis_in_chain,
     vxlan_dev,
     vxlan_link_add_args,
     xfrm_add_args,
@@ -195,6 +199,47 @@ def _isolated_pair_journal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         "ai.backend.agent.network.pair_journal.DEFAULT_PAIR_JOURNAL_DIR",
         tmp_path / "net-esp-pair",
     )
+
+
+def _protection_reader(plugin: VxlanNetworkPlugin, *, vni: int | None) -> _Listing:
+    """A reader whose snapshot says the node is fully protected (or, with vni=None, is not)."""
+    # The jumps come first, exactly as `iptables-save` prints them: the pass checks their
+    # position in the same snapshot it checks the rules in.
+    filter_rules = f"-A INPUT -j {CHAIN_IN}\n-A OUTPUT -j {CHAIN_GUARD}\n"
+    mangle_rules = f"-A OUTPUT -j {CHAIN_MARK}\n"
+    if vni is not None:
+        for chain in (CHAIN_IN, CHAIN_GUARD):
+            filter_rules += f'-A {chain} -m u32 --u32 "0>>22&0x3C@12>>8={vni}" -j DROP\n'
+        mangle_rules += f'-A {CHAIN_MARK} -m u32 --u32 "0>>22&0x3C@12>>8={vni}" -j MARK\n'
+    spis = "".join(
+        f"src {src} dst {dst}\n\tproto esp spi {_esp_spi(src, dst, generation):#x}"
+        f" reqid {XFRM_REQID} mode transport\n"
+        for key, generations in plugin._pair_slot_generations.items()
+        for generation in generations.values()
+        for src, dst in ((key[0], key[1]), (key[1], key[0]))
+    )
+    policies = "".join(
+        f"src {key[0]}/32 dst {key[1]}/32 proto udp dport {key[2]} \n"
+        f"\tmark {XFRM_MARK:#x}/0xffffffff \n"
+        for key in plugin._pair_slot_generations
+    )
+
+    def _listing(argv: Sequence[str]) -> str:
+        if argv[0] == "iptables-save":
+            table = argv[argv.index("-t") + 1]
+            return mangle_rules if table == "mangle" else filter_rules
+        if list(argv[:3]) == ["ip", "xfrm", "state"]:
+            return spis
+        if list(argv[:3]) == ["ip", "xfrm", "policy"]:
+            return policies
+        table = argv[argv.index("-t") + 1] if "-t" in argv else "filter"
+        builtin = argv[argv.index("-S") + 1]
+        for owned_table, owned_builtin, chain in OWNED_CHAINS:
+            if (owned_table, owned_builtin) == (table, builtin):
+                return f"-P {builtin} ACCEPT\n-A {builtin} -j {chain}\n"
+        return f"-P {builtin} ACCEPT\n"
+
+    return _Listing(_listing)
 
 
 def _plugin(
@@ -2653,3 +2698,72 @@ class TestAnUnrecordableClaimFailsClosed:
         with pytest.raises(OverlayEncryptionUnavailable):
             await plugin.add_peer("s1", _PEER)
         assert not any(list(c[:3]) == ["bridge", "fdb", "append"] for c in rec.calls)
+
+
+class TestProtectionIsOneNodeWidePass:
+    """It used to be a timer per session, reprogramming everything unconditionally: roughly 21
+    iptables processes plus 13 per peer, per session, every three seconds. At a hundred sessions
+    that is over a thousand subprocesses a second -- and the xtables lock contention it creates is
+    itself read as a protection failure, so the loop meant to keep tunnels up takes them down."""
+
+    def test_a_hex_normalised_rule_is_recognised(self) -> None:
+        # iptables-save prints the u32 expression in hex while the rule was written in decimal.
+        # Comparing the text finds nothing, every rule looks missing, and the pass reprograms the
+        # whole node every tick.
+        listing = (
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4789 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -j DROP\n'
+        )
+        assert vnis_in_chain(listing, CHAIN_IN) == frozenset({4097})
+
+    def test_a_decimal_rule_is_recognised_too(self) -> None:
+        listing = f'-A {CHAIN_IN} -m u32 --u32 "0>>22&0x3C@12>>8=4097" -j DROP\n'
+        assert vnis_in_chain(listing, CHAIN_IN) == frozenset({4097})
+
+    def test_another_chains_rules_are_not_counted(self) -> None:
+        listing = '-A SOMEONE-ELSE -m u32 --u32 "0>>22&0x3C@12>>8=4097" -j DROP\n'
+        assert vnis_in_chain(listing, CHAIN_IN) == frozenset()
+
+    def test_only_our_reqid_counts_as_our_sa(self) -> None:
+        listing = (
+            "src 10.0.0.1 dst 10.0.0.2\n"
+            f"\tproto esp spi 0x00001001 reqid {XFRM_REQID} mode transport\n"
+            "src 10.0.0.3 dst 10.0.0.4\n"
+            "\tproto esp spi 0x00002002 reqid 13681891 mode transport\n"
+        )
+        assert parse_owned_sa_spis(listing, XFRM_REQID) == frozenset({0x1001})
+
+    def test_only_our_mark_counts_as_our_policy(self) -> None:
+        listing = (
+            "src 10.0.0.1/32 dst 10.0.0.2/32 proto udp dport 4789 \n"
+            "\tdir out priority 0 \n"
+            f"\tmark {XFRM_MARK:#x}/0xffffffff \n"
+            "src 10.0.0.3/32 dst 10.0.0.4/32 proto udp dport 7789 \n"
+            "\tdir out priority 0 \n"
+            "\tmark 0xd0c4e3/0xffffffff \n"
+        )
+        assert parse_owned_policies(listing, f"{XFRM_MARK:#x}") == frozenset({
+            ("10.0.0.1", "10.0.0.2", 4789)
+        })
+
+    async def test_an_intact_node_is_left_alone(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.calls.clear()
+        plugin._reader = _protection_reader(plugin, vni=4097)
+        await plugin.reassert_protection()
+        assert rec.calls == [], (
+            "a steady-state pass changed something; at a hundred sessions this is the process"
+            f" storm the pass exists to avoid ({rec.calls[:3]})"
+        )
+
+    async def test_a_missing_rule_is_restored(self) -> None:
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        plugin._reader = _protection_reader(plugin, vni=None)  # every rule gone
+        await plugin.reassert_protection()
+        assert plaintext_drop_add_args(4097, 4789) in rec.calls

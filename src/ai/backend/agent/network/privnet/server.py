@@ -331,6 +331,46 @@ class PrivNetServer:
         finally:
             await self._runtime.close()
 
+    async def _retry_recovery(self) -> None:
+        """Re-attempt only what recovery could not do -- never the whole of it.
+
+        `recover()` begins by bringing down every tunnel on this node and pruning every claim,
+        which is correct exactly once, before anything is trusted. On a timer it is destructive:
+        one session that keeps failing would take every healthy VXLAN down and up again every
+        thirty seconds. So this re-reads the journal if that is what failed, and otherwise
+        re-adopts only the sessions that did not adopt -- under the same per-session lock the RPC
+        verbs take, so a session being SET UP right now is not mistaken for a dead one.
+        """
+        try:
+            live = await self._live_containers()
+            journalled_sessions = await self._journal.sessions()
+            journalled_attachments = await self._journal.attachments()
+            journalled_peers = await self._journal.peers()
+        except Exception as e:
+            self._recovery_failed = str(e)
+            return
+        self._recovery_failed = None
+        for session_id in sorted(self._unrecovered_sessions):
+            if session_id not in journalled_sessions:
+                # Gone while we were failing to adopt it: there is nothing left to recover, and
+                # keeping the mark would hold this node out of service for a session that ended.
+                self._unrecovered_sessions.pop(session_id, None)
+                continue
+            async with self._session_locked(session_id):
+                try:
+                    await self._readopt_session(
+                        session_id,
+                        journalled_sessions[session_id],
+                        journalled_peers.get(session_id),
+                        live,
+                        journalled_attachments,
+                    )
+                except Exception as e:
+                    self._unrecovered_sessions[session_id] = str(e)
+                    continue
+                self._unrecovered_sessions.pop(session_id, None)
+                log.info("privnet recovered session {} on a later attempt", session_id)
+
     def _start_recovery_retry(self) -> None:
         """Keep retrying whatever recovery could not do, on a timer.
 
@@ -348,7 +388,7 @@ class PrivNetServer:
                 if self._recovery_failed is None and not self._unrecovered_sessions:
                     return
                 try:
-                    await self.recover()
+                    await self._retry_recovery()
                 except asyncio.CancelledError:
                     raise
                 except Exception:
@@ -449,13 +489,21 @@ class PrivNetServer:
                 "could not read the privnet journal; leaving surviving tunnels down and starting "
                 "with an empty registry"
             )
+            # Distinct from an empty journal, which is a complete answer: this is "the answer
+            # could not be read", and the flag is what brings the retry back.
             # Left down is safe, but permanently down is not a recovery. Without this the whole
             # node's sessions stay unmanaged until the process restarts, however transient the
             # runtime or journal error was.
             self._recovery_failed = str(e)
             self._start_recovery_retry()
             return
+        # Read successfully, so whatever failed last time is no longer failing. Clearing it here
+        # rather than after the loop below matters for the empty case: an empty journal is a
+        # complete answer, and returning with the flag still set would keep this node reporting
+        # itself unrecovered for as long as it runs.
+        self._recovery_failed = None
         if not journalled_sessions and not journalled_attachments:
+            self._unrecovered_sessions.clear()
             return
 
         live_sessions = {
@@ -478,7 +526,6 @@ class PrivNetServer:
                 continue
             await self._reclaim_dead_container(container_id, record, journalled_sessions)
 
-        self._recovery_failed = None
         # Adopt every live session before reasserting or reclaiming anything. VXLAN adoption holds
         # encrypted tunnels down, and its XFRM policy/SA are shared by sessions on the same node
         # pair. This phase therefore closes every affected data path and rebuilds every surviving

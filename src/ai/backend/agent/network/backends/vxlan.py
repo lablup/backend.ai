@@ -10,14 +10,17 @@ runner; the command builders and CNI-config assembly are pure and unit-tested.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import hmac
 import ipaddress
 import logging
 import os
 import re
+import shlex
 import time
 from collections.abc import Awaitable, Callable, Collection, Sequence
+from dataclasses import dataclass
 from typing import Any, Final, override
 
 from ai.backend.agent.errors.network import (
@@ -195,6 +198,11 @@ _XFRM_MARK_MASK: Final = "0xffffffff"
 # Both ends derive these identically, so there is nothing to negotiate -- but an agent that
 # predates this cannot decrypt an ESN peer's traffic, so the two must not be mixed in one cluster.
 XFRM_REPLAY_WINDOW: Final = 128
+#: How often the node re-asserts every encrypted session's protection. Short, because
+#: the window it leaves is one in which injected plaintext is accepted or -- if the
+#: mark went with the rules -- traffic stops; affordable, because one pass reads the
+#: whole node's state in four commands and changes only what drifted.
+PROTECTION_INTERVAL_SEC: Final = 3.0
 KEY_ROTATION_INTERVAL_SEC: Final = 12 * 60 * 60
 _KEYRING_SIZE: Final = 3
 _VXLAN_LINE: Final = re.compile(r"^\d+:\s+(?P<name>[^:@\s]+)")
@@ -531,6 +539,100 @@ def jump_del_args(table: str, builtin: str, chain: str) -> list[str]:
     return ["iptables", "-t", table, "-D", builtin, "-j", chain]
 
 
+@dataclass(frozen=True)
+class ProtectionSnapshot:
+    """One read of everything the protection re-assert needs to decide, for the WHOLE node.
+
+    Four commands, whatever the session count. The check used to be per session and per peer,
+    every three seconds, reprogramming unconditionally: roughly 21 iptables processes plus 13 per
+    peer for each encrypted session, which at a hundred sessions is over a thousand subprocesses a
+    second -- and the xtables lock contention that produces is itself read as a protection
+    failure, so the loop meant to keep tunnels up starts taking them down.
+    """
+
+    filter_rules: str
+    mangle_rules: str
+    #: SPIs of the ESP SAs this backend owns (matched on its own reqid).
+    sa_spis: frozenset[int]
+    #: (src, dst, dport) of the outbound policies carrying this backend's mark.
+    policy_pairs: frozenset[tuple[str, str, int]]
+
+    def table(self, table: str) -> str:
+        return self.mangle_rules if table == "mangle" else self.filter_rules
+
+
+def vnis_in_chain(listing: str, chain: str) -> frozenset[int]:
+    """Every VNI a `u32` rule in ``chain`` selects, from an ``iptables-save`` listing.
+
+    The value is read as an integer rather than compared as text: iptables-save normalises the
+    expression to hex (`...@0xc>>0x8=0x1000`) while the rule was written in decimal, so a string
+    comparison finds nothing and every rule looks missing.
+    """
+    found: set[int] = set()
+    for line in listing.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith(f"-A {chain} "):
+            continue
+        tokens = shlex.split(stripped)
+        for index, token in enumerate(tokens):
+            if token != "--u32" or index + 1 >= len(tokens):
+                continue
+            _, _, value = tokens[index + 1].rpartition("=")
+            try:
+                found.add(int(value, 0))
+            except ValueError:
+                continue
+    return frozenset(found)
+
+
+def parse_owned_sa_spis(listing: str, reqid: int) -> frozenset[int]:
+    """SPIs of the SAs carrying ``reqid``, from `ip xfrm state`."""
+    found: set[int] = set()
+    for line in listing.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("proto esp"):
+            continue
+        tokens = stripped.split()
+        spi = _value_after(tokens, "spi")
+        found_reqid = _value_after(tokens, "reqid")
+        if spi is None or found_reqid is None:
+            continue
+        try:
+            if int(found_reqid, 0) == reqid:
+                found.add(int(spi, 0))
+        except ValueError:
+            continue
+    return frozenset(found)
+
+
+def parse_owned_policies(listing: str, mark: str) -> frozenset[tuple[str, str, int]]:
+    """(src, dst, dport) of the outbound policies carrying ``mark``, from `ip xfrm policy`."""
+    found: set[tuple[str, str, int]] = set()
+    header: tuple[str, str, int] | None = None
+    for line in listing.splitlines():
+        if line.startswith("src "):
+            tokens = line.split()
+            src = tokens[1].split("/")[0]
+            dst = _value_after(tokens, "dst")
+            dport = _value_after(tokens, "dport")
+            header = (
+                (src, dst.split("/")[0], int(dport))
+                if dst is not None and dport is not None and dport.isdigit()
+                else None
+            )
+            continue
+        if header is not None and mark in line:
+            found.add(header)
+    return frozenset(found)
+
+
+def _value_after(tokens: Sequence[str], key: str) -> str | None:
+    for index, token in enumerate(tokens):
+        if token == key and index + 1 < len(tokens):
+            return tokens[index + 1]
+    return None
+
+
 def jump_is_first(listing: str, builtin: str, chain: str) -> bool:
     """Whether our jump is the first rule of ``builtin`` in an ``iptables -S`` listing.
 
@@ -865,6 +967,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     _remote_endpoints: dict[str, dict[tuple[str, str], str]]
     #: Reads the firewall's own rule order, so reconcile can restore it (see `jump_is_first`).
     _reader: Reader
+    #: The node's single protection watchdog. One task, not one per session.
+    _protection_task: asyncio.Task[None] | None
     #: Node-wide record of who is using each ESP pair. The in-process refcount below is only
     #: node-wide where one privnet owns the host; with the backend in-process, every agent has
     #: its own and each believes it is the pair's sole user.
@@ -899,6 +1003,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._runner = runner or _run_command
         self._reader = reader or _read_command
         self._unclosed_devices = set()
+        self._protection_task = None
         self._pair_journal = pair_journal or PairJournal()
         # A pid only as the last resort: it is wrong across restarts, but a claim tagged
         # with something is still better than one that cannot be told from a peer's.
@@ -967,9 +1072,29 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 " scheduled here will retry and refuse if it still cannot",
                 exc_info=True,
             )
+        # ONE watchdog for the node, not one per session. What it costs does not grow with the
+        # session count, which is what lets it run often enough to matter.
+        if self._protection_task is None or self._protection_task.done():
+            self._protection_task = asyncio.create_task(self._protection_watchdog())
+
+    async def _protection_watchdog(self) -> None:
+        """Re-assert every encrypted session's protection on one node-wide clock."""
+        while True:
+            try:
+                await self.reassert_protection()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("the overlay protection watchdog pass failed")
+            await asyncio.sleep(PROTECTION_INTERVAL_SEC)
 
     @override
     async def cleanup(self) -> None:
+        if self._protection_task is not None:
+            self._protection_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._protection_task
+            self._protection_task = None
         await self._remove_owned_chains()
 
     @override
@@ -1080,6 +1205,102 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             if failures is None:
                 raise
             failures.append(f"{' '.join(argv[:5])}: {e}")
+
+    async def _snapshot_protection(self) -> ProtectionSnapshot:
+        """Read the node's whole protection state once, for the periodic re-assert."""
+        return ProtectionSnapshot(
+            filter_rules=await self._reader(["iptables-save", "-t", "filter"]),
+            mangle_rules=await self._reader(["iptables-save", "-t", "mangle"]),
+            sa_spis=parse_owned_sa_spis(await self._reader(["ip", "xfrm", "state"]), XFRM_REQID),
+            policy_pairs=parse_owned_policies(
+                await self._reader(["ip", "xfrm", "policy"]), _XFRM_MARK
+            ),
+        )
+
+    def _pair_intact(self, snapshot: ProtectionSnapshot, key: tuple[str, str, int]) -> bool:
+        """Whether the kernel still holds everything this pair is supposed to have."""
+        self_vtep, peer_vtep, dstport = key
+        generations = self._pair_slot_generations.get(key)
+        if not generations:
+            return False
+        for generation in generations.values():
+            for src, dst in ((self_vtep, peer_vtep), (peer_vtep, self_vtep)):
+                if _esp_spi(src, dst, generation) not in snapshot.sa_spis:
+                    return False
+        return (self_vtep, peer_vtep, dstport) in snapshot.policy_pairs
+
+    async def reassert_protection(self) -> None:
+        """One node-wide pass: read the real state, change only what actually drifted.
+
+        This replaces a per-session timer that reprogrammed everything unconditionally. Reading
+        first is what makes it affordable -- four commands for the whole node instead of tens per
+        session -- and it is also what makes it correct at scale: the old pass's own xtables lock
+        contention was reported as a protection failure, which took down tunnels that were fine.
+        """
+        # (session, meta, vni) so the VNI is narrowed once here rather than re-proved below.
+        encrypted = [
+            (session_id, meta, meta.vni)
+            for session_id, meta in self._sessions.items()
+            if meta.encryption_key is not None and meta.vni is not None
+        ]
+        if not encrypted:
+            return
+        try:
+            snapshot = await self._snapshot_protection()
+        except Exception:
+            log.exception("could not read this node's protection state; skipping this pass")
+            return
+        for table, builtin, chain in OWNED_CHAINS:
+            if not jump_is_first(snapshot.table(table), builtin, chain):
+                await self._ensure_owned_chains()
+                break
+        for session_id, meta, vni in encrypted:
+            try:
+                await self._reassert_session(session_id, meta, vni, snapshot)
+            except Exception:
+                # `_reassert_session` has already closed the tunnel for anything it could not
+                # restore; one session's failure must not stop the rest of the node's.
+                log.exception("could not re-assert protection for session {}", session_id)
+
+    async def _reassert_session(
+        self, session_id: str, meta: SessionNetMeta, vni: int, snapshot: ProtectionSnapshot
+    ) -> None:
+        missing = [
+            vni_rules
+            for chain, table, vni_rules in (
+                (CHAIN_IN, "filter", "drop"),
+                (CHAIN_GUARD, "filter", "guard"),
+                (CHAIN_MARK, "mangle", "mark"),
+            )
+            if vni not in vnis_in_chain(snapshot.table(table), chain)
+        ]
+        if missing:
+            # Only the rules that are actually gone, and only for this VNI.
+            if not await self._firewall_side_ok(meta, session_id):
+                raise OverlayEncryptionUnavailable(
+                    f"session {session_id} is encrypted but its {', '.join(missing)} rule(s) could"
+                    " not be restored; the overlay tunnel is held down until they can"
+                )
+        self_vtep = self._self_vteps.get(session_id)
+        if self_vtep is None:
+            return
+        for peer_vtep in sorted(self._encrypted_peers.get(session_id, set())):
+            key = (self_vtep, peer_vtep, meta.vxlan_port)
+            if self._pair_intact(snapshot, key):
+                continue  # the kernel still has it; nothing to do and nothing to spend
+            try:
+                if not await self._program_encryption(meta, session_id, peer_vtep, force=True):
+                    raise OverlayEncryptionUnavailable(
+                        f"session {session_id} cannot re-assert the ESP pair for {peer_vtep}"
+                    )
+            except Exception:
+                # The FDB entry for this peer is already open, so a failure here is not "the peer
+                # is unreachable" but "the peer is reachable and may be unprotected".
+                self._forget_pair(meta, session_id, peer_vtep)
+                await self._close_tunnel(
+                    meta, session_id, f"the ESP pair for {peer_vtep} could not be re-asserted"
+                )
+                raise
 
     async def _ensure_owned_chains(self) -> None:
         """Create this backend's chains and put their jumps back at the head of the built-ins.

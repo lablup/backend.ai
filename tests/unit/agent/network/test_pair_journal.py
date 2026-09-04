@@ -231,6 +231,22 @@ class TestHostileNeighbours:
         async with asyncio.timeout(5):
             assert await _claim(PairJournal(root), key, "agent-a", "s1") is False
 
+    async def test_an_old_world_writable_journal_is_repaired(self, tmp_path: Path) -> None:
+        # An earlier version created it 0o1777, which is the mode the lock-replacement attack
+        # needs. A host that upgraded must not keep it: where the mode can be corrected it is,
+        # and where it cannot (somebody else owns the tree) `unusable_reason` refuses instead.
+        root = tmp_path / "net-esp-pair"
+        root.mkdir(mode=0o1777)
+        assert PairJournal(root).unusable_reason() is None
+        assert stat.S_IMODE(root.stat().st_mode) & stat.S_IWOTH == 0
+
+    async def test_a_journal_that_cannot_be_written_is_refused(self, tmp_path: Path) -> None:
+        # Opening the root proves the directory is there, not that a claim can be created in it.
+        blocked = tmp_path / "wall"
+        blocked.mkdir(mode=0o555)
+        reason = PairJournal(blocked / "net-esp-pair").unusable_reason()
+        assert reason is not None
+
     async def test_the_journal_is_not_world_writable(self, tmp_path: Path) -> None:
         # It used to be 0o1777 so agents running as different users could each add claims. A local
         # user who created a pair's directory first then OWNED it, and could unlink and recreate
@@ -241,6 +257,8 @@ class TestHostileNeighbours:
         await _claim(_journal(tmp_path), key, "a", "s1")
         assert stat.S_IMODE(root.stat().st_mode) & 0o002 == 0
         assert stat.S_IMODE((root / key).stat().st_mode) & 0o002 == 0
+        # ...but group-writable, because the contract says agents may share a group.
+        assert stat.S_IMODE(root.stat().st_mode) & 0o020 == 0o020
 
     async def test_an_unusable_journal_says_why(self, tmp_path: Path) -> None:
         blocked = tmp_path / "file"
