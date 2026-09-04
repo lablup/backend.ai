@@ -150,7 +150,9 @@ class TestRlimMiddleware:
         # Arrange
         mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
         mock_valkey_client.consume = AsyncMock(
-            return_value=RateLimitState(count=test_case.rolling_count, reset=_RESET)
+            return_value=RateLimitState(
+                count=test_case.rolling_count, limit=test_case.rate_limit, reset=_RESET
+            )
         )
 
         # Act
@@ -170,6 +172,7 @@ class TestRlimMiddleware:
         mock_valkey_client.consume.assert_called_once_with(
             user_id=_USER_ID,
             window=_RATELIMIT_WINDOW,
+            rate_limit=test_case.rate_limit,
         )
 
     @pytest.mark.parametrize(
@@ -208,7 +211,9 @@ class TestRlimMiddleware:
         # Arrange
         mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
         mock_valkey_client.consume = AsyncMock(
-            return_value=RateLimitState(count=test_case.rolling_count, reset=_RESET)
+            return_value=RateLimitState(
+                count=test_case.rolling_count, limit=test_case.rate_limit, reset=_RESET
+            )
         )
 
         # Act & Assert
@@ -228,4 +233,5 @@ class TestRlimMiddleware:
         mock_valkey_client.consume.assert_called_once_with(
             user_id=_USER_ID,
             window=_RATELIMIT_WINDOW,
+            rate_limit=test_case.rate_limit,
         )

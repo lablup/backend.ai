@@ -58,6 +58,7 @@ def make_rlim_middleware(
             state = await valkey_client.consume(
                 user_id=request["user"]["uuid"],
                 window=_RATELIMIT_WINDOW,
+                rate_limit=rate_limit,
             )
             if rate_limit is not None and state.count > rate_limit:
                 reserve_response_headers(
