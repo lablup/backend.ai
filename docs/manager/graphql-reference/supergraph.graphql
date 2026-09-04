@@ -11135,6 +11135,11 @@ type ModelCardV2 implements Node
   metadata: ModelCardV2Metadata!
 
   """
+  Minimum resource requirements for serving this model. Each entry maps a resource slot (e.g. 'cpu', 'cuda.shares') to its minimum required quantity. Used to filter compatible deployment revision presets via `available_presets`.
+  """
+  minResource: [ModelCardV2ResourceSlotEntry!]
+
+  """
   README content from the model VFolder, typically containing usage instructions and model documentation.
   """
   readme: String
@@ -11147,11 +11152,6 @@ type ModelCardV2 implements Node
 
   """Timestamp of the last modification to this model card."""
   updatedAt: DateTime
-
-  """
-  Minimum resource requirements for serving this model. Each entry maps a resource slot (e.g. 'cpu', 'cuda.shares') to its minimum required quantity. Used to filter compatible deployment revision presets via `available_presets`. Read on demand: the requirements are their own table, so a query that does not select this field does not read it.
-  """
-  minResource: [ModelCardV2ResourceSlotEntry!]
 
   """
   The VFolder that stores this model card's files. Resolved through a DataLoader so that listing many model cards does not trigger N+1 fetches.
