@@ -255,6 +255,10 @@ def _protection_reader(plugin: VxlanNetworkPlugin, *, vni: int | None) -> _Listi
             return spis
         if list(argv[:3]) == ["ip", "xfrm", "policy"]:
             return policies
+        if "link" in argv and "vxlan" in argv:
+            # The device is up unless the test says the session is unprotected.
+            flags = "<BROADCAST,MULTICAST,UP,LOWER_UP>" if vni is not None else "<BROADCAST>"
+            return f"7: baivx4097@enp0s1: {flags} mtu 1450\n"
         table = argv[argv.index("-t") + 1] if "-t" in argv else "filter"
         builtin = argv[argv.index("-S") + 1]
         for owned_table, owned_builtin, chain in OWNED_CHAINS:
@@ -2887,3 +2891,141 @@ class TestTheWatchdogAndTeardownDoNotRace:
         assert added == [], (
             f"the pass reinstalled the rules of a session already torn down ({added[:2]})"
         )
+
+
+class TestAFailClosedTunnelComesBack:
+    """`_close_tunnel` is what stops a session sending in clear while its protection is missing.
+    Nothing was bringing it back: the only caller of `_reopen_tunnel` was
+    `ensure_session_security`, and a steady membership stopped reaching it -- so one failed pass
+    closed the session for the life of the process."""
+
+    async def test_the_watchdog_reopens_it_once_protection_is_back(self, tmp_path: Path) -> None:
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        meta = plugin._sessions["s1"]
+        await plugin._close_tunnel(meta, "s1", "a test closed it")
+        assert plugin.security_state("s1") is VxlanSecurityState.BLOCKED
+
+        rec.calls.clear()
+        plugin._reader = _protection_reader(plugin, vni=4097)
+        await plugin.reassert_protection()
+        assert link_up_args(vxlan_dev(4097)) in rec.calls
+        assert plugin.security_state("s1") is VxlanSecurityState.READY
+
+    async def test_a_device_downed_by_a_co_located_restart_is_raised(self, tmp_path: Path) -> None:
+        # Another agent's fail-close preflight downs every `baivx*` on the host, ours included.
+        # The membership does not change and this session still says READY, so nothing else looks.
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+
+        intact = _protection_reader(plugin, vni=4097)
+
+        async def _rules_intact_device_down(argv: Sequence[str]) -> str:
+            if "link" in argv and "vxlan" in argv:
+                return "7: baivx4097@enp0s1: <BROADCAST,MULTICAST> mtu 1450\n"
+            return await intact(argv)
+
+        plugin._reader = _rules_intact_device_down
+        await plugin.reassert_protection()
+        assert link_up_args(vxlan_dev(4097)) in rec.calls
+
+
+class TestKeyRotationStillHappens:
+    """Nothing asks what generation a pair should be on once the membership settles, so without
+    this the pairs sit on the generation they were first programmed with for the life of the
+    session -- and a peer that reprograms later ends up a generation apart."""
+
+    async def test_a_moved_generation_reprograms_the_pair(self, tmp_path: Path) -> None:
+        generation = _TEST_GENERATION
+        rec = Recorder()
+        plugin = _plugin(
+            rec,
+            pair_journal=PairJournal(tmp_path / "pairs"),
+            key_generation=lambda: generation,
+        )
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        plugin._reader = _protection_reader(plugin, vni=4097)
+
+        rec.calls.clear()
+        await plugin.reassert_protection()
+        assert not any(list(c[:4]) == ["ip", "xfrm", "state", "add"] for c in rec.calls)
+
+        generation += 1  # twelve hours later
+        rec.calls.clear()
+        await plugin.reassert_protection()
+        assert any(list(c[:4]) == ["ip", "xfrm", "state", "add"] for c in rec.calls), (
+            "the pair stayed on its old generation; nothing else drives the rotation"
+        )
+
+
+class TestAnAcceptAboveTheDropIsNotProtection:
+    """The DROP being present is not the question -- whether a packet reaches it is. An ACCEPT for
+    the same traffic above it means injected plaintext never gets there."""
+
+    def test_an_accept_first_is_not_protection(self) -> None:
+        expected = _plaintext_drop_rule(4097, 4789)
+        listing = (
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4789 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -j ACCEPT\n'
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4789 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -m policy --dir in --pol none -j DROP\n'
+        )
+        assert rule_is_present(listing, expected) is False
+
+    def test_a_rule_about_other_traffic_does_not_shadow_it(self) -> None:
+        expected = _plaintext_drop_rule(4097, 4789)
+        listing = (
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4790 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1002" -j ACCEPT\n'
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4789 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -m policy --dir in --pol none -j DROP\n'
+        )
+        assert rule_is_present(listing, expected) is True
+
+    def test_a_different_packet_word_is_not_the_same_rule(self) -> None:
+        # `@12` and `@16` read different words; keeping only the value after `=` calls them equal.
+        expected = _plaintext_drop_rule(4097, 4789)
+        listing = (
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4789 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0x10>>0x8=0x1001" -m policy --dir in --pol none -j DROP\n'
+        )
+        assert rule_is_present(listing, expected) is False
+
+    def test_a_narrower_mark_mask_is_not_the_same_rule(self) -> None:
+        expected = _output_mark_rule(4097, 4789)
+        listing = (
+            f"-A {CHAIN_MARK} -p udp -m udp --dport 4789 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -j MARK --set-xmark 0xba100001/0xffff\n'
+        )
+        assert rule_is_present(listing, expected) is False
+
+
+class TestAFailedWithdrawalIsNotADeparture:
+    """What a withdrawal removes is this node's CLAIM -- its watchdog responsibility, its ESP pair
+    claim, its journal record. The devices stay either way, which is what made swallowing the
+    failure look harmless: the manager then believes the VNI is free while all of it is still
+    here, and a privnet that restarts re-adopts the session from the record nobody deleted."""
+
+    async def test_a_claim_the_journal_could_not_release_raises(self, tmp_path: Path) -> None:
+        journal = PairJournal(tmp_path / "pairs")
+        plugin = _plugin(Recorder(), pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+
+        blocked = tmp_path / "wall"
+        blocked.write_text("not a directory")
+        plugin._pair_journal = PairJournal(blocked / "pairs")  # unreachable from here on
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.withdraw_session_network("s1")
+
+    async def test_a_released_claim_completes(self, tmp_path: Path) -> None:
+        journal = PairJournal(tmp_path / "pairs")
+        plugin = _plugin(Recorder(), pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        await plugin.withdraw_session_network("s1")
+        assert plugin.security_state("s1") is None

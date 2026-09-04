@@ -385,8 +385,39 @@ class PrivNetServer:
                 except Exception as e:
                     self._unrecovered_sessions[session_id] = str(e)
                     continue
+                try:
+                    # Adoption holds an encrypted tunnel DOWN; this is what raises it again once
+                    # its complete peer set is back. Without it the retry left every recovered
+                    # session dark -- adopted, protected, and carrying nothing.
+                    await self._restore_live_security(session_id, journalled_peers.get(session_id))
+                except Exception as e:
+                    self._unrecovered_sessions[session_id] = str(e)
+                    continue
                 self._unrecovered_sessions.pop(session_id, None)
                 log.info("privnet recovered session {} on a later attempt", session_id)
+        if self._unrecovered_sessions:
+            return  # the dead-state sweep below needs a complete picture of what is live
+        # Only once every live session is adopted: a dead session's devices are named after its
+        # VNI, and reclaiming one whose VNI a live session now holds deletes the LIVE session's
+        # devices. Deferred out of the first pass because it never ran there either -- the failure
+        # that brought us here happened before it.
+        live_vnis = {
+            vni
+            for session_id in journalled_sessions
+            if session_id in self._sessions
+            and (vni := self._journalled_vni(journalled_sessions.get(session_id))) is not None
+        }
+        for session_id, raw_config in journalled_sessions.items():
+            if session_id in self._sessions:
+                continue
+            if (vni := self._journalled_vni(raw_config)) is not None and vni in live_vnis:
+                continue
+            try:
+                await self._reclaim_dead_session(
+                    session_id, raw_config, journalled_peers.get(session_id)
+                )
+            except Exception:
+                log.exception("failed to reclaim dead session {} on a later attempt", session_id)
 
     def _start_recovery_retry(self) -> None:
         """Keep retrying whatever recovery could not do, on a timer.
@@ -937,6 +968,9 @@ class PrivNetServer:
         backend = self._backends.get(str(entry.meta.backend))
         if backend is not None:
             await backend.withdraw_session_network(session_id)
+        # The journal too, or the next restart reads it back and re-adopts a session this node has
+        # given up -- taking its ESP pair claim and its watchdog responsibility with it.
+        await self._journal.forget_session(session_id)
         self._sessions.pop(session_id, None)
 
     async def _teardown(self, session_id: str) -> None:
