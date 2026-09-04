@@ -243,13 +243,15 @@ class PrivNetBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
         But "the privnet" is per agent, and a session can be shared by two agents on one host --
         the second one's kernels join devices the first one's privnet made. That privnet has no
         record of the session, so every later attach is refused with "attach before setup" and
-        every peer with "peer programming before session setup". Setting it up there is idempotent
-        (the devices already exist and the backend's own setup is leftover-safe), and it is the
-        agent's own session to declare: it is being told to adopt it.
+        every peer with "peer programming before session setup".
+
+        ADOPT, not SETUP. Setup deletes the session's bridge, VXLAN device and LOCAL bridge before
+        rebuilding them, so sending it here cuts the network out from under every container already
+        running on them -- the very containers this call exists to keep serving.
         """
         await self._client.call(
             PrivNetRequest(
-                PrivNetOp.SETUP_SESSION,
+                PrivNetOp.ADOPT_SESSION,
                 meta.session_id,
                 network_config=_network_config_from_meta(meta),
             )

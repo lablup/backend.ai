@@ -19,7 +19,7 @@ import os
 import re
 import shlex
 import time
-from collections.abc import Awaitable, Callable, Collection, Sequence
+from collections.abc import Awaitable, Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, override
 
@@ -39,7 +39,7 @@ from ai.backend.agent.network.caps import probe_caps
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
 from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
 from ai.backend.agent.network.overlay_probe import arp_probe
-from ai.backend.agent.network.pair_journal import PairJournal, pair_key
+from ai.backend.agent.network.pair_journal import PairJournal, pair_key, sa_key
 from ai.backend.agent.network.path_mtu import underlay_mtu
 from ai.backend.agent.network.readiness import conflicting_device
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
@@ -206,6 +206,10 @@ XFRM_REPLAY_WINDOW: Final = 128
 PROTECTION_INTERVAL_SEC: Final = 3.0
 KEY_ROTATION_INTERVAL_SEC: Final = 12 * 60 * 60
 _KEYRING_SIZE: Final = 3
+#: Consecutive protection passes that may fail to read the node's state before every encrypted
+#: session is closed. One failure is a transient (a busy host, an xtables lock held elsewhere);
+#: a run of them is a node that cannot say whether anything on it is protected.
+_MAX_UNVERIFIED_PASSES: Final = 3
 _VXLAN_LINE: Final = re.compile(r"^\d+:\s+(?P<name>[^:@\s]+)")
 
 
@@ -556,7 +560,8 @@ class ProtectionSnapshot:
     #: (src, dst, spi) of the ESP SAs this backend owns, matched on its own reqid.
     sa_endpoints: frozenset[tuple[str, str, int]]
     #: (src, dst, dport) of the outbound policies carrying this backend's mark.
-    policy_pairs: frozenset[tuple[str, str, int]]
+    #: (src, dst, dport) -> the SPI the policy's template selects.
+    policy_pairs: Mapping[tuple[str, str, int], int]
     #: VXLAN devices that are administratively UP. A device this node believes is carrying can be
     #: DOWN because a co-located agent restarted and its fail-close preflight downs every
     #: `baivx*` on the host, ours included -- and nothing else ever looks.
@@ -718,17 +723,25 @@ def parse_owned_sa_endpoints(listing: str, reqid: int) -> frozenset[tuple[str, s
     would accept an SA between the wrong two hosts as this pair's.
 
     And an SA counts only if it still carries what the session was promised -- transport mode,
-    AES-GCM, ESN and a replay window. One that has lost any of them is not this SA, and reporting
-    it as present is how a session goes on running with replay protection it does not have.
+    AES-GCM with a full-length ICV, ESN and a replay window. One that has lost any of them is not
+    this SA, and reporting it as present is how a session goes on running with protection it does
+    not have.
+
+    The algorithm line must be PRESENT, not merely not-wrong: an SA with no `aead` at all is an
+    SA that encrypts nothing, and treating a missing line as "nothing to object to" reported
+    exactly that as this session's protection. ESN implies the replay window -- `ip` refuses
+    `flag esn` without one -- so the flag is the whole check, and the window itself is printed in
+    the ESN context block rather than the `replay-window` field, which reads 0 for every ESN SA.
     """
     found: set[tuple[str, str, int]] = set()
     header: tuple[str, str] | None = None
     spi: int | None = None
     ours = False
     protected = False
+    encrypted = False
 
     def _flush() -> None:
-        if header is not None and spi is not None and ours and protected:
+        if header is not None and spi is not None and ours and protected and encrypted:
             found.add((header[0], header[1], spi))
 
     for line in listing.splitlines():
@@ -737,7 +750,7 @@ def parse_owned_sa_endpoints(listing: str, reqid: int) -> frozenset[tuple[str, s
             tokens = line.split()
             dst = _value_after(tokens, "dst")
             header = (tokens[1].split("/")[0], dst.split("/")[0]) if dst is not None else None
-            spi, ours, protected = None, False, False
+            spi, ours, protected, encrypted = None, False, False, False
             continue
         stripped = line.strip()
         if header is None:
@@ -755,8 +768,10 @@ def parse_owned_sa_endpoints(listing: str, reqid: int) -> frozenset[tuple[str, s
             # packets and is not what the policy's template asks for.
             if "transport" not in tokens:
                 ours = False
-        if "aead" in tokens and _ESP_AEAD not in stripped:
-            ours = False  # some other algorithm; not the one the session was promised
+        if "aead" in tokens:
+            # The algorithm AND the ICV length: a truncated tag is a weaker authenticator than the
+            # one the session was promised, and it is the last token on the line.
+            encrypted = _ESP_AEAD in stripped and tokens[-1] == str(_ICV_BITS)
         if "flag" in tokens and "esn" in tokens:
             protected = True
     _flush()
@@ -800,23 +815,30 @@ def parse_sa_identities(listing: str) -> dict[tuple[str, int], tuple[str, int | 
     return found
 
 
-def parse_owned_policies(listing: str, mark: str) -> frozenset[tuple[str, str, int]]:
-    """(src, dst, dport) of the OUTBOUND UDP policies carrying ``mark`` and this backend's template.
+def parse_owned_policies(listing: str, mark: str) -> dict[tuple[str, str, int], int]:
+    """``{(src, dst, dport): template SPI}`` for the OUTBOUND UDP policies carrying ``mark`` and
+    this backend's template.
 
     Every part of that is load-bearing. The direction, because this backend installs an out policy
     and nothing else -- counting an inbound one reports the send path protected when only the
     receive path had a rule. The protocol, because a policy on another one does not select this
     traffic. The mask, because `mark X/0xffff` and `mark X/0xffffffff` match different packets.
-    The template, because a policy whose template names a different reqid or mode sends the
-    traffic through an SA this backend does not own.
+    The template, because a policy whose template names a different reqid, protocol or mode sends
+    the traffic through an SA this backend does not own -- and one at `level use` sends it in clear
+    text when no SA matches, which is the whole failure this design exists to prevent.
+
+    The SPI comes back with it because that is which generation the policy actually selects: one
+    left on a retired generation still reads as present, and its traffic goes to an SA slot the
+    rotation has already rebuilt with a different key.
     """
-    found: set[tuple[str, str, int]] = set()
+    found: dict[tuple[str, str, int], int] = {}
     header: tuple[str, str, int] | None = None
     outbound = marked = templated = False
+    tmpl_spi: int | None = None
 
     def _flush() -> None:
-        if header is not None and outbound and marked and templated:
-            found.add(header)
+        if header is not None and outbound and marked and templated and tmpl_spi is not None:
+            found[header] = tmpl_spi
 
     for line in listing.splitlines():
         if line.startswith("src "):
@@ -833,6 +855,7 @@ def parse_owned_policies(listing: str, mark: str) -> frozenset[tuple[str, str, i
                 else None
             )
             outbound = marked = templated = False
+            tmpl_spi = None
             continue
         if header is None:
             continue
@@ -844,15 +867,25 @@ def parse_owned_policies(listing: str, mark: str) -> frozenset[tuple[str, str, i
             marked = value == mark and (not mask or int(mask, 0) == 0xFFFFFFFF)
         if "tmpl" in tokens:
             raw_reqid = _value_after(tokens, "reqid")
+            raw_spi = _value_after(tokens, "spi")
+            try:
+                tmpl_spi = int(raw_spi, 0) if raw_spi is not None else None
+            except ValueError:
+                tmpl_spi = None
             templated = (
                 raw_reqid is not None
                 and int(raw_reqid, 0) == XFRM_REQID
+                and _value_after(tokens, "proto") == "esp"
                 and "transport" in tokens
+                # `level use` makes the template optional: with no matching SA the packet leaves
+                # unprotected instead of being dropped. iproute2 prints the level only when it is
+                # not the default (`required`), so its absence is the safe state.
+                and _value_after(tokens, "level") != "use"
                 and _value_after(tokens, "src") == header[0]
                 and _value_after(tokens, "dst") == header[1]
             )
     _flush()
-    return frozenset(found)
+    return found
 
 
 def _value_after(tokens: Sequence[str], key: str) -> str | None:
@@ -1158,12 +1191,21 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     # what broke the others
     # -- silently to clear text when it was the policy. Keyed by session id rather than counted so
     # add/remove stay idempotent under the coordinator's retries.
-    _pair_users: dict[tuple[str, str, int], set[str]]
-    #: The pairs the kernel actually holds an SA and policy for. Separate from ``_pair_users``,
+    #: Keyed on the VTEP pair alone, because an SA is: the kernel identifies it by
+    #: (dst, spi, proto), and it is created with no port at all. Every session between these two
+    #: nodes therefore rides the same SAs whatever port its overlay runs on -- counting them per
+    #: port let the last session on one port delete the SAs another port's sessions were still
+    #: sending through.
+    _pair_users: dict[tuple[str, str], set[str]]
+    #: Who needs the OUTBOUND POLICY, which does name the port in its selector.
+    _policy_users: dict[tuple[str, str, int], set[str]]
+    #: The pairs the kernel actually holds SAs for. Separate from ``_pair_users``,
     #: which records who would have to release a pair: a session is recorded as a user before the
     #: commands run (so a partial failure is still cleaned up), and treating that record as proof
     #: of programming would make every retry skip a pair that was never finished.
-    _programmed_pairs: set[tuple[str, str, int]]
+    _programmed_pairs: set[tuple[str, str]]
+    #: The (pair, port) policies the kernel actually holds.
+    _programmed_policies: set[tuple[str, str, int]]
     # Per-session background reach probes, so teardown does not leave them running against a
     # bridge that is being deleted.
     _reach_tasks: dict[str, set[asyncio.Task[None]]]
@@ -1186,14 +1228,18 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     #: port, so two sessions racing on one pair can interleave into "A decides it is the last user,
     #: B programs the pair, A deletes what B just made" -- B then holds an open FDB with nothing
     #: encrypting it. Per pair, not global: unrelated pairs have no reason to wait on each other.
-    _pair_locks: dict[tuple[str, str, int], asyncio.Lock]
+    #: On the VTEP pair, not the port: the SAs are shared across ports, so one port's teardown
+    #: and another's programming of the same pair must not run at the same time.
+    _pair_locks: dict[tuple[str, str], asyncio.Lock]
     #: Full generation currently stored in each of a pair's three SPI slots. The SPI is bounded by
     #: slot, while the key derivation includes the full generation; this map tells rotation which
     #: stale slot must be deleted and recreated rather than incorrectly `update`d in place.
-    _pair_slot_generations: dict[tuple[str, str, int], dict[int, int]]
+    _pair_slot_generations: dict[tuple[str, str], dict[int, int]]
     #: The outbound generation never moves backwards if wall clock is corrected. A rollback would
     #: deliberately resume a retired traffic key and reset this process's security horizon.
-    _pair_active_generations: dict[tuple[str, str, int], int]
+    _pair_active_generations: dict[tuple[str, str], int]
+    #: Consecutive protection passes that could not read the node's state at all.
+    _unverified_passes: int
     _key_generation: KeyGeneration
     #: Serialize forwarding changes for one session/VTEP. Without this, DEL_PEER can observe no
     #: endpoint yet, remove the pair, and race with ADD_ENDPOINT opening a unicast FDB immediately
@@ -1265,9 +1311,12 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._unreachable_peers = {}
         self._encrypted_peers = {}
         self._pair_users = {}
+        self._policy_users = {}
         self._programmed_pairs = set()
+        self._programmed_policies = set()
         self._security_states = {}
         self._pair_locks = {}
+        self._unverified_passes = 0
         self._pair_slot_generations = {}
         self._pair_active_generations = {}
         self._forwarding_locks = {}
@@ -1472,14 +1521,20 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     def _pair_intact(self, snapshot: ProtectionSnapshot, key: tuple[str, str, int]) -> bool:
         """Whether the kernel still holds everything this pair is supposed to have."""
         self_vtep, peer_vtep, dstport = key
-        generations = self._pair_slot_generations.get(key)
+        generations = self._pair_slot_generations.get((self_vtep, peer_vtep))
         if not generations:
             return False
         for generation in generations.values():
             for src, dst in ((self_vtep, peer_vtep), (peer_vtep, self_vtep)):
                 if (src, dst, _esp_spi(src, dst, generation)) not in snapshot.sa_endpoints:
                     return False
-        return (self_vtep, peer_vtep, dstport) in snapshot.policy_pairs
+        selected = snapshot.policy_pairs.get((self_vtep, peer_vtep, dstport))
+        if selected is None:
+            return False
+        # A policy left on a retired generation reads as present while sending this pair's traffic
+        # to a slot the rotation has already rebuilt under a different key.
+        active = self._pair_active_generations.get((self_vtep, peer_vtep))
+        return active is None or selected == _esp_spi(self_vtep, peer_vtep, active)
 
     async def reassert_protection(self) -> None:
         """One node-wide pass: read the real state, change only what actually drifted.
@@ -1499,9 +1554,27 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             return
         try:
             snapshot = await self._snapshot_protection()
-        except Exception:
-            log.exception("could not read this node's protection state; skipping this pass")
+        except Exception as e:
+            # One failed read is a transient, and skipping the pass keeps sessions that are almost
+            # certainly fine running. But a node that has not been able to say whether its sessions
+            # are protected for several passes running is not "probably fine" -- it has no idea,
+            # and carrying encrypted traffic on no idea is what this backend exists to refuse.
+            self._unverified_passes += 1
+            log.exception(
+                "could not read this node's protection state ({} consecutive)",
+                self._unverified_passes,
+            )
+            if self._unverified_passes >= _MAX_UNVERIFIED_PASSES:
+                for session_id, meta, _vni in encrypted:
+                    with contextlib.suppress(Exception):
+                        await self._close_tunnel(
+                            meta,
+                            session_id,
+                            "this node's protection state has been unreadable for"
+                            f" {self._unverified_passes} passes ({e})",
+                        )
             return
+        self._unverified_passes = 0
         for table, builtin, chain in OWNED_CHAINS:
             if jump_is_first(snapshot.table(table), builtin, chain):
                 continue
@@ -1587,7 +1660,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             # `ensure_session_security`: nothing else asks what generation it should be on, so
             # the pairs would sit on their first one for the life of the session.
             drifted = not self._pair_intact(snapshot, key)
-            rotated = self._pair_active_generations.get(key, generation) < generation
+            rotated = (
+                self._pair_active_generations.get((self_vtep, peer_vtep), generation) < generation
+            )
             if not drifted and not rotated:
                 continue  # the kernel has it, at the generation it should be on
             try:
@@ -1869,8 +1944,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         log.info("security state is back for session {}; reopening the tunnel", session_id)
         return True
 
-    def _pair_lock(self, key: tuple[str, str, int]) -> asyncio.Lock:
-        return self._pair_locks.setdefault(key, asyncio.Lock())
+    def _pair_lock(self, sa: tuple[str, str]) -> asyncio.Lock:
+        return self._pair_locks.setdefault(sa, asyncio.Lock())
 
     def _forwarding_lock(self, session_id: str, peer_vtep: str) -> asyncio.Lock:
         return self._forwarding_locks.setdefault((session_id, peer_vtep), asyncio.Lock())
@@ -1912,7 +1987,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self_vtep = self._self_vteps.get(session_id)
         if self_vtep is None:
             return
-        self._programmed_pairs.discard((self_vtep, peer_vtep, meta.vxlan_port))
+        self._programmed_pairs.discard((self_vtep, peer_vtep))
+        self._programmed_policies.discard((self_vtep, peer_vtep, meta.vxlan_port))
 
     def _pair_is_protected(self, meta: SessionNetMeta, session_id: str, peer_vtep: str) -> bool:
         """Whether traffic to ``peer_vtep`` would actually be encrypted."""
@@ -1923,7 +1999,13 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             return False
         if self_vtep == peer_vtep:
             return True  # this node's own endpoint: reached over the bridge, no tunnel involved
-        return (self_vtep, peer_vtep, meta.vxlan_port) in self._programmed_pairs
+        # Both: the SAs carry the traffic and the policy is what selects them. Either one
+        # missing means this peer's traffic is not actually encrypted.
+        return (self_vtep, peer_vtep) in self._programmed_pairs and (
+            self_vtep,
+            peer_vtep,
+            meta.vxlan_port,
+        ) in self._programmed_policies
 
     @override
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
@@ -2090,13 +2172,20 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         if meta is None or meta.encryption_key is None or self_vtep is None:
             return
         for peer_vtep in sorted({peer.vtep_ip for peer in peers if peer.vtep_ip is not None}):
+            sa = (self_vtep, peer_vtep)
             key = (self_vtep, peer_vtep, meta.vxlan_port)
             self._encrypted_peers.setdefault(session_id, set()).add(peer_vtep)
-            self._pair_users.setdefault(key, set()).add(session_id)
-            async with self._pair_journal.claiming(
-                pair_key(*key), self._journal_owner, session_id
-            ) as recorded:
-                if not recorded:
+            self._pair_users.setdefault(sa, set()).add(session_id)
+            self._policy_users.setdefault(key, set()).add(session_id)
+            async with (
+                self._pair_journal.claiming(
+                    sa_key(*sa), self._journal_owner, session_id
+                ) as sa_recorded,
+                self._pair_journal.claiming(
+                    pair_key(*key), self._journal_owner, session_id
+                ) as recorded,
+            ):
+                if not sa_recorded or not recorded:
                     # Adopting a pair whose claim will not record is the same hazard as
                     # programming one: another agent reads it as free and removes it. Leave the
                     # kernel state alone and let the drift re-assert retry.
@@ -2108,9 +2197,11 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                         meta.vxlan_port,
                         session_id,
                     )
-                    self._pair_users.get(key, set()).discard(session_id)
+                    self._pair_users.get(sa, set()).discard(session_id)
+                    self._policy_users.get(key, set()).discard(session_id)
                     continue
-            self._programmed_pairs.add(key)
+            self._programmed_pairs.add(sa)
+            self._programmed_policies.add(key)
 
     @override
     async def prepare_recovery(self) -> None:
@@ -2232,18 +2323,26 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             if meta is not None and self_vtep is not None:
                 unreleased: list[str] = []
                 for peer_vtep in sorted(self._encrypted_peers.get(session_id, set())):
+                    sa = (self_vtep, peer_vtep)
                     key = (self_vtep, peer_vtep, meta.vxlan_port)
-                    # The claim, not the SAs: another agent here is still carried by them, which
-                    # is exactly what the node-wide refcount is for.
-                    async with self._pair_journal.releasing(
-                        pair_key(*key), self._journal_owner, session_id
-                    ) as freed:
-                        if freed is None:
+                    # The claims, not the SAs: another agent here is still carried by them, which
+                    # is exactly what the node-wide refcount is for. Both, because the SAs and the
+                    # policy are counted separately -- see `sa_key`.
+                    async with (
+                        self._pair_journal.releasing(
+                            sa_key(*sa), self._journal_owner, session_id
+                        ) as sa_freed,
+                        self._pair_journal.releasing(
+                            pair_key(*key), self._journal_owner, session_id
+                        ) as freed,
+                    ):
+                        if sa_freed is None or freed is None:
                             # The journal could not say. Our claim may still be on disk, and
                             # reporting the withdrawal as done leaves it there with nobody
                             # left to remove it.
                             unreleased.append(peer_vtep)
-                    self._pair_users.get(key, set()).discard(session_id)
+                    self._pair_users.get(sa, set()).discard(session_id)
+                    self._policy_users.get(key, set()).discard(session_id)
                 if unreleased:
                     raise OverlayEncryptionUnavailable(
                         f"session {session_id} could not release its ESP pair claim for"
@@ -2481,19 +2580,27 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # every retry take the `already programmed` shortcut below and the pair would stay
         # half-built for good. So the two are separate -- `_pair_users` says who would have to
         # release it, `_programmed_pairs` says whether the kernel actually has it.
+        sa = (self_vtep, peer_vtep)
         key = (self_vtep, peer_vtep, meta.vxlan_port)
         # Under the pair's lock, so the refcount below and the commands that follow from it cannot
         # interleave with another session's teardown of the same pair -- see `_pair_locks`.
-        async with self._pair_lock(key):
+        async with self._pair_lock(sa):
             self._encrypted_peers.setdefault(session_id, set()).add(peer_vtep)
-            self._pair_users.setdefault(key, set()).add(session_id)
-            # The host lock is held from here through the SA/policy programming below. Recording
+            self._pair_users.setdefault(sa, set()).add(session_id)
+            self._policy_users.setdefault(key, set()).add(session_id)
+            # The host locks are held from here through the SA/policy programming below. Recording
             # the claim and installing what it claims are one step: between them, another agent
-            # can read the pair as unused and delete the very objects being installed.
-            async with self._pair_journal.claiming(
-                pair_key(*key), self._journal_owner, session_id
-            ) as recorded:
-                if not recorded:
+            # can read the pair as unused and delete the very objects being installed. Two claims,
+            # counted separately, because the SAs outlive any one port -- see `sa_key`.
+            async with (
+                self._pair_journal.claiming(
+                    sa_key(*sa), self._journal_owner, session_id
+                ) as sa_recorded,
+                self._pair_journal.claiming(
+                    pair_key(*key), self._journal_owner, session_id
+                ) as recorded,
+            ):
+                if not sa_recorded or not recorded:
                     # Refuse rather than program. The claim is what another agent process counts
                     # when it decides whether the pair is still in use; with ours not on disk, it
                     # reads the pair as free and deletes the very SAs about to be installed --
@@ -2509,7 +2616,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                         meta.vxlan_port,
                         session_id,
                     )
-                    self._pair_users.get(key, set()).discard(session_id)
+                    self._pair_users.get(sa, set()).discard(session_id)
+                    self._policy_users.get(key, set()).discard(session_id)
                     self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
                     return False
                 return await self._program_pair_locked(
@@ -2533,19 +2641,25 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         """
         if meta.encryption_key is None:
             return True
+        sa = (self_vtep, peer_vtep)
         if True:
             observed_generation = self._key_generation()
             generation = max(
                 observed_generation,
-                self._pair_active_generations.get(key, observed_generation),
+                self._pair_active_generations.get(sa, observed_generation),
             )
             target_generations = (generation - 1, generation, generation + 1)
             target_slots = {
                 target_generation % _KEYRING_SIZE: target_generation
                 for target_generation in target_generations
             }
-            slot_generations = self._pair_slot_generations.setdefault(key, {})
-            if key in self._programmed_pairs and slot_generations == target_slots and not force:
+            slot_generations = self._pair_slot_generations.setdefault(sa, {})
+            if (
+                sa in self._programmed_pairs
+                and key in self._programmed_policies
+                and slot_generations == target_slots
+                and not force
+            ):
                 return True  # another session on this node already programmed this pair
             try:
                 for target_generation in target_generations:
@@ -2567,11 +2681,18 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                     # window, so delete it and create the slot with the new key instead. A missing
                     # delete is harmless; a failed delete followed by EEXIST on add is surfaced,
                     # never downgraded to an in-place update with the old key.
-                    for args in xfrm_state_del_args(
-                        self_vtep, peer_vtep, generation=target_generation
+                    #
+                    # Filtered, like every other SA delete: `ip xfrm state del` resolves the SA by
+                    # (dst, spi, proto) and ignores the src it is given, so a delete written for
+                    # this pair removes another peer's SA when the two derived the same SPI. A
+                    # skipped delete leaves the add to fail with EEXIST, which fails this pair
+                    # closed -- which is the right end for a collision we cannot program through.
+                    for del_args in await self._own_sa_deletes(
+                        xfrm_state_del_args(self_vtep, peer_vtep, generation=target_generation),
+                        None,
                     ):
                         try:
-                            await self._runner(args)
+                            await self._runner(del_args)
                         except RuntimeError:
                             pass
                     for args in add_args:
@@ -2588,13 +2709,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                     generation=generation,
                 ):
                     await self._runner(args)
-                self._pair_active_generations[key] = generation
+                self._pair_active_generations[sa] = generation
             except Exception:
-                self._programmed_pairs.discard(key)
+                self._programmed_pairs.discard(sa)
+                self._programmed_policies.discard(key)
                 # The SA/policy belongs to every session between this node pair. A partial rekey
                 # can affect all of them, so holding down only the session that happened to run
                 # this reconcile would leave its siblings open on uncertain shared state.
-                for user_session_id in sorted(self._pair_users.get(key, set())):
+                for user_session_id in sorted(self._pair_users.get(sa, set())):
                     if (user_meta := self._sessions.get(user_session_id)) is not None:
                         await self._close_tunnel(
                             user_meta,
@@ -2605,7 +2727,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             # Only now. Anything that raised above left the pair unmarked, so the next reconcile
             # retries it -- and the FDB entry that would have carried clear text was never
             # appended, because add_peer programs before it opens the path.
-            self._programmed_pairs.add(key)
+            self._programmed_pairs.add(sa)
+            self._programmed_policies.add(key)
         return True
 
     async def _unprogram_encryption(
@@ -2616,15 +2739,17 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self_vtep: str | None,
         failures: list[str] | None = None,
     ) -> None:
-        """Remove this session's ESP SA pair, and the shared policy once nobody is left on it.
+        """Remove this pair's ESP objects, each once nobody on this node is left on it.
 
-        Idempotent, and reports what it could not remove rather than assuming success (a
-        surviving SA or policy is not untidiness -- see `OverlayTeardownIncomplete`). The SAs are
-        this session's (the SPI folds the VNI in) and go
-        unconditionally; the policy belongs to every session between the same two nodes on the same
-        port, so it goes only when the last of them does. Deleting it with the first session to end
-        is what silently drops the others to clear text -- they keep running, their SAs are still
-        there, and nothing selects them any more.
+        Two scopes, counted separately. The policy names the port in its selector, so it belongs
+        to the sessions between these two nodes ON THIS PORT. The SAs name no port at all -- the
+        kernel identifies them by (dst, spi, proto) -- so they belong to every session between the
+        two nodes, whatever port it runs on. Counting the SAs per port let the last session on one
+        port delete the SAs a session on another port was still sending through, leaving that
+        session's policy selecting an SA that no longer exists.
+
+        Idempotent, and reports what it could not remove rather than assuming success (a surviving
+        SA or policy is not untidiness -- see `OverlayTeardownIncomplete`).
         """
         if meta.encryption_key is None or meta.vni is None or self_vtep is None:
             self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
@@ -2634,7 +2759,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # two are one step: without the lock, another session can program this very pair between
         # "nobody is left" and the delete, and be left holding an open FDB with nothing to encrypt
         # it -- see `_pair_locks`.
-        async with self._pair_lock(key):
+        async with self._pair_lock((self_vtep, peer_vtep)):
             await self._unprogram_pair(meta, session_id, peer_vtep, self_vtep, key, failures)
 
     async def _unprogram_pair(
@@ -2647,12 +2772,54 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         failures: list[str] | None = None,
     ) -> None:
         """The body of `_unprogram_encryption`, run with the pair's lock held."""
-        async with self._pair_journal.releasing(
-            pair_key(*key), self._journal_owner, session_id
-        ) as node_wide_free:
+        sa = (self_vtep, peer_vtep)
+        async with (
+            self._pair_journal.releasing(sa_key(*sa), self._journal_owner, session_id) as sa_free,
+            self._pair_journal.releasing(
+                pair_key(*key), self._journal_owner, session_id
+            ) as policy_free,
+        ):
             await self._unprogram_pair_locked(
-                meta, session_id, peer_vtep, self_vtep, key, node_wide_free, failures
+                meta, session_id, peer_vtep, self_vtep, key, sa_free, policy_free, failures
             )
+
+    def _scope_is_free(
+        self,
+        users: set[str],
+        session_id: str,
+        node_wide_free: bool | None,
+        programmed: bool,
+        what: str,
+    ) -> bool:
+        """Whether one scope's kernel objects may be deleted now that this session is leaving.
+
+        ``node_wide_free`` is the journal's answer: True to remove, False to leave, None when it
+        could not be determined. Unknown is NOT permission: the journal is what every process on
+        this node agrees on, and an answer it could not give is not one. Of the two ways to be
+        wrong, a stale SA keeps traffic encrypted while a deleted one takes down whoever else was
+        on it.
+        """
+        if users - {session_id}:
+            return False  # another session of this agent's is still carried by it
+        if node_wide_free is not True:
+            return False  # another agent on this host, or an answer the journal could not give
+        if not programmed:
+            # This process did not program it, so it does not know who else is on it. That happens
+            # when only the privnet restarted: the agent's coordinator still remembers its peers as
+            # applied and never re-sends them, so the refcount here rebuilds as empty while other
+            # sessions are still carried by the very objects about to be removed.
+            #
+            # Deleting on that empty count is what drops those sessions -- to clear text when it is
+            # the policy that goes. Leaking instead costs one stale object per node pair until the
+            # kernel or an operator clears it.
+            log.warning(
+                "not removing {} for session {}: this process did not program it (privnet"
+                " restart?), so it cannot tell whether another session still needs it",
+                what,
+                session_id,
+            )
+            return False
+        return True
 
     async def _unprogram_pair_locked(
         self,
@@ -2661,78 +2828,71 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         peer_vtep: str,
         self_vtep: str,
         key: tuple[str, str, int],
-        node_wide_free: bool | None,
+        sa_free: bool | None,
+        policy_free: bool | None,
         failures: list[str] | None,
     ) -> None:
-        """The body of `_unprogram_pair`, with the pair's host-wide lock held.
-
-        ``node_wide_free`` is the journal's answer: True to remove, False to leave, None when it
-        could not be determined. Unknown is NOT permission. Of the two ways to be wrong, a stale
-        SA keeps traffic encrypted while a deleted one takes down whoever else was on it -- and
-        the same reasoning applies to a pair whose claim never reached the journal at all.
-        """
-        users = self._pair_users.get(key, set())
-        # Only an explicit True frees the pair. Unknown is not permission: the journal is what
-        # every process on this node agrees on, and an answer it could not give is not one.
-        if (users - {session_id}) or node_wide_free is not True:
-            # Another session -- possibly another agent's on this same host -- is still carried
-            # by this pair's SA and policy. Nothing to delete, so the refcount settles here.
-            users.discard(session_id)
-            self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
-            return
-        if key not in self._programmed_pairs:
-            # This process did not program the pair, so it does not know who else is on it. That
-            # happens when only the privnet restarted: the agent's coordinator still remembers its
-            # peers as applied and never re-sends them, so the refcount here rebuilds as empty
-            # while other sessions are still carried by the very SA and policy about to be removed.
-            #
-            # Deleting on that empty count is what drops those sessions to clear text -- their SAs
-            # remain, nothing selects them any more, and nothing says so. Leaking the pair instead
-            # costs one stale SA and policy per node pair until the kernel or an operator clears
-            # them; of the two ways to be wrong, that is the one that keeps traffic encrypted.
-            log.warning(
-                "not removing the ESP pair {}->{}:{} for session {}: this process did not program"
-                " it (privnet restart?), so it cannot tell whether another session still needs it",
-                self_vtep,
-                peer_vtep,
-                meta.vxlan_port,
-                session_id,
-            )
-            users.discard(session_id)
-            self._pair_users.pop(key, None)
-            self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
-            return
-        # SA first, then the policy. Between the two there is a window, and this order makes it a
-        # window where traffic is blocked (a policy with no SA) rather than one where it leaves in
-        # clear text (a live tunnel with nothing requiring ESP). Nothing should be flowing here --
-        # this runs when the last session on the pair is gone -- but of the two ways to be wrong,
-        # dropping is the one to pick.
-        state_deletes = [
-            args
-            for slot in range(_KEYRING_SIZE)
-            for args in xfrm_state_del_args(self_vtep, peer_vtep, generation=slot)
-        ]
+        """The body of `_unprogram_pair`, with the pair's host-wide claim locks held."""
+        sa = (self_vtep, peer_vtep)
+        sa_users = self._pair_users.setdefault(sa, set())
+        policy_users = self._policy_users.setdefault(key, set())
+        remove_sa = self._scope_is_free(
+            sa_users,
+            session_id,
+            sa_free,
+            sa in self._programmed_pairs,
+            f"the ESP SAs for {self_vtep}->{peer_vtep}",
+        )
+        remove_policy = self._scope_is_free(
+            policy_users,
+            session_id,
+            policy_free,
+            key in self._programmed_policies,
+            f"the ESP policy for {self_vtep}->{peer_vtep}:{meta.vxlan_port}",
+        )
         # Delete first, THEN forget. The other order looks harmless because teardown reports the
         # failure -- but the retry it is asking for reads `_encrypted_peers` to find the pairs to
         # revisit, and that entry is already gone. The retry then finds nothing to do, succeeds,
         # and the manager releases the VNI over an SA and policy that are still on the host.
         # Collect into the caller's list when it is collecting, and let `_remove` raise when it
-        # is not. Keeping the two in one variable is what forced the cast away: with no list,
-        # nothing reaches the branch below because the raise has already left.
+        # is not.
         pair_failures: list[str] | None = [] if failures is not None else None
-        for args in (
-            *await self._own_sa_deletes(state_deletes, pair_failures),
-            *xfrm_policy_del_args(self_vtep, peer_vtep, dstport=meta.vxlan_port),
-        ):
+        deletes: list[Sequence[str]] = []
+        if remove_sa:
+            # SAs first, then the policy. Between the two there is a window, and this order makes
+            # it a window where traffic is blocked (a policy with no SA) rather than one where it
+            # leaves in clear text (a live tunnel with nothing requiring ESP). Nothing should be
+            # flowing here -- this runs when the last session on the pair is gone -- but of the two
+            # ways to be wrong, dropping is the one to pick.
+            deletes.extend(
+                await self._own_sa_deletes(
+                    [
+                        args
+                        for slot in range(_KEYRING_SIZE)
+                        for args in xfrm_state_del_args(self_vtep, peer_vtep, generation=slot)
+                    ],
+                    pair_failures,
+                )
+            )
+        if remove_policy:
+            deletes.extend(xfrm_policy_del_args(self_vtep, peer_vtep, dstport=meta.vxlan_port))
+        for args in deletes:
             await self._remove(args, pair_failures)
         if failures is not None and pair_failures:
             failures.extend(pair_failures)
             return  # bookkeeping untouched, so the next teardown visits this pair again
-        self._programmed_pairs.discard(key)
-        self._pair_slot_generations.pop(key, None)
-        self._pair_active_generations.pop(key, None)
-        users.discard(session_id)
-        self._pair_users.pop(key, None)
+        if remove_sa:
+            self._programmed_pairs.discard(sa)
+            self._pair_slot_generations.pop(sa, None)
+            self._pair_active_generations.pop(sa, None)
+            self._pair_users.pop(sa, None)
+        else:
+            sa_users.discard(session_id)
+        if remove_policy:
+            self._programmed_policies.discard(key)
+            self._policy_users.pop(key, None)
+        else:
+            policy_users.discard(session_id)
         self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
 
     async def _run_xfrm(self, argv: Sequence[str]) -> None:
