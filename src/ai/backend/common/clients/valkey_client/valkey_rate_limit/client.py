@@ -9,7 +9,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_valkey_client,
 )
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.exception import BackendAIError, ValkeyRateLimitBatchAborted
+from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     BackoffStrategy,
@@ -116,7 +116,7 @@ class ValkeyRateLimitClient:
         async with self._client.client() as conn:
             results = await conn.exec(batch, raise_on_error=True)
         if results is None:
-            raise ValkeyRateLimitBatchAborted
+            raise UnreachableError("an atomic batch without WATCH cannot be aborted")
         count, _, reset = results
         return RateLimitState(count=cast(int, count), reset=cast(int, reset))
 

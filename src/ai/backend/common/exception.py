@@ -1026,23 +1026,6 @@ class ValkeySentinelMasterNotFound(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
-class ValkeyRateLimitBatchAborted(BackendAIError, web.HTTPServiceUnavailable):
-    """
-    Raised when the atomic batch that counts a request against the rate limit returns no result.
-    """
-
-    error_type = "https://api.backend.ai/probs/valkey-rate-limit-batch-aborted"
-    error_title = "Valkey Rate Limit Batch Aborted"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.UNAVAILABLE,
-        )
-
-
 class ValkeyRoleMismatchError(BackendAIError, web.HTTPServiceUnavailable):
     """
     Raised when a Valkey connection points to a node whose role is not the expected one
