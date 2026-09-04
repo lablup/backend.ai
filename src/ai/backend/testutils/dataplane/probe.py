@@ -8,6 +8,10 @@ the other's test module.
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+
 from ai.backend.testutils.dataplane.nodes import Node
 
 
@@ -185,3 +189,86 @@ async def delivery_ratio(
         check=False,
     )
     return _received_fraction(result.stdout)
+
+
+async def vtep_interface(node: Node, vtep_ip: str) -> str:
+    """The interface that holds ``vtep_ip`` on this node.
+
+    Deliberately not a route lookup. A node with a second default route -- a laptop with both
+    Ethernet and Wi-Fi up, which is exactly what one of the nodes here is -- answers
+    ``ip route get`` with the wrong one, and a capture on it records nothing while the tunnel is
+    busy on the other. The backend picks its uplink the same way, from the address.
+    """
+    result = await node.run(["ip", "-o", "-4", "addr", "show"])
+    for line in result.stdout.splitlines():
+        tokens = line.split()
+        if len(tokens) >= 4 and tokens[3].split("/")[0] == vtep_ip:
+            return tokens[1]
+    raise AssertionError(f"no interface on {node.name} holds {vtep_ip}")
+
+
+@dataclass(frozen=True)
+class UnderlayCapture:
+    """What a node saw on the wire for one VXLAN port."""
+
+    esp: int
+    plaintext: int
+
+    @property
+    def is_encrypted_only(self) -> bool:
+        return self.esp > 0 and self.plaintext == 0
+
+
+async def capture_underlay(
+    node: Node,
+    iface: str,
+    generate: Callable[[], Awaitable[None]],
+    *,
+    port: int = 4789,
+    seconds: int = 12,
+) -> UnderlayCapture:
+    """Count ESP against plaintext VXLAN on ``iface`` while ``generate`` runs.
+
+    tcpdump only flushes its buffer when it exits, so the capture is read after waiting out the
+    whole window rather than as soon as the traffic stops -- reading early reports zero of both
+    and looks exactly like a dead tunnel.
+    """
+    path = "/tmp/bai-dataplane-underlay.pcap"
+    await node.run(["sudo", "-n", "rm", "-f", path], check=False)
+    await node.run([
+        "sudo", "-n", "sh", "-c",
+        f"nohup timeout {seconds} tcpdump -ni {iface} -w {path} "
+        f"'esp or (udp port {port})' >/dev/null 2>&1 &",
+    ])  # fmt: skip
+    await asyncio.sleep(2)
+    await generate()
+    await asyncio.sleep(seconds)
+    esp = await node.run(["sudo", "-n", "tcpdump", "-nr", path, "esp"], check=False)
+    plain = await node.run(["sudo", "-n", "tcpdump", "-nr", path, f"udp port {port}"], check=False)
+    await node.run(["sudo", "-n", "rm", "-f", path], check=False)
+    return UnderlayCapture(
+        esp=len([line for line in esp.stdout.splitlines() if line.strip()]),
+        plaintext=len([line for line in plain.stdout.splitlines() if line.strip()]),
+    )
+
+
+async def iptables_rules(node: Node, table: str, chain: str) -> list[str]:
+    result = await node.run(["sudo", "-n", "iptables", "-t", table, "-S", chain], check=False)
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+async def jump_position(node: Node, table: str, builtin: str, chain: str) -> int | None:
+    """1-based index of the jump to ``chain`` within ``builtin``, or None when it is absent.
+
+    Position, not presence: an ACCEPT above the jump bypasses the chain while ``iptables -C``
+    still reports it there.
+    """
+    index = 0
+    for line in await iptables_rules(node, table, builtin):
+        tokens = line.split()
+        if not tokens or tokens[0] != "-A" or tokens[1] != builtin:
+            continue
+        index += 1
+        if tokens[-2:] == ["-j", chain]:
+            return index
+    return None
