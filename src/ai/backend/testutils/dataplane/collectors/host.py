@@ -23,7 +23,12 @@ DEFAULT_DEVICE_PREFIXES: tuple[str, ...] = ("bai",)
 # `-m comment --comment bai:<container_id>`, the tag published port-forwards carry.
 IPTABLES_COMMENT_MARKER = "bai:"
 
-DEFAULT_IPTABLES_TABLES: tuple[str, ...] = ("filter", "nat")
+# The chains the vxlan backend owns. Their names do not start with the device prefix, and the
+# mangle one is where the XFRM mark is set -- a table the harness did not look at, so a leaked
+# mark rule (or a missing one) was invisible to every leak check.
+OWNED_CHAIN_PREFIX = "BAI-VXLAN-"
+
+DEFAULT_IPTABLES_TABLES: tuple[str, ...] = ("filter", "nat", "mangle")
 
 
 class NetworkLinkCollector:
@@ -109,7 +114,7 @@ class IptablesRuleCollector:
     def _mentions_ours(self, line: str) -> bool:
         if IPTABLES_COMMENT_MARKER in line:
             return True
-        if "CNI-" in line:
+        if "CNI-" in line or OWNED_CHAIN_PREFIX in line:
             return True
         tokens = shlex.split(line)
         return any(token.startswith(prefix) for token in tokens for prefix in self._prefixes)
@@ -121,7 +126,7 @@ class IptablesRuleCollector:
             if line.startswith(":"):
                 # `:CNI-abc - [0:0]` — drop the packet counters, which change every poll.
                 chain = line[1:].split()[0]
-                if not chain.startswith("CNI-"):
+                if not chain.startswith(("CNI-", OWNED_CHAIN_PREFIX)):
                     continue
                 found.add(Resource(self.kind, self._node.name, f"{table} chain {chain}"))
                 continue
@@ -320,9 +325,11 @@ class NeighbourCollector:
             if dev is None or not self._is_ours(dev):
                 continue
             dst = _value_after(tokens, "dst")
-            found.add(
-                Resource(self.kind, self._node.name, f"fdb {tokens[0]} dev {dev}", f"dst={dst}")
-            )
+            # The destination is part of WHICH entry this is, not colour: an entry whose dst
+            # moved to another VTEP sends a reused address's traffic to the wrong node, and as
+            # `detail` (which is excluded from Resource identity) it compared equal to the
+            # correct one and no snapshot diff could see the change.
+            found.add(Resource(self.kind, self._node.name, f"fdb {tokens[0]} dev {dev} dst {dst}"))
         return found
 
     def parse_neigh(self, raw: str) -> set[Resource]:
@@ -364,3 +371,86 @@ def ip_in_pool(ip: str, pool: str) -> bool:
         return ipaddress.ip_address(ip) in ipaddress.ip_network(pool, strict=False)
     except ValueError:
         return False
+
+
+class XfrmCollector:
+    """ESP security associations and policies the backend programs, on one node.
+
+    Nothing collected these before, and they are the one kind of state that outlives everything
+    that names it: they live in the netns, not on a device, so deleting the vxlan link leaves
+    them behind. A surviving outbound policy is worse than clutter -- it selects ESP for this
+    node pair's VXLAN port with no SA to satisfy it, so the next session on that pair is dropped
+    wholesale.
+
+    Scoped by the backend's own `reqid`/`mark`, the same markers its teardown keys off, so a
+    co-tenant's IPsec (Docker's overlay uses different values deliberately) is never reported.
+    """
+
+    _node: Node
+    _reqid: str
+    _mark: str
+
+    def __init__(self, node: Node, *, reqid: str = "0xba100002", mark: str = "0xba100001") -> None:
+        self._node = node
+        self._reqid = reqid
+        self._mark = mark
+
+    @property
+    def kind(self) -> str:
+        return "xfrm"
+
+    def _ours(self, block: str) -> bool:
+        lowered = block.lower()
+        return int(self._reqid, 16).__str__() in lowered or self._mark in lowered
+
+    def parse_state(self, raw: str) -> set[Resource]:
+        """`ip xfrm state` blocks: a `src ... dst ...` line and indented attributes under it.
+
+        Only the SPI and endpoints identify an SA. Counters and the key are excluded on purpose:
+        the counters move every poll, and the key is the traffic secret -- a leak report is not
+        a place to print it.
+        """
+        found: set[Resource] = set()
+        for header, body in _xfrm_blocks(raw):
+            if not self._ours(body):
+                continue
+            spi = _value_after(body.split(), "spi")
+            found.add(Resource(self.kind, self._node.name, f"state {header} spi {spi}"))
+        return found
+
+    def parse_policy(self, raw: str) -> set[Resource]:
+        found: set[Resource] = set()
+        for header, body in _xfrm_blocks(raw):
+            if not self._ours(body):
+                continue
+            direction = _value_after(body.split(), "dir")
+            found.add(Resource(self.kind, self._node.name, f"policy {header} dir {direction}"))
+        return found
+
+    async def collect(self) -> set[Resource]:
+        state = await self._node.run(["ip", "xfrm", "state"])
+        policy = await self._node.run(["ip", "xfrm", "policy"])
+        return self.parse_state(state.stdout) | self.parse_policy(policy.stdout)
+
+
+def _xfrm_blocks(raw: str) -> list[tuple[str, str]]:
+    """Split `ip xfrm` output into (header, whole block) pairs.
+
+    A block starts at a non-indented `src ...` line and runs until the next one; every attribute
+    that identifies it (spi, reqid, dir, mark) sits in the indented lines below.
+    """
+    blocks: list[tuple[str, str]] = []
+    header: str | None = None
+    lines: list[str] = []
+    for line in raw.splitlines():
+        if line.startswith("src "):
+            if header is not None:
+                blocks.append((header, "\n".join(lines)))
+            header = " ".join(line.split()[:4])
+            lines = [line]
+            continue
+        if header is not None:
+            lines.append(line)
+    if header is not None:
+        blocks.append((header, "\n".join(lines)))
+    return blocks
