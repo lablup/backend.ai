@@ -49,14 +49,64 @@ class PrivNetClientError(RuntimeError):
     """The privnet refused or failed a request. Carries the privnet's generic reason."""
 
 
+class PrivNetUnreachable(PrivNetClientError):
+    """The privileged helper could not be reached at all, rather than refusing one request.
+
+    A subclass, so every caller that already degrades on a failed request keeps doing so -- the
+    distinction is for the ones that want to say WHY, and for readiness, which reports a node
+    whose helper is down instead of letting each session discover it at create time.
+    """
+
+
 class PrivNetClient:
     _socket_path: str
 
     def __init__(self, socket_path: str) -> None:
         self._socket_path = socket_path
 
+    async def reachable(self) -> str | None:
+        """None if the privileged helper answers, else why it does not.
+
+        Every device, rule and XFRM object on a privnet-backed node is made by that process, so a
+        node whose socket is dead can serve no session at all -- and used to find out at create
+        time, one node at a time, with a bare `ConnectionRefusedError` for a reason.
+        """
+        try:
+            _, writer = await asyncio.open_unix_connection(self._socket_path)
+        except FileNotFoundError:
+            return f"the privileged network helper's socket {self._socket_path} does not exist"
+        except ConnectionRefusedError:
+            return (
+                f"nothing is listening on the privileged network helper's socket"
+                f" {self._socket_path} (the privnet process is not running)"
+            )
+        except PermissionError:
+            return (
+                f"this agent may not connect to {self._socket_path}; the privnet allows one uid"
+                " and it is not this one (it takes it from SUDO_UID, so launching privnet through"
+                " a second sudo makes it allow root instead)"
+            )
+        except OSError as e:
+            return f"could not reach the privileged network helper at {self._socket_path}: {e}"
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+        return None
+
     async def call(self, req: PrivNetRequest) -> PrivNetResponse:
-        reader, writer = await asyncio.open_unix_connection(self._socket_path)
+        try:
+            reader, writer = await asyncio.open_unix_connection(self._socket_path)
+        except OSError as e:
+            # Named, not raw: this reaches a session-creation path, and a bare
+            # ConnectionRefusedError there says nothing about which node, which socket, or that
+            # the whole data plane on this node is down rather than one operation failing.
+            raise PrivNetUnreachable(
+                f"the privileged network helper at {self._socket_path} is unreachable ({e}); no"
+                " overlay device, firewall rule or XFRM object can be made on this node until it"
+                " is back"
+            ) from e
         try:
             writer.write(req.encode())
             await writer.drain()

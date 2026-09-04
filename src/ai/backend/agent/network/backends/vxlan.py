@@ -14,6 +14,7 @@ import hashlib
 import hmac
 import ipaddress
 import logging
+import os
 import re
 import time
 from collections.abc import Awaitable, Callable, Collection, Sequence
@@ -35,6 +36,7 @@ from ai.backend.agent.network.caps import probe_caps
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
 from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
 from ai.backend.agent.network.overlay_probe import arp_probe
+from ai.backend.agent.network.pair_journal import PairJournal, pair_key
 from ai.backend.agent.network.path_mtu import underlay_mtu
 from ai.backend.agent.network.readiness import conflicting_device
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
@@ -863,6 +865,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     _remote_endpoints: dict[str, dict[tuple[str, str], str]]
     #: Reads the firewall's own rule order, so reconcile can restore it (see `jump_is_first`).
     _reader: Reader
+    #: Node-wide record of who is using each ESP pair. The in-process refcount below is only
+    #: node-wide where one privnet owns the host; with the backend in-process, every agent has
+    #: its own and each believes it is the pair's sole user.
+    _pair_journal: PairJournal
+    #: This node's name for the claims it makes in that journal. The AGENT ID, not a pid: claims
+    #: outlive the process, and an owner that changed on every restart would strand each of them
+    #: on a pair nobody then removes. Same convention as the node-local subnet journal.
+    _journal_owner: str
     #: Surviving tunnels `prepare_recovery` could not bring down. Kept because the privnet
     #: continues in degraded mode after that failure, and a device nothing can classify is
     #: an open path: setup refuses the VNI that names one until it is actually closed.
@@ -877,6 +887,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         runner: Runner | None = None,
         reader: Reader | None = None,
         local_subnets: LocalSubnetAllocator | None = None,
+        pair_journal: PairJournal | None = None,
+        journal_owner: str | None = None,
         mtu_probe: MtuProbe | None = None,
         reach_probe: ReachProbe | None = None,
         vxlan_lister: VxlanLister | None = None,
@@ -887,6 +899,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._runner = runner or _run_command
         self._reader = reader or _read_command
         self._unclosed_devices = set()
+        self._pair_journal = pair_journal or PairJournal()
+        # A pid only as the last resort: it is wrong across restarts, but a claim tagged
+        # with something is still better than one that cannot be told from a peer's.
+        self._journal_owner = journal_owner or f"pid{os.getpid()}"
         # Injectable for the same reason as `runner`: the probe shells out and reads sysfs, and the
         # command builders must stay testable without either.
         self._mtu_probe = mtu_probe or underlay_mtu
@@ -1507,6 +1523,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             key = (self_vtep, peer_vtep, meta.vxlan_port)
             self._encrypted_peers.setdefault(session_id, set()).add(peer_vtep)
             self._pair_users.setdefault(key, set()).add(session_id)
+            self._pair_journal.claim(pair_key(*key), self._journal_owner, session_id)
             self._programmed_pairs.add(key)
 
     @override
@@ -1531,6 +1548,13 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             else:
                 failed.append(device)
         self._unclosed_devices.update(failed)
+        # Claims outlive the process that made them: a crash between programming a pair and
+        # tearing it down leaves one with nobody behind it, and the pair it names is then never
+        # removed by anyone. At this point no session has been re-adopted yet, so every claim of
+        # ours is stale by definition.
+        pruned = self._pair_journal.prune(self._journal_owner, live_sessions=())
+        if pruned:
+            log.info("dropped {} stale ESP pair claim(s) left by a previous life", pruned)
         if failed:
             raise OverlayEncryptionUnavailable(
                 "could not fail-close surviving VXLAN tunnel(s) before recovery: "
@@ -1560,24 +1584,36 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         """Surviving tunnels this node has not managed to bring down, for diagnostics."""
         return frozenset(self._unclosed_devices)
 
-    async def _require_closed(self, vni: int) -> None:
-        """Refuse to build on a VNI whose surviving device is still up, retrying the close first.
+    async def retry_fail_close(self) -> frozenset[str]:
+        """Try again to bring down every survivor recovery could not close. Returns what is left.
 
-        `prepare_recovery` raising does not stop the privnet: it continues in degraded mode so
-        live sessions can retry their own transitions. That leaves an orphan carrying whatever a
-        previous life was carrying, and a new session drawing the same VNI would `ip link add`
-        onto a name it does not own -- or, once the delete in setup removes it, adopt its traffic.
+        Called on a timer as well as before setup: `prepare_recovery` raising does not stop the
+        privnet -- it continues in degraded mode on purpose -- so without a retry an orphan whose
+        session is not in the journal stays UP for as long as the process runs, carrying whatever
+        a previous life was carrying, with nothing coming back to it.
         """
-        dev = vxlan_dev(vni)
-        if dev not in self._unclosed_devices:
-            return
-        if await self._hold_vxlan_down_or_absent(dev):
-            self._unclosed_devices.discard(dev)
+        for dev in sorted(self._unclosed_devices):
+            if await self._hold_vxlan_down_or_absent(dev):
+                self._unclosed_devices.discard(dev)
+                log.info("surviving tunnel {} is finally down", dev)
+        return frozenset(self._unclosed_devices)
+
+    async def _require_closed(self, vni: int) -> None:
+        """Refuse to build any overlay while a survivor from a previous life is still up.
+
+        Not just the VNI that names it. This node cannot say what an unclosed tunnel is carrying,
+        and it shares the underlay port, the XFRM pairs and the firewall chains with whatever is
+        set up next -- so admitting a different VNI is admitting a session onto state nobody owns.
+        Refusing everything is the loud failure; the alternative is a session that comes up beside
+        it and quietly inherits its traffic.
+        """
+        remaining = await self.retry_fail_close()
+        if not remaining:
             return
         raise OverlayEncryptionUnavailable(
-            f"refusing to set up VNI {vni}: the surviving tunnel {dev} from a previous life is"
-            " still up and could not be brought down, so this node cannot tell what it is"
-            " carrying. Remove it by hand (`ip link del`) once its traffic is accounted for."
+            f"refusing to set up VNI {vni}: {', '.join(sorted(remaining))} survived a previous"
+            " life on this node and could not be brought down, so what they are carrying is"
+            " unknown. Remove them by hand (`ip link del`) once their traffic is accounted for."
         )
 
     @override
@@ -1805,6 +1841,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         async with self._pair_lock(key):
             self._encrypted_peers.setdefault(session_id, set()).add(peer_vtep)
             self._pair_users.setdefault(key, set()).add(session_id)
+            self._pair_journal.claim(pair_key(*key), self._journal_owner, session_id)
             observed_generation = self._key_generation()
             generation = max(
                 observed_generation,
@@ -1919,9 +1956,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     ) -> None:
         """The body of `_unprogram_encryption`, run with the pair's lock held."""
         users = self._pair_users.get(key, set())
-        if users - {session_id}:
-            # Another session is still carried by this pair's SA and policy. Nothing to delete,
-            # so the refcount can be settled here.
+        # The node-wide answer wins where it is available: another agent process on this host may
+        # be carried by the very SA and policy about to be removed, and its claim is invisible to
+        # the refcount above. None means the journal could not be read, and the in-process count
+        # is then all there is -- which is exactly the situation every deployment was in before.
+        node_wide_free = self._pair_journal.release(pair_key(*key), self._journal_owner, session_id)
+        if (users - {session_id}) or node_wide_free is False:
+            # Another session -- possibly another agent's on this same host -- is still carried
+            # by this pair's SA and policy. Nothing to delete, so the refcount settles here.
             users.discard(session_id)
             self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
             return

@@ -252,6 +252,30 @@ class OverlayEncryptionUnavailable(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class UndescribableVxlanDevice(BackendAIError, web.HTTPInternalServerError):
+    """Another VXLAN is on this host and its parameters cannot be read.
+
+    The plaintext-drop and mark rules select on (UDP port, VNI) and nothing else, so a co-tenant
+    tunnel sharing both would have its frames dropped as unprotected plaintext, and its traffic
+    marked for this session's XFRM policy -- in both directions, with neither side told. Refusing
+    is the answer because the alternative is admitting on "could not check", which reads exactly
+    like "checked, nothing there".
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/undescribable-vxlan-device"
+    error_title = (
+        "A VXLAN device on this node cannot be described, so a collision cannot be ruled out."
+    )
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
 class OverlayTeardownIncomplete(BackendAIError, web.HTTPInternalServerError):
     """Raised when teardown could not remove everything it owns on this node.
 
