@@ -70,9 +70,14 @@ class _StubBackend:
         self.endpoints: list[tuple[str, str, str, str, str]] = []  # (op, sid, ip, mac, vtep)
         self.attach_kernel_configs: list[Any] = []  # kernel_config each attach_endpoint received
         self.self_members: list[Any] = []  # the membership the server publishes for this node
+        self.withdraw_calls: list[str] = []
         self.recovery_preparations = 0
         self.recovery_error = recovery_error
         self.teardown_failures = teardown_failures
+
+    async def withdraw_session_network(self, session_id: str) -> None:
+        self.withdraw_calls.append(session_id)
+        self._known_sessions.discard(session_id)
 
     async def prepare_recovery(self) -> None:
         self.recovery_preparations += 1
@@ -342,6 +347,17 @@ class _Harness:
             pass
         if self._tmp is not None:
             self._tmp.cleanup()
+
+    async def setup(self, session_id: str, **config: object) -> None:
+        """Set one session up through the RPC, as an agent would."""
+        resp = await self.client().call(
+            PrivNetRequest(
+                PrivNetOp.SETUP_SESSION,
+                session_id,
+                network_config={"backend": "bridge", "subnet": "172.30.9.0/24", **config},
+            )
+        )
+        assert resp.ok, resp.error
 
     def client(self) -> PrivNetClient:
         return PrivNetClient(self.server._socket_path)
@@ -1370,3 +1386,92 @@ class TestPeerAuthentication:
             mode = os.stat(h.server._socket_path).st_mode & 0o777
 
             assert mode == 0o600, oct(mode)
+
+
+class TestDeferredRecovery:
+    """A privnet that could not read its inputs stays up on purpose -- refusing every verb for
+    every session would be worse -- but "stays up" is not "recovers". These pin what the retry has
+    to do afterwards, which is everything the first pass did not."""
+
+    async def test_a_read_failure_arms_the_retry(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        runtime = _StubRuntime(live={"c1": "s1"})
+        async with _Harness(runtime, state_dir=tmp_path) as h:
+            await h.setup("s1")
+
+        async def _boom() -> dict[str, str]:
+            raise RuntimeError("containerd was unreachable")
+
+        # A second daemon over the same state, whose first inventory read fails.
+        async with _Harness(_StubRuntime(live={"c1": "s1"}), state_dir=tmp_path) as h2:
+            monkeypatch.setattr(h2.server, "_live_containers", _boom)
+            await h2.server.recover()
+            assert h2.server._recovery_failed is not None
+
+    async def test_the_retry_adopts_every_live_session_after_a_read_failure(
+        self, tmp_path: Path
+    ) -> None:
+        # The first pass adopted nothing, so there are no per-session marks to work from: the
+        # retry must take the whole live set, or it iterates an empty set and leaves the node
+        # with every tunnel down and an empty registry.
+        runtime = _StubRuntime(live={"c1": "s1"})
+        async with _Harness(runtime, state_dir=tmp_path) as h:
+            await h.setup("s1")
+
+        async with _Harness(_StubRuntime(live={"c1": "s1"}), state_dir=tmp_path) as h2:
+            h2.server._recovery_failed = "containerd was unreachable"
+            h2.backend.adopt_calls.clear()
+            await h2.server._retry_recovery()
+            assert h2.backend.adopt_calls == ["s1"]
+
+    async def test_the_retry_restores_security_so_the_tunnel_is_not_left_dark(
+        self, tmp_path: Path
+    ) -> None:
+        # Adoption holds an encrypted tunnel DOWN. A retry that stopped there "recovered" every
+        # session into darkness.
+        runtime = _StubRuntime(live={"c1": "s1"})
+        async with _Harness(runtime, state_dir=tmp_path) as h:
+            await h.setup("s1")
+
+        async with _Harness(_StubRuntime(live={"c1": "s1"}), state_dir=tmp_path) as h2:
+            h2.server._recovery_failed = "containerd was unreachable"
+            h2.backend.ensure_calls.clear()
+            await h2.server._retry_recovery()
+            assert [sid for sid, _ in h2.backend.ensure_calls] == ["s1"]
+
+    async def test_a_session_gone_from_the_journal_stops_being_retried(
+        self, tmp_path: Path
+    ) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            h.server._unrecovered_sessions["ghost"] = "was failing"
+            await h.server._retry_recovery()
+            assert "ghost" not in h.server._unrecovered_sessions
+
+
+class TestWithdrawingASession:
+    """The agent whose last kernel of a session leaves while a co-located agent still has one.
+    The devices are the node's and stay; this node's CLAIM on the session must not."""
+
+    async def test_the_journal_record_goes_with_it(self, tmp_path: Path) -> None:
+        # Left behind, the next restart reads it and re-adopts a session this node gave up --
+        # taking its ESP pair claim and its watchdog responsibility back with it.
+        async with _Harness(_StubRuntime(live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+            assert "s1" in await h.journal.sessions()
+            resp = await h.client().call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "s1"))
+            assert resp.ok
+            assert "s1" not in await h.journal.sessions()
+
+    async def test_the_backend_is_told_to_let_go(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+            await h.client().call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "s1"))
+            assert h.backend.withdraw_calls == ["s1"]
+            assert h.backend.teardown_calls == [], "withdrawal must not tear the data plane down"
+
+    async def test_withdrawing_an_unknown_session_is_harmless(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            resp = await h.client().call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "nope"))
+            assert resp.ok
+            assert h.backend.withdraw_calls == []
