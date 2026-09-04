@@ -717,7 +717,11 @@ def plaintext_drop_check_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[st
 
 
 def plaintext_drop_add_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
-    return ["iptables", "-A", *_plaintext_drop_rule(vni, dstport)]
+    # Inserted, not appended. Inside a chain of our own the order is immaterial -- the rules are
+    # disjoint by VNI -- but a restored rule has to outrank anything that displaced it: an
+    # impostor carrying the same VNI with an ACCEPT would otherwise sit above the DROP that was
+    # put back, and go on bypassing it.
+    return ["iptables", "-I", *_plaintext_drop_rule(vni, dstport)]
 
 
 def plaintext_drop_del_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
@@ -749,7 +753,11 @@ def egress_guard_check_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]
 
 
 def egress_guard_add_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
-    return ["iptables", "-A", *_egress_guard_rule(vni, dstport)]
+    # Inserted, not appended. Inside a chain of our own the order is immaterial -- the rules are
+    # disjoint by VNI -- but a restored rule has to outrank anything that displaced it: an
+    # impostor carrying the same VNI with an ACCEPT would otherwise sit above the DROP that was
+    # put back, and go on bypassing it.
+    return ["iptables", "-I", *_egress_guard_rule(vni, dstport)]
 
 
 def egress_guard_del_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
@@ -772,7 +780,8 @@ def output_mark_check_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
 
 
 def output_mark_add_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
-    return ["iptables", "-t", "mangle", "-A", *_output_mark_rule(vni, dstport)]
+    # Inserted for the same reason as the filter rules above.
+    return ["iptables", "-t", "mangle", "-I", *_output_mark_rule(vni, dstport)]
 
 
 def output_mark_del_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
