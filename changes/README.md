@@ -52,14 +52,7 @@ For example, when changed both `client.func` and `client.cli` with the same sign
 
 Note: maintainers may modify the PR title without notice during reviews.
 
-### Same-release fixes: `chore`/`misc`, not `fix`
-
-A `fix:` pull request backports automatically to every maintained version listed in `.github/maintained-versions.yml`.
-That only makes sense when the bug being fixed already exists on a maintained release branch.
-
-When a PR fixes code that was introduced earlier in the same, still-unreleased cycle — the buggy code exists only on `main` and has never reached a maintained release branch — it is not a user-facing bug fix from the release notes' point of view.
-Use `chore` as the PR title prefix and `misc` as the news fragment type instead of `fix`.
-Tagging it `fix` would trigger a backport of code that was never released.
+See `changes/KNOWLEDGE.md` for the category-to-PR-title-prefix/changelog-type mapping, including the same-release fix rule (`chore`/`misc`, not `fix`).
 
 ## Most macroscopic: Release highlights
 
