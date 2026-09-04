@@ -1550,7 +1550,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             for session_id, meta in self._sessions.items()
             if meta.encryption_key is not None and meta.vni is not None
         ]
-        if not encrypted:
+        # Plaintext sessions have no protection to re-assert, but they do have a device that
+        # something else on this host can take down -- see `_raise_downed_plaintext`.
+        plaintext = [
+            (session_id, meta.vni)
+            for session_id, meta in self._sessions.items()
+            if meta.encryption_key is None and meta.vni is not None
+        ]
+        if not encrypted and not plaintext:
             return
         try:
             snapshot = await self._snapshot_protection()
@@ -1575,6 +1582,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                         )
             return
         self._unverified_passes = 0
+        # First, and outside the chain and protection work below: a plaintext session needs
+        # neither, and either of them ending the pass would leave its device down.
+        await self._raise_downed_plaintext(plaintext, snapshot)
         for table, builtin, chain in OWNED_CHAINS:
             if jump_is_first(snapshot.table(table), builtin, chain):
                 continue
@@ -1703,6 +1713,33 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             )
             await self._runner(link_up_args(vxlan_dev(vni)))
 
+    async def _raise_downed_plaintext(
+        self, plaintext: Sequence[tuple[str, int]], snapshot: ProtectionSnapshot
+    ) -> None:
+        """Bring back a plaintext session's tunnel that something else on this host took down.
+
+        `prepare_recovery` holds every `baivx*` on the node down, ours and a co-located agent's
+        alike, because at that moment nothing can tell them apart. The agent that restarted then
+        re-adopts its own and raises them -- and nobody raises anyone else's. An encrypted session
+        of ours is caught by its own re-assert below; a plaintext one has no protection to
+        re-assert and so had nothing looking at it, and its cross-node traffic stopped until the
+        next restart of whichever process happened to own it.
+
+        There is no state in which this backend wants a live plaintext session's device down.
+        """
+        for session_id, vni in plaintext:
+            if vxlan_dev(vni) in snapshot.up_devices:
+                continue
+            log.warning(
+                "{} was down while plaintext session {} is live; raising it again",
+                vxlan_dev(vni),
+                session_id,
+            )
+            try:
+                await self._runner(link_up_args(vxlan_dev(vni)))
+            except Exception:
+                log.exception("could not raise {} for session {}", vxlan_dev(vni), session_id)
+
     async def _ensure_owned_chains(self) -> None:
         """Create this backend's chains and put their jumps back at the head of the built-ins.
 
@@ -1726,6 +1763,23 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 pass  # nothing to remove
             await self._runner(jump_add_args(table, builtin, chain))
 
+    async def _chains_are_empty(self) -> bool:
+        """Whether every owned chain holds no rule -- ours or anyone else's.
+
+        The chains are host-global and shared by every agent on the node, so this process's own
+        bookkeeping cannot answer who still needs them. What CAN answer is the chains themselves:
+        every session's rules are removed by its teardown, so an empty chain is one no session on
+        this host is relying on. An unreadable one is not empty.
+        """
+        for table, _builtin, chain in OWNED_CHAINS:
+            try:
+                listing = await self._reader(chain_list_args(table, chain))
+            except (RuntimeError, OSError):
+                return False
+            if any(line.startswith("-A ") for line in listing.splitlines()):
+                return False
+        return True
+
     async def _remove_owned_chains(self) -> None:
         """Withdraw the chains. Only at process cleanup -- never while a session ends.
 
@@ -1735,7 +1789,19 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         conclude nobody is left, and delete the chains out from under a session that had just
         finished protecting itself -- leaving it sending and accepting clear text until the next
         reconcile. An empty chain costs nothing; that window costs the guarantee.
+
+        And "this process" is not "this host": a co-located agent's encrypted sessions keep their
+        plaintext drop and egress guard in these very chains. Deleting them at our exit would take
+        that agent's protection with it, leaving its sessions accepting clear text with nothing
+        said anywhere. So the chains go only when they are empty, which is precisely when no
+        session on the node is behind them.
         """
+        if not await self._chains_are_empty():
+            log.info(
+                "leaving the overlay firewall chains in place: they still carry rules, which on a"
+                " host with more than one agent are somebody's protection"
+            )
+            return
         for table, builtin, chain in OWNED_CHAINS:
             for argv in (
                 jump_del_args(table, builtin, chain),
