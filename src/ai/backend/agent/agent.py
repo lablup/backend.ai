@@ -76,6 +76,7 @@ from ai.backend.agent.metrics.metric import (
     StatTaskObserver,
     SyncContainerLifecycleObserver,
 )
+from ai.backend.agent.network.caps import publish_backend
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.tasks import (
     CleanupReportedKernelsTask,
@@ -966,6 +967,11 @@ class AbstractAgent[
         """
         self.resource_lock = asyncio.Lock()
         self.registry_lock = asyncio.Lock()
+        # Advertise which container runtime this agent runs. The manager pairs the cluster-network
+        # driver against it: a driver only one backend can serve must not be handed to an agent of
+        # the other kind, or the session comes up with kernels that cannot reach each other and
+        # nothing says so. Without this the guard reads an absent key and permits everything.
+        await publish_backend(self.etcd, str(self.id), str(self.local_config.agent.backend))
         self.container_lifecycle_queue = asyncio.Queue()
 
         if self.local_config.redis is None:
