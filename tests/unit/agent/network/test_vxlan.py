@@ -57,6 +57,7 @@ from ai.backend.agent.network.backends.vxlan import (
     overlay_mac_capability_args,
     parse_owned_policies,
     parse_owned_sa_endpoints,
+    parse_sa_identities,
     plaintext_drop_add_args,
     plaintext_drop_check_args,
     plaintext_drop_del_args,
@@ -175,14 +176,18 @@ class _Listing:
     """Stands in for ``iptables -S``. Defaults to a built-in chain whose first rule is our jump,
     so tests unrelated to rule order neither shell out to the host nor see spurious drift."""
 
-    def __init__(self, listing: Callable[[Sequence[str]], str] | None = None) -> None:
+    def __init__(self, listing: Callable[[Sequence[str]], str | None] | None = None) -> None:
         self.calls: list[list[str]] = []
         self._listing = listing
 
     async def __call__(self, argv: Sequence[str]) -> str:
         self.calls.append(list(argv))
-        if self._listing is not None:
-            return self._listing(argv)
+        if self._listing is not None and (answer := self._listing(argv)) is not None:
+            return answer
+        if argv[0] == "ip":
+            # A kernel holding no XFRM state and no vxlan device of its own: the honest default
+            # for a test that is not about what else the node is running.
+            return ""
         table = argv[argv.index("-t") + 1] if "-t" in argv else "filter"
         builtin = argv[argv.index("-S") + 1]
         for owned_table, owned_builtin, chain in OWNED_CHAINS:
@@ -237,6 +242,8 @@ def _protection_reader(plugin: VxlanNetworkPlugin, *, vni: int | None) -> _Listi
     spis = "".join(
         f"src {src} dst {dst}\n\tproto esp spi {_esp_spi(src, dst, generation):#x}"
         f" reqid {XFRM_REQID} mode transport\n"
+        "\treplay-window 0 flag esn\n"
+        "\taead rfc4106(gcm(aes)) 0xdeadbeef 128\n"
         for key, generations in plugin._pair_slot_generations.items()
         for generation in generations.values()
         for src, dst in ((key[0], key[1]), (key[1], key[0]))
@@ -244,6 +251,7 @@ def _protection_reader(plugin: VxlanNetworkPlugin, *, vni: int | None) -> _Listi
     policies = "".join(
         f"src {key[0]}/32 dst {key[1]}/32 proto udp dport {key[2]} \n"
         f"\tdir out priority 0 \n\tmark {XFRM_MARK:#x}/0xffffffff \n"
+        f"\ttmpl src {key[0]} dst {key[1]} proto esp spi 0x1 reqid {XFRM_REQID} mode transport\n"
         for key in plugin._pair_slot_generations
     )
 
@@ -267,6 +275,42 @@ def _protection_reader(plugin: VxlanNetworkPlugin, *, vni: int | None) -> _Listi
         return f"-P {builtin} ACCEPT\n"
 
     return _Listing(_listing)
+
+
+_STATE = ["ip", "xfrm", "state"]
+
+
+class _FailingAdd(Recorder):
+    """A kernel that already holds every SA we try to add, which is what a re-assert meets."""
+
+    @override
+    async def __call__(self, argv: Sequence[str]) -> None:
+        await super().__call__(argv)
+        if list(argv[:4]) == ["ip", "xfrm", "state", "add"]:
+            raise RuntimeError("RTNETLINK answers: File exists")
+
+
+def _sa_listing(src: str, dst: str, spis: Sequence[int]) -> str:
+    """`ip xfrm state` output holding one ESP SA per SPI, all with ``src`` as their source."""
+    return "".join(
+        f"src {src} dst {dst}\n"
+        f"\tproto esp spi {spi:#x} reqid {XFRM_REQID} mode transport\n"
+        "\treplay-window 128 flag esn\n"
+        "\taead rfc4106(gcm(aes)) 0xdeadbeef 128\n"
+        for spi in spis
+    )
+
+
+def _our_sas(src: str, dst: str) -> str:
+    """The SAs this pair derives, as the kernel would print them back to us."""
+    return _sa_listing(
+        src,
+        dst,
+        [
+            _esp_spi(src, dst, generation)
+            for generation in range(_TEST_GENERATION - 1, _TEST_GENERATION + 2)
+        ],
+    )
 
 
 def _plugin(
@@ -2049,6 +2093,48 @@ class TestXfrmStateVerb:
         verbs = [c[3] for c in rec.calls if c[:3] == ["ip", "xfrm", "state"]]
         assert verbs.count("add") == 6 and verbs.count("update") == 6, verbs
 
+    async def test_an_sa_of_ours_at_that_spi_is_still_updated(self) -> None:
+        # The ordinary EEXIST: our own SA, from before this process. The guard must not turn a
+        # re-assert of our own protection into a refusal.
+        ours = _our_sas("10.0.0.1", "10.0.0.2") + _our_sas("10.0.0.2", "10.0.0.1")
+        rec, reader = Recorder(), _Listing(lambda argv: ours if list(argv[:3]) == _STATE else None)
+        plugin = _plugin(rec, reader=reader)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        failing = _FailingAdd()
+        plugin._runner = failing
+        await plugin.ensure_session_security("s1", [_PEER])
+        assert [c[3] for c in failing.calls if c[:3] == _STATE].count("update") == 6
+
+    async def test_a_foreign_sa_at_that_spi_is_not_overwritten(self) -> None:
+        """The kernel keys an SA on (dst, spi, proto) with no src in it, and this SPI is 32 bits of
+        a hash: two peers of the same node can derive the same one. `update` would then replace the
+        other pair's key and its src -- their traffic stops decrypting, with nothing said on either
+        side. Fail this pair closed instead; it is the one we were asked about."""
+        held = _sa_listing(
+            "10.9.9.9", "10.0.0.2", [_esp_spi("10.0.0.1", "10.0.0.2", _TEST_GENERATION)]
+        )
+        reader = _Listing(lambda argv: held if list(argv[:3]) == _STATE else None)
+        plugin = _plugin(Recorder(), reader=reader)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        plugin._runner = _FailingAdd()
+        with pytest.raises(OverlayEncryptionUnavailable, match=r"already belongs to 10\.9\.9\.9"):
+            await plugin.ensure_session_security("s1", [_PEER])
+
+    async def test_an_unreadable_sa_table_is_not_a_licence_to_overwrite(self) -> None:
+        def _unreadable(argv: Sequence[str]) -> str | None:
+            if list(argv[:3]) == _STATE:
+                raise RuntimeError("Operation not permitted")
+            return None
+
+        plugin = _plugin(Recorder(), reader=_Listing(_unreadable))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        plugin._runner = _FailingAdd()
+        with pytest.raises(OverlayEncryptionUnavailable, match="could not be read"):
+            await plugin.ensure_session_security("s1", [_PEER])
+
     async def test_a_non_state_failure_is_not_swallowed(self) -> None:
         class FailPolicy(Recorder):
             @override
@@ -2777,6 +2863,8 @@ class TestProtectionIsOneNodeWidePass:
         listing = (
             "src 10.9.9.1 dst 10.9.9.2\n"
             f"\tproto esp spi 0x00001001 reqid {XFRM_REQID} mode transport\n"
+            "\treplay-window 0 flag esn\n"
+            "\taead rfc4106(gcm(aes)) 0xdeadbeef 128\n"
         )
         assert parse_owned_sa_endpoints(listing, XFRM_REQID) == frozenset({
             ("10.9.9.1", "10.9.9.2", 0x1001)
@@ -2789,13 +2877,16 @@ class TestProtectionIsOneNodeWidePass:
         assert parse_owned_sa_endpoints(listing, XFRM_REQID) == frozenset()
 
     def test_only_an_outbound_policy_with_our_mark_counts(self) -> None:
+        tmpl = f"proto esp spi 0x1 reqid {XFRM_REQID} mode transport"
         listing = (
             "src 10.0.0.1/32 dst 10.0.0.2/32 proto udp dport 4789 \n"
             "\tdir out priority 0 \n"
             f"\tmark {XFRM_MARK:#x}/0xffffffff \n"
+            f"\ttmpl src 10.0.0.1 dst 10.0.0.2 {tmpl}\n"
             "src 10.0.0.5/32 dst 10.0.0.6/32 proto udp dport 4789 \n"
             "\tdir in priority 0 \n"
             f"\tmark {XFRM_MARK:#x}/0xffffffff \n"
+            f"\ttmpl src 10.0.0.5 dst 10.0.0.6 {tmpl}\n"
             "src 10.0.0.3/32 dst 10.0.0.4/32 proto udp dport 7789 \n"
             "\tdir out priority 0 \n"
             "\tmark 0xd0c4e3/0xffffffff \n"
@@ -3029,3 +3120,243 @@ class TestAFailedWithdrawalIsNotADeparture:
         await plugin.add_peer("s1", _PEER)
         await plugin.withdraw_session_network("s1")
         assert plugin.security_state("s1") is None
+
+
+class TestAnSaMustStillBeTheProtectionItPromised:
+    """An SA carrying the right endpoints and reqid is not automatically this session's
+    protection. One that has lost its mode, its algorithm or its replay window is a different SA,
+    and reporting it as present is how a session runs on protection it does not have."""
+
+    def _sa(
+        self, *, mode: str = "transport", aead: str = "rfc4106(gcm(aes))", esn: bool = True
+    ) -> str:
+        return (
+            "src 10.0.0.1 dst 10.0.0.2\n"
+            f"\tproto esp spi 0x1001 reqid {XFRM_REQID} mode {mode}\n"
+            + ("\treplay-window 0 flag esn\n" if esn else "\treplay-window 0\n")
+            + f"\taead {aead} 0xdeadbeef 128\n"
+        )
+
+    def test_a_complete_sa_counts(self) -> None:
+        assert parse_owned_sa_endpoints(self._sa(), XFRM_REQID) == frozenset({
+            ("10.0.0.1", "10.0.0.2", 0x1001)
+        })
+
+    def test_tunnel_mode_is_a_different_sa(self) -> None:
+        # It protects different packets than the policy's template asks for.
+        assert parse_owned_sa_endpoints(self._sa(mode="tunnel"), XFRM_REQID) == frozenset()
+
+    def test_another_algorithm_is_not_it(self) -> None:
+        assert (
+            parse_owned_sa_endpoints(self._sa(aead="rfc4543(gcm(aes))"), XFRM_REQID) == frozenset()
+        )
+
+    def test_without_esn_it_is_not_it(self) -> None:
+        # A 32-bit sequence stops the tunnel when it runs out, and the window is what refuses a
+        # replayed packet; an SA that lost them is not the one the session was promised.
+        assert parse_owned_sa_endpoints(self._sa(esn=False), XFRM_REQID) == frozenset()
+
+
+class TestAPolicyMustSelectTheRightTraffic:
+    def _policy(
+        self,
+        *,
+        proto: str = "udp",
+        mask: str = "0xffffffff",
+        reqid: int = XFRM_REQID,
+        mode: str = "transport",
+    ) -> str:
+        return (
+            f"src 10.0.0.1/32 dst 10.0.0.2/32 proto {proto} dport 4789 \n"
+            "\tdir out priority 0 \n"
+            f"\tmark {XFRM_MARK:#x}/{mask} \n"
+            f"\ttmpl src 10.0.0.1 dst 10.0.0.2 proto esp spi 0x1 reqid {reqid} mode {mode}\n"
+        )
+
+    def test_a_complete_policy_counts(self) -> None:
+        assert parse_owned_policies(self._policy(), f"{XFRM_MARK:#x}") == frozenset({
+            ("10.0.0.1", "10.0.0.2", 4789)
+        })
+
+    def test_another_protocol_does_not_select_this_traffic(self) -> None:
+        assert parse_owned_policies(self._policy(proto="tcp"), f"{XFRM_MARK:#x}") == frozenset()
+
+    def test_a_narrower_mark_mask_matches_different_packets(self) -> None:
+        assert parse_owned_policies(self._policy(mask="0xffff"), f"{XFRM_MARK:#x}") == frozenset()
+
+    def test_a_template_naming_another_reqid_is_not_ours(self) -> None:
+        # It sends the traffic through an SA this backend does not own.
+        assert parse_owned_policies(self._policy(reqid=13681891), f"{XFRM_MARK:#x}") == frozenset()
+
+    def test_a_tunnel_mode_template_is_not_ours(self) -> None:
+        assert parse_owned_policies(self._policy(mode="tunnel"), f"{XFRM_MARK:#x}") == frozenset()
+
+
+class TestABroaderRuleShadowsOurs:
+    """`-p udp --dport 4789 -j ACCEPT` with no `--u32` sees every VNI on the port, this session's
+    included. Requiring the selectors to match exactly let exactly that sit above the DROP."""
+
+    def test_a_rule_with_fewer_constraints_shadows(self) -> None:
+        listing = (
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4789 -j ACCEPT\n"
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4789 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -m policy --dir in --pol none -j DROP\n'
+        )
+        assert rule_is_present(listing, _plaintext_drop_rule(4097, 4789)) is False
+
+    def test_a_rule_on_another_port_does_not(self) -> None:
+        listing = (
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4790 -j ACCEPT\n"
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4789 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -m policy --dir in --pol none -j DROP\n'
+        )
+        assert rule_is_present(listing, _plaintext_drop_rule(4097, 4789)) is True
+
+
+class TestAShadowedRuleIsMovedNotAccepted:
+    """`iptables -C` finds the DROP wherever it is, so trusting it restores the session to READY
+    with the rule still bypassed. The repair has to move it."""
+
+    async def test_the_rule_is_deleted_and_reinserted(self, tmp_path: Path) -> None:
+        rec = Recorder()  # a plain runner: `-C` succeeds, so the old path would do nothing
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin._ensure_plaintext_drop(4097, 4789, reinstall=True)
+        assert plaintext_drop_del_args(4097, 4789) in rec.calls
+        assert plaintext_drop_add_args(4097, 4789) in rec.calls
+
+    async def test_the_ordinary_path_still_avoids_a_duplicate(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin._ensure_plaintext_drop(4097, 4789)
+        assert plaintext_drop_add_args(4097, 4789) not in rec.calls
+
+
+class TestADeleteMustNotTakeAnotherPeersSa:
+    """`ip xfrm state del` resolves the SA by (dst, spi, proto) and ignores the src it was given.
+    A delete written for our pair therefore removes a different peer's SA whenever the two derived
+    the same SPI -- and that peer's tunnel goes dark during a teardown it had no part in."""
+
+    def _deletes(self, rec: Recorder) -> list[int]:
+        return [
+            int(c[c.index("spi") + 1], 0)
+            for c in rec.calls
+            if c[:4] == ["ip", "xfrm", "state", "del"]
+        ]
+
+    async def test_the_foreign_one_is_skipped_and_ours_are_not(self) -> None:
+        stolen = _esp_spi("10.0.0.1", "10.0.0.2", 0)
+        held = _sa_listing("10.9.9.9", "10.0.0.2", [stolen])
+        reader = _Listing(lambda argv: held if list(argv[:3]) == _STATE else None)
+        rec = Recorder()
+        plugin = _plugin(rec, reader=reader)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        deleted = self._deletes(rec)
+        assert stolen not in deleted
+        assert _esp_spi("10.0.0.2", "10.0.0.1", 0) in deleted, "our own SAs still go"
+
+    async def test_an_sa_of_ours_is_deleted(self) -> None:
+        spis = [_esp_spi("10.0.0.1", "10.0.0.2", g) for g in range(3)]
+        held = _sa_listing("10.0.0.1", "10.0.0.2", spis)
+        reader = _Listing(lambda argv: held if list(argv[:3]) == _STATE else None)
+        rec = Recorder()
+        plugin = _plugin(rec, reader=reader)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert set(spis) <= set(self._deletes(rec))
+
+    async def test_an_unreadable_table_stops_the_deletes_rather_than_guessing(self) -> None:
+        # Unverified is not permission: a leaked SA of ours keeps traffic encrypted, a wrongly
+        # deleted one does not. Teardown reports it, so the retry comes back to this pair.
+        def _unreadable(argv: Sequence[str]) -> str | None:
+            if list(argv[:3]) == _STATE:
+                raise RuntimeError("Operation not permitted")
+            return None
+
+        rec = Recorder()
+        plugin = _plugin(rec, reader=_Listing(_unreadable))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.calls.clear()
+        with pytest.raises(OverlayTeardownIncomplete):
+            await plugin.teardown_session_network("s1")
+        assert self._deletes(rec) == []
+
+
+class TestReadingBackWhoHoldsAnSa:
+    def test_it_reports_every_sa_not_only_ours(self) -> None:
+        # The point of it: a foreign SA is exactly the one that must not be overwritten, so it has
+        # to appear here even though `parse_owned_sa_endpoints` filters it out.
+        listing = (
+            "src 10.0.0.1 dst 10.0.0.2\n"
+            "\tproto esp spi 0x1001 reqid 0x99 mode tunnel\n"
+            "src 10.0.0.3 dst 10.0.0.2\n"
+            f"\tproto esp spi 0x1002 reqid {XFRM_REQID} mode transport\n"
+        )
+        assert parse_sa_identities(listing) == {
+            ("10.0.0.2", 0x1001): ("10.0.0.1", 0x99),
+            ("10.0.0.2", 0x1002): ("10.0.0.3", XFRM_REQID),
+        }
+
+    def test_the_key_is_the_kernels_own_identity(self) -> None:
+        # (dst, spi) with no src in it -- which is the whole reason a collision can happen.
+        listing = _sa_listing("10.0.0.1", "10.0.0.2", [0x1001]) + _sa_listing(
+            "10.9.9.9", "10.0.0.2", [0x1001]
+        )
+        assert parse_sa_identities(listing)[("10.0.0.2", 0x1001)][0] == "10.9.9.9"
+
+    def test_an_unparseable_spi_is_skipped(self) -> None:
+        assert parse_sa_identities("src 10.0.0.1 dst 10.0.0.2\n\tproto esp spi zz\n") == {}
+
+
+class TestTheChainsCarryEverySessionsRules:
+    """A jump that is gone or displaced and cannot be put back is not one session's problem: every
+    encrypted session on the node is unprotected at once, and none of them would notice."""
+
+    def _reader_without_jumps(self) -> _Listing:
+        def _listing(argv: Sequence[str]) -> str | None:
+            if argv[0] == "iptables-save":
+                builtin = "OUTPUT" if argv[argv.index("-t") + 1] == "mangle" else "INPUT"
+                return f"-A {builtin} -j SOMEONE-ELSE\n"
+            if list(argv[:2]) == ["iptables", "-S"]:
+                return f"-P {argv[2]} ACCEPT\n-A {argv[2]} -j SOMEONE-ELSE\n"
+            return None
+
+        return _Listing(_listing)
+
+    async def test_every_encrypted_session_is_closed(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, reader=self._reader_without_jumps())
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        second = replace(_ENC_META, session_id="s2", vni=4098, subnet="10.128.6.0/24")
+        await plugin.setup_session_network(second, _SELF)
+        await plugin.add_peer("s2", _PEER)
+        rec.fail_on = lambda argv: argv[:2] == ["iptables", "-I"]
+        rec.calls.clear()
+
+        await plugin.reassert_protection()
+
+        assert link_down_args(vxlan_dev(4097)) in rec.calls
+        assert link_down_args(vxlan_dev(4098)) in rec.calls
+
+    async def test_a_session_with_nothing_to_protect_is_left_alone(self) -> None:
+        # Fail-closing an unencrypted session would take down a tunnel that was never promised
+        # protection in the first place.
+        rec = Recorder()
+        plugin = _plugin(rec, reader=self._reader_without_jumps())
+        await plugin.setup_session_network(_META, _SELF)
+        rec.fail_on = lambda argv: argv[:2] == ["iptables", "-I"]
+        rec.calls.clear()
+
+        await plugin.reassert_protection()
+
+        assert link_down_args(vxlan_dev(4097)) not in rec.calls

@@ -182,6 +182,7 @@ def fdb_replace_args(vni: int, mac: str, dst: str) -> list[str]:
 # the VXLAN UDP (4789) — the L2 overlay is untouched.
 
 _ICV_BITS = 128  # AES-GCM authentication tag length
+_ESP_AEAD: Final = "rfc4106(gcm(aes))"
 # Host-global XFRM ownership identifiers. These deliberately differ from Docker/libnetwork's
 # 0xD0C4E3: Docker removes every policy with its mark and every SA with its reqid, and an equal
 # selector is updated in place. Sharing its values would therefore let either implementation
@@ -315,8 +316,8 @@ def xfrm_state_add_args(
     spi_out, spi_in = f"{spi_out_n:#x}", f"{spi_in_n:#x}"
     key_hex = _pair_key(cluster_key_hex, self_vtep, peer_vtep, generation)
     # One salt per SA, so the two directions never share a (key, salt) pair.
-    aead_out = ["aead", "rfc4106(gcm(aes))", _aead_key(key_hex, spi_out_n), str(_ICV_BITS)]
-    aead_in = ["aead", "rfc4106(gcm(aes))", _aead_key(key_hex, spi_in_n), str(_ICV_BITS)]
+    aead_out = ["aead", _ESP_AEAD, _aead_key(key_hex, spi_out_n), str(_ICV_BITS)]
+    aead_in = ["aead", _ESP_AEAD, _aead_key(key_hex, spi_in_n), str(_ICV_BITS)]
     # `flag esn` is rejected without a window, so the two are one setting, not two.
     replay = ["replay-window", str(XFRM_REPLAY_WINDOW), "flag", "esn"]
     return [
@@ -565,6 +566,11 @@ class ProtectionSnapshot:
         return self.mangle_rules if table == "mangle" else self.filter_rules
 
 
+def _as_delete(add: Sequence[str]) -> list[str]:
+    """The `-D` form of an `-A`/`-I` command, so a rule can be moved rather than duplicated."""
+    return [("-D" if token in ("-A", "-I") else token) for token in add]
+
+
 def rule_is_present(listing: str, expected: Sequence[str]) -> bool:
     """Whether ``expected`` -- a rule as this backend builds it -- is in force in the chain.
 
@@ -589,10 +595,26 @@ def rule_is_present(listing: str, expected: Sequence[str]) -> bool:
             found = _normalise_rule(shlex.split(stripped)[1:])
         except ValueError:
             continue
-        if _traffic_selector(found) != selector:
-            continue  # a rule about other traffic; it does not shadow ours
+        if not _shadows(_traffic_selector(found), selector):
+            continue  # a rule about other traffic; it cannot shadow ours
         return found == wanted
     return False
+
+
+def _shadows(candidate: Sequence[str], ours: Sequence[str]) -> bool:
+    """Whether a rule with selector ``candidate`` also sees the traffic ``ours`` selects.
+
+    Not equality. A BROADER rule shadows a narrower one -- `-p udp --dport 4789 -j ACCEPT` with no
+    `--u32` sees every VNI on the port, including this session's -- and requiring the selectors to
+    match exactly would let exactly that sit above the DROP unnoticed. So: every constraint the
+    candidate places must also be one ours places, with the same value. A candidate that
+    constrains less matches more.
+    """
+    ours_pairs = dict(zip(ours[::2], ours[1::2], strict=False))
+    for key, value in zip(candidate[::2], candidate[1::2], strict=False):
+        if ours_pairs.get(key) != value:
+            return False
+    return True
 
 
 def _traffic_selector(tokens: Sequence[str]) -> tuple[str, ...]:
@@ -690,69 +712,146 @@ def parse_up_vxlan_devices(listing: str) -> frozenset[str]:
 
 
 def parse_owned_sa_endpoints(listing: str, reqid: int) -> frozenset[tuple[str, str, int]]:
-    """(src, dst, spi) of the ESP SAs carrying ``reqid``, from `ip xfrm state`.
+    """(src, dst, spi) of the ESP SAs that are actually this backend's protection.
 
     The endpoints, not the SPI alone: an SPI is derived from the pair, so checking it in isolation
     would accept an SA between the wrong two hosts as this pair's.
+
+    And an SA counts only if it still carries what the session was promised -- transport mode,
+    AES-GCM, ESN and a replay window. One that has lost any of them is not this SA, and reporting
+    it as present is how a session goes on running with replay protection it does not have.
     """
     found: set[tuple[str, str, int]] = set()
     header: tuple[str, str] | None = None
+    spi: int | None = None
+    ours = False
+    protected = False
+
+    def _flush() -> None:
+        if header is not None and spi is not None and ours and protected:
+            found.add((header[0], header[1], spi))
+
     for line in listing.splitlines():
         if line.startswith("src "):
+            _flush()
             tokens = line.split()
             dst = _value_after(tokens, "dst")
             header = (tokens[1].split("/")[0], dst.split("/")[0]) if dst is not None else None
+            spi, ours, protected = None, False, False
             continue
         stripped = line.strip()
-        if header is None or not stripped.startswith("proto esp"):
+        if header is None:
             continue
         tokens = stripped.split()
-        spi = _value_after(tokens, "spi")
-        found_reqid = _value_after(tokens, "reqid")
-        if spi is None or found_reqid is None:
-            continue
-        try:
-            if int(found_reqid, 0) == reqid:
-                found.add((header[0], header[1], int(spi, 0)))
-        except ValueError:
-            continue
+        if stripped.startswith("proto esp"):
+            raw_spi = _value_after(tokens, "spi")
+            raw_reqid = _value_after(tokens, "reqid")
+            try:
+                spi = int(raw_spi, 0) if raw_spi is not None else None
+                ours = raw_reqid is not None and int(raw_reqid, 0) == reqid
+            except ValueError:
+                spi, ours = None, False
+            # Transport mode: a tunnel-mode SA between the same endpoints protects different
+            # packets and is not what the policy's template asks for.
+            if "transport" not in tokens:
+                ours = False
+        if "aead" in tokens and _ESP_AEAD not in stripped:
+            ours = False  # some other algorithm; not the one the session was promised
+        if "flag" in tokens and "esn" in tokens:
+            protected = True
+    _flush()
     return frozenset(found)
 
 
-def parse_owned_policies(listing: str, mark: str) -> frozenset[tuple[str, str, int]]:
-    """(src, dst, dport) of the OUTBOUND policies carrying ``mark``, from `ip xfrm policy`.
+def parse_sa_identities(listing: str) -> dict[tuple[str, int], tuple[str, int | None]]:
+    """``{(dst, spi): (src, reqid)}`` for every ESP SA on the node, ours and everyone else's.
 
-    The direction is part of it. This backend installs an out policy and nothing else, so an in
-    or forward policy carrying the same mark is not what it is looking for -- and counting one
-    would report the send path protected when only the receive path had a rule.
+    The key is the kernel's own SA identity -- (dst, spi, proto), with no src in it -- which is why
+    this exists separately from `parse_owned_sa_endpoints`. Programming an SA whose (dst, spi)
+    another src already holds does not add one; it replaces theirs.
+    """
+    found: dict[tuple[str, int], tuple[str, int | None]] = {}
+    src: str | None = None
+    dst: str | None = None
+    for line in listing.splitlines():
+        if line.startswith("src "):
+            tokens = line.split()
+            raw_dst = _value_after(tokens, "dst")
+            src = tokens[1].split("/")[0]
+            dst = raw_dst.split("/")[0] if raw_dst is not None else None
+            continue
+        stripped = line.strip()
+        if not stripped.startswith("proto esp") or src is None or dst is None:
+            continue
+        tokens = stripped.split()
+        raw_spi = _value_after(tokens, "spi")
+        raw_reqid = _value_after(tokens, "reqid")
+        if raw_spi is None:
+            continue
+        try:
+            spi = int(raw_spi, 0)
+        except ValueError:
+            continue
+        try:
+            reqid = int(raw_reqid, 0) if raw_reqid is not None else None
+        except ValueError:
+            reqid = None
+        found[(dst, spi)] = (src, reqid)
+    return found
+
+
+def parse_owned_policies(listing: str, mark: str) -> frozenset[tuple[str, str, int]]:
+    """(src, dst, dport) of the OUTBOUND UDP policies carrying ``mark`` and this backend's template.
+
+    Every part of that is load-bearing. The direction, because this backend installs an out policy
+    and nothing else -- counting an inbound one reports the send path protected when only the
+    receive path had a rule. The protocol, because a policy on another one does not select this
+    traffic. The mask, because `mark X/0xffff` and `mark X/0xffffffff` match different packets.
+    The template, because a policy whose template names a different reqid or mode sends the
+    traffic through an SA this backend does not own.
     """
     found: set[tuple[str, str, int]] = set()
     header: tuple[str, str, int] | None = None
-    outbound = False
-    marked = False
+    outbound = marked = templated = False
+
+    def _flush() -> None:
+        if header is not None and outbound and marked and templated:
+            found.add(header)
+
     for line in listing.splitlines():
         if line.startswith("src "):
-            if header is not None and outbound and marked:
-                found.add(header)
+            _flush()
             tokens = line.split()
             dst = _value_after(tokens, "dst")
             dport = _value_after(tokens, "dport")
             header = (
                 (tokens[1].split("/")[0], dst.split("/")[0], int(dport))
-                if dst is not None and dport is not None and dport.isdigit()
+                if dst is not None
+                and dport is not None
+                and dport.isdigit()
+                and _value_after(tokens, "proto") == "udp"
                 else None
             )
-            outbound = marked = False
+            outbound = marked = templated = False
             continue
         if header is None:
             continue
         tokens = line.split()
         if _value_after(tokens, "dir") == "out":
             outbound = True
-        if any(token.split("/")[0] == mark for token in tokens if token.startswith("0x")):
-            marked = True
-    if header is not None and outbound and marked:
-        found.add(header)
+        if (raw := _value_after(tokens, "mark")) is not None:
+            value, _, mask = raw.partition("/")
+            marked = value == mark and (not mask or int(mask, 0) == 0xFFFFFFFF)
+        if "tmpl" in tokens:
+            raw_reqid = _value_after(tokens, "reqid")
+            templated = (
+                raw_reqid is not None
+                and int(raw_reqid, 0) == XFRM_REQID
+                and "transport" in tokens
+                and _value_after(tokens, "src") == header[0]
+                and _value_after(tokens, "dst") == header[1]
+            )
+    _flush()
     return frozenset(found)
 
 
@@ -1404,9 +1503,24 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             log.exception("could not read this node's protection state; skipping this pass")
             return
         for table, builtin, chain in OWNED_CHAINS:
-            if not jump_is_first(snapshot.table(table), builtin, chain):
+            if jump_is_first(snapshot.table(table), builtin, chain):
+                continue
+            try:
                 await self._ensure_owned_chains()
-                break
+            except Exception as e:
+                # The chains carry EVERY session's rules, so a jump that is gone or displaced and
+                # cannot be put back is every session unprotected at once -- and ending the pass
+                # here would leave them all READY and taking injected plaintext. Close them.
+                log.exception("could not restore the overlay firewall chains")
+                for session_id, meta, _vni in encrypted:
+                    with contextlib.suppress(Exception):
+                        await self._close_tunnel(
+                            meta,
+                            session_id,
+                            f"this node's {chain} jump is not in place ({e})",
+                        )
+                return
+            break
         for session_id, meta, vni in encrypted:
             try:
                 async with self._session_guard(session_id):
@@ -1453,7 +1567,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         ]
         if missing:
             # Only the rules that are actually gone, and only for this VNI.
-            if not await self._firewall_side_ok(meta, session_id):
+            # `reinstall`: the snapshot decided these are not in force, and `iptables -C` cannot
+            # tell the difference between "not there" and "there but shadowed". Trusting the check
+            # is what restores a session to READY with the DROP still bypassed.
+            if not await self._firewall_side_ok(meta, session_id, reinstall=True):
                 raise OverlayEncryptionUnavailable(
                     f"session {session_id} is encrypted but its {', '.join(missing)} rule(s) could"
                     " not be restored; the overlay tunnel is held down until they can"
@@ -1555,7 +1672,21 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 except (RuntimeError, OSError):
                     pass  # never installed, or already gone
 
-    async def _ensure_rule(self, check: Sequence[str], add: Sequence[str]) -> None:
+    async def _ensure_rule(
+        self, check: Sequence[str], add: Sequence[str], *, reinstall: bool = False
+    ) -> None:
+        """Put ``add`` in place, using ``check`` to avoid a duplicate.
+
+        ``reinstall`` skips the check and re-inserts. That is for the case `iptables -C` cannot
+        see: the rule IS present but shadowed by one above it, so the check succeeds, nothing
+        moves, and the session is restored to READY still bypassed. Re-inserting puts it back at
+        the head of our chain, above whatever displaced it.
+        """
+        if reinstall:
+            with contextlib.suppress(RuntimeError, OSError):
+                await self._runner(_as_delete(add))
+            await self._runner(add)
+            return
         try:
             await self._runner(check)
             return  # already present
@@ -1563,7 +1694,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             pass  # absent, or a match module is unavailable -- try to add it
         await self._runner(add)
 
-    async def _ensure_plaintext_drop(self, vni: int, dstport: int) -> None:
+    async def _ensure_plaintext_drop(
+        self, vni: int, dstport: int, *, reinstall: bool = False
+    ) -> None:
         """Close the receive side of an encrypted VNI: drop VXLAN that did not arrive inside an SA.
 
         Not best-effort, unlike the FORWARD accept above. A missing accept costs connectivity and
@@ -1576,6 +1709,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             await self._ensure_rule(
                 plaintext_drop_check_args(vni, dstport),
                 plaintext_drop_add_args(vni, dstport),
+                reinstall=reinstall,
             )
         except (RuntimeError, OSError) as e:
             raise OverlayEncryptionUnavailable(
@@ -1591,7 +1725,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     ) -> None:
         await self._remove(plaintext_drop_del_args(vni, dstport), failures)
 
-    async def _ensure_egress_guard(self, vni: int, dstport: int) -> None:
+    async def _ensure_egress_guard(
+        self, vni: int, dstport: int, *, reinstall: bool = False
+    ) -> None:
         """Refuse to emit this VNI's VXLAN unencrypted, whatever happened to the mark.
 
         The mark alone is fail-OPEN: MARK is not terminating, so a later rule in the same hook
@@ -1603,6 +1739,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             await self._ensure_rule(
                 egress_guard_check_args(vni, dstport),
                 egress_guard_add_args(vni, dstport),
+                reinstall=reinstall,
             )
         except (RuntimeError, OSError) as e:
             raise OverlayEncryptionUnavailable(
@@ -1616,13 +1753,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     ) -> None:
         await self._remove(egress_guard_del_args(vni, dstport), failures)
 
-    async def _ensure_output_mark(self, vni: int, dstport: int) -> None:
+    async def _ensure_output_mark(self, vni: int, dstport: int, *, reinstall: bool = False) -> None:
         """Mark only this encrypted VNI for the outbound XFRM policy."""
         try:
             await self._ensure_owned_chains()
             await self._ensure_rule(
                 output_mark_check_args(vni, dstport),
                 output_mark_add_args(vni, dstport),
+                reinstall=reinstall,
             )
         except (RuntimeError, OSError) as e:
             raise OverlayEncryptionUnavailable(
@@ -1671,7 +1809,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             )
         return current
 
-    async def _firewall_side_ok(self, meta: SessionNetMeta, session_id: str) -> bool:
+    async def _firewall_side_ok(
+        self, meta: SessionNetMeta, session_id: str, *, reinstall: bool = False
+    ) -> bool:
         """Whether this encrypted VNI's inbound drop, outbound mark and egress guard are in place.
 
         setup refuses a session it cannot protect, so this exists for the session that was already
@@ -1687,9 +1827,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         if meta.encryption_key is None or meta.vni is None:
             return True
         try:
-            await self._ensure_output_mark(meta.vni, meta.vxlan_port)
-            await self._ensure_egress_guard(meta.vni, meta.vxlan_port)
-            await self._ensure_plaintext_drop(meta.vni, meta.vxlan_port)
+            await self._ensure_output_mark(meta.vni, meta.vxlan_port, reinstall=reinstall)
+            await self._ensure_egress_guard(meta.vni, meta.vxlan_port, reinstall=reinstall)
+            await self._ensure_plaintext_drop(meta.vni, meta.vxlan_port, reinstall=reinstall)
         except OverlayEncryptionUnavailable as e:
             await self._close_tunnel(meta, session_id, str(e))
             return False
@@ -2581,7 +2721,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # nothing reaches the branch below because the raise has already left.
         pair_failures: list[str] | None = [] if failures is not None else None
         for args in (
-            *state_deletes,
+            *await self._own_sa_deletes(state_deletes, pair_failures),
             *xfrm_policy_del_args(self_vtep, peer_vtep, dstport=meta.vxlan_port),
         ):
             await self._remove(args, pair_failures)
@@ -2601,13 +2741,109 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         Kernel SAs outlive the agent process, so a restart re-programs onto an existing one; `add`
         is EEXIST there and `update` is the in-place replace. Only that one case is retried -- any
         other failure is the caller's to see.
+
+        The replay is conditional, because EEXIST does not mean "the same SA". The kernel keys an SA
+        on (dst, spi, proto) with no src in it, while the SPI here is 32 bits of a SHA-256 over the
+        directed pair: two different peers of the same node can derive the same one. Updating then
+        does not re-program our SA, it takes the other pair's over -- silently replacing its key and
+        its src, so that peer's traffic stops decrypting with no error on either side.
         """
         try:
             await self._runner(argv)
         except RuntimeError:
             if list(argv[:4]) != ["ip", "xfrm", "state", "add"]:
                 raise
+            await self._refuse_foreign_sa(argv)
             await self._runner(["ip", "xfrm", "state", "update", *argv[4:]])
+
+    async def _own_sa_deletes(
+        self, deletes: Sequence[Sequence[str]], failures: list[str] | None
+    ) -> list[Sequence[str]]:
+        """Of these SA deletes, the ones that would remove an SA of ours.
+
+        `ip xfrm state del` resolves the SA by (dst, spi, proto) and ignores the src on its command
+        line, so a delete written for our pair removes a different peer's SA whenever the two
+        derived the same SPI -- taking down a working tunnel this teardown has nothing to do with.
+        Reading the table once is what tells them apart.
+        """
+        try:
+            existing = parse_sa_identities(await self._reader(["ip", "xfrm", "state"]))
+        except (RuntimeError, OSError) as e:
+            # Unverified is not permission to delete, for the same reason an unknown journal answer
+            # is not: a leaked SA of ours keeps traffic encrypted, a wrongly deleted one does not.
+            if failures is None:
+                raise OverlayEncryptionUnavailable(
+                    "cannot remove this pair's ESP SAs: the kernel's existing SAs could not be read"
+                    f" to check whether their SPIs now belong to another peer ({e})"
+                ) from e
+            failures.append(f"ip xfrm state: {e}")
+            return []
+        kept: list[Sequence[str]] = []
+        for argv in deletes:
+            tokens = list(argv)
+            src = _value_after(tokens, "src")
+            dst = _value_after(tokens, "dst")
+            raw_spi = _value_after(tokens, "spi")
+            if src is None or dst is None or raw_spi is None:
+                kept.append(argv)
+                continue
+            try:
+                spi = int(raw_spi, 0)
+            except ValueError:
+                kept.append(argv)
+                continue
+            holder = existing.get((dst, spi))
+            # Absent is ours to delete: the command is a no-op and absence is handled as success.
+            if holder is None or (holder[0] == src and holder[1] == XFRM_REQID):
+                kept.append(argv)
+                continue
+            log.warning(
+                "not deleting the ESP SA {} -> {} (spi {:#x}): the kernel holds that SPI at this"
+                " destination for {} -> {}, and the delete would remove theirs",
+                src,
+                dst,
+                spi,
+                holder[0],
+                dst,
+            )
+        return kept
+
+    async def _refuse_foreign_sa(self, argv: Sequence[str]) -> None:
+        """Stop before overwriting an SA at our (dst, spi) that is not ours.
+
+        Fail-closed for the pair we were asked to program, which is the smaller harm: this peer's
+        tunnel stays down and says why, instead of this node quietly breaking a working pair.
+        """
+        tokens = list(argv)
+        src = _value_after(tokens, "src")
+        dst = _value_after(tokens, "dst")
+        raw_spi = _value_after(tokens, "spi")
+        if src is None or dst is None or raw_spi is None:
+            return
+        try:
+            spi = int(raw_spi, 0)
+        except ValueError:
+            return
+        try:
+            existing = parse_sa_identities(await self._reader(["ip", "xfrm", "state"]))
+        except (RuntimeError, OSError) as e:
+            # We could not establish whose SA is there. Overwriting on a guess is the outcome this
+            # guard exists to prevent.
+            raise OverlayEncryptionUnavailable(
+                f"cannot program the ESP SA {src} -> {dst} (spi {spi:#x}): the kernel's existing"
+                f" SAs could not be read to check whether that SPI is already another peer's ({e})"
+            ) from e
+        holder = existing.get((dst, spi))
+        if holder is None or (holder[0] == src and holder[1] == XFRM_REQID):
+            return
+        held_src, held_reqid = holder
+        raise OverlayEncryptionUnavailable(
+            f"refusing to program the ESP SA {src} -> {dst} (spi {spi:#x}): that SPI at this"
+            f" destination already belongs to {held_src} -> {dst} (reqid"
+            f" {'none' if held_reqid is None else f'{held_reqid:#x}'}), and replacing it would"
+            " break that peer's protection. This node pair cannot be encrypted until the"
+            " conflicting SA is gone."
+        )
 
     @override
     async def del_peer(self, session_id: str, peer: Member) -> None:

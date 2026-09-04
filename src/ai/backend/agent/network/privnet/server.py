@@ -234,7 +234,11 @@ class PrivNetServer:
     _recovery_failed: str | None
     #: Sessions this process holds state for but could not re-adopt, and why.
     _unrecovered_sessions: dict[str, str]
-    #: Retries recovery while either of the two above is non-empty.
+    #: Containers that died while we were down and whose host-side state we could not give back.
+    _unreclaimed_containers: dict[str, str]
+    #: Dead sessions whose devices and subnet block we could not give back, and why.
+    _unreclaimed_sessions: dict[str, str]
+    #: Retries recovery while any of the four above is non-empty.
     _recovery_retry_task: asyncio.Task[None] | None
 
     def __init__(
@@ -276,6 +280,8 @@ class PrivNetServer:
         self._fail_close_tasks = {}
         self._recovery_failed = None
         self._unrecovered_sessions = {}
+        self._unreclaimed_containers = {}
+        self._unreclaimed_sessions = {}
         self._recovery_retry_task = None
         # Set only where the PID record is agent-written (the rootless backends); see _attach.
         self._netns_owner_uid = netns_owner_uid
@@ -358,6 +364,24 @@ class PrivNetServer:
         # mark set would have cleared the failure flag and left the node exactly there.
         never_adopted = self._recovery_failed is not None
         self._recovery_failed = None
+        # Gone from the journal since the failure: another verb finished the job, and holding the
+        # marker would keep this timer running for something that no longer exists.
+        for container_id in list(self._unreclaimed_containers):
+            if container_id not in journalled_attachments:
+                self._unreclaimed_containers.pop(container_id, None)
+        for session_id in list(self._unreclaimed_sessions):
+            if session_id not in journalled_sessions:
+                self._unreclaimed_sessions.pop(session_id, None)
+        # Dead containers first, for the reason the first pass does them first: the DEL needs the
+        # session's plan, and reclaiming the session releases it. A pass that never adopted
+        # anything never reached this either, so everything dead is still owed its reclaim.
+        for container_id, record in journalled_attachments.items():
+            if container_id in live:
+                self._unreclaimed_containers.pop(container_id, None)
+                continue
+            if not never_adopted and container_id not in self._unreclaimed_containers:
+                continue
+            await self._reclaim_dead_container(container_id, record, journalled_sessions)
         pending = (
             {
                 session_id
@@ -411,13 +435,31 @@ class PrivNetServer:
             if session_id in self._sessions:
                 continue
             if (vni := self._journalled_vni(raw_config)) is not None and vni in live_vnis:
+                self._unreclaimed_sessions[session_id] = f"VNI {vni} is held by a live session"
                 continue
             try:
                 await self._reclaim_dead_session(
                     session_id, raw_config, journalled_peers.get(session_id)
                 )
-            except Exception:
+            except Exception as e:
                 log.exception("failed to reclaim dead session {} on a later attempt", session_id)
+                self._unreclaimed_sessions[session_id] = str(e)
+            else:
+                self._unreclaimed_sessions.pop(session_id, None)
+
+    def _recovery_pending(self) -> bool:
+        """Whether anything recovery owes this node is still outstanding.
+
+        Reclaiming is part of that debt, not a best-effort extra: the host veth, the LOCAL address,
+        the DNAT rules and the node-local subnet block of a dead container or session are given back
+        by this pass and by nothing else.
+        """
+        return bool(
+            self._recovery_failed is not None
+            or self._unrecovered_sessions
+            or self._unreclaimed_containers
+            or self._unreclaimed_sessions
+        )
 
     def _start_recovery_retry(self) -> None:
         """Keep retrying whatever recovery could not do, on a timer.
@@ -433,7 +475,7 @@ class PrivNetServer:
         async def _loop() -> None:
             while True:
                 await asyncio.sleep(_RECOVERY_RETRY_INTERVAL)
-                if self._recovery_failed is None and not self._unrecovered_sessions:
+                if not self._recovery_pending():
                     return
                 try:
                     await self._retry_recovery()
@@ -552,6 +594,8 @@ class PrivNetServer:
         self._recovery_failed = None
         if not journalled_sessions and not journalled_attachments:
             self._unrecovered_sessions.clear()
+            self._unreclaimed_containers.clear()
+            self._unreclaimed_sessions.clear()
             return
 
         live_sessions = {
@@ -571,6 +615,7 @@ class PrivNetServer:
         # would release its subnet block and leave these addresses stranded in the IPAM store.
         for container_id, record in journalled_attachments.items():
             if container_id in live:
+                self._unreclaimed_containers.pop(container_id, None)
                 continue
             await self._reclaim_dead_container(container_id, record, journalled_sessions)
 
@@ -596,9 +641,6 @@ class PrivNetServer:
                 self._unrecovered_sessions[session_id] = str(e)
             else:
                 self._unrecovered_sessions.pop(session_id, None)
-
-        if self._unrecovered_sessions:
-            self._start_recovery_retry()
 
         # Only after all live encrypted tunnels are down and their ownership is known may each
         # complete peer set be re-asserted and its tunnel reopened.
@@ -632,13 +674,22 @@ class PrivNetServer:
                     session_id,
                     vni,
                 )
+                # A marker, because "later" has to arrive: the retry timer is what brings this
+                # session back once the live one has ended, and without it its devices and subnet
+                # block wait for the next restart of this process.
+                self._unreclaimed_sessions[session_id] = f"VNI {vni} is held by a live session"
                 continue
             try:
                 await self._reclaim_dead_session(
                     session_id, raw_config, journalled_peers.get(session_id)
                 )
-            except Exception:
+            except Exception as e:
                 log.exception("failed to recover session {}", session_id)
+                self._unreclaimed_sessions[session_id] = str(e)
+            else:
+                self._unreclaimed_sessions.pop(session_id, None)
+        if self._recovery_pending():
+            self._start_recovery_retry()
 
     async def _live_containers(self) -> dict[str, str]:
         """``{container_id: session_id}`` for every container the backend still runs for us."""
@@ -776,9 +827,14 @@ class PrivNetServer:
                 plan = await self._derive_plan(backend, meta, record.overlay_ip)
                 await self._del_attachment(plan, container_id)
             await self._journal.forget_attachment(container_id)
-        except Exception:
+        except Exception as e:
+            # Marked, not just logged: the address stays allocated and the DNAT rules stay in the
+            # table until this succeeds, and the container is gone -- nothing else will ever ask
+            # for it again.
             log.exception("failed to reclaim the network of dead container {}", container_id)
+            self._unreclaimed_containers[container_id] = str(e)
         else:
+            self._unreclaimed_containers.pop(container_id, None)
             log.info("reclaimed the network of dead container {}", container_id)
 
     async def _derive_plan(

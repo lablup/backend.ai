@@ -16,7 +16,6 @@ config — so it holds no CAP_NET_ADMIN / CAP_SYS_ADMIN.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast, override
@@ -236,22 +235,37 @@ class PrivNetBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
 
     @override
     async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
-        # Nothing to do: the privnet owns this session's devices, attach plans and backend state,
-        # and it recovers them itself — from its own journal reconciled against containerd, not
-        # from anything we could tell it (see privnet/server.py `recover`). Re-declaring the session
-        # here is exactly the move the trust model forbids the agent.
-        return
+        """Make sure the privnet serving THIS agent knows the session.
 
-    @override
+        Usually nothing to do: the privnet owns the devices and recovers them from its own journal
+        reconciled against containerd, which is the only source the trust model lets it believe.
+
+        But "the privnet" is per agent, and a session can be shared by two agents on one host --
+        the second one's kernels join devices the first one's privnet made. That privnet has no
+        record of the session, so every later attach is refused with "attach before setup" and
+        every peer with "peer programming before session setup". Setting it up there is idempotent
+        (the devices already exist and the backend's own setup is leftover-safe), and it is the
+        agent's own session to declare: it is being told to adopt it.
+        """
+        await self._client.call(
+            PrivNetRequest(
+                PrivNetOp.SETUP_SESSION,
+                meta.session_id,
+                network_config=_network_config_from_meta(meta),
+            )
+        )
+
     @override
     async def withdraw_session_network(self, session_id: str) -> None:
         """Ask the privnet to drop its ownership of a session whose devices must stay.
 
-        Best-effort by design: the devices are the node's and remain either way, and refusing the
-        withdrawal would only strand this agent on a session it no longer has kernels for.
+        Failures propagate. Swallowing them looks harmless -- the devices remain either way -- but
+        what the withdrawal removes is this node's CLAIM: the privnet's journal record, its ESP
+        pair claim and its watchdog responsibility. Reporting that as done makes the caller drop
+        this node's member key and cancel its teardown retry, so the manager believes the VNI is
+        free while all of it is still here.
         """
-        with contextlib.suppress(PrivNetClientError, OSError):
-            await self._client.call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, session_id))
+        await self._client.call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, session_id))
 
     @override
     async def teardown_session_network(self, session_id: str) -> None:
