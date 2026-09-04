@@ -89,6 +89,10 @@ from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     PublicResolveAccessKeyScopeAction,
     PublicResolveAccessKeyScopeResult,
 )
+from ai.backend.manager.services.auth.actions.resolve_default_keypair_rate_limit import (
+    PublicResolveDefaultKeypairRateLimitAction,
+    PublicResolveDefaultKeypairRateLimitResult,
+)
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     PublicResolveUserScopeAction,
     PublicResolveUserScopeResult,
@@ -794,6 +798,15 @@ class AuthService:
             requester_access_key=requester_ak,
             owner_access_key=owner_ak,
         )
+
+    async def resolve_default_keypair_rate_limit(
+        self, action: PublicResolveDefaultKeypairRateLimitAction
+    ) -> PublicResolveDefaultKeypairRateLimitResult:
+        try:
+            keypair = await self._auth_repository.default_keypair(action.user_id)
+        except KeyPairNotFound:
+            return PublicResolveDefaultKeypairRateLimitResult(rate_limit=None)
+        return PublicResolveDefaultKeypairRateLimitResult(rate_limit=keypair.rate_limit)
 
     async def resolve_user_scope(
         self, action: PublicResolveUserScopeAction

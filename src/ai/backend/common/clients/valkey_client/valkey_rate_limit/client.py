@@ -1,16 +1,15 @@
 import logging
-import time
-from decimal import Decimal
-from typing import Final, Self, cast
+from dataclasses import dataclass
+from typing import Self, cast
 
-from glide import Batch, ExpirySet, ExpiryType, ScoreBoundary, Script
+from glide import Batch, ExpireOptions
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     BackoffStrategy,
@@ -40,25 +39,12 @@ valkey_rate_limit_resilience = Resilience(
     ]
 )
 
-_DEFAULT_RATE_LIMIT_EXPIRATION = 60 * 15  # 15 minutes
-_TIME_PRECISION = Decimal("1e-3")  # milliseconds
 
-
-_RATE_LIMIT_SCRIPT: Final[str] = """
-local key = KEYS[1]
-local now = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
-local request_id = tonumber(redis.call('INCR', '__request_id'))
-if request_id >= 1e12 then
-    redis.call('SET', '__request_id', 1)
-end
-if redis.call('EXISTS', key) == 1 then
-    redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
-end
-redis.call('ZADD', key, now, tostring(request_id))
-redis.call('EXPIRE', key, window)
-return redis.call('ZCARD', key)
-"""
+@dataclass(frozen=True)
+class RateLimitState:
+    count: int
+    limit: int | None
+    reset: int
 
 
 class ValkeyRateLimitClient:
@@ -109,110 +95,83 @@ class ValkeyRateLimitClient:
         await self._client.disconnect()
 
     @valkey_rate_limit_resilience.apply()
-    async def execute_rate_limit_logic(
-        self,
-        user_id: UserID,
-        window: int = _DEFAULT_RATE_LIMIT_EXPIRATION,
-    ) -> int:
+    async def consume(self, user_id: UserID, window: int) -> RateLimitState:
         """
-        Execute the rate limiting logic for rolling counter.
-        This replicates the Lua script logic using individual commands.
+        Consume one request of the user's current window and return its state.
 
-        :param user_id: The user the rolling counter is keyed by.
-        :param window: The time window for rate limiting in seconds.
-        :return: The current count.
+        :param user_id: The user the counter is keyed by.
+        :param window: The window length in seconds, applied when the request opens a window.
+        :return: The count, the limit fixed for the window if any, and the seconds until it ends.
         """
-        now = Decimal(time.time()).quantize(_TIME_PRECISION)
-        now_float = float(now)
-        # Increment request ID counter
+        key = f"user.{user_id}"
+        batch = Batch(is_atomic=True)
+        batch.hincrby(key, "count", 1)
+        batch.expire(key, window, ExpireOptions.HasNoExpiry)
+        batch.hget(key, "limit")
+        batch.ttl(key)
         async with self._client.client() as conn:
-            result = await conn.invoke_script(
-                Script(_RATE_LIMIT_SCRIPT),
-                keys=[f"user.{user_id}"],
-                args=[str(now_float), str(window)],
-            )
-
-        # The last result is the count
-        return cast(int, result)
+            results = await conn.exec(batch, raise_on_error=True)
+        if results is None:
+            raise UnreachableError("an atomic batch without WATCH cannot be aborted")
+        count, _, limit, reset = results
+        return RateLimitState(
+            count=cast(int, count),
+            limit=int(cast(bytes, limit)) if limit is not None else None,
+            reset=cast(int, reset),
+        )
 
     @valkey_rate_limit_resilience.apply()
-    async def get_rolling_count(self, user_id: UserID) -> int:
+    async def store_limit(self, user_id: UserID, rate_limit: int) -> RateLimitState:
         """
-        Get the current rolling count of a user.
+        Fix the limit of the user's open window unless one is already fixed, and return
+        the state including the limit that stands.
 
-        :param user_id: The user the rolling counter is keyed by.
-        :return: The current count.
+        :param user_id: The user the counter is keyed by.
+        :param rate_limit: The limit to fix for the window.
+        :return: The count, the limit fixed for the window and the seconds until it ends.
         """
+        key = f"user.{user_id}"
+        batch = Batch(is_atomic=True)
+        batch.hsetnx(key, "limit", str(rate_limit))
+        batch.hget(key, "count")
+        batch.hget(key, "limit")
+        batch.ttl(key)
         async with self._client.client() as conn:
-            return await conn.zcard(f"user.{user_id}")
+            results = await conn.exec(batch, raise_on_error=True)
+        if results is None:
+            raise UnreachableError("an atomic batch without WATCH cannot be aborted")
+        _, count, limit, reset = results
+        return RateLimitState(
+            count=int(cast(bytes, count)),
+            limit=int(cast(bytes, limit)) if limit is not None else None,
+            reset=cast(int, reset),
+        )
 
     @valkey_rate_limit_resilience.apply()
-    async def set_rate_limit_config(
-        self,
-        key: str,
-        value: str,
-        expiration: int = _DEFAULT_RATE_LIMIT_EXPIRATION,
-    ) -> None:
+    async def get_state(self, user_id: UserID) -> RateLimitState | None:
         """
-        Set rate limit configuration with expiration time.
+        Read the user's current window without counting a request.
 
-        :param key: The key to set.
-        :param value: The configuration value to set.
-        :param expiration: The expiration time in seconds.
+        :param user_id: The user the counter is keyed by.
+        :return: The window state, or None when no window is open for the user.
         """
+        key = f"user.{user_id}"
+        batch = Batch(is_atomic=True)
+        batch.hmget(key, ["count", "limit"])
+        batch.ttl(key)
         async with self._client.client() as conn:
-            await conn.set(
-                key=key,
-                value=value,
-                expiry=ExpirySet(ExpiryType.SEC, expiration),
-            )
-
-    @valkey_rate_limit_resilience.apply()
-    async def increment_with_expiration(
-        self,
-        key: str,
-        expiration: int = _DEFAULT_RATE_LIMIT_EXPIRATION,
-    ) -> int:
-        """
-        Increment a key and set expiration if it doesn't exist.
-
-        :param key: The key to increment.
-        :param expiration: The expiration time in seconds.
-        :return: The new value after increment.
-        """
-        tx = self._create_batch()
-        tx.incr(key)
-        tx.expire(key, expiration)
-        async with self._client.client() as conn:
-            results = await conn.exec(tx, raise_on_error=True)
-        # Handle the result properly by extracting the first result
-        if results and len(results) > 0:
-            return cast(int, results[0])
-        return 0
-
-    @valkey_rate_limit_resilience.apply()
-    async def get_rate_limit_data(self, key: str) -> str | None:
-        """
-        Get rate limit data by key.
-
-        :param key: The key to get.
-        :return: The rate limit data or None if not found.
-        """
-        async with self._client.client() as conn:
-            result = await conn.get(key)
-        return result.decode("utf-8") if result else None
-
-    @valkey_rate_limit_resilience.apply()
-    async def get_key(self, key: str) -> str | None:
-        """
-        Get the value of a key (deprecated: use get_rate_limit_data).
-
-        :param key: The key to get.
-        :return: The value or None if not found.
-        """
-        async with self._client.client() as conn:
-            result = await conn.get(key)
-        return result.decode("utf-8") if result else None
+            results = await conn.exec(batch, raise_on_error=True)
+        if results is None:
+            return None
+        fields, reset = cast(list[object], results)
+        count, limit = cast(list[object], fields)
+        if count is None:
+            return None
+        return RateLimitState(
+            count=int(cast(bytes, count)),
+            limit=int(cast(bytes, limit)) if limit is not None else None,
+            reset=cast(int, reset),
+        )
 
     @valkey_rate_limit_resilience.apply()
     async def delete_key(self, key: str) -> bool:
@@ -233,52 +192,3 @@ class ValkeyRateLimitClient:
         """
         async with self._client.client() as conn:
             await conn.flushdb()
-
-    @valkey_rate_limit_resilience.apply()
-    async def remove_expired_entries(
-        self,
-        key: str,
-        now: float,
-        window: int = _DEFAULT_RATE_LIMIT_EXPIRATION,
-    ) -> None:
-        """
-        Remove expired entries from a sorted set.
-
-        :param key: The sorted set key.
-        :param now: The current timestamp.
-        :param window: The time window in seconds.
-        """
-        cutoff_time = now - window
-        async with self._client.client() as conn:
-            await conn.zremrangebyscore(key, ScoreBoundary(0), ScoreBoundary(cutoff_time))
-
-    @valkey_rate_limit_resilience.apply()
-    async def add_to_sorted_set_with_expiration(
-        self,
-        key: str,
-        score: float,
-        member: str,
-        expiration: int = _DEFAULT_RATE_LIMIT_EXPIRATION,
-    ) -> None:
-        """
-        Add a member to a sorted set with expiration.
-
-        :param key: The sorted set key.
-        :param score: The score for the member.
-        :param member: The member to add.
-        :param expiration: The expiration time in seconds.
-        """
-        tx = self._create_batch()
-        tx.zadd(key, {member: score})
-        tx.expire(key, expiration)
-        async with self._client.client() as conn:
-            await conn.exec(tx, raise_on_error=True)
-
-    def _create_batch(self, is_atomic: bool = False) -> Batch:
-        """
-        Create a batch for transaction operations.
-
-        :param is_atomic: Whether the batch should be atomic.
-        :return: A Batch instance.
-        """
-        return Batch(is_atomic=is_atomic)

@@ -18,6 +18,10 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import Val
 from ai.backend.common.web.reserved_response_headers import reserve_response_headers
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import WebRequestHandler
+from ai.backend.manager.services.auth.actions.resolve_default_keypair_rate_limit import (
+    PublicResolveDefaultKeypairRateLimitAction,
+)
+from ai.backend.manager.services.auth.processors import AuthProcessors
 
 if TYPE_CHECKING:
     from aiohttp.typedefs import Middleware
@@ -32,39 +36,69 @@ _RATELIMIT_WINDOW: Final = 60 * 15
 class RateLimitQuota:
     limit: int | None
     remaining: int
-    window: int = _RATELIMIT_WINDOW
+    reset: int
+    window: int
 
     def apply_to(self, headers: CIMultiDict[str]) -> None:
         headers["X-RateLimit-Limit"] = str(self.limit)
         headers["X-RateLimit-Remaining"] = str(self.remaining)
+        headers["X-RateLimit-Reset"] = str(self.reset)
         headers["X-RateLimit-Window"] = str(self.window)
 
 
 def make_rlim_middleware(
     valkey_client: ValkeyRateLimitClient,
+    auth: AuthProcessors,
 ) -> Middleware:
-    """Create a rate-limit middleware that captures *valkey_client* via closure."""
+    """Create a rate-limit middleware that captures its dependencies via closure."""
 
     @web.middleware
     async def rlim_middleware(
         request: web.Request,
         handler: WebRequestHandler,
     ) -> web.StreamResponse:
-        """Global middleware implementing a rolling-counter rate limiter."""
+        """Global middleware implementing a fixed-window rate limiter."""
         if request["is_authorized"]:
-            rate_limit = request["keypair"]["rate_limit"]
-            rolling_count = await valkey_client.execute_rate_limit_logic(
-                user_id=request["user"]["uuid"],
-                window=_RATELIMIT_WINDOW,
-            )
-            if rate_limit is not None and rolling_count > rate_limit:
-                reserve_response_headers(request, RateLimitQuota(limit=rate_limit, remaining=0))
+            user_id = request["user"]["uuid"]
+            state = await valkey_client.consume(user_id=user_id, window=_RATELIMIT_WINDOW)
+            if state.limit is None:
+                resolved = await auth.public_resolve_default_keypair_rate_limit.run(
+                    PublicResolveDefaultKeypairRateLimitAction(user_id=user_id)
+                )
+                if resolved.rate_limit is not None:
+                    state = await valkey_client.store_limit(user_id, resolved.rate_limit)
+            if state.limit is not None and state.count > state.limit:
+                reserve_response_headers(
+                    request,
+                    RateLimitQuota(
+                        limit=state.limit,
+                        remaining=0,
+                        reset=state.reset,
+                        window=_RATELIMIT_WINDOW,
+                    ),
+                )
                 raise RateLimitExceeded
-            remaining = rate_limit - rolling_count if rate_limit is not None else rolling_count
-            reserve_response_headers(request, RateLimitQuota(limit=rate_limit, remaining=remaining))
+            remaining = state.limit - state.count if state.limit is not None else state.count
+            reserve_response_headers(
+                request,
+                RateLimitQuota(
+                    limit=state.limit,
+                    remaining=remaining,
+                    reset=state.reset,
+                    window=_RATELIMIT_WINDOW,
+                ),
+            )
             return await handler(request)
         # No checks for rate limiting for non-authorized queries.
-        reserve_response_headers(request, RateLimitQuota(limit=1000, remaining=1000))
+        reserve_response_headers(
+            request,
+            RateLimitQuota(
+                limit=1000,
+                remaining=1000,
+                reset=_RATELIMIT_WINDOW,
+                window=_RATELIMIT_WINDOW,
+            ),
+        )
         return await handler(request)
 
     return rlim_middleware

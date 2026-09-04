@@ -349,7 +349,9 @@ def build_api_routes(
         register_resource_group_routes(resource_group_handler, route_deps),
         register_error_log_routes(error_log_handler, route_deps),
         register_health_routes(health_handler, route_deps),
-        register_ratelimit_routes(route_deps, valkey_rate_limit=valkey_rate_limit),
+        register_ratelimit_routes(
+            route_deps, valkey_rate_limit=valkey_rate_limit, auth=processors.auth
+        ),
         register_container_registry_routes(container_registry_handler, route_deps),
         register_artifact_routes(artifact_handler, route_deps),
         register_artifact_registry_routes(artifact_registry_handler, route_deps),

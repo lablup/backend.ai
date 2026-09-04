@@ -1,33 +1,95 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
+    RateLimitState,
     ValkeyRateLimitClient,
 )
 from ai.backend.common.data.entity.user import UserID
 
 
-async def test_valkey_rate_limit_logic_execution(
+async def test_first_request_opens_the_window(
     test_valkey_rate_limit: ValkeyRateLimitClient,
 ) -> None:
-    """Test rate limiting logic execution."""
     user_id = UserID(uuid.uuid4())
 
-    # Execute the rate limiting logic
-    result = await test_valkey_rate_limit.execute_rate_limit_logic(
-        user_id=user_id,
-        window=60,
-    )
+    state = await test_valkey_rate_limit.consume(user_id, window=60)
 
-    assert result == 1  # First request should return 1
+    assert state == RateLimitState(count=1, limit=None, reset=60)
 
-    # Execute again
-    result2 = await test_valkey_rate_limit.execute_rate_limit_logic(
-        user_id=user_id,
-        window=60,
-    )
 
-    assert result2 == 2  # Second request should return 2
+async def test_later_requests_keep_the_window(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
+) -> None:
+    user_id = UserID(uuid.uuid4())
+    await test_valkey_rate_limit.consume(user_id, window=60)
+    await asyncio.sleep(1.1)
 
-    assert await test_valkey_rate_limit.get_rolling_count(user_id) == 2
+    state = await test_valkey_rate_limit.consume(user_id, window=60)
+
+    assert state.count == 2
+    assert 0 < state.reset < 60
+
+
+async def test_store_limit_fixes_the_limit_of_the_window(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
+) -> None:
+    user_id = UserID(uuid.uuid4())
+    await test_valkey_rate_limit.consume(user_id, window=60)
+
+    state = await test_valkey_rate_limit.store_limit(user_id, 30000)
+
+    assert state == RateLimitState(count=1, limit=30000, reset=60)
+    assert (await test_valkey_rate_limit.consume(user_id, window=60)).limit == 30000
+
+
+async def test_store_limit_keeps_the_limit_already_fixed(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
+) -> None:
+    user_id = UserID(uuid.uuid4())
+    await test_valkey_rate_limit.consume(user_id, window=60)
+    await test_valkey_rate_limit.store_limit(user_id, 30000)
+
+    state = await test_valkey_rate_limit.store_limit(user_id, 10)
+
+    assert state.limit == 30000
+
+
+async def test_count_keeps_growing_past_the_limit(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
+) -> None:
+    user_id = UserID(uuid.uuid4())
+    await test_valkey_rate_limit.consume(user_id, window=60)
+    await test_valkey_rate_limit.store_limit(user_id, 2)
+    for _ in range(2):
+        await test_valkey_rate_limit.consume(user_id, window=60)
+
+    state = await test_valkey_rate_limit.consume(user_id, window=60)
+
+    assert state.count == 4
+    assert state.limit == 2
+
+
+async def test_new_window_starts_without_a_limit(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
+) -> None:
+    user_id = UserID(uuid.uuid4())
+    await test_valkey_rate_limit.consume(user_id, window=1)
+    await test_valkey_rate_limit.store_limit(user_id, 30000)
+    await asyncio.sleep(1.1)
+
+    state = await test_valkey_rate_limit.consume(user_id, window=60)
+
+    assert state == RateLimitState(count=1, limit=None, reset=60)
+
+
+async def test_windows_are_keyed_by_user(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
+) -> None:
+    counted_user = UserID(uuid.uuid4())
+    other_user = UserID(uuid.uuid4())
+    await test_valkey_rate_limit.consume(counted_user, window=60)
+
+    assert await test_valkey_rate_limit.get_state(other_user) is None
