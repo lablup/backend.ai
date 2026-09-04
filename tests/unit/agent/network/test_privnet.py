@@ -25,6 +25,7 @@ from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.locator import ContainerLocator, LiveContainer
 from ai.backend.agent.network.native_attacher import HostLocalIpam
 from ai.backend.agent.network.privnet.client import (
+    PrivNetBackendProxy,
     PrivNetClient,
     PrivNetClientError,
     PrivNetProvisioner,
@@ -41,6 +42,7 @@ from ai.backend.agent.network.privnet.server import PrivNetServer
 from ai.backend.common.network.types import (
     AttachKind,
     EndpointPlan,
+    Member,
     NetworkAttachSpec,
     NetworkBackendKind,
     NetworkRole,
@@ -207,14 +209,18 @@ def _short_socket_path() -> str:
 class _RecordingForwarder:
     """Stands in for the real iptables PortForwarder inside the privnet."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, remove_failures: int = 0) -> None:
         self.installed: list[Any] = []
         self.removed: list[str] = []
+        self.remove_failures = remove_failures
 
     async def install(self, forwards: Any) -> None:
         self.installed.extend(forwards)
 
     async def remove_container(self, container_id: str) -> list[int]:
+        if self.remove_failures:
+            self.remove_failures -= 1
+            raise RuntimeError("iptables was busy")
         self.removed.append(container_id)
         return sorted(f.host_port for f in self.installed if f.container_id == container_id)
 
@@ -1475,3 +1481,147 @@ class TestWithdrawingASession:
             resp = await h.client().call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "nope"))
             assert resp.ok
             assert h.backend.withdraw_calls == []
+
+
+class TestReclaimingIsRetriedToo:
+    """Reclaiming is the only pass that gives back a dead container's address and DNAT rules, and a
+    dead session's devices and node-local subnet block. Nothing asks for them again -- the
+    container and the session are gone -- so a failure that is only logged is a permanent leak."""
+
+    async def test_a_failed_container_reclaim_is_marked_and_retried(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as first:
+            await first.setup("s1")
+            await first.client().call(
+                PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "s1", container_id="c1")
+            )
+
+        # c1 died while we were down, and the first reclaim of it fails.
+        forwarder = _RecordingForwarder(remove_failures=1)
+        async with _Harness(
+            _StubRuntime(live={"c2": "s1"}), state_dir=tmp_path, forwarder=forwarder
+        ) as restarted:
+            assert restarted.server._unreclaimed_containers.keys() == {"c1"}
+            assert "c1" in await restarted.journal.attachments()
+            await restarted.server._retry_recovery()
+            assert restarted.server._unreclaimed_containers == {}
+            assert "c1" not in await restarted.journal.attachments()
+
+    async def test_a_failed_dead_session_reclaim_is_marked_and_retried(
+        self, tmp_path: Path
+    ) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as first:
+            await first.setup("s1")
+
+        async with _Harness(_StubRuntime(), state_dir=tmp_path, teardown_failures=1) as restarted:
+            assert restarted.server._unreclaimed_sessions.keys() == {"s1"}
+            assert "s1" in await restarted.journal.sessions()
+            await restarted.server._retry_recovery()
+            assert restarted.server._unreclaimed_sessions == {}
+            assert restarted.backend.teardown_calls == ["s1"]
+            assert "s1" not in await restarted.journal.sessions()
+
+    async def test_a_session_deferred_behind_a_live_vni_is_reclaimed_once_that_vni_is_free(
+        self, tmp_path: Path
+    ) -> None:
+        # Deferring is correct -- the devices are named after the VNI and belong to the live
+        # session -- but only the timer makes "later" arrive. Without the marker the loop is never
+        # armed, and the block waits for the next restart of this process.
+        vxlan = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c-old": "dead"}), state_dir=tmp_path
+        ) as first:
+            for session_id in ("dead", "live"):
+                await first.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, session_id, network_config=dict(vxlan))
+                )
+            await first.client().call(
+                PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "live", container_id="c-new")
+            )
+
+        runtime = _StubRuntime(live={"c-new": "live"})
+        async with _Harness(runtime, state_dir=tmp_path) as restarted:
+            assert restarted.server._unreclaimed_sessions.keys() == {"dead"}
+            assert "dead" not in restarted.backend.teardown_calls
+
+            # "live" ends the ordinary way; its VNI is free now.
+            await restarted.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "live"))
+            runtime._live.clear()
+            await restarted.server._retry_recovery()
+            assert "dead" in restarted.backend.teardown_calls
+            assert restarted.server._unreclaimed_sessions == {}
+
+    async def test_a_reclaim_failure_arms_the_retry_timer(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as first:
+            await first.setup("s1")
+
+        async with _Harness(_StubRuntime(), state_dir=tmp_path, teardown_failures=1) as restarted:
+            task = restarted.server._recovery_retry_task
+            assert task is not None and not task.done()
+
+    async def test_a_reclaim_that_something_else_finished_stops_being_retried(
+        self, tmp_path: Path
+    ) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            h.server._unreclaimed_containers["ghost-c"] = "was failing"
+            h.server._unreclaimed_sessions["ghost-s"] = "was failing"
+            await h.server._retry_recovery()
+            assert h.server._unreclaimed_containers == {}
+            assert h.server._unreclaimed_sessions == {}
+
+
+class TestTheAgentFacingProxy:
+    """The facade the agent's coordinator drives. Every verb here crosses the process boundary,
+    so what it does with a failure is what the agent believes about the host."""
+
+    def _proxy(self, calls: list[PrivNetRequest], *, fail: bool = False) -> PrivNetBackendProxy:
+        class _Client:
+            async def call(self, request: PrivNetRequest) -> PrivNetResponse:
+                calls.append(request)
+                if fail:
+                    raise PrivNetClientError("privnet said no")
+                return PrivNetResponse(ok=True)
+
+        return PrivNetBackendProxy({}, {}, client=cast(Any, _Client()))
+
+    def _meta(self) -> SessionNetMeta:
+        return SessionNetMeta(
+            session_id="s1",
+            subnet="10.128.5.0/24",
+            backend=NetworkBackendKind.VXLAN,
+            mtu=1412,
+            vni=4138,
+            vxlan_port=4789,
+            encryption_key="ab" * 32,
+        )
+
+    async def test_adoption_declares_the_session_to_this_agents_privnet(self) -> None:
+        # "The privnet" is per agent. When a second agent on the same host joins a session the
+        # first one's privnet built, its own privnet has no record of it and refuses every later
+        # attach with "attach before setup" -- so adoption has to say so, not return quietly.
+        calls: list[PrivNetRequest] = []
+        await self._proxy(calls).adopt_session_network(
+            self._meta(), Member(agent_id="a1", host_ip="10.0.0.1", vtep_ip="10.0.0.1")
+        )
+        assert [c.op for c in calls] == [PrivNetOp.SETUP_SESSION]
+        assert calls[0].network_config == {
+            "backend": "vxlan",
+            "subnet": "10.128.5.0/24",
+            "vni": 4138,
+            "mtu": 1412,
+            "vxlan_port": 4789,
+            "encryption_key": "ab" * 32,
+        }
+
+    async def test_a_failed_withdrawal_is_not_reported_as_done(self) -> None:
+        # The devices stay either way; what the withdrawal removes is this node's CLAIM -- the
+        # journal record, the ESP pair claim, the watchdog responsibility. Reporting it as done
+        # makes the caller drop the member key and the manager believe the VNI is free.
+        calls: list[PrivNetRequest] = []
+        with pytest.raises(PrivNetClientError):
+            await self._proxy(calls, fail=True).withdraw_session_network("s1")
+        assert [c.op for c in calls] == [PrivNetOp.WITHDRAW_SESSION]
+
+    async def test_a_successful_withdrawal_names_the_session(self) -> None:
+        calls: list[PrivNetRequest] = []
+        await self._proxy(calls).withdraw_session_network("s1")
+        assert [(c.op, c.session_id) for c in calls] == [(PrivNetOp.WITHDRAW_SESSION, "s1")]
