@@ -30,6 +30,9 @@ from ai.backend.common.types import (
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
+    from .config.unified import AgentUnifiedConfig
+    from .network.locator import ContainerLocator
+    from .network.runtime import OciRuntime
     from .resources import AbstractComputePlugin
 
 
@@ -38,6 +41,10 @@ class AgentBackend(enum.StrEnum):
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
     DUMMY = "dummy"
+    CONTAINERD = "containerd"
+    ENROOT = "enroot"
+    SINGULARITY = "singularity"
+    PODMAN = "podman"
 
 
 class AbstractAgentDiscovery(ABC):
@@ -80,6 +87,38 @@ class AbstractAgentDiscovery(ABC):
         """
         raise NotImplementedError
 
+    def create_oci_runtime(self, local_config: AgentUnifiedConfig) -> OciRuntime:
+        """Construct the OCI runtime client this backend drives.
+
+        Deliberately not abstract: only the OCI-spec backends (containerd and its enroot variant)
+        have one, and the Docker/Kubernetes/dummy backends legitimately do not.
+
+        This lives on the discovery — the one place that already dispatches per backend, and is
+        reachable from code that holds only the config — rather than solely on the agent class,
+        because a kernel needs it too: `ContainerdKernel.commit()` runs a short-lived runtime
+        client of its own, and hard-coding the containerd one there sent an enroot kernel's commit
+        to a containerd daemon that knows nothing about it.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not drive an OCI runtime",
+        )
+
+    def create_container_locator(self, local_config: AgentUnifiedConfig) -> ContainerLocator:
+        """Construct what the privnet is allowed to see of this backend's containers.
+
+        Narrowed to the three questions the privnet may ask (see
+        ai.backend.agent.network.locator), so a backend answers them however it can: Docker's reads
+        the Docker daemon, and an OCI-spec backend wraps the runtime client it already drives.
+
+        Deliberately not abstract and deliberately without a default. A backend that carries no
+        containers has nothing to locate and inherits this refusal; one that does must say how,
+        because guessing hands the privnet a client for containers it does not own -- it would
+        report "no such container" for every kernel the agent started.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not expose a container locator",
+        )
+
 
 def get_agent_discovery(backend: AgentBackend) -> AbstractAgentDiscovery:
     agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
@@ -111,6 +150,18 @@ class Port:
 class AgentEventData:
     type: str
     data: dict[str, Any]
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class ContainerNetns:
+    """
+    How to reach a running container's network namespace, for stat collectors that read
+    its interface counters. ``pid`` is preferred (/proc/<pid>/net/dev); ``path`` is the
+    fallback for runtimes that keep the namespace pinned after the main process is gone.
+    """
+
+    pid: int | None
+    path: Path | None
 
 
 @attrs.define(auto_attribs=True, slots=True)

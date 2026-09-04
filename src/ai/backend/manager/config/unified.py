@@ -1999,6 +1999,24 @@ class PluginsConfig(BaseConfigSchema):
 
 
 class InterContainerNetworkConfig(BaseConfigSchema):
+    forced_backend: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("forced-backend", "forced_backend"),
+            serialization_alias="forced-backend",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Pin the per-session data plane the CNI driver builds (BEP-1062), e.g. 'vxlan'. "
+                "Unset lets the driver pick from what the session's member agents advertise, "
+                "which is the right answer whenever the cluster is not deliberately homogeneous."
+            ),
+            added_version="25.20.0",
+            example=ConfigExample(local=None, prod=None),
+        ),
+    ]
+
     default_driver: Annotated[
         str | None,
         Field(
