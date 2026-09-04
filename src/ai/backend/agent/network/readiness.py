@@ -10,10 +10,13 @@ they are already looking.
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
+
+from ai.backend.logging import BraceStyleAdapter
 
 #: Devices this backend made. Anything else on our port or in our VNI range belongs to someone
 #: else, and the plaintext-drop and mark rules match on (port, VNI) alone -- so an overlap means
@@ -24,6 +27,8 @@ _REQUIRED_BINARIES: Final = ("ip", "bridge", "iptables")
 #: The two iptables matches the encrypted path needs: `u32` picks the VNI out of the encapsulation
 #: and `policy` tells an ESP-decapsulated frame from an injected one.
 _REQUIRED_MATCHES: Final = ("u32", "policy")
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _HEADER = re.compile(r"^\d+:\s+(?P<name>[^:@\s]+)[@:]")
 
@@ -142,22 +147,60 @@ async def _match_present(name: str) -> bool:
     return proc.returncode == 0
 
 
-async def _vxlan_details() -> str:
+async def _run(argv: Sequence[str]) -> str | None:
+    """The command's stdout, or None when it did not complete successfully."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            "ip",
-            "-d",
-            "link",
-            "show",
-            "type",
-            "vxlan",
+            *argv,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
         stdout, _ = await proc.communicate()
     except OSError:
-        return ""
-    return stdout.decode(errors="replace") if proc.returncode == 0 else ""
+        return None
+    return stdout.decode(errors="replace") if proc.returncode == 0 else None
+
+
+async def _vxlan_names() -> tuple[str, ...]:
+    """Every vxlan device's name, from the one `ip link` form that is reliable here.
+
+    ``ip -o link show type vxlan`` (no ``-d``) is the same on every kernel this has been run on;
+    the detailed variants are not -- see `describe_vxlan_devices`.
+    """
+    raw = await _run(["ip", "-o", "link", "show", "type", "vxlan"])
+    if raw is None:
+        return ()
+    names: list[str] = []
+    for line in raw.splitlines():
+        if (match := _HEADER.match(line)) is not None:
+            names.append(match.group("name"))
+    return tuple(names)
+
+
+async def describe_vxlan_devices() -> tuple[tuple[VxlanDevice, ...], tuple[str, ...]]:
+    """Every vxlan device this host can describe, and the names of the ones it cannot.
+
+    ``ip -d`` is not dependable here and the failure is not a clean error. On three hosts running
+    the same iproute2 6.1.0 it SEGFAULTS, in opposite directions: one crashes on
+    ``ip -d link show type vxlan`` and answers ``ip -d link show dev <name>``, another does the
+    reverse, a third answers both. (The JSON variants are separately malformed or empty by
+    kernel version -- see `_list_vxlan_devices` in the vxlan backend.) So both forms are tried,
+    and what neither could describe is RETURNED rather than dropped: reporting "no conflict"
+    because the host could not be asked is the fail-open this check exists to remove.
+    """
+    listing = await _run(["ip", "-d", "link", "show", "type", "vxlan"])
+    if listing is not None:
+        return parse_vxlan_details(listing), ()
+    described: list[VxlanDevice] = []
+    unreadable: list[str] = []
+    for name in await _vxlan_names():
+        per_device = await _run(["ip", "-d", "link", "show", "dev", name])
+        parsed = parse_vxlan_details(per_device) if per_device is not None else ()
+        if parsed:
+            described.extend(parsed)
+        else:
+            unreadable.append(name)
+    return tuple(described), tuple(unreadable)
 
 
 @dataclass(frozen=True)
@@ -202,9 +245,15 @@ async def probe_readiness(*, port: int, vni_range: tuple[int, int]) -> Readiness
                 f"iptables has no `{match}` match (xt_{match}). An encrypted session needs it to "
                 "tell its own VNI's frames apart, and is refused on this node without it."
             )
-    advisory = foreign_conflicts(
-        parse_vxlan_details(await _vxlan_details()), port=port, vni_range=vni_range
-    )
+    devices, unreadable = await describe_vxlan_devices()
+    advisory = foreign_conflicts(devices, port=port, vni_range=vni_range)
+    if unreadable:
+        advisory.append(
+            f"this host's `ip -d link` cannot describe {', '.join(unreadable)} (it exits non-zero"
+            " or crashes on both of its forms), so a VXLAN already using this cluster's port or"
+            " VNI range cannot be ruled out here. Check by hand before co-hosting another"
+            " overlay."
+        )
     return Readiness(blocking=tuple(blocking), advisory=tuple(advisory))
 
 
@@ -216,7 +265,19 @@ async def conflicting_device(*, port: int, vni: int) -> str | None:
     until a session does. An overlap here is not advisory: the drop and mark rules select on
     (port, VNI) alone, so the two tunnels would act on each other's traffic.
     """
-    for device in parse_vxlan_details(await _vxlan_details()):
+    devices, unreadable = await describe_vxlan_devices()
+    for device in devices:
         if not device.is_ours and device.dstport == port and device.vni == vni:
             return device.name
+    if unreadable:
+        # Not a refusal: no session could start on a host whose iproute2 cannot describe its own
+        # devices, and that is a worse failure than the one being guarded against. Said out loud
+        # instead, so "no conflict found" is never confused with "no conflict".
+        log.warning(
+            "could not describe the VXLAN device(s) {} on this host, so VNI {} on udp/{} was"
+            " admitted without ruling out a collision with them",
+            ", ".join(unreadable),
+            vni,
+            port,
+        )
     return None
