@@ -102,7 +102,11 @@ class DockerKernel(AbstractKernel):
             self.kernel_id,
             self.session_id,
             event_producer,
-            kernel_host="127.0.0.1",  # repl ports are always bound to 127.0.0.1
+            # Docker publishes the repl ports on loopback, so 127.0.0.1 is where they are —
+            # except under BEP-1062, where Docker publishes nothing and the agent reaches the
+            # container's own LOCAL address directly (the host is that bridge's gateway). Going
+            # through a published port there would need DNAT on loopback, hence route_localnet.
+            kernel_host=self.data.get("repl_host") or "127.0.0.1",
             repl_in_port=self.data["repl_in_port"],
             repl_out_port=self.data["repl_out_port"],
             exec_timeout=0,
