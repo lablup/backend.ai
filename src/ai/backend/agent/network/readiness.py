@@ -275,8 +275,15 @@ async def probe_readiness(
         # at create time, from a bare connection error.
         from ai.backend.agent.network.privnet.client import PrivNetClient
 
-        if (unreachable := await PrivNetClient(privnet_socket).reachable()) is not None:
+        client = PrivNetClient(privnet_socket)
+        if (unreachable := await client.reachable()) is not None:
             blocking.append(unreachable)
+        else:
+            for what, why in sorted((await client.recovery_problems()).items()):
+                # Blocking. A node whose privnet cannot take charge of something already running
+                # on it looks healthy from every other angle, and the manager goes on scheduling
+                # onto it -- while that session's VNI can be handed out underneath it.
+                blocking.append(f"the privileged network helper has not recovered {what}: {why}")
     devices, unreadable = await describe_vxlan_devices()
     advisory = foreign_conflicts(devices, port=port, vni_range=vni_range)
     if unreadable:

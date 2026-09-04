@@ -20,12 +20,18 @@ startup when it detects that shape.
 
     [Service]
     User=backendai-privnet
+    SupplementaryGroups=backendai-agent
     AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
     CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
     NoNewPrivileges=yes
     Environment=BACKENDAI_PRIVNET_UID=<the agent's uid>
     Environment=BACKENDAI_PRIVNET_AGENT_ID=<this node's agent id>
     ExecStart=/usr/bin/python -m ai.backend.agent.network.privnet ...
+
+``SupplementaryGroups`` is load-bearing, not tidiness: the daemon hands the socket to the agent by
+chowning it to the agent's primary group, and `chown` to a group you are not a member of needs
+CAP_CHOWN. Membership is the smaller of the two, so the unit asks for it and the daemon says which
+one is missing if neither is there.
 
 With that split, give ``backendai-privnet`` sole ownership (0700) of the privnet state directory
 and the node-wide claim trees, and the agent nothing but the socket: the daemon chowns it to the

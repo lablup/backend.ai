@@ -64,6 +64,19 @@ class PrivNetClient:
     def __init__(self, socket_path: str) -> None:
         self._socket_path = socket_path
 
+    async def recovery_problems(self) -> dict[str, str]:
+        """What the privnet says it could not take charge of.
+
+        Empty on any failure to ask, including a daemon too old to know the verb: `reachable`
+        already reports a privnet that is not answering at all, and reporting this as a problem
+        too would turn one fault into two lines about the same thing.
+        """
+        try:
+            resp = await self.call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
+        except (PrivNetClientError, OSError):
+            return {}
+        return dict(resp.problems or {})
+
     async def reachable(self) -> str | None:
         """None if the privileged helper answers, else why it does not.
 

@@ -2275,3 +2275,118 @@ class TestASessionRunningWithNoRecordOfIt:
             _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
         ) as restarted:
             assert restarted.server._unrecovered_sessions == {}
+
+
+class TestTheRetryCannotRunThroughARequest:
+    """The retry reads a snapshot of the journal and the runtime and then acts on it -- pruning
+    node-wide claims, reclaiming dead sessions. A SETUP that lands in the middle is absent from
+    that snapshot, and the prune then deletes the VNI claim of a session built moments ago."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    async def test_a_setup_during_a_retry_keeps_its_claim(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            # A retry whose snapshot is taken before the setup and whose prune runs after it.
+            reached = asyncio.Event()
+            release = asyncio.Event()
+            original = h.server._journal.sessions
+
+            async def _slow_sessions() -> dict[str, dict[str, Any]]:
+                out = await original()
+                reached.set()
+                await release.wait()
+                return out
+
+            monkeypatch.setattr(h.server._journal, "sessions", _slow_sessions)
+            retry = asyncio.create_task(h.server._retry_recovery())
+            await reached.wait()
+            monkeypatch.setattr(h.server._journal, "sessions", original)
+
+            setup = asyncio.create_task(
+                h.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+            )
+            await asyncio.sleep(0.05)
+            assert not setup.done(), "the request ran while the retry held the barrier"
+            release.set()
+            await retry
+            assert (await setup).ok
+            assert {h.session_id for h in await h.vni_registry.holders(4138)} == {"s1"}
+
+    async def test_a_retry_waits_for_a_request_in_flight(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            await h.server._mutation_lock.acquire()
+            try:
+                retry = asyncio.create_task(h.server._retry_recovery())
+                await asyncio.sleep(0.05)
+                assert not retry.done()
+            finally:
+                h.server._mutation_lock.release()
+            await retry
+
+    async def test_a_readiness_query_does_not_wait_on_it(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            await h.server._mutation_lock.acquire()
+            try:
+                resp = await asyncio.wait_for(
+                    h.client().call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status")), 2
+                )
+                assert resp.ok
+            finally:
+                h.server._mutation_lock.release()
+
+
+class TestATeardownOverAnUnreadableJournal:
+    """After a restart there is no in-memory entry, so the journal is the only thing that says
+    what the session is. A read that failed used to become "no record", and no record is what
+    tells teardown there is nothing to release and nothing to remove."""
+
+    async def test_it_is_refused_rather_than_reported_done(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+
+        (tmp_path / "journal" / "sessions" / "damaged").write_text("{not json")
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as restarted:
+            with pytest.raises(PrivNetClientError):
+                await restarted.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+            assert "s1" in {p.name for p in (tmp_path / "journal" / "sessions").iterdir()}, (
+                "the record went while the devices stayed"
+            )
+
+
+class TestTheNodeSaysWhatItCouldNotRecover:
+    """A privnet that cannot take charge of something already running on it looks healthy from
+    every other angle, and the manager goes on scheduling onto it."""
+
+    async def test_an_orphaned_live_session_is_reported(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(live={"c1": "ghost"}), state_dir=tmp_path) as h:
+            resp = await h.client().call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
+            assert resp.ok
+            assert "privnet:session:ghost" in (resp.problems or {})
+
+    async def test_a_healthy_node_reports_nothing(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+            resp = await h.client().call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
+            assert resp.problems == {}
+
+    async def test_the_mark_survives_the_next_retry(self, tmp_path: Path) -> None:
+        # It used to be dropped for not being journalled -- which is the whole point of it.
+        async with _Harness(_StubRuntime(live={"c1": "ghost"}), state_dir=tmp_path) as h:
+            await h.server._retry_recovery()
+            assert "ghost" in h.server._unrecovered_sessions
+
+    async def test_an_orphan_stops_the_prune(self, tmp_path: Path) -> None:
+        # The prune's premise is that the journal is the whole list of what this agent owns, and
+        # an orphan is exactly a counterexample.
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+            async with h.vni_registry.binding(4999, "i-test", "elsewhere", "deadbeef") as bound:
+                bound.mark_built()
+
+        async with _Harness(_StubRuntime(live={"c9": "ghost"}), state_dir=tmp_path) as restarted:
+            assert restarted.server._unrecovered_sessions.keys() >= {"ghost"}
+            assert await restarted.vni_registry.holders(4999)

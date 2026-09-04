@@ -93,6 +93,13 @@ _FAIL_CLOSE_RETRY_INTERVAL = 30.0
 #: How often to retry a recovery that could not complete. Same reasoning as above:
 #: what is being waited for is a runtime or filesystem coming back, not a race.
 _RECOVERY_RETRY_INTERVAL = 30.0
+#: Verbs that only read. They skip the node-wide mutation barrier, because nothing they do can
+#: race a recovery pass and a readiness probe must not wait on one.
+_READ_ONLY_OPS = frozenset({
+    PrivNetOp.RECOVERY_STATUS,
+    PrivNetOp.LIST_PORTS,
+    PrivNetOp.LOCAL_SUBNET,
+})
 
 
 # Capability bit numbers we care about (linux/capability.h).
@@ -266,6 +273,13 @@ class PrivNetServer:
     _unreclaimed_sessions: dict[str, str]
     #: Retries recovery while any of the four above is non-empty.
     _recovery_retry_task: asyncio.Task[None] | None
+    #: Held by every request and by the whole of a recovery retry, so the two cannot interleave.
+    #: The retry reads a snapshot of the journal and the runtime and then acts on it -- pruning
+    #: node-wide claims, reclaiming dead sessions -- and a SETUP that lands in between makes the
+    #: snapshot a lie about the very session whose claim the prune then deletes.
+    #:
+    #: Always taken BEFORE any per-session lock, on both paths, so the order is one way only.
+    _mutation_lock: asyncio.Lock
 
     def __init__(
         self,
@@ -316,6 +330,7 @@ class PrivNetServer:
         self._unreclaimed_containers = {}
         self._unreclaimed_sessions = {}
         self._recovery_retry_task = None
+        self._mutation_lock = asyncio.Lock()
         # Set only where the PID record is agent-written (the rootless backends); see _attach.
         self._netns_owner_uid = netns_owner_uid
         self._netns = netns_pinner or netns_mod.NetnsPinner()
@@ -392,7 +407,15 @@ class PrivNetServer:
                 " no passwd entry, so its group cannot be resolved. Set BACKENDAI_PRIVNET_UID to"
                 " the agent's uid, or run both as the same user."
             ) from None
-        os.chown(sock_path, -1, gid)
+        try:
+            os.chown(sock_path, -1, gid)
+        except PermissionError as e:
+            # `chown` to a group this process is not a member of needs CAP_CHOWN. Say which of the
+            # two is missing rather than leave a socket the agent cannot open.
+            raise PrivNetError(
+                f"cannot hand {sock_path} to the agent (uid {self._allowed_uid}, gid {gid}): {e}."
+                " Add that group to this service's SupplementaryGroups, or give it CAP_CHOWN."
+            ) from e
         sock_path.chmod(0o660)
 
     def _warn_if_not_separated(self) -> None:
@@ -422,6 +445,11 @@ class PrivNetServer:
     async def _retry_recovery(self) -> None:
         """Re-attempt only what recovery could not do -- never the whole of it.
 
+        Under `_mutation_lock` from the first read to the last write. What follows acts on a
+        snapshot of the journal and the runtime: a SETUP that completes in the middle of it is
+        absent from that snapshot, and the node-wide prune below then deletes the VNI claim of a
+        session that was built moments ago -- leaving it running with no ownership on this host.
+
         `recover()` begins by bringing down every tunnel on this node and pruning every claim,
         which is correct exactly once, before anything is trusted. On a timer it is destructive:
         one session that keeps failing would take every healthy VXLAN down and up again every
@@ -432,6 +460,10 @@ class PrivNetServer:
         "What still needs it" is every live session when the first pass could not read its inputs
         at all, and the sessions that failed individually otherwise.
         """
+        async with self._mutation_lock:
+            await self._retry_recovery_locked()
+
+    async def _retry_recovery_locked(self) -> None:
         try:
             live = await self._live_containers()
             journalled_sessions = await self._journal.sessions()
@@ -446,7 +478,11 @@ class PrivNetServer:
         # mark set would have cleared the failure flag and left the node exactly there.
         never_adopted = self._recovery_failed is not None
         self._recovery_failed = None
-        unbound = await self._rebind_journalled(journalled_sessions)
+        # Recomputed every pass, and BEFORE the rebind: a session running here that this privnet
+        # has no record of is not something a later pass may forget, and its VNI must not be
+        # pruned on the strength of a journal that does not mention it.
+        orphans = self._orphaned_live_sessions(live, journalled_sessions)
+        unbound = await self._rebind_journalled(journalled_sessions, prune=not orphans)
         # Gone from the journal since the failure: another verb finished the job, and holding the
         # marker would keep this timer running for something that no longer exists.
         for container_id in list(self._unreclaimed_containers):
@@ -475,6 +511,8 @@ class PrivNetServer:
             else set(self._unrecovered_sessions)
         )
         for session_id in sorted(pending):
+            if session_id in orphans:
+                continue  # not journalled and not gone: still running here, still unmanageable
             if session_id not in journalled_sessions:
                 # Gone while we were failing to adopt it: there is nothing left to recover, and
                 # keeping the mark would hold this node out of service for a session that ended.
@@ -506,6 +544,7 @@ class PrivNetServer:
                     continue
                 self._unrecovered_sessions.pop(session_id, None)
                 log.info("privnet recovered session {} on a later attempt", session_id)
+        self._unrecovered_sessions.update(orphans)
         if self._unrecovered_sessions:
             return  # the dead-state sweep below needs a complete picture of what is live
         # Only once every live session is adopted: a dead session's devices are named after its
@@ -527,15 +566,43 @@ class PrivNetServer:
             if (vni := self._journalled_vni(raw_config)) is not None and vni in live_vnis:
                 self._unreclaimed_sessions[session_id] = f"VNI {vni} is held by a live session"
                 continue
-            try:
-                await self._reclaim_dead_session(
-                    session_id, raw_config, journalled_peers.get(session_id)
-                )
-            except Exception as e:
-                log.exception("failed to reclaim dead session {} on a later attempt", session_id)
-                self._unreclaimed_sessions[session_id] = str(e)
-            else:
-                self._unreclaimed_sessions.pop(session_id, None)
+            # Under the session's own lock, and re-checked inside it: everything above was decided
+            # from a snapshot, and this is the step that deletes devices.
+            async with self._session_locked(session_id):
+                if session_id in self._sessions:
+                    continue  # adopted since the snapshot; not dead after all
+                if session_id not in await self._journal.sessions():
+                    self._unreclaimed_sessions.pop(session_id, None)
+                    continue  # somebody finished it while we were deciding
+                try:
+                    await self._reclaim_dead_session(
+                        session_id, raw_config, journalled_peers.get(session_id)
+                    )
+                except Exception as e:
+                    log.exception(
+                        "failed to reclaim dead session {} on a later attempt", session_id
+                    )
+                    self._unreclaimed_sessions[session_id] = str(e)
+                else:
+                    self._unreclaimed_sessions.pop(session_id, None)
+
+    def recovery_problems(self) -> dict[str, str]:
+        """Everything this privnet knows it has not been able to take charge of, and why.
+
+        Read by the agent's readiness probe. Without it a node whose privnet cannot manage a live
+        session -- one it has no journal record of, one whose VNI belongs to something else --
+        looks healthy from every other angle, and the manager goes on scheduling onto it.
+        """
+        problems: dict[str, str] = {}
+        if self._recovery_failed is not None:
+            problems["privnet:recovery"] = self._recovery_failed
+        for session_id, reason in self._unrecovered_sessions.items():
+            problems[f"privnet:session:{session_id}"] = reason
+        for session_id, reason in self._unreclaimed_sessions.items():
+            problems[f"privnet:dead-session:{session_id}"] = reason
+        for container_id, reason in self._unreclaimed_containers.items():
+            problems[f"privnet:dead-container:{container_id}"] = reason
+        return problems
 
     def _recovery_pending(self) -> bool:
         """Whether anything recovery owes this node is still outstanding.
@@ -677,13 +744,16 @@ class PrivNetServer:
             self._recovery_failed = str(e)
             self._start_recovery_retry()
             return
-        unbound = await self._rebind_journalled(journalled_sessions)
         # Read successfully, so whatever failed last time is no longer failing. Clearing it here
         # rather than after the loop below matters for the empty case: an empty journal is a
         # complete answer, and returning with the flag still set would keep this node reporting
         # itself unrecovered for as long as it runs.
         self._recovery_failed = None
-        self._unrecovered_sessions = self._orphaned_live_sessions(live, journalled_sessions)
+        # Before the rebind, because its prune's premise is that the journal is the whole list of
+        # what this agent owns -- and an orphan is exactly a counterexample.
+        orphans = self._orphaned_live_sessions(live, journalled_sessions)
+        self._unrecovered_sessions = dict(orphans)
+        unbound = await self._rebind_journalled(journalled_sessions, prune=not orphans)
         if not journalled_sessions and not journalled_attachments:
             self._unreclaimed_containers.clear()
             self._unreclaimed_sessions.clear()
@@ -795,7 +865,7 @@ class PrivNetServer:
             self._start_recovery_retry()
 
     async def _rebind_journalled(
-        self, journalled_sessions: dict[str, dict[str, Any]]
+        self, journalled_sessions: dict[str, dict[str, Any]], *, prune: bool = True
     ) -> dict[str, str]:
         """Re-establish this agent's VNI bindings from its journal, and drop the rest.
 
@@ -845,6 +915,15 @@ class PrivNetServer:
                 unbound[session_id] = str(e)
         for session_id, reason in unbound.items():
             log.warning("journalled session {} cannot re-bind its VNI: {}", session_id, reason)
+        if not prune:
+            # A session is running on this node that the journal does not mention, so the journal
+            # is not the whole list of what this agent owns -- and the prune's whole premise is
+            # that it is. Dropping a claim on that basis takes a live session's ownership away.
+            log.warning(
+                "not pruning this agent's VNI bindings: a session is running here that this"
+                " privnet has no record of, so the journal cannot be trusted as the full list"
+            )
+            return unbound
         try:
             dropped = await self._vni_registry.prune(self._agent_id, live)
         except Exception:
@@ -853,6 +932,16 @@ class PrivNetServer:
         if dropped:
             log.info("dropped {} stale VNI binding(s) of this agent", dropped)
         return unbound
+
+    def _now_managed(self, session_id: str) -> None:
+        """This privnet is on top of the session again, so drop whatever it was reported for.
+
+        A session running here with no record of it is reported until there IS a record: the
+        report is what stops the manager scheduling onto a node that cannot manage what it holds.
+        Setting it up or adopting it is the thing that ends that, and nothing else does.
+        """
+        self._unrecovered_sessions.pop(session_id, None)
+        self._unreclaimed_sessions.pop(session_id, None)
 
     def _orphaned_live_sessions(
         self, live: dict[str, str], journalled_sessions: dict[str, dict[str, Any]]
@@ -1139,64 +1228,75 @@ class PrivNetServer:
             session_id = policy.validate_session_id(req.session_id)
         except (ProtocolError, policy.PolicyViolation) as e:
             return PrivNetResponse(ok=False, error=str(e))
-        async with self._session_locked(session_id):
-            try:
-                match req.op:
-                    case PrivNetOp.SETUP_SESSION:
-                        await self._setup(session_id, req.network_config or {})
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.ADOPT_SESSION:
-                        await self._adopt(session_id, req.network_config or {})
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.TEARDOWN_SESSION:
-                        await self._teardown(session_id)
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.WITHDRAW_SESSION:
-                        await self._withdraw(session_id)
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.ATTACH_CONTAINER:
-                        assigned = await self._attach(
-                            session_id, req.container_id, req.ip, req.local_ip
-                        )
-                        return PrivNetResponse(ok=True, assigned=assigned)
-                    case PrivNetOp.DETACH_CONTAINER:
-                        await self._detach(session_id, req.container_id)
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.ADD_PEER | PrivNetOp.DEL_PEER:
-                        await self._peer(session_id, req)
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.ENSURE_SECURITY:
-                        await self._ensure_security(session_id, req)
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.ADD_ENDPOINT | PrivNetOp.DEL_ENDPOINT:
-                        await self._endpoint(session_id, req)
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.PUBLISH_PORTS:
-                        await self._publish_ports(session_id, req)
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.UNPUBLISH_PORTS:
-                        return PrivNetResponse(ok=True, host_ports=await self._unpublish_ports(req))
-                    case PrivNetOp.LIST_PORTS:
-                        return PrivNetResponse(ok=True, forwards=await self._list_ports())
-                    case PrivNetOp.CONFINE_CONTAINER:
-                        await self._confine_container(req)
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.RELEASE_CONTAINER:
-                        await self._release_container(req)
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.LOCAL_SUBNET:
-                        return PrivNetResponse(ok=True, subnet=await self._local_subnet(session_id))
-                    case PrivNetOp.SETUP_DNS_REDIRECT:
-                        await self._setup_dns_redirect(session_id, req.dns_port)
-                        return PrivNetResponse(ok=True)
-                    case PrivNetOp.TEARDOWN_DNS_REDIRECT:
-                        await remove_dns_redirect(session_id)
-                        return PrivNetResponse(ok=True)
-            except (policy.PolicyViolation, netns_mod.NetnsError, PrivNetError) as e:
-                return PrivNetResponse(ok=False, error=str(e))
-            except Exception:
-                log.exception("privnet op {} failed for session {}", req.op, session_id)
-                return PrivNetResponse(ok=False, error="operation failed")
+        if req.op in _READ_ONLY_OPS:
+            # No barrier: these change nothing, and a readiness probe must not queue behind a
+            # recovery pass that is busy re-adopting a node's worth of sessions.
+            async with self._session_locked(session_id):
+                return await self._dispatch_locked(req, session_id)
+        # Global first, then per-session: the recovery retry takes them in that order too.
+        async with self._mutation_lock, self._session_locked(session_id):
+            return await self._dispatch_locked(req, session_id)
+
+    async def _dispatch_locked(self, req: PrivNetRequest, session_id: str) -> PrivNetResponse:
+        try:
+            match req.op:
+                case PrivNetOp.SETUP_SESSION:
+                    await self._setup(session_id, req.network_config or {})
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.ADOPT_SESSION:
+                    await self._adopt(session_id, req.network_config or {})
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.TEARDOWN_SESSION:
+                    await self._teardown(session_id)
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.WITHDRAW_SESSION:
+                    await self._withdraw(session_id)
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.ATTACH_CONTAINER:
+                    assigned = await self._attach(
+                        session_id, req.container_id, req.ip, req.local_ip
+                    )
+                    return PrivNetResponse(ok=True, assigned=assigned)
+                case PrivNetOp.DETACH_CONTAINER:
+                    await self._detach(session_id, req.container_id)
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.ADD_PEER | PrivNetOp.DEL_PEER:
+                    await self._peer(session_id, req)
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.ENSURE_SECURITY:
+                    await self._ensure_security(session_id, req)
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.ADD_ENDPOINT | PrivNetOp.DEL_ENDPOINT:
+                    await self._endpoint(session_id, req)
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.PUBLISH_PORTS:
+                    await self._publish_ports(session_id, req)
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.UNPUBLISH_PORTS:
+                    return PrivNetResponse(ok=True, host_ports=await self._unpublish_ports(req))
+                case PrivNetOp.LIST_PORTS:
+                    return PrivNetResponse(ok=True, forwards=await self._list_ports())
+                case PrivNetOp.CONFINE_CONTAINER:
+                    await self._confine_container(req)
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.RELEASE_CONTAINER:
+                    await self._release_container(req)
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.LOCAL_SUBNET:
+                    return PrivNetResponse(ok=True, subnet=await self._local_subnet(session_id))
+                case PrivNetOp.SETUP_DNS_REDIRECT:
+                    await self._setup_dns_redirect(session_id, req.dns_port)
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.TEARDOWN_DNS_REDIRECT:
+                    await remove_dns_redirect(session_id)
+                    return PrivNetResponse(ok=True)
+                case PrivNetOp.RECOVERY_STATUS:
+                    return PrivNetResponse(ok=True, problems=self.recovery_problems())
+        except (policy.PolicyViolation, netns_mod.NetnsError, PrivNetError) as e:
+            return PrivNetResponse(ok=False, error=str(e))
+        except Exception:
+            log.exception("privnet op {} failed for session {}", req.op, session_id)
+            return PrivNetResponse(ok=False, error="operation failed")
 
     def _resolve_backend(self, backend: NetworkBackendKind) -> AbstractNetworkAgentPluginV2[Any]:
         try:
@@ -1280,6 +1380,7 @@ class PrivNetServer:
         await self._journal.record_session(session_id, dict(raw_config))
         await backend.setup_session_network(meta, self._self_member(meta.backend))
         self._sessions[session_id] = _SessionEntry(meta, backend, digest)
+        self._now_managed(session_id)
 
     def _binding_of(
         self, session_id: str, raw_config: dict[str, Any] | None
@@ -1394,6 +1495,7 @@ class PrivNetServer:
             )
         if (adopted := self._sessions.get(session_id)) is not None:
             adopted.built = True
+        self._now_managed(session_id)
 
     async def _withdraw(self, session_id: str) -> None:
         """Drop this node's ownership of a session whose devices must stay.
@@ -1507,10 +1609,15 @@ class PrivNetServer:
         await backend.teardown_session_network(session_id)
 
     async def _journalled_config(self, session_id: str) -> dict[str, Any] | None:
-        try:
-            return (await self._journal.sessions()).get(session_id)
-        except Exception:
-            return None
+        """The session's journalled network config, or None when the journal has no record of it.
+
+        Only that. An exception here used to become None, and None is what tells teardown there is
+        nothing to release and nothing to remove: after a privnet restart with one damaged record,
+        a teardown found no binding, deleted no device, dropped the journal record and reported
+        success -- leaving the VXLAN, the bridge, the XFRM state, the firewall rules and the LOCAL
+        subnet block on the host with nothing left that names them.
+        """
+        return (await self._journal.sessions()).get(session_id)
 
     def _kernel_cgroup(self, container_id: str) -> Path:
         """Where this container's cgroup lives. Derived from the validated id, never from the

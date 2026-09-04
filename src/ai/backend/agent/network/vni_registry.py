@@ -136,6 +136,16 @@ class VniConflict(Exception):
     """The VNI is already bound to a different session, or to a different configuration."""
 
 
+class VniStillBound(Exception):
+    """The teardown finished but this agent's binding on the VNI could not be dropped.
+
+    The devices are gone and the claim is not, so this node will refuse that VNI to every later
+    session until something clears it. Raised rather than logged so the caller keeps the session's
+    journal record and comes back -- the retry finds the teardown already done and only has the
+    claim left to remove.
+    """
+
+
 class VniRegistry:
     """Node-wide VNI -> (session, configuration) bindings."""
 
@@ -262,15 +272,16 @@ class VniRegistry:
                 return
             yield not (existing - mine)
             # Reached only on a clean exit from the caller's block.
-            for state in (_BUILT, _HELD):
-                if not claims.remove(owner, _claim_id(state, session_id, digest)):
-                    log.warning(
-                        "could not drop this agent's {} binding on VNI {} for session {}; it will"
-                        " refuse that VNI to later sessions until the next startup prunes it",
-                        state,
-                        vni,
-                        session_id,
-                    )
+            stuck = [
+                state
+                for state in (_BUILT, _HELD)
+                if not claims.remove(owner, _claim_id(state, session_id, digest))
+            ]
+            if stuck:
+                raise VniStillBound(
+                    f"the {'/'.join(stuck)} binding on VNI {vni} for session {session_id} could"
+                    " not be dropped; this node will refuse that VNI until it is"
+                )
 
     async def prune(self, owner: str, live: Collection[tuple[str, str]]) -> int:
         """Drop this agent's bindings for sessions it no longer has.
