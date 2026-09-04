@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from ai.backend.common.network.keys import endpoint_key, session_ipam_key
-from ai.backend.common.network.types import EndpointAddr, mac_for_ip
+from ai.backend.common.network.types import DEFAULT_VNI_RANGE, EndpointAddr, mac_for_ip
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import (
     NetworkPoolExhausted,
@@ -29,7 +29,6 @@ if TYPE_CHECKING:
 
 DEFAULT_IPAM_POOL = "10.128.0.0/12"
 DEFAULT_BLOCK_PREFIXLEN = 24
-DEFAULT_VNI_RANGE = (4096, 16777215)
 
 _ALLOCATED_PREFIX = "network/ipam/allocated"
 _VNI_PREFIX = "network/ipam/vni"
