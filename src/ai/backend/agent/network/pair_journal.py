@@ -16,10 +16,13 @@ door, which exists because the identical assumption was wrong there and was meas
 
 from __future__ import annotations
 
+import asyncio
 import fcntl
 import logging
-from collections.abc import Collection, Iterator
-from contextlib import contextmanager
+import os
+import stat
+from collections.abc import AsyncIterator, Collection
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Final
 
@@ -56,74 +59,145 @@ class PairJournal:
             return False
         return True
 
-    @contextmanager
-    def _locked(self, key: str) -> Iterator[Path | None]:
-        """The pair's file, with an exclusive lock held across read-modify-write.
+    @asynccontextmanager
+    async def claiming(self, key: str, owner: str, session_id: str) -> AsyncIterator[bool]:
+        """Record this session's claim and hold the host lock while the caller programs the pair.
 
-        A journal this cannot open is not a reason to refuse the operation -- the in-process
-        refcount still bounds it to the single-owner case, which is what every deployment had
-        before this existed. It yields None and the caller falls back.
+        One step on purpose. Between recording the claim and installing the SAs there is a window
+        in which another agent can decide it is the last user and delete them, and the pair would
+        then be open with nothing encrypting it.
+
+        Yields whether the claim was actually recorded. False means the journal could not be
+        written -- the caller may still program, but must never later conclude from this journal
+        that the pair is free.
         """
-        if not self._ensure_root():
+        async with self._hold(key) as path:
+            if path is None:
+                yield False
+                return
+            users = await asyncio.to_thread(self._read, path)
+            if users is None:
+                yield False
+                return
+            users.add(f"{owner}/{session_id}")
+            yield await asyncio.to_thread(self._write, path, users)
+
+    @asynccontextmanager
+    async def releasing(self, key: str, owner: str, session_id: str) -> AsyncIterator[bool | None]:
+        """Drop this claim and hold the host lock while the caller removes the pair.
+
+        Yields whether the pair is now unused by anyone on this node: True to remove it, False to
+        leave it, and None when that could not be determined -- which the caller must treat as
+        "leave it". Of the two ways to be wrong, a stale SA keeps traffic encrypted while a
+        deleted one takes down whoever else was on it.
+
+        The lock spans the caller's block so the answer cannot go stale inside it.
+        """
+        async with self._hold(key) as path:
+            if path is None:
+                yield None
+                return
+            users = await asyncio.to_thread(self._read, path)
+            if users is None:
+                yield None
+                return
+            users.discard(f"{owner}/{session_id}")
+            if not await asyncio.to_thread(self._write, path, users):
+                # The claim may still be on disk, so another agent could still read us as a user.
+                # Removing the SAs now would be removing them on an answer we did not manage to
+                # publish.
+                yield None
+                return
+            yield not users
+
+    @asynccontextmanager
+    async def _hold(self, key: str) -> AsyncIterator[Path | None]:
+        """The pair's exclusive host-wide lock, acquired off the event loop."""
+        opened = await asyncio.to_thread(self._open_locked, key)
+        if opened is None:
             yield None
             return
-        path = self._root / key
+        fd, path = opened
         try:
-            with path.open("a+", encoding="utf-8") as handle:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-                try:
-                    yield path
-                finally:
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-        except OSError as e:
-            log.debug("ESP pair journal {} unavailable: {}", path, e)
-            yield None
+            yield path
+        finally:
+            await asyncio.to_thread(self._unlock, fd)
 
-    def _read(self, path: Path) -> set[str]:
+    def _open_locked(self, key: str) -> tuple[int, Path] | None:
+        if not self._ensure_root():
+            return None
+        path = self._root / key
+        fd: int | None = None
+        try:
+            # O_NOFOLLOW: the directory is shared by every agent on the node, so a local user can
+            # pre-create one of these predictable names as a symlink. Following it would have a
+            # process holding CAP_DAC_OVERRIDE read and truncate whatever it points at.
+            fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                log.warning("ESP pair journal entry {} is not a regular file; ignoring it", path)
+                os.close(fd)
+                return None
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        except OSError as e:
+            log.warning("ESP pair journal {} unavailable: {}", path, e)
+            if fd is not None:
+                os.close(fd)
+            return None
+        return fd, path
+
+    def _unlock(self, fd: int) -> None:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+    def _read(self, path: Path) -> set[str] | None:
+        """The pair's users, or None when the file could not be read.
+
+        None is not an empty set. An unreadable file answers "nobody is on this pair" if the two
+        are conflated, and that answer authorises deleting an SA somebody else is using.
+        """
         try:
             return {line.strip() for line in path.read_text().splitlines() if line.strip()}
-        except OSError:
-            return set()
+        except OSError as e:
+            log.warning("could not read the ESP pair journal {}: {}", path, e)
+            return None
 
-    def _write(self, path: Path, users: set[str]) -> None:
+    def _write(self, path: Path, users: set[str]) -> bool:
+        """Replace the pair's users. Returns whether it landed.
+
+        Written to a temporary file and renamed, so a crash mid-write leaves the previous set
+        rather than a truncated one: a half-written claim file reads as fewer users than there
+        are, which is the same failure as an unreadable one.
+        """
         try:
-            if users:
-                path.write_text("\n".join(sorted(users)) + "\n")
-            else:
+            if not users:
                 path.unlink(missing_ok=True)
+                return True
+            tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    handle.write("\n".join(sorted(users)) + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+            except BaseException:
+                tmp.unlink(missing_ok=True)
+                raise
+            tmp.replace(path)
+            return True
         except OSError as e:
             log.warning("could not update the ESP pair journal {}: {}", path, e)
+            return False
 
-    def claim(self, key: str, owner: str, session_id: str) -> None:
-        """Record that ``owner``'s session is carried by this pair."""
-        with self._locked(key) as path:
-            if path is None:
-                return
-            users = self._read(path)
-            users.add(f"{owner}/{session_id}")
-            self._write(path, users)
-
-    def release(self, key: str, owner: str, session_id: str) -> bool | None:
-        """Drop this session's claim; return whether the pair is now unused by anyone on the node.
-
-        None means the journal could not be consulted, and the caller decides with what it has.
-        """
-        with self._locked(key) as path:
-            if path is None:
-                return None
-            users = self._read(path)
-            users.discard(f"{owner}/{session_id}")
-            self._write(path, users)
-            return not users
-
-    def users(self, key: str) -> frozenset[str]:
+    async def users(self, key: str) -> frozenset[str]:
         """Everyone on this node currently claiming the pair, for diagnostics."""
-        with self._locked(key) as path:
+        async with self._hold(key) as path:
             if path is None:
                 return frozenset()
-            return frozenset(self._read(path))
+            return frozenset(await asyncio.to_thread(self._read, path) or ())
 
-    def prune(self, owner: str, live_sessions: Collection[str]) -> int:
+    async def prune(self, owner: str, live_sessions: Collection[str]) -> int:
         """Drop ``owner``'s claims for sessions it no longer has. Returns how many went.
 
         Run at startup, because the claims outlive the process that made them: a crash between
@@ -139,10 +213,14 @@ class PairJournal:
         except OSError:
             return 0
         for name in names:
-            with self._locked(name) as path:
+            if name.startswith("."):
+                continue  # a interrupted write's temporary file
+            async with self._hold(name) as path:
                 if path is None:
                     continue
-                users = self._read(path)
+                users = await asyncio.to_thread(self._read, path)
+                if users is None:
+                    continue
                 stale = {
                     user
                     for user in users
@@ -150,6 +228,6 @@ class PairJournal:
                 }
                 if not stale:
                     continue
-                removed += len(stale)
-                self._write(path, users - stale)
+                if await asyncio.to_thread(self._write, path, users - stale):
+                    removed += len(stale)
         return removed

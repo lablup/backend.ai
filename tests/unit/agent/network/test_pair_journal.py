@@ -29,70 +29,106 @@ class TestPairKey:
         assert "/" not in pair_key("10.0.0.1", "10.0.0.2", 4789)
 
 
+async def _claim(journal: PairJournal, key: str, owner: str, session: str) -> bool:
+    async with journal.claiming(key, owner, session) as recorded:
+        return recorded
+
+
+async def _release(journal: PairJournal, key: str, owner: str, session: str) -> bool | None:
+    async with journal.releasing(key, owner, session) as free:
+        return free
+
+
 class TestNodeWideRefcount:
-    def test_the_last_user_on_the_node_frees_the_pair(self, tmp_path: Path) -> None:
+    async def test_the_last_user_on_the_node_frees_the_pair(self, tmp_path: Path) -> None:
         journal = _journal(tmp_path)
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
-        journal.claim(key, "agent-a", "s1")
-        assert journal.release(key, "agent-a", "s1") is True
+        assert await _claim(journal, key, "agent-a", "s1") is True
+        assert await _release(journal, key, "agent-a", "s1") is True
 
-    def test_another_agents_claim_keeps_the_pair(self, tmp_path: Path) -> None:
+    async def test_another_agents_claim_keeps_the_pair(self, tmp_path: Path) -> None:
         # This is the case the in-process refcount could not see: agent-b's session is carried by
         # the very SA and policy agent-a is about to remove.
         journal = _journal(tmp_path)
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
-        journal.claim(key, "agent-a", "s1")
-        journal.claim(key, "agent-b", "s2")
-        assert journal.release(key, "agent-a", "s1") is False
-        assert journal.users(key) == frozenset({"agent-b/s2"})
+        await _claim(journal, key, "agent-a", "s1")
+        await _claim(journal, key, "agent-b", "s2")
+        assert await _release(journal, key, "agent-a", "s1") is False
+        assert await journal.users(key) == frozenset({"agent-b/s2"})
 
-    def test_releasing_twice_is_harmless(self, tmp_path: Path) -> None:
+    async def test_releasing_twice_is_harmless(self, tmp_path: Path) -> None:
         journal = _journal(tmp_path)
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
-        journal.claim(key, "agent-a", "s1")
-        assert journal.release(key, "agent-a", "s1") is True
-        assert journal.release(key, "agent-a", "s1") is True
+        await _claim(journal, key, "agent-a", "s1")
+        assert await _release(journal, key, "agent-a", "s1") is True
+        assert await _release(journal, key, "agent-a", "s1") is True
 
-    def test_an_unwritable_root_reports_unknown_rather_than_free(self, tmp_path: Path) -> None:
+    async def test_an_unreachable_journal_reports_unknown_rather_than_free(
+        self, tmp_path: Path
+    ) -> None:
         # None, not True: answering "free" from a journal that could not be read is how the pair
         # gets removed out from under whoever else is on it.
         blocked = tmp_path / "file"
         blocked.write_text("not a directory")
         journal = PairJournal(blocked / "net-esp-pair")
-        assert journal.release(pair_key("10.0.0.1", "10.0.0.2", 4789), "agent-a", "s1") is None
+        assert await _release(journal, pair_key("10.0.0.1", "10.0.0.2", 4789), "a", "s1") is None
+
+    async def test_an_unreachable_journal_reports_the_claim_as_unrecorded(
+        self, tmp_path: Path
+    ) -> None:
+        # The caller has to know: with no claim on disk, no later release may conclude from this
+        # journal that the pair is free.
+        blocked = tmp_path / "file"
+        blocked.write_text("not a directory")
+        journal = PairJournal(blocked / "net-esp-pair")
+        assert await _claim(journal, pair_key("10.0.0.1", "10.0.0.2", 4789), "a", "s1") is False
+
+    async def test_a_symlinked_entry_is_refused(self, tmp_path: Path) -> None:
+        # The directory is shared by every agent on the node, so a local user can pre-create one
+        # of these predictable names pointing at something else; following it would have a process
+        # holding CAP_DAC_OVERRIDE truncate whatever it points at.
+        root = tmp_path / "net-esp-pair"
+        root.mkdir()
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        target = tmp_path / "victim"
+        target.write_text("do not touch")
+        (root / key).symlink_to(target)
+        journal = PairJournal(root)
+        assert await _claim(journal, key, "agent-a", "s1") is False
+        assert target.read_text() == "do not touch"
 
 
 class TestPruningAPreviousLife:
     """Claims outlive the process that made them. A crash between programming a pair and tearing
     it down leaves one with nobody behind it, and the pair it names is then never removed."""
 
-    def test_this_owners_dead_claims_go(self, tmp_path: Path) -> None:
+    async def test_this_owners_dead_claims_go(self, tmp_path: Path) -> None:
         journal = _journal(tmp_path)
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
-        journal.claim(key, "agent-a", "s1")
-        assert journal.prune("agent-a", live_sessions=()) == 1
-        assert journal.users(key) == frozenset()
+        await _claim(journal, key, "agent-a", "s1")
+        assert await journal.prune("agent-a", live_sessions=()) == 1
+        assert await journal.users(key) == frozenset()
 
-    def test_this_owners_live_claims_stay(self, tmp_path: Path) -> None:
+    async def test_this_owners_live_claims_stay(self, tmp_path: Path) -> None:
         journal = _journal(tmp_path)
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
-        journal.claim(key, "agent-a", "s1")
-        assert journal.prune("agent-a", live_sessions=("s1",)) == 0
-        assert journal.users(key) == frozenset({"agent-a/s1"})
+        await _claim(journal, key, "agent-a", "s1")
+        assert await journal.prune("agent-a", live_sessions=("s1",)) == 0
+        assert await journal.users(key) == frozenset({"agent-a/s1"})
 
-    def test_another_agents_claims_are_never_touched(self, tmp_path: Path) -> None:
+    async def test_another_agents_claims_are_never_touched(self, tmp_path: Path) -> None:
         # Treating a co-located agent's claims as dead is precisely the bug this journal exists
         # to prevent.
         journal = _journal(tmp_path)
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
-        journal.claim(key, "agent-b", "s2")
-        assert journal.prune("agent-a", live_sessions=()) == 0
-        assert journal.users(key) == frozenset({"agent-b/s2"})
+        await _claim(journal, key, "agent-b", "s2")
+        assert await journal.prune("agent-a", live_sessions=()) == 0
+        assert await journal.users(key) == frozenset({"agent-b/s2"})
 
-    def test_a_restarted_agent_keeps_the_same_name(self, tmp_path: Path) -> None:
+    async def test_a_restarted_agent_keeps_the_same_name(self, tmp_path: Path) -> None:
         # The owner is the agent id, not a pid: a pid would make every claim from the previous
         # life unrecognisable, so none of them would ever be pruned or released.
         journal = _journal(tmp_path)
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
-        journal.claim(key, "i-dk-104", "s1")
-        assert journal.prune("i-dk-104", live_sessions=()) == 1
+        await _claim(journal, key, "i-dk-104", "s1")
+        assert await journal.prune("i-dk-104", live_sessions=()) == 1

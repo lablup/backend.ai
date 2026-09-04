@@ -2569,7 +2569,10 @@ class TestPairOwnershipIsNodeWide:
         await plugin.setup_session_network(_ENC_META, _SELF)
         await plugin.add_peer("s1", _PEER)
         # A co-located agent programs the same pair for its own session.
-        journal.claim(pair_key(_SELF.vtep_ip or "", _PEER.vtep_ip or "", 4789), "agent-b", "s9")
+        async with journal.claiming(
+            pair_key(_SELF.vtep_ip or "", _PEER.vtep_ip or "", 4789), "agent-b", "s9"
+        ):
+            pass
 
         rec.calls.clear()
         await plugin.teardown_session_network("s1")
@@ -2591,10 +2594,11 @@ class TestPairOwnershipIsNodeWide:
     async def test_recovery_drops_the_claims_of_a_previous_life(self, tmp_path: Path) -> None:
         journal = PairJournal(tmp_path / "pairs")
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
-        journal.claim(key, "agent-a", "gone")
+        async with journal.claiming(key, "agent-a", "gone"):
+            pass
         plugin = _plugin(Recorder(), pair_journal=journal, journal_owner="agent-a")
         await plugin.prepare_recovery()
-        assert journal.users(key) == frozenset()
+        assert await journal.users(key) == frozenset()
 
 
 class TestUnclosedSurvivorsBlockEverything:
