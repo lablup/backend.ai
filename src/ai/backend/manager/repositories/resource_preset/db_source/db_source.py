@@ -428,9 +428,6 @@ class ResourcePresetDBSource:
         result = await db_sess.execute(query)
         rows = result.all()
 
-        if not rows:
-            return ({sg: [] for sg in sgroup_names}, [])
-
         # Build remaining list[SlotQuantity] per agent, track scaling group
         agent_data: dict[str, tuple[str, list[SlotQuantity]]] = {}
         for row in rows:
@@ -449,6 +446,17 @@ class ResourcePresetDBSource:
                 per_sgroup_remaining[resource_group] = add_quantities(
                     per_sgroup_remaining[resource_group], remaining
                 )
+
+        # Zero-fill missing slot types per scaling group. Without this, slots no
+        # alive schedulable agent provides fall through the caller's
+        # min_quantities clamp (missing slots default to the OTHER list's value),
+        # so an agent-less group reported the policy remaining — often Infinity —
+        # as its free capacity instead of zero.
+        for sg in sgroup_names:
+            existing_slots = {sq.slot_name for sq in per_sgroup_remaining[sg]}
+            for slot_name in known_slot_types.keys():
+                if str(slot_name) not in existing_slots:
+                    per_sgroup_remaining[sg].append(SlotQuantity(str(slot_name), Decimal(0)))
 
         return per_sgroup_remaining, agent_slots
 
@@ -680,6 +688,7 @@ class ResourcePresetDBSource:
         return CheckPresetsDBData(
             known_slot_types=known_slot_types,
             keypair_data=keypair_data,
+            domain_limits=domain_usage.limits,
             per_sgroup_data=per_sgroup,
             presets=presets,
         )
