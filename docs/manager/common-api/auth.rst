@@ -193,7 +193,8 @@ Success example for checking the latest API version
    Content-Length: 31
    X-RateLimit-Limit: 2000
    X-RateLimit-Remaining: 1999
-   X-RateLimit-Reset: 897065
+   X-RateLimit-Reset: 897
+   X-RateLimit-Window: 900
 
    {
       "version": "v2.20170215"
@@ -219,7 +220,8 @@ Failure example with a missing authorization header
    Content-Length: 139
    X-RateLimit-Limit: 2000
    X-RateLimit-Remaining: 1998
-   X-RateLimit-Reset: 834821
+   X-RateLimit-Reset: 834
+   X-RateLimit-Window: 900
 
    {
       "type": "https://sorna.io/problems/unauthorized",
