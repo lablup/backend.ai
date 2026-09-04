@@ -552,8 +552,8 @@ class ProtectionSnapshot:
 
     filter_rules: str
     mangle_rules: str
-    #: SPIs of the ESP SAs this backend owns (matched on its own reqid).
-    sa_spis: frozenset[int]
+    #: (src, dst, spi) of the ESP SAs this backend owns, matched on its own reqid.
+    sa_endpoints: frozenset[tuple[str, str, int]]
     #: (src, dst, dport) of the outbound policies carrying this backend's mark.
     policy_pairs: frozenset[tuple[str, str, int]]
 
@@ -561,36 +561,76 @@ class ProtectionSnapshot:
         return self.mangle_rules if table == "mangle" else self.filter_rules
 
 
-def vnis_in_chain(listing: str, chain: str) -> frozenset[int]:
-    """Every VNI a `u32` rule in ``chain`` selects, from an ``iptables-save`` listing.
+def rule_is_present(listing: str, expected: Sequence[str]) -> bool:
+    """Whether ``expected`` -- a rule as this backend builds it -- is in an `iptables-save` listing.
 
-    The value is read as an integer rather than compared as text: iptables-save normalises the
-    expression to hex (`...@0xc>>0x8=0x1000`) while the rule was written in decimal, so a string
-    comparison finds nothing and every rule looks missing.
+    Compared as a normalised token multiset, not as text: `iptables-save` renders the same rule
+    differently from how it was written (`--u32` in hex, `MARK --set-mark` as `--set-xmark
+    <mark>/<mask>`, `-p udp` gaining `-m udp`), so a string match finds nothing and every rule
+    looks missing -- which makes the pass reprogram the whole node every tick.
+
+    And it compares the WHOLE rule, not just the VNI it selects. Matching on the VNI alone would
+    accept a rule with the wrong port, the wrong policy direction, or an ACCEPT where a DROP
+    belongs, and report the session protected when it is not.
     """
-    found: set[int] = set()
+    wanted = _normalise_rule(expected)
+    chain = expected[0]
     for line in listing.splitlines():
         stripped = line.strip()
         if not stripped.startswith(f"-A {chain} "):
             continue
-        tokens = shlex.split(stripped)
-        for index, token in enumerate(tokens):
-            if token != "--u32" or index + 1 >= len(tokens):
-                continue
+        try:
+            found = _normalise_rule(shlex.split(stripped)[1:])
+        except ValueError:
+            continue
+        if found == wanted:
+            return True
+    return False
+
+
+def _normalise_rule(tokens: Sequence[str]) -> tuple[str, ...]:
+    """One rule reduced to what identifies it, in the form both spellings agree on."""
+    out: list[str] = []
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token == "-m" and index + 1 < len(tokens) and tokens[index + 1] in ("udp", "tcp"):
+            index += 2  # `-p udp` implies it; iptables-save writes it and we do not
+            continue
+        if token == "--u32" and index + 1 < len(tokens):
             _, _, value = tokens[index + 1].rpartition("=")
             try:
-                found.add(int(value, 0))
+                out.extend(("--u32", str(int(value, 0))))
             except ValueError:
-                continue
-    return frozenset(found)
+                out.extend(("--u32", tokens[index + 1]))
+            index += 2
+            continue
+        if token in ("--set-mark", "--set-xmark") and index + 1 < len(tokens):
+            mark, _, _mask = tokens[index + 1].partition("/")
+            out.extend(("--set-mark", str(int(mark, 0))))
+            index += 2
+            continue
+        out.append(token)
+        index += 1
+    return tuple(out)
 
 
-def parse_owned_sa_spis(listing: str, reqid: int) -> frozenset[int]:
-    """SPIs of the SAs carrying ``reqid``, from `ip xfrm state`."""
-    found: set[int] = set()
+def parse_owned_sa_endpoints(listing: str, reqid: int) -> frozenset[tuple[str, str, int]]:
+    """(src, dst, spi) of the ESP SAs carrying ``reqid``, from `ip xfrm state`.
+
+    The endpoints, not the SPI alone: an SPI is derived from the pair, so checking it in isolation
+    would accept an SA between the wrong two hosts as this pair's.
+    """
+    found: set[tuple[str, str, int]] = set()
+    header: tuple[str, str] | None = None
     for line in listing.splitlines():
+        if line.startswith("src "):
+            tokens = line.split()
+            dst = _value_after(tokens, "dst")
+            header = (tokens[1].split("/")[0], dst.split("/")[0]) if dst is not None else None
+            continue
         stripped = line.strip()
-        if not stripped.startswith("proto esp"):
+        if header is None or not stripped.startswith("proto esp"):
             continue
         tokens = stripped.split()
         spi = _value_after(tokens, "spi")
@@ -599,30 +639,46 @@ def parse_owned_sa_spis(listing: str, reqid: int) -> frozenset[int]:
             continue
         try:
             if int(found_reqid, 0) == reqid:
-                found.add(int(spi, 0))
+                found.add((header[0], header[1], int(spi, 0)))
         except ValueError:
             continue
     return frozenset(found)
 
 
 def parse_owned_policies(listing: str, mark: str) -> frozenset[tuple[str, str, int]]:
-    """(src, dst, dport) of the outbound policies carrying ``mark``, from `ip xfrm policy`."""
+    """(src, dst, dport) of the OUTBOUND policies carrying ``mark``, from `ip xfrm policy`.
+
+    The direction is part of it. This backend installs an out policy and nothing else, so an in
+    or forward policy carrying the same mark is not what it is looking for -- and counting one
+    would report the send path protected when only the receive path had a rule.
+    """
     found: set[tuple[str, str, int]] = set()
     header: tuple[str, str, int] | None = None
+    outbound = False
+    marked = False
     for line in listing.splitlines():
         if line.startswith("src "):
+            if header is not None and outbound and marked:
+                found.add(header)
             tokens = line.split()
-            src = tokens[1].split("/")[0]
             dst = _value_after(tokens, "dst")
             dport = _value_after(tokens, "dport")
             header = (
-                (src, dst.split("/")[0], int(dport))
+                (tokens[1].split("/")[0], dst.split("/")[0], int(dport))
                 if dst is not None and dport is not None and dport.isdigit()
                 else None
             )
+            outbound = marked = False
             continue
-        if header is not None and mark in line:
-            found.add(header)
+        if header is None:
+            continue
+        tokens = line.split()
+        if _value_after(tokens, "dir") == "out":
+            outbound = True
+        if any(token.split("/")[0] == mark for token in tokens if token.startswith("0x")):
+            marked = True
+    if header is not None and outbound and marked:
+        found.add(header)
     return frozenset(found)
 
 
@@ -967,6 +1023,11 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     _remote_endpoints: dict[str, dict[tuple[str, str], str]]
     #: Reads the firewall's own rule order, so reconcile can restore it (see `jump_is_first`).
     _reader: Reader
+    #: Serialises a session's teardown against the protection watchdog. Without it the watchdog
+    #: can read the host state, have the session torn down under it while it awaits, and then
+    #: reinstall the dead session's rules, XFRM and pair claim -- which the next session to draw
+    #: that VNI inherits.
+    _session_guards: dict[str, asyncio.Lock]
     #: The node's single protection watchdog. One task, not one per session.
     _protection_task: asyncio.Task[None] | None
     #: Node-wide record of who is using each ESP pair. The in-process refcount below is only
@@ -1004,6 +1065,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._reader = reader or _read_command
         self._unclosed_devices = set()
         self._protection_task = None
+        self._session_guards = {}
         self._pair_journal = pair_journal or PairJournal()
         # A pid only as the last resort: it is wrong across restarts, but a claim tagged
         # with something is still better than one that cannot be told from a peer's.
@@ -1206,12 +1268,17 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 raise
             failures.append(f"{' '.join(argv[:5])}: {e}")
 
+    def _session_guard(self, session_id: str) -> asyncio.Lock:
+        return self._session_guards.setdefault(session_id, asyncio.Lock())
+
     async def _snapshot_protection(self) -> ProtectionSnapshot:
         """Read the node's whole protection state once, for the periodic re-assert."""
         return ProtectionSnapshot(
             filter_rules=await self._reader(["iptables-save", "-t", "filter"]),
             mangle_rules=await self._reader(["iptables-save", "-t", "mangle"]),
-            sa_spis=parse_owned_sa_spis(await self._reader(["ip", "xfrm", "state"]), XFRM_REQID),
+            sa_endpoints=parse_owned_sa_endpoints(
+                await self._reader(["ip", "xfrm", "state"]), XFRM_REQID
+            ),
             policy_pairs=parse_owned_policies(
                 await self._reader(["ip", "xfrm", "policy"]), _XFRM_MARK
             ),
@@ -1225,7 +1292,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             return False
         for generation in generations.values():
             for src, dst in ((self_vtep, peer_vtep), (peer_vtep, self_vtep)):
-                if _esp_spi(src, dst, generation) not in snapshot.sa_spis:
+                if (src, dst, _esp_spi(src, dst, generation)) not in snapshot.sa_endpoints:
                     return False
         return (self_vtep, peer_vtep, dstport) in snapshot.policy_pairs
 
@@ -1256,7 +1323,13 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 break
         for session_id, meta, vni in encrypted:
             try:
-                await self._reassert_session(session_id, meta, vni, snapshot)
+                async with self._session_guard(session_id):
+                    if self._sessions.get(session_id) is not meta:
+                        # Torn down (or replaced) while this pass was reading. Reinstalling now
+                        # would leave a dead session's rules and claim for the next session that
+                        # draws this VNI to inherit.
+                        continue
+                    await self._reassert_session(session_id, meta, vni, snapshot)
             except Exception:
                 # `_reassert_session` has already closed the tunnel for anything it could not
                 # restore; one session's failure must not stop the rest of the node's.
@@ -1265,14 +1338,17 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     async def _reassert_session(
         self, session_id: str, meta: SessionNetMeta, vni: int, snapshot: ProtectionSnapshot
     ) -> None:
+        # The whole rule, as this backend builds it -- not just "something mentions this VNI".
+        # A rule with the wrong port, the wrong policy direction, or an ACCEPT where the DROP
+        # belongs would otherwise be read as protection.
         missing = [
-            vni_rules
-            for chain, table, vni_rules in (
-                (CHAIN_IN, "filter", "drop"),
-                (CHAIN_GUARD, "filter", "guard"),
-                (CHAIN_MARK, "mangle", "mark"),
+            name
+            for name, table, expected in (
+                ("drop", "filter", _plaintext_drop_rule(vni, meta.vxlan_port)),
+                ("guard", "filter", _egress_guard_rule(vni, meta.vxlan_port)),
+                ("mark", "mangle", _output_mark_rule(vni, meta.vxlan_port)),
             )
-            if vni not in vnis_in_chain(snapshot.table(table), chain)
+            if not rule_is_present(snapshot.table(table), expected)
         ]
         if missing:
             # Only the rules that are actually gone, and only for this VNI.
@@ -1867,6 +1943,33 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         )
 
     @override
+    @override
+    async def withdraw_session_network(self, session_id: str) -> None:
+        """Give up this node's OWNERSHIP of a session without touching the shared data plane.
+
+        For the agent whose kernels of a session leave while another agent on the same host still
+        has some: the devices and the LOCAL block are the node's, so they stay -- but this
+        process's claim on the ESP pairs, and its watchdog's belief that it is responsible for
+        this session, must not. Left behind, the watchdog goes on reprogramming a session it no
+        longer serves, and the claim keeps the pair alive after the last agent has gone.
+        """
+        async with self._session_guard(session_id):
+            meta = self._sessions.get(session_id)
+            self_vtep = self._self_vteps.get(session_id)
+            if meta is not None and self_vtep is not None:
+                for peer_vtep in sorted(self._encrypted_peers.get(session_id, set())):
+                    key = (self_vtep, peer_vtep, meta.vxlan_port)
+                    # The claim, not the SAs: another agent here is still carried by them, which
+                    # is exactly what the node-wide refcount is for.
+                    async with self._pair_journal.releasing(
+                        pair_key(*key), self._journal_owner, session_id
+                    ):
+                        pass
+                    self._pair_users.get(key, set()).discard(session_id)
+            await self._forget_session(session_id)
+        self._session_guards.pop(session_id, None)
+
+    @override
     async def teardown_session_network(self, session_id: str) -> None:
         """Remove everything this node holds for the session, or keep owning what is left.
 
@@ -1875,6 +1978,16 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         the session is dropped only once every removal has actually succeeded. "Already gone"
         counts as success; anything else keeps the record so the caller can retry against the
         same session instead of losing track of live host state -- see `OverlayTeardownIncomplete`.
+        """
+        async with self._session_guard(session_id):
+            await self._teardown_guarded(session_id)
+        self._session_guards.pop(session_id, None)
+
+    async def _teardown_guarded(self, session_id: str) -> None:
+        """The body of `teardown_session_network`, with the session's guard held.
+
+        Held for the whole of it so the protection watchdog cannot be midway through reinstalling
+        what this is removing.
         """
         meta = self._sessions.get(session_id)
         # Confirm the device is closed before removing any XFRM object. Even teardown may race

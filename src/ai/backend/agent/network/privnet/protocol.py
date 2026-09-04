@@ -24,6 +24,9 @@ from typing import Any
 class PrivNetOp(enum.StrEnum):
     SETUP_SESSION = "setup_session"
     TEARDOWN_SESSION = "teardown_session"
+    # Give up ownership of a session whose devices must stay, because a co-located agent still has
+    # kernels on them. Distinct from teardown: nothing on the host is removed.
+    WITHDRAW_SESSION = "withdraw_session"
     ATTACH_CONTAINER = "attach_container"
     DETACH_CONTAINER = "detach_container"
     # Multi-node overlay (vxlan): program peer VTEP + remote-endpoint FDB/ARP. The agent's

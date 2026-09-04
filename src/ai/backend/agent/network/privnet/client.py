@@ -16,6 +16,7 @@ config — so it holds no CAP_NET_ADMIN / CAP_SYS_ADMIN.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast, override
@@ -240,6 +241,17 @@ class PrivNetBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
         # from anything we could tell it (see privnet/server.py `recover`). Re-declaring the session
         # here is exactly the move the trust model forbids the agent.
         return
+
+    @override
+    @override
+    async def withdraw_session_network(self, session_id: str) -> None:
+        """Ask the privnet to drop its ownership of a session whose devices must stay.
+
+        Best-effort by design: the devices are the node's and remain either way, and refusing the
+        withdrawal would only strand this agent on a session it no longer has kernels for.
+        """
+        with contextlib.suppress(PrivNetClientError, OSError):
+            await self._client.call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, session_id))
 
     @override
     async def teardown_session_network(self, session_id: str) -> None:

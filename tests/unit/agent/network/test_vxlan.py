@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import logging
+import re
 from collections.abc import Awaitable, Callable, Collection, Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -25,8 +26,11 @@ from ai.backend.agent.network.backends.vxlan import (
     XFRM_REPLAY_WINDOW,
     XFRM_REQID,
     VxlanNetworkPlugin,
+    _egress_guard_rule,
     _esp_spi,
+    _output_mark_rule,
     _pair_key,
+    _plaintext_drop_rule,
     bridge_dev,
     bridge_link_add_args,
     egress_guard_add_args,
@@ -52,11 +56,11 @@ from ai.backend.agent.network.backends.vxlan import (
     overlay_cni_config,
     overlay_mac_capability_args,
     parse_owned_policies,
-    parse_owned_sa_spis,
+    parse_owned_sa_endpoints,
     plaintext_drop_add_args,
     plaintext_drop_check_args,
     plaintext_drop_del_args,
-    vnis_in_chain,
+    rule_is_present,
     vxlan_dev,
     vxlan_link_add_args,
     xfrm_add_args,
@@ -203,14 +207,33 @@ def _isolated_pair_journal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
 
 def _protection_reader(plugin: VxlanNetworkPlugin, *, vni: int | None) -> _Listing:
     """A reader whose snapshot says the node is fully protected (or, with vni=None, is not)."""
+
     # The jumps come first, exactly as `iptables-save` prints them: the pass checks their
     # position in the same snapshot it checks the rules in.
+    def _saved(rule: list[str]) -> str:
+        # As `iptables-save` renders it: hex u32, --set-xmark, and the implied `-m udp`.
+        body = []
+        for index, token in enumerate(rule[1:]):
+            body.append(token)
+            if token == "udp" and rule[index] == "-p":
+                body.extend(("-m", "udp"))
+        text = " ".join(f'"{t}"' if t.startswith("0>>") else t for t in body).replace(
+            "--set-mark", "--set-xmark"
+        )
+        text = re.sub(
+            r'"0>>22&0x3C@12>>8=(\d+)"',
+            lambda m: f'"0x0>>0x16&0x3c@0xc>>0x8={int(m.group(1)):#x}"',
+            text,
+        )
+        text = re.sub(r"--set-xmark (0x[0-9a-f]+)", r"--set-xmark \1/0xffffffff", text)
+        return f"-A {rule[0]} {text}\n"
+
     filter_rules = f"-A INPUT -j {CHAIN_IN}\n-A OUTPUT -j {CHAIN_GUARD}\n"
     mangle_rules = f"-A OUTPUT -j {CHAIN_MARK}\n"
     if vni is not None:
-        for chain in (CHAIN_IN, CHAIN_GUARD):
-            filter_rules += f'-A {chain} -m u32 --u32 "0>>22&0x3C@12>>8={vni}" -j DROP\n'
-        mangle_rules += f'-A {CHAIN_MARK} -m u32 --u32 "0>>22&0x3C@12>>8={vni}" -j MARK\n'
+        filter_rules += _saved(_plaintext_drop_rule(vni, 4789))
+        filter_rules += _saved(_egress_guard_rule(vni, 4789))
+        mangle_rules += _saved(_output_mark_rule(vni, 4789))
     spis = "".join(
         f"src {src} dst {dst}\n\tproto esp spi {_esp_spi(src, dst, generation):#x}"
         f" reqid {XFRM_REQID} mode transport\n"
@@ -220,7 +243,7 @@ def _protection_reader(plugin: VxlanNetworkPlugin, *, vni: int | None) -> _Listi
     )
     policies = "".join(
         f"src {key[0]}/32 dst {key[1]}/32 proto udp dport {key[2]} \n"
-        f"\tmark {XFRM_MARK:#x}/0xffffffff \n"
+        f"\tdir out priority 0 \n\tmark {XFRM_MARK:#x}/0xffffffff \n"
         for key in plugin._pair_slot_generations
     )
 
@@ -2706,37 +2729,68 @@ class TestProtectionIsOneNodeWidePass:
     that is over a thousand subprocesses a second -- and the xtables lock contention it creates is
     itself read as a protection failure, so the loop meant to keep tunnels up takes them down."""
 
-    def test_a_hex_normalised_rule_is_recognised(self) -> None:
-        # iptables-save prints the u32 expression in hex while the rule was written in decimal.
-        # Comparing the text finds nothing, every rule looks missing, and the pass reprograms the
-        # whole node every tick.
+    def test_a_rule_as_iptables_save_renders_it_is_recognised(self) -> None:
+        # It writes the u32 in hex, MARK as --set-xmark with a mask, and adds the `-m udp` that
+        # `-p udp` implies. A text comparison finds none of it, every rule looks missing, and the
+        # pass reprograms the whole node every tick.
         listing = (
             f"-A {CHAIN_IN} -p udp -m udp --dport 4789 -m u32 --u32"
-            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -j DROP\n'
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -m policy --dir in --pol none -j DROP\n'
         )
-        assert vnis_in_chain(listing, CHAIN_IN) == frozenset({4097})
+        assert rule_is_present(listing, _plaintext_drop_rule(4097, 4789)) is True
 
-    def test_a_decimal_rule_is_recognised_too(self) -> None:
-        listing = f'-A {CHAIN_IN} -m u32 --u32 "0>>22&0x3C@12>>8=4097" -j DROP\n'
-        assert vnis_in_chain(listing, CHAIN_IN) == frozenset({4097})
-
-    def test_another_chains_rules_are_not_counted(self) -> None:
-        listing = '-A SOMEONE-ELSE -m u32 --u32 "0>>22&0x3C@12>>8=4097" -j DROP\n'
-        assert vnis_in_chain(listing, CHAIN_IN) == frozenset()
-
-    def test_only_our_reqid_counts_as_our_sa(self) -> None:
+    def test_the_same_vni_on_another_port_is_not_it(self) -> None:
         listing = (
-            "src 10.0.0.1 dst 10.0.0.2\n"
-            f"\tproto esp spi 0x00001001 reqid {XFRM_REQID} mode transport\n"
-            "src 10.0.0.3 dst 10.0.0.4\n"
-            "\tproto esp spi 0x00002002 reqid 13681891 mode transport\n"
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4790 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -m policy --dir in --pol none -j DROP\n'
         )
-        assert parse_owned_sa_spis(listing, XFRM_REQID) == frozenset({0x1001})
+        assert rule_is_present(listing, _plaintext_drop_rule(4097, 4789)) is False
 
-    def test_only_our_mark_counts_as_our_policy(self) -> None:
+    def test_an_accept_where_the_drop_belongs_is_not_it(self) -> None:
+        # Matching on the VNI alone would call this protection.
+        listing = (
+            f"-A {CHAIN_IN} -p udp -m udp --dport 4789 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -m policy --dir in --pol none -j ACCEPT\n'
+        )
+        assert rule_is_present(listing, _plaintext_drop_rule(4097, 4789)) is False
+
+    def test_the_wrong_policy_direction_is_not_it(self) -> None:
+        listing = (
+            f"-A {CHAIN_GUARD} -p udp -m udp --dport 4789 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -m policy --dir in --pol none -j DROP\n'
+        )
+        assert rule_is_present(listing, _egress_guard_rule(4097, 4789)) is False
+
+    def test_another_chains_rule_is_not_it(self) -> None:
+        listing = (
+            "-A SOMEONE-ELSE -p udp -m udp --dport 4789 -m u32 --u32"
+            ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -m policy --dir in --pol none -j DROP\n'
+        )
+        assert rule_is_present(listing, _plaintext_drop_rule(4097, 4789)) is False
+
+    def test_an_sa_between_other_hosts_is_not_ours(self) -> None:
+        # The SPI is derived from the pair, so checking it alone would accept this one.
+        listing = (
+            "src 10.9.9.1 dst 10.9.9.2\n"
+            f"\tproto esp spi 0x00001001 reqid {XFRM_REQID} mode transport\n"
+        )
+        assert parse_owned_sa_endpoints(listing, XFRM_REQID) == frozenset({
+            ("10.9.9.1", "10.9.9.2", 0x1001)
+        })
+
+    def test_another_reqid_is_not_our_sa(self) -> None:
+        listing = (
+            "src 10.0.0.1 dst 10.0.0.2\n\tproto esp spi 0x2002 reqid 13681891 mode transport\n"
+        )
+        assert parse_owned_sa_endpoints(listing, XFRM_REQID) == frozenset()
+
+    def test_only_an_outbound_policy_with_our_mark_counts(self) -> None:
         listing = (
             "src 10.0.0.1/32 dst 10.0.0.2/32 proto udp dport 4789 \n"
             "\tdir out priority 0 \n"
+            f"\tmark {XFRM_MARK:#x}/0xffffffff \n"
+            "src 10.0.0.5/32 dst 10.0.0.6/32 proto udp dport 4789 \n"
+            "\tdir in priority 0 \n"
             f"\tmark {XFRM_MARK:#x}/0xffffffff \n"
             "src 10.0.0.3/32 dst 10.0.0.4/32 proto udp dport 7789 \n"
             "\tdir out priority 0 \n"
@@ -2767,3 +2821,69 @@ class TestProtectionIsOneNodeWidePass:
         plugin._reader = _protection_reader(plugin, vni=None)  # every rule gone
         await plugin.reassert_protection()
         assert plaintext_drop_add_args(4097, 4789) in rec.calls
+
+
+class TestWithdrawingWithoutTearingDown:
+    """When a co-located agent still has kernels of the session, the devices are the node's and
+    stay. This process's ownership must not: its watchdog would go on reprogramming a session it
+    no longer serves, and its ESP pair claim would outlive the last agent that had one."""
+
+    async def test_the_devices_are_left_alone(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.calls.clear()
+        await plugin.withdraw_session_network("s1")
+        assert not any(list(c[:3]) == ["ip", "link", "del"] for c in rec.calls)
+        assert not any(list(c[:4]) == ["ip", "xfrm", "state", "del"] for c in rec.calls)
+
+    async def test_the_pair_claim_is_released(self, tmp_path: Path) -> None:
+        journal = PairJournal(tmp_path / "pairs")
+        plugin = _plugin(Recorder(), pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        key = pair_key(_SELF.vtep_ip or "", _PEER.vtep_ip or "", 4789)
+        assert await journal.users(key) != frozenset()
+        await plugin.withdraw_session_network("s1")
+        assert await journal.users(key) == frozenset()
+
+    async def test_the_watchdog_stops_visiting_it(self, tmp_path: Path) -> None:
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.withdraw_session_network("s1")
+        rec.calls.clear()
+        plugin._reader = _protection_reader(plugin, vni=None)  # every rule "missing"
+        await plugin.reassert_protection()
+        assert rec.calls == [], "the watchdog reprogrammed a session this agent has withdrawn from"
+
+
+class TestTheWatchdogAndTeardownDoNotRace:
+    """The watchdog copies the session list, then awaits four reads. A teardown that finishes in
+    that window used to have its rules, XFRM and pair claim reinstalled behind it -- and the next
+    session to draw that VNI inherits them."""
+
+    async def test_a_session_torn_down_mid_pass_is_not_reinstalled(self, tmp_path: Path) -> None:
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        reader = _protection_reader(plugin, vni=None)
+        torn = False
+
+        async def _read_then_teardown(argv: Sequence[str]) -> str:
+            nonlocal torn
+            out = await reader(argv)
+            if not torn:
+                torn = True
+                await plugin.teardown_session_network("s1")
+            return out
+
+        plugin._reader = _read_then_teardown
+        rec.calls.clear()
+        await plugin.reassert_protection()
+        # Additions only: the teardown itself deletes rules, and those calls are its own.
+        added = [c for c in rec.calls if "--u32" in c and ("-A" in c or "-I" in c)]
+        assert added == [], (
+            f"the pass reinstalled the rules of a session already torn down ({added[:2]})"
+        )

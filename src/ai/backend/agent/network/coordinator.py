@@ -198,18 +198,23 @@ class SessionNetworkCoordinator:
         applied = self._applied.setdefault(session_id, {})
         current = {aid: m for aid, m in members.items() if aid != self._agent_id}
         blocked_vteps = blocked_vteps or set()
-        # Before the diff, not inside it, and driven by the published membership rather than by the
-        # diff or by what either side remembers. The security state can be removed under this node
-        # by anything that touches the host, and none of that is a membership change -- while a
-        # backend that restarted remembers none of what it programmed and would never be told
-        # again, because `applied` below still holds every peer whose record has not changed.
-        # Failing is not fatal to the pass: the backend closes what it cannot protect, and add_peer
-        # refuses each peer in turn, which is what keeps them out of `applied` and retried.
-        await self._try(
-            session_id,
-            "ensure_session_security",
-            self._backend.ensure_session_security(session_id, list(current.values())),
-        )
+        # Only when this pass has something new to say. Drift -- an `iptables -F`, a firewall
+        # reload, an `ip xfrm state flush` -- is the backend's own node-wide watchdog to notice,
+        # and it does so from one read for the whole node; calling this unconditionally every
+        # fifteen seconds put the per-session reprogramming cost straight back, roughly 21
+        # iptables and 13 XFRM commands per session per pass.
+        #
+        # "Something new" is a changed membership OR nothing applied yet: a backend that restarted
+        # under a running session remembers none of what it programmed and would never be told
+        # again, because `applied` still holds every peer whose record has not changed.
+        if not applied or current != applied:
+            # Failing is not fatal to the pass: the backend closes what it cannot protect, and
+            # add_peer refuses each peer in turn, which keeps them out of `applied` and retried.
+            await self._try(
+                session_id,
+                "ensure_session_security",
+                self._backend.ensure_session_security(session_id, list(current.values())),
+            )
 
         for agent_id, member in current.items():
             if applied.get(agent_id) == member:
