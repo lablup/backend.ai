@@ -1,0 +1,24 @@
+# backend	pm
+# started_utc	20260901T102352Z
+# cases	B1 B4 E1 F1 F3 F5 G1 G2 G3 G4
+# churn	5 x 12s
+# local_host	127.0.0.1
+# peer_host	none
+# image_id	b46e2770-7777-486b-8c87-db84a8fb34c5
+# git_commit	b29fbc8a3
+# host	Linux 6.14.0-37-generic x86_64
+case	status	detail
+B1	PASS	단일노드 세션 (RUNNING)
+B4	PASS	잔여 repl 소켓 0 (local=0 peer=0)
+E1	PASS	지표 전 항목 존재 (cpu_used cpu_util io_read io_scratch_size io_write mem net_rx net_tx )
+F1	PASS	파일 1 개, 최대 8699328 B, 총 8699328 B (48 MiB 를 쏟은 뒤)
+F3	PASS	8699329 B (회전된 파일까지 읽음)
+F5	PASS	종료된 커널의 로그 파일 (0)
+G1	PASS	에이전트 SIGKILL 후 커널 (yes)
+G2	PASS	재기동 후 세션 RUNNING, 커널 생존
+G3	PASS	고아 로그·스크래치 제거, 살아있는 커널의 로그 보존 (before: 2 logs / 2 scratches)
+G4	PASS	컨테이너 안 좀비 (0)
+# finished_utc	20260901T102655Z
+# pass	10
+# fail	0
+# skip	0

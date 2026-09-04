@@ -1,0 +1,12 @@
+# backend	pm
+# started_utc	20260901T101945Z
+# cases	B1 B4 E1 F1 F3 F5
+# churn	5 x 12s
+# local_host	127.0.0.1
+# peer_host	none
+# image_id	b46e2770-7777-486b-8c87-db84a8fb34c5
+# git_commit	b29fbc8a3
+# host	Linux 6.14.0-37-generic x86_64
+case	status	detail
+B1	FAIL	enqueue 실패
+B4	PASS	잔여 repl 소켓 0 (local=0 peer=0)

@@ -52,6 +52,7 @@ current, see `AGENTS.md` in this directory.
 | `assign-pr-number.py` | Renames news fragments to the assigned PR number | auto — `assign-pr-number.yml` (via `timeline-check.yml`) |
 | `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | auto — `ci.yml` |
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto — `ci.yml` |
+| `check-empty-tests.py` | Rejects an empty test module (it collects nothing and reports success) | manual — run before claiming a suite passes |
 | `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | auto — `knowledge-check.yml`; person |
 | `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | auto — `ci.yml`, `build-test.yml` |
 | `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto — `backport.yml` |

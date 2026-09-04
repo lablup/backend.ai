@@ -1,0 +1,35 @@
+# backend	en
+# started_utc	20260831T093032Z
+# cases	A1 A2 B1 B2 C1 C2 B3 B4 D1 D2 D4 E1 E2 F1 F3 F5 F6 G1 G2 G3 G4
+# churn	3 x 12s
+# local_host	192.168.0.104
+# peer_host	192.168.0.156
+# image_id	b46e2770-7777-486b-8c87-db84a8fb34c5
+# git_commit	91b023a7e
+# host	Linux 6.14.0-37-generic x86_64
+case	status	detail
+A1	PASS	대상 백엔드만 기동됨
+A2	PASS	소켓과 프로세스 확인 (/tmp/backend.ai/net-privnet-en.sock)
+B1	PASS	단일노드 세션 (RUNNING)
+B2	PASS	RUNNING 이고 두 노드에 갈림 (main1@peer, sub1@local)
+C1	PASS	sub1=10.128.26.1 main1=10.128.26.2
+C2	PASS	main1→sub1 및 sub1→main1 모두 0% (10.128.26.1 / 10.128.26.2)
+B3	PASS	3 회 전부 RUNNING, 전부 분산
+B4	PASS	잔여 repl 소켓 0 (local=0 peer=0)
+D1	PASS	커널과 그 자손 6 개 전부 filter 모드
+D2	PASS	memory.max=2147483648 cpuset.cpus=0-3
+D4	PASS	커널 cgroup=/backend-ai/dd120e07-eb51-4853-98f7-243f8fa343d8, 에이전트=/user.slice/user-1000.slice/user@1000.service/tmux-spawn-7c40ed52-35de-43a3-a616-187b362f5cf5.scope (분리됨)
+E1	PASS	지표 전 항목 존재 (cpu_used cpu_util io_read io_scratch_size io_write mem net_rx net_tx )
+E2	PASS	occupied_slots 에 이 세션의 할당이 반영됨 (cpu=4 ≥ 4)
+F1	PASS	파일 2 개, 최대 2097152 B, 총 2097152 B (48 MiB 를 쏟은 뒤)
+F3	PASS	2097153 B (회전된 파일까지 읽음)
+F5	PASS	종료된 커널의 로그 파일 (0)
+F6	SKIP	containerd 의 binary:// 라이터에만 해당
+G1	PASS	에이전트 SIGKILL 후 커널 (yes)
+G2	PASS	재기동 후 세션 RUNNING, 커널 생존
+G3	PASS	고아 로그·스크래치 제거, 살아있는 커널의 로그 보존 (before: 2 logs / 2 scratches)
+G4	PASS	컨테이너 안 좀비 (0)
+# finished_utc	20260831T093742Z
+# pass	20
+# fail	0
+# skip	1

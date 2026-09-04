@@ -1,0 +1,17 @@
+# backend	pm
+# started_utc	20260901T094547Z
+# cases	A1 A2 B1
+# churn	5 x 12s
+# local_host	127.0.0.1
+# peer_host	none
+# image_id	b46e2770-7777-486b-8c87-db84a8fb34c5
+# git_commit	ee0cdfcd0
+# host	Linux 6.14.0-37-generic x86_64
+case	status	detail
+A1	FAIL	다른 백엔드가 같이 떠 있음: cd (한 번에 하나만)
+A2	PASS	소켓과 프로세스 확인 (/tmp/backend.ai/net-privnet-pm.sock)
+B1	FAIL	단일노드 세션 — 기대 RUNNING, 실제 CANCELLED
+# finished_utc	20260901T094726Z
+# pass	1
+# fail	2
+# skip	0

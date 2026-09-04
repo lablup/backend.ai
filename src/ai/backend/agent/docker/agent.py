@@ -1935,7 +1935,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # drift that accumulated while it was down.
         try:
             await self._session_network.recover()
-        except Exception:
+        except Exception as e:
+            self._session_network.mark_recovery_failed(str(e))
             # Not fatal to startup: an agent that cannot recover its network state can still serve
             # new sessions, and refusing to start would take the node out over sessions that are
             # already running. Loud, because everything above stays true until it is fixed.

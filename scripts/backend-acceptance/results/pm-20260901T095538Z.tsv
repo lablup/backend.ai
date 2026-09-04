@@ -1,0 +1,10 @@
+# backend	pm
+# started_utc	20260901T095538Z
+# cases	B1
+# churn	5 x 12s
+# local_host	127.0.0.1
+# peer_host	none
+# image_id	b46e2770-7777-486b-8c87-db84a8fb34c5
+# git_commit	ee0cdfcd0
+# host	Linux 6.14.0-37-generic x86_64
+case	status	detail

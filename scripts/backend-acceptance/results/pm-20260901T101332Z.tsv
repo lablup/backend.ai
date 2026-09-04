@@ -1,0 +1,41 @@
+# backend	pm
+# started_utc	20260901T101332Z
+# cases	A1 A2 B1 B2 C1 C2 C3 C4 C5 C6 C7 B3 B4 D1 D2 D4 E1 E2 F1 F3 F5 F6 G1 G2 G3 G4
+# churn	5 x 12s
+# local_host	127.0.0.1
+# peer_host	none
+# image_id	b46e2770-7777-486b-8c87-db84a8fb34c5
+# git_commit	b29fbc8a3
+# host	Linux 6.14.0-37-generic x86_64
+case	status	detail
+A1	PASS	대상 백엔드만 기동됨
+A2	PASS	소켓과 프로세스 확인 (/tmp/backend.ai/net-privnet-pm.sock)
+B1	PASS	단일노드 세션 (RUNNING)
+B2	SKIP	피어 노드가 설정되지 않음 (ACC_PEER_HOST)
+C1	SKIP	피어 노드가 설정되지 않음
+C2	SKIP	피어 노드가 설정되지 않음
+C3	SKIP	피어 노드가 설정되지 않음
+C4	SKIP	피어 노드가 설정되지 않음
+C5	SKIP	피어 노드가 설정되지 않음
+C6	SKIP	피어 노드가 설정되지 않음
+C7	SKIP	피어 노드가 설정되지 않음
+B3	SKIP	피어 노드가 설정되지 않음
+B4	PASS	잔여 repl 소켓 0 (local=0 peer=0)
+B4	FAIL	종료된 커널의 로그가 남음 (1)
+D1	PASS	커널과 그 자손 6 개 전부 filter 모드
+D2	PASS	memory.max=2147483648 cpuset.cpus=0-3
+D4	PASS	커널 cgroup=/backend-ai/ad81b68f-8515-4362-974c-652d42bd95f8, 에이전트=/user.slice/user-1000.slice/user@1000.service/tmux-spawn-7c40ed52-35de-43a3-a616-187b362f5cf5.scope (분리됨)
+E1	FAIL	누락된 지표: mem io_read net_rx net_tx cpu_used
+E2	PASS	occupied_slots 에 이 세션의 할당이 반영됨 (cpu=4 ≥ 4)
+F1	FAIL	파일 1 개, 최대 8699328 B (기대: ≤5 개, 개당 ≤2097152 B)
+F3	PASS	8699329 B (회전된 파일까지 읽음)
+F5	FAIL	종료된 커널의 로그 파일 — 기대 0, 실제 1
+F6	SKIP	containerd 의 binary:// 라이터에만 해당
+G1	PASS	에이전트 SIGKILL 후 커널 (yes)
+G2	SKIP	ACC_START_CMD 가 설정되지 않음
+G3	SKIP	ACC_START_CMD 가 설정되지 않음 (재기동이 필요한 케이스)
+G4	PASS	컨테이너 안 좀비 (0)
+# finished_utc	20260901T101726Z
+# pass	11
+# fail	4
+# skip	12
