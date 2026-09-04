@@ -1,7 +1,11 @@
+from typing import override
+
 import strawberry
+from graphql import GraphQLError
 from graphql.pyutils.undefined import Undefined as GraphQLUndefined
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
+from strawberry.types import ExecutionContext
 
 from ai.backend.common.api_handlers import Sentinel as BackendSentinel
 from ai.backend.manager.api.gql.extensions import (
@@ -909,6 +913,16 @@ class Subscription:
 
 
 class CustomizedSchema(Schema):
+    @override
+    def process_errors(
+        self,
+        errors: list[GraphQLError],
+        execution_context: ExecutionContext | None = None,
+    ) -> None:
+        # Suppresses strawberry's default StrawberryLogger.error call; GQLExceptionHandlerExtension
+        # already logs every resolver error at the right level.
+        pass
+
     def as_str(self) -> str:
         # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
         # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so
