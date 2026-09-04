@@ -29,11 +29,10 @@ from ai.backend.manager.models.container_registry import (
 )
 from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryCreator,
-    ContainerRegistryGroupCreator,
+    ContainerRegistryProjectCreator,
 )
 from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryProjectPurger,
-    ContainerRegistryProjectsPurger,
     ContainerRegistryPurger,
 )
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
@@ -43,12 +42,8 @@ from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
-    ContainerRegistryOpsProvider,
-)
-from ai.backend.manager.repositories.ops.v2.container_registry.write import (
-    ContainerRegistryWriteOps,
-)
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.write import V2RelationWriteOps
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -71,11 +66,9 @@ container_registry_repository_resilience = Resilience(
 
 class ContainerRegistryRepository:
     _db: ExtendedAsyncSAEngine
-    _ops_provider: ContainerRegistryOpsProvider
+    _ops_provider: RelationOpsProvider
 
-    def __init__(
-        self, db: ExtendedAsyncSAEngine, ops_provider: ContainerRegistryOpsProvider
-    ) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: RelationOpsProvider) -> None:
         self._db = db
         self._ops_provider = ops_provider
 
@@ -83,12 +76,8 @@ class ContainerRegistryRepository:
         self,
         creator: ContainerRegistryCreator,
     ) -> ContainerRegistryData:
-        """Create a container registry with its own virtual entity.
-
-        The registry becomes a scope of its own so the entities it owns (images)
-        resolve through the virtual-entity chain; allowed projects are enrolled in
-        that scope to reach them.
-        """
+        """Create a container registry with its own virtual entity, related to the
+        allowed projects."""
         allowed_groups = creator.allowed_groups
         async with self._ops_provider.write_ops() as w:
             data = await w.create_global_entity(creator)
@@ -102,9 +91,7 @@ class ContainerRegistryRepository:
     ) -> ContainerRegistryData:
         registry_id = updater.registry_id
         async with self._ops_provider.write_ops() as w:
-            if updater.is_global.optional_value() is True:
-                await self._clear_all_allowed_groups(w, registry_id)
-            elif updater.has_allowed_groups_update:
+            if updater.has_allowed_groups_update:
                 await self._handle_allowed_groups_update(
                     w, registry_id, updater.allowed_groups.value()
                 )
@@ -123,12 +110,9 @@ class ContainerRegistryRepository:
             return data
 
     async def delete_registry(self, purger: ContainerRegistryPurger) -> ContainerRegistryData:
-        """Delete a container registry with the RBAC graph it left.
-
-        Raises ContainerRegistryNotFound if the registry does not exist.
-        """
+        """Delete a container registry with the graph it left; its project relations go
+        with it through the foreign key. Raises ContainerRegistryNotFound if absent."""
         async with self._ops_provider.write_ops() as w:
-            await self._clear_all_allowed_groups(w, purger.registry_id)
             data = await w.purge_entity(purger)
             if data is None:
                 raise ContainerRegistryNotFound(
@@ -276,62 +260,30 @@ class ContainerRegistryRepository:
 
     async def _handle_allowed_groups_update(
         self,
-        ops: ContainerRegistryWriteOps,
+        ops: V2RelationWriteOps,
         registry_id: ContainerRegistryID,
         allowed_group_updates: AllowedGroupsModel,
     ) -> None:
-        """Add or remove the projects a container registry is reachable from.
-
-        Raises ContainerRegistryGroupsAlreadyAssociated when a project is already
-        associated, and ContainerRegistryGroupsAssociationNotFound when none of the
-        projects to remove was associated.
+        """Relate the registry to the projects to add and unrelate it from the ones to
+        remove. Raises ContainerRegistryGroupsAlreadyAssociated on a project already
+        related and ContainerRegistryGroupsAssociationNotFound when none to remove was.
         """
-        # Registries created before the virtual-entity rollout have no node.
-        await ops.provision_registry(registry_id)
-
         for raw_project_id in allowed_group_updates.add:
             project_id = ProjectID(uuid.UUID(raw_project_id))
-            await ops.create_field(
-                registry_id, ContainerRegistryGroupCreator(project_id=project_id)
-            )
-            await ops.enroll_registry_in_project(registry_id, project_id)
+            await ops.create_relation(ContainerRegistryProjectCreator(), project_id, registry_id)
 
         if allowed_group_updates.remove:
-            total_deleted = 0
+            unlinked = 0
             for raw_project_id in allowed_group_updates.remove:
                 project_id = ProjectID(uuid.UUID(raw_project_id))
-                total_deleted += await self._withdraw_registry_from_project(
-                    ops, registry_id, project_id
-                )
-            if total_deleted == 0:
+                if await ops.purge_relation(
+                    ContainerRegistryProjectPurger(), project_id, registry_id
+                ):
+                    unlinked += 1
+            if unlinked == 0:
                 raise ContainerRegistryGroupsAssociationNotFound(
                     f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
                 )
-
-    async def _clear_all_allowed_groups(
-        self,
-        ops: ContainerRegistryWriteOps,
-        registry_id: ContainerRegistryID,
-    ) -> None:
-        await ops.provision_registry(registry_id)
-        removed = await ops.batch_purge_field_entities(
-            registry_id, ContainerRegistryProjectsPurger()
-        )
-        for group in removed:
-            await ops.withdraw_registry_from_project(registry_id, group.project_id)
-
-    async def _withdraw_registry_from_project(
-        self,
-        ops: ContainerRegistryWriteOps,
-        registry_id: ContainerRegistryID,
-        project_id: ProjectID,
-    ) -> int:
-        """Reverse an association, returning the number of deleted mapping rows."""
-        removed = await ops.batch_purge_field_entities(
-            registry_id, ContainerRegistryProjectPurger(project_id=project_id)
-        )
-        await ops.withdraw_registry_from_project(registry_id, project_id)
-        return len(removed)
 
     async def _get_by_registry_and_project(
         self,

@@ -53,7 +53,7 @@
 - A primitive only one domain uses does NOT go on the general ops. Write ops extending
   `V2WriteOps` and a provider extending `V2DBOpsProvider` that overrides `write_ops()`,
   and inject that provider only into the repositories needing the primitive
-  (`ops/v2/reconciler/`, `ops/v2/container_registry/`, `ops/rbac/`, `ops/user/`).
+  (`ops/v2/reconciler/`, `ops/rbac/`, `ops/user/`).
 - Separating into a repository is the default; internal operations may use db directly.
 - ops methods take only spec types (Querier/Creator/Updater/Upserter/Purger, `DependentCreatorSpec`).
   A single spec owns only a single table.

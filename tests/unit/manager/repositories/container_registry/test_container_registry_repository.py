@@ -3,15 +3,21 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import (
+    CONTAINER_REGISTRY_ENTITY_TYPE,
+    ContainerRegistryID,
+)
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -77,9 +83,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
-    ContainerRegistryOpsProvider,
-)
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -176,7 +180,7 @@ class TestContainerRegistryRepository:
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
         """Create ContainerRegistryRepository instance with real database"""
         return ContainerRegistryRepository(
-            db=db_with_cleanup, ops_provider=ContainerRegistryOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, ops_provider=RelationOpsProvider(db_with_cleanup)
         )
 
     @pytest.fixture
@@ -225,6 +229,7 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
+                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
                 group_ids.append(group.id)
 
             await session.commit()
@@ -480,6 +485,7 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
+                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
                 group_ids.append(str(group.id))
             await session.commit()
 
@@ -846,6 +852,10 @@ class TestContainerRegistryRepository:
                 project=project,
             )
             session.add(registry)
+            await session.flush()
+            session.add(
+                VirtualEntityRow(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry.id)
+            )
             await session.commit()
             await session.refresh(registry)
             return self._RegistryWithAvailableGroups(
@@ -925,6 +935,10 @@ class TestContainerRegistryRepository:
                 project=project,
             )
             session.add(registry)
+            await session.flush()
+            session.add(
+                VirtualEntityRow(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry.id)
+            )
 
             # Create resource policies
             user_policy = UserResourcePolicyRow(
@@ -954,6 +968,7 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
+                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
                 group_ids.append(group.id)
 
                 # Associate with registry
@@ -1050,6 +1065,10 @@ class TestContainerRegistryRepository:
                 project=project,
             )
             session.add(registry)
+            await session.flush()
+            session.add(
+                VirtualEntityRow(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry.id)
+            )
 
             # Create resource policies
             user_policy = UserResourcePolicyRow(
@@ -1079,6 +1098,7 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
+                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
                 group_ids.append(group.id)
 
             # Associate first 2 groups with the registry
@@ -1221,17 +1241,15 @@ class TestContainerRegistryRepository:
         with pytest.raises(ContainerRegistryGroupsAlreadyAssociated):
             await repository.modify_registry(updater_with_two_duplicate_two_new_allowed_groups)
 
-    async def test_modify_registry_set_is_global_clears_allowed_groups(
+    async def test_modify_registry_set_is_global_keeps_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_with_associated_groups: _RegistryWithGroups,
     ) -> None:
-        """Test that setting is_global=True clears all group associations."""
-        # Given - Registry already has 3 groups associated
+        """is_global is a legacy read flag; the project relations are not touched."""
         registry_id = registry_with_associated_groups.registry.id
 
-        # When - Set is_global to True
         result = await repository.modify_registry(
             ContainerRegistryUpdater(
                 registry_id=ContainerRegistryID(registry_id),
@@ -1239,25 +1257,112 @@ class TestContainerRegistryRepository:
             )
         )
 
-        # Then - Registry is updated
         assert result is not None
         assert result.is_global is True
-
-        # Then - All group associations are cleared
         async with db_with_cleanup.begin_readonly_session() as session:
-            associations = (
-                (
-                    await session.execute(
-                        sa.select(AssociationContainerRegistriesGroupsRow).where(
-                            AssociationContainerRegistriesGroupsRow.registry_id == registry_id
-                        )
+            linked = (
+                await session.scalars(
+                    sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
+                        AssociationContainerRegistriesGroupsRow.registry_id == registry_id
                     )
                 )
-                .scalars()
-                .all()
+            ).all()
+            assert set(linked) == set(registry_with_associated_groups.group_ids)
+
+    async def test_allowed_project_reads_the_registry_and_is_read_by_it(
+        self,
+        repository: ContainerRegistryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_and_groups_for_adding: _RegistryWithAvailableGroups,
+    ) -> None:
+        """The relation: the project governs the registry under READ, and the registry
+        holds the project under a READ share."""
+        registry_id = ContainerRegistryID(registry_and_groups_for_adding.registry.id)
+        project_id = registry_and_groups_for_adding.group_ids[0]
+        await repository.modify_registry(
+            ContainerRegistryUpdater(
+                registry_id=registry_id,
+                allowed_groups=TriState.update(
+                    AllowedGroupsModel(add=[str(project_id)], remove=[])
+                ),
+            )
+        )
+
+        assert await self._govern_cap(db_with_cleanup, project_id, registry_id) == Permission.READ
+        assert await self._share_cap(db_with_cleanup, registry_id, project_id) == Permission.READ
+
+        await repository.modify_registry(
+            ContainerRegistryUpdater(
+                registry_id=registry_id,
+                allowed_groups=TriState.update(
+                    AllowedGroupsModel(add=[], remove=[str(project_id)])
+                ),
+            )
+        )
+
+        assert await self._govern_cap(db_with_cleanup, project_id, registry_id) is None
+        assert await self._share_cap(db_with_cleanup, registry_id, project_id) is None
+
+    def _node(self, entity: EntityIdentifier) -> sa.ScalarSelect[Any]:
+        return (
+            sa.select(VirtualEntityRow.id)
+            .where(
+                VirtualEntityRow.entity_type == entity.entity_type(),
+                VirtualEntityRow.entity_id == entity,
+            )
+            .scalar_subquery()
+        )
+
+    async def _govern_cap(
+        self, db: ExtendedAsyncSAEngine, scope: EntityIdentifier, entity: EntityIdentifier
+    ) -> Permission | None:
+        """The cap the scope governs the entity under; ``None`` when it does not."""
+        async with db.begin_readonly_session() as session:
+            return await session.scalar(
+                sa.select(ScopeBindingRow.permission_cap).where(
+                    ScopeBindingRow.virtual_entity_id == self._node(entity),
+                    ScopeBindingRow.scope_entity_id == self._node(scope),
+                )
             )
 
-            assert len(associations) == 0
+    async def _share_cap(
+        self, db: ExtendedAsyncSAEngine, scope: EntityIdentifier, member: EntityIdentifier
+    ) -> Permission | None:
+        """The bits the scope holds the member under; ``None`` when it does not."""
+        async with db.begin_readonly_session() as session:
+            membership_id = await session.scalar(
+                sa.select(EntityMembershipRow.id).where(
+                    EntityMembershipRow.virtual_entity_id == self._node(scope),
+                    EntityMembershipRow.member_entity_id == self._node(member),
+                )
+            )
+            if membership_id is None:
+                return None
+            cap = Permission.NONE
+            for bit in await session.scalars(
+                sa.select(EntityMembershipCapRow.permission).where(
+                    EntityMembershipCapRow.membership_id == membership_id
+                )
+            ):
+                cap |= bit
+            return cap
+
+    async def test_delete_registry_takes_its_project_relations_with_it(
+        self,
+        repository: ContainerRegistryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_with_associated_groups: _RegistryWithGroups,
+    ) -> None:
+        registry_id = ContainerRegistryID(registry_with_associated_groups.registry.id)
+        await repository.delete_registry(ContainerRegistryPurger(registry_id=registry_id))
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            left = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(AssociationContainerRegistriesGroupsRow)
+                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
+            )
+            assert left == 0
 
     async def test_delete_registry_success(
         self,
@@ -1364,7 +1469,7 @@ class TestSearchContainerRegistries:
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
         return ContainerRegistryRepository(
-            db=db_with_cleanup, ops_provider=ContainerRegistryOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, ops_provider=RelationOpsProvider(db_with_cleanup)
         )
 
     @pytest.fixture

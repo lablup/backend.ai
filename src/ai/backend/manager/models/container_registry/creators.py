@@ -1,4 +1,4 @@
-"""Insert specs for container registries and their project associations."""
+"""Insert specs for a container registry and the project relation it takes part in."""
 
 from __future__ import annotations
 
@@ -9,19 +9,16 @@ from typing import Any, override
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.data.entity.container_registry_group import ContainerRegistryGroupID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
-from ai.backend.manager.data.container_registry.types import (
-    ContainerRegistryData,
-    ContainerRegistryGroupData,
-)
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.specs.creator import FieldCreator, GlobalEntityCreator
+from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
@@ -76,20 +73,20 @@ class ContainerRegistryCreator(
 
 
 @dataclass
-class ContainerRegistryGroupCreator(
-    FieldCreator[
-        ContainerRegistryID,
-        AssociationContainerRegistriesGroupsRow,
-        ContainerRegistryGroupData,
-    ],
+class ContainerRegistryProjectCreator(
+    RelationCreator[ProjectID, ContainerRegistryID, AssociationContainerRegistriesGroupsRow]
 ):
-    """Creator for the row associating a registry with one project."""
-
-    project_id: ProjectID
+    """Links a project (the scope) to a registry (the target)."""
 
     @override
-    def field_id(self, row: AssociationContainerRegistriesGroupsRow) -> ContainerRegistryGroupID:
-        return ContainerRegistryGroupID(row.id)
+    def row_class(self) -> type[AssociationContainerRegistriesGroupsRow]:
+        return AssociationContainerRegistriesGroupsRow
+
+    @override
+    def build_row(
+        self, scope: ProjectID, target: ContainerRegistryID
+    ) -> AssociationContainerRegistriesGroupsRow:
+        return AssociationContainerRegistriesGroupsRow(registry_id=target, group_id=scope)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
@@ -98,22 +95,7 @@ class ContainerRegistryGroupCreator(
                 violation_type=UniqueConstraintViolationError,
                 constraint_name="uq_registry_id_group_id",
                 error=ContainerRegistryGroupsAlreadyAssociated(
-                    f"Already associated groups for project_id: {self.project_id}"
+                    "The project is already allowed on the registry"
                 ),
             ),
-        )
-
-    @override
-    def build_row(self, owner_id: ContainerRegistryID) -> AssociationContainerRegistriesGroupsRow:
-        return AssociationContainerRegistriesGroupsRow(
-            registry_id=owner_id,
-            group_id=self.project_id,
-        )
-
-    @override
-    def to_data(self, row: AssociationContainerRegistriesGroupsRow) -> ContainerRegistryGroupData:
-        return ContainerRegistryGroupData(
-            id=ContainerRegistryGroupID(row.id),
-            registry_id=ContainerRegistryID(row.registry_id),
-            project_id=ProjectID(row.group_id),
         )

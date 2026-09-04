@@ -20,11 +20,12 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 
 
-class RelationCreator[TRow: Base](ABC):
+class RelationCreator[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](ABC):
     """Insert spec of a row linking two entities.
 
     Takes both ids rather than an owner: the pair is what names the row, and the caller
-    holds the pair and not the row's id.
+    holds the pair and not the row's id. Typed by the pair's id types, so a spec reads
+    each id as what it is.
 
     Answers no ``data``. A relation is not returned to a caller — what a read answers
     with is the entities the relation reaches, never the relation.
@@ -38,7 +39,7 @@ class RelationCreator[TRow: Base](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def build_row(self, scope: EntityIdentifier, target: EntityIdentifier) -> TRow:
+    def build_row(self, scope: TScope, target: TTarget) -> TRow:
         """Build the row linking the scope to the target."""
         raise NotImplementedError
 
@@ -47,7 +48,9 @@ class RelationCreator[TRow: Base](ABC):
         raise NotImplementedError
 
 
-class RelationLifecycleUpdater[TRow: Base](ABC):
+class RelationLifecycleUpdater[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
+    ABC
+):
     """Update spec that switches one relation off or back on.
 
     ``build_values`` returns a constant, as the entity soft delete's updaters do: a
@@ -66,9 +69,7 @@ class RelationLifecycleUpdater[TRow: Base](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def conditions(
-        self, scope: EntityIdentifier, target: EntityIdentifier
-    ) -> Sequence[QueryCondition]:
+    def conditions(self, scope: TScope, target: TTarget) -> Sequence[QueryCondition]:
         """Return the conditions naming the pair's row, AND combined."""
         raise NotImplementedError
 
@@ -78,11 +79,12 @@ class RelationLifecycleUpdater[TRow: Base](ABC):
         raise NotImplementedError
 
 
-class RelationPurger[TRow: Base](ABC):
+class RelationPurger[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](ABC):
     """Delete spec of the row linking two entities.
 
     Names the row by the pair, never by its own id: a relation row holds nothing in the
-    graph, and nothing outside it holds that id.
+    graph, and nothing outside it holds that id. An entity going away takes its rows
+    with it through the table's foreign keys, so nothing names a whole side.
     """
 
     @abstractmethod
@@ -90,9 +92,7 @@ class RelationPurger[TRow: Base](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def conditions(
-        self, scope: EntityIdentifier, target: EntityIdentifier
-    ) -> Sequence[QueryCondition]:
+    def conditions(self, scope: TScope, target: TTarget) -> Sequence[QueryCondition]:
         """Return the conditions naming the pair's row, AND combined."""
         raise NotImplementedError
 

@@ -75,38 +75,34 @@ class RelationTestRow(Base):
     off: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
 
 
-class _Creator(RelationCreator[RelationTestRow]):
+class _Creator(RelationCreator[_ScopeID, _TargetID, RelationTestRow]):
     @override
     def row_class(self) -> type[RelationTestRow]:
         return RelationTestRow
 
     @override
-    def build_row(self, scope: EntityIdentifier, target: EntityIdentifier) -> RelationTestRow:
-        return RelationTestRow(
-            id=uuid.uuid4(), scope_id=uuid.UUID(str(scope)), target_id=uuid.UUID(str(target))
-        )
+    def build_row(self, scope: _ScopeID, target: _TargetID) -> RelationTestRow:
+        return RelationTestRow(id=uuid.uuid4(), scope_id=scope, target_id=target)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return ()
 
 
-def _pair_conditions(scope: EntityIdentifier, target: EntityIdentifier) -> Sequence[QueryCondition]:
+def _pair_conditions(scope: _ScopeID, target: _TargetID) -> Sequence[QueryCondition]:
     return (
-        lambda: RelationTestRow.scope_id == uuid.UUID(str(scope)),
-        lambda: RelationTestRow.target_id == uuid.UUID(str(target)),
+        lambda: RelationTestRow.scope_id == scope,
+        lambda: RelationTestRow.target_id == target,
     )
 
 
-class _SwitchOff(RelationLifecycleUpdater[RelationTestRow]):
+class _SwitchOff(RelationLifecycleUpdater[_ScopeID, _TargetID, RelationTestRow]):
     @override
     def row_class(self) -> type[RelationTestRow]:
         return RelationTestRow
 
     @override
-    def conditions(
-        self, scope: EntityIdentifier, target: EntityIdentifier
-    ) -> Sequence[QueryCondition]:
+    def conditions(self, scope: _ScopeID, target: _TargetID) -> Sequence[QueryCondition]:
         return _pair_conditions(scope, target)
 
     @override
@@ -120,15 +116,13 @@ class _SwitchOn(_SwitchOff):
         return {"off": False}
 
 
-class _Purger(RelationPurger[RelationTestRow]):
+class _Purger(RelationPurger[_ScopeID, _TargetID, RelationTestRow]):
     @override
     def row_class(self) -> type[RelationTestRow]:
         return RelationTestRow
 
     @override
-    def conditions(
-        self, scope: EntityIdentifier, target: EntityIdentifier
-    ) -> Sequence[QueryCondition]:
+    def conditions(self, scope: _ScopeID, target: _TargetID) -> Sequence[QueryCondition]:
         return _pair_conditions(scope, target)
 
     @override
@@ -344,6 +338,6 @@ class TestPurgeRelation:
     ) -> None:
         scope, target = pair
         async with provider.write_ops() as ops:
-            await ops.purge_relation(_Purger(), scope, target)
+            assert await ops.purge_relation(_Purger(), scope, target) is False
 
         assert await _row_count(database) == 0

@@ -30,8 +30,8 @@ from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 class V2RelationWriteOps(V2WriteOps):
     """The general write ops plus the relations between existing entities."""
 
-    async def create_relation[TRow: Base](
-        self, creator: RelationCreator[TRow], scope: EntityIdentifier, target: EntityIdentifier
+    async def create_relation[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
+        self, creator: RelationCreator[TScope, TTarget, TRow], scope: TScope, target: TTarget
     ) -> None:
         """Link the scope to the target: the relation row, the scope governing the
         target under READ, and READ on the scope added to what the target holds of
@@ -41,45 +41,48 @@ class V2RelationWriteOps(V2WriteOps):
         await self._govern([scope], target, cap=Permission.READ)
         await self._widen_share(target, scope, {Permission.READ: None})
 
-    async def delete_relation[TRow: Base](
+    async def delete_relation[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
         self,
-        updater: RelationLifecycleUpdater[TRow],
-        scope: EntityIdentifier,
-        target: EntityIdentifier,
+        updater: RelationLifecycleUpdater[TScope, TTarget, TRow],
+        scope: TScope,
+        target: TTarget,
     ) -> None:
         """Switch the relation off: the lifecycle column alone. What each side reads
         of the other stays, so the relation is still listed and can be switched back."""
         await self._switch_relation(updater, scope, target)
 
-    async def restore_relation[TRow: Base](
+    async def restore_relation[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
         self,
-        updater: RelationLifecycleUpdater[TRow],
-        scope: EntityIdentifier,
-        target: EntityIdentifier,
+        updater: RelationLifecycleUpdater[TScope, TTarget, TRow],
+        scope: TScope,
+        target: TTarget,
     ) -> None:
         """Switch the relation back on: the lifecycle column alone."""
         await self._switch_relation(updater, scope, target)
 
-    async def purge_relation[TRow: Base](
-        self, purger: RelationPurger[TRow], scope: EntityIdentifier, target: EntityIdentifier
-    ) -> None:
+    async def purge_relation[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
+        self, purger: RelationPurger[TScope, TTarget, TRow], scope: TScope, target: TTarget
+    ) -> bool:
         """Unlink the scope from the target: the relation row and the govern go, READ
         on the scope is taken back from the target, and a share left with nothing goes
-        too. Silent when the pair was never linked."""
+        too. Answers whether the pair was linked; unlinking one that was not is silent."""
         await self._validate_conflict_checks(purger.conflict_checks())
-        stmt = sa.delete(purger.row_class())
+        row_class = purger.row_class()
+        stmt = sa.delete(row_class).returning(row_class)
         for condition in purger.conditions(scope, target):
             stmt = stmt.where(condition())
-        await self._sess.execute(stmt)
+        if not (await self._sess.scalars(stmt)).all():
+            return False
         await self._ungovern([scope], target)
         await self._narrow_share(target, scope, {Permission.READ: None})
         await self._unshare_if_empty(target, scope)
+        return True
 
-    async def _switch_relation[TRow: Base](
+    async def _switch_relation[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
         self,
-        updater: RelationLifecycleUpdater[TRow],
-        scope: EntityIdentifier,
-        target: EntityIdentifier,
+        updater: RelationLifecycleUpdater[TScope, TTarget, TRow],
+        scope: TScope,
+        target: TTarget,
     ) -> None:
         stmt = sa.update(updater.row_class()).values(updater.build_values())
         for condition in updater.conditions(scope, target):

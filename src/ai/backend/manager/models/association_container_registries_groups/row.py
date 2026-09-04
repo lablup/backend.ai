@@ -7,6 +7,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.base import GUID, Base
@@ -26,13 +27,15 @@ class AssociationContainerRegistriesGroupsRow(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    registry_id: Mapped[uuid.UUID] = mapped_column(
+    registry_id: Mapped[ContainerRegistryID] = mapped_column(
         "registry_id",
-        GUID,
+        GUID(ContainerRegistryID),
+        sa.ForeignKey("container_registries.id", ondelete="CASCADE"),
         nullable=False,
     )
     group_id: Mapped[ProjectID] = mapped_column(
         "group_id",
         GUID(ProjectID),
+        sa.ForeignKey("groups.id", ondelete="CASCADE"),
         nullable=False,
     )
