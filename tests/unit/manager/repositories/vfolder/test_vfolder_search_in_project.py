@@ -34,7 +34,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.vfolder.scopes import ProjectVFolderOperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
@@ -71,7 +71,7 @@ class TestVfolderSearchInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
         return VfolderRepository(
-            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
         )
 
     @pytest.fixture

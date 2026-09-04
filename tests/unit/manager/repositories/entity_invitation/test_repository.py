@@ -39,7 +39,6 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.models.specs.membership import EntityGrant
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -54,6 +53,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.entity_invitation.repository import EntityInvitationRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
@@ -166,7 +166,7 @@ def ops(database: ExtendedAsyncSAEngine) -> OpsRepository[EntityInvitationData]:
 
 @pytest.fixture
 def repository(database: ExtendedAsyncSAEngine) -> EntityInvitationRepository:
-    return EntityInvitationRepository(V2DBOpsProvider(database))
+    return EntityInvitationRepository(ShareOpsProvider(database))
 
 
 async def _status(
@@ -210,16 +210,14 @@ async def _cap(database: ExtendedAsyncSAEngine, grantee: UserID) -> tuple[bool, 
     return True, cap
 
 
-async def _grant(database: ExtendedAsyncSAEngine, cap: Permission) -> None:
-    async with V2DBOpsProvider(database).write_ops() as w:
-        await w.grant_entities([
-            EntityGrant(entity=_target(), grantee=_INVITEE_ID, permission_cap=cap)
-        ])
+async def _share(database: ExtendedAsyncSAEngine, cap: Permission) -> None:
+    async with ShareOpsProvider(database).write_ops() as w:
+        await w.replace_share(_INVITEE_ID, _target(), cap)
 
 
 async def _belong(database: ExtendedAsyncSAEngine) -> None:
     """A belonging edge to the target: no ceiling, which a share never states."""
-    await _grant(database, Permission.NONE)
+    await _share(database, Permission.NONE)
     async with database.begin_session() as sess:
         await sess.execute(
             sa.update(EntityMembershipRow)
@@ -247,7 +245,7 @@ class TestAccept:
         ops: OpsRepository[EntityInvitationData],
         repository: EntityInvitationRepository,
     ) -> None:
-        await _grant(database, Permission.UPDATE)
+        await _share(database, Permission.UPDATE)
         created = await ops.create_entity(_creator(cap=Permission.READ))
         await repository.accept(created.id, _INVITEE_ID)
         assert await _cap(database, _INVITEE_ID) == (

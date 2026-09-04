@@ -8,10 +8,10 @@ from collections.abc import Sequence
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
-from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOps
+from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOpsBase
 
 
-class V2GlobalWriteOps(V2GraphWriteOps):
+class V2GlobalWriteOps(V2GraphWriteOpsBase):
     """Global writes, bound to a single session."""
 
     async def create_global_entity[TRow: Base, TData](

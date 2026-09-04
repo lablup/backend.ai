@@ -3,7 +3,8 @@
 Row insert/delete/upsert with spec-declared check execution, and integrity-error
 parsing and matching. No public operation and no graph relation lives here — the
 per-concern write ops inherit these on top of :class:`~.base.V2OpsBase`; the graph
-is :class:`~.graph_write.V2GraphWriteOps`.
+is :class:`~.graph_write.V2GraphWriteOpsBase`, and the relations over existing
+entities are the share and relation write ops.
 """
 
 from __future__ import annotations

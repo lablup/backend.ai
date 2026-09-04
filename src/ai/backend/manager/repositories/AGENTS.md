@@ -60,6 +60,12 @@
 - Do NOT do multi-table writes inside a spec. The repository creates the parent first, then composes the dependent values
   from the result and passes them to `create_dependent` / `bulk_create_dependent` as a `DependentCreatorSpec`.
 - The read default is `batch_query_with_scopes`. `batch_query_in_global` is for superadmin/internal paths only.
+- 그래프 관계는 provider / ops 쌍 셋으로만 쓴다. entity write(`V2DBOpsProvider` / `V2WriteOps`:
+  생성·삭제, 생성 시 own·govern 포함), relation write(`RelationOpsProvider` / `V2RelationWriteOps`:
+  relation 생성·삭제), share write(`ShareOpsProvider` / `V2ShareWriteOps`: 공유·확대·축소·회수·
+  초대 수락·소유권 이동). 저장소는 필요한 쌍 하나를 주입받는다.
+- 어디서나 그래프 ops 에 닿을 수 있다는 가정은 금지다. own·govern 프리미티브는 세 ops 의 공통
+  기반(`V2GraphWriteOpsBase`)에만 있고 어떤 provider 도 직접 내주지 않는다.
 
 ## Transactions
 

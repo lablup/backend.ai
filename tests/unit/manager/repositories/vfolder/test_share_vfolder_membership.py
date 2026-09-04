@@ -66,7 +66,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
     EntityMembershipFieldRow,
 )
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder import repository as vfolder_repo_module
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
@@ -554,7 +554,7 @@ class TestShareVfolderWithUsersMembership:
         member_user_email: str,
     ) -> None:
         """A user that is a project member is returned in the share result."""
-        repo = VfolderRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+        repo = VfolderRepository(db_with_cleanup, ShareOpsProvider(db_with_cleanup))
         result = await repo.share_vfolder_with_users(
             **self._share_kwargs(vfolder, project, requester, domain_fixture, [member_user_email])
         )
@@ -571,7 +571,7 @@ class TestShareVfolderWithUsersMembership:
         non_member_user_email: str,
     ) -> None:
         """A user without a virtual-entity membership triggers ObjectNotFound."""
-        repo = VfolderRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+        repo = VfolderRepository(db_with_cleanup, ShareOpsProvider(db_with_cleanup))
         with pytest.raises(ObjectNotFound):
             await repo.share_vfolder_with_users(
                 **self._share_kwargs(
@@ -590,7 +590,7 @@ class TestShareVfolderWithUsersMembership:
         non_member_user_email: str,
     ) -> None:
         """When some emails are not project members, the call must reject the whole batch."""
-        repo = VfolderRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+        repo = VfolderRepository(db_with_cleanup, ShareOpsProvider(db_with_cleanup))
         with pytest.raises(ObjectNotFound):
             await repo.share_vfolder_with_users(
                 **self._share_kwargs(
@@ -612,7 +612,7 @@ class TestShareVfolderWithUsersMembership:
         other_project_member_email: str,
     ) -> None:
         """Membership in a different project does not satisfy this folder's group filter."""
-        repo = VfolderRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+        repo = VfolderRepository(db_with_cleanup, ShareOpsProvider(db_with_cleanup))
         with pytest.raises(ObjectNotFound):
             await repo.share_vfolder_with_users(
                 **self._share_kwargs(
@@ -634,7 +634,7 @@ class TestShareVfolderWithUsersMembership:
         inactive_member_user_email: str,
     ) -> None:
         """Membership alone is not enough — inactive users are excluded by status filter."""
-        repo = VfolderRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+        repo = VfolderRepository(db_with_cleanup, ShareOpsProvider(db_with_cleanup))
         with pytest.raises(ObjectNotFound):
             await repo.share_vfolder_with_users(
                 **self._share_kwargs(

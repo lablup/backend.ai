@@ -28,6 +28,9 @@ class RelationCreator[TRow: Base](ABC):
 
     Answers no ``data``. A relation is not returned to a caller — what a read answers
     with is the entities the relation reaches, never the relation.
+
+    A pair already linked, switched off or not, is a unique violation the spec maps to a
+    domain error; switching it back on is the restore updater's, not the create's.
     """
 
     @abstractmethod
@@ -35,28 +38,8 @@ class RelationCreator[TRow: Base](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def build_row(self, left: EntityIdentifier, right: EntityIdentifier) -> TRow:
-        """Build the row linking the two entities."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def index_elements(self) -> list[str]:
-        """The column names conflict detection keys on.
-
-        Whether a soft-deleted row occupies the pair is a property of the table's own
-        unique constraint, so what conflicts is declared here rather than assumed.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def build_conflict_values(self) -> dict[str, Any] | None:
-        """What to write when the pair is already taken.
-
-        ``None`` leaves the existing row alone. A mapping revives it — which is what a
-        table whose unique constraint covers the bare pair needs, since a soft-deleted
-        row still occupies it and an insert that did nothing would leave the relation
-        switched off.
-        """
+    def build_row(self, scope: EntityIdentifier, target: EntityIdentifier) -> TRow:
+        """Build the row linking the scope to the target."""
         raise NotImplementedError
 
     @abstractmethod
@@ -72,6 +55,8 @@ class RelationLifecycleUpdater[TRow: Base](ABC):
     relation declares one class per direction, and which of the two an operation is
     comes from the ops method it is handed to.
 
+    Switching touches the row alone: what each side reads of the other stays, so a
+    relation switched off is still listed on both sides and can be switched back on.
     Only relations carrying a lifecycle column declare these. A relation without one is
     linked and purged, and has nothing to switch.
     """
@@ -82,7 +67,7 @@ class RelationLifecycleUpdater[TRow: Base](ABC):
 
     @abstractmethod
     def conditions(
-        self, left: EntityIdentifier, right: EntityIdentifier
+        self, scope: EntityIdentifier, target: EntityIdentifier
     ) -> Sequence[QueryCondition]:
         """Return the conditions naming the pair's row, AND combined."""
         raise NotImplementedError
@@ -106,7 +91,7 @@ class RelationPurger[TRow: Base](ABC):
 
     @abstractmethod
     def conditions(
-        self, left: EntityIdentifier, right: EntityIdentifier
+        self, scope: EntityIdentifier, target: EntityIdentifier
     ) -> Sequence[QueryCondition]:
         """Return the conditions naming the pair's row, AND combined."""
         raise NotImplementedError

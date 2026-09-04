@@ -70,7 +70,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
@@ -165,7 +165,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
         return VfolderRepository(
-            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
         )
 
     @pytest.fixture
@@ -425,6 +425,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 quota_scope_id=f"user:{user_a_id}",
             )
             db_sess.add(vfolder_row)
+            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
             await db_sess.flush()
 
         # Grant A owner permission (creates scope-entity mapping + permissions)
@@ -487,6 +488,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 quota_scope_id=f"user:{user_a_id}",
             )
             db_sess.add(vfolder_row)
+            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
             await db_sess.flush()
 
         await repo.create_vfolder_permission(
@@ -552,6 +554,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 quota_scope_id=f"user:{user_a_id}",
             )
             db_sess.add(vfolder_row)
+            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
             await db_sess.flush()
 
         # A gets owner permission
@@ -628,6 +631,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 quota_scope_id=f"user:{user_a_id}",
             )
             db_sess.add(vfolder_row)
+            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
             await db_sess.flush()
 
         # Grant A owner permission
@@ -691,6 +695,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 quota_scope_id=f"user:{user_a_id}",
             )
             db_sess.add(vfolder_row)
+            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
             await db_sess.flush()
 
         # Grant B invitee permission (legacy vfolder_permissions record)

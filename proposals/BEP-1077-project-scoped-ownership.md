@@ -81,7 +81,7 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | ➕ | Backfill existing resource entities into the graph and **remove every path that is not `scope -> virtual_scope -> entity`**: the legacy recursive path, `association_scopes_entities`, `object_permissions`, `RBACElementType` (BA-7204) |
 | ➕ | 그래프 관계는 own 과 govern 둘이다. 생성(`created_in`)은 둘 다 쓰고, 공유는 cap 이 붙은 own 만 쓴다. project·user 는 domain 안에서 만들어진다. user VE 는 자기 domain 만 govern 한다; project 로스터의 user 는 READ cap 공유다 |
 | ➕ | Add a `field_permissions` table as a child of permission rows, and declare a catalog (fields, default-visible set) per entity. Checks always name the owning entity — the former colon sub-target names are fields |
-| ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows shared via `share` to the accessible set |
+| ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows shared via `replace_share` to the accessible set |
 | ➕ | Blank unreadable fields and refuse filtering or sorting by them. Replace the data loaders with permission-aware bulk queries |
 
 ### 4.3 Reaching an entity from another scope
@@ -140,11 +140,11 @@ Sharing puts an entity into a virtual scope, not a person into a project. Sharin
 
 | 선언 | own | govern | 규칙 |
 |---|---|---|---|
-| 생성 시 `created_in` | 있음 | 있음 | session 은 project·user 안에서, project·user 는 domain 안에서 만들어진다. 만든 곳의 명단에 오르고, 만든 곳의 role 이 그 아래(초대)까지 닿는다. unsharing 으로 지워지지 않는다. 소유권 이동은 `own(owner, entity)`. user 의 ve 는 자기 domain 만 govern 하고 project 는 govern 하지 않는다 — user 가 own 한 것이 project 로 새지 않도록 |
+| 생성 시 `created_in` | 있음 | 있음 | session 은 project·user 안에서, project·user 는 domain 안에서 만들어진다. 만든 곳의 명단에 오르고, 만든 곳의 role 이 그 아래(초대)까지 닿는다. unsharing 으로 지워지지 않는다. 소유권 이동은 `transfer(from_scopes, to_scopes, entity)`. user 의 ve 는 자기 domain 만 govern 하고 project 는 govern 하지 않는다 — user 가 own 한 것이 project 로 새지 않도록 |
 | relation `create_relation(scope, target)` | target 이 scope 를 READ cap 으로 | scope 가 target 을 READ cap 으로 | project 는 resource group·registry 와 그것이 own 한 agent·image 를 읽고, resource group·registry 는 project 자신만 읽는다. govern 쪽 cap 을 쓰는 유일한 곳 |
-| 공유 `share(scope, entity, cap)` / `share_fields(scope, entity, fields)` | cap 있음 | 없음 | `share` 는 전 필드에 cap 까지 — cap 은 항상 명시, 0 포함. `share_fields` 는 READ/UPDATE 를 필드 경로에만(5.2). `unshare` 로 지워진다. 공유는 받은 scope 에 빌려준 것이라 그 scope 의 자기 govern 으로만 답하고, 공유된 entity 자신에게만 답한다 |
+| 공유 `replace_share(scope, entity, cap)` / `replace_share_fields(scope, entity, {READ: paths, UPDATE: paths})` | cap 있음 | 없음 | `replace_share` 는 전 필드에 cap 까지 — cap 은 항상 명시, 0 포함. `replace_share_fields` 는 READ/UPDATE 를 필드 경로에만(5.2). `unshare` 로 지워진다. 공유는 받은 scope 에 빌려준 것이라 그 scope 의 자기 govern 으로만 답하고, 공유된 entity 자신에게만 답한다 |
 
-project 로스터의 user 는 공유다: `share_fields(project, user, {기본 공개 필드: READ})`. domain 로스터는 따로 없다 — user 는 domain 안에서 만들어진다. 가입 시 auto_assign 역할 부여는 별도 프리미티브다.
+project 로스터의 user 는 공유다: `replace_share_fields(project, user, {READ: 기본 공개 필드})`. domain 로스터는 따로 없다 — user 는 domain 안에서 만들어진다. 가입 시 auto_assign 역할 부여는 별도 프리미티브다.
 
 | Question | Answered by |
 |---|---|
@@ -278,7 +278,7 @@ An invisible target cannot be named.
 
 To give to an outside team, give to a person on that team who then puts it into their own team. What is given to a person lands in that person's personal project.
 
-cap 은 공유 행마다 붙는 비트별 행이다. `share(scope, entity, cap)` 는 cap 의 비트마다 "전 필드" 행 하나를 쓰고, `share_fields(scope, entity, fields)` 는 READ/UPDATE 비트에 "경로" 행들을 쓴다 — token 없이 deployment 를 공유하는 것은 token 경로를 뺀 `share_fields` 다. 경로는 자손을 덮고, deny 는 없다. 유효 필드는 role 의 필드 범위와 경로에 있는 cap 들의 필드 범위의 교집합이다. 이름 붙인 cap(preset)은 이 두 호출을 묶어 부르는 편의이지 저장 단위가 아니다.
+cap 은 공유 행마다 붙는 비트별 행이다. `replace_share(scope, entity, cap)` 는 cap 의 비트마다 "전 필드" 행 하나를 쓰고, `replace_share_fields(scope, entity, fields)` 는 READ/UPDATE 비트에 "경로" 행들을 쓴다 — token 없이 deployment 를 공유하는 것은 token 경로를 뺀 `replace_share_fields` 다. 경로는 자손을 덮고, deny 는 없다. 유효 필드는 role 의 필드 범위와 경로에 있는 cap 들의 필드 범위의 교집합이다. 이름 붙인 cap(preset)은 이 두 호출을 묶어 부르는 편의이지 저장 단위가 아니다.
 
 | Place | Meaning | Composition |
 |---|---|---|
@@ -403,7 +403,7 @@ Opening project-folder creation and narrowing user information are the intended 
 | Scoped reads | Filter instead of rejecting; write actions keep rejecting |
 | Sharing address | Invisible targets cannot be named. People by email, projects only those I am a member of |
 | Share acceptance | Unneeded when only capability grows; projects answer with an acceptance setting |
-| Share caps | 공유 행마다 비트별 cap 행. `share` 는 전 필드, `share_fields` 는 필드 경로. 이름 붙인 cap 은 둘을 묶어 부르는 편의 |
+| Share caps | 공유 행마다 비트별 cap 행. `replace_share` 는 전 필드, `replace_share_fields` 는 필드 경로. 이름 붙인 cap 은 둘을 묶어 부르는 편의 |
 | Re-sharing | Closed by default; opening requires cascading revocation |
 | Sharing records | Separate from `entity_memberships`; the invited state has no graph row |
 | Non-owning projects | No delete operation, only unshare |

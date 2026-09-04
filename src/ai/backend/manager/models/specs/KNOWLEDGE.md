@@ -1,7 +1,7 @@
 ---
 name: write-spec-design
 type: design-rationale
-description: write-spec selection criteria (Entity/Global/Field/Sidecar/Relation), why a row two entities own belongs to neither position and declares its own conflict handling, why the roots share no common ABC, what a sidecar row is and why it belongs to neither position, why the role-managed root is not an EntityCreator subtype, why a global entity is provisioned in the graph, how a field row's owner is read, the two graph relations (own, govern), how created_in combines them, relation and cap-based sharing, open entity-type strings
+description: write-spec selection criteria (Entity/Global/Field/Sidecar/Relation), why a row two entities own belongs to neither position, why switching a relation off keeps both reads, why the roots share no common ABC, what a sidecar row is and why it belongs to neither position, why the role-managed root is not an EntityCreator subtype, why a global entity is provisioned in the graph, how a field row's owner is read, the two graph relations (own, govern), how created_in combines them, relation and cap-based sharing, open entity-type strings
 scope: src/ai/backend/manager/models/specs
 keywords: [RelationCreator, RelationPurger, RelationLifecycleUpdater, EntityCreator, GlobalEntityCreator, FieldCreator, RoleManagedEntityCreator, SidecarCreator, FieldOwnerLookup, RoleTemplateSource, created_in, create_relation, entity_id, virtual-entity, preset-role, DataUpdater, soft-delete]
 sources:
@@ -51,11 +51,10 @@ execution path.
 - The relation roots therefore name the pair, never a row id. Nothing outside the layer
   that wrote the row holds that id, and a read answers with the entities the relation
   reaches rather than the row between them.
-- Conflict handling is the spec's because it is the table's. A unique constraint on the
-  bare pair means a soft-deleted row still occupies it, so an insert that did nothing
-  would leave the relation switched off; a partial index on (pair, alive) admits a new
-  row and keeps the history. One rule cannot serve both, so `build_conflict_values()`
-  declares which.
+- 끄기는 접근이 아니라 상태다. project 에서 resource group 을 임시 제외해도 양쪽이 서로를 읽는
+  관계는 남아야 "제외됨" 을 보여주고 다시 켤 수 있다(Kubernetes cordon, GitLab archive 와 같은
+  선택). 그래서 lifecycle 전이는 행만 바꾸고, 그래프는 create 와 purge 만 움직인다. create 가 꺼진
+  행을 되살리는 upsert 를 갖지 않는 이유도 같다 — 되살리기는 restore 하나의 일이다.
 - Full rationale: `proposals/BEP-1075-entity-relation-operations.md`.
 
 ## A sidecar belongs to neither position
@@ -169,7 +168,7 @@ updater's fields rather than about a column name.
   만든다. user 의 ve 는 자기 domain 만 govern 한다 — project 가 govern 하면 user 가 own 한 것이
   project 로 샌다(BEP-1077).
 - 예전 `member_of` 도 둘을 한꺼번에 썼다. 이름이 own 하나만 말해서 govern 이 숨어 있었다.
-- 공유(`share` / `share_fields`)는 cap 이 붙은 own 이고, 받은 scope 에 빌려준 것이다. own 은 ve 에 넣는 것이라
+- 공유(`replace_share` / `replace_share_fields`)는 cap 이 붙은 own 이고, 받은 scope 에 빌려준 것이다. own 은 ve 에 넣는 것이라
   ve 를 govern 하는 모든 scope 의 것이 되지만, 공유는 그 ve 의 scope 하나에 준 것이라 그 scope 의 자기
   govern 으로만 답한다. 해석기는 그래서 공유를 (1) 공유된 entity 의 타입에 대해서만, (2) 자기 govern
   을 통해서만 통과시킨다. 공유받은 vfolder 를 scope 로 삼아 초대를 읽을 수 없고, resource group 에
@@ -184,15 +183,29 @@ updater's fields rather than about a column name.
   해도 공유는 그쪽에 답하지 않으므로 새지 않는다.
 - 두 축으로 root 넷: `created_in` 유무(Global / Entity) × preset 역할 유무(plain / RoleManaged).
   role-managed 는 preset 을 만드는 것 외에 plain 과 같은 관계를 맺는다.
-- 전 필드 공유와 필드 경로 공유는 뜻이 달라 메소드도 다르다. `share(scope, entity, cap)` 는
-  "이 entity 를 cap 까지" 이고, `share_fields(scope, entity, fields)` 는 "이 entity 의 이 필드들만" 이다.
-  저장은 같은 cap 행 트리(비트별 행, 경로 행)이지만 선언에서 섞지 않는다.
-- 관계 ops 의 배치: private 프리미티브(`_provision` / `_teardown`, `_own` / `_disown`, `_govern` /
-  `_ungovern`, `_created_in` / `_withdraw` — 마지막 쌍은 own 과 govern 을 노드 조회 한 번으로 같이
-  쓰고 거둔다)는 `V2GraphWriteOpsBase` 에 있고 entity 쓰기 ops 가 상속한다. public
-  관계 ops(`share` / `share_fields` / `widen_*` / `unshare` / `own` / `create_relation` /
-  `purge_relation`)는 `V2GraphWriteOps` 하나에 있고 provider 의 `graph_ops()` 로만 받는다. "grant" 는
-  role 의 permission 을 주는 뜻과 겹쳐 쓰지 않는다.
+- 전 필드 공유와 필드 경로 공유는 뜻이 달라 메소드도 다르다. 저장은 같은 cap 행 트리(비트별 행,
+  경로 행)이지만 선언에서 섞지 않는다. replace 는 이전 것을 전부 대체하고(조회 없이 지우고 붙임), widen 은 있는 것을 읽어 더하기만,
+  narrow 는 빼기만 한다. 섞인 공유는 replace 뒤 widen 으로 적는다.
+- 관계 ops 의 배치. private 프리미티브는 `V2GraphWriteOpsBase` 하나에 있고 어떤 provider 도 내주지
+  않는다. public 은 세 provider / ops 쌍이다.
+
+| 관계 | 쓰기 | 되돌리기 | 쓰는 곳 |
+|---|---|---|---|
+| 노드 | `_provision(entities)` — 노드 + 자기 own + 자기 govern | `_teardown(entity)` — 나머지 관계는 FK cascade | 생성 / purge |
+| own | `_own(owners, entity)` — 공유가 있던 자리면 own 으로 | `_disown(owners, entity)` | preset role |
+| govern | `_govern(scopes, entity, cap)` | `_ungovern(scopes, entity)` | relation (cap READ) |
+| own + govern | `_created_in(scopes, entity)` — 노드 조회 한 번 | `_removed_from(scopes, entity)` | 생성, 소유권 이동 |
+| 공유 (cap own) | `_share(scope, entity, cap)` — 전 필드 | `_unshare(scope, entities)` | relation, share write |
+
+| 쌍 | provider / ops | 메소드 |
+|---|---|---|
+| entity write | `V2DBOpsProvider` / `V2WriteOps` | create / upsert / purge / update / field / batch. 생성 시 `_created_in`, purge 시 `_teardown` |
+| relation write | `RelationOpsProvider` / `V2RelationWriteOps` | `create_relation(creator, scope, target)` / `purge_relation` — `_govern(cap READ)` + `_share(READ)` |
+| share write | `ShareOpsProvider` / `V2ShareWriteOps` | `replace_share` / `replace_share_fields` / `widen_*` / `narrow_*` / `unshare` / `transfer` / `accept_invitation` |
+
+  두 쌍의 ops 는 `V2WriteOps` 를 상속하므로 행 쓰기와 관계 쓰기가 한 트랜잭션에 놓인다(vfolder 의
+  permission 행 + share, 초대 행 갱신 + share). "grant" 는 role 의 permission 을 주는 뜻과 겹쳐 쓰지
+  않는다.
 - 한계: govern 은 한 홉이라 domain → user → session → 초대 처럼 세 단계면 domain 이 초대에 못 닿는다.
   필요해지면 govern 을 쓸 때 상위 scope 의 govern 을 함께 복사하는 방식으로 닫는다.
 

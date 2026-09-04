@@ -14,10 +14,10 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.purger import EntityBatchPurger
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
-from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOps
+from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOpsBase
 
 
-class V2BatchWriteOps(V2GraphWriteOps):
+class V2BatchWriteOps(V2GraphWriteOpsBase):
     """Batch writes over scope-restricted or global selections."""
 
     async def batch_update_in_scopes[TRow: Base, TData](

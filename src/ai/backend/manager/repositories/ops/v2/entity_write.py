@@ -63,7 +63,7 @@ from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOps
+from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOpsBase
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -81,7 +81,7 @@ class _PresetRoleSpec:
     entity_operations: Mapping[RBACElementType, Sequence[OperationType]]
 
 
-class V2EntityWriteOps(V2GraphWriteOps):
+class V2EntityWriteOps(V2GraphWriteOpsBase):
     """Entity writes, bound to a single session."""
 
     # Rendered role names are stored in ``roles.name`` (sa.String(64)).

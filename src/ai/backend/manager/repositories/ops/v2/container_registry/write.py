@@ -41,5 +41,4 @@ class ContainerRegistryWriteOps(V2WriteOps):
 
         Silent for a project or registry that never had a virtual entity.
         """
-        await self._disown([project_id], registry_id)
-        await self._ungovern([project_id], registry_id)
+        await self._removed_from([project_id], registry_id)

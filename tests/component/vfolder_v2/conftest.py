@@ -41,6 +41,7 @@ from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -95,7 +96,7 @@ def vfolder_processors(
     RBAC checks use check_permission_with_scope_chain() against the real DB.
     Without explicit RBAC permission grants, all access is denied (403).
     """
-    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
     user_repository = UserRepository(
         database_engine,
         V2DBOpsProvider(database_engine),

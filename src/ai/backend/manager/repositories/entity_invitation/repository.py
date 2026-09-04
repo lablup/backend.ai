@@ -9,7 +9,7 @@ from ai.backend.manager.models.entity_invitation.updaters import (
     EntityInvitationCancelUpdater,
     EntityInvitationRejectUpdater,
 )
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
 __all__ = ("EntityInvitationRepository",)
 
@@ -23,17 +23,17 @@ class EntityInvitationRepository:
     exists would answer a question they were not asked.
     """
 
-    _ops: V2DBOpsProvider
+    _ops: ShareOpsProvider
 
-    def __init__(self, v2_ops_provider: V2DBOpsProvider) -> None:
-        self._ops = v2_ops_provider
+    def __init__(self, ops_provider: ShareOpsProvider) -> None:
+        self._ops = ops_provider
 
     async def accept(
         self, invitation_id: EntityInvitationID, invitee_user_id: UserID
     ) -> EntityInvitationData:
         """Take what was offered: the invitation is settled and the entity granted."""
         async with self._ops.write_ops() as w:
-            data = await w.accept_entity_invitation(
+            data = await w.accept_invitation(
                 EntityInvitationAcceptUpdater(
                     invitation_id=invitation_id, invitee_user_id=invitee_user_id
                 )

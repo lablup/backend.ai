@@ -71,7 +71,6 @@ from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
-from ai.backend.manager.models.specs.membership import EntityGrant, EntityMembershipEntry
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
@@ -129,7 +128,7 @@ from ai.backend.manager.repositories.base import (
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.base.integrity import match_integrity_error
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.purge_guards import (
     find_active_vfolder_references,
     vfolder_reference_conflict_checks,
@@ -172,9 +171,9 @@ def _mount_permission_cap(permission: VFolderMountPermission) -> Permission:
 
 class VfolderRepository:
     _db: ExtendedAsyncSAEngine
-    _v2_ops: V2DBOpsProvider
+    _v2_ops: ShareOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: ShareOpsProvider) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
 
@@ -510,13 +509,7 @@ class VfolderRepository:
                         permission=VFolderMountPermission.OWNER_PERM,
                     ),
                 )
-                await w.grant_entities([
-                    EntityGrant(
-                        entity=vfolder_id,
-                        grantee=UserID(params.user),
-                        permission_cap=Permission.READ,
-                    )
-                ])
+                await w.replace_share(UserID(params.user), vfolder_id, Permission.READ)
 
             return created
 
@@ -896,13 +889,9 @@ class VfolderRepository:
                 VFolderUUID(vfolder_id),
                 VFolderPermissionCreator(user_id=user_id, permission=permission),
             )
-            await w.grant_entities([
-                EntityGrant(
-                    entity=VFolderUUID(vfolder_id),
-                    grantee=UserID(user_id),
-                    permission_cap=_mount_permission_cap(permission),
-                )
-            ])
+            await w.replace_share(
+                UserID(user_id), VFolderUUID(vfolder_id), _mount_permission_cap(permission)
+            )
             return created
 
     @vfolder_repository_resilience.apply()
@@ -914,7 +903,7 @@ class VfolderRepository:
             await w.batch_purge_field_entities(
                 VFolderUUID(vfolder_id), VFolderUserPermissionBatchPurger(user_id=user_id)
             )
-            await w.revoke_entities([VFolderUUID(vfolder_id)], UserID(user_id))
+            await w.unshare(UserID(user_id), [VFolderUUID(vfolder_id)])
 
     @vfolder_repository_resilience.apply()
     async def get_vfolder_invitations_by_vfolder(
@@ -2177,32 +2166,29 @@ class VfolderRepository:
                 await conn.execute(del_query)
 
             # Also clear what the new owner held from when they were an invitee; the
-            # ownership grant below replaces it uncapped.
+            # ownership below replaces it uncapped.
             async with self._v2_ops.write_ops() as w:
-                await w.revoke_entities([VFolderUUID(vfolder_id)], UserID(user_info.uuid))
+                await w.unshare(UserID(user_info.uuid), [VFolderUUID(vfolder_id)])
 
         await execute_with_retry(_delete_related_rows)
 
         # Step 5: Clean up old owner's RBAC records for this vfolder
         if old_owner_uuid is not None and old_owner_uuid != user_info.uuid:
 
-            async def _cleanup_old_owner_rbac() -> None:
+            async def _transfer_rbac() -> None:
                 async with self._v2_ops.write_ops() as w:
-                    await w.revoke_entities([VFolderUUID(vfolder_id)], UserID(old_owner_uuid))
-
-            await execute_with_retry(_cleanup_old_owner_rbac)
-
-        # Step 6: The vfolder now belongs to the new owner — no cap
-        async def _grant_new_owner_rbac() -> None:
-            async with self._v2_ops.write_ops() as w:
-                await w.enroll_entities([
-                    EntityMembershipEntry(
-                        member=VFolderUUID(vfolder_id),
-                        parent=UserID(user_info.uuid),
+                    await w.transfer(
+                        [UserID(old_owner_uuid)], [UserID(user_info.uuid)], VFolderUUID(vfolder_id)
                     )
-                ])
 
-        await execute_with_retry(_grant_new_owner_rbac)
+            await execute_with_retry(_transfer_rbac)
+        else:
+
+            async def _own_by_new_owner() -> None:
+                async with self._v2_ops.write_ops() as w:
+                    await w.transfer([], [UserID(user_info.uuid)], VFolderUUID(vfolder_id))
+
+            await execute_with_retry(_own_by_new_owner)
 
     @vfolder_repository_resilience.apply()
     async def get_alive_agent_ids(
