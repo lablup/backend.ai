@@ -344,33 +344,67 @@ class SessionNetwork:
     async def _retry_unresumed(self) -> None:
         """Try again to recover what would not recover, rather than only reporting it.
 
-        A transient container-runtime or metadata error used to leave a session unmanaged -- and
-        this node unable to take overlay work -- until the process was restarted, because nothing
-        ever came back to it. A wholly failed recovery re-runs `recover`; individual sessions
-        re-run their own resume.
+        Never by re-running `recover()`. Its first step brings down every tunnel this node owns
+        and prunes every claim, which is correct exactly once -- before anything is trusted -- and
+        destructive on a timer: it would cut the sessions that recovered in between, and the
+        resume below would then install a SECOND coordinator for each of them without stopping
+        the first, leaving two sets of watch, reconcile and protection tasks changing the same
+        host state. So the preflight belongs to the process's lifetime, and this retries only the
+        part that failed.
         """
-        if "recovery" in self._unresumed:
-            try:
-                await self.recover()
-            except Exception as e:
-                self._unresumed["recovery"] = str(e)
-            else:
-                self._unresumed.pop("recovery", None)
-            return  # recover() rebuilds the per-session state itself
-        for session_id in list(self._unresumed):
-            meta = await self._read_session_meta(session_id)
-            if meta is None:
-                # The manager dropped the session while we were failing to resume it; there is
-                # nothing left to resume and its containers are orphans that clean_kernel removes.
-                self._unresumed.pop(session_id, None)
+        self._unresumed.pop("recovery", None)  # the inventory below IS the retry of it
+        try:
+            live, ours = await self._live_and_own_containers()
+        except Exception as e:
+            # Without the inventory there is nothing to resume against; try again next tick.
+            self._unresumed["recovery"] = str(e)
+            return
+        by_session: dict[str, list[str]] = {}
+        for container_id, session_id in ours.items():
+            by_session.setdefault(session_id, []).append(container_id)
+        for session_id in sorted(by_session):
+            if session_id not in self._unresumed and session_id in self._coordinators:
+                # Already resumed. Re-running would install a SECOND coordinator without stopping
+                # the first, leaving two sets of watch, reconcile and protection tasks changing
+                # the same host state.
                 continue
-            try:
-                await self._resume_session(session_id, meta)
-            except Exception as e:
-                self._unresumed[session_id] = str(e)
+            if not await self._resume_one(session_id, by_session[session_id]):
                 continue
-            self._unresumed.pop(session_id, None)
             log.info("session network for {} recovered on a later attempt", session_id)
+        if not self._unresumed:
+            await self._reclaim_orphans(live)
+
+    async def _resume_one(self, session_id: str, container_ids: Sequence[str]) -> bool:
+        """Resume one session AND re-derive its containers' tracking and detach plans.
+
+        Both halves. Resuming alone leaves every container untracked and detach-less: it cannot
+        give back its veth or its address when it goes, and the last one of a session cannot start
+        the teardown -- while `_unresumed` clears and readiness says the node is fine again.
+        """
+        meta = await self._read_session_meta(session_id)
+        if meta is None:
+            # The manager dropped the session while we were failing to resume it; there is nothing
+            # left to resume and its containers are orphans that clean_kernel removes.
+            self._unresumed.pop(session_id, None)
+            return False
+        try:
+            await self._resume_session(session_id, meta)
+        except Exception as e:
+            self._unresumed[session_id] = str(e)
+            return False
+        for container_id in container_ids:
+            self._tracker.track(session_id, container_id)
+            try:
+                attachment = await self._recover_attachment(container_id, session_id, meta)
+            except Exception:
+                # One container's plan failing must not undo the session's resume; it stays
+                # tracked but detach-less, and its host leftovers are reclaimed as orphans later.
+                log.exception("failed to recover attachment for container {}", container_id)
+                continue
+            if attachment is not None:
+                self._attachments[container_id] = attachment
+        self._unresumed.pop(session_id, None)
+        return True
 
     def _unrecovered_sessions(self) -> dict[str, str]:
         """Sessions this node holds state for but could not resume, as readiness problems.

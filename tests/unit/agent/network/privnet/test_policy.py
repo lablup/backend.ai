@@ -9,6 +9,9 @@ looks right" is not the same claim as "the regex refuses `../`". Only `validate_
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any, cast
+
 import pytest
 
 from ai.backend.agent.network.privnet.policy import (
@@ -23,7 +26,21 @@ from ai.backend.agent.network.privnet.policy import (
 )
 
 # The two id validators share one pattern, so they are held to the same cases.
-_ID_VALIDATORS = (validate_session_id, validate_container_id)
+#: Both take a name and return it, or raise. Typed here because a parameter annotated `object`
+#: cannot be called -- and the point of the parametrisation is that they are interchangeable.
+_Validator = Callable[[str], str]
+_ID_VALIDATORS: tuple[_Validator, ...] = (validate_session_id, validate_container_id)
+
+
+def _validate_untyped(value: object) -> object:
+    """`validate_port_pairs` with the annotation dropped.
+
+    These cases feed it exactly what its signature forbids, which is the point: the request comes
+    off a socket, so the annotation is a promise the caller can break and the validator is what
+    has to catch it. Calling through here says that, where silencing the checker would only hide
+    that the test is deliberately out of contract.
+    """
+    return validate_port_pairs(cast(Any, value))
 
 
 class TestTheIdsThatBecomePaths:
@@ -45,24 +62,24 @@ class TestTheIdsThatBecomePaths:
         ],
     )
     def test_nothing_that_could_escape_the_tree_is_accepted(
-        self, validate: object, value: str
+        self, validate: _Validator, value: str
     ) -> None:
         with pytest.raises(PolicyViolation):
-            validate(value)  # type: ignore[operator]
+            validate(value)
 
     @pytest.mark.parametrize("validate", _ID_VALIDATORS)
     @pytest.mark.parametrize("value", ["", " ", "\n", "a\nb", "a\x00b", "a b", "a;rm -rf /", "a$b"])
     def test_nothing_that_could_reach_a_shell_or_a_log_line_is_accepted(
-        self, validate: object, value: str
+        self, validate: _Validator, value: str
     ) -> None:
         with pytest.raises(PolicyViolation):
-            validate(value)  # type: ignore[operator]
+            validate(value)
 
     @pytest.mark.parametrize("validate", _ID_VALIDATORS)
-    def test_a_name_longer_than_the_bound_is_refused(self, validate: object) -> None:
-        assert validate("a" * 128) == "a" * 128  # type: ignore[operator]
+    def test_a_name_longer_than_the_bound_is_refused(self, validate: _Validator) -> None:
+        assert validate("a" * 128) == "a" * 128
         with pytest.raises(PolicyViolation):
-            validate("a" * 129)  # type: ignore[operator]
+            validate("a" * 129)
 
     @pytest.mark.parametrize("validate", _ID_VALIDATORS)
     @pytest.mark.parametrize(
@@ -74,8 +91,8 @@ class TestTheIdsThatBecomePaths:
             "A1",
         ],
     )
-    def test_the_names_actually_used_are_accepted(self, validate: object, value: str) -> None:
-        assert validate(value) == value  # type: ignore[operator]
+    def test_the_names_actually_used_are_accepted(self, validate: _Validator, value: str) -> None:
+        assert validate(value) == value
 
 
 class TestDnsPort:
@@ -118,9 +135,10 @@ class TestPortPairs:
 
     @pytest.mark.parametrize("proto", ["icmp", "TCP", "", "tcp; iptables -F", None])
     def test_only_tcp_and_udp_reach_iptables(self, proto: object) -> None:
-        """It becomes iptables `-p`."""
+        """It becomes iptables `-p`. The value is deliberately outside the declared type: the
+        request arrives over a socket, so the annotation is a promise the caller can break."""
         with pytest.raises(PolicyViolation, match="protocol"):
-            validate_port_pairs(((30001, 8080, None, proto),))  # type: ignore[arg-type]
+            _validate_untyped(((30001, 8080, None, proto),))
 
     def test_a_duplicate_host_port_is_refused(self) -> None:
         with pytest.raises(PolicyViolation, match="duplicate"):
@@ -141,7 +159,7 @@ class TestPortPairs:
     @pytest.mark.parametrize("value", [None, ()])
     def test_an_empty_request_is_refused(self, value: object) -> None:
         with pytest.raises(PolicyViolation, match="missing ports"):
-            validate_port_pairs(value)  # type: ignore[arg-type]
+            _validate_untyped(value)
 
     def test_the_batch_is_bounded(self) -> None:
         """One request must not be able to write an unbounded number of iptables rules."""
