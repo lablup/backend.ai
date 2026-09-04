@@ -34,7 +34,7 @@ class AuditLogRow(Base):
     __table_args__ = (sa.Index("ix_audit_logs_lookup", "lookup_kind", "lookup_key"),)
 
     id: Mapped[AuditLogID] = mapped_column(
-        "id", GUID(AuditLogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(AuditLogID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
 
     action_kind: Mapped[ActionKind | None] = mapped_column(

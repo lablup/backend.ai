@@ -28,7 +28,7 @@ class AuditLogScopeRow(Base):
     )
 
     id: Mapped[AuditLogScopeID] = mapped_column(
-        "id", GUID(AuditLogScopeID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(AuditLogScopeID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     audit_log_id: Mapped[AuditLogID] = mapped_column(
         "audit_log_id",
