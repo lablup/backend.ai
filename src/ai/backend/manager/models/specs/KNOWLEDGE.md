@@ -161,12 +161,13 @@ updater's fields rather than about a column name.
 - 해석기는 `entity → 그 entity 를 own 한 ve → 그 ve 를 govern 한 scope → role` 로 한 홉 걷는다.
   판정도 ops 에 있다(`PermissionReadOps`, `PermissionOpsProvider` 의 read 쪽). `PermissionDBSource`
   는 거기에 위임만 한다 — 그래프는 ops 로만 쓰고 읽는다.
-- 판정은 둘이고 이름이 관계 이름과 같다.
+- 판정은 둘이고 이름이 관계 이름과 같다. repository 는 키마다 마스크를 답하고, 판정
+  (`mask.covers(bits)`)은 validator 가 한다.
 
-| 판정 | 질문 | 재료 | 판정 |
-|---|---|---|---|
-| own 판정 | 내 role 이 있는 scope 가 govern 하는 ve 가 이 entity 를 own(cap 포함) 하는가 — "내가 이 entity 를 이 비트로 own 하는가" | `owned_permissions(keys)`: 키마다 경로들의 `permission & govern cap & share cap` 을 OR 한 마스크 | `check_owned(key, bits)` / `check_owned_all(keys, bits)` |
-| govern 판정 | 내 role 이 있는 scope 가 이 scope 의 ve 를 govern 하는가(자기 govern 포함), 그 안의 entity 종류에 이 비트를 주는가 — "내가 이 scope 를 이 종류·이 비트로 govern 하는가" | `governed_permissions(keys)` | `check_governed(keys, bits)` |
+| 판정 | 질문 | repository 가 답하는 마스크 |
+|---|---|---|
+| own 판정 | 내 role 이 있는 scope 가 govern 하는 ve 가 이 entity 를 own(cap 포함) 하는가 — "내가 이 entity 를 이 비트로 own 하는가" | `owned_permissions(keys)`: 키마다 경로들의 `permission & govern cap & share cap` 을 OR 한 것 |
+| govern 판정 | 내 role 이 있는 scope 가 이 scope 의 ve 를 govern 하는가(자기 govern 포함), 그 안의 entity 종류에 이 비트를 주는가 — "내가 이 scope 를 이 종류·이 비트로 govern 하는가" | `governed_permissions(keys)` |
 
   entity 생성·검색은 govern 판정(만들면 그 scope 가 own 하게 된다), 개별 entity 동작·bulk·relation
   은 own 판정, global 은 그래프 밖(superadmin)이다. 필드 판정과 목록 필터(BEP-1077 5.2, 5.4)는 후속.

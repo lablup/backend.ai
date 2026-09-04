@@ -4,6 +4,7 @@ from typing import override
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
 from ai.backend.manager.actions.v2.bulk.validator.base import (
@@ -55,8 +56,8 @@ class BulkOwnCheck:
             for entity_id in meta.entity_ids
         ]
         permission = meta.operation_type.to_permission()
-        owned = await self._repository.check_owned_all(keys, permission)
-        return {key.entity: owned.get(key, False) for key in keys}
+        owned = await self._repository.owned_permissions(keys)
+        return {key.entity: owned.get(key, Permission.NONE).covers(permission) for key in keys}
 
 
 class VirtualEntityAtomicBulkActionRBACValidator(AtomicBulkActionValidator):

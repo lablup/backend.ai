@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.types import EntityIdentifier, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.v2.relation.trigger import RelationActionTriggerMeta
 from ai.backend.manager.actions.v2.relation.validator.base import RelationActionValidator
@@ -51,8 +52,10 @@ class VirtualEntityRelationActionRBACValidator(RelationActionValidator):
         ]
         keys = [OwnCheckKey(user_id=UserID(user.user_id), entity=entity) for entity in entities]
         permission = meta.operation_type.to_permission()
-        permission_map = await self._repository.check_owned_all(keys, permission)
-        denied = [key.entity for key in keys if not permission_map.get(key, False)]
+        owned = await self._repository.owned_permissions(keys)
+        denied = [
+            key.entity for key in keys if not owned.get(key, Permission.NONE).covers(permission)
+        ]
         if denied:
             raise NotEnoughPermission(
                 f"User {user.user_id} lacks permission {permission!r} on scopes {denied}"

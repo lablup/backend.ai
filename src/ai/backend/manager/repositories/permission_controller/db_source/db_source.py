@@ -1162,56 +1162,12 @@ class PermissionDBSource:
 
     # ------------------------------------------------ virtual-entity-chain checks
 
-    async def check_owned(
-        self,
-        key: OwnCheckKey,
-        permission: Permission,
-    ) -> bool:
-        """Return whether the user holds *permission* on the key's entity via a virtual entity.
-
-        Takes the bits the user holds on the entity through own and govern and tests
-        that it covers *every* bit of ``permission``, which may be a mask
-        (``UPSERT`` requires ``CREATE | UPDATE``) rather than a single bit.
-        """
-        resolved = await self.owned_permissions([key])
-        return resolved.get(key, Permission.NONE).covers(permission)
-
-    async def check_owned_all(
-        self,
-        keys: Collection[OwnCheckKey],
-        permission: Permission,
-    ) -> Mapping[OwnCheckKey, bool]:
-        """The own check on each entity in one go.
-
-        Returns a mapping from each input key to whether every bit of ``permission``
-        is granted.
-        """
-        if not keys:
-            return {}
-        resolved = await self.owned_permissions(keys)
-        return {key: resolved.get(key, Permission.NONE).covers(permission) for key in keys}
-
-    async def check_governed(
-        self,
-        keys: Collection[GovernCheckKey],
-        permission: Permission,
-    ) -> Mapping[GovernCheckKey, bool]:
-        """The govern check on each scope in one go.
-
-        Returns a mapping from each input key to whether every bit of ``permission``
-        is granted.
-        """
-        if not keys:
-            return {}
-        resolved = await self.governed_permissions(keys)
-        return {key: resolved.get(key, Permission.NONE).covers(permission) for key in keys}
-
     async def owned_permissions(
         self,
         keys: Collection[OwnCheckKey],
     ) -> Mapping[OwnCheckKey, Permission]:
-        """Resolve each target entity's effective :class:`Permission` through the
-        graph; the walk is :meth:`PermissionReadOps.resolve_effective_permissions`."""
+        """The bits each user holds on each entity; the walk is
+        :meth:`PermissionReadOps.owned_permissions`."""
         if not keys:
             return {}
         async with self._ops.read_ops() as r:

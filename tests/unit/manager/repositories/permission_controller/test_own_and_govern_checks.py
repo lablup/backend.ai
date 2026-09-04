@@ -80,6 +80,9 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
@@ -422,7 +425,9 @@ class TestCheckPermissionViaVirtualEntity:
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_owned(key, permission)
+        result = (
+            (await db_source.owned_permissions([key])).get(key, Permission.NONE).covers(permission)
+        )
         assert result is expected
 
     @pytest.mark.parametrize(
@@ -476,8 +481,8 @@ class TestCheckPermissionViaVirtualEntity:
             user_id=chain.user_id,
             entity=VFolderUUID(uuid.uuid4()),
         )
-        result = await db_source.check_owned_all([reachable, unreachable], Permission.READ)
-        assert result == {reachable: True, unreachable: False}
+        result = await db_source.owned_permissions([reachable, unreachable])
+        assert result == {reachable: Permission.READ, unreachable: Permission.NONE}
 
     @pytest.mark.parametrize(
         ("chain",),
@@ -498,8 +503,8 @@ class TestCheckPermissionViaVirtualEntity:
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_owned_all([reachable], Permission.CREATE | Permission.UPDATE)
-        assert result == {reachable: False}
+        result = await db_source.owned_permissions([reachable])
+        assert not result[reachable].covers(Permission.CREATE | Permission.UPDATE)
 
     @pytest.mark.parametrize(
         ("chain",),
@@ -515,7 +520,11 @@ class TestCheckPermissionViaVirtualEntity:
             user_id=UserID(uuid.uuid4()),
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_owned(key, Permission.READ)
+        result = (
+            (await db_source.owned_permissions([key]))
+            .get(key, Permission.NONE)
+            .covers(Permission.READ)
+        )
         assert result is False
 
     async def _build_unmapped_chain(
@@ -650,6 +659,13 @@ class TestUserRosterEnrollment:
     @pytest.fixture
     def ids(self) -> VSChainFixture:
         return VSChainFixture()
+
+    @pytest.fixture
+    def repository(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> PermissionControllerRepository:
+        return PermissionControllerRepository(db_with_rbac_tables)
 
     async def _grant_on_project(
         self,
@@ -800,7 +816,11 @@ class TestUserRosterEnrollment:
             user_id=ids.user_id,
             entity=VFolderUUID(ids.entity_id),
         )
-        result = await db_source.check_owned(key, Permission.READ)
+        result = (
+            (await db_source.owned_permissions([key]))
+            .get(key, Permission.NONE)
+            .covers(Permission.READ)
+        )
         assert result is False
 
     async def test_project_grant_reaches_an_entity_enrolled_in_the_project(
@@ -831,7 +851,11 @@ class TestUserRosterEnrollment:
             user_id=ids.user_id,
             entity=SessionID(session_id),
         )
-        result = await db_source.check_owned(key, Permission.READ)
+        result = (
+            (await db_source.owned_permissions([key]))
+            .get(key, Permission.NONE)
+            .covers(Permission.READ)
+        )
         assert result is True
 
     async def _put_vfolder_in_project_vs(
@@ -868,6 +892,7 @@ class TestUserRosterEnrollment:
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         ops_provider: RBACOpsProvider,
+        repository: PermissionControllerRepository,
         ids: VSChainFixture,
         cap: Permission | None,
         reaches: bool,
@@ -894,8 +919,8 @@ class TestUserRosterEnrollment:
             scope=ScopeRef(scope_type=ScopeType(VFOLDER_ENTITY_TYPE), scope_id=vfolder_id),
             entity_type=SESSION_ENTITY_TYPE,
         )
-        result = await db_source.check_governed([key], Permission.READ)
-        assert result[key] is reaches
+        result = await repository.governed_permissions([key])
+        assert result[key] == (Permission.READ if reaches else Permission.NONE)
 
     async def _govern_resource_group_from_project(
         self,
@@ -972,7 +997,11 @@ class TestUserRosterEnrollment:
         )
 
         key = OwnCheckKey(user_id=ids.user_id, entity=ProjectID(other_project_id))
-        result = await db_source.check_owned(key, Permission.READ)
+        result = (
+            (await db_source.owned_permissions([key]))
+            .get(key, Permission.NONE)
+            .covers(Permission.READ)
+        )
         assert result is reaches
 
     async def test_roster_cap_clips_the_grant_over_the_member_user(

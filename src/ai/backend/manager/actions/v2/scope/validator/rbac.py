@@ -2,6 +2,7 @@ from typing import override
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -54,8 +55,10 @@ class VirtualEntityScopeActionRBACValidator(ScopeActionValidator):
             for scope in action.scope_targets()
         ]
         permission = action.operation_type().to_permission()
-        permission_map = await self._repository.check_governed(keys, permission)
-        denied = [key.scope for key in keys if not permission_map.get(key, False)]
+        governed = await self._repository.governed_permissions(keys)
+        denied = [
+            key.scope for key in keys if not governed.get(key, Permission.NONE).covers(permission)
+        ]
         if denied:
             raise NotEnoughPermission(
                 f"User {user.user_id} lacks permission {permission!r} "

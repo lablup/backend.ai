@@ -2,6 +2,7 @@ from typing import override
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.v2.single_entity.trigger import (
     SingleEntityActionTriggerMeta,
@@ -45,8 +46,8 @@ class VirtualEntitySingleEntityActionRBACValidator(SingleEntityActionValidator):
             entity=meta.entity,
         )
         permission = meta.operation_type.to_permission()
-        allowed = await self._repository.check_owned(key, permission)
-        if not allowed:
+        owned = await self._repository.owned_permissions([key])
+        if not owned.get(key, Permission.NONE).covers(permission):
             raise NotEnoughPermission(
                 f"User {user.user_id} lacks permission {permission!r} "
                 f"on {meta.entity.entity_type()} {meta.entity}"

@@ -429,48 +429,22 @@ class PermissionControllerRepository:
         return await self._db_source.check_bulk_permission_with_scope_chain(data)
 
     @permission_controller_repository_resilience.apply()
-    async def check_owned(
-        self,
-        key: OwnCheckKey,
-        permission: Permission,
-    ) -> bool:
-        """The own check on one entity: does the user hold every bit of ``permission``
-        on it through the scopes governing a virtual entity that owns it.
-
-        Resolves the effective permission via
-        ``entity -> entity_memberships -> scope_bindings -> scope`` with per-hop
-        cap clipping and grants only when it covers every bit of ``permission``,
-        which may be a mask (``UPSERT`` requires ``CREATE | UPDATE``).
-        """
-        return await self._db_source.check_owned(key, permission)
-
-    @permission_controller_repository_resilience.apply()
-    async def check_owned_all(
+    async def owned_permissions(
         self,
         keys: Collection[OwnCheckKey],
-        permission: Permission,
-    ) -> Mapping[OwnCheckKey, bool]:
-        """The own check on several entities in one go.
-
-        Same semantics as check_owned but
-        for an arbitrary collection of per-entity keys, batched per
-        ``(user_id, entity_type)`` group.
-        """
-        return await self._db_source.check_owned_all(keys, permission)
+    ) -> Mapping[OwnCheckKey, Permission]:
+        """The bits each user holds on each entity through own and govern; a key
+        nothing reaches maps to :attr:`Permission.NONE`."""
+        return await self._db_source.owned_permissions(keys)
 
     @permission_controller_repository_resilience.apply()
-    async def check_governed(
+    async def governed_permissions(
         self,
         keys: Collection[GovernCheckKey],
-        permission: Permission,
-    ) -> Mapping[GovernCheckKey, bool]:
-        """The govern check on several scopes in one go.
-
-        Each scope is walked as an entity while permission rows are matched on
-        the key's ``entity_type``, batched per
-        ``(user_id, scope_type, entity_type)`` group.
-        """
-        return await self._db_source.check_governed(keys, permission)
+    ) -> Mapping[GovernCheckKey, Permission]:
+        """The bits each user holds on the key's entity type within the key's scope;
+        a key nothing reaches maps to :attr:`Permission.NONE`."""
+        return await self._db_source.governed_permissions(keys)
 
     @permission_controller_repository_resilience.apply()
     async def resolve_effective_permissions(
