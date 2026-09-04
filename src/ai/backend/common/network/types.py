@@ -28,6 +28,11 @@ Calico in IPIP mode, where Calico uses no VXLAN at all), so on a Calico cluster 
 on 4789 comes up and carries nothing. Moving either side off 4789 restores it.
 """
 
+DEFAULT_VNI_RANGE = (4096, 16777215)
+"""The VNI pool the manager allocates from, and the range an agent checks a foreign tunnel
+against. Starts above the 0-4095 a hand-configured tunnel is most likely to use; the top is the
+24-bit VNI maximum."""
+
 VXLAN_OVERHEAD = 50
 """IPv4 VXLAN encapsulation: 20 IP + 8 UDP + 8 VXLAN + 14 inner Ethernet."""
 
@@ -247,3 +252,8 @@ class AgentNetworkCaps:
 
     tunnel_offload: bool
     backends: list[str] = field(default_factory=list)
+    #: What would stop this node from serving an overlay session, in the operator's words; empty
+    #: when nothing would. Published rather than enforced: the node still refuses a session it
+    #: cannot protect when one arrives, and that guard belongs in the data-plane backend. This is
+    #: so the reason is visible BEFORE a session is scheduled here and fails on one node.
+    readiness: list[str] = field(default_factory=list)

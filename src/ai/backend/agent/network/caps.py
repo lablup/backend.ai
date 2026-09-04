@@ -16,13 +16,18 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
+from ai.backend.agent.network.readiness import probe_readiness
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.network.keys import (
     agent_backend_key,
     agent_caps_key,
     agent_vtep_key,
 )
-from ai.backend.common.network.types import AgentNetworkCaps
+from ai.backend.common.network.types import (
+    DEFAULT_VNI_RANGE,
+    DEFAULT_VXLAN_PORT,
+    AgentNetworkCaps,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
@@ -68,20 +73,33 @@ async def _run_ethtool(iface: str) -> str | None:
     return stdout.decode(errors="replace")
 
 
-def compute_caps(*, tunnel_offload: bool) -> AgentNetworkCaps:
+def compute_caps(*, tunnel_offload: bool, readiness: list[str] | None = None) -> AgentNetworkCaps:
     """Assemble AgentNetworkCaps from probed facts. ``vxlan`` is the data-plane backend
     every agent supports."""
     return AgentNetworkCaps(
         tunnel_offload=tunnel_offload,
         backends=["vxlan"],
+        readiness=list(readiness or []),
     )
 
 
-async def probe_caps(iface: str) -> AgentNetworkCaps:
-    """Probe this host's networking capabilities."""
+async def probe_caps(
+    iface: str,
+    *,
+    vxlan_port: int = DEFAULT_VXLAN_PORT,
+    vni_range: tuple[int, int] = DEFAULT_VNI_RANGE,
+) -> AgentNetworkCaps:
+    """Probe this host's networking capabilities, and what would stop it serving a session.
+
+    The readiness half is why this is worth more than a boolean: the agent advertised `vxlan`
+    unconditionally, so a host with no `xt_u32`, or one whose CNI already owns the overlay's UDP
+    port, was handed a session it could only fail -- at create time, on one node, with the reason
+    visible in nothing the operator was looking at.
+    """
     output = await _run_ethtool(iface)
     tunnel_offload = parse_tunnel_offload(output) if output is not None else False
-    return compute_caps(tunnel_offload=tunnel_offload)
+    readiness = await probe_readiness(port=vxlan_port, vni_range=vni_range)
+    return compute_caps(tunnel_offload=tunnel_offload, readiness=readiness)
 
 
 async def publish_caps(etcd: AbstractKVStore, agent_id: str, caps: AgentNetworkCaps) -> None:

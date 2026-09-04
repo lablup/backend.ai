@@ -1980,11 +1980,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # A diagnostic signal for operators (e.g. VXLAN tunnel offload); best-effort, because a
         # failure to describe the uplink must not stop the agent from serving kernels.
         try:
-            await publish_caps(
-                self.etcd,
-                str(self.id),
-                await probe_caps(uplink_for_ip(self._vtep_ip or self._host_ip)),
-            )
+            caps = await probe_caps(uplink_for_ip(self._vtep_ip or self._host_ip))
+            await publish_caps(self.etcd, str(self.id), caps)
+            for problem in caps.readiness:
+                # Once at startup, where an operator can act on it -- rather than at the first
+                # session scheduled here, which fails on one node with the reason buried in a
+                # create-time traceback.
+                log.warning("overlay readiness: {}", problem)
         except Exception:
             log.exception("could not publish this agent's network capabilities")
         # Only the validated address is ever published; with none, say so once here, where an
