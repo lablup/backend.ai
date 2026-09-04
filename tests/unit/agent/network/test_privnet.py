@@ -383,7 +383,9 @@ class _Harness:
         return PrivNetClient(self.server._socket_path)
 
 
-async def _hand_the_vni_back(h: _Harness, session_id: str, config: dict[str, Any]) -> None:
+async def _hand_the_vni_back(
+    h: _Harness, session_id: str, config: dict[str, Any], agent_id: str = "i-test"
+) -> None:
     """Model the manager handing a VNI back out.
 
     The session ended, so this node's binding on its VNI went with it -- while the privnet's own
@@ -391,7 +393,7 @@ async def _hand_the_vni_back(h: _Harness, session_id: str, config: dict[str, Any
     the reason a dead session and a live one can be journalled on one VNI at all.
     """
     async with h.vni_registry.releasing(
-        int(config["vni"]), "i-test", session_id, config_digest(config)
+        int(config["vni"]), agent_id, session_id, config_digest(config)
     ):
         pass
 
@@ -1897,3 +1899,183 @@ class TestAnAgentCannotNameAnotherSessionsVni:
                 PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
             )
             assert resp.ok, resp.error
+
+
+class TestTearingDownASharedDataPlane:
+    """`baivx*` and `baibr*` are the HOST's devices, and two agents on one host can share a
+    session on them. Each agent's locator sees only its own runtime, so "no containers of mine are
+    left" says nothing about the other agent's -- the node-wide binding is the only thing that can
+    tell the two apart, and it has to be asked BEFORE the delete, not after."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    async def test_the_devices_survive_while_another_agent_holds_the_session(
+        self, tmp_path: Path
+    ) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(
+                _StubRuntime(pid=4242, live={"c2": "s1"}),
+                state_dir=tmp_path / "b",
+                agent_id="i-b",
+            ) as b:
+                await b.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+                resp = await b.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+                assert resp.ok, resp.error
+                assert b.backend.teardown_calls == [], (
+                    "the shared bridge and VXLAN device were deleted while a co-located agent"
+                    " still had kernels on them"
+                )
+
+    async def test_the_leaving_agent_still_gives_up_everything_of_its_own(
+        self, tmp_path: Path
+    ) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(
+                _StubRuntime(pid=4242, live={"c2": "s1"}),
+                state_dir=tmp_path / "b",
+                agent_id="i-b",
+            ) as b:
+                await b.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+                await b.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+                # A withdrawal in all but name: the ESP pair claim and the watchdog go.
+                assert b.backend.withdraw_calls == ["s1"]
+                assert "s1" not in b.server._sessions
+                assert "s1" not in await b.journal.sessions()
+
+    async def test_the_last_agent_out_does_delete_them(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(
+                _StubRuntime(pid=4242, live={"c2": "s1"}),
+                state_dir=tmp_path / "b",
+                agent_id="i-b",
+            ) as b:
+                await b.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+                await b.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+            await a.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+            assert a.backend.teardown_calls == ["s1"]
+
+    async def test_a_lone_agent_tears_down_normally(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+            assert h.backend.teardown_calls == ["s1"]
+            assert "s1" not in await h.journal.sessions()
+
+    async def test_an_unanswerable_registry_refuses_rather_than_deletes(
+        self, tmp_path: Path
+    ) -> None:
+        # Not knowing whether anyone else is on the devices is not permission to delete them. The
+        # RPC fails so the agent retries, instead of reporting a teardown that took someone's
+        # network with it.
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            h.server._vni_registry = VniRegistry(tmp_path / "gone" / "vni" / "unreachable")
+            (tmp_path / "gone").write_text("not a directory")
+            with pytest.raises(PrivNetClientError):
+                await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+            assert h.backend.teardown_calls == []
+            assert "s1" in await h.journal.sessions(), "still ours, so still journalled"
+
+    async def test_a_dead_session_is_not_reclaimed_out_from_under_another_agent(
+        self, tmp_path: Path
+    ) -> None:
+        # The reclaim pass runs precisely because THIS node's runtime shows no containers -- which
+        # is what a co-located agent's containers look like from here.
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(
+                _StubRuntime(pid=4242, live={"c2": "s1"}),
+                state_dir=tmp_path / "b",
+                agent_id="i-b",
+            ) as b:
+                await b.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+
+            # b restarts with no containers of its own: to it, s1 is a dead session.
+            async with _Harness(
+                _StubRuntime(), state_dir=tmp_path / "b", agent_id="i-b"
+            ) as restarted:
+                assert restarted.backend.teardown_calls == []
+                assert "s1" not in await restarted.journal.sessions(), (
+                    "it is no longer this agent's, so its record goes -- the devices do not"
+                )
+
+
+class TestRecoveryDoesNotAdoptAVniItCouldNotBind:
+    """An encrypted adopt holds the VXLAN of that name DOWN, and a reclaim deletes it. Both act on
+    the device by its name, so doing either for a VNI the registry says belongs to something else
+    reaches straight into that session's data plane."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    async def test_a_conflicting_live_session_is_left_alone(self, tmp_path: Path) -> None:
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path, agent_id="i-a"
+        ) as first:
+            await first.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            await _hand_the_vni_back(first, "s1", self._VXLAN, "i-a")
+
+        # Another agent took VNI 4138 for a different session while this one was down.
+        squatter = _Harness(_StubRuntime(), state_dir=tmp_path / "other", agent_id="i-other")
+        async with squatter.vni_registry.binding(
+            4138, "i-other", "other", config_digest(self._VXLAN)
+        ) as bound:
+            bound.mark_built()
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path, agent_id="i-a"
+        ) as restarted:
+            assert restarted.backend.adopt_calls == [], "adopting holds that VXLAN down"
+            assert restarted.backend.teardown_calls == [], "reclaiming deletes it"
+            assert "s1" in restarted.server._unrecovered_sessions
+
+    async def test_it_is_retried_once_the_conflict_clears(self, tmp_path: Path) -> None:
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path, agent_id="i-a"
+        ) as first:
+            await first.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            await _hand_the_vni_back(first, "s1", self._VXLAN, "i-a")
+
+        blocker = _Harness(_StubRuntime(), state_dir=tmp_path / "other", agent_id="i-other")
+        async with blocker.vni_registry.binding(
+            4138, "i-other", "other", config_digest(self._VXLAN)
+        ) as bound:
+            bound.mark_built()
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path, agent_id="i-a"
+        ) as restarted:
+            assert restarted.backend.adopt_calls == []
+            async with blocker.vni_registry.releasing(
+                4138, "i-other", "other", config_digest(self._VXLAN)
+            ):
+                pass
+            await restarted.server._retry_recovery()
+            assert restarted.backend.adopt_calls == ["s1"]
+            assert restarted.server._unrecovered_sessions == {}

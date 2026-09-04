@@ -30,8 +30,14 @@ _CONFIG = {
 }
 
 
-async def _bind(registry: VniRegistry, agent: str, session: str, config: dict[str, Any]) -> bool:
+async def _bind(
+    registry: VniRegistry, agent: str, session: str, config: dict[str, Any], *, built: bool = True
+) -> bool:
+    """Reserve the VNI and, unless the caller is modelling a setup that died partway, record that
+    its devices were actually built."""
     async with registry.binding(int(config["vni"]), agent, session, config_digest(config)) as b:
+        if b.recorded and built:
+            b.mark_built()
         return b.recorded
 
 
@@ -88,13 +94,36 @@ class TestBinding:
         with pytest.raises(VniConflict, match="different network configuration"):
             await _bind(registry, "a2", "s1", {**_CONFIG, "subnet": "10.128.9.0/24"})
 
-    async def test_it_reports_an_existing_hold(self, tmp_path: Path) -> None:
+    async def test_it_reports_a_data_plane_that_already_exists(self, tmp_path: Path) -> None:
         # What tells a caller to ADOPT the data plane rather than rebuild it.
         registry = self._registry(tmp_path)
         async with registry.binding(4138, "a1", "s1", config_digest(_CONFIG)) as first:
             assert first.already_held is False
+            first.mark_built()
         async with registry.binding(4138, "a2", "s1", config_digest(_CONFIG)) as second:
             assert second.already_held is True
+
+    async def test_a_reservation_alone_is_not_a_data_plane(self, tmp_path: Path) -> None:
+        # The claim is written BEFORE the devices. A setup that died in the middle -- and failed
+        # to clean up after itself -- leaves one behind, and adopting it adopts nothing: the next
+        # setup would report success over a session with no bridge and no VXLAN device.
+        registry = self._registry(tmp_path)
+        await _bind(registry, "a1", "s1", _CONFIG, built=False)
+        async with registry.binding(4138, "a2", "s1", config_digest(_CONFIG)) as second:
+            assert second.already_held is False
+
+    async def test_an_abandoned_reservation_frees_the_vni(self, tmp_path: Path) -> None:
+        registry = self._registry(tmp_path)
+        async with registry.binding(4138, "a1", "s1", config_digest(_CONFIG)) as first:
+            first.abandon()
+        assert await _bind(registry, "a2", "s2", _CONFIG) is True
+
+    async def test_a_reservation_still_conflicts_with_another_session(self, tmp_path: Path) -> None:
+        # Two agents must not build the same VNI at once, whether or not either has finished.
+        registry = self._registry(tmp_path)
+        await _bind(registry, "a1", "s1", _CONFIG, built=False)
+        with pytest.raises(VniConflict):
+            await _bind(registry, "a2", "s2", _CONFIG)
 
     async def test_an_unusable_store_binds_nothing(self, tmp_path: Path) -> None:
         # Not "the VNI is free". A binding no other agent can read is not one.
@@ -128,6 +157,12 @@ class TestPruning:
         assert await registry.prune("a1", []) == 1
         assert await _bind(registry, "a2", "s2", _CONFIG) is True
 
+    async def test_a_reservation_with_nobody_behind_it_is_dropped_too(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path / "vni")
+        await _bind(registry, "a1", "s1", _CONFIG, built=False)
+        assert await registry.prune("a1", []) == 1
+        assert await _bind(registry, "a2", "s2", _CONFIG) is True
+
     async def test_a_live_binding_survives(self, tmp_path: Path) -> None:
         registry = VniRegistry(tmp_path / "vni")
         await _bind(registry, "a1", "s1", _CONFIG)
@@ -148,9 +183,15 @@ class TestHolders:
         registry = VniRegistry(tmp_path / "vni")
         await _bind(registry, "a1", "s1", _CONFIG)
         assert await registry.holders(4138) == frozenset({
-            VniHolder(agent_id="a1", session_id="s1", digest=config_digest(_CONFIG))
+            VniHolder(agent_id="a1", session_id="s1", digest=config_digest(_CONFIG), built=True)
         })
+
+    async def test_it_says_whether_the_data_plane_was_built(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path / "vni")
+        await _bind(registry, "a1", "s1", _CONFIG, built=False)
+        assert [holder.built for holder in await registry.holders(4138)] == [False]
 
     def test_a_malformed_claim_is_ignored_rather_than_trusted(self) -> None:
         assert VniHolder.parse("no-separator") is None
         assert VniHolder.parse("a1/s1") is None
+        assert VniHolder.parse("a1/nonsense#s1#abc") is None
