@@ -79,6 +79,7 @@ pants lint --changed-since=origin/{base_branch}
    - **Title**: Conventional commit style with JIRA key as scope
      - Format: `type(BA-XXXX): description`
      - Example: `fix(BA-1234): resolve session cleanup race condition`
+     - See `changes/KNOWLEDGE.md` for the category-to-prefix/changelog-type mapping, including same-release fixes (`chore`, not `fix`)
    - **Body**: Use this template:
 
    ```markdown
@@ -120,28 +121,7 @@ pants lint --changed-since=origin/{base_branch}
 
 ### Phase 5: Changelog (News Fragment)
 
-1. **Determine changelog type** (if not provided)
-   - Map from PR content:
-     - New functionality → `feature`
-     - Bug fix → `fix`
-     - Performance/refactoring → `enhance`
-     - Breaking API change → `breaking`
-     - Test-only change → `test`
-     - Documentation → `doc`
-     - Dependency update → `deps`
-
-   Valid types (from `pyproject.toml`):
-   | Type | Category |
-   |------|----------|
-   | `breaking` | Breaking Changes |
-   | `feature` | Features |
-   | `enhance` | Improvements |
-   | `deprecation` | Deprecations |
-   | `fix` | Fixes |
-   | `doc` | Documentation Updates |
-   | `deps` | External Dependency Updates |
-   | `misc` | Miscellaneous |
-   | `test` | Test Updates |
+1. **Determine changelog type** (if not provided) — see `changes/KNOWLEDGE.md` for valid types and the category mapping
 
 2. **Generate changelog message** (if not provided)
    - Single-line English sentence
