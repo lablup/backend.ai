@@ -66,6 +66,11 @@ from ai.backend.agent.network.privnet.protocol import (
     PrivNetResponse,
     ProtocolError,
 )
+from ai.backend.agent.network.vni_registry import (
+    VniConflict,
+    VniRegistry,
+    config_digest,
+)
 from ai.backend.common.network.types import (
     Member,
     NetworkBackendKind,
@@ -122,9 +127,19 @@ class _SessionEntry:
     # host port may be DNAT'd to; never taken from the agent.
     local_ips: dict[str, str]
 
-    def __init__(self, meta: SessionNetMeta, backend: AbstractNetworkAgentPluginV2[Any]) -> None:
+    #: The configuration digest this session's VNI is bound to node-wide, so the binding is
+    #: released under the same name it was made under.
+    digest: str
+
+    def __init__(
+        self,
+        meta: SessionNetMeta,
+        backend: AbstractNetworkAgentPluginV2[Any],
+        digest: str = "",
+    ) -> None:
         self.meta = meta
         self.backend = backend
+        self.digest = digest
         self.attached = {}
         self.local_ips = {}
 
@@ -228,6 +243,9 @@ class PrivNetServer:
     # owner (it owns every privileged network op), so it is also the one that can answer which
     # block a session holds — the LOCAL_SUBNET query the agent uses to resolve single-node peers.
     _local_subnets: LocalSubnetAllocator
+    #: Node-wide VNI -> (session, configuration) bindings, so one agent's declaration cannot name
+    #: the VNI another agent's live session is running on -- see `vni_registry`.
+    _vni_registry: VniRegistry
     #: Keeps retrying the fail-close for tunnels the recovery preflight left UP.
     _fail_close_tasks: dict[int, asyncio.Task[None]]
     #: Why the last recovery could not even read its inputs, or None.
@@ -256,6 +274,7 @@ class PrivNetServer:
         journal: PrivNetJournal | None = None,
         ipam: HostLocalIpam | None = None,
         local_subnets: LocalSubnetAllocator | None = None,
+        vni_registry: VniRegistry | None = None,
         netns_owner_uid: int | None = None,
         netns_pinner: netns_mod.NetnsPinner | None = None,
     ) -> None:
@@ -277,6 +296,7 @@ class PrivNetServer:
         self._journal = journal or PrivNetJournal()
         self._ipam = ipam or get_host_local_ipam()
         self._local_subnets = local_subnets or get_local_subnet_allocator()
+        self._vni_registry = vni_registry or VniRegistry()
         self._fail_close_tasks = {}
         self._recovery_failed = None
         self._unrecovered_sessions = {}
@@ -587,6 +607,7 @@ class PrivNetServer:
             self._recovery_failed = str(e)
             self._start_recovery_retry()
             return
+        await self._rebind_journalled(journalled_sessions)
         # Read successfully, so whatever failed last time is no longer failing. Clearing it here
         # rather than after the loop below matters for the empty case: an empty journal is a
         # complete answer, and returning with the flag still set would keep this node reporting
@@ -690,6 +711,45 @@ class PrivNetServer:
                 self._unreclaimed_sessions.pop(session_id, None)
         if self._recovery_pending():
             self._start_recovery_retry()
+
+    async def _rebind_journalled(self, journalled_sessions: dict[str, dict[str, Any]]) -> None:
+        """Re-establish this agent's VNI bindings from its journal, and drop the rest.
+
+        Bindings outlive the process that made them -- that is the point -- but a crash between
+        binding a VNI and tearing it down leaves one with nobody behind it, and the VNI it names
+        is then refused to every later session on this node. Only this agent's own bindings are
+        touched; a co-located agent's are its to settle.
+        """
+        live: list[tuple[str, str]] = []
+        for session_id, raw_config in journalled_sessions.items():
+            try:
+                vni = policy.validate_network_config(raw_config).vni
+            except Exception:
+                continue
+            if vni is None:
+                continue
+            digest = config_digest(raw_config)
+            live.append((session_id, digest))
+            try:
+                async with self._vni_registry.binding(
+                    vni, self._agent_id, session_id, digest
+                ) as bound:
+                    if not bound.recorded:
+                        log.warning(
+                            "could not re-bind VNI {} for journalled session {}", vni, session_id
+                        )
+            except VniConflict as e:
+                # Someone else has this VNI now. The journalled session is the one that must go;
+                # reclaiming it would delete the live session's devices, which the VNI check in
+                # the reclaim path already refuses to do.
+                log.warning("journalled session {} cannot re-bind its VNI: {}", session_id, e)
+        try:
+            dropped = await self._vni_registry.prune(self._agent_id, live)
+        except Exception:
+            log.exception("could not prune this agent's stale VNI bindings")
+            return
+        if dropped:
+            log.info("dropped {} stale VNI binding(s) of this agent", dropped)
 
     async def _live_containers(self) -> dict[str, str]:
         """``{container_id: session_id}`` for every container the backend still runs for us."""
@@ -806,6 +866,7 @@ class PrivNetServer:
                 session_id,
             )
         await backend.teardown_session_network(session_id)
+        await self._release_vni(session_id, raw_config)
         await self._journal.forget_session(session_id)
         log.info("reclaimed the network of dead session {}", session_id)
 
@@ -935,6 +996,9 @@ class PrivNetServer:
                     case PrivNetOp.SETUP_SESSION:
                         await self._setup(session_id, req.network_config or {})
                         return PrivNetResponse(ok=True)
+                    case PrivNetOp.ADOPT_SESSION:
+                        await self._adopt(session_id, req.network_config or {})
+                        return PrivNetResponse(ok=True)
                     case PrivNetOp.TEARDOWN_SESSION:
                         await self._teardown(session_id)
                         return PrivNetResponse(ok=True)
@@ -994,21 +1058,140 @@ class PrivNetServer:
     async def _setup(self, session_id: str, raw_config: dict[str, Any]) -> None:
         cfg = policy.validate_network_config(raw_config)
         self._require_vtep(cfg.backend)  # refuse before anything is journalled or built
-        meta = SessionNetMeta(
-            session_id=session_id,
-            subnet=cfg.subnet or "",
-            backend=cfg.backend,
-            mtu=cfg.mtu,
-            vni=cfg.vni,
-            vxlan_port=cfg.vxlan_port,
-            encryption_key=cfg.encryption_key,
-        )
+        meta = self._meta_of(session_id, raw_config)
         backend = self._resolve_backend(cfg.backend)
+        digest = config_digest(raw_config)
+        if cfg.vni is None:
+            # Nothing to bind: this backend's devices are not named after a VNI, so no declaration
+            # can point at another session's.
+            await self._build(session_id, meta, backend, raw_config, digest)
+            return
+        try:
+            # The binding is held across the build, not taken and dropped before it: between
+            # "this VNI is free" and the devices existing there is a window in which a co-located
+            # agent decides the same thing, and the two then build over each other.
+            async with self._vni_registry.binding(
+                cfg.vni, self._agent_id, session_id, digest
+            ) as bound:
+                if not bound.recorded:
+                    raise PrivNetError(
+                        f"cannot set session {session_id} up: its VNI {cfg.vni} could not be bound"
+                        " in the node-wide registry, so this node cannot tell whether another"
+                        " session is already running on it"
+                    )
+                if bound.already_held:
+                    # A co-located agent (or this one before a restart) already built this very
+                    # session. Building again deletes its devices first, and they are carrying its
+                    # containers -- so take it over instead. Decided under the binding's lock, so
+                    # nothing can claim the VNI between the answer and acting on it.
+                    await self._adopt_bound(session_id, raw_config, digest)
+                    return
+                await self._build(session_id, meta, backend, raw_config, digest)
+        except VniConflict as e:
+            # The declaration names a VNI this node has already given to something else. Setup
+            # deletes `baivx<vni>` and its bridges before rebuilding them, so accepting this is
+            # how one agent's request cuts another session's containers off the network.
+            raise policy.PolicyViolation(str(e)) from None
+
+    async def _build(
+        self,
+        session_id: str,
+        meta: SessionNetMeta,
+        backend: AbstractNetworkAgentPluginV2[Any],
+        raw_config: dict[str, Any],
+        digest: str,
+    ) -> None:
+        """Journal the session and build its data plane, with its VNI binding held."""
         # Journal before the host is mutated: a record with no device is reconciled away on the
         # next boot, while a device with no record is one nobody can ever name again.
         await self._journal.record_session(session_id, dict(raw_config))
-        await backend.setup_session_network(meta, self._self_member(cfg.backend))
-        self._sessions[session_id] = _SessionEntry(meta, backend)
+        await backend.setup_session_network(meta, self._self_member(meta.backend))
+        self._sessions[session_id] = _SessionEntry(meta, backend, digest)
+
+    async def _release_vni(self, session_id: str, raw_config: dict[str, Any] | None) -> None:
+        """Give this agent's binding on the session's VNI back.
+
+        Only this agent's: a co-located agent that also holds the session keeps its own, and the
+        VNI stays bound until the last of them lets go -- which is what stops the next session on
+        this node from being handed a VNI whose devices are still carrying traffic.
+        """
+        entry = self._sessions.get(session_id)
+        vni = entry.meta.vni if entry is not None else None
+        digest = entry.digest if entry is not None else ""
+        if vni is None and raw_config is not None:
+            try:
+                vni = policy.validate_network_config(raw_config).vni
+            except Exception:
+                return
+            digest = config_digest(raw_config)
+        if vni is None or not digest:
+            return
+        async with self._vni_registry.releasing(vni, self._agent_id, session_id, digest):
+            pass
+
+    async def _adopt(self, session_id: str, raw_config: dict[str, Any]) -> None:
+        """Take a session whose data plane already exists on this host into this privnet.
+
+        Never `_setup`. Setup deletes the session's overlay bridge, its VXLAN device and its LOCAL
+        bridge before rebuilding them, which is correct for a fresh session and cuts every running
+        container of one that is already up -- the surviving veths are not re-enslaved to the new
+        bridge, so the kernels keep running with no network at all.
+
+        Two callers, one meaning: an agent that restarted under its own live session, and a second
+        agent on this host joining a session another agent's privnet built. Both are "this session
+        exists; be responsible for it", and neither is "build it".
+        """
+        cfg = policy.validate_network_config(raw_config)
+        self._require_vtep(cfg.backend)
+        declared = self._meta_of(session_id, raw_config)
+        if (entry := self._sessions.get(session_id)) is not None:
+            # Already ours. Rebuilding the entry would drop the attachment plans it holds, which
+            # are what every later detach is derived from, so re-declaring is a no-op -- but only
+            # if it is the same session. A different declaration under a live name is the trust
+            # boundary this process exists for, not an update.
+            if entry.meta != declared:
+                raise PrivNetError(
+                    f"session {session_id} is already set up on this node with a different network"
+                    " configuration; refusing to redeclare it"
+                )
+            return
+        journalled = (await self._journal.sessions()).get(session_id)
+        if journalled is not None and self._meta_of(session_id, journalled) != declared:
+            raise PrivNetError(
+                f"session {session_id} is journalled on this node with a different network"
+                " configuration; refusing to adopt it under a new declaration"
+            )
+        digest = config_digest(raw_config)
+        if cfg.vni is None:
+            await self._adopt_bound(session_id, raw_config, digest)
+            return
+        try:
+            async with self._vni_registry.binding(
+                cfg.vni, self._agent_id, session_id, digest
+            ) as bound:
+                if not bound.recorded:
+                    raise PrivNetError(
+                        f"cannot adopt session {session_id}: its VNI {cfg.vni} could not be"
+                        " bound in the node-wide registry"
+                    )
+                await self._adopt_bound(session_id, raw_config, digest)
+        except VniConflict as e:
+            raise policy.PolicyViolation(str(e)) from None
+
+    async def _adopt_bound(self, session_id: str, raw_config: dict[str, Any], digest: str) -> None:
+        """Take the session over, with its VNI binding already held."""
+        await self._journal.record_session(session_id, dict(raw_config))
+        # The same rebuild recovery does, so an adopting privnet regains the attachment plans and
+        # LOCAL addresses of containers that are already running under this session.
+        await self._readopt_session(
+            session_id,
+            dict(raw_config),
+            (await self._journal.peers()).get(session_id),
+            await self._live_containers(),
+            await self._journal.attachments(),
+        )
+        if (entry := self._sessions.get(session_id)) is not None:
+            entry.digest = digest
 
     async def _withdraw(self, session_id: str) -> None:
         """Drop this node's ownership of a session whose devices must stay.
@@ -1024,6 +1207,7 @@ class PrivNetServer:
         backend = self._backends.get(str(entry.meta.backend))
         if backend is not None:
             await backend.withdraw_session_network(session_id)
+        await self._release_vni(session_id, None)
         # The journal too, or the next restart reads it back and re-adopts a session this node has
         # given up -- taking its ESP pair claim and its watchdog responsibility with it.
         await self._journal.forget_session(session_id)
@@ -1048,7 +1232,14 @@ class PrivNetServer:
             await backend.adopt_session_network(meta, self._self_member(meta.backend))
             await backend.restore_session_peer_ownership(session_id, self._members_of(peer_vteps))
             await backend.teardown_session_network(session_id)
+        await self._release_vni(session_id, await self._journalled_config(session_id))
         await self._journal.forget_session(session_id)
+
+    async def _journalled_config(self, session_id: str) -> dict[str, Any] | None:
+        try:
+            return (await self._journal.sessions()).get(session_id)
+        except Exception:
+            return None
 
     def _kernel_cgroup(self, container_id: str) -> Path:
         """Where this container's cgroup lives. Derived from the validated id, never from the

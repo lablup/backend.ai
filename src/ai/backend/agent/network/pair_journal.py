@@ -66,8 +66,23 @@ _LOCK_POLL_SEC: Final = 0.05
 
 
 def pair_key(self_vtep: str, peer_vtep: str, dstport: int) -> str:
-    """The journal's name for one pair. Directed, exactly as the SAs are."""
+    """The journal's name for one pair's OUTBOUND POLICY. Directed, exactly as the SAs are.
+
+    Per port, because the policy selector names the port: a session on another port needs its own.
+    """
     return f"{self_vtep}_{peer_vtep}_{dstport}".replace(":", "-").replace("/", "-")
+
+
+def sa_key(self_vtep: str, peer_vtep: str) -> str:
+    """The journal's name for one pair's SAs.
+
+    Deliberately without the port. An SA carries no port -- the kernel identifies it by
+    (dst, spi, proto) and it is created with neither -- so every session between these two nodes
+    rides the same one whatever port its overlay runs on. Counting SA users per port lets the last
+    session on one port delete the SAs a session on another port is still sending through, leaving
+    that session's policy selecting an SA that no longer exists.
+    """
+    return f"{self_vtep}_{peer_vtep}_sa".replace(":", "-").replace("/", "-")
 
 
 def _claim_name(owner: str, session_id: str) -> str:
@@ -76,6 +91,37 @@ def _claim_name(owner: str, session_id: str) -> str:
 
 def _sanitise(value: str) -> str:
     return value.replace("/", "-").replace(_CLAIM_SEP, "-")
+
+
+@dataclass(frozen=True)
+class ClaimSet:
+    """One key's claims, with the node-wide lock held: read them, add or drop this owner's.
+
+    Handed out by `holding` so a caller that must DECIDE from the existing claims before making
+    its own -- "is this VNI already another session's?" -- can do both inside one critical
+    section. Reading and then claiming as two calls is two locks with a gap between them, and the
+    gap is where two agents both read "free" and both claim.
+    """
+
+    _journal: PairJournal
+    _held: _Held
+
+    def users(self) -> frozenset[str] | None:
+        """``owner/session`` for everyone claiming this key, or None if it could not be listed.
+
+        None is not an empty set: an unlistable directory answering "nobody" is what authorises
+        taking something somebody else is using.
+        """
+        claims = self._journal._claims(self._held)
+        if claims is None:
+            return None
+        return frozenset(name.replace(_CLAIM_SEP, "/", 1) for name in claims)
+
+    def add(self, owner: str, session_id: str) -> bool:
+        return self._journal._write_claim(self._held, owner, session_id)
+
+    def remove(self, owner: str, session_id: str) -> bool:
+        return self._journal._remove_claim(self._held, owner, session_id)
 
 
 @dataclass(frozen=True)
@@ -234,11 +280,11 @@ class PairJournal:
         written, and the caller must NOT program the pair: a claim that is not on disk is a claim
         another process cannot count, and it will remove the very SAs being installed.
         """
-        async with self._hold(key) as held:
-            if held is None:
+        async with self.holding(key) as claims:
+            if claims is None:
                 yield False
                 return
-            yield self._write_claim(held, owner, session_id)
+            yield claims.add(owner, session_id)
 
     @asynccontextmanager
     async def releasing(self, key: str, owner: str, session_id: str) -> AsyncIterator[bool | None]:
@@ -251,23 +297,29 @@ class PairJournal:
 
         The lock spans the caller's block so the answer cannot go stale inside it.
         """
-        async with self._hold(key) as held:
-            if held is None:
+        async with self.holding(key) as claims:
+            if claims is None:
                 yield None
                 return
-            if not self._remove_claim(held, owner, session_id):
+            if not claims.remove(owner, session_id):
                 yield None
                 return
-            remaining = self._claims(held)
+            remaining = claims.users()
             yield None if remaining is None else not remaining
 
     async def users(self, key: str) -> frozenset[str]:
-        """Everyone on this node currently claiming the pair, for diagnostics."""
+        """Everyone on this node currently claiming the key, for diagnostics."""
+        async with self.holding(key) as claims:
+            return frozenset() if claims is None else (claims.users() or frozenset())
+
+    @asynccontextmanager
+    async def holding(self, key: str) -> AsyncIterator[ClaimSet | None]:
+        """This key's claims with the node-wide lock held for the caller's block.
+
+        None means the lock could not be taken, which is never permission to act.
+        """
         async with self._hold(key) as held:
-            if held is None:
-                return frozenset()
-            claims = self._claims(held) or set()
-            return frozenset(name.replace(_CLAIM_SEP, "/", 1) for name in claims)
+            yield None if held is None else ClaimSet(self, held)
 
     async def prune(self, owner: str, live_sessions: Collection[str]) -> int:
         """Drop ``owner``'s claims for sessions it no longer has. Returns how many went.

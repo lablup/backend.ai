@@ -76,7 +76,7 @@ from ai.backend.agent.network.backends.vxlan_security import (
     VxlanSecurityStateMachine,
 )
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
-from ai.backend.agent.network.pair_journal import PairJournal, pair_key
+from ai.backend.agent.network.pair_journal import PairJournal, pair_key, sa_key
 from ai.backend.common.network.types import (
     Member,
     NetworkBackendKind,
@@ -244,15 +244,18 @@ def _protection_reader(plugin: VxlanNetworkPlugin, *, vni: int | None) -> _Listi
         f" reqid {XFRM_REQID} mode transport\n"
         "\treplay-window 0 flag esn\n"
         "\taead rfc4106(gcm(aes)) 0xdeadbeef 128\n"
-        for key, generations in plugin._pair_slot_generations.items()
+        for sa, generations in plugin._pair_slot_generations.items()
         for generation in generations.values()
-        for src, dst in ((key[0], key[1]), (key[1], key[0]))
+        for src, dst in (sa, (sa[1], sa[0]))
     )
     policies = "".join(
         f"src {key[0]}/32 dst {key[1]}/32 proto udp dport {key[2]} \n"
         f"\tdir out priority 0 \n\tmark {XFRM_MARK:#x}/0xffffffff \n"
-        f"\ttmpl src {key[0]} dst {key[1]} proto esp spi 0x1 reqid {XFRM_REQID} mode transport\n"
-        for key in plugin._pair_slot_generations
+        f"\ttmpl src {key[0]} dst {key[1]} proto esp"
+        # The generation the pair is actually on: a policy left on a retired one is drift.
+        f" spi {_esp_spi(key[0], key[1], plugin._pair_active_generations[key[:2]]):#x}"
+        f" reqid {XFRM_REQID} mode transport\n"
+        for key in plugin._programmed_policies
     )
 
     def _listing(argv: Sequence[str]) -> str:
@@ -278,6 +281,18 @@ def _protection_reader(plugin: VxlanNetworkPlugin, *, vni: int | None) -> _Listi
 
 
 _STATE = ["ip", "xfrm", "state"]
+
+
+class _BreakableStateRead:
+    """A reader whose `ip xfrm state` can be made to fail after the pair is already programmed."""
+
+    def __init__(self) -> None:
+        self.broken = False
+
+    def __call__(self, argv: Sequence[str]) -> str | None:
+        if self.broken and list(argv[:3]) == _STATE:
+            raise RuntimeError("Operation not permitted")
+        return None
 
 
 class _FailingAdd(Recorder):
@@ -1284,10 +1299,10 @@ class TestSharedPairRaces:
 
         # Whatever the order, the surviving session must not be left with an open path and no
         # encryption: either the pair is still programmed, or s2 never opened its FDB.
-        key = ("10.0.0.1", "10.0.0.2", 4789)
+        sa = ("10.0.0.1", "10.0.0.2")
         if fdb_append_args(4098, "10.0.0.2") in rec.calls:
-            assert key in plugin._programmed_pairs
-        assert plugin._pair_users.get(key, set()) in (set(), {"s2"})
+            assert sa in plugin._programmed_pairs
+        assert plugin._pair_users.get(sa, set()) in (set(), {"s2"})
 
 
 class TestLocalSubnetAllocation:
@@ -1447,7 +1462,7 @@ class TestKeyRotation:
         assert policies[0][policies[0].index("spi") + 1] == (
             f"{vx._esp_spi('10.0.0.1', '10.0.0.2', _TEST_GENERATION):#x}"
         )
-        assert plugin._pair_active_generations[("10.0.0.1", "10.0.0.2", 4789)] == (_TEST_GENERATION)
+        assert plugin._pair_active_generations[("10.0.0.1", "10.0.0.2")] == (_TEST_GENERATION)
 
     async def test_rotation_installs_next_generation_before_switching_policy(self) -> None:
         generation = _TEST_GENERATION
@@ -1468,7 +1483,7 @@ class TestKeyRotation:
         new_policy = xfrm_policy_add_args("10.0.0.1", "10.0.0.2", generation=generation)[0]
         policy_index = rec.calls.index(new_policy)
         assert all(rec.calls.index(command) < policy_index for command in new_future)
-        assert plugin._pair_slot_generations[("10.0.0.1", "10.0.0.2", 4789)] == {
+        assert plugin._pair_slot_generations[("10.0.0.1", "10.0.0.2")] == {
             (generation - 1) % 3: generation - 1,
             generation % 3: generation,
             (generation + 1) % 3: generation + 1,
@@ -1668,7 +1683,7 @@ class TestEncryptedPeers:
             await plugin.del_peer("s1", _PEER)
 
         assert rec.calls == [fdb_del_args(4097, "10.0.0.2")]
-        assert ("10.0.0.1", "10.0.0.2", 4789) in plugin._programmed_pairs
+        assert ("10.0.0.1", "10.0.0.2") in plugin._programmed_pairs
 
     async def test_del_peer_refuses_while_unicast_fdb_remains(self) -> None:
         rec = Recorder()
@@ -2123,14 +2138,11 @@ class TestXfrmStateVerb:
             await plugin.ensure_session_security("s1", [_PEER])
 
     async def test_an_unreadable_sa_table_is_not_a_licence_to_overwrite(self) -> None:
-        def _unreadable(argv: Sequence[str]) -> str | None:
-            if list(argv[:3]) == _STATE:
-                raise RuntimeError("Operation not permitted")
-            return None
-
-        plugin = _plugin(Recorder(), reader=_Listing(_unreadable))
+        breaks = _BreakableStateRead()
+        plugin = _plugin(Recorder(), reader=_Listing(breaks))
         await plugin.setup_session_network(_ENC_META, _SELF)
         await plugin.add_peer("s1", _PEER)
+        breaks.broken = True
         plugin._runner = _FailingAdd()
         with pytest.raises(OverlayEncryptionUnavailable, match="could not be read"):
             await plugin.ensure_session_security("s1", [_PEER])
@@ -2726,7 +2738,12 @@ class TestPairOwnershipIsNodeWide:
         plugin = _plugin(rec, pair_journal=journal, journal_owner="agent-a")
         await plugin.setup_session_network(_ENC_META, _SELF)
         await plugin.add_peer("s1", _PEER)
-        # A co-located agent programs the same pair for its own session.
+        # A co-located agent programs the same pair for its own session: both claims, as the
+        # programming path records them.
+        async with journal.claiming(
+            sa_key(_SELF.vtep_ip or "", _PEER.vtep_ip or ""), "agent-b", "s9"
+        ):
+            pass
         async with journal.claiming(
             pair_key(_SELF.vtep_ip or "", _PEER.vtep_ip or "", 4789), "agent-b", "s9"
         ):
@@ -2891,9 +2908,9 @@ class TestProtectionIsOneNodeWidePass:
             "\tdir out priority 0 \n"
             "\tmark 0xd0c4e3/0xffffffff \n"
         )
-        assert parse_owned_policies(listing, f"{XFRM_MARK:#x}") == frozenset({
-            ("10.0.0.1", "10.0.0.2", 4789)
-        })
+        assert parse_owned_policies(listing, f"{XFRM_MARK:#x}") == {
+            ("10.0.0.1", "10.0.0.2", 4789): 0x1
+        }
 
     async def test_an_intact_node_is_left_alone(self) -> None:
         rec = Recorder()
@@ -3156,6 +3173,26 @@ class TestAnSaMustStillBeTheProtectionItPromised:
         # replayed packet; an SA that lost them is not the one the session was promised.
         assert parse_owned_sa_endpoints(self._sa(esn=False), XFRM_REQID) == frozenset()
 
+    def test_an_sa_with_no_algorithm_at_all_is_not_it(self) -> None:
+        # It encrypts nothing. Treating a missing `aead` line as "nothing to object to" reported
+        # exactly that as this session's protection.
+        listing = (
+            "src 10.0.0.1 dst 10.0.0.2\n"
+            f"\tproto esp spi 0x1001 reqid {XFRM_REQID} mode transport\n"
+            "\treplay-window 0 flag esn\n"
+        )
+        assert parse_owned_sa_endpoints(listing, XFRM_REQID) == frozenset()
+
+    def test_a_truncated_icv_is_not_it(self) -> None:
+        # 64 bits of tag is a weaker authenticator than the 128 the session was promised.
+        listing = (
+            "src 10.0.0.1 dst 10.0.0.2\n"
+            f"\tproto esp spi 0x1001 reqid {XFRM_REQID} mode transport\n"
+            "\treplay-window 0 flag esn\n"
+            "\taead rfc4106(gcm(aes)) 0xdeadbeef 64\n"
+        )
+        assert parse_owned_sa_endpoints(listing, XFRM_REQID) == frozenset()
+
 
 class TestAPolicyMustSelectTheRightTraffic:
     def _policy(
@@ -3165,31 +3202,51 @@ class TestAPolicyMustSelectTheRightTraffic:
         mask: str = "0xffffffff",
         reqid: int = XFRM_REQID,
         mode: str = "transport",
+        tmpl_proto: str = "esp",
+        level: str = "",
     ) -> str:
         return (
             f"src 10.0.0.1/32 dst 10.0.0.2/32 proto {proto} dport 4789 \n"
             "\tdir out priority 0 \n"
             f"\tmark {XFRM_MARK:#x}/{mask} \n"
-            f"\ttmpl src 10.0.0.1 dst 10.0.0.2 proto esp spi 0x1 reqid {reqid} mode {mode}\n"
+            f"\ttmpl src 10.0.0.1 dst 10.0.0.2 proto {tmpl_proto} spi 0x1"
+            f" reqid {reqid} mode {mode}{level}\n"
         )
 
     def test_a_complete_policy_counts(self) -> None:
-        assert parse_owned_policies(self._policy(), f"{XFRM_MARK:#x}") == frozenset({
-            ("10.0.0.1", "10.0.0.2", 4789)
-        })
+        assert parse_owned_policies(self._policy(), f"{XFRM_MARK:#x}") == {
+            ("10.0.0.1", "10.0.0.2", 4789): 0x1
+        }
+
+    def test_it_reports_which_generation_the_policy_selects(self) -> None:
+        # A policy left on a retired generation still reads as present, and sends this pair's
+        # traffic to a slot the rotation has already rebuilt under a different key.
+        assert (
+            parse_owned_policies(self._policy(), f"{XFRM_MARK:#x}")[("10.0.0.1", "10.0.0.2", 4789)]
+            == 0x1
+        )
 
     def test_another_protocol_does_not_select_this_traffic(self) -> None:
-        assert parse_owned_policies(self._policy(proto="tcp"), f"{XFRM_MARK:#x}") == frozenset()
+        assert parse_owned_policies(self._policy(proto="tcp"), f"{XFRM_MARK:#x}") == {}
 
     def test_a_narrower_mark_mask_matches_different_packets(self) -> None:
-        assert parse_owned_policies(self._policy(mask="0xffff"), f"{XFRM_MARK:#x}") == frozenset()
+        assert parse_owned_policies(self._policy(mask="0xffff"), f"{XFRM_MARK:#x}") == {}
 
     def test_a_template_naming_another_reqid_is_not_ours(self) -> None:
         # It sends the traffic through an SA this backend does not own.
-        assert parse_owned_policies(self._policy(reqid=13681891), f"{XFRM_MARK:#x}") == frozenset()
+        assert parse_owned_policies(self._policy(reqid=13681891), f"{XFRM_MARK:#x}") == {}
 
     def test_a_tunnel_mode_template_is_not_ours(self) -> None:
-        assert parse_owned_policies(self._policy(mode="tunnel"), f"{XFRM_MARK:#x}") == frozenset()
+        assert parse_owned_policies(self._policy(mode="tunnel"), f"{XFRM_MARK:#x}") == {}
+
+    def test_a_template_on_another_protocol_is_not_ours(self) -> None:
+        # AH authenticates without encrypting; the session was promised ESP.
+        assert parse_owned_policies(self._policy(tmpl_proto="ah"), f"{XFRM_MARK:#x}") == {}
+
+    def test_an_optional_template_is_not_protection(self) -> None:
+        # `level use` lets the packet leave unprotected when no SA matches -- the exact failure the
+        # plaintext drop and the egress guard exist to prevent, written into the policy itself.
+        assert parse_owned_policies(self._policy(level=" level use"), f"{XFRM_MARK:#x}") == {}
 
 
 class TestABroaderRuleShadowsOurs:
@@ -3276,15 +3333,12 @@ class TestADeleteMustNotTakeAnotherPeersSa:
     async def test_an_unreadable_table_stops_the_deletes_rather_than_guessing(self) -> None:
         # Unverified is not permission: a leaked SA of ours keeps traffic encrypted, a wrongly
         # deleted one does not. Teardown reports it, so the retry comes back to this pair.
-        def _unreadable(argv: Sequence[str]) -> str | None:
-            if list(argv[:3]) == _STATE:
-                raise RuntimeError("Operation not permitted")
-            return None
-
+        breaks = _BreakableStateRead()
         rec = Recorder()
-        plugin = _plugin(rec, reader=_Listing(_unreadable))
+        plugin = _plugin(rec, reader=_Listing(breaks))
         await plugin.setup_session_network(_ENC_META, _SELF)
         await plugin.add_peer("s1", _PEER)
+        breaks.broken = True
         rec.calls.clear()
         with pytest.raises(OverlayTeardownIncomplete):
             await plugin.teardown_session_network("s1")
@@ -3359,4 +3413,202 @@ class TestTheChainsCarryEverySessionsRules:
 
         await plugin.reassert_protection()
 
+        assert link_down_args(vxlan_dev(4097)) not in rec.calls
+
+
+class TestSaOwnershipIsPortIndependent:
+    """An SA carries no port. The kernel identifies it by (dst, spi, proto) and `ip xfrm state add`
+    is given none, so every session between two nodes rides the same SAs whatever port its overlay
+    runs on -- while the outbound policy names the port in its selector and does not.
+
+    Counting both per port is what lets the last session on one port delete the SAs a session on
+    another port is still sending through: its policy survives, selects an SA that is gone, and its
+    cross-node traffic stops."""
+
+    def _other_port(self) -> SessionNetMeta:
+        return replace(
+            _ENC_META, session_id="s2", vni=4098, subnet="10.128.6.0/24", vxlan_port=4790
+        )
+
+    async def _two_ports(self, rec: Recorder, tmp_path: Path) -> VxlanNetworkPlugin:
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        await plugin.setup_session_network(self._other_port(), _SELF)
+        await plugin.add_peer("s2", _PEER)
+        return plugin
+
+    async def test_the_first_port_to_end_leaves_the_sas_alone(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = await self._two_ports(rec, tmp_path)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert not any(c[:4] == ["ip", "xfrm", "state", "del"] for c in rec.calls), (
+            "the SAs of a pair a session on another port is still sending through were deleted"
+        )
+
+    async def test_it_does_remove_its_own_policy(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = await self._two_ports(rec, tmp_path)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        deleted_ports = [
+            c[c.index("dport") + 1] for c in rec.calls if c[:4] == ["ip", "xfrm", "policy", "del"]
+        ]
+        assert deleted_ports == ["4789"], "the other port's policy must survive"
+
+    async def test_the_last_port_to_end_removes_them(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = await self._two_ports(rec, tmp_path)
+        await plugin.teardown_session_network("s1")
+        rec.calls.clear()
+        await plugin.teardown_session_network("s2")
+        assert any(c[:4] == ["ip", "xfrm", "state", "del"] for c in rec.calls)
+        assert plugin._programmed_pairs == set()
+        assert plugin._programmed_policies == set()
+
+    async def test_the_second_port_reuses_the_pairs_sas(self, tmp_path: Path) -> None:
+        # One SA ring per node pair, so the second port programs a policy and nothing else.
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        await plugin.setup_session_network(self._other_port(), _SELF)
+        rec.calls.clear()
+        await plugin.add_peer("s2", _PEER)
+        assert not any(c[:3] == ["ip", "xfrm", "state"] for c in rec.calls)
+        assert ("10.0.0.1", "10.0.0.2", 4790) in plugin._programmed_policies
+
+    async def test_another_agent_on_another_port_still_holds_the_sas(self, tmp_path: Path) -> None:
+        # The node-wide half of the same rule: agent B's session runs on 4790, so it claims the
+        # pair's SAs but not this port's policy.
+        journal = PairJournal(tmp_path / "pairs")
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        async with journal.claiming(sa_key("10.0.0.1", "10.0.0.2"), "agent-b", "s9"):
+            pass
+        async with journal.claiming(pair_key("10.0.0.1", "10.0.0.2", 4790), "agent-b", "s9"):
+            pass
+
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert not any(c[:4] == ["ip", "xfrm", "state", "del"] for c in rec.calls)
+        assert any(c[:4] == ["ip", "xfrm", "policy", "del"] for c in rec.calls), (
+            "our own port's policy is ours to remove; only the SAs are shared"
+        )
+
+
+class TestTheRekeyDeleteIsGuardedToo:
+    """Rotation deletes a stale SPI slot before recreating it with the new key. That delete goes
+    through the kernel's (dst, spi, proto) lookup like every other, so it can take a colliding
+    peer's SA -- and a rekey is not a reason to be less careful than a teardown."""
+
+    async def test_a_foreign_sa_at_the_slots_spi_is_not_deleted(self, tmp_path: Path) -> None:
+        generation = _TEST_GENERATION
+
+        def current() -> int:
+            return generation
+
+        rec = Recorder()
+        plugin = _plugin(rec, key_generation=current, pair_journal=PairJournal(tmp_path / "p"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+
+        # A stranger now holds the SPI the next generation's slot will reuse.
+        stolen = _esp_spi("10.0.0.1", "10.0.0.2", generation + 2)
+        held = _sa_listing("10.9.9.9", "10.0.0.2", [stolen])
+        plugin._reader = _Listing(lambda argv: held if list(argv[:3]) == _STATE else None)
+        # The kernel already holds that SPI, so the add on it is EEXIST -- as it would be on a
+        # real host once the delete has been skipped.
+        rec.fail_on = lambda argv: (
+            argv[:4] == ["ip", "xfrm", "state", "add"] and f"{stolen:#x}" in argv
+        )
+        generation += 1
+        rec.calls.clear()
+
+        # Fail closed on the pair we were asked about: the right end for a collision this node
+        # cannot program through.
+        with pytest.raises(RuntimeError):
+            await plugin.ensure_session_security("s1", [_PEER])
+        assert not any(
+            c[:4] == ["ip", "xfrm", "state", "del"] and int(c[c.index("spi") + 1], 0) == stolen
+            for c in rec.calls
+        ), "the stranger's SA was deleted by our rekey"
+        assert ("10.0.0.1", "10.0.0.2") not in plugin._programmed_pairs
+
+
+class TestAPolicyOnARetiredGeneration:
+    """A policy left on the previous generation still reads as present. Its traffic goes to an SPI
+    slot the rotation has already deleted and rebuilt under a different key."""
+
+    async def test_the_pass_reprograms_it(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        stale = _esp_spi("10.0.0.1", "10.0.0.2", _TEST_GENERATION - 1)
+        reader = _protection_reader(plugin, vni=4097)
+        intact = reader._listing
+        assert intact is not None
+
+        def _retired(argv: Sequence[str]) -> str | None:
+            text = intact(argv)
+            if text is not None and list(argv[:3]) == ["ip", "xfrm", "policy"]:
+                return re.sub(r"proto esp spi 0x[0-9a-f]+", f"proto esp spi {stale:#x}", text)
+            return text
+
+        plugin._reader = _Listing(_retired)
+        rec.calls.clear()
+        await plugin.reassert_protection()
+        assert any(c[:4] == ["ip", "xfrm", "policy", "update"] for c in rec.calls)
+
+
+class TestANodeThatCannotSeeItsOwnProtection:
+    """Skipping a pass on one unreadable snapshot is right -- a busy host, an xtables lock held
+    elsewhere. Skipping forever is not: the node has no idea whether anything on it is protected,
+    and it is carrying encrypted traffic on that."""
+
+    def _blind(self) -> _Listing:
+        def _listing(argv: Sequence[str]) -> str | None:
+            raise RuntimeError("xtables lock held")
+
+        return _Listing(_listing)
+
+    async def test_one_failure_leaves_the_session_running(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        plugin._reader = self._blind()
+        rec.calls.clear()
+        await plugin.reassert_protection()
+        assert link_down_args(vxlan_dev(4097)) not in rec.calls
+
+    async def test_a_run_of_them_closes_the_tunnel(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        plugin._reader = self._blind()
+        rec.calls.clear()
+        for _ in range(3):
+            await plugin.reassert_protection()
+        assert link_down_args(vxlan_dev(4097)) in rec.calls
+
+    async def test_one_good_read_clears_the_count(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        plugin._reader = self._blind()
+        await plugin.reassert_protection()
+        await plugin.reassert_protection()
+        plugin._reader = _protection_reader(plugin, vni=4097)
+        await plugin.reassert_protection()
+        assert plugin._unverified_passes == 0
+        plugin._reader = self._blind()
+        rec.calls.clear()
+        await plugin.reassert_protection()
         assert link_down_args(vxlan_dev(4097)) not in rec.calls

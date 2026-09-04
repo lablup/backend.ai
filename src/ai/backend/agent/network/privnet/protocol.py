@@ -23,6 +23,10 @@ from typing import Any
 
 class PrivNetOp(enum.StrEnum):
     SETUP_SESSION = "setup_session"
+    # Take over a session whose data plane already exists on this host, without touching it.
+    # Distinct from setup, which deletes the session's devices before recreating them: that is
+    # right for a fresh session and cuts every running container of one that is already up.
+    ADOPT_SESSION = "adopt_session"
     TEARDOWN_SESSION = "teardown_session"
     # Give up ownership of a session whose devices must stay, because a co-located agent still has
     # kernels on them. Distinct from teardown: nothing on the host is removed.
