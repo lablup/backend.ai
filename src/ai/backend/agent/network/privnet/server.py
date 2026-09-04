@@ -80,6 +80,10 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+#: How often to retry bringing down a tunnel the recovery preflight could not close. Slow:
+#: the thing being waited for is an operator or a transient kernel condition, not a race.
+_FAIL_CLOSE_RETRY_INTERVAL = 30.0
+
 
 # Capability bit numbers we care about (linux/capability.h).
 _CAP_NAMES = {12: "CAP_NET_ADMIN", 21: "CAP_SYS_ADMIN", 0: "CAP_CHOWN", 1: "CAP_DAC_OVERRIDE"}
@@ -221,6 +225,8 @@ class PrivNetServer:
     # owner (it owns every privileged network op), so it is also the one that can answer which
     # block a session holds — the LOCAL_SUBNET query the agent uses to resolve single-node peers.
     _local_subnets: LocalSubnetAllocator
+    #: Keeps retrying the fail-close for tunnels the recovery preflight left UP.
+    _fail_close_tasks: dict[int, asyncio.Task[None]]
 
     def __init__(
         self,
@@ -258,6 +264,7 @@ class PrivNetServer:
         self._journal = journal or PrivNetJournal()
         self._ipam = ipam or get_host_local_ipam()
         self._local_subnets = local_subnets or get_local_subnet_allocator()
+        self._fail_close_tasks = {}
         # Set only where the PID record is agent-written (the rootless backends); see _attach.
         self._netns_owner_uid = netns_owner_uid
         self._netns = netns_pinner or netns_mod.NetnsPinner()
@@ -312,6 +319,34 @@ class PrivNetServer:
         finally:
             await self._runtime.close()
 
+    def _start_fail_close_retry(self, backend: AbstractNetworkAgentPluginV2[Any]) -> None:
+        """Keep trying to bring down what the recovery preflight could not.
+
+        The preflight failing does not stop this process -- that is deliberate, so live sessions
+        can retry their own transitions -- but it leaves a tunnel UP that nothing owns. Retrying
+        only when a new session asks for setup means a node whose sessions have all ended never
+        retries at all.
+        """
+        retry = getattr(backend, "retry_fail_close", None)
+        if retry is None:
+            return  # a backend with no surviving-device concept
+        identity = id(backend)
+        if (existing := self._fail_close_tasks.get(identity)) is not None and not existing.done():
+            return
+
+        async def _loop() -> None:
+            while True:
+                await asyncio.sleep(_FAIL_CLOSE_RETRY_INTERVAL)
+                try:
+                    if not await retry():
+                        return  # everything is down; nothing left to come back for
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("retrying the fail-close of surviving tunnels failed")
+
+        self._fail_close_tasks[identity] = asyncio.create_task(_loop())
+
     async def recover(self) -> None:
         """Rebuild the session registry after a privnet restart, and give back what died while we
         were down.
@@ -353,6 +388,7 @@ class PrivNetServer:
                 )
             try:
                 await backend.prepare_recovery()
+                self._start_fail_close_retry(backend)
             except Exception:
                 # A backend preflight attempts every owned device before it raises. Keep the
                 # privileged service available so the journal can classify those devices, live
@@ -361,6 +397,11 @@ class PrivNetServer:
                 log.exception(
                     "network backend recovery preflight failed; continuing in degraded mode"
                 )
+                # Degraded mode is the reason this exists. Without a timer, a tunnel that could
+                # not be brought down stays UP for as long as this process runs unless a new
+                # session happens to ask for setup -- and on a node whose sessions all ended,
+                # nothing ever asks.
+                self._start_fail_close_retry(backend)
         try:
             live = await self._live_containers()
             journalled_sessions = await self._journal.sessions()
