@@ -93,6 +93,7 @@ async def probe_caps(
     *,
     vxlan_port: int = DEFAULT_VXLAN_PORT,
     vni_range: tuple[int, int] = DEFAULT_VNI_RANGE,
+    privnet_socket: str | None = None,
 ) -> AgentNetworkCaps:
     """Probe this host's networking capabilities, and what would stop it serving a session.
 
@@ -103,7 +104,9 @@ async def probe_caps(
     """
     output = await _run_ethtool(iface)
     tunnel_offload = parse_tunnel_offload(output) if output is not None else False
-    readiness = await probe_readiness(port=vxlan_port, vni_range=vni_range)
+    readiness = await probe_readiness(
+        port=vxlan_port, vni_range=vni_range, privnet_socket=privnet_socket
+    )
     return compute_caps(tunnel_offload=tunnel_offload, readiness=readiness)
 
 

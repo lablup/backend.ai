@@ -67,6 +67,7 @@ from ai.backend.agent.network.backends.vxlan_security import (
     VxlanSecurityStateMachine,
 )
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
+from ai.backend.agent.network.pair_journal import PairJournal, pair_key
 from ai.backend.common.network.types import (
     Member,
     NetworkBackendKind,
@@ -182,10 +183,26 @@ class _Listing:
         return f"-P {builtin} ACCEPT\n"
 
 
+@pytest.fixture(autouse=True)
+def _isolated_pair_journal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point the node-wide ESP pair journal at this test's own directory.
+
+    Its real home is a node-global path shared by every agent on the host, which is the point --
+    and exactly why a test must never use it: the claims would outlive the test and the next one
+    would see a pair still held by a session that does not exist.
+    """
+    monkeypatch.setattr(
+        "ai.backend.agent.network.pair_journal.DEFAULT_PAIR_JOURNAL_DIR",
+        tmp_path / "net-esp-pair",
+    )
+
+
 def _plugin(
     recorder: Recorder,
     *,
     uplink: str = "eth0",
+    pair_journal: PairJournal | None = None,
+    journal_owner: str | None = None,
     underlay: int | None = 1500,
     reach: _ReachRecorder | None = None,
     vxlans: Collection[str] | None = None,
@@ -198,6 +215,8 @@ def _plugin(
         uplink=uplink,
         runner=recorder,
         reader=reader or _Listing(),
+        pair_journal=pair_journal,
+        journal_owner=journal_owner,
         mtu_probe=_mtu_probe(underlay),
         # Default to a probe that answers, so tests unrelated to reachability neither spawn a real
         # AF_PACKET probe nor leave a retry loop running.
@@ -2536,3 +2555,67 @@ class TestUnclosedSurvivors:
         rec.fail_on = None
         await plugin.setup_session_network(_ENC_META, _SELF)
         assert plugin.unclosed_devices() == frozenset()
+
+
+class TestPairOwnershipIsNodeWide:
+    """Two agent processes on one host share the ESP pair between the same node pair, and each
+    has its own in-process refcount. The journal is what stops the first session to end from
+    taking the other's protection with it."""
+
+    async def test_another_agents_claim_stops_the_removal(self, tmp_path: Path) -> None:
+        journal = PairJournal(tmp_path / "pairs")
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        # A co-located agent programs the same pair for its own session.
+        journal.claim(pair_key(_SELF.vtep_ip or "", _PEER.vtep_ip or "", 4789), "agent-b", "s9")
+
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert not any(list(c[:4]) == ["ip", "xfrm", "state", "del"] for c in rec.calls), (
+            "the pair's SAs were deleted while another agent on this host was still carried by"
+            " them; its session goes dead until the next reconcile"
+        )
+
+    async def test_the_last_agent_on_the_node_does_remove_it(self, tmp_path: Path) -> None:
+        journal = PairJournal(tmp_path / "pairs")
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert any(list(c[:4]) == ["ip", "xfrm", "state", "del"] for c in rec.calls)
+
+    async def test_recovery_drops_the_claims_of_a_previous_life(self, tmp_path: Path) -> None:
+        journal = PairJournal(tmp_path / "pairs")
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        journal.claim(key, "agent-a", "gone")
+        plugin = _plugin(Recorder(), pair_journal=journal, journal_owner="agent-a")
+        await plugin.prepare_recovery()
+        assert journal.users(key) == frozenset()
+
+
+class TestUnclosedSurvivorsBlockEverything:
+    """An unclosed tunnel shares the underlay port, the XFRM pairs and the firewall chains with
+    whatever is set up next, so admitting a DIFFERENT VNI beside it is admitting a session onto
+    state nobody owns."""
+
+    async def test_a_different_vni_is_refused_too(self) -> None:
+        rec = Recorder(fail_on=lambda argv: list(argv[:3]) == ["ip", "link", "set"])
+        plugin = _plugin(rec, vxlans={vxlan_dev(4097)})
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.prepare_recovery()
+        other = replace(_ENC_META, session_id="s2", vni=4098)
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(other, _SELF)
+
+    async def test_retry_reports_what_is_still_up(self) -> None:
+        rec = Recorder(fail_on=lambda argv: list(argv[:3]) == ["ip", "link", "set"])
+        plugin = _plugin(rec, vxlans={vxlan_dev(4097)})
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.prepare_recovery()
+        assert await plugin.retry_fail_close() == frozenset({vxlan_dev(4097)})
+        rec.fail_on = None
+        assert await plugin.retry_fail_close() == frozenset()

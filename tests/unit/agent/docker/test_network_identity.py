@@ -8,6 +8,7 @@ happens and the pairing check never fires. These pin the publishing itself.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -40,6 +41,9 @@ class _AgentStub:
         self.id = "i-abc123"
         self._vtep_ip = vtep_ip
         self._host_ip = host_ip
+        # Readiness asks the privileged helper whether it is up; None means this node does not
+        # use one, which is the case that needs no socket.
+        self.local_config = SimpleNamespace(agent=SimpleNamespace(network_privnet_socket=None))
 
 
 async def _publish(stub: _AgentStub) -> None:

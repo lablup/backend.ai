@@ -238,7 +238,15 @@ async def _amain() -> None:
     )
     backends = {
         str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin(
-            {}, {}, uplink=uplink, local_subnets=local_subnets
+            {},
+            {},
+            uplink=uplink,
+            local_subnets=local_subnets,
+            # One privnet usually owns the whole host's networking, which makes the in-process
+            # pair refcount node-wide on its own -- but not on a host also running an agent with
+            # the backend in-process, and not across this privnet's own restarts. Tagged with the
+            # agent id either way, so the claims can be told apart and reclaimed.
+            journal_owner=agent_id,
         ),
         str(NetworkBackendKind.BRIDGE): BridgeNetworkPlugin(
             {}, {}, uplink=uplink, local_subnets=local_subnets

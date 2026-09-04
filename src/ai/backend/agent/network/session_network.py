@@ -1364,7 +1364,16 @@ def build_session_network(
         if backends is None:
             backends = {
                 str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin(
-                    {}, {}, uplink=uplink, local_subnets=owned_local_subnets
+                    {},
+                    {},
+                    uplink=uplink,
+                    local_subnets=owned_local_subnets,
+                    # Several agents can run the backend in-process on one host, and the ESP pair
+                    # they share is node-wide state. The claim is tagged with the agent id for the
+                    # same reason the LOCAL subnet claim next to it is: so a co-located agent
+                    # replaying the journal can tell whose sessions are whose, and so a restart
+                    # can find and drop the claims its previous life left behind.
+                    journal_owner=agent_id,
                 ),
                 str(NetworkBackendKind.BRIDGE): BridgeNetworkPlugin(
                     {}, {}, uplink=uplink, local_subnets=owned_local_subnets
