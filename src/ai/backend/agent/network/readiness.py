@@ -16,6 +16,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from ai.backend.agent.errors.network import UndescribableVxlanDevice
 from ai.backend.logging import BraceStyleAdapter
 
 #: Devices this backend made. Anything else on our port or in our VNI range belongs to someone
@@ -226,7 +227,12 @@ class Readiness:
         return not self.blocking
 
 
-async def probe_readiness(*, port: int, vni_range: tuple[int, int]) -> Readiness:
+async def probe_readiness(
+    *,
+    port: int,
+    vni_range: tuple[int, int],
+    privnet_socket: str | None = None,
+) -> Readiness:
     """Everything that would stop this node from serving an overlay session.
 
     Read-only, and run at startup: the point is that the reason exists BEFORE a session is
@@ -245,6 +251,15 @@ async def probe_readiness(*, port: int, vni_range: tuple[int, int]) -> Readiness
                 f"iptables has no `{match}` match (xt_{match}). An encrypted session needs it to "
                 "tell its own VNI's frames apart, and is refused on this node without it."
             )
+    if privnet_socket is not None:
+        # On a privnet-backed node every device, rule and XFRM object is made by that process.
+        # Checking only the local binaries said this node was ready while the thing that would
+        # actually do the work was not running -- and the session found out one node at a time,
+        # at create time, from a bare connection error.
+        from ai.backend.agent.network.privnet.client import PrivNetClient
+
+        if (unreachable := await PrivNetClient(privnet_socket).reachable()) is not None:
+            blocking.append(unreachable)
     devices, unreadable = await describe_vxlan_devices()
     advisory = foreign_conflicts(devices, port=port, vni_range=vni_range)
     if unreadable:
@@ -269,15 +284,18 @@ async def conflicting_device(*, port: int, vni: int) -> str | None:
     for device in devices:
         if not device.is_ours and device.dstport == port and device.vni == vni:
             return device.name
-    if unreadable:
-        # Not a refusal: no session could start on a host whose iproute2 cannot describe its own
-        # devices, and that is a worse failure than the one being guarded against. Said out loud
-        # instead, so "no conflict found" is never confused with "no conflict".
-        log.warning(
-            "could not describe the VXLAN device(s) {} on this host, so VNI {} on udp/{} was"
-            " admitted without ruling out a collision with them",
-            ", ".join(unreadable),
-            vni,
-            port,
+    # Only OUR devices being undescribable is not a hazard: we know their VNI from their name,
+    # and two of our own sessions never share one. A FOREIGN device we could not read is the
+    # dangerous case -- it may be on this exact port and VNI, and the drop and mark rules select
+    # on nothing else -- and "could not check" must not be reported as "no conflict".
+    foreign_unreadable = [name for name in unreadable if not name.startswith(OURS_PREFIX)]
+    if foreign_unreadable:
+        raise UndescribableVxlanDevice(
+            f"refusing VNI {vni} on udp/{port}: this host has VXLAN device(s)"
+            f" ({', '.join(foreign_unreadable)}) that `ip -d link` cannot describe -- it exits"
+            " non-zero or crashes on both of its forms -- so a collision with them cannot be"
+            " ruled out, and a collision means each side's firewall rules act on the other's"
+            " traffic. Give this cluster its own UDP port (the manager's `vxlan-port`), or"
+            " remove the device."
         )
     return None
