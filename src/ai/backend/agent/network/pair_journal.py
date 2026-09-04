@@ -21,8 +21,10 @@ import fcntl
 import logging
 import os
 import stat
+import tempfile
 from collections.abc import AsyncIterator, Collection
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
@@ -34,6 +36,20 @@ DEFAULT_PAIR_JOURNAL_DIR: Final = Path("/var/lib/backend.ai/net-esp-pair")
 #: Created like /tmp: any co-located agent may add its own claim, and the sticky bit stops it
 #: removing anyone else's.
 _SHARED_DIR_MODE: Final = 0o1777
+#: Entries are group-readable so agents running as different users on one host can still count
+#: each other's claims -- the whole point of the journal.
+_ENTRY_MODE: Final = 0o644
+#: The lock lives beside the data, on a file that is never renamed, replaced or removed.
+_LOCK_SUFFIX: Final = ".lock"
+
+
+@dataclass(frozen=True)
+class _Held:
+    """One pair's lock, held: the lock fd, and where its data lives."""
+
+    fd: int
+    path: Path
+    root: Path
 
 
 def pair_key(self_vtep: str, peer_vtep: str, dstport: int) -> str:
@@ -68,19 +84,19 @@ class PairJournal:
         then be open with nothing encrypting it.
 
         Yields whether the claim was actually recorded. False means the journal could not be
-        written -- the caller may still program, but must never later conclude from this journal
-        that the pair is free.
+        written, and the caller must NOT program the pair: a claim that is not on disk is a claim
+        another process cannot count, and it will remove the very SAs being installed.
         """
-        async with self._hold(key) as path:
-            if path is None:
+        async with self._hold(key) as held:
+            if held is None:
                 yield False
                 return
-            users = await asyncio.to_thread(self._read, path)
+            users = await asyncio.to_thread(self._read, held)
             if users is None:
                 yield False
                 return
             users.add(f"{owner}/{session_id}")
-            yield await asyncio.to_thread(self._write, path, users)
+            yield await asyncio.to_thread(self._write, held, users)
 
     @asynccontextmanager
     async def releasing(self, key: str, owner: str, session_id: str) -> AsyncIterator[bool | None]:
@@ -93,109 +109,149 @@ class PairJournal:
 
         The lock spans the caller's block so the answer cannot go stale inside it.
         """
-        async with self._hold(key) as path:
-            if path is None:
+        async with self._hold(key) as held:
+            if held is None:
                 yield None
                 return
-            users = await asyncio.to_thread(self._read, path)
+            users = await asyncio.to_thread(self._read, held)
             if users is None:
                 yield None
                 return
             users.discard(f"{owner}/{session_id}")
-            if not await asyncio.to_thread(self._write, path, users):
+            if not await asyncio.to_thread(self._write, held, users):
                 # The claim may still be on disk, so another agent could still read us as a user.
-                # Removing the SAs now would be removing them on an answer we did not manage to
-                # publish.
+                # Removing the SAs now would be removing them on an answer we did not publish.
                 yield None
                 return
             yield not users
 
     @asynccontextmanager
-    async def _hold(self, key: str) -> AsyncIterator[Path | None]:
-        """The pair's exclusive host-wide lock, acquired off the event loop."""
-        opened = await asyncio.to_thread(self._open_locked, key)
-        if opened is None:
+    async def _hold(self, key: str) -> AsyncIterator[_Held | None]:
+        """The pair's exclusive host-wide lock, acquired off the event loop.
+
+        The lock is taken on a file of its own that is never renamed, replaced or removed. It used
+        to be taken on the data file, which `_write` replaces by rename -- so the moment a writer
+        published its new version, the lock it still held was on an inode nobody would open again
+        and the next process locked the new one straight away. Reproduced with two journal
+        instances: the second entered `claiming()` while the first was inside `releasing()`.
+        """
+        held = await asyncio.to_thread(self._acquire, key)
+        if held is None:
             yield None
             return
-        fd, path = opened
         try:
-            yield path
+            yield held
         finally:
-            await asyncio.to_thread(self._unlock, fd)
+            await asyncio.to_thread(self._release_lock, held)
 
-    def _open_locked(self, key: str) -> tuple[int, Path] | None:
+    def _acquire(self, key: str) -> _Held | None:
         if not self._ensure_root():
             return None
-        path = self._root / key
+        lock_path = self._root / f"{key}{_LOCK_SUFFIX}"
         fd: int | None = None
         try:
             # O_NOFOLLOW: the directory is shared by every agent on the node, so a local user can
             # pre-create one of these predictable names as a symlink. Following it would have a
             # process holding CAP_DAC_OVERRIDE read and truncate whatever it points at.
-            fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+            fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, _ENTRY_MODE)
             if not stat.S_ISREG(os.fstat(fd).st_mode):
-                log.warning("ESP pair journal entry {} is not a regular file; ignoring it", path)
+                log.warning("ESP pair lock {} is not a regular file; ignoring it", lock_path)
                 os.close(fd)
                 return None
             fcntl.flock(fd, fcntl.LOCK_EX)
         except OSError as e:
-            log.warning("ESP pair journal {} unavailable: {}", path, e)
+            log.warning("ESP pair lock {} unavailable: {}", lock_path, e)
             if fd is not None:
                 os.close(fd)
             return None
-        return fd, path
+        return _Held(fd=fd, path=self._root / key, root=self._root)
 
-    def _unlock(self, fd: int) -> None:
+    def _release_lock(self, held: _Held) -> None:
         try:
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            fcntl.flock(held.fd, fcntl.LOCK_UN)
         finally:
-            os.close(fd)
+            os.close(held.fd)
 
-    def _read(self, path: Path) -> set[str] | None:
+    def _read(self, held: _Held) -> set[str] | None:
         """The pair's users, or None when the file could not be read.
 
         None is not an empty set. An unreadable file answers "nobody is on this pair" if the two
         are conflated, and that answer authorises deleting an SA somebody else is using.
+
+        Read through a fd opened here rather than by re-opening the name later: with the lock on a
+        separate inode, the data name is the only thing left that a co-tenant could swap between
+        the check and the read.
         """
         try:
-            return {line.strip() for line in path.read_text().splitlines() if line.strip()}
+            fd = os.open(held.path, os.O_RDONLY | os.O_NOFOLLOW)
+        except FileNotFoundError:
+            return set()  # nobody has claimed this pair yet
         except OSError as e:
-            log.warning("could not read the ESP pair journal {}: {}", path, e)
+            log.warning("could not read the ESP pair journal {}: {}", held.path, e)
+            return None
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                log.warning("ESP pair journal {} is not a regular file", held.path)
+                return None
+            with os.fdopen(fd, "r", encoding="utf-8") as handle:
+                return {line.strip() for line in handle.read().splitlines() if line.strip()}
+        except OSError as e:
+            log.warning("could not read the ESP pair journal {}: {}", held.path, e)
             return None
 
-    def _write(self, path: Path, users: set[str]) -> bool:
+    def _write(self, held: _Held, users: set[str]) -> bool:
         """Replace the pair's users. Returns whether it landed.
 
-        Written to a temporary file and renamed, so a crash mid-write leaves the previous set
-        rather than a truncated one: a half-written claim file reads as fewer users than there
-        are, which is the same failure as an unreadable one.
+        Written to a unique temporary file and renamed, then the directory is fsynced: a crash
+        mid-write must leave the previous set rather than a truncated one, because a half-written
+        claim file reads as fewer users than there are -- the same failure as an unreadable one.
+        The name is unique rather than pid-based, so a temporary left by a crash cannot make every
+        later write fail on O_EXCL once that pid comes round again.
+
+        An emptied pair is written empty rather than unlinked: the name stays stable, and nothing
+        here has to reason about a file appearing and disappearing under a lock held elsewhere.
         """
+        tmp: Path | None = None
         try:
-            if not users:
-                path.unlink(missing_ok=True)
-                return True
-            tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                    handle.write("\n".join(sorted(users)) + "\n")
-                    handle.flush()
-                    os.fsync(handle.fileno())
-            except BaseException:
-                tmp.unlink(missing_ok=True)
-                raise
-            tmp.replace(path)
+            fd, tmp_name = tempfile.mkstemp(
+                dir=held.root, prefix=f".{held.path.name}.", suffix=".tmp"
+            )
+            tmp = Path(tmp_name)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write("\n".join(sorted(users)) + "\n" if users else "")
+                handle.flush()
+                os.fsync(handle.fileno())
+            tmp.chmod(_ENTRY_MODE)
+            tmp.replace(held.path)
+            tmp = None
+            self._fsync_dir(held.root)
             return True
         except OSError as e:
-            log.warning("could not update the ESP pair journal {}: {}", path, e)
+            log.warning("could not update the ESP pair journal {}: {}", held.path, e)
             return False
+        finally:
+            if tmp is not None:
+                tmp.unlink(missing_ok=True)
+
+    def _fsync_dir(self, root: Path) -> None:
+        """Make the rename itself durable, not just the bytes it published."""
+        try:
+            fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+        except OSError:
+            return
+        try:
+            os.fsync(fd)
+        except OSError:
+            pass
+        finally:
+            os.close(fd)
 
     async def users(self, key: str) -> frozenset[str]:
         """Everyone on this node currently claiming the pair, for diagnostics."""
-        async with self._hold(key) as path:
-            if path is None:
+        async with self._hold(key) as held:
+            if held is None:
                 return frozenset()
-            return frozenset(await asyncio.to_thread(self._read, path) or ())
+            return frozenset(await asyncio.to_thread(self._read, held) or ())
 
     async def prune(self, owner: str, live_sessions: Collection[str]) -> int:
         """Drop ``owner``'s claims for sessions it no longer has. Returns how many went.
@@ -209,16 +265,20 @@ class PairJournal:
         prefix = f"{owner}/"
         removed = 0
         try:
-            names = sorted(entry.name for entry in self._root.iterdir() if entry.is_file())
+            names = sorted(
+                entry.name
+                for entry in self._root.iterdir()
+                if entry.is_file()
+                and not entry.name.startswith(".")
+                and not entry.name.endswith(_LOCK_SUFFIX)
+            )
         except OSError:
             return 0
         for name in names:
-            if name.startswith("."):
-                continue  # a interrupted write's temporary file
-            async with self._hold(name) as path:
-                if path is None:
+            async with self._hold(name) as held:
+                if held is None:
                     continue
-                users = await asyncio.to_thread(self._read, path)
+                users = await asyncio.to_thread(self._read, held)
                 if users is None:
                     continue
                 stale = {
@@ -228,6 +288,6 @@ class PairJournal:
                 }
                 if not stale:
                     continue
-                if await asyncio.to_thread(self._write, path, users - stale):
+                if await asyncio.to_thread(self._write, held, users - stale):
                     removed += len(stale)
         return removed
