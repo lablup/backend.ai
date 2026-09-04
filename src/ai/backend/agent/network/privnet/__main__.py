@@ -37,7 +37,9 @@ Configuration comes from environment variables so the launcher stays trivial:
                                  config's [agent] network-privnet-socket, else /run default)
     BACKENDAI_PRIVNET_CONFIG   agent config file to read the socket path from (optional)
     BACKENDAI_PRIVNET_UID      uid allowed to connect (default: the invoking SUDO_UID)
-    BACKENDAI_PRIVNET_AGENT_ID this node's agent id
+    BACKENDAI_PRIVNET_AGENT_ID this node's agent id (REQUIRED: it is the owner half of
+                                 every node-wide claim, so an empty one lets two agents
+                                 on a host delete each other's networks)
     BACKENDAI_PRIVNET_HOST_IP  advertised host IP (VTEP for vxlan)
     BACKENDAI_PRIVNET_CTRD_NS  containerd namespace (default backend-ai)
     BACKENDAI_PRIVNET_UPLINK   uplink interface for vxlan (default: the live interface holding
@@ -213,7 +215,17 @@ async def _amain() -> None:
     raw_cfg = _read_agent_config()
     socket_path = _resolve_socket_path(raw_cfg)
     allowed_uid = int(os.environ.get("BACKENDAI_PRIVNET_UID") or _default_uid())
-    agent_id = os.environ.get("BACKENDAI_PRIVNET_AGENT_ID", "")
+    # Required, not defaulted. The agent id is the OWNER half of every node-wide claim this
+    # process makes -- ESP pairs and VNI bindings alike -- and an empty one writes claims no
+    # reader can attribute. A registry that cannot attribute a claim cannot count it, and a VNI
+    # whose holders cannot be counted reads as free to the next setup, which then deletes the
+    # devices of whatever is running on it.
+    agent_id = os.environ.get("BACKENDAI_PRIVNET_AGENT_ID", "").strip()
+    if not agent_id:
+        raise SystemExit(
+            "BACKENDAI_PRIVNET_AGENT_ID is required: it identifies this agent in the node-wide"
+            " claims that keep two agents on one host from deleting each other's networks."
+        )
     host_ip = os.environ.get("BACKENDAI_PRIVNET_HOST_IP", "127.0.0.1")
     # Derive the uplink from the advertised address, as the agent does: a vxlan device built on a
     # hard-coded eth0 that does not carry the VTEP advertises an endpoint peers cannot reach.
