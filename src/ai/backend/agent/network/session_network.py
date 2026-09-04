@@ -1131,16 +1131,7 @@ class SessionNetwork:
                 session_id,
                 len(running),
             )
-            if backend is not None:
-                # BEFORE the coordinator stops, because stopping it removes this node's member
-                # key -- the manager's signal that this agent has let the session go. Removing
-                # that first and then failing to withdraw is what leaves the manager believing
-                # the VNI is free while the claim, the watchdog responsibility and the journal
-                # record are all still here. The failure propagates for the same reason.
-                #
-                # The devices stay for the co-located agent; only this process's ownership goes.
-                await backend.withdraw_session_network(session_id)
-            await coordinator.stop(session_id, teardown_data_plane=False)
+            await self._withdraw_without_teardown(session_id, coordinator, backend)
         else:
             if backend is not None:
                 with contextlib.suppress(Exception):
@@ -1156,6 +1147,24 @@ class SessionNetwork:
         self._coordinators.pop(session_id, None)
         self._orchestrators.pop(session_id, None)
         self._session_backends.pop(session_id, None)
+
+    async def _withdraw_without_teardown(
+        self,
+        session_id: str,
+        coordinator: SessionNetworkCoordinator,
+        backend: AbstractNetworkAgentPluginV2[Any] | None,
+    ) -> None:
+        """Let a session go while its devices stay for a co-located agent's kernels.
+
+        The backend first, then the coordinator. Stopping the coordinator removes this node's
+        member key -- the manager's signal that this agent has let the session go -- so removing
+        that first and then failing to withdraw leaves the manager believing the VNI is free while
+        the ESP pair claim, the watchdog responsibility and the privnet's journal record are all
+        still here. The failure propagates for the same reason.
+        """
+        if backend is not None:
+            await backend.withdraw_session_network(session_id)
+        await coordinator.stop(session_id, teardown_data_plane=False)
 
     async def _purge_local_addresses(self, session_id: str) -> None:
         """Drop the IPAM claims in this session's LOCAL block, whose containers are all gone."""
