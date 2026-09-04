@@ -6,8 +6,7 @@ from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from glide import GlideClient
-from glide.exceptions import ClosingError  # type: ignore[import-not-found]
+from glide import ClosingError, GlideClient
 
 from ai.backend.common.clients.valkey_client.client import (
     MonitoringValkeyClient,

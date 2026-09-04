@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import multiprocessing as mp
 import random
 import tempfile
 import threading
@@ -9,6 +10,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
+from multiprocessing.queues import Queue as MPQueue
 from pathlib import Path
 from typing import Any, Literal, override
 
@@ -421,68 +423,66 @@ async def test_global_timer_redlock(
     assert target_count - 2 <= num_records <= target_count + 2
 
 
-# Tests using Process are failing due to a compatibility issue with valkey-glide.
-# @pytest.mark.parametrize("etcd_client", ["etcd-client-py"])
-# async def test_global_timer_etcdlock(
-#     test_case_ns,
-#     etcd_container,
-#     etcd_client,
-#     redis_container,
-#     test_node_id,
-# ) -> None:
-#     lock_name = f"{test_case_ns}lock"
-#     event_records_queue: Queue = Queue()
-#     num_processes = 7
-#     num_records = 0
-#     delay = 3.0
-#     interval = 0.5
-#     target_count = delay / interval
-#     processes: List[Process] = []
-#     stop_event = Event()
-#     stream_key = f"test-stream-{random.randint(0, 1000)}"
-#     group_name = f"test-group-{random.randint(0, 1000)}"
-#     for proc_idx in range(num_processes):
-#         process = Process(
-#             target=etcd_timer_node_process,
-#             name=f"proc-{proc_idx}",
-#             args=(
-#                 event_records_queue,
-#                 stop_event,
-#                 EtcdLockContext(
-#                     addr=etcd_container[1],
-#                     namespace=test_case_ns,
-#                     lock_name=lock_name,
-#                 ),
-#                 TimerNodeContext(
-#                     test_case_ns=test_case_ns,
-#                     interval=interval,
-#                     redis_container=redis_container[1],
-#                     stream_key=stream_key,
-#                     group_name=group_name,
-#                     node_id=test_node_id,
-#                 ),
-#                 etcd_client,
-#             ),
-#         )
-#         process.start()
-#         processes.append(process)
-#     print(f"spawned {num_processes} timers")
-#     print(processes)
-#     print("waiting")
-#     time.sleep(delay)
-#     print("stopping timers")
-#     stop_event.set()
-#     print("joining timer processes")
-#     for timer_node in processes:
-#         timer_node.join()
-#     print("checking records")
-#     event_records: List[float] = []
-#     while not event_records_queue.empty():
-#         event_records.append(event_records_queue.get())
-#     print(event_records)
-#     num_records = len(event_records)
-#     print(f"{num_records=}")
-#     assert target_count - 2 <= num_records <= target_count + 2
+@pytest.mark.parametrize("etcd_client", ["etcd-client-py"])
+async def test_global_timer_etcdlock(
+    test_case_ns: str,
+    etcd_container: tuple[Any, Any],
+    etcd_client: Literal["etcd-client-py"],
+    redis_container: tuple[Any, HostPortPair],
+    test_node_id: str,
+) -> None:
+    lock_name = f"{test_case_ns}lock"
+    event_records_queue: MPQueue[float] = mp.Queue()
+    num_processes = 7
+    delay = 3.0
+    interval = 0.5
+    target_count = delay / interval
+    processes: list[mp.Process] = []
+    stop_event = mp.Event()
+    stream_key = f"test-stream-{random.randint(0, 1000)}"
+    group_name = f"test-group-{random.randint(0, 1000)}"
+    for proc_idx in range(num_processes):
+        process = mp.Process(
+            target=etcd_timer_node_process,
+            name=f"proc-{proc_idx}",
+            args=(
+                event_records_queue,
+                stop_event,
+                EtcdLockContext(
+                    namespace=test_case_ns,
+                    addrs=[etcd_container[1].to_legacy()],
+                    lock_name=lock_name,
+                ),
+                TimerNodeContext(
+                    test_case_ns=test_case_ns,
+                    interval=interval,
+                    redis_container=redis_container[1],
+                    stream_key=stream_key,
+                    group_name=group_name,
+                    node_id=test_node_id,
+                ),
+                etcd_client,
+            ),
+        )
+        process.start()
+        processes.append(process)
+    print(f"spawned {num_processes} timers")
+    print(processes)
+    print("waiting")
+    time.sleep(delay)
+    print("stopping timers")
+    stop_event.set()
+    print("joining timer processes")
+    for timer_process in processes:
+        timer_process.join()
+    print("checking records")
+    event_records: list[float] = []
+    while not event_records_queue.empty():
+        event_records.append(event_records_queue.get())
+    print(event_records)
+    num_records = len(event_records)
+    print(f"{num_records=}")
+    assert target_count - 2 <= num_records <= target_count + 2
 
 
 async def test_global_timer_join_leave(
