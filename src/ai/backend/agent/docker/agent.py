@@ -81,6 +81,12 @@ from ai.backend.agent.kernel_registry.recovery.docker_recovery import (
     DockerKernelRegistryRecovery,
 )
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.network.caps import (
+    probe_caps,
+    publish_caps,
+    publish_vtep,
+    withdraw_vtep,
+)
 from ai.backend.agent.network.dns import resolve_container_dns
 from ai.backend.agent.network.port_forward import (
     PortForwarder,
@@ -1784,6 +1790,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     #: The address peers program into their FDB. None means this node cannot anchor a tunnel, and
     #: ensure_session refuses a vxlan session outright rather than publishing an unreachable VTEP.
     _vtep_ip: str | None
+    #: The raw configured address the VTEP was validated from, kept for the startup diagnostic.
+    _host_ip: str
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1896,6 +1904,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         # membership record.
         container_cfg = self.local_config.container
         host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
+        self._host_ip = host_ip
         self._vtep_ip = usable_vtep(host_ip)
         self._session_network = build_docker_session_network(
             self.etcd,
@@ -1911,6 +1920,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         await self._session_network.open()
         await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
+        await self._publish_network_identity()
         try:
             async with Docker() as docker:
                 gwbridge = await docker.networks.get("docker_gwbridge")
@@ -1959,6 +1969,38 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             context=self,
             allowlist=self.local_config.agent.allow_network_plugins,
             blocklist=self.local_config.agent.block_network_plugins,
+        )
+
+    async def _publish_network_identity(self) -> None:
+        """Advertise this node's overlay identity: its capabilities and its VTEP (BEP-1062).
+
+        The VTEP lets the manager pre-seed session membership, which is what removes the
+        peer-publish race for a multi-node overlay. See `network/caps.py`.
+        """
+        # A diagnostic signal for operators (e.g. VXLAN tunnel offload); best-effort, because a
+        # failure to describe the uplink must not stop the agent from serving kernels.
+        try:
+            await publish_caps(
+                self.etcd,
+                str(self.id),
+                await probe_caps(uplink_for_ip(self._vtep_ip or self._host_ip)),
+            )
+        except Exception:
+            log.exception("could not publish this agent's network capabilities")
+        # Only the validated address is ever published; with none, say so once here, where an
+        # operator can act on it, rather than only at the first vxlan session that gets refused.
+        if self._vtep_ip is not None:
+            await publish_vtep(self.etcd, str(self.id), self._vtep_ip)
+            return
+        # Retract, not merely skip: the key is durable, so an address published on an earlier boot
+        # would otherwise keep being pre-seeded into peers' FDBs long after this node stopped
+        # holding it -- by which time it may belong to a different host entirely.
+        await withdraw_vtep(self.etcd, str(self.id))
+        log.warning(
+            "no usable VTEP: container.advertised-host/bind-host ({!r}) is not a routable unicast"
+            " IPv4 address held by an interface of this host that is up. Single-node sessions work;"
+            " a multi-node overlay (vxlan) session scheduled here will be refused until it is set.",
+            self._host_ip,
         )
 
     @override
