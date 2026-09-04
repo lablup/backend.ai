@@ -101,7 +101,7 @@ def gql_node_type(
     )
 
     def wrap(cls: type[T]) -> type[T]:
-        wrapped = cast(type[T], strawberry_wrap(cls))
+        wrapped = strawberry_wrap(cls)
         dto_cls = node_dto_type(wrapped)
         if dto_cls is not None:
             check_no_resolver_field_shadowing(wrapped, dto_cls)
