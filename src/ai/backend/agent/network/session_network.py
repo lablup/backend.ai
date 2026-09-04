@@ -30,6 +30,7 @@ from ai.backend.agent.errors.network import (
     ContainerLifecycleUnavailable,
     ContainerSourceUnwired,
     LocalSubnetSourceUnwired,
+    OverlayEncryptionUnavailable,
     SessionNetworkGone,
     UnusableVtep,
 )
@@ -319,7 +320,57 @@ class SessionNetwork:
                 self._recovery_incomplete[name] = f"still up: {', '.join(sorted(remaining))}"
             else:
                 self._recovery_incomplete.pop(name, None)
+        if not self._recovery_incomplete:
+            # The devices are down, so a claim of ours that no live session accounts for is stale
+            # and nothing else will ever remove it. Deferred until now on purpose: pruning while a
+            # tunnel was still UP would drop the claim of a pair that may still be carrying.
+            await self._prune_stale_claims()
+        await self._retry_unresumed()
         return {**self._recovery_incomplete, **self._unrecovered_sessions()}
+
+    async def _prune_stale_claims(self) -> None:
+        """Drop this node's pair claims for sessions it no longer holds."""
+        live = set(self._tracker.sessions())
+        for name, backend in self._backends.items():
+            prune = getattr(backend, "prune_pair_claims", None)
+            if prune is None:
+                continue
+            try:
+                if dropped := await prune(live):
+                    log.info("dropped {} stale ESP pair claim(s) from {}", dropped, name)
+            except Exception:
+                log.exception("could not prune stale ESP pair claims from {}", name)
+
+    async def _retry_unresumed(self) -> None:
+        """Try again to recover what would not recover, rather than only reporting it.
+
+        A transient container-runtime or metadata error used to leave a session unmanaged -- and
+        this node unable to take overlay work -- until the process was restarted, because nothing
+        ever came back to it. A wholly failed recovery re-runs `recover`; individual sessions
+        re-run their own resume.
+        """
+        if "recovery" in self._unresumed:
+            try:
+                await self.recover()
+            except Exception as e:
+                self._unresumed["recovery"] = str(e)
+            else:
+                self._unresumed.pop("recovery", None)
+            return  # recover() rebuilds the per-session state itself
+        for session_id in list(self._unresumed):
+            meta = await self._read_session_meta(session_id)
+            if meta is None:
+                # The manager dropped the session while we were failing to resume it; there is
+                # nothing left to resume and its containers are orphans that clean_kernel removes.
+                self._unresumed.pop(session_id, None)
+                continue
+            try:
+                await self._resume_session(session_id, meta)
+            except Exception as e:
+                self._unresumed[session_id] = str(e)
+                continue
+            self._unresumed.pop(session_id, None)
+            log.info("session network for {} recovered on a later attempt", session_id)
 
     def _unrecovered_sessions(self) -> dict[str, str]:
         """Sessions this node holds state for but could not resume, as readiness problems.
@@ -667,6 +718,26 @@ class SessionNetwork:
                 del self._session_lock_users[session_id]
                 self._session_locks.pop(session_id, None)
 
+    def _refuse_while_unrecovered(self, meta: SessionNetMeta) -> None:
+        """Refuse a new overlay session while this node has not finished recovering.
+
+        Readiness tells the manager, but the manager reads it on its own schedule and a request
+        decided before that read still arrives here. Building a new VXLAN beside state this node
+        can neither converge nor tear down is the case that has to be refused locally, at the
+        moment it is asked, not the moment the capability was published.
+        """
+        if meta.backend is not NetworkBackendKind.VXLAN:
+            return  # a node-local bridge session shares nothing with the unrecovered state
+        problems = self.recovery_problems()
+        if not problems:
+            return
+        raise OverlayEncryptionUnavailable(
+            "refusing a new overlay session on this node: recovery has not completed"
+            f" ({'; '.join(f'{where}: {why}' for where, why in sorted(problems.items()))})."
+            " Until it does, this node holds devices, XFRM state and firewall rules it can"
+            " neither converge nor tear down, and a new session would be built beside them."
+        )
+
     async def ensure_session(
         self, session_id: str, kernel_id: str, network_config: Mapping[str, Any]
     ) -> SessionNetMeta:
@@ -680,6 +751,7 @@ class SessionNetwork:
         plane down under the ones still being built (see SessionContainerTracker.reserve).
         """
         meta = session_net_meta_from_network_config(session_id, network_config)
+        self._refuse_while_unrecovered(meta)
         if meta.backend is NetworkBackendKind.VXLAN and self._vtep_ip is None:
             # Refuse the session here rather than build an overlay this node cannot be reached on.
             # Silently joining would strand the whole session: the peers program our unusable VTEP,

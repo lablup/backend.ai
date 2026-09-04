@@ -37,9 +37,14 @@ DEFAULT_PAIR_JOURNAL_DIR: Final = Path("/var/lib/backend.ai/net-esp-pair")
 #: Created like /tmp: any co-located agent may add its own claim, and the sticky bit stops it
 #: removing anyone else's -- which is exactly the guarantee this journal needs.
 _SHARED_DIR_MODE: Final = 0o1777
-#: The lock is only ever opened read-only, so this need not be writable by other users.
+#: The lock is only ever opened read-only, but it must be readable by every agent on the node --
+#: and `os.open`'s mode is masked by umask, which is 0o077 on a hardened host. It is set
+#: explicitly with `fchmod` after creation, on the descriptor, so no name is re-resolved.
 _LOCK_MODE: Final = 0o644
 _LOCK_NAME: Final = ".lock"
+#: Claim files are readable by every agent so they can count each other's; only their owner ever
+#: creates or removes one.
+_CLAIM_MODE: Final = 0o644
 #: Separates the two halves of a claim's filename. Neither an agent id nor a session id contains
 #: it, and it cannot be confused with the path separator they are sanitised of.
 _CLAIM_SEP: Final = "~"
@@ -64,10 +69,15 @@ def _sanitise(value: str) -> str:
 
 @dataclass(frozen=True)
 class _Held:
-    """One pair's lock, held: the lock's fd and the directory its claims live in."""
+    """One pair's lock, held: the lock's fd and a verified descriptor on its directory.
 
-    fd: int
-    directory: Path
+    A descriptor, not a path. Everything done under the lock is done relative to it, so no name
+    is resolved a second time and nothing can be swapped underneath between the check and the use.
+    """
+
+    lock_fd: int
+    dir_fd: int
+    key: str
 
 
 class PairJournal:
@@ -80,17 +90,55 @@ class PairJournal:
         # what tests must be able to redirect, and a default argument would freeze it.
         self._root = root if root is not None else DEFAULT_PAIR_JOURNAL_DIR
 
-    def _ensure_dir(self, path: Path) -> bool:
+    def _open_root(self) -> int | None:
+        """A descriptor on the journal root, created world-writable-sticky like /tmp.
+
+        The root itself has to carry the mode: `mkdir(parents=True)` gives the intermediate
+        directories the process umask, and a root at 0o775 is one that a co-located agent running
+        as another user cannot create a new pair in -- which is the whole point of the journal.
+        """
         try:
-            path.mkdir(parents=True, exist_ok=True)
-            path.chmod(_SHARED_DIR_MODE)
+            self._root.mkdir(parents=True, exist_ok=True)
         except OSError as e:
-            # chmod fails for a directory another user created; that is fine, it already has the
-            # mode we would have set. Only a directory we cannot get at all is a problem.
-            if not path.is_dir():
-                log.warning("ESP pair journal directory {} unavailable: {}", path, e)
-                return False
-        return True
+            log.warning("ESP pair journal root {} unavailable: {}", self._root, e)
+            return None
+        try:
+            fd = os.open(self._root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        except OSError as e:
+            log.warning("ESP pair journal root {} is not a usable directory: {}", self._root, e)
+            return None
+        try:
+            os.fchmod(fd, _SHARED_DIR_MODE)
+        except OSError:
+            pass  # another user created it; it already carries the mode we would have set
+        return fd
+
+    def _open_pair(self, root_fd: int, key: str) -> int | None:
+        """A descriptor on one pair's directory, opened relative to the root and never followed.
+
+        Every step is relative to a descriptor whose inode has already been verified, and each
+        open refuses a symlink. Resolving the path by name instead is what let a pre-created
+        symlink at the pair's name have this process chmod SOMEBODY ELSE'S directory to 0o1777 and
+        fill it with files -- reproduced, with a 0o700 directory coming back 0o1777.
+        """
+        try:
+            os.mkdir(key, mode=_SHARED_DIR_MODE, dir_fd=root_fd)
+        except FileExistsError:
+            pass
+        except OSError as e:
+            log.warning("could not create the ESP pair directory {}: {}", key, e)
+            return None
+        try:
+            fd = os.open(key, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd)
+        except OSError as e:
+            # ELOOP here is the attack above, refused.
+            log.warning("ESP pair directory {} is not a usable directory: {}", key, e)
+            return None
+        try:
+            os.fchmod(fd, _SHARED_DIR_MODE)
+        except OSError:
+            pass  # created by another user, already sticky
+        return fd
 
     @asynccontextmanager
     async def claiming(self, key: str, owner: str, session_id: str) -> AsyncIterator[bool]:
@@ -150,10 +198,17 @@ class PairJournal:
         live = {_sanitise(session_id) for session_id in live_sessions}
         prefix = f"{_sanitise(owner)}{_CLAIM_SEP}"
         removed = 0
+        root_fd = self._open_root()
+        if root_fd is None:
+            return 0
         try:
-            pairs = sorted(entry.name for entry in self._root.iterdir() if entry.is_dir())
+            # Listed through the verified descriptor, and each name is opened with O_NOFOLLOW by
+            # `_open_pair` below -- a symlink planted at a pair's name is refused there.
+            pairs = sorted(os.listdir(root_fd))
         except OSError:
             return 0
+        finally:
+            os.close(root_fd)
         for pair in pairs:
             async with self._hold(pair) as held:
                 if held is None:
@@ -165,7 +220,9 @@ class PairJournal:
                     if not name.startswith(prefix) or name[len(prefix) :] in live:
                         continue
                     try:
-                        (held.directory / name).unlink(missing_ok=True)
+                        os.unlink(name, dir_fd=held.dir_fd)
+                        removed += 1
+                    except FileNotFoundError:
                         removed += 1
                     except OSError as e:
                         log.warning("could not drop the stale ESP pair claim {}: {}", name, e)
@@ -191,38 +248,67 @@ class PairJournal:
             self._release_lock(held)
 
     async def _acquire(self, key: str) -> _Held | None:
-        directory = self._root / key
-        if not self._ensure_dir(directory):
+        root_fd = self._open_root()
+        if root_fd is None:
             return None
-        lock_path = directory / _LOCK_NAME
+        try:
+            dir_fd = self._open_pair(root_fd, key)
+        finally:
+            os.close(root_fd)
+        if dir_fd is None:
+            return None
         while True:
-            fd: int | None = None
+            lock_fd: int | None = None
             try:
-                # Read-only: `flock` needs a descriptor, not write access, and a co-located agent
-                # running as another user cannot open the first one's lock file for writing.
-                # O_NOFOLLOW because the directory is shared and the name is predictable.
-                fd = os.open(lock_path, os.O_RDONLY | os.O_CREAT | os.O_NOFOLLOW, _LOCK_MODE)
-                if not stat.S_ISREG(os.fstat(fd).st_mode):
-                    log.warning("ESP pair lock {} is not a regular file; ignoring it", lock_path)
-                    os.close(fd)
+                # Relative to the verified directory, never followed, and NON-BLOCKING: an
+                # attacker who pre-creates the predictable `.lock` name as a FIFO makes a plain
+                # `open` wait for a writer that never comes -- which stops the whole process, not
+                # just this coroutine. Reproduced: the interpreter hung until it was killed.
+                # O_NOFOLLOW does not cover this; O_NONBLOCK plus the regular-file check does.
+                lock_fd = os.open(
+                    _LOCK_NAME,
+                    os.O_RDONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
+                    _LOCK_MODE,
+                    dir_fd=dir_fd,
+                )
+                if not stat.S_ISREG(os.fstat(lock_fd).st_mode):
+                    log.warning("ESP pair lock for {} is not a regular file; ignoring it", key)
+                    os.close(lock_fd)
+                    os.close(dir_fd)
                     return None
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                # Explicitly, on the descriptor: `open`'s mode is masked by umask, and a lock at
+                # 0o600 is one no other agent on the node can open at all.
+                try:
+                    os.fchmod(lock_fd, _LOCK_MODE)
+                except OSError:
+                    pass  # somebody else owns it and already set the mode
             except OSError as e:
-                if fd is not None:
-                    os.close(fd)
-                if e.errno in (errno.EACCES, errno.EAGAIN):
+                if lock_fd is not None:
+                    os.close(lock_fd)
+                os.close(dir_fd)
+                # A permission error is NOT contention. Treating the two alike is how a node with
+                # a mis-owned journal polls forever instead of reporting that it cannot serve.
+                log.warning("ESP pair lock for {} unavailable: {}", key, e)
+                return None
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as e:
+                os.close(lock_fd)
+                if e.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
                     # Somebody else has it. Waiting here is cancellable, which is the point.
                     await asyncio.sleep(_LOCK_POLL_SEC)
                     continue
-                log.warning("ESP pair lock {} unavailable: {}", lock_path, e)
+                os.close(dir_fd)
+                log.warning("could not lock the ESP pair {}: {}", key, e)
                 return None
-            return _Held(fd=fd, directory=directory)
+            return _Held(lock_fd=lock_fd, dir_fd=dir_fd, key=key)
 
     def _release_lock(self, held: _Held) -> None:
         try:
-            fcntl.flock(held.fd, fcntl.LOCK_UN)
+            fcntl.flock(held.lock_fd, fcntl.LOCK_UN)
         finally:
-            os.close(held.fd)
+            os.close(held.lock_fd)
+            os.close(held.dir_fd)
 
     def _claims(self, held: _Held) -> set[str] | None:
         """Every claim file in the pair's directory, or None if it could not be listed.
@@ -232,32 +318,39 @@ class PairJournal:
         """
         try:
             return {
-                entry.name
-                for entry in held.directory.iterdir()
-                if entry.name != _LOCK_NAME and not entry.name.startswith(".")
+                name
+                for name in os.listdir(held.dir_fd)
+                if name != _LOCK_NAME and not name.startswith(".")
             }
         except OSError as e:
-            log.warning("could not list the ESP pair claims in {}: {}", held.directory, e)
+            log.warning("could not list the ESP pair claims for {}: {}", held.key, e)
             return None
 
     def _write_claim(self, held: _Held, owner: str, session_id: str) -> bool:
-        path = held.directory / _claim_name(owner, session_id)
+        name = _claim_name(owner, session_id)
         try:
             # Its own file, created and later removed by this owner alone: nothing here ever
             # rewrites another user's file, so the sticky bit protects each agent's claims
             # instead of blocking them.
-            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o644)
+            fd = os.open(
+                name,
+                os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
+                _CLAIM_MODE,
+                dir_fd=held.dir_fd,
+            )
         except OSError as e:
-            log.warning("could not record the ESP pair claim {}: {}", path, e)
+            log.warning("could not record the ESP pair claim {}: {}", name, e)
             return False
         os.close(fd)
         return True
 
     def _remove_claim(self, held: _Held, owner: str, session_id: str) -> bool:
-        path = held.directory / _claim_name(owner, session_id)
+        name = _claim_name(owner, session_id)
         try:
-            path.unlink(missing_ok=True)
+            os.unlink(name, dir_fd=held.dir_fd)
+        except FileNotFoundError:
+            return True  # already gone; the claim is what matters, not the unlink
         except OSError as e:
-            log.warning("could not drop the ESP pair claim {}: {}", path, e)
+            log.warning("could not drop the ESP pair claim {}: {}", name, e)
             return False
         return True

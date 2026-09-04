@@ -9,6 +9,8 @@ in-process, two agents on one host each believed they were the pair's only user.
 from __future__ import annotations
 
 import asyncio
+import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -197,3 +199,48 @@ class TestTheLockActuallyExcludes:
         assert await _claim(journal, key, "agent-a", "s1") is True
         assert await _claim(journal, key, "agent-a", "s1") is True
         assert await journal.users(key) == frozenset({"agent-a/s1"})
+
+
+class TestHostileNeighbours:
+    """The journal lives in a world-writable directory with predictable names, so a local user can
+    pre-create any of them. Each of these was reproduced against an earlier version."""
+
+    async def test_a_directory_symlink_is_not_followed(self, tmp_path: Path) -> None:
+        # Reproduced: a 0o700 directory came back 0o1777 with the journal's files inside it,
+        # because `mkdir(exist_ok=True)` succeeds through a symlink and `chmod` follows it.
+        root = tmp_path / "net-esp-pair"
+        root.mkdir()
+        victim = tmp_path / "victim"
+        victim.mkdir(mode=0o700)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        (root / key).symlink_to(victim)
+
+        assert await _claim(PairJournal(root), key, "agent-a", "s1") is False
+        assert stat.S_IMODE(victim.stat().st_mode) == 0o700
+        assert list(victim.iterdir()) == []
+
+    async def test_a_fifo_lock_does_not_block(self, tmp_path: Path) -> None:
+        # Reproduced: opening a FIFO read-only waits for a writer that never comes, and it is the
+        # THREAD that blocks -- the whole interpreter hung, so not even a timeout could fire.
+        # O_NOFOLLOW does not cover this; O_NONBLOCK plus the regular-file check does.
+        root = tmp_path / "net-esp-pair"
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        (root / key).mkdir(parents=True)
+        os.mkfifo(root / key / ".lock")
+
+        async with asyncio.timeout(5):
+            assert await _claim(PairJournal(root), key, "agent-a", "s1") is False
+
+    async def test_the_root_is_world_writable(self, tmp_path: Path) -> None:
+        # Created by `mkdir(parents=True)` it carries the process umask, and a root at 0o775 is
+        # one a co-located agent running as another user cannot create a new pair in.
+        root = tmp_path / "net-esp-pair"
+        await _claim(_journal(tmp_path), pair_key("10.0.0.1", "10.0.0.2", 4789), "a", "s1")
+        assert stat.S_IMODE(root.stat().st_mode) == 0o1777
+
+    async def test_the_lock_is_readable_by_other_agents(self, tmp_path: Path) -> None:
+        # `open`'s mode is masked by umask; a lock left at 0o600 is one no other agent can open.
+        root = tmp_path / "net-esp-pair"
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(_journal(tmp_path), key, "agent-a", "s1")
+        assert stat.S_IMODE((root / key / ".lock").stat().st_mode) & 0o044 == 0o044
