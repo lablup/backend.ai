@@ -556,24 +556,30 @@ class ProtectionSnapshot:
     sa_endpoints: frozenset[tuple[str, str, int]]
     #: (src, dst, dport) of the outbound policies carrying this backend's mark.
     policy_pairs: frozenset[tuple[str, str, int]]
+    #: VXLAN devices that are administratively UP. A device this node believes is carrying can be
+    #: DOWN because a co-located agent restarted and its fail-close preflight downs every
+    #: `baivx*` on the host, ours included -- and nothing else ever looks.
+    up_devices: frozenset[str]
 
     def table(self, table: str) -> str:
         return self.mangle_rules if table == "mangle" else self.filter_rules
 
 
 def rule_is_present(listing: str, expected: Sequence[str]) -> bool:
-    """Whether ``expected`` -- a rule as this backend builds it -- is in an `iptables-save` listing.
+    """Whether ``expected`` -- a rule as this backend builds it -- is in force in the chain.
 
-    Compared as a normalised token multiset, not as text: `iptables-save` renders the same rule
-    differently from how it was written (`--u32` in hex, `MARK --set-mark` as `--set-xmark
-    <mark>/<mask>`, `-p udp` gaining `-m udp`), so a string match finds nothing and every rule
-    looks missing -- which makes the pass reprogram the whole node every tick.
+    In force, not merely present. Two things beyond "is the text there":
 
-    And it compares the WHOLE rule, not just the VNI it selects. Matching on the VNI alone would
-    accept a rule with the wrong port, the wrong policy direction, or an ACCEPT where a DROP
-    belongs, and report the session protected when it is not.
+    * The rule is compared as a normalised token sequence, because `iptables-save` renders the
+      same rule differently from how it was written (`--u32` in hex, `MARK --set-mark` as
+      `--set-xmark <mark>/<mask>`, `-p udp` gaining `-m udp`). A string match finds nothing, so
+      every rule looks missing and the pass reprograms the whole node every tick.
+    * It must be the FIRST rule in that chain selecting this traffic. A DROP with an ACCEPT for
+      the same VNI above it is not protection -- the packet never reaches it -- and checking only
+      for existence reports the session protected while injected plaintext walks past.
     """
     wanted = _normalise_rule(expected)
+    selector = _traffic_selector(wanted)
     chain = expected[0]
     for line in listing.splitlines():
         stripped = line.strip()
@@ -583,9 +589,28 @@ def rule_is_present(listing: str, expected: Sequence[str]) -> bool:
             found = _normalise_rule(shlex.split(stripped)[1:])
         except ValueError:
             continue
-        if found == wanted:
-            return True
+        if _traffic_selector(found) != selector:
+            continue  # a rule about other traffic; it does not shadow ours
+        return found == wanted
     return False
+
+
+def _traffic_selector(tokens: Sequence[str]) -> tuple[str, ...]:
+    """The part of a rule that decides WHICH packets it sees, without its target or match modules.
+
+    Two rules with the same selector are about the same traffic, so whichever comes first decides
+    what happens to it.
+    """
+    out: list[str] = []
+    index = 1  # skip the chain
+    while index < len(tokens):
+        token = tokens[index]
+        if token in ("-p", "--dport", "--sport", "--u32") and index + 1 < len(tokens):
+            out.extend((token, tokens[index + 1]))
+            index += 2
+            continue
+        index += 1
+    return tuple(out)
 
 
 def _normalise_rule(tokens: Sequence[str]) -> tuple[str, ...]:
@@ -598,21 +623,70 @@ def _normalise_rule(tokens: Sequence[str]) -> tuple[str, ...]:
             index += 2  # `-p udp` implies it; iptables-save writes it and we do not
             continue
         if token == "--u32" and index + 1 < len(tokens):
-            _, _, value = tokens[index + 1].rpartition("=")
-            try:
-                out.extend(("--u32", str(int(value, 0))))
-            except ValueError:
-                out.extend(("--u32", tokens[index + 1]))
+            out.extend(("--u32", _normalise_u32(tokens[index + 1])))
             index += 2
             continue
         if token in ("--set-mark", "--set-xmark") and index + 1 < len(tokens):
-            mark, _, _mask = tokens[index + 1].partition("/")
-            out.extend(("--set-mark", str(int(mark, 0))))
+            mark, _, mask = tokens[index + 1].partition("/")
+            # The mask is part of it: `--set-xmark 0xba100001/0xffffffff` and
+            # `--set-xmark 0xba100001/0x0000ffff` set different bits, and the XFRM policy selects
+            # on the whole value.
+            # `--set-mark X` with no mask sets every bit of the value and clears none of the
+            # others -- which iptables renders back as `--set-xmark X/0xffffffff`. Defaulting the
+            # mask to the value instead makes the rule we wrote and the rule iptables reports look
+            # different, so the pass reprograms it on every tick.
+            out.extend(("--set-mark", str(int(mark, 0)), str(int(mask, 0) if mask else 0xFFFFFFFF)))
             index += 2
             continue
         out.append(token)
         index += 1
     return tuple(out)
+
+
+def _normalise_u32(expression: str) -> str:
+    """The WHOLE u32 expression with every literal in one base.
+
+    Not just the value it compares against: `0>>22&0x3C@12>>8=4097` and
+    `0>>22&0x3C@16>>8=4097` read different words of the packet, and keeping only the right-hand
+    side would call the second one this rule.
+    """
+    out: list[str] = []
+    number = ""
+    for char in expression.strip('"'):
+        if char.isalnum() or (char == "x" and number):
+            number += char
+            continue
+        if number:
+            out.append(_as_int_text(number))
+            number = ""
+        out.append(char)
+    if number:
+        out.append(_as_int_text(number))
+    return "".join(out)
+
+
+def _as_int_text(token: str) -> str:
+    try:
+        return str(int(token, 0))
+    except ValueError:
+        return token
+
+
+def parse_up_vxlan_devices(listing: str) -> frozenset[str]:
+    """Names of the VXLAN devices that are administratively UP, from `ip -o link show type vxlan`.
+
+    The flags, not `state`: a device with no peer traffic reports `state UNKNOWN` while being
+    perfectly up, and only the `UP` flag says whether it was administratively raised.
+    """
+    up: set[str] = set()
+    for line in listing.splitlines():
+        match = _VXLAN_LINE.match(line)
+        if match is None:
+            continue
+        flags = line.partition("<")[2].partition(">")[0]
+        if "UP" in flags.split(","):
+            up.add(match.group("name"))
+    return frozenset(up)
 
 
 def parse_owned_sa_endpoints(listing: str, reqid: int) -> frozenset[tuple[str, str, int]]:
@@ -1291,6 +1365,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             policy_pairs=parse_owned_policies(
                 await self._reader(["ip", "xfrm", "policy"]), _XFRM_MARK
             ),
+            up_devices=parse_up_vxlan_devices(
+                await self._reader(["ip", "-o", "link", "show", "type", "vxlan"])
+            ),
         )
 
     def _pair_intact(self, snapshot: ProtectionSnapshot, key: tuple[str, str, int]) -> bool:
@@ -1347,6 +1424,21 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     async def _reassert_session(
         self, session_id: str, meta: SessionNetMeta, vni: int, snapshot: ProtectionSnapshot
     ) -> None:
+        machine = self._security_states.get(session_id)
+        if machine is not None and machine.state is VxlanSecurityState.BLOCKING:
+            # A prior link-down failed. Protection must not be rebuilt on top of an unconfirmed
+            # open path and then mistaken for a normal restore: retry the physical block first.
+            await self._close_tunnel(
+                meta,
+                session_id,
+                machine.failure_reason or "the overlay tunnel has not been confirmed down",
+            )
+            if machine.state is VxlanSecurityState.BLOCKING:
+                return  # still not down; the next pass tries again
+        # Moves a BLOCKED session to RESTORING, which is what lets `_reopen_tunnel` below raise
+        # the link once everything checks out. Without it a fail-closed session stays closed no
+        # matter how many times its protection is found intact.
+        self._transition_security(session_id, VxlanSecurityEvent.RECONCILE_STARTED)
         # The whole rule, as this backend builds it -- not just "something mentions this VNI".
         # A rule with the wrong port, the wrong policy direction, or an ACCEPT where the DROP
         # belongs would otherwise be read as protection.
@@ -1369,12 +1461,20 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self_vtep = self._self_vteps.get(session_id)
         if self_vtep is None:
             return
+        generation = self._key_generation()
         for peer_vtep in sorted(self._encrypted_peers.get(session_id, set())):
             key = (self_vtep, peer_vtep, meta.vxlan_port)
-            if self._pair_intact(snapshot, key):
-                continue  # the kernel still has it; nothing to do and nothing to spend
+            # `force` only for kernel state that is actually gone. A pair whose generation has
+            # merely moved on is reprogrammed the ordinary way -- which is also the ONLY thing
+            # that drives the 12-hour key rotation now that a steady membership no longer calls
+            # `ensure_session_security`: nothing else asks what generation it should be on, so
+            # the pairs would sit on their first one for the life of the session.
+            drifted = not self._pair_intact(snapshot, key)
+            rotated = self._pair_active_generations.get(key, generation) < generation
+            if not drifted and not rotated:
+                continue  # the kernel has it, at the generation it should be on
             try:
-                if not await self._program_encryption(meta, session_id, peer_vtep, force=True):
+                if not await self._program_encryption(meta, session_id, peer_vtep, force=drifted):
                     raise OverlayEncryptionUnavailable(
                         f"session {session_id} cannot re-assert the ESP pair for {peer_vtep}"
                     )
@@ -1386,6 +1486,30 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                     meta, session_id, f"the ESP pair for {peer_vtep} could not be re-asserted"
                 )
                 raise
+        # Everything this session needs is in place, so a tunnel held down because it once was
+        # not may come back. Without this a single failed pass closed the session for good: the
+        # only other caller of `_reopen_tunnel` is `ensure_session_security`, which a steady
+        # membership no longer reaches.
+        if not await self._reopen_tunnel(meta, session_id):
+            raise OverlayEncryptionUnavailable(
+                f"session {session_id}'s protection was restored but its overlay tunnel could"
+                " not be reopened"
+            )
+        if (
+            vxlan_dev(vni) not in snapshot.up_devices
+            and (machine := self._security_states.get(session_id)) is not None
+            and machine.state in {VxlanSecurityState.READY, VxlanSecurityState.PLAINTEXT}
+        ):
+            # Down while this node believes it is carrying: a co-located agent restarted and its
+            # fail-close preflight downs every `baivx*` on the host, ours included. Nothing else
+            # looks -- the membership did not change and this session's own state still says
+            # READY -- so the device stays down for the life of the process.
+            log.warning(
+                "{} was down while session {} is READY; raising it again",
+                vxlan_dev(vni),
+                session_id,
+            )
+            await self._runner(link_up_args(vxlan_dev(vni)))
 
     async def _ensure_owned_chains(self) -> None:
         """Create this backend's chains and put their jumps back at the head of the built-ins.
@@ -1966,15 +2090,25 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             meta = self._sessions.get(session_id)
             self_vtep = self._self_vteps.get(session_id)
             if meta is not None and self_vtep is not None:
+                unreleased: list[str] = []
                 for peer_vtep in sorted(self._encrypted_peers.get(session_id, set())):
                     key = (self_vtep, peer_vtep, meta.vxlan_port)
                     # The claim, not the SAs: another agent here is still carried by them, which
                     # is exactly what the node-wide refcount is for.
                     async with self._pair_journal.releasing(
                         pair_key(*key), self._journal_owner, session_id
-                    ):
-                        pass
+                    ) as freed:
+                        if freed is None:
+                            # The journal could not say. Our claim may still be on disk, and
+                            # reporting the withdrawal as done leaves it there with nobody
+                            # left to remove it.
+                            unreleased.append(peer_vtep)
                     self._pair_users.get(key, set()).discard(session_id)
+                if unreleased:
+                    raise OverlayEncryptionUnavailable(
+                        f"session {session_id} could not release its ESP pair claim for"
+                        f" {', '.join(unreleased)}; this node has not let the session go"
+                    )
             await self._forget_session(session_id)
         self._session_guards.pop(session_id, None)
 
