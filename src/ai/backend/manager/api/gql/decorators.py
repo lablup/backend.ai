@@ -41,8 +41,6 @@ from ai.backend.common.meta import BackendAIGQLMeta
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
     PydanticNodeMixin,
-    check_no_resolver_field_shadowing,
-    node_dto_type,
 )
 
 __all__ = (
@@ -93,21 +91,12 @@ def gql_node_type(
     Use for types that inherit PydanticNodeMixin and implement the Relay Node interface.
     For non-node output types backed by a Pydantic DTO, use gql_pydantic_type instead.
     """
-    strawberry_wrap = strawberry.type(
+    return strawberry.type(
         name=name,
         description=_build_description(meta),
         directives=directives,
         extend=extend,
     )
-
-    def wrap(cls: type[T]) -> type[T]:
-        wrapped = strawberry_wrap(cls)
-        dto_cls = node_dto_type(wrapped)
-        if dto_cls is not None:
-            check_no_resolver_field_shadowing(wrapped, dto_cls)
-        return wrapped
-
-    return wrap
 
 
 @dataclass_transform(
@@ -243,7 +232,6 @@ def gql_pydantic_type[PydanticModel: BaseModel](
             if isinstance(value, StrawberryField) and value.description is not None
         }
         wrapped = strawberry_wrap(cls)
-        check_no_resolver_field_shadowing(wrapped, model)
         for field in get_object_definition(wrapped, strict=True).fields:
             declared = declared_descriptions.get(field.python_name)
             if declared is not None:

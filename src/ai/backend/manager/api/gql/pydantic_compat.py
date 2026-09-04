@@ -60,55 +60,6 @@ from strawberry import UNSET
 from strawberry.relay import Node
 from strawberry.types.base import StrawberryObjectDefinition
 
-from ai.backend.manager.errors.api import ResolverFieldShadowsDTOFieldError
-
-
-def _dto_attribute_names(dto_cls: type[BaseModel]) -> frozenset[str]:
-    names = set(dto_cls.model_fields) | set(dto_cls.model_computed_fields)
-    for klass in dto_cls.__mro__:
-        for attr_name, attr in vars(klass).items():
-            if isinstance(attr, property):
-                names.add(attr_name)
-    return frozenset(names)
-
-
-def node_dto_type(cls: type) -> type[BaseModel] | None:
-    """The DTO a Node type is parameterized with, or ``None`` if it is not concrete."""
-    for klass in cls.__mro__:
-        for base in getattr(klass, "__orig_bases__", ()):
-            if get_origin(base) is not PydanticNodeMixin:
-                continue
-            args = get_args(base)
-            if args and isinstance(args[0], type) and issubclass(args[0], BaseModel):
-                return args[0]
-    return None
-
-
-def check_no_resolver_field_shadowing(cls: type, dto_cls: type[BaseModel]) -> None:
-    """Reject a GQL type whose resolver field names collide with the DTO's.
-
-    ``from_pydantic`` maps DTO attributes onto constructor keywords, but a resolver
-    field is ``init=False`` — the collision would only surface as a ``TypeError``
-    at conversion time, so it is rejected when the type is declared.
-    """
-    if not dataclasses.is_dataclass(cls):
-        return
-    dto_names = _dto_attribute_names(dto_cls)
-    shadowed = sorted(
-        field.name
-        for field in dataclasses.fields(cls)
-        if not field.init and field.name in dto_names
-    )
-    if not shadowed:
-        return
-    raise ResolverFieldShadowsDTOFieldError(
-        extra_msg=(
-            f"{cls.__name__} defines resolver field(s) {shadowed} that also exist on "
-            f"{dto_cls.__name__}. Either drop the resolver and let from_pydantic() carry "
-            f"the DTO value, or remove the field from the DTO."
-        )
-    )
-
 
 def _from_pydantic_kwargs(
     cls: type,
