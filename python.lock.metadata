@@ -126,7 +126,7 @@
     "types-tqdm<4.70",
     "typing_extensions~=4.11",
     "uvloop~=0.22.1; sys_platform != \"Windows\"",
-    "valkey-glide~=2.3.1",
+    "valkey-glide~=2.5.2",
     "yarl~=1.19.0",
     "zipstream-new~=1.1.8"
   ],
