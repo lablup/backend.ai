@@ -16,13 +16,24 @@ from typing import (
     cast,
     get_args,
     get_origin,
+    override,
 )
 
 from aiohttp import web
 from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 from multidict import CIMultiDictProxy, MultiMapping
-from pydantic import AliasChoices, ConfigDict, RootModel
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    GetCoreSchemaHandler,
+    GetJsonSchemaHandler,
+    RootModel,
+    SerializerFunctionWrapHandler,
+)
 from pydantic.fields import FieldInfo
+from pydantic.json_schema import GenerateJsonSchema, JsonSchemaMode, JsonSchemaValue
+from pydantic_core import CoreSchema, core_schema
 from pydantic_core._pydantic_core import ValidationError
 
 from ai.backend.common.types import BackendAISchema, StreamReader
@@ -49,11 +60,147 @@ class Sentinel(enum.Enum):
 SENTINEL = Sentinel.TOKEN
 
 
+class Undefined(enum.Enum):
+    """Marks an update-request field that was not provided ("no change").
+
+    Update DTOs declare clearable fields as ``T | Undefined | None = Field(default=UNDEFINED)``:
+
+    | value       | meaning   |
+    | ----------- | --------- |
+    | ``UNDEFINED`` | no change |
+    | ``None``      | clear     |
+    | value         | update    |
+
+    ``BaseRequestModel`` drops ``UNDEFINED``-valued fields from ``model_dump()`` and from
+    ``model_json_schema()``, so the token never reaches the wire or the OpenAPI schema.
+    Only the ``Undefined.TOKEN`` object itself validates: wire values such as ``1`` or ``true``
+    are rejected instead of being coerced into "not provided".
+    """
+
+    TOKEN = enum.auto()
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source: type[Any], handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.no_info_plain_validator_function(cls._reject_wire_value),
+            python_schema=core_schema.is_instance_schema(cls),
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return dict(_UNDEFINED_SCHEMA_MARKER)
+
+    @staticmethod
+    def _reject_wire_value(_value: Any) -> Any:
+        raise ValueError("Undefined cannot be provided on the wire")
+
+
+UNDEFINED = Undefined.TOKEN
+
+# Placeholder emitted for ``Undefined`` in JSON schemas; ``_UndefinedFreeJsonSchema`` removes it.
+_UNDEFINED_SCHEMA_MARKER: JsonSchemaValue = {"title": Undefined.__name__, "not": {}}
+
+
+class _UndefinedFreeJsonSchema(GenerateJsonSchema):
+    """JSON schema generator that removes every trace of ``Undefined``.
+
+    pydantic renders ``T | Undefined | None`` as ``anyOf: [T, <marker>, null]`` with
+    ``default: <enum value>``. The marker is removed from ``anyOf`` and the default is dropped
+    only on nodes where a marker was removed.
+    """
+
+    @override
+    def generate(self, schema: CoreSchema, mode: JsonSchemaMode = "validation") -> JsonSchemaValue:
+        json_schema = super().generate(schema, mode)
+        self._strip(json_schema)
+        return json_schema
+
+    @staticmethod
+    def _is_undefined_marker(node: Any) -> bool:
+        return isinstance(node, dict) and node == _UNDEFINED_SCHEMA_MARKER
+
+    @classmethod
+    def _strip(cls, node: Any) -> None:
+        if isinstance(node, dict):
+            variants = node.get("anyOf")
+            if isinstance(variants, list) and any(cls._is_undefined_marker(v) for v in variants):
+                remaining = [v for v in variants if not cls._is_undefined_marker(v)]
+                if node.get("default") == UNDEFINED.value:
+                    node.pop("default")
+                if len(remaining) == 1:
+                    node.pop("anyOf")
+                    node.update(remaining[0])
+                else:
+                    node["anyOf"] = remaining
+            for child in node.values():
+                cls._strip(child)
+        elif isinstance(node, list):
+            for child in node:
+                cls._strip(child)
+
+
+def _drop_undefined_fields(model: BaseModel, handler: SerializerFunctionWrapHandler) -> Any:
+    """Exclude ``UNDEFINED``-valued fields from every ``model_dump`` / ``model_dump_json``."""
+    data = handler(model)
+    if not isinstance(data, dict):
+        return data
+    skipped_keys: set[str] = set()
+    for name, field_info in type(model).model_fields.items():
+        if getattr(model, name, None) is UNDEFINED:
+            skipped_keys.add(name)
+            if field_info.alias:
+                skipped_keys.add(field_info.alias)
+            if field_info.serialization_alias:
+                skipped_keys.add(field_info.serialization_alias)
+    if not skipped_keys:
+        return data
+    return {k: v for k, v in data.items() if k not in skipped_keys}
+
+
 class BaseRequestModel(BackendAISchema):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_by_name=True,
     )
+
+    @classmethod
+    @override
+    def __get_pydantic_core_schema__(
+        cls, source: type[Any], handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        schema = handler(source)
+        # Model validators (before/after/wrap) wrap the model node in function-* schemas;
+        # walk down to the model node itself.
+        node: Any = schema
+        while node["type"] != "model" and isinstance(node.get("schema"), dict):
+            node = node["schema"]
+        if node["type"] == "model":
+            model_schema = cast(core_schema.ModelSchema, node)
+            if "serialization" not in model_schema:
+                model_schema["serialization"] = core_schema.wrap_serializer_function_ser_schema(
+                    _drop_undefined_fields, info_arg=False
+                )
+        return schema
+
+    @classmethod
+    @override
+    def model_json_schema(
+        cls,
+        by_alias: bool = True,
+        ref_template: str = "#/$defs/{model}",
+        schema_generator: type[GenerateJsonSchema] = _UndefinedFreeJsonSchema,
+        mode: JsonSchemaMode = "validation",
+    ) -> dict[str, Any]:
+        return super().model_json_schema(
+            by_alias=by_alias,
+            ref_template=ref_template,
+            schema_generator=schema_generator,
+            mode=mode,
+        )
 
 
 class BaseFieldModel(BackendAISchema):
