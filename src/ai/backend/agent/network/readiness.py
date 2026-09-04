@@ -253,9 +253,14 @@ async def probe_readiness(
                 "tell its own VNI's frames apart, and is refused on this node without it."
             )
     from ai.backend.agent.network.pair_journal import PairJournal
+    from ai.backend.agent.network.vni_registry import VniRegistry
 
     if (journal_problem := PairJournal().unusable_reason()) is not None:
         blocking.append(journal_problem)
+    if (registry_problem := VniRegistry().unusable_reason()) is not None:
+        # Without it this node cannot tell whether a declared VNI is already another session's,
+        # and setup deletes the devices of whatever holds it.
+        blocking.append(registry_problem)
     for backend_name, problem in (recovery_problems or {}).items():
         # A node that could not close what it left behind holds devices whose protection it cannot
         # vouch for. Blocking, not advisory: a new session would be built beside them.
