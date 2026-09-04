@@ -2191,3 +2191,87 @@ class TestAFailedTeardownKeepsTheVni:
                 PrivNetRequest(PrivNetOp.SETUP_SESSION, "s2", network_config=dict(self._VXLAN))
             )
             assert resp.ok, resp.error
+
+
+class TestAnAdoptionTheRegistryWouldNotVouchFor:
+    """The session entry lands before the registry is told the VNI is built. Returning early on
+    the entry's mere presence made every retry of that ADOPT a no-op -- leaving the VNI recorded
+    as a half-finished build that a co-located privnet may rebuild over these live devices."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    def _wont_mark(self, real: VniRegistry, root: Path) -> VniRegistry:
+        class _WontMark(VniRegistry):
+            @override
+            @contextlib.asynccontextmanager
+            async def binding(
+                self, vni: int, owner: str, session_id: str, digest: str
+            ) -> AsyncIterator[Binding]:
+                async with real.binding(vni, owner, session_id, digest) as bound:
+                    yield replace(bound, _claims=None)  # every mark_built() now fails
+
+        return _WontMark(root)
+
+    async def test_the_retry_runs_the_adoption_again(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(
+                _StubRuntime(pid=4242, live={"c1": "s1"}),
+                state_dir=tmp_path / "b",
+                agent_id="i-b",
+            ) as b:
+                real = b.server._vni_registry
+                b.server._vni_registry = self._wont_mark(real, tmp_path / "vni")
+                with pytest.raises(PrivNetClientError, match="could not record its VNI as"):
+                    await b.client().call(
+                        PrivNetRequest(
+                            PrivNetOp.ADOPT_SESSION, "s1", network_config=dict(self._VXLAN)
+                        )
+                    )
+                assert b.server._sessions["s1"].built is False
+
+                b.server._vni_registry = real
+                resp = await b.client().call(
+                    PrivNetRequest(PrivNetOp.ADOPT_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+                assert resp.ok, resp.error
+                assert b.server._sessions["s1"].built is True
+
+    async def test_a_settled_adoption_is_still_idempotent(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(
+                _StubRuntime(pid=4242, live={"c1": "s1"}),
+                state_dir=tmp_path / "b",
+                agent_id="i-b",
+            ) as b:
+                await b.client().call(
+                    PrivNetRequest(PrivNetOp.ADOPT_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+                b.backend.adopt_calls.clear()
+                await b.client().call(
+                    PrivNetRequest(PrivNetOp.ADOPT_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+                assert b.backend.adopt_calls == []
+
+
+class TestASessionRunningWithNoRecordOfIt:
+    """A container of a session is on this node and this privnet journalled nothing about it. It
+    cannot be adopted (the record is what says what it IS) and must not be reclaimed (nothing here
+    names its devices) -- so the node must not report itself recovered over it."""
+
+    async def test_the_node_reports_itself_unrecovered(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(live={"c1": "ghost"}), state_dir=tmp_path) as h:
+            assert "ghost" in h.server._unrecovered_sessions
+
+    async def test_a_journalled_session_does_not_count(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
+        ) as restarted:
+            assert restarted.server._unrecovered_sessions == {}
