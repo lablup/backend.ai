@@ -40,6 +40,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import pwd
 import socket
 import struct
 from collections.abc import AsyncIterator, Mapping, Sequence
@@ -131,6 +132,11 @@ class _SessionEntry:
     #: The configuration digest this session's VNI is bound to node-wide, so the binding is
     #: released under the same name it was made under.
     digest: str
+    #: Whether the node-wide registry actually records this session's VNI as BUILT. False means
+    #: this entry exists but the store never took the mark, and another privnet reads the VNI as a
+    #: half-finished build it may rebuild -- over these very devices. An entry in that state must
+    #: not let a later ADOPT return early, or the retry that would fix it never runs.
+    built: bool
 
     def __init__(
         self,
@@ -141,6 +147,7 @@ class _SessionEntry:
         self.meta = meta
         self.backend = backend
         self.digest = digest
+        self.built = False
         self.attached = {}
         self.local_ips = {}
 
@@ -352,16 +359,65 @@ class PrivNetServer:
         if sock_path.exists():
             sock_path.unlink()
         server = await asyncio.start_unix_server(self._handle_conn, path=self._socket_path)
-        sock_path.chmod(0o600)
+        self._restrict_socket(sock_path)
         log.info(
             "network privnet listening on {} (agent uid={})", self._socket_path, self._allowed_uid
         )
         log.info("running as uid={} with {}", os.getuid(), _self_effective_caps())
+        self._warn_if_not_separated()
         try:
             async with server:
                 await server.serve_forever()
         finally:
             await self._runtime.close()
+
+    def _restrict_socket(self, sock_path: Path) -> None:
+        """Make the socket reachable by the agent and nobody else.
+
+        0600 is right only while the two processes share a uid. Under real privilege separation
+        this daemon owns the socket and the agent is a different user, so the connect needs group
+        access -- granted to the agent's primary group and to no one else. `_peer_uid` still gates
+        every connection; this only decides who may knock.
+        """
+        if self._allowed_uid == os.geteuid():
+            sock_path.chmod(0o600)
+            return
+        try:
+            gid = pwd.getpwuid(self._allowed_uid).pw_gid
+        except KeyError:
+            # No passwd entry to take a group from. Owner-only is not usable by the agent, so say
+            # so plainly rather than leave a socket nothing can reach.
+            raise PrivNetError(
+                f"cannot grant the agent (uid {self._allowed_uid}) access to {sock_path}: it has"
+                " no passwd entry, so its group cannot be resolved. Set BACKENDAI_PRIVNET_UID to"
+                " the agent's uid, or run both as the same user."
+            ) from None
+        os.chown(sock_path, -1, gid)
+        sock_path.chmod(0o660)
+
+    def _warn_if_not_separated(self) -> None:
+        """Say out loud when the containment this daemon exists for is not actually in place.
+
+        Running as the agent's own uid is a supported deployment and the common one, but it is not
+        privilege separation: the agent can then unlink this process's journal, its claim files and
+        its socket, and everything below is a defence in depth rather than a boundary. That is a
+        deployment fact nothing in the code can fix, so it is stated once, here, where an operator
+        reading the startup log will see it.
+        """
+        if self._allowed_uid != os.geteuid():
+            return
+        log.warning(
+            "network privnet is running as the agent's own uid ({}): the agent can modify this"
+            " process's journal and claims, so this is defence in depth, not containment. For a"
+            " real boundary run the privnet as its own user with the agent's uid in"
+            " BACKENDAI_PRIVNET_UID, and give that user sole ownership of {} and the node-wide"
+            " claim directories.",
+            self._allowed_uid,
+            self._journal_root(),
+        )
+
+    def _journal_root(self) -> str:
+        return str(getattr(self._journal, "_dir", "the privnet state directory"))
 
     async def _retry_recovery(self) -> None:
         """Re-attempt only what recovery could not do -- never the whole of it.
@@ -436,6 +492,7 @@ class PrivNetServer:
                         live,
                         journalled_attachments,
                     )
+                    self._sessions[session_id].built = True
                 except Exception as e:
                     self._unrecovered_sessions[session_id] = str(e)
                     continue
@@ -626,8 +683,8 @@ class PrivNetServer:
         # complete answer, and returning with the flag still set would keep this node reporting
         # itself unrecovered for as long as it runs.
         self._recovery_failed = None
+        self._unrecovered_sessions = self._orphaned_live_sessions(live, journalled_sessions)
         if not journalled_sessions and not journalled_attachments:
-            self._unrecovered_sessions.clear()
             self._unreclaimed_containers.clear()
             self._unreclaimed_sessions.clear()
             return
@@ -671,6 +728,9 @@ class PrivNetServer:
                     live,
                     journalled_attachments,
                 )
+                # `_rebind_journalled` already re-bound this VNI and recorded it as built (or it
+                # has none), which is what `built` claims -- see `_SessionEntry`.
+                self._sessions[session_id].built = True
             except Exception as e:
                 # One unrecoverable session must not cost us the others: a privnet that gave up here
                 # would refuse every verb for every session on the node. Recorded rather than only
@@ -793,6 +853,21 @@ class PrivNetServer:
         if dropped:
             log.info("dropped {} stale VNI binding(s) of this agent", dropped)
         return unbound
+
+    def _orphaned_live_sessions(
+        self, live: dict[str, str], journalled_sessions: dict[str, dict[str, Any]]
+    ) -> dict[str, str]:
+        """Sessions with a container running here that this privnet has no record of.
+
+        Neither adoptable (the record is what says what the session IS) nor reclaimable (nothing
+        here names its devices), so the only honest thing is to keep saying so. A node reporting
+        itself recovered over a session it cannot manage is how that session's VNI is handed out
+        again underneath it.
+        """
+        return dict.fromkeys(
+            sorted(set(live.values()) - set(journalled_sessions)),
+            "a container of this session is running on this node, but this privnet has no journal record of it",
+        )
 
     async def _live_containers(self) -> dict[str, str]:
         """``{container_id: session_id}`` for every container the backend still runs for us."""
@@ -1137,8 +1212,9 @@ class PrivNetServer:
         digest = config_digest(raw_config)
         if cfg.vni is None:
             # Nothing to bind: this backend's devices are not named after a VNI, so no declaration
-            # can point at another session's.
+            # can point at another session's, and there is no binding to record as built.
             await self._build(session_id, meta, backend, raw_config, digest)
+            self._sessions[session_id].built = True
             return
         try:
             # The binding is held across the build, not taken and dropped before it: between
@@ -1167,7 +1243,9 @@ class PrivNetServer:
                     # behind, the next setup of this session adopts devices that do not exist.
                     bound.abandon()
                     raise
-                if not bound.mark_built():
+                if bound.mark_built():
+                    self._sessions[session_id].built = True
+                else:
                     # The devices exist and the store will not say so. Left there, a co-located
                     # agent's setup of this same session reads "not built", takes the build path,
                     # and deletes these devices out from under whatever is already on them. Give
@@ -1247,7 +1325,16 @@ class PrivNetServer:
                     f"session {session_id} is already set up on this node with a different network"
                     " configuration; refusing to redeclare it"
                 )
-            return
+            if entry.built:
+                return
+            # The entry is here but the registry never recorded the VNI as built, so a co-located
+            # privnet still reads it as a half-finished build it may rebuild over these devices.
+            # Returning early on the entry alone is what made every retry of this ADOPT a no-op
+            # and left the node in that state for good.
+            log.warning(
+                "re-running the adoption of session {}: its VNI is not recorded as built",
+                session_id,
+            )
         journalled = (await self._journal.sessions()).get(session_id)
         if journalled is not None and self._meta_of(session_id, journalled) != declared:
             raise PrivNetError(
@@ -1291,13 +1378,22 @@ class PrivNetServer:
         )
         if (entry := self._sessions.get(session_id)) is not None:
             entry.digest = digest
-        if binding is not None and not binding.mark_built():
+        if binding is None:
+            # No VNI, so no binding to vouch for: nothing can name these devices by number.
+            if (adopted := self._sessions.get(session_id)) is not None:
+                adopted.built = True
+            return
+        if not binding.mark_built():
             # This agent now serves a data plane that exists, and the store will not say so. A
-            # co-located agent would then read "not built" and rebuild these very devices.
+            # co-located agent would then read "not built" and rebuild these very devices. The
+            # entry stays -- its attachment plans are real -- but marked unbuilt, so the next
+            # ADOPT runs this again instead of returning early on the entry's mere presence.
             raise PrivNetError(
                 f"session {session_id} was adopted but this node could not record its VNI as"
                 " built in the node-wide registry"
             )
+        if (adopted := self._sessions.get(session_id)) is not None:
+            adopted.built = True
 
     async def _withdraw(self, session_id: str) -> None:
         """Drop this node's ownership of a session whose devices must stay.

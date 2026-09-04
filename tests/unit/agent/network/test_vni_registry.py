@@ -250,3 +250,31 @@ class TestTheClaimIsCommittedAfterTheTeardown:
         await _bind(registry, "a2", "s1", _CONFIG)
         async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)) as freed:
             assert freed is False
+
+
+class TestHoldingNothingIsNotPermission:
+    """`releasing` answers "may I delete this VNI's devices?". Computed as "is anything left after
+    removing mine", it answers yes from an empty set -- so an agent that never had a claim, or
+    whose claim something else removed, is handed permission to delete a live session's bridge and
+    VXLAN device."""
+
+    async def test_an_agent_with_no_claim_gets_no_answer(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path / "vni")
+        await _bind(registry, "a1", "s1", _CONFIG)
+        async with registry.releasing(4138, "a2", "s2", config_digest(_CONFIG)) as freed:
+            assert freed is None
+
+    async def test_an_empty_registry_gives_no_answer_either(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path / "vni")
+        async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)) as freed:
+            assert freed is None
+
+    async def test_a_claim_removed_behind_our_back_gives_no_answer(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path / "vni")
+        await _bind(registry, "a1", "s1", _CONFIG)
+        directory = tmp_path / "vni" / "vni4138"
+        for claim in directory.iterdir():
+            if claim.name != ".lock":
+                claim.unlink()
+        async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)) as freed:
+            assert freed is None
