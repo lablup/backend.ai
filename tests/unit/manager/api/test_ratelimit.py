@@ -36,12 +36,6 @@ class RateLimitSuccessCase:
     description: str = ""
 
 
-@dataclass(frozen=True)
-class RateLimitPublishCase:
-    keypair_rate_limit: int | None
-    default_keypair_rate_limit: int | None
-
-
 @dataclass
 class RateLimitExceedCase:
     """Test case data for rate limit exceeded scenarios."""
@@ -85,7 +79,7 @@ class TestRlimMiddleware:
         request = make_mocked_request("GET", "/")
         request["is_authorized"] = True
         request["keypair"] = {"rate_limit": 30000}
-        request["user"] = {"uuid": _USER_ID, "default_keypair_rate_limit": 30000}
+        request["user"] = {"uuid": _USER_ID}
         return request
 
     async def test_anonymous_query_returns_default_headers(
@@ -154,7 +148,7 @@ class TestRlimMiddleware:
     ) -> None:
         """Authorized requests within rate limit succeed and return correct headers."""
         # Arrange
-        mock_request_authorized["user"]["default_keypair_rate_limit"] = test_case.rate_limit
+        mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
         mock_valkey_client.consume = AsyncMock(
             return_value=RateLimitState(
                 count=test_case.rolling_count, limit=test_case.rate_limit, reset=_RESET
@@ -179,46 +173,6 @@ class TestRlimMiddleware:
             user_id=_USER_ID,
             window=_RATELIMIT_WINDOW,
             rate_limit=test_case.rate_limit,
-        )
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            RateLimitPublishCase(keypair_rate_limit=30000, default_keypair_rate_limit=30000),
-            RateLimitPublishCase(keypair_rate_limit=100, default_keypair_rate_limit=30000),
-            RateLimitPublishCase(keypair_rate_limit=None, default_keypair_rate_limit=30000),
-            RateLimitPublishCase(keypair_rate_limit=100, default_keypair_rate_limit=None),
-        ],
-        ids=lambda case: f"keypair={case.keypair_rate_limit}-default={case.default_keypair_rate_limit}",
-    )
-    async def test_the_default_keypair_limit_is_stored_whichever_keypair_signs(
-        self,
-        middleware: Any,
-        mock_valkey_client: MagicMock,
-        mock_request_authorized: web.Request,
-        mock_handler: AsyncMock,
-        case: RateLimitPublishCase,
-    ) -> None:
-        """The stored limit follows the default keypair, not the keypair that signed."""
-        # Arrange
-        mock_request_authorized["keypair"]["rate_limit"] = case.keypair_rate_limit
-        mock_request_authorized["user"]["default_keypair_rate_limit"] = (
-            case.default_keypair_rate_limit
-        )
-        mock_valkey_client.consume = AsyncMock(
-            return_value=RateLimitState(
-                count=1, limit=case.default_keypair_rate_limit, reset=_RESET
-            )
-        )
-
-        # Act
-        await middleware(mock_request_authorized, mock_handler)
-
-        # Assert
-        mock_valkey_client.consume.assert_called_once_with(
-            user_id=_USER_ID,
-            window=_RATELIMIT_WINDOW,
-            rate_limit=case.default_keypair_rate_limit,
         )
 
     @pytest.mark.parametrize(
@@ -255,7 +209,7 @@ class TestRlimMiddleware:
     ) -> None:
         """Authorized requests exceeding rate limit raise RateLimitExceeded."""
         # Arrange
-        mock_request_authorized["user"]["default_keypair_rate_limit"] = test_case.rate_limit
+        mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
         mock_valkey_client.consume = AsyncMock(
             return_value=RateLimitState(
                 count=test_case.rolling_count, limit=test_case.rate_limit, reset=_RESET
