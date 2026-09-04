@@ -218,9 +218,9 @@ Failure example with a missing authorization header
    Content-Type: application/problem+json
    Content-Language: en
    Content-Length: 139
-   X-RateLimit-Limit: 2000
-   X-RateLimit-Remaining: 1998
-   X-RateLimit-Reset: 834
+   X-RateLimit-Limit: 1000
+   X-RateLimit-Remaining: 1000
+   X-RateLimit-Reset: 900
    X-RateLimit-Window: 900
 
    {

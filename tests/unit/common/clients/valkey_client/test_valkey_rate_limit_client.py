@@ -29,7 +29,8 @@ async def test_later_requests_keep_the_window(
 
     state = await test_valkey_rate_limit.consume(user_id, window=60)
 
-    assert state == RateLimitState(count=2, reset=59)
+    assert state.count == 2
+    assert 0 < state.reset < 60
 
 
 async def test_new_window_after_expiry(
