@@ -9,7 +9,6 @@ in-process, two agents on one host each believed they were the pair's only user.
 from __future__ import annotations
 
 import asyncio
-import os
 from pathlib import Path
 
 import pytest
@@ -87,16 +86,16 @@ class TestNodeWideRefcount:
         journal = PairJournal(blocked / "net-esp-pair")
         assert await _claim(journal, pair_key("10.0.0.1", "10.0.0.2", 4789), "a", "s1") is False
 
-    async def test_a_symlinked_entry_is_refused(self, tmp_path: Path) -> None:
+    async def test_a_symlinked_lock_is_refused(self, tmp_path: Path) -> None:
         # The directory is shared by every agent on the node, so a local user can pre-create one
         # of these predictable names pointing at something else; following it would have a process
-        # holding CAP_DAC_OVERRIDE truncate whatever it points at.
+        # holding CAP_DAC_OVERRIDE open whatever it points at.
         root = tmp_path / "net-esp-pair"
-        root.mkdir()
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        (root / key).mkdir(parents=True)
         target = tmp_path / "victim"
         target.write_text("do not touch")
-        (root / key).symlink_to(target)
+        (root / key / ".lock").symlink_to(target)
         journal = PairJournal(root)
         assert await _claim(journal, key, "agent-a", "s1") is False
         assert target.read_text() == "do not touch"
@@ -160,14 +159,27 @@ class TestTheLockActuallyExcludes:
         await task
         assert entered.is_set()
 
-    async def test_the_lock_file_is_not_the_data_file(self, tmp_path: Path) -> None:
-        # The data file is replaced by rename on every write; a lock on it does not survive that.
+    async def test_the_lock_is_a_name_of_its_own(self, tmp_path: Path) -> None:
+        # Never a file that gets removed: a lock on a claim file dies with the claim.
         journal = _journal(tmp_path)
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
         await _claim(journal, key, "agent-a", "s1")
-        root = tmp_path / "net-esp-pair"
-        assert (root / f"{key}.lock").exists()
-        assert (root / key).exists()
+        pair_dir = tmp_path / "net-esp-pair" / key
+        assert (pair_dir / ".lock").is_file()
+        await _release(journal, key, "agent-a", "s1")
+        assert (pair_dir / ".lock").is_file()
+
+    async def test_each_claim_is_its_own_file(self, tmp_path: Path) -> None:
+        # Nothing rewrites another agent's file, which is what lets agents running as different
+        # users share the journal: the sticky bit protects each one's claims instead of blocking
+        # a shared file's replacement.
+        journal = _journal(tmp_path)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(journal, key, "agent-a", "s1")
+        await _claim(journal, key, "agent-b", "s2")
+        pair_dir = tmp_path / "net-esp-pair" / key
+        names = {p.name for p in pair_dir.iterdir() if p.name != ".lock"}
+        assert names == {"agent-a~s1", "agent-b~s2"}
 
     async def test_an_emptied_pair_keeps_a_stable_name(self, tmp_path: Path) -> None:
         # Written empty rather than unlinked, so nothing has to reason about the file appearing
@@ -178,12 +190,10 @@ class TestTheLockActuallyExcludes:
         await _release(journal, key, "agent-a", "s1")
         assert await journal.users(key) == frozenset()
 
-    async def test_a_leftover_temporary_does_not_block_later_writes(self, tmp_path: Path) -> None:
-        # Unique names, not pid-based: a temporary left by a crash used to make every later write
-        # fail on O_EXCL once that pid came round again.
-        root = tmp_path / "net-esp-pair"
-        root.mkdir()
+    async def test_a_claim_survives_being_recorded_twice(self, tmp_path: Path) -> None:
+        # Re-programming a pair re-records the claim; it must not fail the second time.
+        journal = _journal(tmp_path)
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
-        (root / f".{key}.{os.getpid()}.tmp").write_text("leftover")
-        journal = PairJournal(root)
         assert await _claim(journal, key, "agent-a", "s1") is True
+        assert await _claim(journal, key, "agent-a", "s1") is True
+        assert await journal.users(key) == frozenset({"agent-a/s1"})
