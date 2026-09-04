@@ -27,6 +27,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     GetCoreSchemaHandler,
+    GetJsonSchemaHandler,
     RootModel,
     SerializerFunctionWrapHandler,
 )
@@ -72,47 +73,62 @@ class Undefined(enum.Enum):
 
     ``BaseRequestModel`` drops ``UNDEFINED``-valued fields from ``model_dump()`` and from
     ``model_json_schema()``, so the token never reaches the wire or the OpenAPI schema.
+    Only the ``Undefined.TOKEN`` object itself validates: wire values such as ``1`` or ``true``
+    are rejected instead of being coerced into "not provided".
     """
 
     TOKEN = enum.auto()
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source: type[Any], handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.no_info_plain_validator_function(cls._reject_wire_value),
+            python_schema=core_schema.is_instance_schema(cls),
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return dict(_UNDEFINED_SCHEMA_MARKER)
+
+    @staticmethod
+    def _reject_wire_value(_value: Any) -> Any:
+        raise ValueError("Undefined cannot be provided on the wire")
+
 
 UNDEFINED = Undefined.TOKEN
+
+# Placeholder emitted for ``Undefined`` in JSON schemas; ``_UndefinedFreeJsonSchema`` removes it.
+_UNDEFINED_SCHEMA_MARKER: JsonSchemaValue = {"title": Undefined.__name__, "not": {}}
 
 
 class _UndefinedFreeJsonSchema(GenerateJsonSchema):
     """JSON schema generator that removes every trace of ``Undefined``.
 
-    pydantic renders ``T | Undefined | None`` as ``anyOf: [T, {$ref: Undefined}, null]`` with
-    ``default: <enum value>``. The ref is removed from ``anyOf``, the default is dropped only on
-    nodes where such a ref was removed, and the ``Undefined`` definition itself is deleted.
+    pydantic renders ``T | Undefined | None`` as ``anyOf: [T, <marker>, null]`` with
+    ``default: <enum value>``. The marker is removed from ``anyOf`` and the default is dropped
+    only on nodes where a marker was removed.
     """
-
-    _UNDEFINED_REF_SUFFIX = f"/{Undefined.__name__}"
 
     @override
     def generate(self, schema: CoreSchema, mode: JsonSchemaMode = "validation") -> JsonSchemaValue:
         json_schema = super().generate(schema, mode)
         self._strip(json_schema)
-        defs = json_schema.get("$defs")
-        if isinstance(defs, dict):
-            defs.pop(Undefined.__name__, None)
-            if not defs:
-                del json_schema["$defs"]
         return json_schema
 
-    @classmethod
-    def _is_undefined_ref(cls, node: Any) -> bool:
-        return isinstance(node, dict) and str(node.get("$ref", "")).endswith(
-            cls._UNDEFINED_REF_SUFFIX
-        )
+    @staticmethod
+    def _is_undefined_marker(node: Any) -> bool:
+        return isinstance(node, dict) and node == _UNDEFINED_SCHEMA_MARKER
 
     @classmethod
     def _strip(cls, node: Any) -> None:
         if isinstance(node, dict):
             variants = node.get("anyOf")
-            if isinstance(variants, list) and any(cls._is_undefined_ref(v) for v in variants):
-                remaining = [v for v in variants if not cls._is_undefined_ref(v)]
+            if isinstance(variants, list) and any(cls._is_undefined_marker(v) for v in variants):
+                remaining = [v for v in variants if not cls._is_undefined_marker(v)]
                 if node.get("default") == UNDEFINED.value:
                     node.pop("default")
                 if len(remaining) == 1:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from pydantic import BaseModel, ConfigDict, Field
 
 from ai.backend.common.api_handlers import (
@@ -9,6 +10,7 @@ from ai.backend.common.api_handlers import (
     BaseRequestModel,
     Undefined,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class UpdateSampleInput(BaseRequestModel):
@@ -215,3 +217,27 @@ def test_serialization_mode_schema_keeps_fields() -> None:
     schema = UpdateSampleInput.model_json_schema(mode="serialization")
     assert set(schema["properties"]) == {"id", "region", "nickName", "count"}
     assert "Undefined" not in json.dumps(schema)
+
+
+@pytest.mark.parametrize("wire_value", [1, True, 1.0])
+def test_wire_value_is_not_coerced_into_undefined_python_mode(wire_value: object) -> None:
+    """model_validate: the enum's raw value on the wire is rejected, not treated as omitted."""
+    with pytest.raises(BackendAISchemaValidationFailed):
+        UpdateSampleInput.model_validate({"id": 1, "region": wire_value})
+
+
+@pytest.mark.parametrize("wire_json", ['{"id": 1, "region": 1}', '{"id": 1, "region": true}'])
+def test_wire_value_is_not_coerced_into_undefined_json_mode(wire_json: str) -> None:
+    """model_validate_json: the enum's raw value on the wire is rejected."""
+    with pytest.raises(BackendAISchemaValidationFailed):
+        UpdateSampleInput.model_validate_json(wire_json)
+
+
+def test_int_field_with_undefined_still_accepts_one() -> None:
+    """An int | Undefined | None field still accepts the legitimate value 1."""
+
+    class IntUpdateInput(BaseRequestModel):
+        count: int | Undefined | None = Field(default=UNDEFINED)
+
+    assert IntUpdateInput.model_validate({"count": 1}).count == 1
+    assert IntUpdateInput.model_validate({}).count is UNDEFINED
