@@ -1564,18 +1564,22 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             else:
                 failed.append(device)
         self._unclosed_devices.update(failed)
-        # Claims outlive the process that made them: a crash between programming a pair and
-        # tearing it down leaves one with nobody behind it, and the pair it names is then never
-        # removed by anyone. At this point no session has been re-adopted yet, so every claim of
-        # ours is stale by definition.
-        pruned = await self._pair_journal.prune(self._journal_owner, live_sessions=())
-        if pruned:
-            log.info("dropped {} stale ESP pair claim(s) left by a previous life", pruned)
         if failed:
+            # Do NOT prune. A claim is what stops another agent removing the SAs of a pair still
+            # in use, and a tunnel that would not go down is exactly a pair that may still be
+            # carrying traffic: dropping its claim while it is UP invites a co-located agent to
+            # conclude it is the last user and delete the protection out from under it. Stale
+            # claims cost a leaked SA; dropping a live one costs the guarantee.
             raise OverlayEncryptionUnavailable(
                 "could not fail-close surviving VXLAN tunnel(s) before recovery: "
                 + ", ".join(failed)
             )
+        # Everything this node owned is down, so every claim of ours is stale by definition --
+        # they outlive the process that made them, and a crash between programming a pair and
+        # tearing it down leaves one with nobody behind it.
+        pruned = await self._pair_journal.prune(self._journal_owner, live_sessions=())
+        if pruned:
+            log.info("dropped {} stale ESP pair claim(s) left by a previous life", pruned)
 
     async def _require_no_conflict(self, vni: int, dstport: int) -> None:
         """Refuse a VNI another VXLAN on this host already carries on the same port.

@@ -1,0 +1,24 @@
+# backend	cd
+# started_utc	20260901T014007Z
+# cases	A1 B1 B2 C1 C2 C3 C4 C5 C6 C7
+# churn	3 x 12s
+# local_host	192.168.0.104
+# peer_host	192.168.0.156
+# image_id	b46e2770-7777-486b-8c87-db84a8fb34c5
+# git_commit	f22c452ee
+# host	Linux 6.14.0-37-generic x86_64
+case	status	detail
+A1	PASS	대상 백엔드만 기동됨
+B1	PASS	단일노드 세션 (RUNNING)
+B2	FAIL	멀티노드 세션이 RUNNING 이 아니거나 한 노드에 몰림
+C1	PASS	sub1=10.128.27.1 main1=10.128.27.2
+C2	PASS	main1→sub1 및 sub1→main1 모두 0% (10.128.27.1 / 10.128.27.2)
+C3	PASS	sub1=10.128.27.1 main1=10.128.27.2
+C4	PASS	main1→sub1 및 sub1→main1 TCP 성립
+C5	PASS	무단편 UDP 페이로드 1422B = 오버레이 MTU 1450B − IP/UDP 28B
+C6	PASS	컨테이너에서 바깥으로 TCP 성립
+C7	PASS	다른 세션의 컨테이너(172.30.0.194)에 닿지 않음 (FAIL:TimeoutError), 그 세션 자신은 닿음
+# finished_utc	20260901T014343Z
+# pass	9
+# fail	1
+# skip	0
