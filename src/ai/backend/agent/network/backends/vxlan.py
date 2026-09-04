@@ -1,0 +1,1843 @@
+"""VXLAN cluster-network backend (BEP-1062).
+
+Portable default data plane: per-session VXLAN VNI + bridge, with unicast head-end
+replication (FDB) driven by the SessionNetworkCoordinator's etcd membership watch.
+
+The side-effecting ``ip``/``bridge`` invocations are isolated behind an injectable
+runner; the command builders and CNI-config assembly are pure and unit-tested.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import hmac
+import ipaddress
+import logging
+import re
+import time
+from collections.abc import Awaitable, Callable, Collection, Sequence
+from typing import Any, Final, override
+
+from ai.backend.agent.errors.network import (
+    OverlayAddressNotAssigned,
+    OverlayEncryptionUnavailable,
+    OverlayMtuTooLarge,
+)
+from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.network.backends.vxlan_security import (
+    VxlanSecurityEvent,
+    VxlanSecurityState,
+    VxlanSecurityStateMachine,
+)
+from ai.backend.agent.network.caps import probe_caps
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
+from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
+from ai.backend.agent.network.overlay_probe import arp_probe
+from ai.backend.agent.network.path_mtu import underlay_mtu
+from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
+from ai.backend.common.network.types import (
+    DEFAULT_VXLAN_PORT,
+    ESP_OVERHEAD,
+    VXLAN_OVERHEAD,
+    AgentNetworkCaps,
+    AttachKind,
+    EndpointPlan,
+    Member,
+    NetworkAttachSpec,
+    NetworkBackendKind,
+    NetworkRole,
+    SessionNetMeta,
+    mac_for_ip,
+)
+from ai.backend.common.types import ClusterInfo, KernelCreationConfig
+from ai.backend.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+VXLAN_DSTPORT = DEFAULT_VXLAN_PORT
+"""Kept as the module-level default for the pure command builders. The value a live session
+actually uses comes from ``SessionNetMeta.vxlan_port``, so both ends of a tunnel agree."""
+OVERLAY_IFNAME = "baimulti0"
+_BROADCAST_MAC = "00:00:00:00:00:00"
+
+Runner = Callable[[Sequence[str]], Awaitable[None]]
+MtuProbe = Callable[[str], Awaitable[int | None]]
+# (bridge, target_ip, target_mac) -> answered? / None when the probe could not run.
+ReachProbe = Callable[[str, str, str], Awaitable[bool | None]]
+KeyGeneration = Callable[[], int]
+#: The name of every VXLAN device on this host.
+VxlanLister = Callable[[], Awaitable[Collection[str]]]
+
+# A freshly published endpoint may belong to a container that is still starting, so the reach
+# probe is retried before it is believed. Cheap (one ARP frame each) and bounded.
+_REACH_ATTEMPTS: Final = 5
+_REACH_RETRY_DELAY_SEC: Final = 3.0
+
+
+# --- naming (kept within the 15-char interface name limit) ---
+
+
+#: Prefix of every vxlan device this backend creates; recovery uses it as the durable ownership
+#: boundary before the process has reconstructed session metadata.
+VXLAN_DEV_PREFIX: Final = "baivx"
+
+
+def vxlan_dev(vni: int) -> str:
+    return f"{VXLAN_DEV_PREFIX}{vni}"
+
+
+def bridge_dev(vni: int) -> str:
+    return f"baibr{vni}"
+
+
+# --- pure command builders ---
+
+
+def vxlan_link_add_args(
+    vni: int,
+    uplink: str,
+    *,
+    local: str | None = None,
+    mtu: int | None = None,
+    dstport: int = VXLAN_DSTPORT,
+) -> list[str]:
+    # ``local`` pins the tunnel's outer source address. Without it the kernel picks one per route
+    # (ip-link(8): the source is chosen automatically when `local` is omitted), so on a host with
+    # more than one address on the uplink the frames can leave from an address that is not the VTEP
+    # this node published. Peers then hold an FDB entry for one address and receive from another,
+    # and — worse — the ESP policy's selector is written against the published pair, so traffic
+    # that leaves from the other address matches no policy and goes out in clear text. The whole
+    # overlay is keyed on this address being the one peers were told about; say so to the kernel.
+    # ``mtu`` is the OVERLAY MTU (the inner frame the tunnel carries), which the manager already
+    # computed as underlay - overhead. Setting it explicitly ties the vxlan device, the overlay
+    # bridge and the container NIC to one value instead of relying on the kernel's auto-calc
+    # (uplink - 50) happening to match — which silently diverges the moment this node's uplink MTU
+    # differs from the manager's assumption, reopening the black hole.
+    # ``mtu`` is a generic link property and MUST precede ``type vxlan``: after it, ``ip`` parses
+    # the next token (our ``id``) as a vxlan sub-option and errors out. Verified against iproute2.
+    mtu_args = ["mtu", str(mtu)] if mtu is not None else []
+    local_args = ["local", local] if local else []
+    return [
+        "ip", "link", "add", vxlan_dev(vni), *mtu_args,
+        "type", "vxlan",
+        "id", str(vni),
+        "dev", uplink,
+        *local_args,
+        "dstport", str(dstport),
+        "nolearning",
+    ]  # fmt: skip
+
+
+def bridge_link_add_args(vni: int, *, mtu: int | None = None) -> list[str]:
+    mtu_args = ["mtu", str(mtu)] if mtu is not None else []
+    return ["ip", "link", "add", bridge_dev(vni), *mtu_args, "type", "bridge"]
+
+
+def set_master_args(vni: int) -> list[str]:
+    return ["ip", "link", "set", vxlan_dev(vni), "master", bridge_dev(vni)]
+
+
+def link_up_args(dev: str) -> list[str]:
+    return ["ip", "link", "set", dev, "up"]
+
+
+def link_down_args(dev: str) -> list[str]:
+    return ["ip", "link", "set", dev, "down"]
+
+
+def link_del_args(dev: str) -> list[str]:
+    return ["ip", "link", "del", dev]
+
+
+def fdb_append_args(vni: int, dst: str, *, mac: str = _BROADCAST_MAC) -> list[str]:
+    return ["bridge", "fdb", "append", mac, "dev", vxlan_dev(vni), "dst", dst]
+
+
+def fdb_del_args(vni: int, dst: str, *, mac: str = _BROADCAST_MAC) -> list[str]:
+    return ["bridge", "fdb", "del", mac, "dev", vxlan_dev(vni), "dst", dst]
+
+
+# --- proactive endpoint programming (unicast FDB + ARP; replaces BUM flooding) ---
+
+
+def fdb_replace_args(vni: int, mac: str, dst: str) -> list[str]:
+    """Program the exact unicast MAC→VTEP forwarding entry for a known remote endpoint."""
+    return ["bridge", "fdb", "replace", mac, "dev", vxlan_dev(vni), "dst", dst]
+
+
+# --- overlay encryption: kernel IPSec (ESP/AES-GCM) on the VXLAN tunnel (overlay-encryption.md) ---
+# The crypto is the kernel's (XFRM/ESP + AES-NI); these only build the `ip xfrm` control-plane
+# commands the privnet runs beside the FDB entry. Transport-mode ESP between the two VTEPs encrypts
+# the VXLAN UDP (4789) — the L2 overlay is untouched.
+
+_ICV_BITS = 128  # AES-GCM authentication tag length
+# Host-global XFRM ownership identifiers. These deliberately differ from Docker/libnetwork's
+# 0xD0C4E3: Docker removes every policy with its mark and every SA with its reqid, and an equal
+# selector is updated in place. Sharing its values would therefore let either implementation
+# replace or delete the other's protection when both use the default UDP port on one host.
+XFRM_MARK: Final = 0xBA100001
+XFRM_REQID: Final = 0xBA100002
+_XFRM_MARK: Final = f"{XFRM_MARK:#x}"
+_XFRM_MARK_MASK: Final = "0xffffffff"
+KEY_ROTATION_INTERVAL_SEC: Final = 12 * 60 * 60
+_KEYRING_SIZE: Final = 3
+_VXLAN_LINE: Final = re.compile(r"^\d+:\s+(?P<name>[^:@\s]+)")
+
+
+async def _list_vxlan_devices() -> frozenset[str]:
+    """The name of every VXLAN device on this host.
+
+    Names only, and deliberately without `ip -d`. Both callers ask one question -- does this device
+    still exist -- and the attribute dump that would answer more is the part that breaks: measured
+    on three nodes running the same iproute2 6.1.0 on Ubuntu 24.04, `ip -d -j link show type vxlan`
+    is valid JSON on kernel 6.8, emits malformed JSON on 6.14 (a `fan-map` value written into the
+    object with no key: `"id":60001fan-map ,"link":...`), and emits nothing at all on 6.17. So a
+    cluster that works today breaks on a kernel upgrade, in two different ways. The plain
+    `ip -o link show type vxlan` line format is the same on all three.
+
+    Recovery relies on this to fail-close unknown surviving tunnels, so a failure is surfaced
+    rather than represented as an empty host.
+    """
+    proc = await asyncio.create_subprocess_exec(
+        "ip",
+        "-o",
+        "link",
+        "show",
+        "type",
+        "vxlan",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    out, _ = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"could not enumerate VXLAN links (rc={proc.returncode})")
+    names: set[str] = set()
+    for line in (out or b"").decode(errors="replace").splitlines():
+        # "<index>: <name>[@<parent>]: <FLAGS> ..." -- the one part of `ip link` output that has
+        # not changed across the kernels above.
+        if (match := _VXLAN_LINE.match(line)) is not None:
+            names.add(match.group("name"))
+    return frozenset(names)
+
+
+def _esp_spi(src: str, dst: str, generation: int = 0) -> int:
+    """A deterministic 32-bit SPI for the directed VTEP pair, so both ends agree without a
+    handshake: A's out-SA (src=A,dst=B) and B's in-SA (src=A,dst=B) compute the same value.
+
+    The pair and one of three generation slots are the whole input. It used to fold the VNI in as
+    well, but every session between these two nodes wants the same pair-generation SA and traffic
+    key. Folding the VNI in would manufacture several equivalent SAs for one policy to choose
+    between, recreating the ambiguity this design removes.
+
+    Kept above 255 (SPIs 0-255 are reserved). Three slots bound the kernel state while letting the
+    previous, current and next traffic-key generations coexist across a rotation boundary."""
+    slot = generation % _KEYRING_SIZE
+    digest = hashlib.sha256(f"{src}:{dst}:slot:{slot}".encode()).digest()
+    return (int.from_bytes(digest[:4], "big") % (2**32 - 256)) + 256
+
+
+def _aead_key(key_hex: str, spi: int) -> str:
+    """rfc4106(gcm(aes)) keys carry a 4-byte salt after the cipher key, and the GCM nonce is that
+    salt followed by the 8-byte per-packet IV. Derive the salt from the key *and the SPI* -- both
+    ends compute the same one for a given SA, and no two SAs get the same one.
+
+    Deriving it from the key alone gave every SA on the node, in both directions and to every peer,
+    one shared salt. RFC 4106 asks for a distinct salt per SA precisely so that a repeated IV cannot
+    become a repeated nonce, and Moby folds the SPI in for the same reason. Measured: on Linux the
+    nonces did not actually collide, because the kernel gives each SA an independent random IV base
+    (a delete-and-recreate of the same key/salt/SPI produced a different one) -- but that is the
+    kernel's choice to make, not a property of what is programmed here. This makes it structural.
+    """
+    salt = hashlib.sha256(bytes.fromhex(key_hex) + spi.to_bytes(4, "big")).digest()[:4]
+    return "0x" + key_hex + salt.hex()
+
+
+def _pair_key(cluster_key_hex: str, self_vtep: str, peer_vtep: str, generation: int = 0) -> str:
+    """The cipher key for one node pair, derived from the cluster secret.
+
+    The SA is already per node pair -- `_esp_spi` folds the VTEP pair and nothing else -- so there
+    is no reason for the bytes in it to be the cluster's. What went in before was the secret
+    itself, verbatim, on every SA on every node; and `ip xfrm state` prints an SA's key back in the
+    clear, so one reader on any node held the material protecting every pair in the cluster. Per
+    pair and generation, that reader holds one pair's time-bounded traffic key.
+
+    It is not a trust boundary -- anything holding the cluster secret derives them all -- only a
+    blast radius. Unordered, so both ends of a pair reach the same value with no handshake, exactly
+    as the SPI and the salt already do. HMAC rather than a bare hash: the standard construction for
+    deriving from a secret, and the input is attacker-visible (VTEP addresses).
+    """
+    lo, hi = sorted((self_vtep, peer_vtep))
+    return hmac.new(
+        bytes.fromhex(cluster_key_hex),
+        f"bai-overlay-pair:{lo}|{hi}|generation:{generation}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def xfrm_state_add_args(
+    self_vtep: str,
+    peer_vtep: str,
+    cluster_key_hex: str,
+    *,
+    generation: int = 0,
+) -> list[list[str]]:
+    """The ESP SA pair for this ordered VTEP pair -- one pair per node pair, shared by every
+    session between them, which is what makes it safe for one policy to select it.
+
+    The cluster secret is what arrives in the session meta; what reaches the kernel is the key
+    derived from it for this pair and generation (see `_pair_key`)."""
+    spi_out_n = _esp_spi(self_vtep, peer_vtep, generation)
+    spi_in_n = _esp_spi(peer_vtep, self_vtep, generation)
+    spi_out, spi_in = f"{spi_out_n:#x}", f"{spi_in_n:#x}"
+    key_hex = _pair_key(cluster_key_hex, self_vtep, peer_vtep, generation)
+    # One salt per SA, so the two directions never share a (key, salt) pair.
+    aead_out = ["aead", "rfc4106(gcm(aes))", _aead_key(key_hex, spi_out_n), str(_ICV_BITS)]
+    aead_in = ["aead", "rfc4106(gcm(aes))", _aead_key(key_hex, spi_in_n), str(_ICV_BITS)]
+    return [
+        ["ip", "xfrm", "state", "add", "src", self_vtep, "dst", peer_vtep,
+         "proto", "esp", "spi", spi_out, "reqid", f"{XFRM_REQID:#x}",
+         "mode", "transport", *aead_out],
+        ["ip", "xfrm", "state", "add", "src", peer_vtep, "dst", self_vtep,
+         "proto", "esp", "spi", spi_in, "reqid", f"{XFRM_REQID:#x}",
+         "mode", "transport", *aead_in],
+    ]  # fmt: skip
+
+
+def xfrm_policy_add_args(
+    self_vtep: str,
+    peer_vtep: str,
+    *,
+    dstport: int = VXLAN_DSTPORT,
+    generation: int = 0,
+) -> list[list[str]]:
+    """The outbound policy selecting this node<->peer VXLAN UDP for ESP.
+
+    NOT per session, and it cannot be: the selector is the OUTER packet (src/dst IP, udp dport) and
+    the VNI lives inside the UDP payload, where no XFRM selector can reach it. So every session
+    between the same two nodes on the same port shares one policy — which is why the caller
+    refcounts it instead of deleting it with whichever session ends first. The SA it selects is
+    shared the same way (see the state args above), so "which one" is no longer a question.
+
+    The receive path deliberately has no inbound XFRM policy. The inbound SA authenticates and
+    decrypts ESP, while the INPUT policy-match rule below drops VXLAN packets with no XFRM secpath.
+    This matches Docker Swarm's split between outbound XFRM selection and inbound filtering.
+    """
+    return [
+        ["ip", "xfrm", "policy", "update", "src", self_vtep, "dst", peer_vtep,
+         "proto", "udp", "dport", str(dstport), "dir", "out",
+         "mark", _XFRM_MARK, "mask", _XFRM_MARK_MASK,
+         "tmpl", "src", self_vtep, "dst", peer_vtep, "proto", "esp",
+         "spi", f"{_esp_spi(self_vtep, peer_vtep, generation):#x}",
+         "reqid", f"{XFRM_REQID:#x}", "mode", "transport"],
+    ]  # fmt: skip
+
+
+def xfrm_state_del_args(self_vtep: str, peer_vtep: str, *, generation: int = 0) -> list[list[str]]:
+    spi_out = f"{_esp_spi(self_vtep, peer_vtep, generation):#x}"
+    spi_in = f"{_esp_spi(peer_vtep, self_vtep, generation):#x}"
+    return [
+        ["ip", "xfrm", "state", "del", "src", self_vtep, "dst", peer_vtep, "proto", "esp",
+         "spi", spi_out],
+        ["ip", "xfrm", "state", "del", "src", peer_vtep, "dst", self_vtep, "proto", "esp",
+         "spi", spi_in],
+    ]  # fmt: skip
+
+
+def xfrm_policy_del_args(
+    self_vtep: str, peer_vtep: str, *, dstport: int = VXLAN_DSTPORT
+) -> list[list[str]]:
+    return [
+        ["ip", "xfrm", "policy", "del", "src", self_vtep, "dst", peer_vtep,
+         "proto", "udp", "dport", str(dstport), "dir", "out",
+         "mark", _XFRM_MARK, "mask", _XFRM_MARK_MASK],
+    ]  # fmt: skip
+
+
+def xfrm_add_args(
+    self_vtep: str,
+    peer_vtep: str,
+    key_hex: str,
+    *,
+    dstport: int = VXLAN_DSTPORT,
+    generation: int = 0,
+) -> list[list[str]]:
+    """The `ip xfrm` commands that encrypt this node↔peer VXLAN traffic: an out/in ESP SA pair plus
+    the outbound policy selecting the VXLAN UDP.
+
+    The states use `add`, not `update`: `XFRM_MSG_UPDSA` looks the SA up first and returns ESRCH
+    when it is absent, so `update` alone never *creates* one -- measured, every call failed with
+    "RTNETLINK answers: No such process" and the overlay ran in clear text while still paying the
+    38-byte ESP MTU cost. `add` is EEXIST on an SA that survived an agent restart, which
+    `_run_xfrm` handles by replaying it as `update`. Policies keep `update`, which is a true
+    upsert (`XFRM_MSG_UPDPOLICY` creates when absent).
+    """
+    return [
+        *xfrm_state_add_args(self_vtep, peer_vtep, key_hex, generation=generation),
+        *xfrm_policy_add_args(self_vtep, peer_vtep, dstport=dstport, generation=generation),
+    ]
+
+
+def xfrm_del_args(
+    self_vtep: str,
+    peer_vtep: str,
+    *,
+    dstport: int = VXLAN_DSTPORT,
+    generation: int | None = None,
+) -> list[list[str]]:
+    generations = range(_KEYRING_SIZE) if generation is None else (generation,)
+    return [
+        *[
+            args
+            for key_generation in generations
+            for args in xfrm_state_del_args(self_vtep, peer_vtep, generation=key_generation)
+        ],
+        *xfrm_policy_del_args(self_vtep, peer_vtep, dstport=dstport),
+    ]
+
+
+def neigh_replace_args(vni: int, ip: str, mac: str) -> list[str]:
+    """Program a permanent ARP entry (IP→MAC) on the overlay bridge.
+
+    This covers traffic the HOST originates onto the overlay. It does not suppress the containers'
+    own ARP: the entry sits on the bridge in the host netns, and the vxlan device carries no
+    ``proxy`` flag, so a container's broadcast ARP is still flooded to every peer VTEP by head-end
+    replication. That works (which is why cross-node traffic passes), but the flooding is real and
+    grows with the peer count. Actual suppression would mean ``proxy`` on the vxlan device with the
+    neighbour entries moved onto it — a behaviour change worth measuring before making.
+    """
+    return ["ip", "neigh", "replace", ip, "lladdr", mac, "dev", bridge_dev(vni), "nud", "permanent"]
+
+
+def neigh_del_args(vni: int, ip: str) -> list[str]:
+    return ["ip", "neigh", "del", ip, "dev", bridge_dev(vni)]
+
+
+# --- overlay-bridge FORWARD accept (survive a DROP FORWARD policy) ---
+#
+# With br_netfilter loaded and net.bridge.bridge-nf-call-iptables=1 (a node co-hosting Docker or
+# kube-proxy, or a hardened host), frames bridged WITHIN the overlay bridge -- container veth <->
+# vxlan device -- traverse the iptables FORWARD chain. If its policy is DROP (Docker sets exactly
+# that), the overlay goes silently dead: handshakes and cross-node traffic are dropped with no
+# ICMP. Accept intra-bridge forwarding on the overlay bridge, the same rule Docker installs for its
+# own bridges. ``-i BR -o BR`` is exactly the intra-bridge path and nothing else (the encapsulated
+# UDP leaves via the host's OUTPUT chain, not FORWARD).
+
+
+def _forward_accept_rule(vni: int) -> list[str]:
+    br = bridge_dev(vni)
+    return ["FORWARD", "-i", br, "-o", br, "-j", "ACCEPT"]
+
+
+def forward_accept_check_args(vni: int) -> list[str]:
+    return ["iptables", "-C", *_forward_accept_rule(vni)]
+
+
+def forward_accept_add_args(vni: int) -> list[str]:
+    return ["iptables", "-I", *_forward_accept_rule(vni)]
+
+
+def forward_accept_del_args(vni: int) -> list[str]:
+    return ["iptables", "-D", *_forward_accept_rule(vni)]
+
+
+# --- drop plaintext VXLAN for an encrypted VNI ---
+#
+# ESP protects what this node *sends*, and nothing else. A vxlan device accepts any well-formed
+# frame that arrives on its UDP port carrying its VNI, decrypted or not, so an encrypted session
+# stays wide open on the receive side: anyone who can reach the underlay port -- an unregistered
+# host, a node evicted from the session, a co-tenant on the same L2 -- injects a plaintext frame
+# with the right VNI and it lands on the overlay bridge as if a member had sent it. Measured on
+# three nodes: a host that was never a member injected plaintext VNI 4097 into an encrypted
+# session and the member accepted it (0% loss) and replied in clear text.
+#
+# So the receive side has to be closed explicitly, which is what Docker's overlay driver does too:
+# for an encrypted VNI, drop VXLAN that did *not* arrive inside an SA. ``-m policy --dir in
+# --pol none`` is the half that distinguishes them -- an ESP-decapsulated frame carries its
+# policy state into INPUT and does not match ``none``, while an injected one does.
+#
+# ``u32`` picks the VNI out of the encapsulation: ``0>>22&0x3C`` is the IP header length, which
+# lands the cursor on the UDP header, and ``@12`` is the VXLAN VNI word (UDP header 8 + VXLAN
+# flags/reserved 4); ``>>8`` drops the trailing reserved byte. The offset was calibrated against
+# real frames rather than derived -- candidate LOG rules at 8, 12 and 16 were installed together
+# and only 12 matched.
+#
+# Per-VNI rather than per-port: two sessions can share the underlay port with only one of them
+# encrypted, and a port-wide rule would black-hole the other.
+
+
+def _plaintext_drop_rule(vni: int, dstport: int) -> list[str]:
+    return [
+        "INPUT",
+        "-p",
+        "udp",
+        "--dport",
+        str(dstport),
+        "-m",
+        "u32",
+        "--u32",
+        f"0>>22&0x3C@12>>8={vni}",
+        "-m",
+        "policy",
+        "--dir",
+        "in",
+        "--pol",
+        "none",
+        "-j",
+        "DROP",
+    ]
+
+
+def plaintext_drop_check_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
+    return ["iptables", "-C", *_plaintext_drop_rule(vni, dstport)]
+
+
+def plaintext_drop_add_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
+    # Inserted at the head: a node co-hosting a CNI (cilium, calico) has its own feeder jumps at
+    # the top of INPUT, and an appended rule would never be reached for traffic they accept.
+    return ["iptables", "-I", *_plaintext_drop_rule(vni, dstport)]
+
+
+def plaintext_drop_del_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
+    return ["iptables", "-D", *_plaintext_drop_rule(vni, dstport)]
+
+
+# --- mark outbound VXLAN for an encrypted VNI ---
+
+
+def _output_mark_rule(vni: int, dstport: int) -> list[str]:
+    return [
+        "OUTPUT",
+        "-p",
+        "udp",
+        "--dport",
+        str(dstport),
+        "-m",
+        "u32",
+        "--u32",
+        f"0>>22&0x3C@12>>8={vni}",
+        "-j",
+        "MARK",
+        "--set-mark",
+        f"{XFRM_MARK:#x}",
+    ]
+
+
+def output_mark_check_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
+    return ["iptables", "-t", "mangle", "-C", *_output_mark_rule(vni, dstport)]
+
+
+def output_mark_add_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
+    return ["iptables", "-t", "mangle", "-I", *_output_mark_rule(vni, dstport)]
+
+
+def output_mark_del_args(vni: int, dstport: int = VXLAN_DSTPORT) -> list[str]:
+    return ["iptables", "-t", "mangle", "-D", *_output_mark_rule(vni, dstport)]
+
+
+# --- pure CNI config assembly ---
+
+
+def _overlay_ipam(meta: SessionNetMeta, ip: str) -> dict[str, Any]:
+    """Static IPAM at the manager-assigned endpoint IP.
+
+    The overlay subnet is stretched across every node in the session, so the address MUST come
+    from the manager's central ``endpoints/`` table — which hands each endpoint a disjoint IP by
+    construction. A per-node host-local pick would give every node the same first address and
+    collide across the tunnel. There is no local fallback: this backend is multi-node only (the
+    single-node path uses the bridge backend), and the manager assigns an endpoint IP to every
+    kernel that has an agent, so a missing IP here is a control-plane bug, not a fallback case —
+    the caller raises rather than silently attach a colliding address."""
+    prefixlen = ipaddress.ip_network(meta.subnet).prefixlen
+    return {"type": "static", "addresses": [{"address": f"{ip}/{prefixlen}"}]}
+
+
+def overlay_cni_config(meta: SessionNetMeta, ip: str | None = None) -> dict[str, Any]:
+    """CNI 'bridge' config attaching the container to this session's overlay bridge.
+
+    ``ip`` is the manager-assigned overlay address and is required: without it the container
+    cannot be given a cluster-unique address on the stretched overlay (see _overlay_ipam)."""
+    if meta.vni is None:
+        raise ValueError(f"overlay_cni_config requires a vxlan meta with a VNI: {meta}")
+    if ip is None:
+        raise OverlayAddressNotAssigned(
+            f"no manager-assigned overlay IP for session {meta.session_id}; "
+            "cannot attach to the stretched overlay without a cluster-unique address"
+        )
+    # The overlay NIC's MAC is pinned to the deterministic address the manager programs into every
+    # peer's FDB/ARP (mac_for_ip) — otherwise the veth gets a random MAC and a peer's unicast frame
+    # (dst=02:42:<ip>) arriving over the tunnel does not match the NIC and is dropped, breaking
+    # cross-node overlay traffic. The pin is expressed in standard CNI vocabulary: the config
+    # DECLARES the ``mac`` capability, and the value is supplied out-of-band as a capability arg
+    # (overlay_mac_capability_args) that the provisioner injects into runtimeConfig — so a real CNI
+    # ``bridge`` binary honours it, unlike the old non-standard top-level ``mac`` key it would drop.
+    return {
+        "cniVersion": "1.0.0",
+        "name": f"bai-overlay-{meta.session_id}",
+        "type": "bridge",
+        "bridge": bridge_dev(meta.vni),
+        "isGateway": False,
+        "ipMasq": False,
+        "mtu": meta.mtu,
+        "ipam": _overlay_ipam(meta, ip),
+        "capabilities": {"mac": True},
+    }
+
+
+def overlay_mac_capability_args(ip: str) -> dict[str, Any]:
+    """The standard ``mac`` capability arg pinning the overlay NIC to its deterministic address
+    (mac_for_ip), which every peer's FDB/ARP is programmed to."""
+    return {"mac": mac_for_ip(ip)}
+
+
+def local_bridge_dev(vni: int) -> str:
+    return f"bailo{vni}"
+
+
+def local_cni_config(
+    session_id: str, *, bridge: str, subnet: str, static_ip: str | None = None
+) -> dict[str, Any]:
+    """CNI 'bridge' config for the host-local interface: agent<->container control
+    channel plus egress NAT, carrying the default route.
+
+    Per BEP-1062 Decision Log (2026-07-03): the LOCAL bridge is **per session**, on a
+    **node-local** NAT subnet (not the stretched overlay subnet). Cross-session isolation
+    comes from separate bridges (verified §8), not ICC-off firewall rules (the stock CNI
+    bridge does not implement ICC-off — §9). A node-local subnet also avoids the
+    stretched-L2 gateway conflict that folding egress into the overlay bridge would cause
+    (option C, rejected in §9).
+
+    ``static_ip`` pins the container at a specific address in the subnet (single-node cluster
+    peers, so /etc/hosts resolves) while keeping host-local's pool + gateway + MASQ; None keeps
+    the dynamic host-local pick for ordinary single-kernel sessions.
+
+    The pin is expressed in standard CNI vocabulary: when ``static_ip`` is set the config DECLARES
+    the ``ips`` capability, and the address is supplied out-of-band as a capability arg
+    (local_ip_capability_args) that the provisioner injects into runtimeConfig. This replaces the
+    old non-standard ``ipam.requested_ip`` key, which a real host-local binary would ignore —
+    silently handing out a dynamic address and breaking the pin."""
+    config: dict[str, Any] = {
+        "cniVersion": "1.0.0",
+        "name": f"bai-local-{session_id}",
+        "type": "bridge",
+        "bridge": bridge,
+        "isGateway": True,
+        "isDefaultGateway": True,
+        "ipMasq": True,
+        "hairpinMode": False,
+        "ipam": {"type": "host-local", "subnet": subnet},
+    }
+    if static_ip is not None:
+        config["capabilities"] = {"ips": True}
+    return config
+
+
+def local_ip_capability_args(subnet: str, static_ip: str) -> dict[str, Any]:
+    """The standard ``ips`` capability arg pinning the LOCAL NIC to ``static_ip`` within ``subnet``
+    (single-node cluster peers, so /etc/hosts resolves). CNI ``ips`` args are CIDR strings."""
+    prefixlen = ipaddress.ip_network(subnet).prefixlen
+    return {"ips": [f"{static_ip}/{prefixlen}"]}
+
+
+async def _run_command(argv: Sequence[str]) -> None:
+    proc = await asyncio.create_subprocess_exec(
+        *argv,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        display_argv = list(argv)
+        secrets: set[str] = set()
+        for index, value in enumerate(display_argv):
+            # `ip xfrm state ... aead ALGORITHM KEY ICV_BITS`: the value two positions after
+            # ``aead`` is the derived pair key plus RFC 4106 salt. It must not cross the
+            # subprocess boundary a second time through logs or exception telemetry.
+            if value == "aead" and index + 2 < len(display_argv):
+                secrets.add(display_argv[index + 2])
+                display_argv[index + 2] = "[REDACTED]"
+        display_stderr = stderr.decode(errors="replace").strip()
+        for secret in secrets:
+            display_stderr = display_stderr.replace(secret, "[REDACTED]")
+        raise RuntimeError(
+            f"command failed (rc={proc.returncode}): {' '.join(display_argv)}: {display_stderr}"
+        )
+
+
+class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
+    """VXLAN data-plane backend."""
+
+    _runner: Runner
+    _uplink: str
+    _sessions: dict[str, SessionNetMeta]
+    _self_vteps: dict[str, str]
+    _local_subnets: LocalSubnetAllocator
+    _mtu_probe: MtuProbe
+    _reach_probe: ReachProbe
+    _vxlan_lister: VxlanLister
+    # Peers whose ESP SA/policy pair this node has programmed, per session. XFRM lives in the
+    # netns rather than on the device, so teardown has to unprogram it explicitly and cannot rely
+    # on `del_peer` having run for every peer first.
+    _encrypted_peers: dict[str, set[str]]
+    # Which sessions are carried by the ESP state+policy of a given (self VTEP, peer VTEP, port).
+    # Both are node-pair resources: the policy selector is the outer packet and carries nothing per
+    # session, and the SA ring it selects is now the pair's too (one cluster root and generation,
+    # so there is nothing to tell apart). Tearing either down with whichever session ends first is
+    # what broke the others
+    # -- silently to clear text when it was the policy. Keyed by session id rather than counted so
+    # add/remove stay idempotent under the coordinator's retries.
+    _pair_users: dict[tuple[str, str, int], set[str]]
+    #: The pairs the kernel actually holds an SA and policy for. Separate from ``_pair_users``,
+    #: which records who would have to release a pair: a session is recorded as a user before the
+    #: commands run (so a partial failure is still cleaned up), and treating that record as proof
+    #: of programming would make every retry skip a pair that was never finished.
+    _programmed_pairs: set[tuple[str, str, int]]
+    # Per-session background reach probes, so teardown does not leave them running against a
+    # bridge that is being deleted.
+    _reach_tasks: dict[str, set[asyncio.Task[None]]]
+    #: Per session, the peer VTEPs a probe is in flight for or has already had answered. The probe
+    #: tests the tunnel to a node, not the endpoint at the far end of it, so one per peer says
+    #: everything eight kernels behind that peer would say -- and says it with one task and one
+    #: raw socket instead of eight. A probe that goes unanswered clears its entry, so the next
+    #: endpoint behind that peer tries again: the first one may simply have been early.
+    _reach_probed: dict[str, set[str]]
+    #: Peers whose tunnel went unanswered, per session. Kept so the failure outlives the log line
+    #: that reports it -- a session is left RUNNING on purpose here, and without this the only
+    #: trace is in the agent's log while the user sees a rendezvous that never completes.
+    _unreachable_peers: dict[str, set[str]]
+    #: Per-session security state machines. They distinguish verification of a previously safe,
+    #: open tunnel from restoration of a held-down one, so only the latter may raise the link after
+    #: the complete peer set is protected.
+    _security_states: dict[str, VxlanSecurityStateMachine]
+    #: One lock per ESP pair, held across the refcount decision AND the kernel commands that follow
+    #: from it. The SA and policy are shared by every session between the same two nodes on the same
+    #: port, so two sessions racing on one pair can interleave into "A decides it is the last user,
+    #: B programs the pair, A deletes what B just made" -- B then holds an open FDB with nothing
+    #: encrypting it. Per pair, not global: unrelated pairs have no reason to wait on each other.
+    _pair_locks: dict[tuple[str, str, int], asyncio.Lock]
+    #: Full generation currently stored in each of a pair's three SPI slots. The SPI is bounded by
+    #: slot, while the key derivation includes the full generation; this map tells rotation which
+    #: stale slot must be deleted and recreated rather than incorrectly `update`d in place.
+    _pair_slot_generations: dict[tuple[str, str, int], dict[int, int]]
+    #: The outbound generation never moves backwards if wall clock is corrected. A rollback would
+    #: deliberately resume a retired traffic key and reset this process's security horizon.
+    _pair_active_generations: dict[tuple[str, str, int], int]
+    _key_generation: KeyGeneration
+    #: Serialize forwarding changes for one session/VTEP. Without this, DEL_PEER can observe no
+    #: endpoint yet, remove the pair, and race with ADD_ENDPOINT opening a unicast FDB immediately
+    #: afterwards.
+    _forwarding_locks: dict[tuple[str, str], asyncio.Lock]
+    #: Remote endpoint FDB entries known to this process. DEL_PEER refuses to withdraw XFRM while
+    #: any remain; the coordinator orders endpoint withdrawal before peer withdrawal as the
+    #: durable/restart-safe half of the same invariant.
+    _remote_endpoints: dict[str, dict[tuple[str, str], str]]
+
+    def __init__(
+        self,
+        plugin_config: Any,
+        local_config: Any,
+        *,
+        uplink: str = "eth0",
+        runner: Runner | None = None,
+        local_subnets: LocalSubnetAllocator | None = None,
+        mtu_probe: MtuProbe | None = None,
+        reach_probe: ReachProbe | None = None,
+        vxlan_lister: VxlanLister | None = None,
+        key_generation: KeyGeneration | None = None,
+    ) -> None:
+        super().__init__(plugin_config, local_config)
+        self._uplink = uplink
+        self._runner = runner or _run_command
+        # Injectable for the same reason as `runner`: the probe shells out and reads sysfs, and the
+        # command builders must stay testable without either.
+        self._mtu_probe = mtu_probe or underlay_mtu
+        self._reach_probe = reach_probe or arp_probe
+        self._vxlan_lister = vxlan_lister or _list_vxlan_devices
+        self._key_generation = key_generation or (
+            lambda: int(time.time() // KEY_ROTATION_INTERVAL_SEC)
+        )
+        self._reach_tasks = {}
+        self._reach_probed = {}
+        self._unreachable_peers = {}
+        self._encrypted_peers = {}
+        self._pair_users = {}
+        self._programmed_pairs = set()
+        self._security_states = {}
+        self._pair_locks = {}
+        self._pair_slot_generations = {}
+        self._pair_active_generations = {}
+        self._forwarding_locks = {}
+        self._remote_endpoints = {}
+        self._sessions = {}
+        # This node's own VXLAN tunnel endpoint per session — the local `src` for every XFRM SA,
+        # captured from `self_member` at setup/adopt because add_peer/del_peer only receive the peer.
+        self._self_vteps = {}
+        # Defaults to the store's single process-wide owner, which is also what the bridge backend
+        # resolves: both carve their LOCAL block out of the same node-local pool, so one owner keeps
+        # their indices from colliding on a subnet.
+        self._local_subnets = local_subnets or get_local_subnet_allocator()
+
+    async def _local_index(self, session_id: str) -> int:
+        """The session's node-local block index (idempotent, durable across restarts).
+
+        The LOCAL bridge is named after this, not after the VNI. `local_subnet` documents the
+        index as naming BOTH the device `bailo<index>` and the subnet its gateway sits on, and the
+        node-wide store's whole job is to keep two agents from deriving the same one. Naming the
+        device off the VNI instead took the device out of that guarantee and left the two halves
+        keyed on unrelated numbers -- safe only for as long as the VNI range (4096+) stays clear of
+        the index range (0..pool size), which is a configuration away from not being true.
+        """
+        return await self._local_subnets.allocate(session_id)
+
+    async def _local_subnet(self, session_id: str) -> str:
+        """The node-local block for the session's LOCAL/egress bridge (idempotent, durable).
+
+        Node-local (behind NAT, never stretched across nodes), so it needs no cross-node
+        coordination and cannot collide with another node's LOCAL subnet. The pool it is cut from
+        and the size of the cut are the operator's (`container.local-network-*`).
+        """
+        return await self._local_subnets.allocate_subnet(session_id)
+
+    @override
+    async def init(self, context: Any = None) -> None:
+        pass
+
+    @override
+    async def cleanup(self) -> None:
+        pass
+
+    @override
+    async def update_plugin_config(self, plugin_config: Any) -> None:
+        self.plugin_config = plugin_config
+
+    @override
+    async def probe_caps(self) -> AgentNetworkCaps:
+        return await probe_caps(self._uplink)
+
+    async def _measured_overlay_ceiling(self, meta: SessionNetMeta) -> int | None:
+        """The largest overlay MTU this node's underlay can actually carry, or None if unmeasurable."""
+        underlay = await self._mtu_probe(self._uplink)
+        if underlay is None:
+            return None
+        return underlay - VXLAN_OVERHEAD - (ESP_OVERHEAD if meta.encryption_key else 0)
+
+    async def _require_mtu_fits(self, meta: SessionNetMeta) -> None:
+        """Refuse the session when the manager's overlay MTU exceeds this node's real underlay.
+
+        The manager derives the number from a configured constant; only the node can tell what its
+        pod network really leaves. When they disagree the overlay still comes up and still passes
+        small packets, so nothing surfaces until a bulk transfer hangs. See path_mtu.py for the
+        measured per-CNI numbers.
+        """
+        ceiling = await self._measured_overlay_ceiling(meta)
+        if ceiling is None:
+            log.warning(
+                "could not measure the underlay MTU on {}; accepting the manager's overlay MTU "
+                "{} unchecked",
+                self._uplink,
+                meta.mtu,
+            )
+            return
+        if meta.mtu > ceiling:
+            raise OverlayMtuTooLarge(
+                f"session {meta.session_id}: overlay MTU {meta.mtu} exceeds what uplink "
+                f"{self._uplink} can carry ({ceiling}). The pod network on this node encapsulates, "
+                f"so the manager's assumed underlay is {meta.mtu - ceiling} bytes too large. "
+                f"Set the manager's network plugin `mtu` to this node's measured underlay "
+                f"({ceiling + VXLAN_OVERHEAD + (ESP_OVERHEAD if meta.encryption_key else 0)})."
+            )
+
+    async def _delete_link_quiet(self, dev: str) -> None:
+        """Delete a link if present; ignore 'does not exist' failures."""
+        try:
+            await self._runner(link_del_args(dev))
+        except RuntimeError:
+            pass
+
+    async def _hold_vxlan_down_or_absent(self, dev: str) -> bool:
+        """Return whether this VXLAN can no longer carry traffic.
+
+        `ip link set ... down` reports an error when a link disappears between discovery and the
+        command. That is already the state teardown/recovery needs. A second inventory check makes
+        that race idempotent without treating a live link's permission or netlink error as safe.
+        """
+        try:
+            await self._runner(link_down_args(dev))
+            return True
+        except (RuntimeError, OSError) as down_error:
+            try:
+                devices = await self._vxlan_lister()
+            except Exception as inventory_error:
+                log.warning(
+                    "could not verify whether {} disappeared after link-down failed: {}; "
+                    "inventory failed: {}",
+                    dev,
+                    down_error,
+                    inventory_error,
+                )
+                return False
+            if dev not in devices:
+                log.debug("{} disappeared before link-down completed; treating it as closed", dev)
+                return True
+            log.warning("could not bring surviving VXLAN {} down: {}", dev, down_error)
+            return False
+
+    async def _ensure_forward_accept(self, vni: int) -> None:
+        """Idempotently accept intra-bridge forwarding on the overlay bridge, so a DROP FORWARD
+        policy (br_netfilter + a Docker/hardened host) cannot silently kill the overlay. Best-effort:
+        harmless where FORWARD already accepts, and a host without iptables has no such policy."""
+        try:
+            await self._runner(forward_accept_check_args(vni))
+            return  # already present
+        except (RuntimeError, OSError):
+            pass  # absent, or iptables unavailable -- try to add it
+        try:
+            await self._runner(forward_accept_add_args(vni))
+        except (RuntimeError, OSError) as e:
+            log.warning("could not install overlay FORWARD-ACCEPT for {}: {}", bridge_dev(vni), e)
+
+    async def _del_forward_accept(self, vni: int) -> None:
+        try:
+            await self._runner(forward_accept_del_args(vni))
+        except (RuntimeError, OSError):
+            pass  # never installed, already gone, or no iptables
+
+    async def _ensure_plaintext_drop(self, vni: int, dstport: int) -> None:
+        """Close the receive side of an encrypted VNI: drop VXLAN that did not arrive inside an SA.
+
+        Not best-effort, unlike the FORWARD accept above. A missing accept costs connectivity and
+        says so loudly; a missing drop costs the guarantee the session was created under, silently
+        -- the overlay comes up, carries traffic, and takes anyone's plaintext along with it. The
+        caller turns a failure here into a refusal to start the session.
+        """
+        try:
+            await self._runner(plaintext_drop_check_args(vni, dstport))
+            return  # already present
+        except (RuntimeError, OSError):
+            pass  # absent, or iptables/u32/policy unavailable -- try to add it
+        try:
+            await self._runner(plaintext_drop_add_args(vni, dstport))
+        except (RuntimeError, OSError) as e:
+            raise OverlayEncryptionUnavailable(
+                f"could not install the plaintext-drop rule for encrypted VNI {vni} on udp/"
+                f"{dstport}: {e}. Without it the overlay accepts injected clear-text frames on "
+                "this node, so the session is refused rather than run under a guarantee it does "
+                "not have. The rule needs the iptables `u32` and `policy` matches "
+                "(xt_u32, xt_policy)."
+            ) from e
+
+    async def _del_plaintext_drop(self, vni: int, dstport: int) -> None:
+        try:
+            await self._runner(plaintext_drop_del_args(vni, dstport))
+        except (RuntimeError, OSError):
+            pass  # never installed, already gone, or no iptables
+
+    async def _ensure_output_mark(self, vni: int, dstport: int) -> None:
+        """Mark only this encrypted VNI for the outbound XFRM policy."""
+        try:
+            await self._runner(output_mark_check_args(vni, dstport))
+            return
+        except (RuntimeError, OSError):
+            pass
+        try:
+            await self._runner(output_mark_add_args(vni, dstport))
+        except (RuntimeError, OSError) as e:
+            raise OverlayEncryptionUnavailable(
+                f"could not install the OUTPUT mark for encrypted VNI {vni} on udp/{dstport}: "
+                f"{e}. Without it the VNI-scoped XFRM policy cannot select outgoing packets, so "
+                "the session is refused instead of transmitting in clear text."
+            ) from e
+
+    async def _del_output_mark(self, vni: int, dstport: int) -> None:
+        try:
+            await self._runner(output_mark_del_args(vni, dstport))
+        except (RuntimeError, OSError):
+            pass
+
+    def security_state(self, session_id: str) -> VxlanSecurityState | None:
+        """Return this node's current VXLAN protection state for diagnostics."""
+        machine = self._security_states.get(session_id)
+        return None if machine is None else machine.state
+
+    def _register_security_state(self, meta: SessionNetMeta) -> None:
+        initial = (
+            VxlanSecurityState.PLAINTEXT
+            if meta.encryption_key is None
+            else VxlanSecurityState.READY
+        )
+        self._security_states[meta.session_id] = VxlanSecurityStateMachine(initial)
+
+    def _transition_security(
+        self,
+        session_id: str,
+        event: VxlanSecurityEvent,
+        *,
+        reason: str | None = None,
+    ) -> VxlanSecurityState | None:
+        machine = self._security_states.get(session_id)
+        if machine is None:
+            return None
+        previous = machine.state
+        current = machine.transition(event, reason=reason)
+        if current is not previous:
+            log.debug(
+                "vxlan security state for session {}: {} -> {} ({})",
+                session_id,
+                previous,
+                current,
+                event,
+            )
+        return current
+
+    async def _firewall_side_ok(self, meta: SessionNetMeta, session_id: str) -> bool:
+        """Whether this encrypted VNI's inbound drop and outbound mark are installed.
+
+        setup refuses a session it cannot protect, so this exists for the session that was already
+        running: iptables is host state, and a firewall reload or an `iptables -F` between two
+        agent lives leaves the devices up and encrypted with the receive side wide open again.
+        Adopting such a session and merely logging it is the same fail-open the drop rule was added
+        to close, so the vxlan device is held DOWN instead -- the containers keep running and their
+        node-local traffic with them, while nothing crosses the tunnel in either direction.
+
+        This only validates protection. It deliberately does not raise a held-down device: the
+        caller that owns the complete published peer set must restore every XFRM pair first.
+        """
+        if meta.encryption_key is None or meta.vni is None:
+            return True
+        try:
+            await self._ensure_output_mark(meta.vni, meta.vxlan_port)
+            await self._ensure_plaintext_drop(meta.vni, meta.vxlan_port)
+        except OverlayEncryptionUnavailable as e:
+            await self._close_tunnel(meta, session_id, str(e))
+            return False
+        return True
+
+    async def _reopen_tunnel(self, meta: SessionNetMeta, session_id: str) -> bool:
+        """Raise a tunnel only after its receive rule and every published XFRM pair are ready."""
+        machine = self._security_states.get(session_id)
+        if machine is None:
+            return False
+        if machine.state in {VxlanSecurityState.PLAINTEXT, VxlanSecurityState.READY}:
+            return True
+        if machine.state is VxlanSecurityState.VERIFYING:
+            self._transition_security(session_id, VxlanSecurityEvent.PROTECTION_READY)
+            return True
+        if machine.state is not VxlanSecurityState.RESTORING or meta.vni is None:
+            return False
+        # Raise the link while the machine still says RESTORING, and transition to READY only if
+        # that worked. Transitioning first and then failing to raise the device would lose the one
+        # record that says this session is still closed, so no later pass would retry it.
+        try:
+            await self._runner(link_up_args(vxlan_dev(meta.vni)))
+        except (RuntimeError, OSError):
+            self._transition_security(
+                session_id,
+                VxlanSecurityEvent.PROTECTION_FAILED,
+                reason=f"{vxlan_dev(meta.vni)} could not be raised",
+            )
+            log.warning(
+                "security state is back for session {} but {} could not be raised; keeping the "
+                "tunnel closed so the next pass retries",
+                session_id,
+                vxlan_dev(meta.vni),
+            )
+            return False
+        self._transition_security(session_id, VxlanSecurityEvent.PROTECTION_READY)
+        log.info("security state is back for session {}; reopening the tunnel", session_id)
+        return True
+
+    def _pair_lock(self, key: tuple[str, str, int]) -> asyncio.Lock:
+        return self._pair_locks.setdefault(key, asyncio.Lock())
+
+    def _forwarding_lock(self, session_id: str, peer_vtep: str) -> asyncio.Lock:
+        return self._forwarding_locks.setdefault((session_id, peer_vtep), asyncio.Lock())
+
+    async def _close_tunnel(self, meta: SessionNetMeta, session_id: str, why: str) -> None:
+        """Hold this session's tunnel down until something can protect it again.
+
+        Shared by the two ways protection is lost -- the drop rule and the ESP pairs -- so both
+        recover only after `ensure_session_security` has restored the complete peer set.
+        """
+        if meta.encryption_key is None or meta.vni is None:
+            return
+        machine = self._security_states.get(session_id)
+        if machine is None:
+            machine = VxlanSecurityStateMachine(VxlanSecurityState.READY)
+            self._security_states[session_id] = machine
+        was_confirmed_down = machine.holds_tunnel_down
+        self._transition_security(session_id, VxlanSecurityEvent.PROTECTION_FAILED, reason=why)
+        if was_confirmed_down:
+            return
+        log.error("closing the overlay tunnel for encrypted session {}: {}", session_id, why)
+        if not await self._hold_vxlan_down_or_absent(vxlan_dev(meta.vni)):
+            # Stay in BLOCKING. Calling this state BLOCKED would claim a physical invariant the
+            # kernel command did not establish, and a later reconcile would then skip the only
+            # operation that can close the clear-text path.
+            log.warning(
+                "could not bring {} down; the session remains BLOCKING and will retry",
+                vxlan_dev(meta.vni),
+            )
+            return
+        self._transition_security(session_id, VxlanSecurityEvent.TUNNEL_BLOCKED)
+
+    def _forget_pair(self, meta: SessionNetMeta, session_id: str, peer_vtep: str) -> None:
+        """Drop this pair's record of having been programmed, so nothing downstream trusts it.
+
+        `_pair_is_protected` answers from `_programmed_pairs`, and a new endpoint would otherwise
+        be given an FDB entry on the strength of a success that the kernel no longer reflects.
+        """
+        self_vtep = self._self_vteps.get(session_id)
+        if self_vtep is None:
+            return
+        self._programmed_pairs.discard((self_vtep, peer_vtep, meta.vxlan_port))
+
+    def _pair_is_protected(self, meta: SessionNetMeta, session_id: str, peer_vtep: str) -> bool:
+        """Whether traffic to ``peer_vtep`` would actually be encrypted."""
+        if meta.encryption_key is None:
+            return True
+        self_vtep = self._self_vteps.get(session_id)
+        if self_vtep is None:
+            return False
+        if self_vtep == peer_vtep:
+            return True  # this node's own endpoint: reached over the bridge, no tunnel involved
+        return (self_vtep, peer_vtep, meta.vxlan_port) in self._programmed_pairs
+
+    @override
+    async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        if meta.backend is not NetworkBackendKind.VXLAN or meta.vni is None:
+            raise ValueError(f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}")
+        vni = meta.vni
+        # Preconditions, so they run before any side effect: a session this node cannot carry must
+        # leave nothing half-built behind.
+        await self._require_mtu_fits(meta)
+        if meta.encryption_key is not None and self_member.vtep_ip is None:
+            # The SAs are keyed on the ordered VTEP pair, so with no local endpoint there is no
+            # `src` to program them with. This used to warn from `add_peer` and carry on, which
+            # brought the session up in clear text with nothing but a log line saying so.
+            raise OverlayEncryptionUnavailable(
+                f"session {meta.session_id} asks for an encrypted overlay, but this node has no "
+                "usable VTEP address to anchor the ESP SAs on; refusing rather than running the "
+                "session unencrypted"
+            )
+        # Leftover-safe: a stale device from a crashed/uncleaned prior session would make
+        # `ip link add` fail with 'File exists' (and could carry stale FDB/IP). Delete any
+        # pre-existing devices of these names first so setup always yields a fresh device.
+        # The LOCAL bridge (bailo{vni}) is created later by CNI, but a leftover one keyed by
+        # the (reused) vni retains a prior session's gateway IP and makes CNI ADD fail with
+        # "already has an IP address different from ..." — so clear it here too.
+        await self._delete_link_quiet(bridge_dev(vni))
+        await self._delete_link_quiet(vxlan_dev(vni))
+        await self._delete_link_quiet(local_bridge_dev(await self._local_index(meta.session_id)))
+        # Transitional: sessions created before the LOCAL bridge was named after the index carry a
+        # `bailo<vni>` device instead. An agent upgraded under them would otherwise never remove it.
+        await self._delete_link_quiet(local_bridge_dev(vni))
+        # The overlay MTU (underlay - VXLAN overhead) the manager put in the meta, applied to both
+        # the vxlan device and the overlay bridge so a full-size inner frame fits the tunnel.
+        # All of it or none of it. A failure partway used to leave a half-built vxlan or bridge
+        # behind, and teardown skips a session it has no meta for -- so the device outlived every
+        # record of it, and the next session that drew the same VNI (the manager hands them back)
+        # inherited a stranger's device. Undo what landed and let the caller see the failure.
+        try:
+            await self._runner(
+                vxlan_link_add_args(
+                    vni,
+                    self._uplink,
+                    # The address this node published to its peers, not whatever the route table
+                    # would pick — see vxlan_link_add_args.
+                    local=self_member.vtep_ip,
+                    mtu=meta.mtu,
+                    dstport=meta.vxlan_port,
+                )
+            )
+            await self._runner(bridge_link_add_args(vni, mtu=meta.mtu))
+            await self._runner(set_master_args(vni))
+            await self._runner(link_up_args(vxlan_dev(vni)))
+            await self._runner(link_up_args(bridge_dev(vni)))
+        except Exception:
+            for dev in (bridge_dev(vni), vxlan_dev(vni)):
+                await self._delete_link_quiet(dev)
+            raise
+        await self._ensure_forward_accept(vni)
+        if meta.encryption_key is not None:
+            try:
+                await self._ensure_output_mark(vni, meta.vxlan_port)
+                await self._ensure_plaintext_drop(vni, meta.vxlan_port)
+            except Exception:
+                await self._del_output_mark(vni, meta.vxlan_port)
+                await self._del_forward_accept(vni)
+                for dev in (bridge_dev(vni), vxlan_dev(vni)):
+                    await self._delete_link_quiet(dev)
+                raise
+        self._sessions[meta.session_id] = meta
+        self._register_security_state(meta)
+        if self_member.vtep_ip is not None:
+            self._self_vteps[meta.session_id] = self_member.vtep_ip
+
+    def unreachable_peers(self, session_id: str) -> frozenset[str]:
+        """The peer VTEPs whose tunnel went unanswered for this session, so far.
+
+        The session is deliberately left RUNNING when a probe fails -- refusing one that was merely
+        early is worse than the silence it replaces -- but "deliberately not fatal" is not the same
+        as "not worth reporting". Empty is the healthy answer, and it is also the answer on a node
+        whose kernel has no AF_PACKET: the probe cannot run there and says nothing either way.
+        """
+        return frozenset(self._unreachable_peers.get(session_id, set()))
+
+    @override
+    async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        if meta.backend is not NetworkBackendKind.VXLAN or meta.vni is None:
+            raise ValueError(f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}")
+        # Register first so a tunnel held down below remains tearable. For encryption, close the
+        # data path before any diagnostic await: a new process cannot know whether the surviving
+        # XFRM set is complete, so even an MTU probe must not extend a possible clear-text window.
+        self._sessions[meta.session_id] = meta
+        self._register_security_state(meta)
+        if self_member.vtep_ip is not None:
+            self._self_vteps[meta.session_id] = self_member.vtep_ip
+        if meta.encryption_key is not None:
+            await self._close_tunnel(
+                meta,
+                meta.session_id,
+                "the complete ESP peer set has not yet been re-asserted after adoption",
+            )
+            await self._firewall_side_ok(meta, meta.session_id)
+
+        # Warn, do not refuse: unlike setup, the devices here are already up and carrying traffic,
+        # and an agent restart that lands after the pod network changed under it would otherwise
+        # kill sessions that are running. The operator still gets the number to fix.
+        ceiling = await self._measured_overlay_ceiling(meta)
+        if ceiling is not None and meta.mtu > ceiling:
+            log.warning(
+                "adopting session {} whose overlay MTU {} exceeds this node's underlay ceiling {} "
+                "on {}; full-size frames will be dropped silently -- set the manager's network "
+                "plugin `mtu` lower",
+                meta.session_id,
+                meta.mtu,
+                ceiling,
+                self._uplink,
+            )
+        # Devices are already up and carrying traffic; only the bookkeeping add_peer/add_endpoint
+        # read is missing. The LOCAL subnet index is re-claimed from the journal by attach_endpoint,
+        # which is idempotent per session. XFRM SAs survive in the kernel across an agent restart;
+        # re-adopting the self VTEP lets add_peer reprogram them idempotently (`ip xfrm ... update`).
+        if meta.encryption_key is not None and self_member.vtep_ip is None:
+            # setup refuses this outright; adopt cannot, because the containers are already
+            # running. Say it plainly instead: without a VTEP there is no `src` to anchor the SAs
+            # on, so add_peer will refuse to open the tunnels and the session's cross-node traffic
+            # stops here rather than continuing in clear text.
+            log.warning(
+                "adopting encrypted session {} on a node with no usable VTEP address: its peers "
+                "cannot be reached until one is configured",
+                meta.session_id,
+            )
+        if meta.encryption_key is None:
+            try:
+                await self._runner(link_up_args(vxlan_dev(meta.vni)))
+            except (RuntimeError, OSError):
+                log.warning("could not bring {} up while adopting", vxlan_dev(meta.vni))
+
+    @override
+    async def restore_session_peer_ownership(
+        self, session_id: str, peers: Sequence[Member]
+    ) -> None:
+        """Rebuild XFRM ownership from the privileged executor's durable journal.
+
+        Recovery invokes this for every live session before reclaiming dead ones. Marking the
+        journalled pair as process-owned makes teardown complete, while `_pair_users` prevents one
+        dead session from deleting a pair a live session still uses. Live sessions immediately
+        force-reassert these pairs before their held-down tunnel is reopened.
+        """
+        meta = self._sessions.get(session_id)
+        self_vtep = self._self_vteps.get(session_id)
+        if meta is None or meta.encryption_key is None or self_vtep is None:
+            return
+        for peer_vtep in sorted({peer.vtep_ip for peer in peers if peer.vtep_ip is not None}):
+            key = (self_vtep, peer_vtep, meta.vxlan_port)
+            self._encrypted_peers.setdefault(session_id, set()).add(peer_vtep)
+            self._pair_users.setdefault(key, set()).add(session_id)
+            self._programmed_pairs.add(key)
+
+    @override
+    async def prepare_recovery(self) -> None:
+        """Hold every surviving Backend.AI VXLAN down before journal recovery.
+
+        At this point no session metadata is trusted or even readable yet. Device ownership is the
+        only durable fact available, so the backend prefix is intentionally the boundary: a valid
+        journal later re-adopts and reopens plaintext sessions immediately and encrypted sessions
+        only after their complete protection state is restored.
+        """
+        try:
+            devices = await self._vxlan_lister()
+        except Exception as e:
+            raise OverlayEncryptionUnavailable(
+                f"could not enumerate surviving {VXLAN_DEV_PREFIX} tunnels before recovery: {e}"
+            ) from e
+        failed: list[str] = []
+        for device in sorted(name for name in devices if name.startswith(VXLAN_DEV_PREFIX)):
+            if not await self._hold_vxlan_down_or_absent(device):
+                failed.append(device)
+        if failed:
+            raise OverlayEncryptionUnavailable(
+                "could not fail-close surviving VXLAN tunnel(s) before recovery: "
+                + ", ".join(failed)
+            )
+
+    @override
+    async def teardown_session_network(self, session_id: str) -> None:
+        meta = self._sessions.get(session_id)
+        # Confirm the device is closed before removing any XFRM object. Even teardown may race
+        # queued traffic or a surviving FDB entry; deleting the policy first would let that packet
+        # leave in clear text. If link-down fails, retain all bookkeeping so teardown can retry.
+        if meta is not None and meta.vni is not None and meta.encryption_key is not None:
+            dev = vxlan_dev(meta.vni)
+            if not await self._hold_vxlan_down_or_absent(dev):
+                raise OverlayEncryptionUnavailable(
+                    f"encrypted session {session_id}'s VXLAN {dev} could not be brought down; "
+                    "retaining teardown ownership for retry"
+                )
+        meta = self._sessions.pop(session_id, None)
+        self_vtep = self._self_vteps.pop(session_id, None)
+        peers = self._encrypted_peers.pop(session_id, set())
+        self._reach_probed.pop(session_id, None)
+        self._unreachable_peers.pop(session_id, None)
+        self._remote_endpoints.pop(session_id, None)
+        for key in [key for key in self._forwarding_locks if key[0] == session_id]:
+            self._forwarding_locks.pop(key, None)
+        self._security_states.pop(session_id, None)
+        for task in self._reach_tasks.pop(session_id, set()):
+            task.cancel()
+        # Read the index BEFORE releasing it: the release makes it unfindable, and the device it
+        # names is deleted below. Read, not allocate -- teardown of a session this node never set
+        # up must not mint an index and then delete the bridge that index names.
+        local_index = await self._local_subnets.lookup(session_id)
+        await self._local_subnets.release(session_id)
+        if meta is None or meta.vni is None:
+            return
+        # XFRM lives in the netns, not on the device: deleting the vxlan link below leaves any SA
+        # and policy behind. `del_peer` cannot be relied on to have run for every peer first -- a
+        # peer node can vanish, or teardown can win the race -- and a leftover outbound policy is
+        # actively harmful rather than untidy: it selects ESP for this node pair's VXLAN UDP even
+        # after the SA is gone, so later plaintext traffic on the same port is dropped wholesale.
+        # Measured before pair refcounting: one node kept `SAD 2 / SPD 1` pointing at a dead peer.
+        # Both objects must therefore be released together after their last user leaves.
+        for peer_vtep in sorted(peers):
+            await self._unprogram_encryption(meta, session_id, peer_vtep, self_vtep)
+        await self._del_forward_accept(meta.vni)
+        if meta.encryption_key is not None:
+            await self._del_output_mark(meta.vni, meta.vxlan_port)
+            await self._del_plaintext_drop(meta.vni, meta.vxlan_port)
+        # delete the overlay bridge/vxlan and the per-session LOCAL bridge; ignore missing.
+        devs = [bridge_dev(meta.vni), vxlan_dev(meta.vni)]
+        if local_index is not None:
+            devs.append(local_bridge_dev(local_index))
+        # `bailo<vni>` is the transitional name (see setup) and is removed alongside -- but only
+        # where it cannot be some other session's live LOCAL bridge. The two names share a number
+        # space: LOCAL indices run 0..layout.size-1 and VNIs start at 4096, so the default layout
+        # (a /16 pool in /26 blocks -> 1024 indices) can never collide. A layout that asks for more
+        # sessions per node than that can: /16 in /30 blocks gives 16384 indices, and index 4097 is
+        # spelled exactly like VNI 4097's transitional device. Deleting it would cut a running
+        # session's containers off their gateway. Not a misconfiguration to refuse -- wanting more
+        # sessions on a node is reasonable -- so bound the cleanup instead.
+        if meta.vni >= self._local_subnets.layout.size:
+            devs.append(local_bridge_dev(meta.vni))
+        for dev in devs:
+            try:
+                await self._runner(link_del_args(dev))
+            except RuntimeError:
+                log.debug("link {} already gone during teardown of {}", dev, session_id)
+
+    @override
+    async def ensure_session_security(self, session_id: str, peers: Sequence[Member]) -> None:
+        """Re-assert this session's plaintext drop and its ESP pairs, and raise if it cannot.
+
+        The reconcile that calls this only visits peers whose published record changed, and none of
+        the ways this state disappears change a record: an `iptables -F`, a firewall reload, an
+        `ip xfrm state flush`. Without a pass that looks at the state itself rather than at the
+        diff, the first of those silently reopens the session to injected plaintext and the last
+        silently sends its traffic in clear, for as long as the session runs.
+
+        Firewall rules are checked before insertion. Same-generation SAs may replay `add` as
+        `update`; generation changes delete and recreate only the expired SPI slot so AEAD key
+        material is actually replaced.
+        """
+        meta = self._sessions.get(session_id)
+        if meta is None or meta.encryption_key is None:
+            return
+        machine = self._security_states.get(session_id)
+        if machine is not None and machine.state is VxlanSecurityState.BLOCKING:
+            # A prior link-down failed. Protection must not be rebuilt on top of an unconfirmed
+            # open path and then mistaken for a normal restore: retry the physical block first.
+            await self._close_tunnel(
+                meta,
+                session_id,
+                machine.failure_reason or "the overlay tunnel has not been confirmed down",
+            )
+            if machine.state is VxlanSecurityState.BLOCKING:
+                raise OverlayEncryptionUnavailable(
+                    f"session {session_id}'s overlay tunnel could not be brought down; security "
+                    "reconciliation is deferred until the fail-closed state is confirmed"
+                )
+        self._transition_security(session_id, VxlanSecurityEvent.RECONCILE_STARTED)
+        if not await self._firewall_side_ok(meta, session_id):
+            # The tunnel is already held down by the call above; raising is what keeps the peers
+            # out of the coordinator's applied set so they are reprogrammed once it comes back.
+            raise OverlayEncryptionUnavailable(
+                f"session {session_id} is encrypted but its plaintext-drop rule could not be "
+                "restored; the overlay tunnel is held down until it can"
+            )
+        # The published membership, not `_encrypted_peers`: a process that restarted under a
+        # running session has an empty one, and nothing refills it -- the agent's reconcile does
+        # not resend a peer whose record has not changed. Measured: after a privnet restart no
+        # add_peer ever arrived, so teardown left this node's SAs *and policies* behind, and a
+        # leftover policy selects ESP for that node pair with no SA to satisfy it.
+        for peer_vtep in sorted(
+            {peer.vtep_ip for peer in peers if peer.vtep_ip is not None}
+            | self._encrypted_peers.get(session_id, set())
+        ):
+            try:
+                if not await self._program_encryption(meta, session_id, peer_vtep, force=True):
+                    raise OverlayEncryptionUnavailable(
+                        f"session {session_id} cannot re-assert the ESP pair for {peer_vtep}: "
+                        "this node's VTEP is unavailable"
+                    )
+            except Exception:
+                # The FDB entry for this peer is already open -- this is a re-assert, not a first
+                # program -- so a failure here is not "the peer is unreachable" but "the peer is
+                # reachable and may be unprotected". Forget the pair (so nothing downstream trusts
+                # a stale success) and close the tunnel, which is the only thing that stops the
+                # session sending in clear while the SAs are missing.
+                self._forget_pair(meta, session_id, peer_vtep)
+                await self._close_tunnel(
+                    meta,
+                    session_id,
+                    f"the ESP pair for {peer_vtep} could not be re-asserted",
+                )
+                raise
+        if not await self._reopen_tunnel(meta, session_id):
+            raise OverlayEncryptionUnavailable(
+                f"session {session_id}'s security state was restored but its overlay tunnel "
+                "could not be reopened"
+            )
+
+    @override
+    async def add_peer(self, session_id: str, peer: Member) -> None:
+        meta = self._sessions.get(session_id)
+        if meta is None or meta.vni is None or peer.vtep_ip is None:
+            return
+        # Encryption first, FDB second. The FDB entry is what makes a frame leave this node for
+        # that peer, so opening it before the ESP policy exists is a window in which an "encrypted"
+        # session sends clear text. Doing it in this order makes the failure mode "the peer is
+        # unreachable" instead of "the peer is reachable and unprotected", and unreachable is the
+        # one a caller can see.
+        # Raise rather than return: the caller records a peer that came back without an error as
+        # applied, and then skips it for as long as its record does not change -- so a silent
+        # refusal here would be remembered as success and never retried, which is the shape of
+        # "the firewall came back and the session stayed unprotected".
+        async with self._forwarding_lock(session_id, peer.vtep_ip):
+            if not await self._firewall_side_ok(meta, session_id):
+                raise OverlayEncryptionUnavailable(
+                    f"not opening the tunnel to {peer.vtep_ip} for session {session_id}: the "
+                    "session's receive side is not closed"
+                )
+            if not await self._program_encryption(meta, session_id, peer.vtep_ip):
+                # The session asked for encryption and this node cannot provide it for this peer.
+                # Appending the FDB entry anyway is the fail-open case the ordering above exists to
+                # avoid -- it would open exactly the path the session was promised would be protected.
+                raise OverlayEncryptionUnavailable(
+                    f"not opening the tunnel to {peer.vtep_ip} for session {session_id}: this node "
+                    "could not program the SAs for that peer"
+                )
+            await self._runner(fdb_append_args(meta.vni, peer.vtep_ip))
+
+    async def _program_encryption(
+        self, meta: SessionNetMeta, session_id: str, peer_vtep: str, *, force: bool = False
+    ) -> bool:
+        """Program the ESP pair for this peer. False means the session wanted encryption and this
+        pair did not get it -- the caller must not open the path."""
+        if meta.encryption_key is None or meta.vni is None:
+            return True  # nothing to protect: an unencrypted session opens normally
+        self_vtep = self._self_vteps.get(session_id)
+        if self_vtep is None:
+            # setup refuses an encrypted session on a node with no VTEP, so this is the adopt
+            # path: an agent restarting under a running session whose node lost its VTEP.
+            log.warning(
+                "cannot encrypt overlay for session {}: this node's VTEP is unknown", session_id
+            )
+            return False
+        # Recorded BEFORE the commands run, not after. A failure partway can leave an SA or a
+        # policy installed, and an unrecorded one is never unprogrammed -- a stranded policy selects
+        # ESP for this node pair with no SA to satisfy it, and the next session between the two is
+        # dropped wholesale. Over-recording costs one best-effort delete; under-recording costs a
+        # dead overlay.
+        #
+        # But the record must not double as "this pair is programmed": a failure would then make
+        # every retry take the `already programmed` shortcut below and the pair would stay
+        # half-built for good. So the two are separate -- `_pair_users` says who would have to
+        # release it, `_programmed_pairs` says whether the kernel actually has it.
+        key = (self_vtep, peer_vtep, meta.vxlan_port)
+        # Under the pair's lock, so the refcount below and the commands that follow from it cannot
+        # interleave with another session's teardown of the same pair -- see `_pair_locks`.
+        async with self._pair_lock(key):
+            self._encrypted_peers.setdefault(session_id, set()).add(peer_vtep)
+            self._pair_users.setdefault(key, set()).add(session_id)
+            observed_generation = self._key_generation()
+            generation = max(
+                observed_generation,
+                self._pair_active_generations.get(key, observed_generation),
+            )
+            target_generations = (generation - 1, generation, generation + 1)
+            target_slots = {
+                target_generation % _KEYRING_SIZE: target_generation
+                for target_generation in target_generations
+            }
+            slot_generations = self._pair_slot_generations.setdefault(key, {})
+            if key in self._programmed_pairs and slot_generations == target_slots and not force:
+                return True  # another session on this node already programmed this pair
+            try:
+                for target_generation in target_generations:
+                    slot = target_generation % _KEYRING_SIZE
+                    add_args = xfrm_state_add_args(
+                        self_vtep,
+                        peer_vtep,
+                        meta.encryption_key,
+                        generation=target_generation,
+                    )
+                    if slot_generations.get(slot) == target_generation:
+                        if force:
+                            for args in add_args:
+                                await self._run_xfrm(args)
+                        continue
+
+                    # A Linux XFRM state update does not replace AEAD key material reliably. The
+                    # stale generation in this slot is outside the accepted three-generation
+                    # window, so delete it and create the slot with the new key instead. A missing
+                    # delete is harmless; a failed delete followed by EEXIST on add is surfaced,
+                    # never downgraded to an in-place update with the old key.
+                    for args in xfrm_state_del_args(
+                        self_vtep, peer_vtep, generation=target_generation
+                    ):
+                        try:
+                            await self._runner(args)
+                        except RuntimeError:
+                            pass
+                    for args in add_args:
+                        await self._runner(args)
+                    slot_generations[slot] = target_generation
+
+                # Switch outbound traffic only after every receiving generation is installed. The
+                # exact SPI makes the policy select the current generation, while adjacent nodes
+                # whose clocks straddle the boundary can still receive previous/next traffic.
+                for args in xfrm_policy_add_args(
+                    self_vtep,
+                    peer_vtep,
+                    dstport=meta.vxlan_port,
+                    generation=generation,
+                ):
+                    await self._runner(args)
+                self._pair_active_generations[key] = generation
+            except Exception:
+                self._programmed_pairs.discard(key)
+                # The SA/policy belongs to every session between this node pair. A partial rekey
+                # can affect all of them, so holding down only the session that happened to run
+                # this reconcile would leave its siblings open on uncertain shared state.
+                for user_session_id in sorted(self._pair_users.get(key, set())):
+                    if (user_meta := self._sessions.get(user_session_id)) is not None:
+                        await self._close_tunnel(
+                            user_meta,
+                            user_session_id,
+                            f"the shared ESP pair for {peer_vtep} failed to rekey",
+                        )
+                raise
+            # Only now. Anything that raised above left the pair unmarked, so the next reconcile
+            # retries it -- and the FDB entry that would have carried clear text was never
+            # appended, because add_peer programs before it opens the path.
+            self._programmed_pairs.add(key)
+        return True
+
+    async def _unprogram_encryption(
+        self, meta: SessionNetMeta, session_id: str, peer_vtep: str, self_vtep: str | None
+    ) -> None:
+        """Remove this session's ESP SA pair, and the shared policy once nobody is left on it.
+
+        Best-effort and idempotent. The SAs are this session's (the SPI folds the VNI in) and go
+        unconditionally; the policy belongs to every session between the same two nodes on the same
+        port, so it goes only when the last of them does. Deleting it with the first session to end
+        is what silently drops the others to clear text -- they keep running, their SAs are still
+        there, and nothing selects them any more.
+        """
+        if meta.encryption_key is None or meta.vni is None or self_vtep is None:
+            self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
+            return
+        key = (self_vtep, peer_vtep, meta.vxlan_port)
+        # Under the pair's lock, from the refcount decision through the deletes it authorises. The
+        # two are one step: without the lock, another session can program this very pair between
+        # "nobody is left" and the delete, and be left holding an open FDB with nothing to encrypt
+        # it -- see `_pair_locks`.
+        async with self._pair_lock(key):
+            await self._unprogram_pair(meta, session_id, peer_vtep, self_vtep, key)
+
+    async def _unprogram_pair(
+        self,
+        meta: SessionNetMeta,
+        session_id: str,
+        peer_vtep: str,
+        self_vtep: str,
+        key: tuple[str, str, int],
+    ) -> None:
+        """The body of `_unprogram_encryption`, run with the pair's lock held."""
+        users = self._pair_users.get(key, set())
+        users.discard(session_id)
+        self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
+        if users:
+            return  # another session is still carried by this pair's SA and policy
+        self._pair_users.pop(key, None)
+        if key not in self._programmed_pairs:
+            # This process did not program the pair, so it does not know who else is on it. That
+            # happens when only the privnet restarted: the agent's coordinator still remembers its
+            # peers as applied and never re-sends them, so the refcount here rebuilds as empty
+            # while other sessions are still carried by the very SA and policy about to be removed.
+            #
+            # Deleting on that empty count is what drops those sessions to clear text -- their SAs
+            # remain, nothing selects them any more, and nothing says so. Leaking the pair instead
+            # costs one stale SA and policy per node pair until the kernel or an operator clears
+            # them; of the two ways to be wrong, that is the one that keeps traffic encrypted.
+            log.warning(
+                "not removing the ESP pair {}->{}:{} for session {}: this process did not program"
+                " it (privnet restart?), so it cannot tell whether another session still needs it",
+                self_vtep,
+                peer_vtep,
+                meta.vxlan_port,
+                session_id,
+            )
+            return
+        self._programmed_pairs.discard(key)
+        self._pair_slot_generations.pop(key, None)
+        self._pair_active_generations.pop(key, None)
+        # SA first, then the policy. Between the two there is a window, and this order makes it a
+        # window where traffic is blocked (a policy with no SA) rather than one where it leaves in
+        # clear text (a live tunnel with nothing requiring ESP). Nothing should be flowing here --
+        # this runs when the last session on the pair is gone -- but of the two ways to be wrong,
+        # dropping is the one to pick.
+        state_deletes = [
+            args
+            for slot in range(_KEYRING_SIZE)
+            for args in xfrm_state_del_args(self_vtep, peer_vtep, generation=slot)
+        ]
+        for args in (
+            *state_deletes,
+            *xfrm_policy_del_args(self_vtep, peer_vtep, dstport=meta.vxlan_port),
+        ):
+            try:
+                await self._runner(args)
+            except RuntimeError:
+                log.debug("xfrm entry already gone for peer {} in {}", peer_vtep, session_id)
+
+    async def _run_xfrm(self, argv: Sequence[str]) -> None:
+        """Run one `ip xfrm` command, replaying a state `add` as `update` when it already exists.
+
+        Kernel SAs outlive the agent process, so a restart re-programs onto an existing one; `add`
+        is EEXIST there and `update` is the in-place replace. Only that one case is retried -- any
+        other failure is the caller's to see.
+        """
+        try:
+            await self._runner(argv)
+        except RuntimeError:
+            if list(argv[:4]) != ["ip", "xfrm", "state", "add"]:
+                raise
+            await self._runner(["ip", "xfrm", "state", "update", *argv[4:]])
+
+    @override
+    async def del_peer(self, session_id: str, peer: Member) -> None:
+        meta = self._sessions.get(session_id)
+        if meta is None or meta.vni is None or peer.vtep_ip is None:
+            return
+        async with self._forwarding_lock(session_id, peer.vtep_ip):
+            remaining = sorted(
+                f"{ip}/{mac}"
+                for (ip, mac), vtep_ip in self._remote_endpoints.get(session_id, {}).items()
+                if vtep_ip == peer.vtep_ip
+            )
+            if remaining:
+                raise OverlayEncryptionUnavailable(
+                    f"not withdrawing encryption for VTEP {peer.vtep_ip} in session {session_id}: "
+                    f"endpoint FDB entries still exist ({', '.join(remaining)})"
+                )
+            # Close forwarding first. Withdrawing XFRM while even the broadcast FDB remains opens
+            # a clear-text window; a failed FDB delete is therefore retried, not swallowed.
+            await self._runner(fdb_del_args(meta.vni, peer.vtep_ip))
+            await self._unprogram_encryption(
+                meta, session_id, peer.vtep_ip, self._self_vteps.get(session_id)
+            )
+
+    @override
+    async def add_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        """Proactively program a remote endpoint: unicast MAC→VTEP FDB + permanent ARP.
+
+        Idempotent (``replace``). Known unicast then never floods over the tunnel."""
+        meta = self._sessions.get(session_id)
+        if meta is None or meta.vni is None:
+            return
+        # The same fail-closed rule add_peer follows. This path is reached from the membership
+        # reconcile, which runs whether or not add_peer succeeded, and a unicast FDB entry opens a
+        # route to that VTEP on its own -- the broadcast entry add_peer withheld is not what a
+        # frame with a known destination MAC needs. Without this check a peer whose SAs failed to
+        # program is still reachable, in clear text, as soon as its endpoint is published.
+        # Raising, for the same reason as add_peer: an endpoint that returns without an error is
+        # recorded as applied and not visited again.
+        async with self._forwarding_lock(session_id, vtep_ip):
+            if not await self._firewall_side_ok(meta, session_id):
+                raise OverlayEncryptionUnavailable(
+                    f"not programming the endpoint {ip} for session {session_id}: the session's "
+                    "receive side is not closed"
+                )
+            if not self._pair_is_protected(meta, session_id, vtep_ip):
+                raise OverlayEncryptionUnavailable(
+                    f"not programming the endpoint {ip} ({mac}) for session {session_id}: the "
+                    f"session is encrypted and the SAs for VTEP {vtep_ip} are not in place"
+                )
+            await self._runner(fdb_replace_args(meta.vni, mac, vtep_ip))
+            # Record immediately after the forwarding path opens. A neighbour failure must not
+            # make DEL_PEER believe the already-installed FDB does not exist.
+            self._remote_endpoints.setdefault(session_id, {})[(ip, mac)] = vtep_ip
+            await self._runner(neigh_replace_args(meta.vni, ip, mac))
+        self._start_reach_probe(session_id, meta, ip=ip, mac=mac, vtep_ip=vtep_ip)
+
+    def _start_reach_probe(
+        self, session_id: str, meta: SessionNetMeta, *, ip: str, mac: str, vtep_ip: str
+    ) -> None:
+        """Check in the background that the tunnel to a REMOTE endpoint carries traffic.
+
+        Only remote ones: a local endpoint is reached over the bridge without touching the tunnel,
+        so probing it would prove nothing about the thing that silently breaks.
+
+        Background and non-fatal by design. This runs on the membership-reconcile path, which must
+        not stall, and the endpoint's container may still be starting -- refusing a session on a
+        probe that was merely early would be worse than the silence it replaces. A loud, greppable
+        error naming the remedy is the whole gain.
+        """
+        if meta.vni is None or self._self_vteps.get(session_id) == vtep_ip:
+            return
+        probed = self._reach_probed.setdefault(session_id, set())
+        if vtep_ip in probed:
+            # Already asked about this peer for this session. Every kernel behind it rides the same
+            # tunnel, so asking once per kernel would multiply tasks and raw sockets by the peer's
+            # kernel count for an answer that cannot differ.
+            return
+        probed.add(vtep_ip)
+        # Bound here, not inside the closure: the guard above narrows `meta.vni` only in this
+        # scope, and a nested function would read it as `int | None` again.
+        bridge = bridge_dev(meta.vni)
+
+        async def _run() -> None:
+            for attempt in range(1, _REACH_ATTEMPTS + 1):
+                answered = await self._reach_probe(bridge, ip, mac)
+                if answered is None:
+                    log.debug("overlay reach probe unavailable on {}; skipping", bridge)
+                    return  # left marked: an unavailable probe will be unavailable next time too
+                if answered:
+                    log.debug(
+                        "overlay reach probe: {} answered over {} (attempt {})",
+                        ip,
+                        bridge,
+                        attempt,
+                    )
+                    self._unreachable_peers.get(session_id, set()).discard(vtep_ip)
+                    return
+                if attempt < _REACH_ATTEMPTS:
+                    await asyncio.sleep(_REACH_RETRY_DELAY_SEC)
+            log.error(
+                "session {}: the overlay to {} ({} via VTEP {}) carries no traffic -- {} ARP "
+                "probes over {} went unanswered. The devices are up and the FDB is programmed, so "
+                "suspect the pod network filtering the tunnel: Calico drops workload UDP on its "
+                "felix vxlanPort (4789 by default, which this session uses: {}) in every "
+                "encapsulation mode. Move the session's port with the manager's network plugin "
+                "`vxlan-port`, or check for a firewall on that UDP port between the nodes.",
+                session_id,
+                ip,
+                mac,
+                vtep_ip,
+                _REACH_ATTEMPTS,
+                bridge,
+                meta.vxlan_port,
+            )
+            self._unreachable_peers.setdefault(session_id, set()).add(vtep_ip)
+            # Unmarked, so the next endpoint behind this peer probes again. The first one may have
+            # been early -- its container was still starting -- and a peer written off on that is a
+            # peer nothing ever asks about again.
+            self._reach_probed.get(session_id, set()).discard(vtep_ip)
+
+        task = asyncio.create_task(_run())
+        tasks = self._reach_tasks.setdefault(session_id, set())
+        tasks.add(task)
+        task.add_done_callback(tasks.discard)
+
+    @override
+    async def del_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        meta = self._sessions.get(session_id)
+        if meta is None or meta.vni is None:
+            return
+        async with self._forwarding_lock(session_id, vtep_ip):
+            # The FDB is the forwarding capability. Its removal must land before the peer's XFRM
+            # can be withdrawn, so failures propagate to the coordinator and keep the endpoint
+            # applied for retry. Neighbour cleanup cannot transmit by itself and remains best-effort.
+            await self._runner(fdb_del_args(meta.vni, vtep_ip, mac=mac))
+            self._remote_endpoints.get(session_id, {}).pop((ip, mac), None)
+            try:
+                await self._runner(neigh_del_args(meta.vni, ip))
+            except RuntimeError:
+                log.debug("neighbour entry {} already gone in session {}", ip, session_id)
+
+    @override
+    async def setup_dns_redirect(self, session_id: str, loopback_port: int) -> None:
+        # In-process (privileged agent) path: this backend holds CAP_NET_ADMIN, so install the
+        # :53 -> 127.0.0.1:<port> redirect directly. In privnet mode the proxy sends this to the
+        # privnet instead. Idempotent (replaces any prior rule).
+        if (subnet := await self._local_subnets.subnet_of(session_id)) is not None:
+            await redirect_session_dns(subnet, loopback_port, session_id)
+
+    @override
+    async def teardown_dns_redirect(self, session_id: str) -> None:
+        await remove_dns_redirect(session_id)
+
+    @override
+    async def attach_endpoint(
+        self,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        *,
+        meta: SessionNetMeta,
+    ) -> EndpointPlan:
+        # Static IP at the manager-assigned overlay address (disjoint across nodes); falls
+        # back to host-local only if the manager did not assign one (single-node / legacy).
+        overlay_ip = kernel_config.get("cluster_network_ip")
+        return EndpointPlan(
+            attachments=[
+                NetworkAttachSpec(
+                    kind=AttachKind.CNI,
+                    interface_name="eth0",
+                    role=NetworkRole.LOCAL,
+                    is_default_route=True,
+                    cni_config=local_cni_config(
+                        meta.session_id,
+                        # Same index the subnet below is cut from, so the device and the address
+                        # it carries cannot drift apart.
+                        bridge=local_bridge_dev(await self._local_index(meta.session_id)),
+                        subnet=await self._local_subnet(meta.session_id),
+                    ),
+                ),
+                NetworkAttachSpec(
+                    kind=AttachKind.CNI,
+                    interface_name=OVERLAY_IFNAME,
+                    role=NetworkRole.OVERLAY,
+                    cni_config=overlay_cni_config(meta, overlay_ip),
+                    # overlay_cni_config raises when overlay_ip is None, so the guard is defensive.
+                    cni_capability_args=(
+                        overlay_mac_capability_args(overlay_ip) if overlay_ip else None
+                    ),
+                ),
+            ]
+        )
+
+    @override
+    async def detach_endpoint(self, kernel: AbstractKernel) -> None:
+        pass

@@ -1,0 +1,185 @@
+"""Node-local bridge cluster-network backend (BEP-1062).
+
+Single-node data plane: a per-session CNI bridge on a node-local NAT subnet, with no
+cross-node overlay. It gives a single-node container a host-reachable IP (the host is the
+bridge gateway) — the pure-CNI replacement for the former nerdctl-managed bridge, so the
+containerd runtime never shells out to nerdctl.
+
+Reuses the vxlan backend's node-local bridge helpers (naming, host-local CNI config); it
+implements only the LOCAL attachment and no-ops every overlay concern (peers, FDB, remote
+endpoints), since a single node has no peers.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import Mapping
+from typing import Any, cast, override
+
+from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.network.backends.vxlan import (
+    Runner,
+    _run_command,
+    link_del_args,
+    local_bridge_dev,
+    local_cni_config,
+    local_ip_capability_args,
+)
+from ai.backend.agent.network.caps import probe_caps
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
+from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
+from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
+from ai.backend.common.network.types import (
+    AgentNetworkCaps,
+    AttachKind,
+    EndpointPlan,
+    Member,
+    NetworkAttachSpec,
+    NetworkRole,
+    SessionNetMeta,
+)
+from ai.backend.common.types import ClusterInfo, KernelCreationConfig
+from ai.backend.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class BridgeNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
+    """Node-local per-session bridge (no overlay)."""
+
+    _runner: Runner
+    _uplink: str
+    _local_subnets: LocalSubnetAllocator
+
+    def __init__(
+        self,
+        plugin_config: Any,
+        local_config: Any,
+        *,
+        uplink: str = "eth0",
+        runner: Runner | None = None,
+        local_subnets: LocalSubnetAllocator | None = None,
+    ) -> None:
+        super().__init__(plugin_config, local_config)
+        self._uplink = uplink
+        self._runner = runner or _run_command
+        # Defaults to the store's single process-wide owner (see the vxlan backend's __init__),
+        # which also owns the pool the block is cut from (the operator's, not ours).
+        self._local_subnets = local_subnets or get_local_subnet_allocator()
+
+    async def _index(self, session_id: str) -> int:
+        """Claim the session's node-local block index (idempotent, durable across restarts)."""
+        return await self._local_subnets.allocate(session_id)
+
+    async def _subnet(self, session_id: str) -> str:
+        return await self._local_subnets.allocate_subnet(session_id)
+
+    async def _bridge(self, session_id: str) -> str:
+        return local_bridge_dev(await self._index(session_id))
+
+    async def _delete_link_quiet(self, dev: str) -> None:
+        try:
+            await self._runner(link_del_args(dev))
+        except RuntimeError:
+            pass
+
+    @override
+    async def init(self, context: Any = None) -> None:
+        pass
+
+    @override
+    async def cleanup(self) -> None:
+        pass
+
+    @override
+    async def update_plugin_config(self, plugin_config: Any) -> None:
+        self.plugin_config = plugin_config
+
+    @override
+    async def probe_caps(self) -> AgentNetworkCaps:
+        return await probe_caps(self._uplink)
+
+    @override
+    async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        # The CNI bridge plugin creates the bridge on attach; only clear a stale device of
+        # the same name (a reused subnet index) so it cannot carry a prior gateway IP that
+        # would make CNI ADD fail with "already has an IP address different from ...".
+        # Safe because the index is claimed from the durable allocator: a freshly assigned
+        # index is never one a live session (including one that predates an agent restart)
+        # still holds, so this cannot delete a running session's bridge.
+        await self._delete_link_quiet(await self._bridge(meta.session_id))
+
+    @override
+    async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        # The bridge backend keeps no per-session memory: the device name and subnet are both
+        # derived from the journalled index, which survives the restart. Re-claim it so the index
+        # is not handed to another session, and leave the live bridge alone.
+        await self._index(meta.session_id)
+
+    @override
+    async def teardown_session_network(self, session_id: str) -> None:
+        # lookup, not allocate: an unknown session must not mint an index and then delete
+        # the bridge that index names.
+        index = await self._local_subnets.lookup(session_id)
+        if index is None:
+            return
+        await self._delete_link_quiet(local_bridge_dev(index))
+        await self._local_subnets.release(session_id)
+
+    @override
+    async def add_peer(self, session_id: str, peer: Member) -> None:
+        pass  # single-node: no peers
+
+    @override
+    async def del_peer(self, session_id: str, peer: Member) -> None:
+        pass
+
+    @override
+    async def setup_dns_redirect(self, session_id: str, loopback_port: int) -> None:
+        # In-process (privileged agent) path: install the :53 -> 127.0.0.1:<port> redirect directly.
+        # In privnet mode the proxy sends this to the privnet instead. Idempotent.
+        if (subnet := await self._local_subnets.subnet_of(session_id)) is not None:
+            await redirect_session_dns(subnet, loopback_port, session_id)
+
+    @override
+    async def teardown_dns_redirect(self, session_id: str) -> None:
+        await remove_dns_redirect(session_id)
+
+    @override
+    async def attach_endpoint(
+        self,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        *,
+        meta: SessionNetMeta,
+    ) -> EndpointPlan:
+        # A single-node cluster session pins each kernel at a deterministic address so peers can be
+        # written into /etc/hosts; the agent computes it and passes it through kernel_config (the
+        # same channel the overlay uses for its manager-assigned IP). Absent for an ordinary
+        # single-kernel session — the host-local pool then picks the address.
+        raw_static_ip = cast(Mapping[str, Any], kernel_config).get("local_static_ip")
+        static_ip = str(raw_static_ip) if raw_static_ip else None
+        subnet = await self._subnet(meta.session_id)
+        return EndpointPlan(
+            attachments=[
+                NetworkAttachSpec(
+                    kind=AttachKind.CNI,
+                    interface_name="eth0",
+                    role=NetworkRole.LOCAL,
+                    is_default_route=True,
+                    cni_config=local_cni_config(
+                        meta.session_id,
+                        bridge=await self._bridge(meta.session_id),
+                        subnet=subnet,
+                        static_ip=static_ip,
+                    ),
+                    cni_capability_args=(
+                        local_ip_capability_args(subnet, static_ip) if static_ip else None
+                    ),
+                ),
+            ]
+        )
+
+    @override
+    async def detach_endpoint(self, kernel: AbstractKernel) -> None:
+        pass

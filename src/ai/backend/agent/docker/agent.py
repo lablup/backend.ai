@@ -61,7 +61,7 @@ from ai.backend.agent.errors import (
     InvalidArgumentError,
     UnsupportedResource,
 )
-from ai.backend.agent.errors.resources import PortPoolExhaustedError
+from ai.backend.agent.errors.resources import PortPoolExhaustedError, ResourceError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
@@ -81,6 +81,15 @@ from ai.backend.agent.kernel_registry.recovery.docker_recovery import (
     DockerKernelRegistryRecovery,
 )
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.network.dns import resolve_container_dns
+from ai.backend.agent.network.port_forward import (
+    PortForwarder,
+    PortPublisher,
+    forwards_for,
+)
+from ai.backend.agent.network.privnet.client import PrivNetClient, PrivNetPortForwarder
+from ai.backend.agent.network.session_network import SessionNetwork
+from ai.backend.agent.network.vtep import uplink_for_ip, usable_vtep
 from ai.backend.agent.plugin.network import (
     ContainerNetworkCapability,
     ContainerNetworkInfo,
@@ -139,6 +148,7 @@ from ai.backend.common.json import (
     dump_json_str,
     load_json,
 )
+from ai.backend.common.network.types import SessionNetMeta
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -154,6 +164,7 @@ from ai.backend.common.types import (
     ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
+    KernelCreationResult,
     KernelId,
     MountPermission,
     MountTypes,
@@ -168,7 +179,13 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
+from .gate import apply_gate, release_gate, stage_gate, wait_gated_pid
 from .kernel import DockerKernel
+from .session_network import (
+    NO_NETWORK_MODE,
+    build_docker_session_network,
+    is_session_networked,
+)
 from .utils import PersistentServiceContainer
 
 if TYPE_CHECKING:
@@ -375,6 +392,30 @@ class DockerPurgeImageReq:
     noprune: bool
 
 
+#: The kernel runner's control channel. Reached at the container's own address under BEP-1062,
+#: so it is never DNAT'd onto the host and the agent dials these numbers, not a host pairing.
+_REPL_IN_PORT: Final = 2000
+_REPL_OUT_PORT: Final = 2001
+_REPL_PORTS: Final = frozenset({_REPL_IN_PORT, _REPL_OUT_PORT})
+
+
+def _port_publisher(
+    local_config: AgentUnifiedConfig, session_network: SessionNetwork
+) -> PortPublisher:
+    """Who installs the host-port DNAT for a session-networked kernel.
+
+    It is an iptables (CAP_NET_ADMIN) op, so it belongs to whoever owns the host's networking: this
+    agent when it runs privileged, the privnet when privilege is separated. Doing it here under a
+    privnet is not a degraded path but a failure -- the agent holds no capability and iptables
+    refuses with "you must be root", which is a kernel that never reaches RUNNING. Same choice the
+    containerd agent makes; see ContainerdAgent.__ainit__.
+    """
+    privnet_socket = local_config.agent.network_privnet_socket
+    if privnet_socket is None:
+        return PortForwarder()
+    return PrivNetPortForwarder(PrivNetClient(privnet_socket), session_network.session_of)
+
+
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     scratch_dir: Path
     tmp_dir: Path
@@ -389,6 +430,18 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None
     gwbridge_subnet: str | None
     _seccomp_profile_as_path: bool
+    #: Whether BAI builds this session's data plane (BEP-1062) instead of Docker. Decided in
+    #: apply_network, read where the container is created and started: it is what puts the
+    #: container behind a gate so a device can be moved into its netns before its command runs.
+    _session_networked: bool
+    #: The node's session half (see docker/session_network.py). Shared with the agent: sessions
+    #: outlive kernels, so the per-session data plane cannot be owned by one kernel's context.
+    _session_network: SessionNetwork
+    #: What ensure_session settled on for this session — subnet, VNI, MTU. Needed at attach time.
+    _net_meta: SessionNetMeta | None
+    #: The container's node-local address, learned from the attach. Docker publishes nothing for a
+    #: `NetworkMode: none` container, so this is what the host ports are DNAT'd at.
+    _container_ip: str | None
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -405,10 +458,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
         network_plugin_ctx: NetworkPluginContext,
+        session_network: SessionNetwork,
         restarting: bool = False,
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
-        gwbridge_subnet: str | None = None,
         seccomp_profile_as_path: bool = False,
+        gwbridge_subnet: str | None = None,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -440,6 +494,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.cluster_ssh_port_mapping = cluster_ssh_port_mapping
         self._seccomp_profile_as_path = seccomp_profile_as_path
         self.gwbridge_subnet = gwbridge_subnet
+        self._session_networked = False
+        self._session_network = session_network
+        self._net_meta = None
+        self._container_ip = None
 
         self.network_plugin_ctx = network_plugin_ctx
 
@@ -761,8 +819,139 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             opts=opts,
         )
 
+    @property
+    def _gate_dir(self) -> Path:
+        """Where this kernel's start gate lives.
+
+        Under the config dir rather than the work dir: the work dir is the user's home, and the
+        wrapper and its FIFO are the agent's, not theirs.
+        """
+        return self.config_dir / "gate"
+
+    def _session_resolv_conf(self) -> Path:
+        """The resolv.conf this kernel gets, bind-mounted over the image's."""
+        return self.config_dir / "resolv.conf"
+
+    def _write_session_resolv_conf(self, gateway: str | None = None) -> None:
+        """Write the kernel's resolver list, optionally with the session resolver first.
+
+        Rewritten in place rather than replaced: the file is bind-mounted, so glibc picks the new
+        contents up on the container's next lookup.
+        """
+        resolv = resolve_container_dns(self.local_config.container.dns or ())
+        if gateway is not None:
+            resolv.nameservers = [gateway, *resolv.nameservers]
+        self._session_resolv_conf().write_text(resolv.render())
+
+    async def _point_resolv_conf_at_resolver(self) -> None:
+        """Prepend the session's cluster resolver, now that the attach has created its gateway.
+
+        Best-effort: with no gateway the upstream-only file stands, which is what a single-kernel
+        session wants anyway. `ensure_cluster_dns` is the loud guard for the clustered case.
+        """
+        gateway = await self._session_network.local_gateway_of(
+            str(self.kernel_config["session_id"])
+        )
+        if gateway is None:
+            return
+        self._write_session_resolv_conf(gateway)
+
+    async def _publish_session_ports(
+        self, cid: str, host_ports: Sequence[int], exposed_ports: Sequence[int]
+    ) -> None:
+        """DNAT the reserved host ports at the container's node-local address.
+
+        This backend runs its own publisher rather than delegating to a privnet: it already drives
+        a root Docker daemon, so the agent process that would delegate the privilege is the one
+        that holds it.
+        """
+        if self._container_ip is None:
+            raise ContainerCreationError(
+                container_id=ContainerId(cid),
+                message="no container address; the kernel's services would be unreachable",
+            )
+        # Services only. The repl is reached at the container's own address (see DockerKernel),
+        # so publishing it would put an interactive channel into the kernel on every local
+        # address for no one to use.
+        forwards = [
+            (hp, cp, None, "tcp")
+            for hp, cp in zip(host_ports, exposed_ports, strict=True)
+            if cp not in _REPL_PORTS
+        ]
+        if forwards:
+            await _port_publisher(self.local_config, self._session_network).install(
+                forwards_for(cid, self._container_ip, forwards)
+            )
+
+    async def _attach_session_network(
+        self, container: DockerContainer, cid: str, cluster_info: ClusterInfo
+    ) -> None:
+        """Move this session's device into the gated container, then let its command run.
+
+        The gate is released in a finally: a container parked forever is worse than one whose
+        network failed, because nothing times it out and the failure has no message. The attach
+        itself is atomic — it rolls back its own partial ADDs — so releasing after a failure starts
+        a kernel with no network, which the caller's own error path then tears down.
+        """
+        if self._net_meta is None:
+            raise ContainerCreationError(
+                container_id=ContainerId(cid),
+                message="the session network was never set up for this kernel",
+            )
+        try:
+            task_pid = await wait_gated_pid(container, self._gate_dir)
+            result = await self._session_network.attach_container(
+                str(self.kernel_config["session_id"]),
+                cid,
+                # Docker names the container, so its id is not the kernel id the session claim was
+                # made under; the tracker needs both to retire that claim.
+                kernel_id=str(self.kernel_id),
+                meta=self._net_meta,
+                kernel_config=self.kernel_config,
+                cluster_info=cluster_info,
+                task_pid=task_pid,
+            )
+            self._container_ip = result.local_ip
+            # The gateway the session resolver listens on exists only now: the attach allocated
+            # the session's LOCAL block.
+            await self._point_resolv_conf_at_resolver()
+            if self._container_ip is None:
+                raise ContainerCreationError(
+                    container_id=ContainerId(cid),
+                    message="the LOCAL attachment yielded no address; cannot publish ports",
+                )
+        finally:
+            await asyncio.to_thread(release_gate, self._gate_dir)
+
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
+        if is_session_networked(cluster_info):
+            # BEP-1062: this session's data plane is BAI's, not Docker's. The container starts with
+            # no network at all and the agent moves a vxlan (or node-local bridge) device into its
+            # netns by PID, which is why it must also be held at a gate until that has happened.
+            # Handing it to Docker's networking as well would put it on two networks, one of which
+            # nothing routes.
+            self._net_meta = await self._session_network.ensure_session(
+                str(self.kernel_config["session_id"]),
+                str(self.kernel_id),
+                cluster_info["network_config"],
+            )
+            self.container_configs.append({
+                "HostConfig": {
+                    "NetworkMode": NO_NETWORK_MODE,
+                    # Docker writes its own /etc/resolv.conf, and for a `none` container that file
+                    # names no resolver this session can use. Bind ours over it: the upstream
+                    # servers now, the session's cluster resolver prepended once the attach has
+                    # created the gateway it listens on. Without that a clustered kernel cannot
+                    # resolve its peers and blocks at rendezvous — with the runner up and
+                    # listening, which is what makes it look like a slow start rather than a
+                    # missing resolver.
+                    "Binds": [f"{self._session_resolv_conf()}:/etc/resolv.conf:rw"],
+                },
+            })
+            self._write_session_resolv_conf()
+            self._session_networked = True
+            return
         # FIXME: find out way to inect network ID to kernel resource spec
         match cluster_info["network_config"].get("mode"):
             case "bridge":
@@ -1370,6 +1559,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 for dev_name, device_alloc in resource_spec.allocations.items():
                     self.computers[dev_name].alloc_map.free(device_alloc)
 
+        if self._session_networked:
+            # BEP-1062: the container must exist, hold a netns and a stable PID, and NOT have run
+            # its command yet, so a vxlan/veth can be moved in first. Docker has no such split --
+            # `docker create` reports PID 0 and no netns -- so the entrypoint becomes a wrapper
+            # that parks at a FIFO after its namespaces exist. Releasing it execs the real command
+            # in place, which is what keeps the PID the attach used.
+            stage_gate(self._gate_dir)
+            apply_gate(container_config, self._gate_dir)
+
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
             container: DockerContainer | None = None
@@ -1421,6 +1619,14 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     message=f"Unexpected error during container start: {e!r}",
                 ) from e
 
+            if self._session_networked:
+                # The container is running but parked: its namespaces exist and its PID is final,
+                # and its command has not started. This is the only window in which the session's
+                # device can be moved in — after the release the runner immediately binds its REPL
+                # and looks its peers up, and an attach racing that surfaces as a hang at
+                # rendezvous rather than as an error here.
+                await self._attach_session_network(container, cid, cluster_info)
+
             if self.internal_data.get("sudo_session_enabled", False):
                 exec = await container.exec(
                     [
@@ -1468,7 +1674,28 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             created_host_ports: tuple[int, ...]
             repl_in_port = 0
             repl_out_port = 0
-            if container_network_info:
+            if self._session_networked:
+                # Docker publishes nothing for a `NetworkMode: none` container, so the pairing the
+                # agent allocated is the pairing — there is no daemon-side map to read back. The
+                # ports are made reachable by DNAT at the address the attach assigned, the same way
+                # the containerd backend does it.
+                kernel_host = str(advertised_kernel_host or container_bind_host)
+                await self._publish_session_ports(cid, host_ports, exposed_ports)
+                session_ports = dict(zip(exposed_ports, host_ports, strict=True))
+                # The container's own ports, not the host pairing: the repl is dialled at the
+                # container's LOCAL address (see repl_host below and DockerKernel), where the
+                # runner listens on 2000/2001. Handing over a host port here sends the agent's
+                # ZMQ at a port nothing published -- the runner is up and answering, and the
+                # creation still times out waiting for it.
+                repl_in_port, repl_out_port = _REPL_IN_PORT, _REPL_OUT_PORT
+                stdin_port = 0  # legacy
+                stdout_port = 0  # legacy
+                for sport in service_ports:
+                    sport["host_ports"] = tuple(
+                        session_ports[cport] for cport in sport["container_ports"]
+                    )
+                created_host_ports = tuple(host_ports)
+            elif container_network_info:
                 kernel_host = container_network_info.container_host
                 port_map = container_network_info.services
                 if "replin" not in port_map or "replout" not in port_map:
@@ -1526,6 +1753,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return {
             "container_id": container._id,
             "kernel_host": kernel_host,
+            # Under BEP-1062 the repl is not published: the agent is on this node and dials the
+            # container's own address. None everywhere else, where Docker's loopback publishing is
+            # what the kernel falls back to.
+            "repl_host": self._container_ip if self._session_networked else None,
             "repl_in_port": repl_in_port,
             "repl_out_port": repl_out_port,
             "stdin_port": stdin_port,  # legacy
@@ -1547,6 +1778,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     checked_invalid_images: set[str]
     _seccomp_profile_as_path: bool
     _cgroup_path_cache: LRUCache[ContainerId, dict[CgroupController, Path]]
+    #: BEP-1062. The session half only — Docker keeps its own container lifecycle, so this object
+    #: has a locator and no runtime and refuses lifecycle calls by name.
+    _session_network: SessionNetwork
+    #: The address peers program into their FDB. None means this node cannot anchor a tunnel, and
+    #: ensure_session refuses a vxlan session outright rather than publishing an unreachable VTEP.
+    _vtep_ip: str | None
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1653,6 +1890,25 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 docker_info["CgroupVersion"],
             )
             self.docker_info = docker_info
+        # BEP-1062. host_ip keeps the overlay on the L2 the agents advertise on rather than a
+        # hard-coded eth0; the VTEP is validated once here because it is what peers program into
+        # their FDB, and an address this node cannot be reached at must never reach a session's
+        # membership record.
+        container_cfg = self.local_config.container
+        host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
+        self._vtep_ip = usable_vtep(host_ip)
+        self._session_network = build_docker_session_network(
+            self.etcd,
+            agent_id=str(self.id),
+            host_ip=host_ip,
+            uplink=uplink_for_ip(self._vtep_ip or host_ip),
+            privnet_socket=self.local_config.agent.network_privnet_socket,
+            local_subnet_layout=container_cfg.local_subnet_layout(),
+            agent_state_dir=self.local_config.agent.var_base_path,
+            vtep_ip=self._vtep_ip,
+            configured_dns=tuple(container_cfg.dns or ()),
+        )
+        await self._session_network.open()
         await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
         try:
@@ -1724,6 +1980,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         if self.docker is not None:
             await self.docker.close()
+        await self._session_network.close()
 
     @override
     async def _load_kernel_registry_from_recovery(self) -> MutableMapping[KernelId, AbstractKernel]:
@@ -2142,10 +2399,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.agent_sockpath,
             self.resource_lock,
             self.network_plugin_ctx,
+            self._session_network,
             restarting=restarting,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
-            gwbridge_subnet=self.gwbridge_subnet,
             seccomp_profile_as_path=self._seccomp_profile_as_path,
+            gwbridge_subnet=self.gwbridge_subnet,
         )
 
     @override
@@ -2212,6 +2470,42 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 await self.error_monitor.capture_exception()
 
     @override
+    async def create_kernel(
+        self,
+        ownership_data: KernelOwnershipData,
+        kernel_image: ImageRef,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        *,
+        restarting: bool = False,
+        throttle_sema: asyncio.Semaphore | None = None,
+    ) -> KernelCreationResult:
+        try:
+            return await super().create_kernel(
+                ownership_data,
+                kernel_image,
+                kernel_config,
+                cluster_info,
+                restarting=restarting,
+                throttle_sema=throttle_sema,
+            )
+        except ResourceError:
+            # "Kernel creation already in progress" — this call never got as far as claiming
+            # anything; the claim belongs to the creation that IS in progress. Releasing it here
+            # would tear the session network down under that live creation.
+            raise
+        except BaseException:
+            # The kernel claimed this node's session network in apply_network, long before its
+            # container existed. If it dies before that container is prepared it never enters the
+            # kernel registry — and a destroy for a kernel the agent has never heard of returns
+            # without queueing a clean, so clean_kernel (which normally releases the claim) never
+            # runs. BaseException, not Exception: a creation cancelled at shutdown leaks the claim
+            # just as surely. (A kernel that already has a container keeps its claim — that one is
+            # released by its own removal.)
+            await self._session_network.release_kernel(str(ownership_data.kernel_id))
+            raise
+
+    @override
     async def clean_kernel(
         self,
         kernel_id: KernelId,
@@ -2271,6 +2565,24 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             domain_socket_proxy.host_proxy_path.unlink()
                         except OSError:
                             pass
+
+            if container_id is not None:
+                # BEP-1062: before the container goes. Removing it reclaims only the container-side
+                # veth via netns teardown — the host veth, the host-local IPAM address and the
+                # egress MASQ rule are ours to give back, and a kernel that skips this leaks them
+                # until the agent restarts. A no-op for a container this node never attached.
+                # The DNAT rules the publish installed are ours to give back too: nothing else
+                # reclaims them, and a host port still pointing at a dead container's address is
+                # handed straight to whichever kernel draws that port next.
+                try:
+                    await _port_publisher(
+                        self.local_config, self._session_network
+                    ).remove_container(str(container_id))
+                except Exception:
+                    log.warning(
+                        "could not remove the published ports of container {}", container_id
+                    )
+                await self._session_network.detach_container(str(container_id))
 
             if not self.local_config.debug.skip_container_deletion and container_id is not None:
                 container = docker.containers.container(container_id)

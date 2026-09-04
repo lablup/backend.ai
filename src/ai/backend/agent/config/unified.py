@@ -33,6 +33,11 @@ from pydantic import (
 )
 
 from ai.backend.agent.affinity_map import AffinityPolicy
+from ai.backend.agent.network.local_subnet import (
+    DEFAULT_BLOCK_PREFIXLEN,
+    DEFAULT_LOCAL_POOL,
+    LocalSubnetLayout,
+)
 from ai.backend.agent.stats import StatModes
 from ai.backend.agent.types import AgentBackend
 from ai.backend.agent.utils import get_arch_name
@@ -1335,6 +1340,28 @@ class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
     """
 
     pass
+    network_privnet_socket: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("network-privnet-socket", "network_privnet_socket"),
+            serialization_alias="network-privnet-socket",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Unix socket path of the privnet daemon (BEP-1062). When set, the "
+                "containerd agent delegates all CAP_NET_ADMIN/CAP_SYS_ADMIN container networking "
+                "to the privnet over this socket and needs no network privilege itself. When unset "
+                "(the default), the agent performs container networking in-process, which requires "
+                "the agent process to hold those capabilities. Only used by the containerd backend."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(
+                local="/tmp/backend.ai/net-privnet.sock",
+                prod="/run/backend.ai/net-privnet.sock",
+            ),
+        ),
+    ]
 
 
 class CommonContainerConfig(BaseConfigSchema):
@@ -1708,6 +1735,68 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
     """
 
     pass
+    dns: Annotated[
+        list[str] | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "DNS nameserver addresses for containers. When empty (the default), the agent "
+                "derives them from the host's resolver configuration, dropping loopback "
+                "nameservers (a container's network namespace cannot reach the host's loopback, "
+                "so a systemd-resolved stub such as 127.0.0.53 is useless inside it) and reading "
+                "the systemd-resolved uplink file instead when one is present. Set this to pin "
+                "specific nameservers, e.g. an internal corporate resolver."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="", prod='["10.0.0.53", "10.0.0.54"]'),
+        ),
+    ]
+    local_network_pool: Annotated[
+        str,
+        Field(
+            default=DEFAULT_LOCAL_POOL,
+            validation_alias=AliasChoices("local-network-pool", "local_network_pool"),
+            serialization_alias="local-network-pool",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Private IPv4 pool this node cuts every session's LOCAL (control + egress/NAT) "
+                "bridge subnet out of (BEP-1062). Node-local and behind NAT, so it never leaves "
+                "the host and needs no coordination with other nodes — but it must not overlap "
+                "any network the host itself routes, or containers will reach this pool instead "
+                "of the real destination. Change it on a drained node only: sessions hold blocks "
+                "cut from the previous pool, and the agent refuses to start rather than read them "
+                "as a different subnet. Only used by the containerd backend."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="172.30.0.0/16", prod="172.30.0.0/16"),
+        ),
+    ]
+    local_network_block_size: Annotated[
+        int,
+        Field(
+            default=DEFAULT_BLOCK_PREFIXLEN,
+            ge=8,
+            le=30,
+            validation_alias=AliasChoices("local-network-block-size", "local_network_block_size"),
+            serialization_alias="local-network-block-size",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Prefix length of the block each session gets out of 'local-network-pool'. This "
+                "sets both how many sessions a node can hold and how many containers one session "
+                "may put on this node: the default /26 out of a /16 pool gives 1024 sessions of "
+                "up to 61 containers each. Raise it for more, smaller sessions; lower it for "
+                "fewer, larger ones. Change it on a drained node only (see 'local-network-pool')."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="26", prod="26"),
+        ),
+    ]
+
+    def local_subnet_layout(self) -> LocalSubnetLayout:
+        """How this node cuts its LOCAL pool into per-session blocks (BEP-1062)."""
+        return LocalSubnetLayout.parse(self.local_network_pool, self.local_network_block_size)
 
 
 class ResourceAllocationConfig(BaseConfigSchema):

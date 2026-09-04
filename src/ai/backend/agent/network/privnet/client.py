@@ -1,0 +1,417 @@
+"""Agent-side client + proxies for the privnet daemon (BEP-1062).
+
+These let the *unprivileged* agent keep its normal composition (SessionNetworkCoordinator
+owns etcd membership; the orchestrator drives per-container attach) while every privileged
+side effect is delegated to the privnet as a semantic verb. The agent sends only
+``session_id`` / ``container_id``; it never builds argv, device names, netns paths, or CNI
+config — so it holds no CAP_NET_ADMIN / CAP_SYS_ADMIN.
+
+- ``PrivNetClient`` — one short-lived unix-socket round trip per request.
+- ``PrivNetBackendProxy`` — an ``AbstractNetworkAgentPluginV2`` whose privileged methods
+  (setup/teardown) become RPCs; overlay peer/endpoint programming is handled privnet-side.
+- ``PrivNetProvisioner`` — the per-container attach/detach path, replacing
+  ``ContainerNetworkProvisioner`` when the privnet is enabled.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from collections.abc import Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, cast, override
+
+from ai.backend.agent.network.caps import probe_caps
+from ai.backend.agent.network.port_forward import PortForward
+from ai.backend.agent.network.privnet.protocol import (
+    PrivNetOp,
+    PrivNetRequest,
+    PrivNetResponse,
+    ProtocolError,
+)
+from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
+from ai.backend.common.network.types import (
+    AgentNetworkCaps,
+    EndpointPlan,
+    Member,
+    NetworkRole,
+    SessionNetMeta,
+)
+from ai.backend.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+if TYPE_CHECKING:
+    from ai.backend.agent.kernel import AbstractKernel
+    from ai.backend.common.types import ClusterInfo, KernelCreationConfig
+
+
+class PrivNetClientError(RuntimeError):
+    """The privnet refused or failed a request. Carries the privnet's generic reason."""
+
+
+class PrivNetClient:
+    _socket_path: str
+
+    def __init__(self, socket_path: str) -> None:
+        self._socket_path = socket_path
+
+    async def call(self, req: PrivNetRequest) -> PrivNetResponse:
+        reader, writer = await asyncio.open_unix_connection(self._socket_path)
+        try:
+            writer.write(req.encode())
+            await writer.drain()
+            line = await reader.readline()
+        finally:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+        resp = PrivNetResponse.decode(line)
+        if not resp.ok:
+            raise PrivNetClientError(resp.error or "privnet request failed")
+        return resp
+
+    async def confine_container(
+        self, session_id: str, container_id: str, top_pid: int, limits: Mapping[str, str]
+    ) -> None:
+        """Have the privnet create this container's cgroup and move its tree in.
+
+        A rootless backend has no daemon to do it (containerd/dockerd declare `cgroupsPath` and
+        their root daemon obliges), so an unprivileged agent otherwise leaves the kernel in its own
+        cgroup: no memory limit, no cpuset pin, no per-kernel stats.
+        """
+        await self.call(
+            PrivNetRequest(
+                op=PrivNetOp.CONFINE_CONTAINER,
+                session_id=session_id,
+                container_id=container_id,
+                cgroup_pid=top_pid,
+                cgroup_limits=dict(limits),
+            )
+        )
+
+    async def release_container(self, session_id: str, container_id: str) -> None:
+        await self.call(
+            PrivNetRequest(
+                op=PrivNetOp.RELEASE_CONTAINER,
+                session_id=session_id,
+                container_id=container_id,
+            )
+        )
+
+    async def local_subnet_of(self, session_id: str) -> str | None:
+        """The session's node-local LOCAL /26, from the privnet that owns the pool.
+
+        The agent has no LOCAL journal of its own in privnet mode, so this is how it learns the
+        subnet it needs to lay out single-node cluster peers. Returns None when the privnet holds
+        no block for the session (unknown or torn down) — the query never allocates, so an
+        unresolved name degrades to "no peer entry" rather than minting a phantom block.
+
+        A failed query — an unreachable privnet, or one too old to know the verb — also degrades to
+        None, not an exception. This lookup sits on the kernel-creation path (``_peer_host_map``):
+        raising here would abort the whole kernel over a best-effort name-resolution step, and a
+        deploy where the agent leads the privnet in version would break every single-node cluster.
+        Degrading loses only the peer /etc/hosts entries (the pre-existing gap), and the kernel
+        still comes up.
+        """
+        try:
+            resp = await self.call(PrivNetRequest(op=PrivNetOp.LOCAL_SUBNET, session_id=session_id))
+        except (PrivNetClientError, OSError, ProtocolError) as e:
+            # PrivNetClientError: an ok=False reply (bad session, or an op an older privnet does
+            # not know). OSError: the socket is missing or the privnet is not accepting. Both mean
+            # "no answer", and on the kernel-creation path that must degrade, not abort.
+            log.warning("privnet LOCAL_SUBNET query for {} failed, degrading: {}", session_id, e)
+            return None
+        return resp.subnet
+
+
+def _network_config_from_meta(meta: SessionNetMeta) -> dict[str, Any]:
+    return {
+        "backend": str(meta.backend),
+        "subnet": meta.subnet or None,
+        "vni": meta.vni,
+        "mtu": meta.mtu,
+        # Not defaulted on the far side: an operator who moved the overlay off 4789 did so because
+        # the fabric drops it, and a privnet that quietly used 4789 would build a tunnel nothing
+        # carries -- with the agent's own ESP policy written for the other port.
+        "vxlan_port": meta.vxlan_port,
+        "encryption_key": meta.encryption_key,
+    }
+
+
+class PrivNetBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
+    """Backend facade the agent's coordinator drives; privileged host ops go to the privnet.
+
+    Single-node overlay concerns (peers/endpoints) are no-ops here because the privnet owns
+    the overlay data plane; they are wired as privnet verbs when multi-node lands."""
+
+    _client: PrivNetClient
+    _uplink: str
+
+    def __init__(
+        self, plugin_config: Any, local_config: Any, *, client: PrivNetClient, uplink: str = "eth0"
+    ) -> None:
+        super().__init__(plugin_config, local_config)
+        self._client = client
+        self._uplink = uplink
+
+    @override
+    async def init(self, context: Any = None) -> None:
+        pass
+
+    @override
+    async def cleanup(self) -> None:
+        pass
+
+    @override
+    async def update_plugin_config(self, plugin_config: Any) -> None:
+        self.plugin_config = plugin_config
+
+    @override
+    async def probe_caps(self) -> AgentNetworkCaps:
+        # Non-privileged NIC feature probe stays agent-side.
+        return await probe_caps(self._uplink)
+
+    @override
+    async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        await self._client.call(
+            PrivNetRequest(
+                op=PrivNetOp.SETUP_SESSION,
+                session_id=meta.session_id,
+                network_config=_network_config_from_meta(meta),
+            )
+        )
+
+    @override
+    async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        # Nothing to do: the privnet owns this session's devices, attach plans and backend state,
+        # and it recovers them itself — from its own journal reconciled against containerd, not
+        # from anything we could tell it (see privnet/server.py `recover`). Re-declaring the session
+        # here is exactly the move the trust model forbids the agent.
+        return
+
+    @override
+    async def teardown_session_network(self, session_id: str) -> None:
+        await self._client.call(
+            PrivNetRequest(op=PrivNetOp.TEARDOWN_SESSION, session_id=session_id)
+        )
+
+    @override
+    async def ensure_session_security(self, session_id: str, peers: Sequence[Member]) -> None:
+        # Not inheritable as a no-op: the privnet owns the data plane, so the state that has to be
+        # re-asserted lives there, while the reconcile that drives it runs here. A failure comes
+        # back as an error and is what keeps this pass's peers out of the coordinator's applied
+        # set, so they are reprogrammed once the privnet can protect them again.
+        await self._client.call(
+            PrivNetRequest(
+                op=PrivNetOp.ENSURE_SECURITY,
+                session_id=session_id,
+                vteps=tuple(peer.vtep_ip for peer in peers if peer.vtep_ip is not None),
+            )
+        )
+
+    @override
+    async def add_peer(self, session_id: str, peer: Member) -> None:
+        if peer.vtep_ip is None:
+            return  # non-overlay peer (bridge): nothing to program on the overlay
+        await self._client.call(
+            PrivNetRequest(op=PrivNetOp.ADD_PEER, session_id=session_id, vtep_ip=peer.vtep_ip)
+        )
+
+    @override
+    async def del_peer(self, session_id: str, peer: Member) -> None:
+        if peer.vtep_ip is None:
+            return
+        await self._client.call(
+            PrivNetRequest(op=PrivNetOp.DEL_PEER, session_id=session_id, vtep_ip=peer.vtep_ip)
+        )
+
+    @override
+    async def add_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        await self._client.call(
+            PrivNetRequest(
+                op=PrivNetOp.ADD_ENDPOINT, session_id=session_id, ip=ip, mac=mac, vtep_ip=vtep_ip
+            )
+        )
+
+    @override
+    async def del_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        await self._client.call(
+            PrivNetRequest(
+                op=PrivNetOp.DEL_ENDPOINT, session_id=session_id, ip=ip, mac=mac, vtep_ip=vtep_ip
+            )
+        )
+
+    @override
+    async def setup_dns_redirect(self, session_id: str, loopback_port: int) -> None:
+        # The agent bound the resolver on 127.0.0.1:<loopback_port> and hands only that port down;
+        # the privnet derives the gateway from the session it owns and installs the :53 DNAT — a
+        # compromised agent can point :53 at its own loopback port, nothing else.
+        await self._client.call(
+            PrivNetRequest(
+                op=PrivNetOp.SETUP_DNS_REDIRECT, session_id=session_id, dns_port=loopback_port
+            )
+        )
+
+    @override
+    async def teardown_dns_redirect(self, session_id: str) -> None:
+        await self._client.call(
+            PrivNetRequest(op=PrivNetOp.TEARDOWN_DNS_REDIRECT, session_id=session_id)
+        )
+
+    @override
+    async def attach_endpoint(
+        self,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        *,
+        meta: SessionNetMeta,
+    ) -> EndpointPlan:
+        # The live attach goes through PrivNetProvisioner (a semantic ATTACH verb), so the only
+        # caller here is the agent's restart recovery, re-deriving the plan it will later detach
+        # with. Under a privnet that plan lives privnet-side, and detach is a verb naming the
+        # container — so the agent needs nothing but a handle, and an empty plan is that handle.
+        # (Raising instead, as this used to, aborted recovery for every container on the node and
+        # left them all with no detach path: their host veths and addresses then leaked.)
+        return EndpointPlan(attachments=[])
+
+    @override
+    async def detach_endpoint(self, kernel: AbstractKernel) -> None:
+        pass
+
+
+class PrivNetProvisioner:
+    """Drop-in for ``ContainerNetworkProvisioner`` that routes per-container attach/detach to
+    the privnet. The agent-supplied ``task_pid`` is intentionally ignored: the privnet resolves
+    the PID from containerd itself and pins the netns, so a stale/forged PID cannot mislead it.
+
+    One provisioner per session (the session network builds it alongside that session's
+    orchestrator), so detach knows its session without having to have witnessed the attach — which
+    is what a restarted agent has not done for the kernels that outlived it.
+    """
+
+    _client: PrivNetClient
+    _session_id: str
+
+    def __init__(self, client: PrivNetClient, session_id: str) -> None:
+        self._client = client
+        self._session_id = session_id
+
+    async def attach(
+        self,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        *,
+        meta: SessionNetMeta,
+        container_id: str,
+        task_pid: int,
+    ) -> tuple[EndpointPlan, dict[NetworkRole, str]]:
+        # Relay the manager-assigned overlay IP (present for multi-node vxlan sessions) so the
+        # privnet attaches the container at its central, disjoint address instead of a per-node
+        # host-local one. The privnet re-validates it is within the session subnet; None (single
+        # node) leaves the privnet on its host-local fallback. The MAC is derived from the IP
+        # privnet-side, so it is not sent.
+        overlay_ip = kernel_config.get("cluster_network_ip")
+        # Single-node cluster: the deterministic LOCAL address this kernel must be pinned at so its
+        # real address matches the /etc/hosts map the agent wrote. Sent alongside the overlay IP; the
+        # privnet re-validates it is within the session's LOCAL subnet. Without this the privnet takes
+        # a host-local dynamic address that need not match the map, and peer resolution is wrong.
+        # local_static_ip is an agent-added key, not part of the KernelCreationConfig TypedDict.
+        local_ip: str | None = cast(Any, kernel_config).get("local_static_ip")
+        resp = await self._client.call(
+            PrivNetRequest(
+                op=PrivNetOp.ATTACH_CONTAINER,
+                session_id=meta.session_id,
+                container_id=container_id,
+                ip=overlay_ip,
+                local_ip=local_ip,
+            )
+        )
+        assigned: dict[NetworkRole, str] = {}
+        for role_name, ip in (resp.assigned or {}).items():
+            try:
+                assigned[NetworkRole(role_name)] = ip
+            except ValueError:
+                continue
+        # The concrete plan lives privnet-side (kept for detach); the agent only needs a
+        # handle to pass back to detach, so an empty plan is sufficient.
+        return EndpointPlan(attachments=[]), assigned
+
+    async def detach(self, plan: EndpointPlan, *, container_id: str, task_pid: int) -> None:
+        # The plan is ignored: the privnet holds the real one (and re-derives it after its own
+        # restart). Detach names the container; the privnet resolves everything else.
+        await self._client.call(
+            PrivNetRequest(
+                op=PrivNetOp.DETACH_CONTAINER,
+                session_id=self._session_id,
+                container_id=container_id,
+            )
+        )
+
+
+# Any valid identifier; LIST_PORTS is node-wide, so the privnet only uses it as a lock key.
+_LIST_LOCK_KEY = "list-ports"
+
+
+class PrivNetPortForwarder:
+    """Same shape as ``PortForwarder``, but the iptables work happens in the privnet.
+
+    The container's address is deliberately not sent: the privnet DNATs to the LOCAL address it
+    assigned at attach. So ``install`` drops the ``container_ip`` its argument carries — that is
+    the agent's belief, not a fact the privnet is willing to act on.
+    """
+
+    _client: PrivNetClient
+    # container_id -> session_id; the privnet's session lock and its attach record are keyed by it
+    _session_of: Callable[[str], str | None]
+
+    def __init__(self, client: PrivNetClient, session_of: Callable[[str], str | None]) -> None:
+        self._client = client
+        self._session_of = session_of
+
+    def _session_for(self, container_id: str) -> str:
+        session_id = self._session_of(container_id)
+        if session_id is None:
+            raise PrivNetClientError(f"no session known for container {container_id}")
+        return session_id
+
+    async def install(self, forwards: Sequence[PortForward]) -> None:
+        if not forwards:
+            return
+        container_id = forwards[0].container_id
+        await self._client.call(
+            PrivNetRequest(
+                op=PrivNetOp.PUBLISH_PORTS,
+                session_id=self._session_for(container_id),
+                container_id=container_id,
+                ports=tuple(
+                    (f.host_port, f.container_port, f.host_ip, f.protocol) for f in forwards
+                ),
+            )
+        )
+
+    async def remove_container(self, container_id: str) -> list[int]:
+        # The privnet finds the rules by their container tag, so an unknown session is not fatal:
+        # fall back to the container id as the lock key rather than leak the rules.
+        session_id = self._session_of(container_id) or container_id
+        resp = await self._client.call(
+            PrivNetRequest(
+                op=PrivNetOp.UNPUBLISH_PORTS,
+                session_id=session_id,
+                container_id=container_id,
+            )
+        )
+        return list(resp.host_ports or ())
+
+    async def list_forwards(self, *, container_id: str | None = None) -> list[PortForward]:
+        resp = await self._client.call(
+            PrivNetRequest(op=PrivNetOp.LIST_PORTS, session_id=_LIST_LOCK_KEY)
+        )
+        forwards = [
+            PortForward(container_id=cid, host_port=hp, container_ip=ip, container_port=cp)
+            for cid, hp, ip, cp in (resp.forwards or ())
+        ]
+        if container_id is None:
+            return forwards
+        return [f for f in forwards if f.container_id == container_id]

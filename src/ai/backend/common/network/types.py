@@ -1,0 +1,249 @@
+"""Runtime-neutral data types for cluster-session networking.
+
+These types decouple the cluster-network control plane and data-plane backends
+from any specific container runtime (Docker, containerd, ...). See
+proposals/BEP-1062 and its sub-documents `control-plane.md` and `agent-plugin-v2.md`.
+"""
+
+from __future__ import annotations
+
+import ipaddress
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
+
+# --- tunnel constants, shared by the manager (which computes the overlay MTU) and the agent
+# (which builds the devices and checks the result against the real path) ---
+
+DEFAULT_VXLAN_PORT = 4789
+"""The IANA VXLAN port, and the default this project ships.
+
+It is a *default*, not a constant, because a cluster's CNI may already claim it in a way that is
+fatal to us. Calico programs an anti-spoofing rule on the host side of every pod veth --
+``-A cali-fw-<iface> -p udp -m multiport --dports <felix vxlanPort> -j DROP``, commented "Drop
+VXLAN encapped packets originating in workloads" -- whose port is Felix's ``vxlanPort``, also 4789
+by default. It is installed regardless of Calico's own encapsulation mode (measured: it fires with
+Calico in IPIP mode, where Calico uses no VXLAN at all), so on a Calico cluster a session overlay
+on 4789 comes up and carries nothing. Moving either side off 4789 restores it.
+"""
+
+VXLAN_OVERHEAD = 50
+"""IPv4 VXLAN encapsulation: 20 IP + 8 UDP + 8 VXLAN + 14 inner Ethernet."""
+
+ESP_OVERHEAD = 38
+"""Transport-mode ESP/AES-GCM added on top of VXLAN when overlay encryption is on: 8 ESP header
+(SPI + seq) + 8 IV + 16 ICV + up to 6 pad/trailer. See overlay-encryption.md."""
+
+
+def mac_for_ip(ip: str) -> str:
+    """Derive a stable, locally-administered unicast MAC from an IPv4 address.
+
+    Uses the ``02:42:`` prefix (locally-administered, unicast — the same convention Docker
+    uses) followed by the four IPv4 octets, so the MAC is unique per endpoint IP and
+    deterministic. This is the SINGLE source of truth both sides share: the manager programs
+    peers' FDB/ARP to this MAC and the agent sets the container's overlay NIC to the same
+    MAC, so they agree without a round-trip. If they diverged, a peer's unicast frame
+    (dst=02:42:...) would not match the container NIC's address and be dropped.
+    """
+    octets = ipaddress.IPv4Address(ip).packed
+    return "02:42:" + ":".join(f"{b:02x}" for b in octets)
+
+
+class NetworkBackendKind(StrEnum):
+    """Selectable data-plane backends for a cluster-session network."""
+
+    VXLAN = "vxlan"
+    """VXLAN overlay. Portable default; per-session isolation via VNI."""
+    BRIDGE = "bridge"
+    """Node-local per-session bridge with no cross-node overlay. Used for single-node
+    sessions: a plain CNI bridge (host-local IPAM) gives the container a host-reachable IP,
+    replacing the former nerdctl-managed bridge."""
+
+
+class AttachKind(StrEnum):
+    """How a runtime should attach a container to a session network."""
+
+    CNI = "cni"
+    """CNI runtimes (containerd, ...): apply ``cni_config`` to the container netns."""
+    DOCKER_NETWORK = "docker"
+    """Docker runtime (v1 back-compat): merge ``docker_config`` into the create request."""
+    HOST_NETNS = "netns"
+    """Agent-driven veth/setns using ``netns_ops``."""
+
+
+class NetworkRole(StrEnum):
+    """Purpose of a single interface attached to a container."""
+
+    LOCAL = "local"
+    """Host-local bridge. Always present. The host (agent) is this bridge's gateway, so it
+    doubles as (1) the agent<->container control channel and (2) external egress via NAT.
+    Inter-container communication is disabled (egress-only between containers) so a shared
+    per-node bridge cannot bridge two different sessions; host<->container still works.
+    Carries the container's default route."""
+    OVERLAY = "overlay"
+    """Cross-node cluster network. Present only for multi-node sessions. Exactly one L2
+    domain = the session; carries inter-node isolation. Installs only the session-subnet route."""
+
+
+@dataclass(frozen=True)
+class SessionNetMeta:
+    """Source-of-truth network descriptor for one cluster session.
+
+    Written by the manager under ``network/session/{session_id}/meta`` and consumed
+    by every data-plane backend.
+    """
+
+    session_id: str
+    subnet: str
+    backend: NetworkBackendKind
+    mtu: int
+    vni: int | None = None
+    """VXLAN Network Identifier; set only when ``backend == VXLAN``."""
+    vxlan_port: int = DEFAULT_VXLAN_PORT
+    """UDP port this session's VXLAN tunnel uses, on the wire and in the XFRM policy selector.
+
+    Carried in the meta rather than read from each agent's own config so the two ends of a tunnel
+    cannot disagree -- a one-sided change yields an overlay that comes up and carries nothing.
+    See ``DEFAULT_VXLAN_PORT`` for why an operator would move it off 4789.
+    """
+    encryption_key: str | None = None
+    """Hex-encoded 256-bit cluster root for kernel IPSec (ESP/AES-GCM) traffic-key derivation, or
+    ``None`` for a plaintext overlay (the default). The root is distributed via etcd like ``vni``;
+    the backend derives pair-and-12-hour-generation keys and programs only those into XFRM. See
+    overlay-encryption.md."""
+
+
+@dataclass(frozen=True)
+class Member:
+    """A node participating in a session network.
+
+    Each agent writes its own entry under ``network/session/{session_id}/members/{agent_id}``.
+    """
+
+    agent_id: str
+    host_ip: str
+    vtep_ip: str | None = None
+    """VXLAN tunnel endpoint address; used by the vxlan backend for FDB entries."""
+
+    def to_etcd_payload(self) -> dict[str, str | None]:
+        """The member's etcd value (``agent_id`` is the key, not part of the value).
+
+        Single source of the on-wire member schema — used by both the agent (self-publish)
+        and the manager (pre-seed) so the two never drift."""
+        return {"host_ip": self.host_ip, "vtep_ip": self.vtep_ip}
+
+    @classmethod
+    def from_etcd_payload(cls, agent_id: str, payload: Mapping[str, Any]) -> Member:
+        return cls(
+            agent_id=agent_id,
+            host_ip=payload["host_ip"],
+            vtep_ip=payload.get("vtep_ip"),
+        )
+
+
+@dataclass(frozen=True)
+class EndpointAddr:
+    """A manager-assigned overlay address for one container endpoint.
+
+    Written by the manager under ``network/session/{session_id}/endpoints/{container_id}``
+    and consumed by overlay backends: the CNI attach uses ``ip`` (static IPAM) and the
+    coordinator proactively programs FDB + neighbor (ARP) entries from ``ip``/``mac``/
+    ``agent_id`` — no per-node host-local allocation, no BUM flood.
+
+    ``cluster_hostname`` (``main1``, ``sub1``, …) makes this table the session-scoped
+    ``hostname -> ip`` source the per-session cluster name resolver reads (BEP-1062,
+    cluster-name-resolution.md) — the same per-session ``endpoints/`` prefix, so names never
+    share a global namespace and cannot collide across sessions.
+    """
+
+    container_id: str
+    ip: str
+    mac: str
+    agent_id: str
+    cluster_hostname: str | None = None
+    """The kernel's in-cluster hostname. ``None`` only for endpoints written before this field
+    existed (backward-compatible decode); a name-less endpoint is simply not resolvable by name."""
+
+    def to_etcd_payload(self) -> dict[str, str | None]:
+        """The endpoint's etcd value (``container_id`` is the key, but kept in the value too for
+        the coordinator's reverse lookups). Single source of the on-wire schema — used by the
+        manager (assign) and the agent (decode) so the two never drift."""
+        return {
+            "ip": self.ip,
+            "mac": self.mac,
+            "agent_id": self.agent_id,
+            "container_id": self.container_id,
+            "cluster_hostname": self.cluster_hostname,
+        }
+
+    @classmethod
+    def from_etcd_payload(cls, container_id: str, payload: Mapping[str, Any]) -> EndpointAddr:
+        return cls(
+            container_id=container_id,
+            ip=payload["ip"],
+            mac=payload["mac"],
+            agent_id=payload["agent_id"],
+            cluster_hostname=payload.get("cluster_hostname"),
+        )
+
+
+@dataclass(frozen=True)
+class NetworkAttachSpec:
+    """Runtime-neutral description of how to attach ONE interface to a container.
+
+    Exactly one of ``cni_config`` / ``docker_config`` / ``netns_ops`` is populated,
+    matching ``kind``. The runtime-specific provisioner interprets it. A container may
+    receive several of these as an ordered chain (see ``EndpointPlan``): always one LOCAL
+    interface, plus one OVERLAY interface for multi-node sessions.
+    """
+
+    kind: AttachKind
+    interface_name: str
+    role: NetworkRole = NetworkRole.LOCAL
+    is_default_route: bool = False
+    """Whether this interface carries the container's default route. Typically the
+    LOCAL interface; the OVERLAY interface installs only the session-subnet route."""
+    ip: str | None = None
+    """Preassigned address, when known. May be None when the interface's IPAM
+    (e.g. host-local for the LOCAL interface) assigns it at attach time."""
+    cni_config: Mapping[str, Any] | None = None
+    cni_capability_args: Mapping[str, Any] | None = None
+    """Standard CNI capability args (e.g. ``{"ips": ["10.0.0.5/26"], "mac": "02:.."}``). The
+    provisioner injects each one into ``runtimeConfig`` for the capability its ``cni_config``
+    declares under ``capabilities`` — the standard way to pin a specific IP / MAC, replacing the
+    non-standard ``ipam.requested_ip`` / top-level ``mac`` keys a real CNI binary would ignore."""
+    docker_config: Mapping[str, Any] | None = None
+    netns_ops: Mapping[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class EndpointPlan:
+    """Ordered set of interfaces to attach to one container.
+
+    Invariants (enforced by backends, not the dataclass):
+      - Exactly one attachment has ``role == LOCAL`` (agent control + egress).
+      - Multi-node sessions additionally have exactly one ``role == OVERLAY``.
+      - At most one attachment has ``is_default_route == True`` (normally the LOCAL one).
+    """
+
+    attachments: list[NetworkAttachSpec]
+
+    def local(self) -> NetworkAttachSpec:
+        """Return the single always-present LOCAL attachment."""
+        return next(a for a in self.attachments if a.role is NetworkRole.LOCAL)
+
+    def overlay(self) -> NetworkAttachSpec | None:
+        """Return the OVERLAY attachment for multi-node sessions, or None for single-node."""
+        return next((a for a in self.attachments if a.role is NetworkRole.OVERLAY), None)
+
+
+@dataclass(frozen=True)
+class AgentNetworkCaps:
+    """Per-agent networking capabilities used by the control plane to select a backend.
+
+    Published under ``network/agent/{agent_id}/caps``.
+    """
+
+    tunnel_offload: bool
+    backends: list[str] = field(default_factory=list)

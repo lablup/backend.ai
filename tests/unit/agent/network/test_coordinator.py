@@ -1,0 +1,619 @@
+import asyncio
+import json
+from collections.abc import AsyncIterator, Sequence
+from typing import Any, cast, override
+from unittest import mock
+
+import ai.backend.agent.network.coordinator as coordinator_mod
+from ai.backend.agent.network.coordinator import SessionClusterNames, SessionNetworkCoordinator
+from ai.backend.common.etcd import AbstractKVStore
+from ai.backend.common.network.keys import endpoints_prefix, member_key, members_prefix
+from ai.backend.common.network.types import Member, NetworkBackendKind, SessionNetMeta
+
+_META = SessionNetMeta(
+    session_id="s1",
+    subnet="10.128.5.0/24",
+    backend=NetworkBackendKind.VXLAN,
+    mtu=1450,
+    vni=4097,
+)
+_SELF = Member(agent_id="a1", host_ip="10.0.0.1", vtep_ip="10.0.0.1")
+_PEER2 = Member(agent_id="a2", host_ip="10.0.0.2", vtep_ip="10.0.0.2")
+_PEER3 = Member(agent_id="a3", host_ip="10.0.0.3", vtep_ip="10.0.0.3")
+
+
+class FakeEtcd:
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+
+    async def put(self, key: str, val: str, **kwargs: Any) -> None:
+        self.store[key] = val
+
+    async def delete(self, key: str, **kwargs: Any) -> None:
+        self.store.pop(key, None)
+
+    async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for key, val in self.store.items():
+            if key.startswith(prefix):
+                remainder = key[len(prefix) :]
+                if "/" not in remainder:
+                    out[remainder] = val
+        return out
+
+    async def watch_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[None]:
+        # No live events in unit tests; end the watch immediately.
+        return
+        yield  # pragma: no cover  (makes this an async generator)
+
+    def seed_member(self, member: Member, session_id: str = "s1") -> None:
+        self.store[member_key(session_id, member.agent_id)] = json.dumps({
+            "host_ip": member.host_ip,
+            "vtep_ip": member.vtep_ip,
+        })
+
+    def seed_endpoint(
+        self,
+        container_id: str,
+        ip: str,
+        mac: str,
+        agent_id: str,
+        session_id: str = "s1",
+        cluster_hostname: str | None = None,
+    ) -> None:
+        self.store[f"{endpoints_prefix(session_id)}{container_id}"] = json.dumps({
+            "ip": ip,
+            "mac": mac,
+            "agent_id": agent_id,
+            "container_id": container_id,
+            "cluster_hostname": cluster_hostname,
+        })
+
+
+class _BlockingWatchEtcd(FakeEtcd):
+    """A FakeEtcd whose watch never yields and never returns, so the coordinator's watch task
+    stays live until it is cancelled — lets us assert stop() actually awaits the cancellation."""
+
+    @override
+    async def watch_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[None]:
+        await asyncio.Event().wait()  # blocks forever (until cancelled)
+        yield  # pragma: no cover  (makes this an async generator)
+
+
+class _ScriptedWatchEtcd(FakeEtcd):
+    """Drives ``_watch`` through a fixed script of per-subscription outcomes so the retry/backoff
+    loop can be exercised deterministically. Each entry is one ``watch_prefix`` call:
+
+    - ``"end"``   — the stream ends immediately (an exhausted/closed watch),
+    - ``"raise"`` — the subscription errors,
+    - ``int n``   — yield ``n`` events, then end.
+    """
+
+    def __init__(self, behaviors: list[object]) -> None:
+        super().__init__()
+        self._behaviors = behaviors
+        self.watch_calls = 0
+
+    @override
+    async def watch_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[None]:
+        i = self.watch_calls
+        self.watch_calls += 1
+        behavior = self._behaviors[i] if i < len(self._behaviors) else "end"
+        if behavior == "raise":
+            raise RuntimeError("etcd hiccup")
+        if isinstance(behavior, int):
+            for _ in range(behavior):
+                yield None
+            return
+        # "end": exhausted stream — the yield above still makes this an async generator.
+        return
+
+
+class RecordingBackend:
+    def __init__(self) -> None:
+        self.setup: list[str] = []
+        self.teardown: list[str] = []
+        self.added: list[str] = []
+        self.removed: list[str] = []
+        self.endpoints_added: list[tuple[str, str]] = []
+        self.endpoints_removed: list[tuple[str, str]] = []
+        #: Every reconcile pass re-asserts the session's security state, whether or not the
+        #: membership changed -- an `iptables -F` is not a membership diff.
+        self.security_checks: list[str] = []
+        self.security_peers: list[list[str]] = []
+
+    async def ensure_session_security(self, session_id: str, peers: Sequence[Member]) -> None:
+        self.security_checks.append(session_id)
+        self.security_peers.append([p.agent_id for p in peers])
+
+    async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        self.setup.append(meta.session_id)
+
+    async def teardown_session_network(self, session_id: str) -> None:
+        self.teardown.append(session_id)
+
+    async def add_peer(self, session_id: str, peer: Member) -> None:
+        self.added.append(peer.agent_id)
+
+    async def del_peer(self, session_id: str, peer: Member) -> None:
+        self.removed.append(peer.agent_id)
+
+    async def add_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        self.endpoints_added.append((ip, vtep_ip))
+
+    async def del_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        self.endpoints_removed.append((ip, vtep_ip))
+
+
+class _FailingBackend(RecordingBackend):
+    """RecordingBackend that can be told to fail specific device ops, to exercise the per-op
+    failure isolation in reconcile_peers. ``add_peer`` raises for any agent_id in ``fail_add``;
+    ``del_peer`` raises the first ``fail_del_times`` times it is called. Both still record the
+    attempt so tests can assert it was tried."""
+
+    def __init__(self, *, fail_add: set[str] | None = None, fail_del_times: int = 0) -> None:
+        super().__init__()
+        self.fail_add: set[str] = fail_add or set()
+        self._fail_del_times = fail_del_times
+
+    @override
+    async def add_peer(self, session_id: str, peer: Member) -> None:
+        if peer.agent_id in self.fail_add:
+            raise RuntimeError(f"unroutable peer {peer.agent_id}")
+        await super().add_peer(session_id, peer)
+
+    @override
+    async def del_peer(self, session_id: str, peer: Member) -> None:
+        await super().del_peer(session_id, peer)  # record the attempt
+        if self._fail_del_times > 0:
+            self._fail_del_times -= 1
+            raise RuntimeError(f"withdrawal failed for {peer.agent_id}")
+
+
+def _coordinator(etcd: FakeEtcd, backend: RecordingBackend) -> SessionNetworkCoordinator:
+    return SessionNetworkCoordinator(
+        cast(AbstractKVStore, etcd),
+        cast(Any, backend),
+        agent_id="a1",
+    )
+
+
+class TestReconcilePeers:
+    async def test_adds_new_peers_excluding_self(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_peers("s1")
+        assert backend.added == ["a2"]  # self excluded
+
+    async def test_is_idempotent(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_peers("s1")
+        await coord.reconcile_peers("s1")
+        assert backend.added == ["a2"]  # not re-added
+
+    async def test_detects_new_and_removed_peers(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_peers("s1")
+
+        etcd.seed_member(_PEER3)  # a3 joins
+        await etcd.delete(member_key("s1", "a2"))  # a2 leaves
+        await coord.reconcile_peers("s1")
+
+        assert backend.added == ["a2", "a3"]
+        assert backend.removed == ["a2"]
+
+    async def test_a_failing_add_peer_is_isolated_and_retried(self) -> None:
+        # One unroutable member used to abort the whole pass, leaving this node with no FDB/ARP for
+        # anybody. A failing add_peer must be isolated: the other peers still apply, and the failed
+        # one is left unapplied so the next reconcile retries exactly it.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_member(_PEER3)
+        backend = _FailingBackend(fail_add={"a2"})
+        coord = _coordinator(etcd, backend)
+
+        await coord.reconcile_peers("s1")
+        # a2 raised, but a3 was still applied (not aborted by a2's failure).
+        assert "a3" in backend.added
+
+        backend.fail_add.clear()  # a2 becomes routable
+        await coord.reconcile_peers("s1")
+        # a2 was left unapplied, so this second pass retries and lands it; a3 is not re-added.
+        assert backend.added == ["a3", "a2"]
+
+    async def test_a_failing_del_peer_keeps_the_record_for_retry(self) -> None:
+        # A departed peer whose withdrawal fails must NOT be forgotten — a dropped record would
+        # leave a stale FDB entry unicasting to a dead VTEP forever. Keep it and retry.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        backend = _FailingBackend(fail_del_times=1)
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_peers("s1")
+
+        await etcd.delete(member_key("s1", "a2"))  # a2 leaves
+        await coord.reconcile_peers("s1")  # withdrawal fails once
+        assert backend.removed == ["a2"]  # attempted
+        await coord.reconcile_peers("s1")  # record kept -> retried and now succeeds
+        assert backend.removed == ["a2", "a2"]
+
+
+class TestStartStop:
+    async def test_start_sets_up_writes_member_and_applies_peers(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_PEER2)  # a peer already present
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.start(_META, _SELF)
+        try:
+            assert backend.setup == ["s1"]
+            assert member_key("s1", "a1") in etcd.store  # self published
+            assert backend.added == ["a2"]  # existing peer applied
+        finally:
+            await coord.stop("s1")
+
+    async def test_stop_tears_down_and_removes_membership(self) -> None:
+        etcd = FakeEtcd()
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.start(_META, _SELF)
+        assert member_key("s1", "a1") in etcd.store
+        await coord.stop("s1")
+        assert backend.teardown == ["s1"]
+        assert member_key("s1", "a1") not in etcd.store
+
+    async def test_stop_awaits_the_cancelled_watch_task(self) -> None:
+        # With a live (blocked) watch, stop() must cancel AND await it, so no trailing reconcile
+        # runs after teardown and the CancelledError is retrieved.
+        etcd = _BlockingWatchEtcd()
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.start(_META, _SELF)
+        task = coord._watch_tasks["s1"]
+        assert not task.done()  # watch is live, blocked on events
+        await coord.stop("s1")
+        assert task.done()  # cancelled and awaited to completion
+
+
+class TestReconcileEndpoints:
+    async def test_peer_withdrawal_waits_for_endpoint_fdb_withdrawal(self) -> None:
+        class _OrderedFailingBackend(RecordingBackend):
+            events: list[str]
+            fail_endpoint_delete: bool
+
+            def __init__(self) -> None:
+                super().__init__()
+                self.events = []
+                self.fail_endpoint_delete = True
+
+            @override
+            async def del_endpoint(
+                self, session_id: str, *, ip: str, mac: str, vtep_ip: str
+            ) -> None:
+                self.events.append("endpoint")
+                if self.fail_endpoint_delete:
+                    raise RuntimeError("FDB delete failed")
+                await super().del_endpoint(session_id, ip=ip, mac=mac, vtep_ip=vtep_ip)
+
+            @override
+            async def del_peer(self, session_id: str, peer: Member) -> None:
+                self.events.append("peer")
+                await super().del_peer(session_id, peer)
+
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint("c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2")
+        backend = _OrderedFailingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord._reconcile_all("s1")
+
+        await etcd.delete(member_key("s1", "a2"))
+        await coord._reconcile_all("s1")
+        assert backend.events == ["endpoint", "endpoint"]
+        assert "peer" not in backend.events
+
+        backend.fail_endpoint_delete = False
+        backend.events.clear()
+        await coord._reconcile_all("s1")
+        assert backend.events[:2] == ["endpoint", "peer"]
+
+    async def test_programs_remote_endpoints_resolving_vtep(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint("c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2")
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_endpoints("s1")
+        # remote endpoint programmed with its owner's VTEP (a2 -> 10.0.0.2)
+        assert backend.endpoints_added == [("10.128.5.20", "10.0.0.2")]
+
+    async def test_skips_own_endpoints(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint("c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1")
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_endpoints("s1")
+        assert backend.endpoints_added == []  # local endpoint not programmed
+
+    async def test_skips_remote_without_published_vtep(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        # a2's endpoint exists but a2's member (VTEP) not yet published
+        etcd.seed_endpoint("c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2")
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_endpoints("s1")
+        assert backend.endpoints_added == []  # retried on a later watch tick
+
+    async def test_idempotent_and_detects_removal(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint("c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2")
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_endpoints("s1")
+        await coord.reconcile_endpoints("s1")
+        assert backend.endpoints_added == [("10.128.5.20", "10.0.0.2")]  # not re-added
+
+        await etcd.delete(f"{endpoints_prefix('s1')}c-remote")
+        await coord.reconcile_endpoints("s1")
+        assert backend.endpoints_removed == [("10.128.5.20", "10.0.0.2")]
+
+
+class TestClusterNameResolution:
+    async def test_resolves_a_remote_peer_name_to_its_ip(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint(
+            "c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2", cluster_hostname="sub1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "sub1") == "10.128.5.20"
+
+    async def test_resolves_a_same_node_peer_name(self) -> None:
+        # The name map is the FULL table, not the remote-only FDB view: a co-located peer (whose
+        # FDB entry reconcile_endpoints skips) must still resolve by name.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint(
+            "c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1", cluster_hostname="main1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "main1") == "10.128.5.10"
+
+    async def test_lookup_is_case_insensitive(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint(
+            "c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1", cluster_hostname="Main1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "MAIN1") == "10.128.5.10"
+
+    async def test_unknown_name_and_unknown_session_return_none(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint(
+            "c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1", cluster_hostname="main1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "nope") is None  # forwarded upstream
+        assert coord.resolve_cluster_name("other-session", "main1") is None  # not set up here
+
+    async def test_a_departed_kernel_drops_out_of_the_name_map(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint(
+            "c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1", cluster_hostname="main1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "main1") == "10.128.5.10"
+
+        await etcd.delete(f"{endpoints_prefix('s1')}c-local")
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "main1") is None  # dynamic membership
+
+    async def test_a_nameless_endpoint_is_absent_from_the_map(self) -> None:
+        # An endpoint written before cluster_hostname existed contributes no name entry.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint("c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1")
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "main1") is None
+
+    async def test_static_names_answer_when_etcd_has_none(self) -> None:
+        # Single-node sessions have no endpoints/ table; the agent registers cluster_host_ips here.
+        etcd = FakeEtcd()
+        coord = _coordinator(etcd, RecordingBackend())
+        coord.register_static_names("s1", {"main1": "172.30.0.2", "sub1": "172.30.0.3"})
+        assert coord.resolve_cluster_name("s1", "sub1") == "172.30.0.3"
+        assert coord.resolve_cluster_name("s1", "Main1") == "172.30.0.2"  # case-insensitive
+        assert coord.resolve_cluster_name("s1", "nope") is None
+        assert coord.resolve_cluster_name("other", "sub1") is None  # session-scoped
+
+    async def test_reverse_lookup_resolves_ip_to_hostname(self) -> None:
+        # PTR: the ip -> hostname direction, over both etcd and static names, session-scoped.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint(
+            "c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2", cluster_hostname="sub1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        coord.register_static_names("s1", {"main1": "172.30.0.2"})
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_ip("s1", "10.128.5.20") == "sub1"  # etcd map
+        assert coord.resolve_cluster_ip("s1", "172.30.0.2") == "main1"  # static map
+        assert coord.resolve_cluster_ip("s1", "10.0.0.9") is None  # unknown
+        assert coord.resolve_cluster_ip("other", "10.128.5.20") is None  # session-scoped
+
+    async def test_etcd_names_win_over_static(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint(
+            "c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2", cluster_hostname="sub1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        coord.register_static_names("s1", {"sub1": "172.30.0.3"})  # stale/local copy
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "sub1") == "10.128.5.20"  # dynamic etcd wins
+
+    async def test_session_cluster_names_binds_a_session_scope(self) -> None:
+        # The resolver sees only a bare hostname; SessionClusterNames pins the session so identical
+        # names in another session are never reached through this adapter.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint(
+            "c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2", cluster_hostname="sub1"
+        )
+        etcd.seed_member(_PEER2)
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        names = SessionClusterNames(coord, "s1")
+        assert names.resolve_name("sub1") == "10.128.5.20"
+        assert SessionClusterNames(coord, "other").resolve_name("sub1") is None
+
+
+class _CancelAfter:
+    """A drop-in for ``asyncio.sleep`` that records each backoff delay and then, once it has been
+    called ``limit`` times, raises ``CancelledError`` to break ``_watch``'s infinite loop — the
+    same way ``stop()`` would in production."""
+
+    def __init__(self, limit: int) -> None:
+        self.delays: list[float] = []
+        self._limit = limit
+
+    async def __call__(self, delay: float, *args: Any, **kwargs: Any) -> None:
+        self.delays.append(delay)
+        if len(self.delays) >= self._limit:
+            raise asyncio.CancelledError()
+
+
+class TestSecurityDrift:
+    """The reconcile only visits peers whose published record changed, so a backend that acts only
+    on the diff never revisits what it programmed. Nothing that removes that state -- `iptables -F`,
+    a firewall reload, `ip xfrm state flush` -- changes a record, so the pass has to look at the
+    state itself."""
+
+    async def test_every_reconcile_re_asserts_it(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+
+        await coord.reconcile_peers("s1")
+        await coord.reconcile_peers("s1")  # nothing changed: no peer op, but still a check
+
+        assert backend.security_checks == ["s1", "s1"]
+        # driven by the published membership, not by the diff: the second pass adds no peer but
+        # still names every one of them
+        assert backend.security_peers == [["a2"], ["a2"]]
+        assert backend.added == ["a2"]  # the peer itself was applied once
+
+    async def test_a_failing_check_does_not_abort_the_pass(self) -> None:
+        # The backend closes what it cannot protect and refuses each peer in turn; that refusal is
+        # what keeps them out of `applied`, not an aborted pass.
+        class _NoSecurity(RecordingBackend):
+            @override
+            async def ensure_session_security(
+                self, session_id: str, peers: Sequence[Member]
+            ) -> None:
+                await super().ensure_session_security(session_id, peers)
+                raise RuntimeError("the drop rule could not be restored")
+
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        backend = _NoSecurity()
+        coord = _coordinator(etcd, backend)
+
+        await coord.reconcile_peers("s1")  # must not raise
+
+        assert backend.security_checks == ["s1"]
+
+
+class TestWatchRetryBackoff:
+    """The watch loop must survive a failing/exhausted subscription and re-establish it, never
+    ending for good and never hot-spinning — the multi-node worker-joins-late regression."""
+
+    async def test_exhausted_stream_re_subscribes_after_a_backoff(self) -> None:
+        # A watch that hands back an already-exhausted stream must NOT be re-subscribed in a tight
+        # loop: each re-subscribe waits a backoff first (this is what stops the 100%-CPU spin).
+        etcd = _ScriptedWatchEtcd(["end", "end", "end"])
+        etcd.seed_member(_PEER2)  # visible only via the catch-up read, not a live event
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        sleep = _CancelAfter(limit=3)
+        with mock.patch("asyncio.sleep", sleep):
+            try:
+                await coord._watch("s1")
+            except asyncio.CancelledError:
+                pass
+        # slept before every re-subscribe (no hot-spin) and re-subscribed each time.
+        assert len(sleep.delays) == 3
+        assert etcd.watch_calls >= 3
+        # the catch-up reconcile on re-subscribe applied the peer that the dead stream never
+        # delivered as an event.
+        assert "a2" in backend.added
+
+    async def test_a_failing_subscription_is_retried_not_fatal(self) -> None:
+        # A single etcd/device error used to end the loop for good, silently dropping the node from
+        # the mesh for the rest of the session. It must be caught and retried instead.
+        etcd = _ScriptedWatchEtcd(["raise", "raise", "raise"])
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        sleep = _CancelAfter(limit=3)
+        with mock.patch("asyncio.sleep", sleep):
+            try:
+                await coord._watch("s1")
+            except asyncio.CancelledError:
+                pass
+        assert etcd.watch_calls >= 3  # kept retrying past the first failure
+
+    async def test_backoff_doubles_and_resets_when_events_flow(self) -> None:
+        # Backoff grows exponentially across consecutive failures and snaps back to the base the
+        # moment a live event arrives (the watch is healthy again).
+        etcd = _ScriptedWatchEtcd(["end", "end", 1, "end"])  # 3rd subscription delivers one event
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        sleep = _CancelAfter(limit=3)
+        with mock.patch("asyncio.sleep", sleep):
+            try:
+                await coord._watch("s1")
+            except asyncio.CancelledError:
+                pass
+        base = coordinator_mod._WATCH_RETRY_BACKOFF
+        # end -> base, end -> 2*base, then an event resets it -> base again.
+        assert sleep.delays == [base, 2 * base, base]
+
+
+class TestKeys:
+    def test_members_prefix_and_member_key(self) -> None:
+        assert members_prefix("s1") == "network/session/s1/members/"
+        assert member_key("s1", "a2") == "network/session/s1/members/a2"
+        assert endpoints_prefix("s1") == "network/session/s1/endpoints/"

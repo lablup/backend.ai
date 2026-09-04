@@ -1,0 +1,129 @@
+"""EndpointPlan -> CNI attach chain (BEP-1062).
+
+Runtime-neutral consumption of a v2 backend's `EndpointPlan`: turn the ordered
+interface chain into ordered CNI ADD operations (and DEL in reverse for detach).
+The actual CNI plugin execution (exec the binary with the CNI_* environment and the
+config on stdin) is isolated behind an injected runner; a containerd provisioner
+supplies the container's netns and a real runner. Everything here is pure/testable.
+"""
+
+from __future__ import annotations
+
+import contextlib
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass, field
+from typing import Any
+
+from ai.backend.common.network.types import AttachKind, EndpointPlan, NetworkRole
+
+
+@dataclass(frozen=True)
+class CniInvocation:
+    ifname: str
+    role: NetworkRole
+    config: Mapping[str, Any]
+    capability_args: Mapping[str, Any] = field(default_factory=dict)
+
+    def effective_config(self) -> Mapping[str, Any]:
+        """The config a CNI plugin actually receives: play the runtime's role and inject each
+        declared capability's arg into ``runtimeConfig``. Only capabilities the config declares
+        under ``capabilities`` are injected, exactly as a conforming CNI runtime does — an
+        undeclared arg is dropped rather than smuggled in."""
+        if not self.capability_args:
+            return self.config
+        caps = self.config.get("capabilities") or {}
+        injected = {k: v for k, v in self.capability_args.items() if caps.get(k)}
+        if not injected:
+            return self.config
+        return {
+            **self.config,
+            "runtimeConfig": {**(self.config.get("runtimeConfig") or {}), **injected},
+        }
+
+
+# runner(command, *, ifname, netns, container_id, config) -> CNI result (assigned IPs) | None
+CniRunner = Callable[..., Awaitable[Mapping[str, Any] | None]]
+
+
+def _first_ip(cni_result: Mapping[str, Any] | None) -> str | None:
+    """Extract the first assigned IP (without prefix) from a CNI ADD result."""
+    if not cni_result:
+        return None
+    ips = cni_result.get("ips") or []
+    if not ips:
+        return None
+    address = ips[0].get("address")
+    return address.split("/")[0] if address else None
+
+
+def plan_to_invocations(plan: EndpointPlan) -> list[CniInvocation]:
+    """Ordered CNI invocations for a plan's CNI attachments (order preserved:
+    LOCAL first, then OVERLAY)."""
+    return [
+        CniInvocation(a.interface_name, a.role, a.cni_config or {}, a.cni_capability_args or {})
+        for a in plan.attachments
+        if a.kind is AttachKind.CNI
+    ]
+
+
+class CniAttacher:
+    """Applies / removes an EndpointPlan against a container netns via CNI."""
+
+    _runner: CniRunner
+
+    def __init__(self, runner: CniRunner) -> None:
+        self._runner = runner
+
+    async def attach(
+        self, plan: EndpointPlan, *, container_id: str, netns: str
+    ) -> dict[NetworkRole, str]:
+        """Apply the plan's CNI chain, returning the assigned IP per interface role
+        (parsed from each CNI ADD result). The LOCAL IP is the host-reachable address the
+        agent uses to reach the kernel; the OVERLAY IP is for cross-node kernel traffic.
+
+        Atomic: if any ADD fails, the ADDs already applied are rolled back (DEL, reverse order)
+        before re-raising, so a partial attach never leaves a dangling veth / IPAM lease / MASQ
+        rule that no later detach would reclaim (the caller only records the plan once attach
+        returns successfully)."""
+        assigned: dict[NetworkRole, str] = {}
+        applied: list[CniInvocation] = []
+        try:
+            for inv in plan_to_invocations(plan):
+                # Recorded BEFORE the ADD, so the rollback below covers the invocation that FAILED,
+                # not just the ones that succeeded before it. A failed ADD can still have wired up
+                # part of the container (that is the CNI contract's whole reason for requiring a DEL
+                # after a failed ADD), and DEL is idempotent, so covering it costs nothing.
+                applied.append(inv)
+                result = await self._runner(
+                    "ADD",
+                    ifname=inv.ifname,
+                    netns=netns,
+                    container_id=container_id,
+                    config=inv.effective_config(),
+                )
+                ip = _first_ip(result)
+                if ip is not None:
+                    assigned[inv.role] = ip
+            return assigned
+        except Exception:
+            for inv in reversed(applied):
+                with contextlib.suppress(Exception):
+                    await self._runner(
+                        "DEL",
+                        ifname=inv.ifname,
+                        netns=netns,
+                        container_id=container_id,
+                        config=inv.effective_config(),
+                    )
+            raise
+
+    async def detach(self, plan: EndpointPlan, *, container_id: str, netns: str) -> None:
+        # tear down in reverse order of attach
+        for inv in reversed(plan_to_invocations(plan)):
+            await self._runner(
+                "DEL",
+                ifname=inv.ifname,
+                netns=netns,
+                container_id=container_id,
+                config=inv.effective_config(),
+            )
