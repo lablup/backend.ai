@@ -41,13 +41,6 @@ _WATCH_RETRY_BACKOFF_MAX = 30.0
 # else in the subtree ever changes, no event will ever correct it — so convergence cannot rest on
 # the watch alone. Two etcd reads per session per tick; device ops only on an actual difference.
 _RECONCILE_INTERVAL = 15.0
-# How often this node re-asserts a session's PROTECTION, separately from the membership reconcile
-# above. Shorter, because the two are exposed to different things and cost different amounts: a
-# membership diff is two etcd reads, while this reads the local firewall and XFRM only, and the
-# window it leaves is a window in which injected plaintext is accepted (the drop rule is gone) or
-# -- if the mark went with it -- traffic stops (the egress guard fires). Fifteen seconds of either
-# is a long time for something a `firewall-cmd --reload` does in one step.
-_PROTECTION_INTERVAL = 3.0
 
 
 def _decode_member(agent_id: str, raw: str) -> Member:
@@ -67,8 +60,6 @@ class SessionNetworkCoordinator:
     _watch_tasks: dict[str, asyncio.Task[None]]
     # The periodic re-converge task per session (see _reconcile_periodically).
     _sweep_tasks: dict[str, asyncio.Task[None]]
-    #: Re-asserts each session's firewall and XFRM at `_PROTECTION_INTERVAL`.
-    _protection_tasks: dict[str, asyncio.Task[None]]
     _reconcile_locks: dict[str, asyncio.Lock]
     # session_id -> {cluster_hostname: ip} for the whole session (every node's endpoints, not the
     # remote-only FDB view). Maintained by the same watch/reconcile that programs the data plane, so
@@ -92,7 +83,6 @@ class SessionNetworkCoordinator:
         self._applied_endpoints = {}
         self._watch_tasks = {}
         self._sweep_tasks = {}
-        self._protection_tasks = {}
         self._reconcile_locks = {}
         self._names = {}
         self._static_names = {}
@@ -121,9 +111,6 @@ class SessionNetworkCoordinator:
         self._names[meta.session_id] = {}
         await self._reconcile_all(meta.session_id)
         self._watch_tasks[meta.session_id] = asyncio.create_task(self._watch(meta.session_id))
-        self._protection_tasks[meta.session_id] = asyncio.create_task(
-            self._protection_loop(meta.session_id)
-        )
         self._sweep_tasks[meta.session_id] = asyncio.create_task(
             self._reconcile_periodically(meta.session_id)
         )
@@ -150,40 +137,6 @@ class SessionNetworkCoordinator:
             except Exception:
                 log.exception("periodic reconcile failed for session {}", session_id)
 
-    async def _protection_loop(self, session_id: str) -> None:
-        """Re-assert this session's protection on its own, faster clock.
-
-        Deliberately not folded into the membership reconcile: that one is paced by etcd reads it
-        does not need to make this often, and the drift being watched for here has nothing to do
-        with membership. `iptables -F`, a firewall reload replacing the ruleset, an
-        `ip xfrm state flush` -- none of them changes a member record, so the diff-driven pass
-        would never look, and the periodic one would look only every fifteen seconds.
-        """
-        while True:
-            try:
-                members = await self._applied_members(session_id)
-                await self._backend.ensure_session_security(session_id, members)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                # Expected while a peer is unreachable or the session is being closed; the
-                # membership reconcile reports the same condition with its full context.
-                log.debug("protection re-assert failed for session {}", session_id, exc_info=True)
-            # After the check, not before it: the first pass costs nothing and closes the window
-            # between the session starting and the loop's first tick.
-            await asyncio.sleep(_PROTECTION_INTERVAL)
-
-    async def _applied_members(self, session_id: str) -> list[Member]:
-        """The peers this node has already programmed -- read from memory, not etcd.
-
-        The point of the faster loop is that it costs nothing but a few local reads.
-        """
-        return [
-            member
-            for agent_id, member in self._applied.get(session_id, {}).items()
-            if agent_id != self._agent_id
-        ]
-
     async def stop(self, session_id: str, *, teardown_data_plane: bool = True) -> None:
         """Stop watching, remove this node's membership, and tear down the data plane.
 
@@ -192,7 +145,7 @@ class SessionNetworkCoordinator:
         session's bridge and its LOCAL block (both keyed on the node's shared journal), so the one
         whose kernels leave first must leave them standing for the other.
         """
-        for tasks in (self._watch_tasks, self._sweep_tasks, self._protection_tasks):
+        for tasks in (self._watch_tasks, self._sweep_tasks):
             if task := tasks.pop(session_id, None):
                 # Await the cancellation so a trailing reconcile can't run after teardown and the
                 # task's exception is retrieved (no "never retrieved" warning).

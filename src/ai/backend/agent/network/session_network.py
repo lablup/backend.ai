@@ -352,21 +352,28 @@ class SessionNetwork:
         host state. So the preflight belongs to the process's lifetime, and this retries only the
         part that failed.
         """
-        self._unresumed.pop("recovery", None)  # the inventory below IS the retry of it
         try:
             live, ours = await self._live_and_own_containers()
         except Exception as e:
-            # Without the inventory there is nothing to resume against; try again next tick.
+            # Without the inventory there is nothing to resume against. The mark is REPLACED, not
+            # cleared first: clearing it before the attempt succeeds opens a window in which the
+            # local admission gate lets a new overlay session onto this node.
             self._unresumed["recovery"] = str(e)
             return
+        self._unresumed.pop("recovery", None)
         by_session: dict[str, list[str]] = {}
         for container_id, session_id in ours.items():
             by_session.setdefault(session_id, []).append(container_id)
+        # A session marked unresumed that no longer has a container here is over: keeping the mark
+        # would hold this node out of overlay service for something that ended while it was down.
+        for session_id in [sid for sid in self._unresumed if sid not in by_session]:
+            self._unresumed.pop(session_id, None)
+            log.info("session {} is gone; dropping its unresumed mark", session_id)
         for session_id in sorted(by_session):
             if session_id not in self._unresumed and session_id in self._coordinators:
                 # Already resumed. Re-running would install a SECOND coordinator without stopping
-                # the first, leaving two sets of watch, reconcile and protection tasks changing
-                # the same host state.
+                # the first, leaving two sets of watch and reconcile tasks changing the same host
+                # state.
                 continue
             if not await self._resume_one(session_id, by_session[session_id]):
                 continue
@@ -381,7 +388,14 @@ class SessionNetwork:
         give back its veth or its address when it goes, and the last one of a session cannot start
         the teardown -- while `_unresumed` clears and readiness says the node is fine again.
         """
-        meta = await self._read_session_meta(session_id)
+        try:
+            meta = await self._read_session_meta(session_id)
+        except Exception as e:
+            # Reading the metadata is part of the attempt, not a precondition of it. Outside the
+            # guard, a transient etcd error propagated out of the retry and left the whole pass
+            # half-done -- with this session's mark already removed by the caller.
+            self._unresumed[session_id] = f"could not read the session's network meta: {e}"
+            return False
         if meta is None:
             # The manager dropped the session while we were failing to resume it; there is nothing
             # left to resume and its containers are orphans that clean_kernel removes.
