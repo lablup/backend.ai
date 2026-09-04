@@ -36,7 +36,7 @@ from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
-from sqlalchemy.orm import aliased, load_only
+from sqlalchemy.orm import load_only
 
 from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.entity.domain import DomainID
@@ -643,25 +643,9 @@ async def _query_auth_context_by_access_key(
 
     Only the columns that context carries are loaded, and the rows stay inside this session.
     """
-    default_keypair = aliased(KeyPairRow)
-    default_keypair_rate_limit = (
-        sa.select(default_keypair.rate_limit)
-        .where(
-            (default_keypair.user == UserRow.uuid)
-            & default_keypair.is_default
-            & default_keypair.is_active
-        )
-        .scalar_subquery()
-    )
     async with db.begin_readonly_session_read_committed() as sess:
         result = await sess.execute(
-            sa.select(
-                KeyPairRow,
-                UserRow,
-                KeyPairResourcePolicyRow,
-                UserResourcePolicyRow,
-                default_keypair_rate_limit,
-            )
+            sa.select(KeyPairRow, UserRow, KeyPairResourcePolicyRow, UserResourcePolicyRow)
             .join(UserRow, UserRow.uuid == KeyPairRow.user)
             .join(
                 KeyPairResourcePolicyRow,
@@ -697,7 +681,7 @@ async def _query_auth_context_by_access_key(
         if row is None:
             return None
 
-        keypair_row, user_row, keypair_policy_row, user_policy_row, default_rate_limit = row
+        keypair_row, user_row, keypair_policy_row, user_policy_row = row
         if user_row.status in _AUTH_DENIED_USER_STATUSES:
             raise AuthorizationFailed(f"User account is {user_row.status}")
         return _AuthContext(
@@ -710,7 +694,6 @@ async def _query_auth_context_by_access_key(
                 sudo_session_enabled=user_row.sudo_session_enabled,
                 allowed_client_ip=user_row.allowed_client_ip,
                 resource_policy=user_policy_row.to_dataclass(),
-                default_keypair_rate_limit=default_rate_limit,
             ),
             keypair=AuthenticatedKeypair(
                 access_key=AccessKey(keypair_row.access_key),

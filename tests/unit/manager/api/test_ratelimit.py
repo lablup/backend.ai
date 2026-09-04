@@ -27,7 +27,8 @@ _RESET = 500
 
 @dataclass(frozen=True)
 class RateLimitSuccessCase:
-    state: RateLimitState
+    rate_limit: int | None
+    count: int
     expected_limit: str
     expected_remaining: str
     description: str = ""
@@ -35,15 +36,10 @@ class RateLimitSuccessCase:
 
 @dataclass(frozen=True)
 class RateLimitExceedCase:
-    state: RateLimitState
+    rate_limit: int
+    count: int
     expected_limit: str
     description: str = ""
-
-
-@dataclass(frozen=True)
-class RateLimitPublishCase:
-    keypair_rate_limit: int | None
-    default_keypair_rate_limit: int | None
 
 
 class TestRlimMiddleware:
@@ -74,7 +70,7 @@ class TestRlimMiddleware:
         request = make_mocked_request("GET", "/")
         request["is_authorized"] = True
         request["keypair"] = {"rate_limit": 30000}
-        request["user"] = {"uuid": _USER_ID, "default_keypair_rate_limit": 30000}
+        request["user"] = {"uuid": _USER_ID}
         return request
 
     async def test_anonymous_query_returns_default_headers(
@@ -98,19 +94,22 @@ class TestRlimMiddleware:
         "test_case",
         [
             RateLimitSuccessCase(
-                state=RateLimitState(count=10, limit=30000, reset=_RESET),
+                rate_limit=30000,
+                count=10,
                 expected_limit="30000",
                 expected_remaining="29990",
                 description="within limit",
             ),
             RateLimitSuccessCase(
-                state=RateLimitState(count=30000, limit=30000, reset=_RESET),
+                rate_limit=30000,
+                count=30000,
                 expected_limit="30000",
                 expected_remaining="0",
                 description="exactly at limit",
             ),
             RateLimitSuccessCase(
-                state=RateLimitState(count=9999, limit=None, reset=_RESET),
+                rate_limit=None,
+                count=9999,
                 expected_limit="None",
                 expected_remaining="9999",
                 description="unlimited",
@@ -126,7 +125,10 @@ class TestRlimMiddleware:
         mock_handler: AsyncMock,
         test_case: RateLimitSuccessCase,
     ) -> None:
-        mock_valkey_client.count_request = AsyncMock(return_value=test_case.state)
+        mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
+        mock_valkey_client.count_request = AsyncMock(
+            return_value=RateLimitState(count=test_case.count, reset=_RESET)
+        )
 
         response = await middleware(mock_request_authorized, mock_handler)
         await apply_reserved_response_headers(mock_request_authorized, response)
@@ -139,60 +141,26 @@ class TestRlimMiddleware:
         mock_valkey_client.count_request.assert_called_once_with(
             user_id=_USER_ID,
             window=_RATELIMIT_WINDOW,
-            rate_limit=30000,
-        )
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            RateLimitPublishCase(keypair_rate_limit=30000, default_keypair_rate_limit=30000),
-            RateLimitPublishCase(keypair_rate_limit=100, default_keypair_rate_limit=30000),
-            RateLimitPublishCase(keypair_rate_limit=None, default_keypair_rate_limit=30000),
-            RateLimitPublishCase(keypair_rate_limit=100, default_keypair_rate_limit=None),
-        ],
-        ids=lambda case: f"keypair={case.keypair_rate_limit}-default={case.default_keypair_rate_limit}",
-    )
-    async def test_the_default_keypair_limit_is_counted_whichever_keypair_signs(
-        self,
-        middleware: Any,
-        mock_valkey_client: MagicMock,
-        mock_request_authorized: web.Request,
-        mock_handler: AsyncMock,
-        case: RateLimitPublishCase,
-    ) -> None:
-        mock_request_authorized["keypair"]["rate_limit"] = case.keypair_rate_limit
-        mock_request_authorized["user"]["default_keypair_rate_limit"] = (
-            case.default_keypair_rate_limit
-        )
-        mock_valkey_client.count_request = AsyncMock(
-            return_value=RateLimitState(
-                count=1, limit=case.default_keypair_rate_limit, reset=_RESET
-            )
-        )
-
-        await middleware(mock_request_authorized, mock_handler)
-
-        mock_valkey_client.count_request.assert_called_once_with(
-            user_id=_USER_ID,
-            window=_RATELIMIT_WINDOW,
-            rate_limit=case.default_keypair_rate_limit,
         )
 
     @pytest.mark.parametrize(
         "test_case",
         [
             RateLimitExceedCase(
-                state=RateLimitState(count=30001, limit=30000, reset=_RESET),
+                rate_limit=30000,
+                count=30001,
                 expected_limit="30000",
                 description="exceeds by 1",
             ),
             RateLimitExceedCase(
-                state=RateLimitState(count=50000, limit=30000, reset=_RESET),
+                rate_limit=30000,
+                count=50000,
                 expected_limit="30000",
                 description="far exceeds limit",
             ),
             RateLimitExceedCase(
-                state=RateLimitState(count=1, limit=0, reset=_RESET),
+                rate_limit=0,
+                count=1,
                 expected_limit="0",
                 description="zero limit always exceeds",
             ),
@@ -207,7 +175,10 @@ class TestRlimMiddleware:
         mock_handler: AsyncMock,
         test_case: RateLimitExceedCase,
     ) -> None:
-        mock_valkey_client.count_request = AsyncMock(return_value=test_case.state)
+        mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
+        mock_valkey_client.count_request = AsyncMock(
+            return_value=RateLimitState(count=test_case.count, reset=_RESET)
+        )
 
         with pytest.raises(RateLimitExceeded):
             await middleware(mock_request_authorized, mock_handler)
@@ -222,5 +193,4 @@ class TestRlimMiddleware:
         mock_valkey_client.count_request.assert_called_once_with(
             user_id=_USER_ID,
             window=_RATELIMIT_WINDOW,
-            rate_limit=30000,
         )

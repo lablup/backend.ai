@@ -54,19 +54,19 @@ def make_rlim_middleware(
     ) -> web.StreamResponse:
         """Global middleware implementing a fixed-window rate limiter."""
         if request["is_authorized"]:
+            rate_limit = request["keypair"]["rate_limit"]
             state = await valkey_client.count_request(
                 user_id=request["user"]["uuid"],
                 window=_RATELIMIT_WINDOW,
-                rate_limit=request["user"]["default_keypair_rate_limit"],
             )
-            if state.limit is not None and state.count > state.limit:
+            if rate_limit is not None and state.count > rate_limit:
                 reserve_response_headers(
-                    request, RateLimitQuota(limit=state.limit, remaining=0, reset=state.reset)
+                    request, RateLimitQuota(limit=rate_limit, remaining=0, reset=state.reset)
                 )
                 raise RateLimitExceeded
-            remaining = state.limit - state.count if state.limit is not None else state.count
+            remaining = rate_limit - state.count if rate_limit is not None else state.count
             reserve_response_headers(
-                request, RateLimitQuota(limit=state.limit, remaining=remaining, reset=state.reset)
+                request, RateLimitQuota(limit=rate_limit, remaining=remaining, reset=state.reset)
             )
             return await handler(request)
         # No checks for rate limiting for non-authorized queries.
