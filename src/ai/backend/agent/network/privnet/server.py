@@ -83,6 +83,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 #: How often to retry bringing down a tunnel the recovery preflight could not close. Slow:
 #: the thing being waited for is an operator or a transient kernel condition, not a race.
 _FAIL_CLOSE_RETRY_INTERVAL = 30.0
+#: How often to retry a recovery that could not complete. Same reasoning as above:
+#: what is being waited for is a runtime or filesystem coming back, not a race.
+_RECOVERY_RETRY_INTERVAL = 30.0
 
 
 # Capability bit numbers we care about (linux/capability.h).
@@ -227,6 +230,12 @@ class PrivNetServer:
     _local_subnets: LocalSubnetAllocator
     #: Keeps retrying the fail-close for tunnels the recovery preflight left UP.
     _fail_close_tasks: dict[int, asyncio.Task[None]]
+    #: Why the last recovery could not even read its inputs, or None.
+    _recovery_failed: str | None
+    #: Sessions this process holds state for but could not re-adopt, and why.
+    _unrecovered_sessions: dict[str, str]
+    #: Retries recovery while either of the two above is non-empty.
+    _recovery_retry_task: asyncio.Task[None] | None
 
     def __init__(
         self,
@@ -265,6 +274,9 @@ class PrivNetServer:
         self._ipam = ipam or get_host_local_ipam()
         self._local_subnets = local_subnets or get_local_subnet_allocator()
         self._fail_close_tasks = {}
+        self._recovery_failed = None
+        self._unrecovered_sessions = {}
+        self._recovery_retry_task = None
         # Set only where the PID record is agent-written (the rootless backends); see _attach.
         self._netns_owner_uid = netns_owner_uid
         self._netns = netns_pinner or netns_mod.NetnsPinner()
@@ -318,6 +330,31 @@ class PrivNetServer:
                 await server.serve_forever()
         finally:
             await self._runtime.close()
+
+    def _start_recovery_retry(self) -> None:
+        """Keep retrying whatever recovery could not do, on a timer.
+
+        The privnet stays up through a failed recovery on purpose -- refusing every verb for every
+        session would be worse -- but "stays up" is not "recovers". A transient container-runtime
+        or journal error otherwise leaves this node's sessions unmanaged, their tunnels closed and
+        their teardowns undone, until somebody restarts the process.
+        """
+        if self._recovery_retry_task is not None and not self._recovery_retry_task.done():
+            return
+
+        async def _loop() -> None:
+            while True:
+                await asyncio.sleep(_RECOVERY_RETRY_INTERVAL)
+                if self._recovery_failed is None and not self._unrecovered_sessions:
+                    return
+                try:
+                    await self.recover()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("retrying privnet recovery failed")
+
+        self._recovery_retry_task = asyncio.create_task(_loop())
 
     def _start_fail_close_retry(self, backend: AbstractNetworkAgentPluginV2[Any]) -> None:
         """Keep trying to bring down what the recovery preflight could not.
@@ -407,11 +444,16 @@ class PrivNetServer:
             journalled_sessions = await self._journal.sessions()
             journalled_attachments = await self._journal.attachments()
             journalled_peers = await self._journal.peers()
-        except Exception:
+        except Exception as e:
             log.exception(
                 "could not read the privnet journal; leaving surviving tunnels down and starting "
                 "with an empty registry"
             )
+            # Left down is safe, but permanently down is not a recovery. Without this the whole
+            # node's sessions stay unmanaged until the process restarts, however transient the
+            # runtime or journal error was.
+            self._recovery_failed = str(e)
+            self._start_recovery_retry()
             return
         if not journalled_sessions and not journalled_attachments:
             return
@@ -436,6 +478,7 @@ class PrivNetServer:
                 continue
             await self._reclaim_dead_container(container_id, record, journalled_sessions)
 
+        self._recovery_failed = None
         # Adopt every live session before reasserting or reclaiming anything. VXLAN adoption holds
         # encrypted tunnels down, and its XFRM policy/SA are shared by sessions on the same node
         # pair. This phase therefore closes every affected data path and rebuilds every surviving
@@ -449,10 +492,18 @@ class PrivNetServer:
                     live,
                     journalled_attachments,
                 )
-            except Exception:
+            except Exception as e:
                 # One unrecoverable session must not cost us the others: a privnet that gave up here
-                # would refuse every verb for every session on the node.
+                # would refuse every verb for every session on the node. Recorded rather than only
+                # logged, because a session left out of the registry is one whose tunnel stays
+                # closed and whose teardown never runs -- and nothing else comes back to it.
                 log.exception("failed to recover session {}", session_id)
+                self._unrecovered_sessions[session_id] = str(e)
+            else:
+                self._unrecovered_sessions.pop(session_id, None)
+
+        if self._unrecovered_sessions:
+            self._start_recovery_retry()
 
         # Only after all live encrypted tunnels are down and their ownership is known may each
         # complete peer set be re-asserted and its tunnel reopened.

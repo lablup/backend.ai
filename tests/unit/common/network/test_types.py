@@ -35,8 +35,10 @@ class TestSessionNetMeta:
             mtu=1450,
             vni=4097,
         )
+        # Through setattr, because the assignment is the thing being refused: written directly it
+        # is a static error, which is a different claim from "the instance rejects it at runtime".
         with pytest.raises(dataclasses.FrozenInstanceError):
-            meta.mtu = 9000  # type: ignore[misc]
+            setattr(meta, "mtu", 9000)
 
 
 class TestMember:

@@ -34,9 +34,18 @@ from ai.backend.logging import BraceStyleAdapter
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_PAIR_JOURNAL_DIR: Final = Path("/var/lib/backend.ai/net-esp-pair")
-#: Created like /tmp: any co-located agent may add its own claim, and the sticky bit stops it
-#: removing anyone else's -- which is exactly the guarantee this journal needs.
-_SHARED_DIR_MODE: Final = 0o1777
+#: Ordinary directory permissions, deliberately NOT world-writable.
+#:
+#: It was 0o1777 so agents running as different users could each add claims. That is a weaker
+#: boundary than it looks: a local user who creates a pair's directory first OWNS it, and can then
+#: unlink and recreate the `.lock` inside -- after which a second holder locks the NEW inode while
+#: the first still holds the old one, and both are in the critical section at once. Reproduced.
+#:
+#: So the namespace is closed instead, and the deployment contract is that every agent sharing a
+#: host runs as the same user (or shares a group with write access to this tree). Its parent,
+#: /var/lib/backend.ai, is already owner-writable only, so no unprivileged user can create the
+#: root either.
+_JOURNAL_DIR_MODE: Final = 0o755
 #: The lock is only ever opened read-only, but it must be readable by every agent on the node --
 #: and `os.open`'s mode is masked by umask, which is 0o077 on a hardened host. It is set
 #: explicitly with `fchmod` after creation, on the descriptor, so no name is re-resolved.
@@ -81,7 +90,12 @@ class _Held:
 
 
 class PairJournal:
-    """Node-wide users of each ESP pair: a directory per pair, a file per claim."""
+    """Node-wide users of each ESP pair: a directory per pair, a file per claim.
+
+    Node-wide among agents that share a user (or a group with write access to the tree). That is a
+    deployment contract, not an implementation detail -- see `_JOURNAL_DIR_MODE` for why the
+    world-writable alternative could not hold the guarantee it appeared to.
+    """
 
     _root: Path
 
@@ -90,12 +104,32 @@ class PairJournal:
         # what tests must be able to redirect, and a default argument would freeze it.
         self._root = root if root is not None else DEFAULT_PAIR_JOURNAL_DIR
 
-    def _open_root(self) -> int | None:
-        """A descriptor on the journal root, created world-writable-sticky like /tmp.
+    def unusable_reason(self) -> str | None:
+        """Why this node cannot use the pair journal, or None if it can.
 
-        The root itself has to carry the mode: `mkdir(parents=True)` gives the intermediate
-        directories the process umask, and a root at 0o775 is one that a co-located agent running
-        as another user cannot create a new pair in -- which is the whole point of the journal.
+        Checked at startup rather than at the first session: without the journal a co-located
+        agent's claims cannot be counted, and every encrypted peer is refused (`claiming` returns
+        False and the caller fails closed) -- which is correct, and useless to debug from a
+        per-session error.
+        """
+        fd = self._open_root()
+        if fd is None:
+            return (
+                f"the ESP pair journal {self._root} cannot be created or opened; without it this"
+                " node cannot tell whether a co-located agent is still using a peer's SAs, so"
+                " every encrypted peer is refused. Its parent must be writable by the user the"
+                " agent runs as, and every agent on this host must share that user or a group"
+                " with write access to the tree."
+            )
+        os.close(fd)
+        return None
+
+    def _open_root(self) -> int | None:
+        """A descriptor on the journal root.
+
+        The mode is set explicitly because `mkdir(parents=True)` gives the intermediate
+        directories the process umask, and this tree's permissions are the boundary -- see
+        `_JOURNAL_DIR_MODE`.
         """
         try:
             self._root.mkdir(parents=True, exist_ok=True)
@@ -108,9 +142,9 @@ class PairJournal:
             log.warning("ESP pair journal root {} is not a usable directory: {}", self._root, e)
             return None
         try:
-            os.fchmod(fd, _SHARED_DIR_MODE)
+            os.fchmod(fd, _JOURNAL_DIR_MODE)
         except OSError:
-            pass  # another user created it; it already carries the mode we would have set
+            pass  # created by the peer agent this host shares a user with; already correct
         return fd
 
     def _open_pair(self, root_fd: int, key: str) -> int | None:
@@ -122,7 +156,7 @@ class PairJournal:
         fill it with files -- reproduced, with a 0o700 directory coming back 0o1777.
         """
         try:
-            os.mkdir(key, mode=_SHARED_DIR_MODE, dir_fd=root_fd)
+            os.mkdir(key, mode=_JOURNAL_DIR_MODE, dir_fd=root_fd)
         except FileExistsError:
             pass
         except OSError as e:
@@ -135,9 +169,9 @@ class PairJournal:
             log.warning("ESP pair directory {} is not a usable directory: {}", key, e)
             return None
         try:
-            os.fchmod(fd, _SHARED_DIR_MODE)
+            os.fchmod(fd, _JOURNAL_DIR_MODE)
         except OSError:
-            pass  # created by another user, already sticky
+            pass  # created by the peer agent; already correct
         return fd
 
     @asynccontextmanager
@@ -204,7 +238,8 @@ class PairJournal:
         try:
             # Listed through the verified descriptor, and each name is opened with O_NOFOLLOW by
             # `_open_pair` below -- a symlink planted at a pair's name is refused there.
-            pairs = sorted(os.listdir(root_fd))
+            with os.scandir(root_fd) as entries:
+                pairs = sorted(entry.name for entry in entries)
         except OSError:
             return 0
         finally:
@@ -294,13 +329,20 @@ class PairJournal:
                 fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError as e:
                 os.close(lock_fd)
-                if e.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
-                    # Somebody else has it. Waiting here is cancellable, which is the point.
+                if e.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
+                    os.close(dir_fd)
+                    log.warning("could not lock the ESP pair {}: {}", key, e)
+                    return None
+                # Somebody else has it. Waiting here is cancellable, which is the point -- and
+                # the directory descriptor has to be closed if the wait IS cancelled, or every
+                # cancelled waiter keeps one and the process walks into its RLIMIT_NOFILE.
+                # Measured before this: 50 cancelled waiters, 50 descriptors left behind.
+                try:
                     await asyncio.sleep(_LOCK_POLL_SEC)
-                    continue
-                os.close(dir_fd)
-                log.warning("could not lock the ESP pair {}: {}", key, e)
-                return None
+                except BaseException:
+                    os.close(dir_fd)
+                    raise
+                continue
             return _Held(lock_fd=lock_fd, dir_fd=dir_fd, key=key)
 
     def _release_lock(self, held: _Held) -> None:
@@ -317,11 +359,12 @@ class PairJournal:
         two are conflated, and that answer authorises deleting an SA somebody else is using.
         """
         try:
-            return {
-                name
-                for name in os.listdir(held.dir_fd)
-                if name != _LOCK_NAME and not name.startswith(".")
-            }
+            with os.scandir(held.dir_fd) as entries:
+                return {
+                    entry.name
+                    for entry in entries
+                    if entry.name != _LOCK_NAME and not entry.name.startswith(".")
+                }
         except OSError as e:
             log.warning("could not list the ESP pair claims for {}: {}", held.key, e)
             return None

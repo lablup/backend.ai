@@ -145,7 +145,19 @@ class SubnetAllocator:
             raise RequestedSubnetInvalid(
                 f"'{subnet}' is not a valid, prefix-aligned subnet: {e}"
             ) from e
-        if requested.version != pool.version or not requested.subnet_of(pool):  # type: ignore[arg-type]
+        # `subnet_of` is typed per address family and refuses a mixed pair, which is the same
+        # thing the version check above is for -- so tell the checker they match by narrowing to
+        # one family rather than asserting the comparison is fine.
+        contained = (
+            isinstance(requested, ipaddress.IPv4Network)
+            and isinstance(pool, ipaddress.IPv4Network)
+            and requested.subnet_of(pool)
+        ) or (
+            isinstance(requested, ipaddress.IPv6Network)
+            and isinstance(pool, ipaddress.IPv6Network)
+            and requested.subnet_of(pool)
+        )
+        if not contained:
             raise RequestedSubnetInvalid(f"'{requested}' is not contained in the IPAM pool {pool}.")
         if requested.prefixlen > self._block_prefixlen:
             raise RequestedSubnetInvalid(
