@@ -13,6 +13,7 @@ from typing import (
 
 from yarl import URL
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.volume.broadcast import DoVolumeMountEvent
@@ -158,7 +159,7 @@ class HammerspaceQuotaModel(BaseQuotaModel):
 
 
 class HammerspaceVolume(BaseHammerspaceVolume):
-    name: ClassVar[str] = "hammerspace"
+    name: ClassVar[StorageBackendType] = StorageBackendType.HAMMERSPACE
 
     def __init__(
         self,
