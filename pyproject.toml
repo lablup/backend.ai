@@ -218,6 +218,10 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization
+# PTH208 wants Path.iterdir(), which cannot take a file descriptor. This journal lives in a
+# world-writable directory and lists through a descriptor it has already verified, precisely so
+# the name is not resolved a second time -- a path-based listing is the bug, not the fix.
+"src/ai/backend/agent/network/pair_journal.py" = ["PTH208"]
 "src/ai/backend/kernel/python/sitecustomize.py" = ["UP036"]  # Python 2 compatibility is intentional for kernel environments
 # UP040 (type alias) exceptions - cannot use `type` statement when used as callable or base class
 "src/ai/backend/storage/volumes/netapp/netappclient.py" = ["UP040"]  # StorageID/VolumeID/QTreeID used as callables
