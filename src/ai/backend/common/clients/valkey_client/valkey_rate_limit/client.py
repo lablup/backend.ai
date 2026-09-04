@@ -3,12 +3,13 @@ import time
 from decimal import Decimal
 from typing import Final, Self, cast
 
-from glide import Batch, ExpirySet, ExpiryType, ScoreBoundary, Script
+from glide import Batch, ExpirySet, ExpiryType, ScoreBoundary
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.script import create_script
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -127,7 +128,7 @@ class ValkeyRateLimitClient:
         # Increment request ID counter
         async with self._client.client() as conn:
             result = await conn.invoke_script(
-                Script(_RATE_LIMIT_SCRIPT),
+                create_script(_RATE_LIMIT_SCRIPT),
                 keys=[f"user.{user_id}"],
                 args=[str(now_float), str(window)],
             )
