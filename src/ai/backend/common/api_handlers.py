@@ -16,13 +16,22 @@ from typing import (
     cast,
     get_args,
     get_origin,
+    override,
 )
 
 from aiohttp import web
 from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 from multidict import CIMultiDictProxy, MultiMapping
-from pydantic import AliasChoices, ConfigDict, RootModel
+from pydantic import (
+    AliasChoices,
+    ConfigDict,
+    RootModel,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+)
 from pydantic.fields import FieldInfo
+from pydantic.json_schema import GenerateJsonSchema, JsonSchemaMode, JsonSchemaValue
+from pydantic_core import CoreSchema
 from pydantic_core._pydantic_core import ValidationError
 
 from ai.backend.common.types import BackendAISchema, StreamReader
@@ -49,11 +58,113 @@ class Sentinel(enum.Enum):
 SENTINEL = Sentinel.TOKEN
 
 
+class Undefined(enum.Enum):
+    """Marks an update-request field that was not provided ("no change").
+
+    Update DTOs declare clearable fields as ``T | Undefined | None = Field(default=UNDEFINED)``:
+
+    | value       | meaning   |
+    | ----------- | --------- |
+    | ``UNDEFINED`` | no change |
+    | ``None``      | clear     |
+    | value         | update    |
+
+    ``BaseRequestModel`` drops ``UNDEFINED``-valued fields from ``model_dump()`` and from
+    ``model_json_schema()``, so the token never reaches the wire or the OpenAPI schema.
+    """
+
+    TOKEN = enum.auto()
+
+
+UNDEFINED = Undefined.TOKEN
+
+
+class _UndefinedFreeJsonSchema(GenerateJsonSchema):
+    """JSON schema generator that removes every trace of ``Undefined``.
+
+    pydantic renders ``T | Undefined | None`` as ``anyOf: [T, {$ref: Undefined}, null]`` with
+    ``default: <enum value>``. The ref is removed from ``anyOf``, the default is dropped only on
+    nodes where such a ref was removed, and the ``Undefined`` definition itself is deleted.
+    """
+
+    _UNDEFINED_REF_SUFFIX = f"/{Undefined.__name__}"
+
+    @override
+    def generate(self, schema: CoreSchema, mode: JsonSchemaMode = "validation") -> JsonSchemaValue:
+        json_schema = super().generate(schema, mode)
+        self._strip(json_schema)
+        defs = json_schema.get("$defs")
+        if isinstance(defs, dict):
+            defs.pop(Undefined.__name__, None)
+            if not defs:
+                del json_schema["$defs"]
+        return json_schema
+
+    @classmethod
+    def _is_undefined_ref(cls, node: Any) -> bool:
+        return isinstance(node, dict) and str(node.get("$ref", "")).endswith(
+            cls._UNDEFINED_REF_SUFFIX
+        )
+
+    @classmethod
+    def _strip(cls, node: Any) -> None:
+        if isinstance(node, dict):
+            variants = node.get("anyOf")
+            if isinstance(variants, list) and any(cls._is_undefined_ref(v) for v in variants):
+                remaining = [v for v in variants if not cls._is_undefined_ref(v)]
+                if node.get("default") == UNDEFINED.value:
+                    node.pop("default")
+                if len(remaining) == 1:
+                    node.pop("anyOf")
+                    node.update(remaining[0])
+                else:
+                    node["anyOf"] = remaining
+            for child in node.values():
+                cls._strip(child)
+        elif isinstance(node, list):
+            for child in node:
+                cls._strip(child)
+
+
 class BaseRequestModel(BackendAISchema):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_by_name=True,
     )
+
+    @model_serializer(mode="wrap")
+    def _drop_undefined_fields(self, handler: SerializerFunctionWrapHandler) -> Any:
+        """Exclude ``UNDEFINED``-valued fields from every ``model_dump`` / ``model_dump_json``."""
+        data = handler(self)
+        if not isinstance(data, dict):
+            return data
+        skipped_keys: set[str] = set()
+        for name, field_info in type(self).model_fields.items():
+            if getattr(self, name, None) is UNDEFINED:
+                skipped_keys.add(name)
+                if field_info.alias:
+                    skipped_keys.add(field_info.alias)
+                if field_info.serialization_alias:
+                    skipped_keys.add(field_info.serialization_alias)
+        if not skipped_keys:
+            return data
+        return {k: v for k, v in data.items() if k not in skipped_keys}
+
+    @classmethod
+    @override
+    def model_json_schema(
+        cls,
+        by_alias: bool = True,
+        ref_template: str = "#/$defs/{model}",
+        schema_generator: type[GenerateJsonSchema] = _UndefinedFreeJsonSchema,
+        mode: JsonSchemaMode = "validation",
+    ) -> dict[str, Any]:
+        return super().model_json_schema(
+            by_alias=by_alias,
+            ref_template=ref_template,
+            schema_generator=schema_generator,
+            mode=mode,
+        )
 
 
 class BaseFieldModel(BackendAISchema):

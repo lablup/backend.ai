@@ -18,6 +18,7 @@ from graphql import UndefinedType
 from pydantic import AliasChoices, Field
 from strawberry.types.unset import UnsetType
 
+from ai.backend.common.api_handlers import Undefined
 from ai.backend.common.types import BackendAISchema, MountPermission, MountTypes
 
 if TYPE_CHECKING:
@@ -110,6 +111,15 @@ class TriState[TVal]:
         """
         self._state = state
         self._value = value
+
+    @classmethod
+    def from_input(cls, value: TVal | Undefined | None) -> TriState[TVal]:
+        """Convert a v2 update DTO field: ``UNDEFINED`` -> nop, ``None`` -> nullify, value -> update."""
+        if isinstance(value, Undefined):
+            return cls.nop()
+        if value is None:
+            return cls.nullify()
+        return cls.update(value)
 
     @classmethod
     def from_graphql(cls, value: TVal | None | UndefinedType) -> TriState[TVal]:
@@ -207,6 +217,18 @@ class OptionalState[TVal]:
             raise ValueError("OptionalState cannot be NULLIFY")
         self._state = state
         self._value = value
+
+    @classmethod
+    def from_input(cls, value: TVal | Undefined) -> OptionalState[TVal]:
+        """Convert a v2 update DTO field: ``UNDEFINED`` -> nop, value -> update.
+
+        ``None`` is rejected: a field that may be cleared must use ``TriState``.
+        """
+        if isinstance(value, Undefined):
+            return cls.nop()
+        if value is None:
+            raise ValueError("OptionalState cannot be NULLIFY")
+        return cls.update(value)
 
     @classmethod
     def from_graphql(cls, value: TVal | None | UndefinedType | UnsetType) -> OptionalState[TVal]:
