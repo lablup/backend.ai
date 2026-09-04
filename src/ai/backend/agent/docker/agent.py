@@ -2025,6 +2025,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             caps = await probe_caps(
                 uplink_for_ip(self._vtep_ip or self._host_ip),
                 privnet_socket=self.local_config.agent.network_privnet_socket,
+                # Retried here rather than on a loop of its own: this already runs on a timer,
+                # and the answer it publishes is exactly what the retry changes.
+                recovery_problems=await self._session_network.retry_recovery_fail_close(),
             )
             await publish_caps(self.etcd, str(self.id), caps)
             for problem in caps.readiness:

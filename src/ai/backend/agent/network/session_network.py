@@ -166,6 +166,8 @@ class SessionNetwork:
     # A vxlan session refuses to set up here in that case, rather than publishing a VTEP its peers
     # cannot reach and building an overlay that carries nothing.
     _vtep_ip: str | None
+    #: Backends whose surviving tunnels recovery could not bring down, and why.
+    _recovery_incomplete: dict[str, str]
 
     def __init__(
         self,
@@ -188,6 +190,7 @@ class SessionNetwork:
         self._agent_id = agent_id
         self._host_ip = host_ip
         self._vtep_ip = vtep_ip
+        self._recovery_incomplete = {}
         # Two interfaces onto the node's containers, and deliberately two objects. The lifecycle
         # half needs the whole runtime (images, exec, commit); the session half needs four calls.
         # That is what lets a backend with no OciRuntime at all -- Docker, which drives its own
@@ -271,6 +274,33 @@ class SessionNetwork:
 
     # --- restart recovery -------------------------------------------------------------------
 
+    def recovery_problems(self) -> dict[str, str]:
+        """Backends that could not fail-close their surviving tunnels, and why.
+
+        Empty is the healthy answer. While it is not, this node holds devices whose protection it
+        cannot vouch for, and it should not be handed a new overlay session.
+        """
+        return dict(self._recovery_incomplete)
+
+    async def retry_recovery_fail_close(self) -> dict[str, str]:
+        """Try again to close what recovery could not. Returns what is still open.
+
+        The in-process counterpart of the privnet's retry timer: without it a rootful agent whose
+        preflight failed leaves those tunnels UP for the life of the process.
+        """
+        for name in list(self._recovery_incomplete):
+            backend = self._backends.get(name)
+            if backend is None:
+                self._recovery_incomplete.pop(name, None)
+                continue
+            try:
+                await backend.prepare_recovery()
+            except Exception as e:
+                self._recovery_incomplete[name] = str(e)
+                continue
+            self._recovery_incomplete.pop(name, None)
+        return dict(self._recovery_incomplete)
+
     async def recover(self) -> None:
         """Rebuild this node's session-network state from ground truth after an agent restart.
 
@@ -294,6 +324,22 @@ class SessionNetwork:
         # views come from ONE listing: asking containerd twice would let a container appear between
         # the answers and end up in `ours` but not in `live`, or vanish and be reclaimed while this
         # pass still treats it as live.
+        #
+        # But fail-close FIRST, before looking at anything. At this point no session metadata is
+        # trusted or even readable, and a surviving VXLAN from the previous life is UP carrying
+        # whatever it was carrying -- with the XFRM and firewall state that protected it possibly
+        # gone. The privnet path has always done this first; this one did not, so a rootful agent
+        # came back with its tunnels open. What stays open is recorded, so readiness can say so.
+        self._recovery_incomplete = {}
+        for name, backend in self._backends.items():
+            try:
+                await backend.prepare_recovery()
+            except Exception as e:
+                # Not fatal: the sessions below still need adopting, and a backend that raised has
+                # already attempted every device it owns.
+                log.exception("network backend {} could not fail-close before recovery", name)
+                self._recovery_incomplete[name] = str(e)
+
         live, ours = await self._live_and_own_containers()
         metas: dict[str, SessionNetMeta] = {}
         for session_id in sorted(set(ours.values())):

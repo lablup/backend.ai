@@ -869,9 +869,6 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     #: node-wide where one privnet owns the host; with the backend in-process, every agent has
     #: its own and each believes it is the pair's sole user.
     _pair_journal: PairJournal
-    #: Pairs whose claim the journal would not record. A release must never conclude from
-    #: that journal that such a pair is free -- our own claim is not in it to be counted.
-    _unjournalled_pairs: set[tuple[str, str, int]]
     #: This node's name for the claims it makes in that journal. The AGENT ID, not a pid: claims
     #: outlive the process, and an owner that changed on every restart would strand each of them
     #: on a pair nobody then removes. Same convention as the node-local subnet journal.
@@ -903,7 +900,6 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._reader = reader or _read_command
         self._unclosed_devices = set()
         self._pair_journal = pair_journal or PairJournal()
-        self._unjournalled_pairs = set()
         # A pid only as the last resort: it is wrong across restarts, but a claim tagged
         # with something is still better than one that cannot be told from a peer's.
         self._journal_owner = journal_owner or f"pid{os.getpid()}"
@@ -1531,7 +1527,19 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 pair_key(*key), self._journal_owner, session_id
             ) as recorded:
                 if not recorded:
-                    self._unjournalled_pairs.add(key)
+                    # Adopting a pair whose claim will not record is the same hazard as
+                    # programming one: another agent reads it as free and removes it. Leave the
+                    # kernel state alone and let the drift re-assert retry.
+                    log.error(
+                        "not adopting ownership of the ESP pair {}->{}:{} for session {}: its"
+                        " claim could not be recorded in the node-wide journal",
+                        self_vtep,
+                        peer_vtep,
+                        meta.vxlan_port,
+                        session_id,
+                    )
+                    self._pair_users.get(key, set()).discard(session_id)
+                    continue
             self._programmed_pairs.add(key)
 
     @override
@@ -1856,9 +1864,24 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 pair_key(*key), self._journal_owner, session_id
             ) as recorded:
                 if not recorded:
-                    # The claim is not on disk, so no later release may conclude from this journal
-                    # that the pair is free -- see `_unprogram_pair_locked`.
-                    self._unjournalled_pairs.add(key)
+                    # Refuse rather than program. The claim is what another agent process counts
+                    # when it decides whether the pair is still in use; with ours not on disk, it
+                    # reads the pair as free and deletes the very SAs about to be installed --
+                    # and a marker kept in this process cannot tell it otherwise. So the honest
+                    # answer is that this node cannot protect the peer, which is what the caller
+                    # already knows how to handle: no FDB entry, no clear-text path.
+                    log.error(
+                        "not programming the ESP pair {}->{}:{} for session {}: its claim could"
+                        " not be recorded in the node-wide journal, so a co-located agent could"
+                        " delete the SAs while this session is using them",
+                        self_vtep,
+                        peer_vtep,
+                        meta.vxlan_port,
+                        session_id,
+                    )
+                    self._pair_users.get(key, set()).discard(session_id)
+                    self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
+                    return False
                 return await self._program_pair_locked(
                     meta, session_id, peer_vtep, self_vtep, key, force=force
                 )
@@ -2019,8 +2042,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         the same reasoning applies to a pair whose claim never reached the journal at all.
         """
         users = self._pair_users.get(key, set())
-        journal_says_hold = node_wide_free is not True or key in self._unjournalled_pairs
-        if (users - {session_id}) or journal_says_hold:
+        # Only an explicit True frees the pair. Unknown is not permission: the journal is what
+        # every process on this node agrees on, and an answer it could not give is not one.
+        if (users - {session_id}) or node_wide_free is not True:
             # Another session -- possibly another agent's on this same host -- is still carried
             # by this pair's SA and policy. Nothing to delete, so the refcount settles here.
             users.discard(session_id)

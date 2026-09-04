@@ -2623,3 +2623,33 @@ class TestUnclosedSurvivorsBlockEverything:
         assert await plugin.retry_fail_close() == frozenset({vxlan_dev(4097)})
         rec.fail_on = None
         assert await plugin.retry_fail_close() == frozenset()
+
+
+class TestAnUnrecordableClaimFailsClosed:
+    """The claim is what another agent process counts when it decides whether the pair is still in
+    use. With ours not on disk it reads the pair as free and deletes the very SAs being installed,
+    and a marker kept in this process cannot tell it otherwise."""
+
+    async def test_the_pair_is_not_programmed(self, tmp_path: Path) -> None:
+        blocked = tmp_path / "file"
+        blocked.write_text("not a directory")
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(blocked / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.add_peer("s1", _PEER)
+        assert not any(list(c[:4]) == ["ip", "xfrm", "state", "add"] for c in rec.calls)
+
+    async def test_no_forwarding_path_is_opened(self, tmp_path: Path) -> None:
+        # The FDB entry is what makes a frame leave for that peer; opening it with no SA is the
+        # clear-text case the ordering exists to avoid.
+        blocked = tmp_path / "file"
+        blocked.write_text("not a directory")
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(blocked / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.add_peer("s1", _PEER)
+        assert not any(list(c[:3]) == ["bridge", "fdb", "append"] for c in rec.calls)

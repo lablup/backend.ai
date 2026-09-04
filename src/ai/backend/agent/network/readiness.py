@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
@@ -232,6 +232,7 @@ async def probe_readiness(
     port: int,
     vni_range: tuple[int, int],
     privnet_socket: str | None = None,
+    recovery_problems: Mapping[str, str] | None = None,
 ) -> Readiness:
     """Everything that would stop this node from serving an overlay session.
 
@@ -251,6 +252,13 @@ async def probe_readiness(
                 f"iptables has no `{match}` match (xt_{match}). An encrypted session needs it to "
                 "tell its own VNI's frames apart, and is refused on this node without it."
             )
+    for backend_name, problem in (recovery_problems or {}).items():
+        # A node that could not close what it left behind holds devices whose protection it cannot
+        # vouch for. Blocking, not advisory: a new session would be built beside them.
+        blocking.append(
+            f"the {backend_name} backend could not bring down the tunnels that survived a previous"
+            f" life on this node ({problem}); until they are down, what they carry is unknown"
+        )
     if privnet_socket is not None:
         # On a privnet-backed node every device, rule and XFRM object is made by that process.
         # Checking only the local binaries said this node was ready while the thing that would

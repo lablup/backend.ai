@@ -33,6 +33,13 @@ class _RecordingEtcd:
         self.puts.pop(key, None)
 
 
+class _StubSessionNetwork:
+    """The one thing `_publish_network_identity` asks of the session network."""
+
+    async def retry_recovery_fail_close(self) -> dict[str, str]:
+        return {}
+
+
 class _AgentStub:
     """The slice of DockerAgent that `_publish_network_identity` actually touches."""
 
@@ -44,6 +51,8 @@ class _AgentStub:
         # Readiness asks the privileged helper whether it is up; None means this node does not
         # use one, which is the case that needs no socket.
         self.local_config = SimpleNamespace(agent=SimpleNamespace(network_privnet_socket=None))
+        # Readiness also reports what recovery could not close, and retries it on this same timer.
+        self._session_network = _StubSessionNetwork()
 
 
 async def _publish(stub: _AgentStub) -> None:
