@@ -540,6 +540,9 @@ class SessionNetwork:
             agent_id=self._agent_id,
             host_ip=self._host_ip,
             vtep_ip=self._vtep_ip if meta.backend is NetworkBackendKind.VXLAN else None,
+            # Written by this node, so it is an acknowledgement: while it stands, the manager
+            # must not hand this session's VNI to anybody else.
+            joined=True,
         )
 
     @contextlib.asynccontextmanager

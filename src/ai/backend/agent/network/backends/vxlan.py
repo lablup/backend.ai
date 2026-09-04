@@ -36,6 +36,7 @@ from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_loca
 from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
 from ai.backend.agent.network.overlay_probe import arp_probe
 from ai.backend.agent.network.path_mtu import underlay_mtu
+from ai.backend.agent.network.readiness import conflicting_device
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
@@ -740,9 +741,11 @@ def is_absent_error(exc: BaseException) -> bool:
     Teardown treats exactly this as success. Everything else -- EPERM, a held xtables lock, EBUSY,
     an nft backend error -- is a real failure that leaves state on the host, and calling it success
     is what turns a retryable problem into a permanent leak.
+
+    A missing binary is NOT absence. `ip` or `iptables` disappearing from PATH after the devices
+    and rules were made says nothing about whether they are still there; it says this node can no
+    longer clean up, which is a failure to report, not a teardown to record as done.
     """
-    if isinstance(exc, FileNotFoundError):
-        return True  # the tool is not installed, so neither is anything it would have made
     text = str(exc).lower()
     return any(marker in text for marker in _ABSENT_MARKERS)
 
@@ -860,6 +863,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     _remote_endpoints: dict[str, dict[tuple[str, str], str]]
     #: Reads the firewall's own rule order, so reconcile can restore it (see `jump_is_first`).
     _reader: Reader
+    #: Surviving tunnels `prepare_recovery` could not bring down. Kept because the privnet
+    #: continues in degraded mode after that failure, and a device nothing can classify is
+    #: an open path: setup refuses the VNI that names one until it is actually closed.
+    _unclosed_devices: set[str]
 
     def __init__(
         self,
@@ -879,6 +886,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._uplink = uplink
         self._runner = runner or _run_command
         self._reader = reader or _read_command
+        self._unclosed_devices = set()
         # Injectable for the same reason as `runner`: the probe shells out and reads sysfs, and the
         # command builders must stay testable without either.
         self._mtu_probe = mtu_probe or underlay_mtu
@@ -931,11 +939,22 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
 
     @override
     async def init(self, context: Any = None) -> None:
-        pass
+        # The chains are host-global and shared by every encrypted session, so they are built
+        # once here rather than by whichever session happens to be first. Best-effort: a node
+        # that cannot make them refuses the session that needs them (`_ensure_plaintext_drop`),
+        # which is where that failure belongs.
+        try:
+            await self._ensure_owned_chains()
+        except Exception:
+            log.warning(
+                "could not install the overlay firewall chains at startup; an encrypted session"
+                " scheduled here will retry and refuse if it still cannot",
+                exc_info=True,
+            )
 
     @override
     async def cleanup(self) -> None:
-        pass
+        await self._remove_owned_chains()
 
     @override
     async def update_plugin_config(self, plugin_config: Any) -> None:
@@ -1070,13 +1089,15 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             await self._runner(jump_add_args(table, builtin, chain))
 
     async def _remove_owned_chains(self) -> None:
-        """Withdraw the chains once no encrypted session is left on this node.
+        """Withdraw the chains. Only at process cleanup -- never while a session ends.
 
-        Only then: the chains are shared by every session, so removing them with the first
-        session to end would strip the protection of the ones still running.
+        They are host-global and every encrypted session's rules live in them, but the only
+        record of who needs them is this process's `_sessions`, which a session joins AFTER its
+        rules are installed. A teardown that consulted it could therefore look during that gap,
+        conclude nobody is left, and delete the chains out from under a session that had just
+        finished protecting itself -- leaving it sending and accepting clear text until the next
+        reconcile. An empty chain costs nothing; that window costs the guarantee.
         """
-        if any(meta.encryption_key is not None for meta in self._sessions.values()):
-            return
         for table, builtin, chain in OWNED_CHAINS:
             for argv in (
                 jump_del_args(table, builtin, chain),
@@ -1326,6 +1347,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # Preconditions, so they run before any side effect: a session this node cannot carry must
         # leave nothing half-built behind.
         await self._require_mtu_fits(meta)
+        await self._require_closed(vni)
+        await self._require_no_conflict(vni, meta.vxlan_port)
         if meta.encryption_key is not None and self_member.vtep_ip is None:
             # The SAs are keyed on the ordered VTEP pair, so with no local endpoint there is no
             # `src` to program them with. This used to warn from `add_peer` and carry on, which
@@ -1393,6 +1416,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._register_security_state(meta)
         if self_member.vtep_ip is not None:
             self._self_vteps[meta.session_id] = self_member.vtep_ip
+
+    def encrypted_peers(self, session_id: str) -> frozenset[str]:
+        """The peer VTEPs this node still holds ESP state for, in this session.
+
+        Also what a failed teardown must leave behind: it is the list the retry reads to find the
+        pairs it still has to remove.
+        """
+        return frozenset(self._encrypted_peers.get(session_id, set()))
 
     def unreachable_peers(self, session_id: str) -> frozenset[str]:
         """The peer VTEPs whose tunnel went unanswered for this session, so far.
@@ -1495,13 +1526,59 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             ) from e
         failed: list[str] = []
         for device in sorted(name for name in devices if name.startswith(VXLAN_DEV_PREFIX)):
-            if not await self._hold_vxlan_down_or_absent(device):
+            if await self._hold_vxlan_down_or_absent(device):
+                self._unclosed_devices.discard(device)
+            else:
                 failed.append(device)
+        self._unclosed_devices.update(failed)
         if failed:
             raise OverlayEncryptionUnavailable(
                 "could not fail-close surviving VXLAN tunnel(s) before recovery: "
                 + ", ".join(failed)
             )
+
+    async def _require_no_conflict(self, vni: int, dstport: int) -> None:
+        """Refuse a VNI another VXLAN on this host already carries on the same port.
+
+        The startup readiness check can only guess at the port: the manager configures it and
+        allocates the VNI, and neither reaches this node until a session does. Here both are
+        known, and an overlap is not advisory -- the plaintext-drop and mark rules select on
+        (port, VNI) alone, so the two tunnels would act on each other's traffic in both
+        directions with nothing reporting it.
+        """
+        conflict = await conflicting_device(port=dstport, vni=vni)
+        if conflict is None:
+            return
+        raise OverlayEncryptionUnavailable(
+            f"refusing VNI {vni} on udp/{dstport}: {conflict} on this host already carries that"
+            " VNI on that port, so this session's firewall rules would match its frames and its"
+            " traffic would be marked for this session's XFRM policy. Move one of the two off the"
+            " shared port (the manager's `vxlan-port`) or out of the VNI range."
+        )
+
+    def unclosed_devices(self) -> frozenset[str]:
+        """Surviving tunnels this node has not managed to bring down, for diagnostics."""
+        return frozenset(self._unclosed_devices)
+
+    async def _require_closed(self, vni: int) -> None:
+        """Refuse to build on a VNI whose surviving device is still up, retrying the close first.
+
+        `prepare_recovery` raising does not stop the privnet: it continues in degraded mode so
+        live sessions can retry their own transitions. That leaves an orphan carrying whatever a
+        previous life was carrying, and a new session drawing the same VNI would `ip link add`
+        onto a name it does not own -- or, once the delete in setup removes it, adopt its traffic.
+        """
+        dev = vxlan_dev(vni)
+        if dev not in self._unclosed_devices:
+            return
+        if await self._hold_vxlan_down_or_absent(dev):
+            self._unclosed_devices.discard(dev)
+            return
+        raise OverlayEncryptionUnavailable(
+            f"refusing to set up VNI {vni}: the surviving tunnel {dev} from a previous life is"
+            " still up and could not be brought down, so this node cannot tell what it is"
+            " carrying. Remove it by hand (`ip link del`) once its traffic is accounted for."
+        )
 
     @override
     async def teardown_session_network(self, session_id: str) -> None:
@@ -1539,10 +1616,6 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             )
         await self._forget_session(session_id)
         await self._local_subnets.release(session_id)
-        if meta is not None and meta.encryption_key is not None:
-            # Only now that nothing of ours is left, and only for a session that actually
-            # installed rules: the chains are shared by every encrypted session on this node.
-            await self._remove_owned_chains()
 
     async def _remove_session_state(
         self,
@@ -1846,11 +1919,12 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     ) -> None:
         """The body of `_unprogram_encryption`, run with the pair's lock held."""
         users = self._pair_users.get(key, set())
-        users.discard(session_id)
-        self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
-        if users:
-            return  # another session is still carried by this pair's SA and policy
-        self._pair_users.pop(key, None)
+        if users - {session_id}:
+            # Another session is still carried by this pair's SA and policy. Nothing to delete,
+            # so the refcount can be settled here.
+            users.discard(session_id)
+            self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
+            return
         if key not in self._programmed_pairs:
             # This process did not program the pair, so it does not know who else is on it. That
             # happens when only the privnet restarted: the agent's coordinator still remembers its
@@ -1869,10 +1943,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 meta.vxlan_port,
                 session_id,
             )
+            users.discard(session_id)
+            self._pair_users.pop(key, None)
+            self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
             return
-        self._programmed_pairs.discard(key)
-        self._pair_slot_generations.pop(key, None)
-        self._pair_active_generations.pop(key, None)
         # SA first, then the policy. Between the two there is a window, and this order makes it a
         # window where traffic is blocked (a policy with no SA) rather than one where it leaves in
         # clear text (a live tunnel with nothing requiring ESP). Nothing should be flowing here --
@@ -1883,11 +1957,25 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             for slot in range(_KEYRING_SIZE)
             for args in xfrm_state_del_args(self_vtep, peer_vtep, generation=slot)
         ]
+        # Delete first, THEN forget. The other order looks harmless because teardown reports the
+        # failure -- but the retry it is asking for reads `_encrypted_peers` to find the pairs to
+        # revisit, and that entry is already gone. The retry then finds nothing to do, succeeds,
+        # and the manager releases the VNI over an SA and policy that are still on the host.
+        pair_failures: list[str] = []
         for args in (
             *state_deletes,
             *xfrm_policy_del_args(self_vtep, peer_vtep, dstport=meta.vxlan_port),
         ):
-            await self._remove(args, failures)
+            await self._remove(args, pair_failures if failures is not None else None)
+        if pair_failures:
+            failures.extend(pair_failures)  # type: ignore[union-attr]
+            return  # bookkeeping untouched, so the next teardown visits this pair again
+        self._programmed_pairs.discard(key)
+        self._pair_slot_generations.pop(key, None)
+        self._pair_active_generations.pop(key, None)
+        users.discard(session_id)
+        self._pair_users.pop(key, None)
+        self._encrypted_peers.get(session_id, set()).discard(peer_vtep)
 
     async def _run_xfrm(self, argv: Sequence[str]) -> None:
         """Run one `ip xfrm` command, replaying a state `add` as `update` when it already exists.
@@ -1921,7 +2009,11 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 )
             # Close forwarding first. Withdrawing XFRM while even the broadcast FDB remains opens
             # a clear-text window; a failed FDB delete is therefore retried, not swallowed.
-            await self._runner(fdb_del_args(meta.vni, peer.vtep_ip))
+            # Idempotent on absence only: an entry an external cleanup or a restart already
+            # removed must not make the coordinator retry this withdrawal forever, while a
+            # permission error or a held lock still has to stop it (a live FDB entry with the
+            # XFRM pair withdrawn underneath it is a clear-text path).
+            await self._remove(fdb_del_args(meta.vni, peer.vtep_ip))
             await self._unprogram_encryption(
                 meta, session_id, peer.vtep_ip, self._self_vteps.get(session_id)
             )
@@ -2037,12 +2129,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             # The FDB is the forwarding capability. Its removal must land before the peer's XFRM
             # can be withdrawn, so failures propagate to the coordinator and keep the endpoint
             # applied for retry. Neighbour cleanup cannot transmit by itself and remains best-effort.
-            await self._runner(fdb_del_args(meta.vni, vtep_ip, mac=mac))
+            # Absent is done -- an entry an external cleanup already removed must not park the
+            # coordinator on this withdrawal -- while EPERM or a held lock still propagates.
+            await self._remove(fdb_del_args(meta.vni, vtep_ip, mac=mac))
             self._remote_endpoints.get(session_id, {}).pop((ip, mac), None)
             try:
-                await self._runner(neigh_del_args(meta.vni, ip))
-            except RuntimeError:
-                log.debug("neighbour entry {} already gone in session {}", ip, session_id)
+                await self._remove(neigh_del_args(meta.vni, ip))
+            except (RuntimeError, OSError):
+                log.debug("could not remove the neighbour entry {} in {}", ip, session_id)
 
     @override
     async def setup_dns_redirect(self, session_id: str, loopback_port: int) -> None:

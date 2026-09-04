@@ -54,11 +54,21 @@ class TestMember:
 
     def test_etcd_payload_roundtrip_excludes_agent_id(self) -> None:
         # single-sourced on-wire schema shared by agent self-publish and manager pre-seed
-        member = Member(agent_id="a1", host_ip="1.2.3.4", vtep_ip="1.2.3.4")
+        member = Member(agent_id="a1", host_ip="1.2.3.4", vtep_ip="1.2.3.4", joined=True)
         payload = member.to_etcd_payload()
-        assert payload == {"host_ip": "1.2.3.4", "vtep_ip": "1.2.3.4"}
+        assert payload == {"host_ip": "1.2.3.4", "vtep_ip": "1.2.3.4", "joined": True}
         assert "agent_id" not in payload  # agent_id is the key, not the value
         assert Member.from_etcd_payload("a1", payload) == member
+
+    def test_a_record_written_before_the_joined_field_reads_as_an_agent_publish(self) -> None:
+        # The pre-seed is newer than the field, so the older shape can only be a self-publish --
+        # and reading it as one keeps an upgraded manager from releasing a live node's VNI.
+        member = Member.from_etcd_payload("a1", {"host_ip": "1.2.3.4", "vtep_ip": "1.2.3.4"})
+        assert member.joined is True
+
+    def test_a_preseeded_record_is_not_a_join(self) -> None:
+        member = Member(agent_id="a1", host_ip="1.2.3.4", vtep_ip="1.2.3.4")
+        assert member.to_etcd_payload()["joined"] is False
 
 
 class TestEndpointAddr:

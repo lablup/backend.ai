@@ -81,6 +81,28 @@ class RequestedSubnetUnavailable(BackendAIError, web.HTTPConflict):
         )
 
 
+class OverlayTeardownPending(BackendAIError, web.HTTPInternalServerError):
+    """A node still holds the session's overlay state, so its VNI cannot be reused yet.
+
+    Not an error in the sense that something went wrong -- it is the normal shape of a node that
+    is a beat slower than the manager. It is raised rather than returned because the caller
+    retries on failure and on nothing else: returning quietly would release the VNI, the subnet
+    and the session's keys the moment one node lagged, and hand that VNI to a session that would
+    then inherit the laggard's devices and rules.
+    """
+
+    error_type = "https://api.backend.ai/probs/overlay-teardown-pending"
+    error_title = "The session's overlay allocation is still held by one of its nodes."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class ForcedBackendUnsupported(BackendAIError, web.HTTPBadRequest):
     """The operator pinned a data-plane backend that cannot serve a multi-node session (BEP-1062).
 
