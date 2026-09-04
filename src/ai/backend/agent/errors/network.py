@@ -252,6 +252,28 @@ class OverlayEncryptionUnavailable(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class OverlayTeardownIncomplete(BackendAIError, web.HTTPInternalServerError):
+    """Raised when teardown could not remove everything it owns on this node.
+
+    Only "already absent" counts as removed. A permission error, a held xtables lock or an EBUSY
+    device leaves real state behind -- SAs, policies, firewall rules, links -- and reporting that
+    as success is what makes it permanent: the caller drops its record and nothing ever revisits
+    it, while the manager hands the VNI to the next session that then inherits a stranger's rules.
+    Raising keeps this node's ownership so teardown can be retried against the same session.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/overlay-teardown-incomplete"
+    error_title = "The session's overlay state could not be fully removed on this node."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class OverlayMtuTooLarge(BackendAIError, web.HTTPInternalServerError):
     """The overlay MTU the manager computed does not fit this node's real underlay.
 
