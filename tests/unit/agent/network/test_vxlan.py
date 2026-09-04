@@ -2693,14 +2693,15 @@ class TestChainsAreProcessScoped:
             assert ["iptables", "-t", table, "-N", chain] in rec.calls
             assert ["iptables", "-t", table, "-I", builtin, "1", "-j", chain] in rec.calls
 
-    async def test_cleanup_removes_them(self) -> None:
+    async def test_cleanup_leaves_them_too(self) -> None:
+        # They are the HOST's, not this process's. See `TestTheChainsBelongToTheHost`.
         rec = Recorder()
         plugin = _plugin(rec)
         await plugin.setup_session_network(_ENC_META, _SELF)
         rec.calls.clear()
         await plugin.cleanup()
         for table, _builtin, chain in OWNED_CHAINS:
-            assert ["iptables", "-t", table, "-X", chain] in rec.calls
+            assert ["iptables", "-t", table, "-X", chain] not in rec.calls
 
 
 class TestUnclosedSurvivors:
@@ -3687,42 +3688,37 @@ class TestAPlaintextTunnelSomethingElseTookDown:
 class TestTheChainsBelongToTheHost:
     """`BAI-VXLAN-IN`, `-GUARD` and `-MARK` are host-global, and a co-located agent's encrypted
     sessions keep their plaintext drop and egress guard in them. Deleting them at this process's
-    exit takes that agent's protection with it, silently."""
+    exit takes that agent's protection with it, silently -- and checking that they are empty first
+    does not help, because the check and the delete are separate commands and a session that
+    installs its rules between the two is left READY and unprotected."""
 
-    def _reader_with(self, rules: dict[str, list[str]]) -> _Listing:
-        """A host whose owned chains hold exactly ``rules``, as `iptables -S CHAIN` prints them."""
-
-        def _listing(argv: Sequence[str]) -> str | None:
-            chain = argv[-1]
-            if "-S" not in argv or chain not in rules:
-                return None
-            return f"-N {chain}\n" + "".join(f"-A {chain} {rule}\n" for rule in rules[chain])
-
-        return _Listing(_listing)
-
-    async def test_chains_that_still_carry_rules_stay(self) -> None:
+    async def test_cleanup_withdraws_nothing(self) -> None:
         rec = Recorder()
-        rules: dict[str, list[str]] = {chain: [] for _t, _b, chain in OWNED_CHAINS}
-        rules[CHAIN_IN] = ["-p udp -m udp --dport 4789 -j DROP"]  # somebody's plaintext drop
-        plugin = _plugin(rec, reader=self._reader_with(rules))
-        await plugin.cleanup()
-        assert not any("-X" in c for c in rec.calls), "a co-located agent's protection went with it"
-        assert not any("-D" in c for c in rec.calls)
-
-    async def test_empty_chains_are_withdrawn(self) -> None:
-        rec = Recorder()
-        plugin = _plugin(rec, reader=self._reader_with({c: [] for _t, _b, c in OWNED_CHAINS}))
-        await plugin.cleanup()
-        deleted = {c[-1] for c in rec.calls if "-X" in c}
-        assert deleted == {chain for _t, _b, chain in OWNED_CHAINS}
-
-    async def test_an_unreadable_chain_is_not_assumed_empty(self) -> None:
-        def _unreadable(argv: Sequence[str]) -> str | None:
-            if "-S" in argv:
-                raise RuntimeError("xtables lock held")
-            return None
-
-        rec = Recorder()
-        plugin = _plugin(rec, reader=_Listing(_unreadable))
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
         await plugin.cleanup()
         assert not any("-X" in c for c in rec.calls)
+        assert not any("-F" in c for c in rec.calls)
+        assert not any(c[:2] == ["iptables", "-D"] or "-D" in c for c in rec.calls)
+
+    async def test_an_empty_chain_is_still_not_ours_to_delete(self) -> None:
+        # Empty now says nothing about empty a moment later, on a host where another agent is
+        # starting a session.
+        rec = Recorder()
+        plugin = _plugin(rec, reader=_Listing(lambda argv: ""))
+        await plugin.init()
+        rec.calls.clear()
+        await plugin.cleanup()
+        assert not any("-X" in c for c in rec.calls)
+
+    async def test_the_next_process_reuses_them(self) -> None:
+        # What makes leaving them cheap: `init` is idempotent over chains that are already there.
+        rec = _AbsentRuleRecorder()
+        plugin = _plugin(rec, reader=_Listing(lambda argv: ""))
+        await plugin.init()
+        await plugin.cleanup()
+        rec.calls.clear()
+        await plugin.init()
+        for table, builtin, chain in OWNED_CHAINS:
+            assert ["iptables", "-t", table, "-I", builtin, "1", "-j", chain] in rec.calls

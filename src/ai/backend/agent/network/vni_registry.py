@@ -248,6 +248,18 @@ class VniRegistry:
                 yield None
                 return
             mine = {f"{owner}/{_claim_id(state, session_id, digest)}" for state in (_HELD, _BUILT)}
+            if not (existing & mine):
+                # We are not on this VNI, so we are in no position to say whether anyone else is.
+                # Answering "free" from an empty set is what turns a lost claim -- or a registry
+                # somebody else emptied -- into permission to delete a live session's devices.
+                log.warning(
+                    "not releasing VNI {} for session {}: this agent holds no binding on it, so"
+                    " it cannot say whether the devices are still in use",
+                    vni,
+                    session_id,
+                )
+                yield None
+                return
             yield not (existing - mine)
             # Reached only on a clean exit from the caller's block.
             for state in (_BUILT, _HELD):

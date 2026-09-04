@@ -520,14 +520,6 @@ def chain_create_args(table: str, chain: str) -> list[str]:
     return ["iptables", "-t", table, "-N", chain]
 
 
-def chain_delete_args(table: str, chain: str) -> list[str]:
-    return ["iptables", "-t", table, "-X", chain]
-
-
-def chain_flush_args(table: str, chain: str) -> list[str]:
-    return ["iptables", "-t", table, "-F", chain]
-
-
 def chain_list_args(table: str, chain: str) -> list[str]:
     return ["iptables", "-t", table, "-S", chain]
 
@@ -1388,7 +1380,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             with contextlib.suppress(asyncio.CancelledError):
                 await self._protection_task
             self._protection_task = None
-        await self._remove_owned_chains()
+        # The chains stay. `BAI-VXLAN-IN`, `-GUARD` and `-MARK` are HOST-global: every encrypted
+        # session on the node keeps its plaintext drop and egress guard in them, including the
+        # sessions of a co-located agent this process knows nothing about, so withdrawing them
+        # here drops that agent's protection silently while its sessions keep running. Checking
+        # that they are empty first does not help -- the check and the delete are separate
+        # commands, and a session that installs its rules between the two is left READY and
+        # unprotected. What stays behind is three empty chains and three jumps, which the next
+        # process to start reuses.
 
     @override
     async def update_plugin_config(self, plugin_config: Any) -> None:
@@ -1762,56 +1761,6 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             except (RuntimeError, OSError):
                 pass  # nothing to remove
             await self._runner(jump_add_args(table, builtin, chain))
-
-    async def _chains_are_empty(self) -> bool:
-        """Whether every owned chain holds no rule -- ours or anyone else's.
-
-        The chains are host-global and shared by every agent on the node, so this process's own
-        bookkeeping cannot answer who still needs them. What CAN answer is the chains themselves:
-        every session's rules are removed by its teardown, so an empty chain is one no session on
-        this host is relying on. An unreadable one is not empty.
-        """
-        for table, _builtin, chain in OWNED_CHAINS:
-            try:
-                listing = await self._reader(chain_list_args(table, chain))
-            except (RuntimeError, OSError):
-                return False
-            if any(line.startswith("-A ") for line in listing.splitlines()):
-                return False
-        return True
-
-    async def _remove_owned_chains(self) -> None:
-        """Withdraw the chains. Only at process cleanup -- never while a session ends.
-
-        They are host-global and every encrypted session's rules live in them, but the only
-        record of who needs them is this process's `_sessions`, which a session joins AFTER its
-        rules are installed. A teardown that consulted it could therefore look during that gap,
-        conclude nobody is left, and delete the chains out from under a session that had just
-        finished protecting itself -- leaving it sending and accepting clear text until the next
-        reconcile. An empty chain costs nothing; that window costs the guarantee.
-
-        And "this process" is not "this host": a co-located agent's encrypted sessions keep their
-        plaintext drop and egress guard in these very chains. Deleting them at our exit would take
-        that agent's protection with it, leaving its sessions accepting clear text with nothing
-        said anywhere. So the chains go only when they are empty, which is precisely when no
-        session on the node is behind them.
-        """
-        if not await self._chains_are_empty():
-            log.info(
-                "leaving the overlay firewall chains in place: they still carry rules, which on a"
-                " host with more than one agent are somebody's protection"
-            )
-            return
-        for table, builtin, chain in OWNED_CHAINS:
-            for argv in (
-                jump_del_args(table, builtin, chain),
-                chain_flush_args(table, chain),
-                chain_delete_args(table, chain),
-            ):
-                try:
-                    await self._runner(argv)
-                except (RuntimeError, OSError):
-                    pass  # never installed, or already gone
 
     async def _ensure_rule(
         self, check: Sequence[str], add: Sequence[str], *, reinstall: bool = False

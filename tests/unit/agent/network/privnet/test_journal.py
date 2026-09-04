@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from ai.backend.agent.network.privnet.journal import PrivNetJournal
+from ai.backend.agent.network.privnet.journal import JournalIncomplete, PrivNetJournal
 
 
 def _config(**over: object) -> dict[str, object]:
@@ -141,15 +141,41 @@ class TestAPartialWriteIsNeverRead:
 
         assert set(await journal.sessions()) == {"sess-a"}
 
-    async def test_an_unreadable_record_is_dropped_rather_than_raising(
+    async def test_a_record_that_cannot_be_read_is_not_a_record_that_is_absent(
         self, journal: PrivNetJournal, tmp_path: Path
     ) -> None:
-        """Recovery runs at daemon boot; raising here would leave a node whose devices are up and
-        whose owner refuses every verb about them."""
+        """Dropping it and returning the rest is indistinguishable from a smaller journal, and
+        recovery acts on the difference: it leaves that session's tunnel down, prunes the VNI
+        binding that was holding its devices, clears its own failure flag and reports a healthy
+        node -- after which the manager can hand that VNI to somebody else while the first
+        session's bridge is still up.
+
+        The daemon stays up either way: recovery catches this, arms its retry, and goes on serving
+        every verb. What it does not do is call the answer complete."""
         await journal.record_session("sess-a", _config())
         (tmp_path / "net-privnet" / "sessions" / "sess-bad").write_text("{not json")
 
-        assert set(await journal.sessions()) == {"sess-a"}
+        with pytest.raises(JournalIncomplete, match="sess-bad"):
+            await journal.sessions()
+
+    async def test_a_peer_record_that_lists_no_vteps_is_incomplete(
+        self, journal: PrivNetJournal, tmp_path: Path
+    ) -> None:
+        # Its session may still hold XFRM state for peers this would silently forget.
+        await journal.record_peers("sess-a", ["10.0.0.2"])
+        (tmp_path / "net-privnet" / "peers" / "sess-b").write_text('{"vteps": 3}')
+
+        with pytest.raises(JournalIncomplete):
+            await journal.peers()
+
+    async def test_an_attach_record_naming_no_session_is_incomplete(
+        self, journal: PrivNetJournal, tmp_path: Path
+    ) -> None:
+        await journal.record_attachment("c1", "sess-a", "10.128.7.1")
+        (tmp_path / "net-privnet" / "attachments" / "c2").write_text("{}")
+
+        with pytest.raises(JournalIncomplete):
+            await journal.attachments()
 
     async def test_no_journal_at_all_reads_empty(self, journal: PrivNetJournal) -> None:
         assert await journal.sessions() == {}
@@ -179,3 +205,59 @@ class TestAttachments:
 
         raw = json.loads((tmp_path / "net-privnet" / "attachments" / "c1").read_text())
         assert raw["session_id"] == "sess-a"
+
+
+class TestTheJournalIsWrittenWhereTheAgentCannotAimIt:
+    """This process holds CAP_DAC_OVERRIDE and CAP_NET_ADMIN, and in the common deployment it runs
+    as the same uid as the agent it is containing. A name it resolves is a name it can write
+    anywhere on the host, so the record path must not be re-resolvable by anything the agent can
+    plant."""
+
+    async def test_a_symlink_at_the_temp_name_does_not_redirect_the_write(
+        self, journal: PrivNetJournal, tmp_path: Path
+    ) -> None:
+        # The old temp name was `.<session>.tmp` -- predictable, and O_CREAT without O_EXCL
+        # follows a symlink sitting there. Pointing it at a host file turned SETUP_SESSION into a
+        # privileged truncate-and-write of that file.
+        sessions = tmp_path / "net-privnet" / "sessions"
+        sessions.mkdir(parents=True, exist_ok=True)
+        victim = tmp_path / "victim"
+        victim.write_text("do not touch")
+        (sessions / ".sess-a.tmp").symlink_to(victim)
+
+        await journal.record_session("sess-a", _config())
+
+        assert victim.read_text() == "do not touch"
+        assert set(await journal.sessions()) == {"sess-a"}
+
+    async def test_a_symlinked_record_is_not_read_through(
+        self, journal: PrivNetJournal, tmp_path: Path
+    ) -> None:
+        # A record is an input the agent's own request named. Following one lets it choose which
+        # file this process parses as a session's network configuration.
+        await journal.record_session("sess-a", _config())
+        sessions = tmp_path / "net-privnet" / "sessions"
+        elsewhere = tmp_path / "elsewhere.json"
+        elsewhere.write_text(json.dumps(_config()))
+        (sessions / "sess-b").symlink_to(elsewhere)
+
+        with pytest.raises(JournalIncomplete, match="sess-b"):
+            await journal.sessions()
+
+    async def test_a_symlinked_kind_directory_is_refused(
+        self, journal: PrivNetJournal, tmp_path: Path
+    ) -> None:
+        root = tmp_path / "net-privnet"
+        root.mkdir(parents=True, exist_ok=True)
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        (root / "sessions").symlink_to(elsewhere, target_is_directory=True)
+
+        with pytest.raises(OSError):
+            await journal.record_session("sess-a", _config())
+
+    async def test_a_record_stays_owner_only(self, journal: PrivNetJournal, tmp_path: Path) -> None:
+        # It holds the overlay's IPsec key.
+        await journal.record_session("sess-a", _config())
+        mode = (tmp_path / "net-privnet" / "sessions" / "sess-a").stat().st_mode
+        assert mode & 0o077 == 0
