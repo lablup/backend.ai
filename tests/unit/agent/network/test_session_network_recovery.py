@@ -242,3 +242,95 @@ class TestARetriedSessionIsFullyRecovered:
             " and the last one cannot tear the session down"
         )
         assert network.recovery_problems() == {}
+
+
+class TestTheRecoveryMarkIsNotClearedEarly:
+    """The mark is what the local admission gate reads. Clearing it before the attempt succeeds
+    opens a window in which a new overlay session is let onto a node that has not recovered."""
+
+    async def test_a_failed_inventory_leaves_the_mark_in_place(self) -> None:
+        network = _network(vxlan=_Backend())
+        network.mark_recovery_failed("containerd was unreachable")
+        await network.retry_recovery_fail_close()  # the inventory still cannot be read here
+        assert "session:recovery" in network.recovery_problems()
+
+    async def test_a_session_that_has_gone_stops_holding_the_node(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Its containers left while we were failing to resume it. Keeping the mark would hold the
+        # node out of overlay service for something that ended.
+        network = _network(vxlan=_Backend())
+
+        async def _inventory() -> tuple[dict[str, str], dict[str, str]]:
+            return {}, {}
+
+        monkeypatch.setattr(network, "_live_and_own_containers", _inventory)
+        network._unresumed["ghost"] = "was failing"
+
+        await network.retry_recovery_fail_close()
+        assert network.recovery_problems() == {}
+
+    async def test_metadata_that_cannot_be_read_is_recorded_not_raised(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Reading it is part of the attempt. Outside the guard it propagated out of the retry and
+        # left the pass half-done, with this session's mark already removed by the caller.
+        network = _network(vxlan=_Backend())
+
+        async def _inventory() -> tuple[dict[str, str], dict[str, str]]:
+            return {"c1": "s1"}, {"c1": "s1"}
+
+        async def _meta(session_id: str) -> object:
+            raise RuntimeError("etcd was unreachable")
+
+        monkeypatch.setattr(network, "_live_and_own_containers", _inventory)
+        monkeypatch.setattr(network, "_read_session_meta", _meta)
+        network._unresumed["s1"] = "was failing"
+
+        await network.retry_recovery_fail_close()
+        assert "session:s1" in network.recovery_problems()
+        assert "etcd was unreachable" in network.recovery_problems()["session:s1"]
+
+
+class TestWithdrawingBeforeTheMemberKeyGoes:
+    """Stopping the coordinator removes this node's member key, which is the manager's signal that
+    this agent has let the session go. Doing that first and then failing to withdraw leaves the
+    manager believing the VNI is free while the claim, the watchdog responsibility and the
+    privnet's journal record are all still here."""
+
+    async def test_the_backend_lets_go_first(self) -> None:
+        order: list[str] = []
+
+        class _Backend2:
+            async def withdraw_session_network(self, session_id: str) -> None:
+                order.append("withdraw")
+
+        class _Coordinator:
+            async def stop(self, session_id: str, *, teardown_data_plane: bool = True) -> None:
+                order.append(f"stop(teardown={teardown_data_plane})")
+
+        network = _network(vxlan=_Backend())
+        await network._withdraw_without_teardown(
+            "s1", cast(Any, _Coordinator()), cast(Any, _Backend2())
+        )
+        assert order == ["withdraw", "stop(teardown=False)"]
+
+    async def test_a_failed_withdrawal_keeps_the_member_key(self) -> None:
+        stopped: list[str] = []
+
+        class _Backend2:
+            async def withdraw_session_network(self, session_id: str) -> None:
+                raise RuntimeError("the journal could not confirm the release")
+
+        class _Coordinator:
+            async def stop(self, session_id: str, *, teardown_data_plane: bool = True) -> None:
+                stopped.append(session_id)
+
+        network = _network(vxlan=_Backend())
+        with pytest.raises(RuntimeError):
+            await network._withdraw_without_teardown(
+                "s1", cast(Any, _Coordinator()), cast(Any, _Backend2())
+            )
+        assert stopped == [], (
+            "the member key was removed anyway; the manager now believes this node let the VNI go"
+        )
