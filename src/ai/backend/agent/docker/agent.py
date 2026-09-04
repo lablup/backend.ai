@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import logging
 import os
 import re
@@ -198,6 +199,10 @@ if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+#: How often the published network capabilities are refreshed. Their readiness half is a
+#: question that does not stay answered -- the privileged helper can die long after startup.
+_NETWORK_IDENTITY_REFRESH_SEC = 60.0
 eof_sentinel = Sentinel.TOKEN
 
 LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) (\d+(?:\.\d+)?)[\d\.]*$")
@@ -1792,6 +1797,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     _vtep_ip: str | None
     #: The raw configured address the VTEP was validated from, kept for the startup diagnostic.
     _host_ip: str
+    #: Refreshes the published capabilities, so readiness does not go stale.
+    _network_identity_task: asyncio.Task[None] | None
 
     network_plugin_ctx: NetworkPluginContext
 
@@ -1905,6 +1912,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         container_cfg = self.local_config.container
         host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
         self._host_ip = host_ip
+        self._network_identity_task = None
         self._vtep_ip = usable_vtep(host_ip)
         self._session_network = build_docker_session_network(
             self.etcd,
@@ -1918,9 +1926,27 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             configured_dns=tuple(container_cfg.dns or ()),
         )
         await self._session_network.open()
+        # Rebuild what a restart emptied, BEFORE anything can ask the session network a question.
+        # Every field it holds is process memory, while the resources they name -- bridges, veths,
+        # IPAM leases, MASQ rules, etcd members -- outlive the process. Skipping it leaves a
+        # restarted agent resuming its kernels with no way to detach them, no way to tear their
+        # session down (the tracker is empty, so `untrack` finds nothing and teardown never runs),
+        # no reaction to peers joining or leaving, and no re-assertion of the firewall or XFRM
+        # drift that accumulated while it was down.
+        try:
+            await self._session_network.recover()
+        except Exception:
+            # Not fatal to startup: an agent that cannot recover its network state can still serve
+            # new sessions, and refusing to start would take the node out over sessions that are
+            # already running. Loud, because everything above stays true until it is fixed.
+            log.exception(
+                "could not recover the session network state; restarted sessions on"
+                " this node may not tear down or re-converge until they are terminated"
+            )
         await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
         await self._publish_network_identity()
+        self._network_identity_task = asyncio.create_task(self._publish_network_identity_forever())
         try:
             async with Docker() as docker:
                 gwbridge = await docker.networks.get("docker_gwbridge")
@@ -1971,6 +1997,22 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             blocklist=self.local_config.agent.block_network_plugins,
         )
 
+    async def _publish_network_identity_forever(self) -> None:
+        """Keep this node's advertised capabilities honest while it runs.
+
+        Published once at startup, they answer a question that does not stay answered: the
+        privileged helper can die an hour later, and the node goes on advertising `vxlan` while
+        nothing on it can build a device. The VTEP does not change, so this is about readiness.
+        """
+        while True:
+            await asyncio.sleep(_NETWORK_IDENTITY_REFRESH_SEC)
+            try:
+                await self._publish_network_identity()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("could not refresh this agent's network capabilities")
+
     async def _publish_network_identity(self) -> None:
         """Advertise this node's overlay identity: its capabilities and its VTEP (BEP-1062).
 
@@ -2010,6 +2052,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
+        if self._network_identity_task is not None:
+            self._network_identity_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._network_identity_task
         # Stop handling agent sock.
         if self.agent_sock_task is not None:
             self.agent_sock_task.cancel()

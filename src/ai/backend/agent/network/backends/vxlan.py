@@ -869,6 +869,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     #: node-wide where one privnet owns the host; with the backend in-process, every agent has
     #: its own and each believes it is the pair's sole user.
     _pair_journal: PairJournal
+    #: Pairs whose claim the journal would not record. A release must never conclude from
+    #: that journal that such a pair is free -- our own claim is not in it to be counted.
+    _unjournalled_pairs: set[tuple[str, str, int]]
     #: This node's name for the claims it makes in that journal. The AGENT ID, not a pid: claims
     #: outlive the process, and an owner that changed on every restart would strand each of them
     #: on a pair nobody then removes. Same convention as the node-local subnet journal.
@@ -900,6 +903,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._reader = reader or _read_command
         self._unclosed_devices = set()
         self._pair_journal = pair_journal or PairJournal()
+        self._unjournalled_pairs = set()
         # A pid only as the last resort: it is wrong across restarts, but a claim tagged
         # with something is still better than one that cannot be told from a peer's.
         self._journal_owner = journal_owner or f"pid{os.getpid()}"
@@ -1523,7 +1527,11 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             key = (self_vtep, peer_vtep, meta.vxlan_port)
             self._encrypted_peers.setdefault(session_id, set()).add(peer_vtep)
             self._pair_users.setdefault(key, set()).add(session_id)
-            self._pair_journal.claim(pair_key(*key), self._journal_owner, session_id)
+            async with self._pair_journal.claiming(
+                pair_key(*key), self._journal_owner, session_id
+            ) as recorded:
+                if not recorded:
+                    self._unjournalled_pairs.add(key)
             self._programmed_pairs.add(key)
 
     @override
@@ -1552,7 +1560,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # tearing it down leaves one with nobody behind it, and the pair it names is then never
         # removed by anyone. At this point no session has been re-adopted yet, so every claim of
         # ours is stale by definition.
-        pruned = self._pair_journal.prune(self._journal_owner, live_sessions=())
+        pruned = await self._pair_journal.prune(self._journal_owner, live_sessions=())
         if pruned:
             log.info("dropped {} stale ESP pair claim(s) left by a previous life", pruned)
         if failed:
@@ -1841,7 +1849,38 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         async with self._pair_lock(key):
             self._encrypted_peers.setdefault(session_id, set()).add(peer_vtep)
             self._pair_users.setdefault(key, set()).add(session_id)
-            self._pair_journal.claim(pair_key(*key), self._journal_owner, session_id)
+            # The host lock is held from here through the SA/policy programming below. Recording
+            # the claim and installing what it claims are one step: between them, another agent
+            # can read the pair as unused and delete the very objects being installed.
+            async with self._pair_journal.claiming(
+                pair_key(*key), self._journal_owner, session_id
+            ) as recorded:
+                if not recorded:
+                    # The claim is not on disk, so no later release may conclude from this journal
+                    # that the pair is free -- see `_unprogram_pair_locked`.
+                    self._unjournalled_pairs.add(key)
+                return await self._program_pair_locked(
+                    meta, session_id, peer_vtep, self_vtep, key, force=force
+                )
+
+    async def _program_pair_locked(
+        self,
+        meta: SessionNetMeta,
+        session_id: str,
+        peer_vtep: str,
+        self_vtep: str,
+        key: tuple[str, str, int],
+        *,
+        force: bool,
+    ) -> bool:
+        """Program this pair's SAs and policy, with its host-wide claim lock held.
+
+        Split out only so the lock can span the whole programming: the claim it records is what
+        stops another agent reading the pair as unused and deleting these very objects.
+        """
+        if meta.encryption_key is None:
+            return True
+        if True:
             observed_generation = self._key_generation()
             generation = max(
                 observed_generation,
@@ -1955,13 +1994,33 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         failures: list[str] | None = None,
     ) -> None:
         """The body of `_unprogram_encryption`, run with the pair's lock held."""
+        async with self._pair_journal.releasing(
+            pair_key(*key), self._journal_owner, session_id
+        ) as node_wide_free:
+            await self._unprogram_pair_locked(
+                meta, session_id, peer_vtep, self_vtep, key, node_wide_free, failures
+            )
+
+    async def _unprogram_pair_locked(
+        self,
+        meta: SessionNetMeta,
+        session_id: str,
+        peer_vtep: str,
+        self_vtep: str,
+        key: tuple[str, str, int],
+        node_wide_free: bool | None,
+        failures: list[str] | None,
+    ) -> None:
+        """The body of `_unprogram_pair`, with the pair's host-wide lock held.
+
+        ``node_wide_free`` is the journal's answer: True to remove, False to leave, None when it
+        could not be determined. Unknown is NOT permission. Of the two ways to be wrong, a stale
+        SA keeps traffic encrypted while a deleted one takes down whoever else was on it -- and
+        the same reasoning applies to a pair whose claim never reached the journal at all.
+        """
         users = self._pair_users.get(key, set())
-        # The node-wide answer wins where it is available: another agent process on this host may
-        # be carried by the very SA and policy about to be removed, and its claim is invisible to
-        # the refcount above. None means the journal could not be read, and the in-process count
-        # is then all there is -- which is exactly the situation every deployment was in before.
-        node_wide_free = self._pair_journal.release(pair_key(*key), self._journal_owner, session_id)
-        if (users - {session_id}) or node_wide_free is False:
+        journal_says_hold = node_wide_free is not True or key in self._unjournalled_pairs
+        if (users - {session_id}) or journal_says_hold:
             # Another session -- possibly another agent's on this same host -- is still carried
             # by this pair's SA and policy. Nothing to delete, so the refcount settles here.
             users.discard(session_id)

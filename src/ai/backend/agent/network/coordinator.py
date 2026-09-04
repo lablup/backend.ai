@@ -160,7 +160,6 @@ class SessionNetworkCoordinator:
         would never look, and the periodic one would look only every fifteen seconds.
         """
         while True:
-            await asyncio.sleep(_PROTECTION_INTERVAL)
             try:
                 members = await self._applied_members(session_id)
                 await self._backend.ensure_session_security(session_id, members)
@@ -170,6 +169,9 @@ class SessionNetworkCoordinator:
                 # Expected while a peer is unreachable or the session is being closed; the
                 # membership reconcile reports the same condition with its full context.
                 log.debug("protection re-assert failed for session {}", session_id, exc_info=True)
+            # After the check, not before it: the first pass costs nothing and closes the window
+            # between the session starting and the loop's first tick.
+            await asyncio.sleep(_PROTECTION_INTERVAL)
 
     async def _applied_members(self, session_id: str) -> list[Member]:
         """The peers this node has already programmed -- read from memory, not etcd.
