@@ -11,7 +11,6 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
-from ai.backend.common.clients.valkey_client.script import create_script
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -91,8 +90,8 @@ class ValkeyLeaderClient:
         """
         self._client = client
         # Create script objects (will be registered when used)
-        self._leader_script = create_script(LEADER_SCRIPT)
-        self._release_script = create_script(RELEASE_SCRIPT)
+        self._leader_script = Script(LEADER_SCRIPT)
+        self._release_script = Script(RELEASE_SCRIPT)
 
     @classmethod
     async def create(

@@ -12,7 +12,6 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
-from ai.backend.common.clients.valkey_client.script import create_script
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -94,8 +93,8 @@ class ValkeyTusClient:
 
     def __init__(self, client: AbstractValkeyClient) -> None:
         self._client = client
-        self._advance_offset_script = create_script(ADVANCE_OFFSET_SCRIPT)
-        self._release_lease_script = create_script(RELEASE_LEASE_SCRIPT)
+        self._advance_offset_script = Script(ADVANCE_OFFSET_SCRIPT)
+        self._release_lease_script = Script(RELEASE_LEASE_SCRIPT)
 
     @classmethod
     async def create(
