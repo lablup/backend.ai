@@ -130,13 +130,21 @@ class Member:
     host_ip: str
     vtep_ip: str | None = None
     """VXLAN tunnel endpoint address; used by the vxlan backend for FDB entries."""
+    joined: bool = False
+    """Whether the AGENT wrote this record, rather than the manager pre-seeding it.
 
-    def to_etcd_payload(self) -> dict[str, str | None]:
+    The two look alike and mean opposite things at teardown. A pre-seed says "this node is
+    *expected* to take part" and is written before the node has touched anything; a self-publish
+    says "this node holds host state for the session". Only the second is an acknowledgement, so
+    only the second may hold the session's VNI back from reuse.
+    """
+
+    def to_etcd_payload(self) -> dict[str, str | bool | None]:
         """The member's etcd value (``agent_id`` is the key, not part of the value).
 
         Single source of the on-wire member schema — used by both the agent (self-publish)
         and the manager (pre-seed) so the two never drift."""
-        return {"host_ip": self.host_ip, "vtep_ip": self.vtep_ip}
+        return {"host_ip": self.host_ip, "vtep_ip": self.vtep_ip, "joined": self.joined}
 
     @classmethod
     def from_etcd_payload(cls, agent_id: str, payload: Mapping[str, Any]) -> Member:
@@ -144,6 +152,9 @@ class Member:
             agent_id=agent_id,
             host_ip=payload["host_ip"],
             vtep_ip=payload.get("vtep_ip"),
+            # A record written before this field existed came from an agent: the manager's
+            # pre-seed is newer than the field, so the older shape can only be a self-publish.
+            joined=bool(payload.get("joined", True)),
         )
 
 

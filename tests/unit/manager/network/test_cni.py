@@ -18,6 +18,7 @@ from ai.backend.manager.errors.network import (
     ForcedBackendUnsupported,
     NetworkBackendMismatch,
     NetworkPoolExhausted,
+    OverlayTeardownPending,
     RequestedSubnetInvalid,
     RequestedSubnetUnavailable,
     VNIPoolExhausted,
@@ -442,8 +443,15 @@ class TestCreateNetwork:
         # each agent's member is written up-front so reconcile-at-start finds every peer
         m1 = json.loads(etcd.store["network/session/s1/members/a1"])
         m2 = json.loads(etcd.store["network/session/s1/members/a2"])
-        assert m1 == {"host_ip": "192.168.105.7", "vtep_ip": "192.168.105.7"}
+        assert m1 == {
+            "host_ip": "192.168.105.7",
+            "vtep_ip": "192.168.105.7",
+            # Not an acknowledgement: nothing on that node has been touched yet, so this record
+            # must not hold the session's VNI back at teardown.
+            "joined": False,
+        }
         assert m2["vtep_ip"] == "192.168.105.8"
+        assert m2["joined"] is False
 
     async def test_preseed_skips_agents_without_published_vtep(self) -> None:
         etcd = FakeEtcd()
@@ -552,30 +560,60 @@ class TestDestroyNetwork:
         await plugin.destroy_network("does-not-exist")  # must not raise
 
     async def test_a_node_that_has_not_confirmed_teardown_holds_the_vni(self) -> None:
-        """A member record still published means that node may still hold this VNI's devices,
+        """A member record the AGENT wrote means that node may still hold this VNI's devices,
         XFRM state and firewall rules. Handing the VNI on then gives the next session a
-        stranger's rules, and lets the laggard's retry tear down the new session's data plane."""
+        stranger's rules, and lets the laggard's retry tear down the new session's data plane.
+
+        It RAISES rather than returning: the caller retries on failure and on nothing else, so a
+        quiet return would strand the allocation the moment one node lagged by a tick.
+        """
         etcd = FakeEtcd()
         plugin = _plugin_with(etcd)
         await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
-        etcd.store["network/session/s1/members/i-slow"] = json.dumps({"host_ip": "10.0.0.1"})
+        etcd.store["network/session/s1/members/i-slow"] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": True,
+        })
 
-        await plugin.destroy_network("s1")
+        with pytest.raises(OverlayTeardownPending):
+            await plugin.destroy_network("s1")
         assert any(k.startswith("network/ipam/vni/") for k in etcd.store)
-        # and the session's own keys stay, so a later destroy can finish the job
+        # and the session's own keys stay, so the retry can finish the job
         assert any(k.startswith("network/session/s1") for k in etcd.store)
 
     async def test_the_release_happens_once_the_last_node_confirms(self) -> None:
         etcd = FakeEtcd()
         plugin = _plugin_with(etcd)
         await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
-        etcd.store["network/session/s1/members/i-slow"] = json.dumps({"host_ip": "10.0.0.1"})
-        await plugin.destroy_network("s1")
+        etcd.store["network/session/s1/members/i-slow"] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": True,
+        })
+        with pytest.raises(OverlayTeardownPending):
+            await plugin.destroy_network("s1")
 
         del etcd.store["network/session/s1/members/i-slow"]
         await plugin.destroy_network("s1")
         assert not any(k.startswith("network/ipam/vni/") for k in etcd.store)
         assert not any(k.startswith("network/session/s1") for k in etcd.store)
+
+    async def test_a_preseeded_member_does_not_hold_the_vni(self) -> None:
+        """The pre-seed says which nodes are EXPECTED to take part, written before any of them has
+        touched the host. Counting it as an acknowledgement would hold every session's allocation
+        forever on a node that never received a kernel."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+        etcd.store["network/session/s1/members/i-expected"] = json.dumps({
+            "host_ip": "10.0.0.9",
+            "vtep_ip": "10.0.0.9",
+            "joined": False,
+        })
+
+        await plugin.destroy_network("s1")
+        assert not any(k.startswith("network/ipam/vni/") for k in etcd.store)
 
 
 class TestAllocationOwnership:

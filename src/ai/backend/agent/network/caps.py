@@ -16,7 +16,7 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
-from ai.backend.agent.network.readiness import probe_readiness
+from ai.backend.agent.network.readiness import Readiness, probe_readiness
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.network.keys import (
     agent_backend_key,
@@ -73,13 +73,18 @@ async def _run_ethtool(iface: str) -> str | None:
     return stdout.decode(errors="replace")
 
 
-def compute_caps(*, tunnel_offload: bool, readiness: list[str] | None = None) -> AgentNetworkCaps:
-    """Assemble AgentNetworkCaps from probed facts. ``vxlan`` is the data-plane backend
-    every agent supports."""
+def compute_caps(*, tunnel_offload: bool, readiness: Readiness | None = None) -> AgentNetworkCaps:
+    """Assemble AgentNetworkCaps from probed facts.
+
+    ``vxlan`` is dropped from the advertised backends when something settled and local would make
+    every session here fail -- a missing binary or iptables match. Advertising it anyway is how a
+    node that cannot serve the backend still gets handed sessions that fail on it alone.
+    """
+    findings = readiness or Readiness()
     return AgentNetworkCaps(
         tunnel_offload=tunnel_offload,
-        backends=["vxlan"],
-        readiness=list(readiness or []),
+        backends=["vxlan"] if findings.can_serve_overlay else [],
+        readiness=findings.problems,
     )
 
 

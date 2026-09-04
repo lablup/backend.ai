@@ -32,7 +32,10 @@ from ai.backend.common.network.types import (
     NetworkBackendKind,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.network import ForcedBackendUnsupported
+from ai.backend.manager.errors.network import (
+    ForcedBackendUnsupported,
+    OverlayTeardownPending,
+)
 from ai.backend.manager.network.ipam import (
     DEFAULT_BLOCK_PREFIXLEN,
     DEFAULT_IPAM_POOL,
@@ -41,7 +44,10 @@ from ai.backend.manager.network.ipam import (
     VNIAllocator,
     overlay_encryption_key,
 )
-from ai.backend.manager.network.pairing import require_members_can_serve_driver
+from ai.backend.manager.network.pairing import (
+    require_members_can_serve_driver,
+    require_members_overlay_ready,
+)
 from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -254,14 +260,15 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         etcd = self._require_etcd()
         pending = await self._members_still_holding(network_id)
         if pending:
-            log.warning(
-                "not releasing session {}'s overlay allocation yet: {} have not confirmed"
-                " teardown ({})",
-                network_id,
-                len(pending),
-                ", ".join(sorted(pending)),
+            # Raise, do not return. The caller (`TerminatedTransitionHook`) retries on failure and
+            # on nothing else, so returning quietly would leave the VNI, the subnet and the
+            # session's keys allocated for good the moment one node was a beat slower than the
+            # manager. This keeps the session in TERMINATING and the self-healing loop comes back.
+            raise OverlayTeardownPending(
+                f"session {network_id}'s overlay allocation is still held by"
+                f" {len(pending)} node(s) ({', '.join(sorted(pending))}) that have not confirmed"
+                " teardown; retrying rather than reusing the VNI over their live state"
             )
-            return
         raw = await etcd.get(session_meta_key(network_id), scope=ConfigScopes.GLOBAL)
         if raw is not None:
             meta = json.loads(raw)
@@ -280,7 +287,25 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         found = await self._require_etcd().get_prefix(
             members_prefix(session_id).rstrip("/"), scope=ConfigScopes.GLOBAL
         )
-        return {str(agent_id) for agent_id in found.keys() if agent_id}
+        holding: set[str] = set()
+        for agent_id, payload in found.items():
+            if not agent_id:
+                continue
+            if not isinstance(payload, str):
+                continue  # a member key holds one JSON value and has no children
+            # Only a record the AGENT wrote is an acknowledgement. The pre-seed this same plugin
+            # writes at create time says which nodes are *expected* to take part, before any of
+            # them has touched the host -- counting it would hold every session's VNI forever on
+            # a node that never received a kernel.
+            try:
+                member = Member.from_etcd_payload(str(agent_id), json.loads(payload))
+            except (ValueError, KeyError):
+                # Unreadable is not "gone": something wrote it, so assume it is still holding.
+                holding.add(str(agent_id))
+                continue
+            if member.joined:
+                holding.add(str(agent_id))
+        return holding
 
     async def _require_members_cni_capable(self, member_agents: list[str]) -> None:
         """Refuse a member agent whose backend cannot serve the 'cni' driver.
@@ -288,7 +313,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         The symmetric check for 'overlay' lives in OverlayNetworkPlugin; both call the same guard
         so the two drivers cannot drift apart on what they accept.
         """
-        await require_members_can_serve_driver(self._require_etcd(), "cni", member_agents)
+        etcd = self._require_etcd()
+        await require_members_can_serve_driver(etcd, "cni", member_agents)
+        await require_members_overlay_ready(etcd, member_agents)
 
     def _select_backend(self, forced_backend: NetworkBackendKind | None) -> NetworkBackendKind:
         """The operator's forced backend wins; otherwise every multi-node cluster session uses

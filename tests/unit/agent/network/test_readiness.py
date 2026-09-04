@@ -7,7 +7,9 @@ the kernel, and the attribute line carries a bare `fan-map` token between the id
 
 from __future__ import annotations
 
+from ai.backend.agent.network.caps import compute_caps
 from ai.backend.agent.network.readiness import (
+    Readiness,
     VxlanDevice,
     foreign_conflicts,
     parse_vxlan_details,
@@ -87,3 +89,31 @@ class TestForeignConflicts:
             )
             == []
         )
+
+
+class TestReadinessGatesTheAdvertisedBackend:
+    """Reporting a problem is not enough on its own: the manager selects on `backends`, so a node
+    that keeps advertising `vxlan` keeps being handed sessions that can only fail on it."""
+
+    def test_a_node_missing_its_tooling_stops_advertising_vxlan(self) -> None:
+        caps = compute_caps(
+            tunnel_offload=False,
+            readiness=Readiness(blocking=("iptables has no `u32` match",)),
+        )
+        assert caps.backends == []
+        assert caps.readiness == ["iptables has no `u32` match"]
+
+    def test_an_advisory_conflict_does_not_take_the_node_out(self) -> None:
+        # Whether it actually collides depends on which VNI a session draws, and the exact
+        # collision is refused at setup where both are known.
+        caps = compute_caps(
+            tunnel_offload=False,
+            readiness=Readiness(advisory=("flannel.1 shares udp/4789",)),
+        )
+        assert caps.backends == ["vxlan"]
+        assert caps.readiness == ["flannel.1 shares udp/4789"]
+
+    def test_a_ready_node_advertises_normally(self) -> None:
+        caps = compute_caps(tunnel_offload=True, readiness=Readiness())
+        assert caps.backends == ["vxlan"]
+        assert caps.readiness == []

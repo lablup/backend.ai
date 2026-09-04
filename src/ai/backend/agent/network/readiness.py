@@ -160,29 +160,63 @@ async def _vxlan_details() -> str:
     return stdout.decode(errors="replace") if proc.returncode == 0 else ""
 
 
-async def probe_readiness(*, port: int, vni_range: tuple[int, int]) -> list[str]:
-    """Everything that would stop this node from serving an overlay session, or an empty list.
+@dataclass(frozen=True)
+class Readiness:
+    """What this node found out about its own ability to serve an overlay session.
 
-    Read-only. It reports rather than refuses: a node that cannot encrypt still refuses the
-    session when one arrives (that guard is in the backend and must stay there), and refusing to
-    start the agent over a missing match would take its single-node sessions down with it.
+    Two kinds, because they call for different answers. ``blocking`` is settled and local -- a
+    missing binary or iptables match makes every session here fail the same way, so the node
+    should stop advertising the backend rather than accept work it cannot do. ``advisory``
+    depends on which VNI a session happens to draw, so it is reported and left to the operator;
+    the exact collision is refused at setup, where the session's real port and VNI are known.
     """
-    problems: list[str] = []
+
+    blocking: tuple[str, ...] = ()
+    advisory: tuple[str, ...] = ()
+
+    @property
+    def problems(self) -> list[str]:
+        return [*self.blocking, *self.advisory]
+
+    @property
+    def can_serve_overlay(self) -> bool:
+        return not self.blocking
+
+
+async def probe_readiness(*, port: int, vni_range: tuple[int, int]) -> Readiness:
+    """Everything that would stop this node from serving an overlay session.
+
+    Read-only, and run at startup: the point is that the reason exists BEFORE a session is
+    scheduled here and fails on one node with it buried in a create-time traceback.
+    """
+    blocking: list[str] = []
     for binary in _REQUIRED_BINARIES:
         if not await _binary_present(binary):
-            problems.append(
+            blocking.append(
                 f"`{binary}` is not on this node's PATH; the overlay is built by shelling out to "
                 "it, so a session scheduled here cannot be set up."
             )
     for match in _REQUIRED_MATCHES:
         if not await _match_present(match):
-            problems.append(
+            blocking.append(
                 f"iptables has no `{match}` match (xt_{match}). An encrypted session needs it to "
                 "tell its own VNI's frames apart, and is refused on this node without it."
             )
-    problems.extend(
-        foreign_conflicts(
-            parse_vxlan_details(await _vxlan_details()), port=port, vni_range=vni_range
-        )
+    advisory = foreign_conflicts(
+        parse_vxlan_details(await _vxlan_details()), port=port, vni_range=vni_range
     )
-    return problems
+    return Readiness(blocking=tuple(blocking), advisory=tuple(advisory))
+
+
+async def conflicting_device(*, port: int, vni: int) -> str | None:
+    """The name of a foreign VXLAN already using this exact (port, VNI), if there is one.
+
+    Checked at setup rather than at startup because that is where the port and VNI are finally
+    known -- the manager configures the port and allocates the VNI, and neither reaches the agent
+    until a session does. An overlap here is not advisory: the drop and mark rules select on
+    (port, VNI) alone, so the two tunnels would act on each other's traffic.
+    """
+    for device in parse_vxlan_details(await _vxlan_details()):
+        if not device.is_ours and device.dstport == port and device.vni == vni:
+            return device.name
+    return None

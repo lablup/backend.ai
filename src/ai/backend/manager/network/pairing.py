@@ -12,10 +12,12 @@ backend is not published yet (an older agent, or one that has not finished start
 unknown-but-allowed. Refusing on absence would take out working deployments the moment this shipped.
 """
 
+import json
 from collections.abc import Iterable
 
 from ai.backend.common.etcd import AbstractKVStore, AsyncEtcd, ConfigScopes
-from ai.backend.common.network.keys import agent_backend_key
+from ai.backend.common.network.keys import agent_backend_key, agent_caps_key
+from ai.backend.common.network.types import AgentNetworkCaps
 from ai.backend.manager.errors.network import NetworkBackendMismatch
 
 # Which agent backend can serve which inter-container network driver.
@@ -104,3 +106,29 @@ async def require_members_can_serve_driver(
                 "session needs one uniform fabric: pair the containerd backend with "
                 "default_driver='cni', and the docker backend with 'overlay'."
             )
+
+
+async def require_members_overlay_ready(etcd: AsyncEtcd, member_agents: Iterable[str]) -> None:
+    """Raise if a member agent has published that it cannot serve an overlay session.
+
+    The node already knows -- it probes its tooling at startup and says so in its capabilities.
+    Without this the answer went nowhere: the session was scheduled anyway and failed on that one
+    node at create time, with the reason in a traceback rather than where the placement was
+    decided. An agent that has published nothing is allowed through, so this cannot strand a
+    deployment whose agents predate the probe.
+    """
+    for agent_id in member_agents:
+        raw = await etcd.get(agent_caps_key(agent_id), scope=ConfigScopes.GLOBAL)
+        if raw is None:
+            continue  # not published (yet): unknown, but allowed
+        try:
+            caps = AgentNetworkCaps(**json.loads(raw))
+        except (ValueError, TypeError):
+            continue  # an unreadable capability record is not evidence of anything
+        if "vxlan" in caps.backends:
+            continue
+        reasons = "; ".join(caps.readiness) or "no reason published"
+        raise NetworkBackendMismatch(
+            f"agent '{agent_id}' does not advertise the 'vxlan' data-plane backend, so a "
+            f"multi-node overlay session placed on it cannot come up: {reasons}"
+        )
