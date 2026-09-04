@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import ipaddress
+import itertools
 import os
 import subprocess
 import tempfile
@@ -39,6 +40,7 @@ from ai.backend.agent.network.privnet.policy import (
 )
 from ai.backend.agent.network.privnet.protocol import PrivNetOp, PrivNetRequest, PrivNetResponse
 from ai.backend.agent.network.privnet.server import PrivNetServer
+from ai.backend.agent.network.vni_registry import VniRegistry, config_digest
 from ai.backend.common.network.types import (
     AttachKind,
     EndpointPlan,
@@ -201,9 +203,15 @@ class _StubRuntime(ContainerLocator):
         return self._cgroup_root / "backendai" / container_id
 
 
+_socket_counter = itertools.count()
+
+
 def _short_socket_path() -> str:
-    # Unix socket paths are capped near 108 bytes; keep it short and unique per test process.
-    return f"/tmp/bai-nh-test-{os.getpid()}.sock"
+    # Unix socket paths are capped near 108 bytes; keep it short. Unique per DAEMON, not per
+    # process: two harnesses alive at once are two co-located agents, and sharing the path made
+    # the second one's bind unlink the first's socket -- after which both clients reached
+    # whichever server happened to be bound.
+    return f"/tmp/bai-nh-test-{os.getpid()}-{next(_socket_counter)}.sock"
 
 
 class _RecordingForwarder:
@@ -299,6 +307,7 @@ class _Harness:
         forwarder: _RecordingForwarder | None = None,
         vtep_ip: str | None = "192.168.0.10",
         allowed_uid: int | None = None,
+        agent_id: str = "i-test",
         recovery_error: Exception | None = None,
         teardown_failures: int = 0,
     ) -> None:
@@ -316,11 +325,15 @@ class _Harness:
         # queries are isolated between tests (and survive a same-state_dir restart, like the real
         # journal does).
         self.local_subnets = LocalSubnetAllocator(root / "local-subnet")
+        # Node-wide: every harness in one test shares it, which is what makes two of them
+        # co-located agents. Redirected away from the real node-global path by
+        # `_isolated_vni_registry`.
+        self.vni_registry = VniRegistry()
         self.cni = _RecordingCni(self.ipam)
         self.server = PrivNetServer(
             socket_path=_short_socket_path(),
             allowed_uid=os.getuid() if allowed_uid is None else allowed_uid,
-            agent_id="i-test",
+            agent_id=agent_id,
             host_ip="127.0.0.1",
             # The entry point validates the real address; a test injects one so it does not depend
             # on what the machine running it happens to hold. None exercises the refusal path.
@@ -332,6 +345,7 @@ class _Harness:
             journal=self.journal,
             ipam=self.ipam,
             local_subnets=self.local_subnets,
+            vni_registry=self.vni_registry,
             netns_pinner=cast(Any, _FakeNetns()),
         )
         self._task: asyncio.Task[None] | None = None
@@ -367,6 +381,33 @@ class _Harness:
 
     def client(self) -> PrivNetClient:
         return PrivNetClient(self.server._socket_path)
+
+
+async def _hand_the_vni_back(h: _Harness, session_id: str, config: dict[str, Any]) -> None:
+    """Model the manager handing a VNI back out.
+
+    The session ended, so this node's binding on its VNI went with it -- while the privnet's own
+    journal record of it survived, which is the state a crash between the two leaves behind and
+    the reason a dead session and a live one can be journalled on one VNI at all.
+    """
+    async with h.vni_registry.releasing(
+        int(config["vni"]), "i-test", session_id, config_digest(config)
+    ):
+        pass
+
+
+@pytest.fixture(autouse=True)
+def _isolated_vni_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point the node-wide VNI registry at this test's own directory.
+
+    Its real home is a node-global path shared by every agent on the host, which is the point --
+    and exactly why a test must never use it: the bindings would outlive the test and the next one
+    would be refused a VNI by a session that does not exist.
+    """
+    monkeypatch.setattr(
+        "ai.backend.agent.network.vni_registry.DEFAULT_VNI_REGISTRY_DIR",
+        tmp_path / "vni",
+    )
 
 
 class TestProtocol:
@@ -836,6 +877,7 @@ class TestSessionLock:
             await first.client().call(
                 PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "dead", container_id="c-old")
             )
+            await _hand_the_vni_back(first, "dead", vxlan)
             await first.client().call(
                 PrivNetRequest(PrivNetOp.SETUP_SESSION, "live", network_config=dict(vxlan))
             )
@@ -1530,10 +1572,13 @@ class TestReclaimingIsRetriedToo:
         async with _Harness(
             _StubRuntime(pid=4242, live={"c-old": "dead"}), state_dir=tmp_path
         ) as first:
-            for session_id in ("dead", "live"):
-                await first.client().call(
-                    PrivNetRequest(PrivNetOp.SETUP_SESSION, session_id, network_config=dict(vxlan))
-                )
+            await first.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "dead", network_config=dict(vxlan))
+            )
+            await _hand_the_vni_back(first, "dead", vxlan)
+            await first.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "live", network_config=dict(vxlan))
+            )
             await first.client().call(
                 PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "live", container_id="c-new")
             )
@@ -1598,11 +1643,14 @@ class TestTheAgentFacingProxy:
         # "The privnet" is per agent. When a second agent on the same host joins a session the
         # first one's privnet built, its own privnet has no record of it and refuses every later
         # attach with "attach before setup" -- so adoption has to say so, not return quietly.
+        #
+        # ADOPT, never SETUP: setup deletes the session's devices before rebuilding them, so the
+        # containers already running on them lose their network -- the ones this call is for.
         calls: list[PrivNetRequest] = []
         await self._proxy(calls).adopt_session_network(
             self._meta(), Member(agent_id="a1", host_ip="10.0.0.1", vtep_ip="10.0.0.1")
         )
-        assert [c.op for c in calls] == [PrivNetOp.SETUP_SESSION]
+        assert [c.op for c in calls] == [PrivNetOp.ADOPT_SESSION]
         assert calls[0].network_config == {
             "backend": "vxlan",
             "subnet": "10.128.5.0/24",
@@ -1625,3 +1673,227 @@ class TestTheAgentFacingProxy:
         calls: list[PrivNetRequest] = []
         await self._proxy(calls).withdraw_session_network("s1")
         assert [(c.op, c.session_id) for c in calls] == [(PrivNetOp.WITHDRAW_SESSION, "s1")]
+
+
+class TestAdoptingALiveSession:
+    """A session whose devices are already up and carrying containers. Whatever this does, it must
+    not be what setup does: setup deletes the bridge, the VXLAN device and the LOCAL bridge before
+    rebuilding them, and the surviving veths are not re-enslaved to the new bridge -- the kernels
+    keep running with no network at all."""
+
+    _CONFIG = {"backend": "bridge", "subnet": "172.30.9.0/24"}
+
+    async def test_it_does_not_rebuild_the_data_plane(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+            h.backend.lifecycle_calls.clear()
+            resp = await h.client().call(
+                PrivNetRequest(PrivNetOp.ADOPT_SESSION, "s1", network_config=dict(self._CONFIG))
+            )
+            assert resp.ok, resp.error
+            assert h.backend.lifecycle_calls == [], "the session was already ours; nothing to do"
+
+    async def test_it_keeps_the_attachment_plans_a_detach_needs(self, tmp_path: Path) -> None:
+        # Rebuilding the entry loses them, and every later detach is derived from them -- the
+        # container's veth, its LOCAL address and its DNAT rules would all be left behind.
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "s1", container_id="c1")
+            )
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.ADOPT_SESSION, "s1", network_config=dict(self._CONFIG))
+            )
+            assert "c1" in h.server._sessions["s1"].attached
+
+    async def test_a_privnet_that_never_saw_it_takes_it_over_without_setup(
+        self, tmp_path: Path
+    ) -> None:
+        # The second agent on the host: its own privnet has no record of a session the first one's
+        # built, and its kernels are about to join those very devices.
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as first:
+            await first.setup("s1")
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path / "second"
+        ) as second:
+            resp = await second.client().call(
+                PrivNetRequest(PrivNetOp.ADOPT_SESSION, "s1", network_config=dict(self._CONFIG))
+            )
+            assert resp.ok, resp.error
+            assert second.backend.adopt_calls == ["s1"]
+            assert second.backend.setup_calls == [], "setup would delete the live devices"
+            assert "s1" in second.server._sessions
+            assert "s1" in await second.journal.sessions(), "or the next restart forgets it"
+
+    async def test_a_later_attach_is_served(self, tmp_path: Path) -> None:
+        # The point of adopting at all: without it the privnet refuses with "attach before setup".
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as first:
+            await first.setup("s1")
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path / "second"
+        ) as second:
+            await second.client().call(
+                PrivNetRequest(PrivNetOp.ADOPT_SESSION, "s1", network_config=dict(self._CONFIG))
+            )
+            resp = await second.client().call(
+                PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "s1", container_id="c2")
+            )
+            assert resp.ok, resp.error
+
+    async def test_redeclaring_a_live_session_differently_is_refused(self, tmp_path: Path) -> None:
+        # An agent is not trusted to say what an existing session is. Accepting this would let one
+        # agent's declaration silently change the subnet or the key of another's running session.
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+            with pytest.raises(PrivNetClientError, match="different network configuration"):
+                await h.client().call(
+                    PrivNetRequest(
+                        PrivNetOp.ADOPT_SESSION,
+                        "s1",
+                        network_config={"backend": "bridge", "subnet": "172.30.55.0/24"},
+                    )
+                )
+
+    async def test_a_journalled_session_cannot_be_adopted_under_a_new_declaration(
+        self, tmp_path: Path
+    ) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as first:
+            await first.setup("s1")
+
+        # A restart that could not re-adopt (no live container), so the journal still holds it.
+        async with _Harness(_StubRuntime(), state_dir=tmp_path, teardown_failures=99) as h:
+            with pytest.raises(PrivNetClientError, match="different network configuration"):
+                await h.client().call(
+                    PrivNetRequest(
+                        PrivNetOp.ADOPT_SESSION,
+                        "s1",
+                        network_config={"backend": "bridge", "subnet": "172.30.55.0/24"},
+                    )
+                )
+
+
+class TestAnAgentCannotNameAnotherSessionsVni:
+    """The trust boundary the privnet exists for, applied to the declaration itself. Setup deletes
+    `baivx<vni>`, `baibr<vni>` and the LOCAL bridge before rebuilding them, and the conflict check
+    treats every `baivx*` as ours -- so a declaration naming a live session's VNI used to cut its
+    containers off the network with no error anywhere."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    async def test_a_second_session_on_a_live_vni_is_refused(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            h.backend.lifecycle_calls.clear()
+            with pytest.raises(PrivNetClientError, match="already held by session s1"):
+                await h.client().call(
+                    PrivNetRequest(
+                        PrivNetOp.SETUP_SESSION, "evil", network_config=dict(self._VXLAN)
+                    )
+                )
+            assert h.backend.lifecycle_calls == [], "nothing was built, so nothing was deleted"
+
+    async def test_another_agents_live_vni_is_refused_too(self, tmp_path: Path) -> None:
+        # The whole point of putting the binding on disk: two agents on one host each have their
+        # own memory, and neither can see the other's sessions.
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(_StubRuntime(), state_dir=tmp_path / "b", agent_id="i-b") as b:
+                with pytest.raises(PrivNetClientError, match="already held by session s1"):
+                    await b.client().call(
+                        PrivNetRequest(
+                            PrivNetOp.SETUP_SESSION, "evil", network_config=dict(self._VXLAN)
+                        )
+                    )
+
+    async def test_redeclaring_a_live_session_differently_is_refused(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(_StubRuntime(), state_dir=tmp_path / "b", agent_id="i-b") as b:
+                with pytest.raises(PrivNetClientError, match="different network configuration"):
+                    await b.client().call(
+                        PrivNetRequest(
+                            PrivNetOp.SETUP_SESSION,
+                            "s1",
+                            network_config={**self._VXLAN, "subnet": "10.128.99.0/24"},
+                        )
+                    )
+
+    async def test_a_co_located_agent_setting_up_the_same_session_adopts_it(
+        self, tmp_path: Path
+    ) -> None:
+        # Not a conflict and not a rebuild: the devices are up and carrying the first agent's
+        # kernels, so the second agent takes them over.
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(
+                _StubRuntime(pid=4242, live={"c1": "s1"}),
+                state_dir=tmp_path / "b",
+                agent_id="i-b",
+            ) as b:
+                resp = await b.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+                assert resp.ok, resp.error
+                assert b.backend.setup_calls == [], "setup would delete the live devices"
+                assert b.backend.adopt_calls == ["s1"]
+
+    async def test_the_vni_is_free_again_once_the_session_is_torn_down(
+        self, tmp_path: Path
+    ) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+            resp = await h.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s2", network_config=dict(self._VXLAN))
+            )
+            assert resp.ok, resp.error
+
+    async def test_withdrawing_releases_only_this_agents_hold(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(
+                _StubRuntime(pid=4242, live={"c1": "s1"}),
+                state_dir=tmp_path / "b",
+                agent_id="i-b",
+            ) as b:
+                await b.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+                await b.client().call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "s1"))
+                # a still has it, so the VNI is not free for anybody else.
+                with pytest.raises(PrivNetClientError, match="already held by session s1"):
+                    await b.client().call(
+                        PrivNetRequest(
+                            PrivNetOp.SETUP_SESSION, "other", network_config=dict(self._VXLAN)
+                        )
+                    )
+
+    async def test_a_binding_left_by_a_crash_does_not_block_the_vni_forever(
+        self, tmp_path: Path
+    ) -> None:
+        # The privnet died between binding the VNI and journalling anything, so its restart finds
+        # a binding with no session behind it. Without the prune, that VNI is refused to every
+        # later session on this node.
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            async with h.vni_registry.binding(4138, "i-test", "ghost", config_digest(self._VXLAN)):
+                pass
+
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as restarted:
+            resp = await restarted.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            assert resp.ok, resp.error
