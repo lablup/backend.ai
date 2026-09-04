@@ -176,9 +176,21 @@ class SubnetAllocator:
             return False
         return True
 
-    async def release(self, subnet: str) -> None:
+    async def release(self, subnet: str, session_id: str) -> bool:
+        """Give the subnet back, but only the unit blocks this session still owns.
+
+        Same reasoning as `VniAllocator.release`: the pool is shared, so releasing a block that
+        now belongs to somebody else is what lets two sessions be handed overlapping overlay
+        address space.
+
+        :return: ``True`` if every unit block was still this session's.
+        """
+        payload = json.dumps({"session_id": session_id})
+        released = True
         for unit in _unit_blocks(ipaddress.ip_network(subnet), self._block_prefixlen):
-            await self._etcd.delete(_allocated_key(unit))
+            if not await self._etcd.delete_if_value(_allocated_key(unit), payload):
+                released = False
+        return released
 
 
 class EndpointAllocator:
@@ -307,5 +319,16 @@ class VNIAllocator:
                 return vni
         raise VNIPoolExhausted()
 
-    async def release(self, vni: int) -> None:
-        await self._etcd.delete(f"{_VNI_PREFIX}/{vni}")
+    async def release(self, vni: int, session_id: str) -> bool:
+        """Give the VNI back, but only while it is still this session's.
+
+        An unconditional delete releases whatever holds the key NOW. After a reuse that is the
+        next session's claim, and dropping it hands the same VNI to a third: two live sessions
+        then share one VNI, and either one's teardown removes the other's rules and devices.
+        The claim records its owner, so the release can check it.
+
+        :return: ``True`` if this session still held it and it was released.
+        """
+        return await self._etcd.delete_if_value(
+            f"{_VNI_PREFIX}/{vni}", json.dumps({"session_id": session_id})
+        )
