@@ -35,6 +35,7 @@ from ai.backend.testutils.dataplane.collectors.host import (
     NetworkLinkCollector,
     ScratchDirCollector,
     StateFileCollector,
+    XfrmCollector,
 )
 from ai.backend.testutils.dataplane.guard import LeakGuard
 from ai.backend.testutils.dataplane.nodes import Node, SudoNode, parse_node_specs
@@ -206,6 +207,7 @@ def _build_collectors(
             NetworkLinkCollector(node),
             IptablesRuleCollector(node),
             NeighbourCollector(node),
+            XfrmCollector(node),
             StateFileCollector(node, dirs=config.state_dirs),
             MountCollector(node, prefixes=config.scratch_roots),
             ScratchDirCollector(node, roots=config.scratch_roots, live_ids=live_kernel_ids),
