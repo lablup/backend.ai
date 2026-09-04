@@ -8,7 +8,11 @@ in-process, two agents on one host each believed they were the pair's only user.
 
 from __future__ import annotations
 
+import asyncio
+import os
 from pathlib import Path
+
+import pytest
 
 from ai.backend.agent.network.pair_journal import PairJournal, pair_key
 
@@ -132,3 +136,54 @@ class TestPruningAPreviousLife:
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
         await _claim(journal, key, "i-dk-104", "s1")
         assert await journal.prune("i-dk-104", live_sessions=()) == 1
+
+
+class TestTheLockActuallyExcludes:
+    """The lock used to be taken on the data file, which `_write` replaces by rename -- so the
+    moment a writer published, the lock it still held was on an inode nobody would open again and
+    the next process locked the new one straight away. Reproduced with two journal instances."""
+
+    async def test_a_second_holder_waits_for_the_first(self, tmp_path: Path) -> None:
+        a, b = _journal(tmp_path), _journal(tmp_path)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(a, key, "agent-a", "s1")
+        entered = asyncio.Event()
+
+        async def second() -> None:
+            async with b.claiming(key, "agent-b", "s2"):
+                entered.set()
+
+        async with a.releasing(key, "agent-a", "s1"):
+            task = asyncio.create_task(second())
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(asyncio.shield(entered.wait()), timeout=1.0)
+        await task
+        assert entered.is_set()
+
+    async def test_the_lock_file_is_not_the_data_file(self, tmp_path: Path) -> None:
+        # The data file is replaced by rename on every write; a lock on it does not survive that.
+        journal = _journal(tmp_path)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(journal, key, "agent-a", "s1")
+        root = tmp_path / "net-esp-pair"
+        assert (root / f"{key}.lock").exists()
+        assert (root / key).exists()
+
+    async def test_an_emptied_pair_keeps_a_stable_name(self, tmp_path: Path) -> None:
+        # Written empty rather than unlinked, so nothing has to reason about the file appearing
+        # and disappearing under a lock held elsewhere.
+        journal = _journal(tmp_path)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(journal, key, "agent-a", "s1")
+        await _release(journal, key, "agent-a", "s1")
+        assert await journal.users(key) == frozenset()
+
+    async def test_a_leftover_temporary_does_not_block_later_writes(self, tmp_path: Path) -> None:
+        # Unique names, not pid-based: a temporary left by a crash used to make every later write
+        # fail on O_EXCL once that pid came round again.
+        root = tmp_path / "net-esp-pair"
+        root.mkdir()
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        (root / f".{key}.{os.getpid()}.tmp").write_text("leftover")
+        journal = PairJournal(root)
+        assert await _claim(journal, key, "agent-a", "s1") is True
