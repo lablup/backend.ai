@@ -12,6 +12,7 @@ where either is missing rather than passing vacuously.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 
 import pytest
@@ -293,7 +294,9 @@ async def _jump_is_first(node: Node) -> bool:
     return await probe.jump_position(node, "filter", "INPUT", CHAIN_IN) == 1
 
 
-async def _wait_for(condition, *, attempts: int = 30, delay: float = 2.0) -> bool:  # type: ignore[no-untyped-def]
+async def _wait_for(
+    condition: Callable[[], Awaitable[bool]], *, attempts: int = 30, delay: float = 2.0
+) -> bool:
     """Poll a condition the reconcile loop restores, rather than guessing its period."""
     for _ in range(attempts):
         if await condition():

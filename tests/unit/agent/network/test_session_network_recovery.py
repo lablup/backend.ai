@@ -100,13 +100,14 @@ class TestRetryIsNotTheWholePreflightAgain:
             " that recovered in between and does not reopen them"
         )
 
-    async def test_the_problem_clears_once_the_device_finally_closes(self) -> None:
+    async def test_the_device_problem_clears_once_it_finally_closes(self) -> None:
         backend = _Backend(preflight_error=RuntimeError("nope"))
         network = _network(vxlan=backend)
         with pytest.raises(Exception):
             await network.recover()
-        assert await network.retry_recovery_fail_close() == {}
-        assert network.recovery_problems() == {}
+        assert "vxlan" in network.recovery_problems()
+        await network.retry_recovery_fail_close()
+        assert "vxlan" not in network.recovery_problems()
 
     async def test_a_device_that_is_still_up_keeps_the_problem(self) -> None:
         backend = _Backend(preflight_error=RuntimeError("nope"), still_up=frozenset({"baivx4096"}))
@@ -136,23 +137,24 @@ class TestRecoveryIsRetriedNotJustReported:
     the node unable to take overlay work -- until the process restarted, because nothing ever came
     back to it."""
 
-    async def test_a_whole_failed_recovery_is_attempted_again(self) -> None:
+    async def test_the_retry_never_re_runs_the_preflight(self) -> None:
+        """The preflight brings down every tunnel this node owns and prunes every claim. Right
+        exactly once, before anything is trusted; on a timer it would cut the sessions that
+        recovered in between -- and the resume that followed would install a SECOND coordinator
+        for each of them without stopping the first."""
         backend = _Backend()
         network = _network(vxlan=backend)
         network.mark_recovery_failed("containerd was unreachable")
-        try:
-            await network.retry_recovery_fail_close()
-        except Exception:
-            pass  # the container source is still not real here; the point is that it TRIED
-        assert backend.preflight_calls >= 1, "the retry did not re-attempt recovery at all"
+        backend.preflight_calls = 0
+        await network.retry_recovery_fail_close()
+        assert backend.preflight_calls == 0
 
-    async def test_the_problem_stays_until_recovery_actually_succeeds(self) -> None:
+    async def test_the_retry_attempts_the_inventory_again(self) -> None:
+        # It is the inventory and resume that failed, so that is what comes back -- reported
+        # again when it fails again, rather than silently cleared.
         network = _network(vxlan=_Backend())
         network.mark_recovery_failed("containerd was unreachable")
-        try:
-            await network.retry_recovery_fail_close()
-        except Exception:
-            pass
+        await network.retry_recovery_fail_close()
         assert "session:recovery" in network.recovery_problems()
 
     async def test_a_node_mid_recovery_refuses_a_new_overlay_session(self) -> None:
@@ -196,3 +198,47 @@ class TestRecoveryIsRetriedNotJustReported:
             mtu=1450,
         )
         network._refuse_while_unrecovered(meta)  # must not raise
+
+
+class TestARetriedSessionIsFullyRecovered:
+    """Resuming alone is not recovery. The tracker and the detach plans live in a separate loop in
+    `recover()`, and a retry that skipped them cleared `_unresumed` -- readiness said the node was
+    fine while every container of that session could give back neither its veth nor its address,
+    and the last one could not start the teardown."""
+
+    async def test_the_retry_tracks_the_containers_too(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        network = _network(vxlan=_Backend())
+        resumed: list[str] = []
+        tracked: list[tuple[str, str]] = []
+
+        async def _resume(session_id: str, meta: object) -> None:
+            resumed.append(session_id)
+
+        async def _meta(session_id: str) -> object:
+            return object()
+
+        async def _inventory() -> tuple[dict[str, str], dict[str, str]]:
+            return {"c1": "s1"}, {"c1": "s1"}
+
+        async def _attachment(container_id: str, session_id: str, meta: object) -> None:
+            return None
+
+        def _track(session_id: str, container_id: str) -> None:
+            tracked.append((session_id, container_id))
+
+        monkeypatch.setattr(network, "_resume_session", _resume)
+        monkeypatch.setattr(network, "_read_session_meta", _meta)
+        monkeypatch.setattr(network, "_live_and_own_containers", _inventory)
+        monkeypatch.setattr(network, "_recover_attachment", _attachment)
+        monkeypatch.setattr(network._tracker, "track", _track)
+        network.mark_recovery_failed("containerd was unreachable")
+
+        await network.retry_recovery_fail_close()
+        assert resumed == ["s1"]
+        assert tracked == [("s1", "c1")], (
+            "the retry resumed the session but left its containers untracked; they cannot detach"
+            " and the last one cannot tear the session down"
+        )
+        assert network.recovery_problems() == {}

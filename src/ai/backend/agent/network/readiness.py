@@ -252,6 +252,10 @@ async def probe_readiness(
                 f"iptables has no `{match}` match (xt_{match}). An encrypted session needs it to "
                 "tell its own VNI's frames apart, and is refused on this node without it."
             )
+    from ai.backend.agent.network.pair_journal import PairJournal
+
+    if (journal_problem := PairJournal().unusable_reason()) is not None:
+        blocking.append(journal_problem)
     for backend_name, problem in (recovery_problems or {}).items():
         # A node that could not close what it left behind holds devices whose protection it cannot
         # vouch for. Blocking, not advisory: a new session would be built beside them.

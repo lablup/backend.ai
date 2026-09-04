@@ -2099,14 +2099,17 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # failure -- but the retry it is asking for reads `_encrypted_peers` to find the pairs to
         # revisit, and that entry is already gone. The retry then finds nothing to do, succeeds,
         # and the manager releases the VNI over an SA and policy that are still on the host.
-        pair_failures: list[str] = []
+        # Collect into the caller's list when it is collecting, and let `_remove` raise when it
+        # is not. Keeping the two in one variable is what forced the cast away: with no list,
+        # nothing reaches the branch below because the raise has already left.
+        pair_failures: list[str] | None = [] if failures is not None else None
         for args in (
             *state_deletes,
             *xfrm_policy_del_args(self_vtep, peer_vtep, dstport=meta.vxlan_port),
         ):
-            await self._remove(args, pair_failures if failures is not None else None)
-        if pair_failures:
-            failures.extend(pair_failures)  # type: ignore[union-attr]
+            await self._remove(args, pair_failures)
+        if failures is not None and pair_failures:
+            failures.extend(pair_failures)
             return  # bookkeeping untouched, so the next teardown visits this pair again
         self._programmed_pairs.discard(key)
         self._pair_slot_generations.pop(key, None)
