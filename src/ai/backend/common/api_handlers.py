@@ -173,8 +173,13 @@ class BaseRequestModel(BackendAISchema):
         cls, source: type[Any], handler: GetCoreSchemaHandler
     ) -> CoreSchema:
         schema = handler(source)
-        if schema["type"] == "model":
-            model_schema = cast(core_schema.ModelSchema, schema)
+        # Model validators (before/after/wrap) wrap the model node in function-* schemas;
+        # walk down to the model node itself.
+        node: Any = schema
+        while node["type"] != "model" and isinstance(node.get("schema"), dict):
+            node = node["schema"]
+        if node["type"] == "model":
+            model_schema = cast(core_schema.ModelSchema, node)
             if "serialization" not in model_schema:
                 model_schema["serialization"] = core_schema.wrap_serializer_function_ser_schema(
                     _drop_undefined_fields, info_arg=False

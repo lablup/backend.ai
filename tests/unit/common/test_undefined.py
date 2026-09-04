@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 
 import pytest
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+    model_validator,
+)
+from pydantic_core.core_schema import ValidatorFunctionWrapHandler
 
 from ai.backend.common.api_handlers import (
     UNDEFINED,
@@ -241,3 +250,56 @@ def test_int_field_with_undefined_still_accepts_one() -> None:
 
     assert IntUpdateInput.model_validate({"count": 1}).count == 1
     assert IntUpdateInput.model_validate({}).count is UNDEFINED
+
+
+class AfterValidatedInput(BaseRequestModel):
+    id: int
+    region: str | Undefined | None = Field(default=UNDEFINED)
+
+    @model_validator(mode="after")
+    def _check(self) -> AfterValidatedInput:
+        return self
+
+
+class WrapValidatedInput(BaseRequestModel):
+    id: int
+    region: str | Undefined | None = Field(default=UNDEFINED)
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _wrap(cls, data: object, handler: ValidatorFunctionWrapHandler) -> WrapValidatedInput:
+        return cast(WrapValidatedInput, handler(data))
+
+
+class BeforeValidatedInput(BaseRequestModel):
+    id: int
+    region: str | Undefined | None = Field(default=UNDEFINED)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _before(cls, data: object) -> object:
+        return data
+
+
+@pytest.mark.parametrize(
+    "model_cls", [AfterValidatedInput, WrapValidatedInput, BeforeValidatedInput]
+)
+def test_model_validator_does_not_disable_undefined_drop(model_cls: type[BaseRequestModel]) -> None:
+    """A before/after/wrap model validator wraps the core schema; UNDEFINED is still dropped."""
+    model = model_cls.model_validate({"id": 1})
+    assert model.model_dump() == {"id": 1}
+    assert json.loads(model.model_dump_json()) == {"id": 1}
+
+
+def test_subclass_model_serializer_takes_precedence() -> None:
+    """A subclass-level @model_serializer replaces the UNDEFINED-dropping serializer."""
+
+    class CustomSerializedInput(BaseRequestModel):
+        id: int
+        region: str | Undefined | None = Field(default=UNDEFINED)
+
+        @model_serializer(mode="wrap")
+        def _custom(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:
+            return {"custom": True}
+
+    assert CustomSerializedInput(id=1).model_dump() == {"custom": True}
