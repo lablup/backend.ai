@@ -168,6 +168,8 @@ class SessionNetwork:
     _vtep_ip: str | None
     #: Backends whose surviving tunnels recovery could not bring down, and why.
     _recovery_incomplete: dict[str, str]
+    #: Sessions this node holds state for but could not resume, and why.
+    _unresumed: dict[str, str]
 
     def __init__(
         self,
@@ -191,6 +193,7 @@ class SessionNetwork:
         self._host_ip = host_ip
         self._vtep_ip = vtep_ip
         self._recovery_incomplete = {}
+        self._unresumed = {}
         # Two interfaces onto the node's containers, and deliberately two objects. The lifecycle
         # half needs the whole runtime (images, exec, commit); the session half needs four calls.
         # That is what lets a backend with no OciRuntime at all -- Docker, which drives its own
@@ -274,32 +277,58 @@ class SessionNetwork:
 
     # --- restart recovery -------------------------------------------------------------------
 
+    def mark_recovery_failed(self, reason: str) -> None:
+        """Record that recovery did not complete at all.
+
+        The caller keeps the agent up -- a node that cannot recover can still serve new sessions,
+        and refusing to start would take it out over sessions already running -- but "cannot
+        recover" has to reach readiness, or the node goes on accepting overlay work while holding
+        state it can neither converge nor tear down.
+        """
+        self._unresumed["recovery"] = reason
+
     def recovery_problems(self) -> dict[str, str]:
         """Backends that could not fail-close their surviving tunnels, and why.
 
         Empty is the healthy answer. While it is not, this node holds devices whose protection it
         cannot vouch for, and it should not be handed a new overlay session.
         """
-        return dict(self._recovery_incomplete)
+        return {**self._recovery_incomplete, **self._unrecovered_sessions()}
 
     async def retry_recovery_fail_close(self) -> dict[str, str]:
-        """Try again to close what recovery could not. Returns what is still open.
+        """Try again to close only what recovery could not. Returns what is still open.
 
-        The in-process counterpart of the privnet's retry timer: without it a rootful agent whose
-        preflight failed leaves those tunnels UP for the life of the process.
+        `retry_fail_close`, never `prepare_recovery`. The preflight brings down EVERY tunnel this
+        backend owns and prunes every claim, which is right exactly once -- before anything is
+        trusted. Running it again on a timer would take down the sessions that recovered
+        successfully in between, drop their claims, and not reopen them: a capability refresh
+        would become the thing that kills the node's live traffic.
         """
         for name in list(self._recovery_incomplete):
             backend = self._backends.get(name)
-            if backend is None:
+            retry = getattr(backend, "retry_fail_close", None)
+            if backend is None or retry is None:
                 self._recovery_incomplete.pop(name, None)
                 continue
             try:
-                await backend.prepare_recovery()
+                remaining = await retry()
             except Exception as e:
                 self._recovery_incomplete[name] = str(e)
                 continue
-            self._recovery_incomplete.pop(name, None)
-        return dict(self._recovery_incomplete)
+            if remaining:
+                self._recovery_incomplete[name] = f"still up: {', '.join(sorted(remaining))}"
+            else:
+                self._recovery_incomplete.pop(name, None)
+        return {**self._recovery_incomplete, **self._unrecovered_sessions()}
+
+    def _unrecovered_sessions(self) -> dict[str, str]:
+        """Sessions this node holds state for but could not resume, as readiness problems.
+
+        Not only the fail-close: a session whose resume raised has its devices down and its
+        coordinator, tracker and detach plans missing, so it will neither converge nor tear down.
+        A node in that state should not be handed new overlay work either.
+        """
+        return {f"session:{session_id}": reason for session_id, reason in self._unresumed.items()}
 
     async def recover(self) -> None:
         """Rebuild this node's session-network state from ground truth after an agent restart.
@@ -351,9 +380,14 @@ class SessionNetwork:
                 continue
             try:
                 await self._resume_session(session_id, meta)
-            except Exception:
+            except Exception as e:
+                # Recorded, not just logged: this session's coordinator, tracker and detach plans
+                # are missing, so it will neither converge nor tear down, and a readiness that
+                # said nothing would keep the node taking new overlay work regardless.
                 log.exception("failed to resume session network for {}", session_id)
+                self._unresumed[session_id] = str(e)
                 continue
+            self._unresumed.pop(session_id, None)
             metas[session_id] = meta
 
         for container_id, session_id in ours.items():
