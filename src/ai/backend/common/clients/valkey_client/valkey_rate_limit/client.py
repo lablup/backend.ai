@@ -95,25 +95,17 @@ class ValkeyRateLimitClient:
         await self._client.disconnect()
 
     @valkey_rate_limit_resilience.apply()
-    async def consume(
-        self,
-        user_id: UserID,
-        window: int,
-        rate_limit: int | None = None,
-    ) -> RateLimitState:
+    async def consume(self, user_id: UserID, window: int) -> RateLimitState:
         """
         Consume one request of the user's current window and return its state.
 
         :param user_id: The user the counter is keyed by.
         :param window: The window length in seconds, applied when the request opens a window.
-        :param rate_limit: The limit fixed for the window by the first request that carries one.
-        :return: The count, the limit fixed for the window and the seconds until it ends.
+        :return: The count, the limit fixed for the window if any, and the seconds until it ends.
         """
         key = f"user.{user_id}"
         batch = Batch(is_atomic=True)
         batch.hincrby(key, "count", 1)
-        if rate_limit is not None:
-            batch.hsetnx(key, "limit", str(rate_limit))
         batch.expire(key, window, ExpireOptions.HasNoExpiry)
         batch.hget(key, "limit")
         batch.ttl(key)
@@ -121,9 +113,36 @@ class ValkeyRateLimitClient:
             results = await conn.exec(batch, raise_on_error=True)
         if results is None:
             raise UnreachableError("an atomic batch without WATCH cannot be aborted")
-        count, *_, limit, reset = results
+        count, _, limit, reset = results
         return RateLimitState(
             count=cast(int, count),
+            limit=int(cast(bytes, limit)) if limit is not None else None,
+            reset=cast(int, reset),
+        )
+
+    @valkey_rate_limit_resilience.apply()
+    async def store_limit(self, user_id: UserID, rate_limit: int) -> RateLimitState:
+        """
+        Fix the limit of the user's open window unless one is already fixed, and return
+        the state including the limit that stands.
+
+        :param user_id: The user the counter is keyed by.
+        :param rate_limit: The limit to fix for the window.
+        :return: The count, the limit fixed for the window and the seconds until it ends.
+        """
+        key = f"user.{user_id}"
+        batch = Batch(is_atomic=True)
+        batch.hsetnx(key, "limit", str(rate_limit))
+        batch.hget(key, "count")
+        batch.hget(key, "limit")
+        batch.ttl(key)
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=True)
+        if results is None:
+            raise UnreachableError("an atomic batch without WATCH cannot be aborted")
+        _, count, limit, reset = results
+        return RateLimitState(
+            count=int(cast(bytes, count)),
             limit=int(cast(bytes, limit)) if limit is not None else None,
             reset=cast(int, reset),
         )

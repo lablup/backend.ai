@@ -18,6 +18,10 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import Val
 from ai.backend.common.web.reserved_response_headers import reserve_response_headers
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import WebRequestHandler
+from ai.backend.manager.services.auth.actions.resolve_default_keypair_rate_limit import (
+    PublicResolveDefaultKeypairRateLimitAction,
+)
+from ai.backend.manager.services.auth.processors import AuthProcessors
 
 if TYPE_CHECKING:
     from aiohttp.typedefs import Middleware
@@ -44,8 +48,9 @@ class RateLimitQuota:
 
 def make_rlim_middleware(
     valkey_client: ValkeyRateLimitClient,
+    auth: AuthProcessors,
 ) -> Middleware:
-    """Create a rate-limit middleware that captures *valkey_client* via closure."""
+    """Create a rate-limit middleware that captures its dependencies via closure."""
 
     @web.middleware
     async def rlim_middleware(
@@ -54,11 +59,14 @@ def make_rlim_middleware(
     ) -> web.StreamResponse:
         """Global middleware implementing a fixed-window rate limiter."""
         if request["is_authorized"]:
-            state = await valkey_client.consume(
-                user_id=request["user"]["uuid"],
-                window=_RATELIMIT_WINDOW,
-                rate_limit=request["keypair"]["rate_limit"],
-            )
+            user_id = request["user"]["uuid"]
+            state = await valkey_client.consume(user_id=user_id, window=_RATELIMIT_WINDOW)
+            if state.limit is None:
+                resolved = await auth.public_resolve_default_keypair_rate_limit.run(
+                    PublicResolveDefaultKeypairRateLimitAction(user_id=user_id)
+                )
+                if resolved.rate_limit is not None:
+                    state = await valkey_client.store_limit(user_id, resolved.rate_limit)
             if state.limit is not None and state.count > state.limit:
                 reserve_response_headers(
                     request,
