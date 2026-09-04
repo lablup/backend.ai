@@ -514,12 +514,13 @@ class _CancelAfter:
 
 
 class TestSecurityDrift:
-    """The reconcile only visits peers whose published record changed, so a backend that acts only
-    on the diff never revisits what it programmed. Nothing that removes that state -- `iptables -F`,
-    a firewall reload, `ip xfrm state flush` -- changes a record, so the pass has to look at the
-    state itself."""
+    """Drift -- `iptables -F`, a firewall reload, `ip xfrm state flush` -- changes no published
+    record, so the diff-driven pass can never notice it. Noticing is the backend's own node-wide
+    watchdog's job, from one read for the whole node; this pass re-asserts only when it has
+    something new to say, because doing it every fifteen seconds per session put the per-session
+    reprogramming cost straight back."""
 
-    async def test_every_reconcile_re_asserts_it(self) -> None:
+    async def test_the_first_reconcile_asserts_it(self) -> None:
         etcd = FakeEtcd()
         etcd.seed_member(_SELF)
         etcd.seed_member(_PEER2)
@@ -527,13 +528,41 @@ class TestSecurityDrift:
         coord = _coordinator(etcd, backend)
 
         await coord.reconcile_peers("s1")
-        await coord.reconcile_peers("s1")  # nothing changed: no peer op, but still a check
+
+        assert backend.security_checks == ["s1"]
+        # driven by the published membership, not by the diff: it names every peer, not just the
+        # one being added
+        assert backend.security_peers == [["a2"]]
+        assert backend.added == ["a2"]
+
+    async def test_an_unchanged_membership_does_not_reprogram(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+
+        await coord.reconcile_peers("s1")
+        await coord.reconcile_peers("s1")
+
+        assert backend.security_checks == ["s1"], (
+            "a steady-state reconcile reprogrammed the session's protection again; at a hundred"
+            " sessions that is the per-session command storm the node watchdog replaced"
+        )
+        assert backend.added == ["a2"]
+
+    async def test_a_changed_membership_asserts_it_again(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+
+        await coord.reconcile_peers("s1")
+        etcd.seed_member(_PEER3)
+        await coord.reconcile_peers("s1")
 
         assert backend.security_checks == ["s1", "s1"]
-        # driven by the published membership, not by the diff: the second pass adds no peer but
-        # still names every one of them
-        assert backend.security_peers == [["a2"], ["a2"]]
-        assert backend.added == ["a2"]  # the peer itself was applied once
 
     async def test_a_failing_check_does_not_abort_the_pass(self) -> None:
         # The backend closes what it cannot protect and refuses each peer in turn; that refusal is

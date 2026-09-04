@@ -68,6 +68,16 @@ class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, meta
         """
         raise NotImplementedError
 
+    async def withdraw_session_network(self, session_id: str) -> None:
+        """Give up this node's ownership of a session without touching the shared data plane.
+
+        For the agent whose kernels of a session leave while a co-located agent still has some:
+        the devices are the node's and stay, but this process must stop believing it is
+        responsible for the session. Default is to do nothing, for a backend that holds no
+        per-session state of its own.
+        """
+        return
+
     @abstractmethod
     async def teardown_session_network(self, session_id: str) -> None:
         """Tear down all host-level state for the session. Must be idempotent."""

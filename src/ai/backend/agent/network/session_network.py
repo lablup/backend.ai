@@ -1132,6 +1132,12 @@ class SessionNetwork:
                 len(running),
             )
             await coordinator.stop(session_id, teardown_data_plane=False)
+            if backend is not None:
+                # The devices stay for the other agent, but this process's ownership must not:
+                # its watchdog would go on reprogramming a session it no longer serves, and its
+                # ESP pair claim would keep the pair alive after the last agent had gone.
+                with contextlib.suppress(Exception):
+                    await backend.withdraw_session_network(session_id)
         else:
             if backend is not None:
                 with contextlib.suppress(Exception):
