@@ -50,6 +50,7 @@ from .types import (
     ArtifactRevisionOrderBy,
     ArtifactStatusChangedInput,
     ArtifactStatusChangedPayload,
+    BulkArtifactV2ErrorGQL,
     CancelArtifactInput,
     CancelImportArtifactPayload,
     CleanupArtifactRevisionsInput,
@@ -500,7 +501,11 @@ async def delete_artifacts(
             Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
         )
 
-    return DeleteArtifactsPayload(artifacts=artifacts)
+    return DeleteArtifactsPayload(
+        successes=artifacts,
+        failed=[BulkArtifactV2ErrorGQL.from_pydantic(item) for item in payload.failed],
+        artifacts=artifacts,
+    )
 
 
 @gql_mutation(
@@ -512,14 +517,14 @@ async def delete_artifacts(
 async def restore_artifacts(
     input: RestoreArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> RestoreArtifactsPayload | None:
-    artifact_node_list = await info.context.adapters.artifact.restore(
+    payload = await info.context.adapters.artifact.restore(
         artifact_ids=[UUID(id) for id in input.artifact_ids],
     )
 
     data_loaders = info.context.data_loaders
 
     artifacts = []
-    for item in artifact_node_list:
+    for item in payload.artifacts:
         registry_url = await get_registry_url(data_loaders, item.registry_id, item.registry_type)
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
@@ -528,7 +533,11 @@ async def restore_artifacts(
             Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
         )
 
-    return RestoreArtifactsPayload(artifacts=artifacts)
+    return RestoreArtifactsPayload(
+        successes=artifacts,
+        failed=[BulkArtifactV2ErrorGQL.from_pydantic(item) for item in payload.failed],
+        artifacts=artifacts,
+    )
 
 
 @gql_mutation(

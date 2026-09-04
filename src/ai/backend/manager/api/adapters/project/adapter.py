@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     AdminSearchGroupsPayload,
+    AssignUserError,
     AssignUsersToProjectPayload,
     DeleteProjectPayload,
     ProjectBasicInfo,
@@ -355,8 +356,11 @@ class ProjectAdapter(BaseAdapter):
                 project_id=ProjectID(project_id), user_ids=input.user_ids, role_id=input.role_id
             )
         )
+        assigned = await self._user_nodes(result.assigned_users)
         return AssignUsersToProjectPayload(
-            items=await self._user_nodes(result.assigned_users),
+            successes=assigned,
+            failed=[AssignUserError(user_id=f.user_id, message=f.reason) for f in result.failures],
+            items=assigned,
         )
 
     async def _user_nodes(self, users: Sequence[UserData]) -> list[UserNode]:

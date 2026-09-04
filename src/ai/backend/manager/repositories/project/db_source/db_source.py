@@ -28,6 +28,8 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.project.types import (
+    AssignUserFailure,
+    AssignUsersResult,
     ProjectData,
     ProjectType,
     UnassignUserFailure,
@@ -534,7 +536,7 @@ class ProjectDBSource:
 
     async def assign_users_to_project(
         self, project_id: ProjectID, user_ids: list[UserID], role_id: UUID
-    ) -> list[UserData]:
+    ) -> AssignUsersResult:
         """Assign users to a project with domain validation via the RBAC member ops.
 
         Validates that the role exists, filters to users in the project's domain
@@ -543,10 +545,12 @@ class ProjectDBSource:
         specified role. Membership grants the project's ``auto_assign`` roles on
         top of that role.
 
-        Returns the list of newly assigned users.
+        Answers for every id the caller named, in that order: a user that could not
+        be enrolled says why rather than dropping out of the answer, and a repeated
+        id is enrolled once and reported as a duplicate at its later positions.
         """
         if not user_ids:
-            return []
+            return AssignUsersResult(assigned_users=[], failures=[])
 
         async with self._rbac_ops_provider.write_ops() as w:
             await self._refuse_personal_project(w, project_id)
@@ -555,22 +559,96 @@ class ProjectDBSource:
             if role is None:
                 raise InvalidAPIParameters(f"Role not found: {role_id}")
 
-            new_user_rows = await self._users_addable_to_project(w, project_id, user_ids)
-            if not new_user_rows:
-                return []
+            unique_ids = list(dict.fromkeys(user_ids))
+            domains = await self._domains_of_users(w, unique_ids)
+            members = await self._project_member_ids(w, project_id, unique_ids)
+            new_user_rows = await self._users_addable_to_project(w, project_id, unique_ids)
+            addable = {row.uuid: row for row in new_user_rows}
 
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    members=[ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
+            if new_user_rows:
+                await w.add_bulk_members(
+                    EntityMembersAddition(
+                        scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
+                        members=[
+                            ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows
+                        ],
+                    )
                 )
-            )
-            user_role_specs = [
-                UserRoleCreatorSpec(user_id=row.uuid, role_id=role_id) for row in new_user_rows
-            ]
-            await w.bulk_create(BulkCreator(specs=user_role_specs))
+                user_role_specs = [
+                    UserRoleCreatorSpec(user_id=row.uuid, role_id=role_id) for row in new_user_rows
+                ]
+                await w.bulk_create(BulkCreator(specs=user_role_specs))
 
-            return [row.to_data() for row in new_user_rows]
+            project_domain = await self._domain_of_project(w, project_id)
+            assigned_users: list[UserData] = []
+            failures: list[AssignUserFailure] = []
+            answered: set[UUID] = set()
+            for user_id in user_ids:
+                if user_id in answered:
+                    failures.append(
+                        AssignUserFailure(
+                            user_id=user_id, reason="Duplicate user id in the request."
+                        )
+                    )
+                    continue
+                answered.add(user_id)
+                row = addable.get(user_id)
+                if row is not None:
+                    assigned_users.append(row.to_data())
+                elif user_id not in domains:
+                    failures.append(
+                        AssignUserFailure(user_id=user_id, reason="User does not exist.")
+                    )
+                elif domains[user_id] != project_domain:
+                    failures.append(
+                        AssignUserFailure(
+                            user_id=user_id,
+                            reason="User does not belong to the project's domain.",
+                        )
+                    )
+                elif user_id in members:
+                    failures.append(
+                        AssignUserFailure(
+                            user_id=user_id, reason="User is already assigned to this project."
+                        )
+                    )
+                else:
+                    failures.append(
+                        AssignUserFailure(user_id=user_id, reason="User could not be assigned.")
+                    )
+            return AssignUsersResult(assigned_users=assigned_users, failures=failures)
+
+    async def _domain_of_project(self, w: RBACWriteOps, project_id: ProjectID) -> str | None:
+        """The domain the project belongs to, ``None`` if it names no project."""
+        result = await w.batch_query_in_global(
+            sa.select(ProjectRow.domain_name).where(ProjectRow.id == project_id),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        rows = list(result.rows)
+        return rows[0].domain_name if rows else None
+
+    async def _domains_of_users(
+        self, w: RBACWriteOps, user_ids: Sequence[UserID]
+    ) -> dict[UUID, str]:
+        """The domain of each id that names a user; an id naming none is absent."""
+        result = await w.batch_query_in_global(
+            sa.select(UserRow.uuid, UserRow.domain_name).where(UserRow.uuid.in_(user_ids)),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        return {row.uuid: row.domain_name for row in result.rows}
+
+    async def _project_member_ids(
+        self, w: RBACWriteOps, project_id: ProjectID, user_ids: Sequence[UserID]
+    ) -> set[UUID]:
+        """Which of the named users already belong to the project."""
+        result = await w.batch_query_in_global(
+            sa.select(UserRow.uuid).where(
+                UserRow.uuid.in_(user_ids)
+                & user_scope_membership_exists(PROJECT_SCOPE_TYPE, project_id, UserRow.uuid)
+            ),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        return {row.uuid for row in result.rows}
 
     async def unassign_users_from_project(
         self, unbinder: UserProjectEntityUnbinder

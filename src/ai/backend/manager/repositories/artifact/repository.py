@@ -19,6 +19,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
     ArtifactType,
     ArtifactWithRevisionsListResult,
+    BulkArtifactResult,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
@@ -351,11 +352,11 @@ class ArtifactRepository:
         )
 
     @artifact_repository_resilience.apply()
-    async def delete_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
+    async def delete_artifacts(self, artifact_ids: list[uuid.UUID]) -> BulkArtifactResult:
         return await self._db_source.delete_artifacts(artifact_ids)
 
     @artifact_repository_resilience.apply()
-    async def restore_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
+    async def restore_artifacts(self, artifact_ids: list[uuid.UUID]) -> BulkArtifactResult:
         return await self._db_source.restore_artifacts(artifact_ids)
 
     @artifact_repository_resilience.apply()

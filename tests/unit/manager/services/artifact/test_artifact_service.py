@@ -28,6 +28,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
     ArtifactType,
     ArtifactWithRevisionsListResult,
+    BulkArtifactResult,
     DelegateeTarget,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
@@ -336,7 +337,9 @@ class TestArtifactService:
             readonly=sample_artifact_data.readonly,
             extra=sample_artifact_data.extra,
         )
-        mock_artifact_repository.delete_artifacts = AsyncMock(return_value=[deleted_artifact])
+        mock_artifact_repository.delete_artifacts = AsyncMock(
+            return_value=BulkArtifactResult(successes=[deleted_artifact], missing=[])
+        )
 
         action = DeleteArtifactsAction(artifact_ids=[sample_artifact_data.id])
         result = await artifact_service.delete_artifacts(action)
@@ -352,7 +355,9 @@ class TestArtifactService:
         sample_artifact_data: ArtifactData,
     ) -> None:
         """Test restoring deleted artifacts"""
-        mock_artifact_repository.restore_artifacts = AsyncMock(return_value=[sample_artifact_data])
+        mock_artifact_repository.restore_artifacts = AsyncMock(
+            return_value=BulkArtifactResult(successes=[sample_artifact_data], missing=[])
+        )
 
         action = RestoreArtifactsAction(artifact_ids=[sample_artifact_data.id])
         result = await artifact_service.restore_artifacts(action)

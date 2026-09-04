@@ -129,6 +129,18 @@ class ArtifactRevisionReadme:
 
 
 @dataclass
+class BulkArtifactResult:
+    """Which of the named artifacts the write reached, and which named no row.
+
+    ``successes`` follows the order the caller named them, so a repeated id appears
+    at each position it was named at.
+    """
+
+    successes: list[ArtifactData]
+    missing: list[ArtifactID]
+
+
+@dataclass
 class ArtifactDataWithRevisions(ArtifactData):
     revisions: list[ArtifactRevisionData]
 

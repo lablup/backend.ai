@@ -94,6 +94,10 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     SourceInfoDTO,
     UpdateArtifactGQLPayload,
 )
+from ai.backend.common.dto.manager.v2.artifact.response import (
+    BulkArtifactV2Error as BulkArtifactV2ErrorDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -1005,13 +1009,51 @@ class ScanArtifactModelsPayload(PydanticOutputMixin[ScanArtifactModelsGQLPayload
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Failure detail for a single artifact in a bulk delete or restore.",
+    ),
+    model=BulkArtifactV2ErrorDTO,
+    name="BulkArtifactV2Error",
+)
+class BulkArtifactV2ErrorGQL(PydanticOutputMixin[BulkArtifactV2ErrorDTO]):
+    artifact_id: uuid.UUID = gql_field(
+        description="UUID of the artifact that could not be reached."
+    )
+    message: str = gql_field(description="Error message describing the failure.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="25.15.0",
         description="Response payload for artifact deletion operations. Contains the artifacts that were soft-deleted. These can be restored later.",
     ),
     model=DeleteArtifactsGQLPayload,
 )
 class DeleteArtifactsPayload(PydanticOutputMixin[DeleteArtifactsGQLPayload]):
-    artifacts: list[Artifact]
+    successes: list[Artifact] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Artifacts that were soft-deleted, in the order they were requested. "
+                "Together with `failed` this answers for every requested artifact "
+                "exactly once."
+            ),
+        ),
+    )
+    failed: list[BulkArtifactV2ErrorGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="List of errors for artifacts that could not be soft-deleted.",
+        ),
+    )
+    artifacts: list[Artifact] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.15.0",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            description="List of soft-deleted artifacts.",
+        ),
+        deprecation_reason="Use successes.",
+    )
 
 
 @gql_pydantic_type(
@@ -1022,4 +1064,26 @@ class DeleteArtifactsPayload(PydanticOutputMixin[DeleteArtifactsGQLPayload]):
     model=RestoreArtifactsGQLPayload,
 )
 class RestoreArtifactsPayload(PydanticOutputMixin[RestoreArtifactsGQLPayload]):
-    artifacts: list[Artifact]
+    successes: list[Artifact] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Artifacts that were restored, in the order they were requested. Together "
+                "with `failed` this answers for every requested artifact exactly once."
+            ),
+        ),
+    )
+    failed: list[BulkArtifactV2ErrorGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="List of errors for artifacts that could not be restored.",
+        ),
+    )
+    artifacts: list[Artifact] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.15.0",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            description="List of restored artifacts.",
+        ),
+        deprecation_reason="Use successes.",
+    )

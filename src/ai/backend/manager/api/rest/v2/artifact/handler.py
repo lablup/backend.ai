@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     CancelImportTaskPayload,
     CleanupRevisionsPayload,
     RejectRevisionPayload,
-    RestoreArtifactsGQLPayload,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import ArtifactIdPathParam, RevisionIdPathParam
@@ -73,8 +72,7 @@ class V2ArtifactHandler:
         body: BodyParam[RestoreArtifactsInput],
     ) -> APIResponse:
         """Restore previously deleted artifacts."""
-        artifacts = await self._adapter.restore(body.parsed.artifact_ids)
-        result = RestoreArtifactsGQLPayload(artifacts=artifacts)
+        result = await self._adapter.restore(body.parsed.artifact_ids)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def get_revision(

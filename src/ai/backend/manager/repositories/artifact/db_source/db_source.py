@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from typing import Any, cast
 
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from ai.backend.common.data.artifact.types import VerificationStepResult
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -16,6 +17,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactStatus,
+    BulkArtifactResult,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.errors.artifact import (
@@ -259,7 +261,13 @@ class ArtifactDBSource:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
-    async def delete_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
+    async def delete_artifacts(self, artifact_ids: list[uuid.UUID]) -> BulkArtifactResult:
+        """Soft-delete the named artifacts and answer for every id that was named.
+
+        An id matching no row is reported as missing rather than dropped: the read
+        back is by id, so nothing else would say the caller named something that is
+        not there.
+        """
         async with self._db.begin_session() as db_sess:
             # Update availability to DELETED for the given artifact IDs (only for ALIVE artifacts)
             await db_sess.execute(
@@ -277,10 +285,13 @@ class ArtifactDBSource:
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
             )
-            rows = list(result.scalars().all())
-            return [row.to_dataclass() for row in rows]
+            return self._answer_for_each(artifact_ids, list(result.scalars().all()))
 
-    async def restore_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
+    async def restore_artifacts(self, artifact_ids: list[uuid.UUID]) -> BulkArtifactResult:
+        """Restore the named artifacts and answer for every id that was named.
+
+        An id matching no row is reported as missing, as :meth:`delete_artifacts` does.
+        """
         async with self._db.begin_session() as db_sess:
             # Update availability to ALIVE for the given artifact IDs (only for DELETED artifacts)
             await db_sess.execute(
@@ -298,8 +309,23 @@ class ArtifactDBSource:
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
             )
-            rows = list(result.scalars().all())
-            return [row.to_dataclass() for row in rows]
+            return self._answer_for_each(artifact_ids, list(result.scalars().all()))
+
+    def _answer_for_each(
+        self, artifact_ids: Sequence[uuid.UUID], rows: Sequence[ArtifactRow]
+    ) -> BulkArtifactResult:
+        """Put the rows that were read back against the ids the caller named."""
+        by_id = {row.id: row for row in rows}
+        successes: list[ArtifactData] = []
+        missing: list[ArtifactID] = []
+        for raw_id in artifact_ids:
+            artifact_id = ArtifactID(raw_id)
+            row = by_id.get(artifact_id)
+            if row is None:
+                missing.append(artifact_id)
+            else:
+                successes.append(row.to_dataclass())
+        return BulkArtifactResult(successes=successes, missing=missing)
 
     async def update_artifact_revision_bytesize(
         self, artifact_revision_id: uuid.UUID, size: int

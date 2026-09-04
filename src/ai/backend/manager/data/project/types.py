@@ -167,6 +167,22 @@ class ProjectModifier(PartialModifier):
 
 
 @dataclass
+class AssignUserFailure:
+    """Why one requested user could not be enrolled in the project."""
+
+    user_id: uuid.UUID
+    reason: str
+
+
+@dataclass
+class AssignUsersResult:
+    """Who was enrolled and, for everyone else the caller named, why not."""
+
+    assigned_users: list[UserData]
+    failures: list[AssignUserFailure]
+
+
+@dataclass
 class UnassignUserFailure:
     user_id: uuid.UUID
     reason: str

@@ -474,14 +474,14 @@ class ArtifactService:
         return RetrieveModelActionResult(result=scanned_models[0])
 
     async def delete_artifacts(self, action: DeleteArtifactsAction) -> DeleteArtifactsActionResult:
-        deleted_artifacts = await self._artifact_repository.delete_artifacts(action.artifact_ids)
-        return DeleteArtifactsActionResult(artifacts=deleted_artifacts)
+        result = await self._artifact_repository.delete_artifacts(action.artifact_ids)
+        return DeleteArtifactsActionResult(artifacts=result.successes, missing=result.missing)
 
     async def restore_artifacts(
         self, action: RestoreArtifactsAction
     ) -> RestoreArtifactsActionResult:
-        restored_artifacts = await self._artifact_repository.restore_artifacts(action.artifact_ids)
-        return RestoreArtifactsActionResult(artifacts=restored_artifacts)
+        result = await self._artifact_repository.restore_artifacts(action.artifact_ids)
+        return RestoreArtifactsActionResult(artifacts=result.successes, missing=result.missing)
 
     async def _resolve_artifact_registry_meta(
         self, _artifact_type: ArtifactType | None, registry_id_or_none: uuid.UUID | None

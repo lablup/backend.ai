@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactData
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
@@ -25,3 +26,4 @@ class DeleteArtifactsAction(ArtifactAction):
 @dataclass
 class DeleteArtifactsActionResult:
     artifacts: list[ArtifactData]
+    missing: list[ArtifactID]
