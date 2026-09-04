@@ -33,7 +33,7 @@ class RateLimitQuota:
     limit: int | None
     remaining: int
     reset: int
-    window: int = _RATELIMIT_WINDOW
+    window: int
 
     def apply_to(self, headers: CIMultiDict[str]) -> None:
         headers["X-RateLimit-Limit"] = str(self.limit)
@@ -61,17 +61,35 @@ def make_rlim_middleware(
             )
             if rate_limit is not None and state.count > rate_limit:
                 reserve_response_headers(
-                    request, RateLimitQuota(limit=rate_limit, remaining=0, reset=state.reset)
+                    request,
+                    RateLimitQuota(
+                        limit=rate_limit,
+                        remaining=0,
+                        reset=state.reset,
+                        window=_RATELIMIT_WINDOW,
+                    ),
                 )
                 raise RateLimitExceeded
             remaining = rate_limit - state.count if rate_limit is not None else state.count
             reserve_response_headers(
-                request, RateLimitQuota(limit=rate_limit, remaining=remaining, reset=state.reset)
+                request,
+                RateLimitQuota(
+                    limit=rate_limit,
+                    remaining=remaining,
+                    reset=state.reset,
+                    window=_RATELIMIT_WINDOW,
+                ),
             )
             return await handler(request)
         # No checks for rate limiting for non-authorized queries.
         reserve_response_headers(
-            request, RateLimitQuota(limit=1000, remaining=1000, reset=_RATELIMIT_WINDOW)
+            request,
+            RateLimitQuota(
+                limit=1000,
+                remaining=1000,
+                reset=_RATELIMIT_WINDOW,
+                window=_RATELIMIT_WINDOW,
+            ),
         )
         return await handler(request)
 
