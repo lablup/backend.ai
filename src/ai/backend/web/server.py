@@ -47,8 +47,9 @@ from ai.backend.client.v2.config import ClientConfig as V2ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -92,6 +93,7 @@ from ai.backend.web.clients.manager_pool import (
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
+from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
 from . import __version__, user_agent
@@ -855,6 +857,13 @@ async def redis_ctx(
     # Keep app["redis"] key for compatibility
     app["redis"] = valkey_session_client
 
+    valkey_rate_limit_client = await ValkeyRateLimitClient.create(
+        valkey_target=valkey_profile_target.profile_target(RedisRole.RATE_LIMIT),
+        db_id=REDIS_RATE_LIMIT_DB,
+        human_readable_name="web.ratelimit",
+    )
+    app["valkey_rate_limit"] = valkey_rate_limit_client
+
     if pidx == 0 and config.session.flush_on_startup:
         await valkey_session_client.flush_all_sessions()
         log.info("flushed session storage.")
@@ -870,6 +879,7 @@ async def redis_ctx(
     try:
         yield
     finally:
+        await valkey_rate_limit_client.close()
         await valkey_session_client.close()
 
 
@@ -1041,11 +1051,14 @@ async def webapp_ctx(
 
     manager_pool = cast(HealthyEndpointPool, app["manager_pool"])
 
-    manager_web_handler = partial(web_handler, endpoint_pool=manager_pool)
-    manager_websocket_handler = partial(websocket_handler, endpoint_pool=manager_pool)
+    manager_proxy_handler = partial(web_handler, endpoint_pool=manager_pool)
+    manager_web_handler = manager_proxy_rate_limited(manager_proxy_handler)
+    manager_websocket_handler = manager_proxy_rate_limited(
+        partial(websocket_handler, endpoint_pool=manager_pool)
+    )
     manager_web_plugin_handler = partial(web_plugin_handler, endpoint_pool=manager_pool)
 
-    anon_web_handler = partial(manager_web_handler, is_anonymous=True)
+    anon_web_handler = partial(manager_proxy_handler, is_anonymous=True)
     anon_web_plugin_handler = partial(manager_web_plugin_handler, is_anonymous=True)
 
     # Pipeline is a separate upstream — no health-aware pool here. A follow-up
@@ -1120,9 +1133,11 @@ async def webapp_ctx(
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
-        supergraph_handler = partial(
-            apollo_router_handler,
-            endpoint_pool=cast(HealthyEndpointPool, app["apollo_router_pool"]),
+        supergraph_handler = manager_proxy_rate_limited(
+            partial(
+                apollo_router_handler,
+                endpoint_pool=cast(HealthyEndpointPool, app["apollo_router_pool"]),
+            )
         )
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
