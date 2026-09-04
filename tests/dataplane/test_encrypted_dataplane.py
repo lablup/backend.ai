@@ -38,14 +38,33 @@ async def _vni_on(node: Node) -> int:
 
 
 async def _vtep_of(node: Node) -> str:
-    """The outer source address the node pinned onto its own vxlan device."""
+    """The outer source address the node pinned onto its own vxlan device.
+
+    Both `ip -d` forms are tried because neither is dependable: on three hosts running the same
+    iproute2 6.1.0, one SEGFAULTS on ``show type vxlan`` and answers ``show dev <name>``, another
+    does the reverse. A helper that picked one would fail on a host for reasons that have nothing
+    to do with what is being tested.
+    """
     vni = await _vni_on(node)
-    result = await node.run(["ip", "-d", "link", "show", f"baivx{vni}"], check=False)
-    tokens = result.stdout.split()
-    for i, token in enumerate(tokens):
-        if token == "local" and i + 1 < len(tokens):
-            return tokens[i + 1]
-    raise AssertionError(f"baivx{vni} on {node.name} has no pinned local address")
+    dev = f"baivx{vni}"
+    for argv in (
+        ["ip", "-d", "link", "show", "dev", dev],
+        ["ip", "-d", "link", "show", "type", "vxlan"],
+    ):
+        result = await node.run(argv, check=False)
+        tokens = result.stdout.split()
+        for i, token in enumerate(tokens):
+            if token == "local" and i + 1 < len(tokens) and _looks_like_ipv4(tokens[i + 1]):
+                return tokens[i + 1]
+    raise AssertionError(
+        f"could not read {dev}'s pinned local address on {node.name}: neither `ip -d link` form"
+        " described it (this host's iproute2 crashes on at least one of them)"
+    )
+
+
+def _looks_like_ipv4(token: str) -> bool:
+    parts = token.split(".")
+    return len(parts) == 4 and all(p.isdigit() for p in parts)
 
 
 class _Placement:
@@ -58,8 +77,8 @@ class _Placement:
         self.node_b, self.pid_b, self.ip_b = node_b, pid_b, ip_b
 
 
-async def _spread_or_skip(node_pair: tuple[Node, Node], session_name: str) -> _Placement:
-    per_node = {n.name: await probe.overlay_endpoints(n, session_name) for n in node_pair}
+async def _spread_or_skip(node_pair: tuple[Node, Node], session: str) -> _Placement:
+    per_node = {n.name: await probe.overlay_endpoints(n, session) for n in node_pair}
     occupied = {name: eps for name, eps in per_node.items() if eps}
     if len(occupied) < 2:
         pytest.skip(
@@ -97,7 +116,7 @@ class TestEncryptedUnderlay:
         as well and is in clear text on the wire.
         """
         async with session_driver.session(encrypted_spec, "dp-g20") as handle:
-            placed = await _spread_or_skip(node_pair, handle.name)
+            placed = await _spread_or_skip(node_pair, str(handle.session_id))
             if not await _is_encrypted(placed.node_a):
                 pytest.skip("this session is not encrypted; there is no ESP to look for")
             iface = await probe.vtep_interface(placed.node_a, await _vtep_of(placed.node_a))
@@ -123,7 +142,7 @@ class TestEncryptedUnderlay:
         """MARK is not a terminating target, so anything later in the hook can clear it. What must
         not happen is the frame leaving anyway: the guard turns that into dropped traffic."""
         async with session_driver.session(encrypted_spec, "dp-g21") as handle:
-            placed = await _spread_or_skip(node_pair, handle.name)
+            placed = await _spread_or_skip(node_pair, str(handle.session_id))
             node = placed.node_a
             if not await _is_encrypted(node):
                 pytest.skip("this session is not encrypted; there is no mark to clear")
@@ -175,7 +194,7 @@ class TestFirewallOwnership:
         """A co-tenant inserting its own rule at position 1 leaves ours present but unreachable --
         which `iptables -C` cannot see. The reconcile reads the order, so it can."""
         async with session_driver.session(encrypted_spec, "dp-g22") as handle:
-            placed = await _spread_or_skip(node_pair, handle.name)
+            placed = await _spread_or_skip(node_pair, str(handle.session_id))
             node = placed.node_a
             if not await _is_encrypted(node):
                 pytest.skip("this session is not encrypted; the chains are not installed")
@@ -238,7 +257,7 @@ class TestFirewallOwnership:
         """`iptables -F` between two reconciles is the case the drift check exists for: the devices
         stay up and encrypted while the receive side is wide open again."""
         async with session_driver.session(encrypted_spec, "dp-g23") as handle:
-            placed = await _spread_or_skip(node_pair, handle.name)
+            placed = await _spread_or_skip(node_pair, str(handle.session_id))
             node = placed.node_a
             if not await _is_encrypted(node):
                 pytest.skip("this session is not encrypted; the chains are not installed")

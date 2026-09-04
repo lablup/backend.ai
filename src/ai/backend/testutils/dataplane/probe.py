@@ -15,17 +15,44 @@ from dataclasses import dataclass
 from ai.backend.testutils.dataplane.nodes import Node
 
 
-async def session_container_ids(node: Node, session_name: str) -> list[str]:
-    """Container ids of this node's kernels for a session, from containerd's own labels.
+async def session_container_ids(node: Node, session: str) -> list[str]:
+    """Container ids of this node's kernels for a session, from the runtime's own labels.
 
     Read from the runtime rather than the manager: the question a scenario asks is where the kernels
     actually landed, and taking the manager's word for it would assume the answer.
+
+    Both runtimes, because a node runs one or the other and the scenarios do not care which. This
+    used to ask containerd only, so every scenario silently skipped on a Docker node -- reported as
+    "the session was not spread across both agents", which reads like a scheduling problem and is
+    not one. ``session`` matches either the name or the id: containerd's record carries the name,
+    Docker's label carries the id.
     """
-    listing = await node.run(["ctr", "-n", "backend-ai", "containers", "list", "-q"])
+    ids = await _containerd_session_containers(node, session)
+    if ids:
+        return ids
+    return await _docker_session_containers(node, session)
+
+
+async def _containerd_session_containers(node: Node, session: str) -> list[str]:
+    listing = await node.run(["ctr", "-n", "backend-ai", "containers", "list", "-q"], check=False)
     ids: list[str] = []
     for cid in listing.lines:
-        info = await node.run(["ctr", "-n", "backend-ai", "containers", "info", cid])
-        if session_name in info.stdout:
+        info = await node.run(["ctr", "-n", "backend-ai", "containers", "info", cid], check=False)
+        if session in info.stdout:
+            ids.append(cid)
+    return ids
+
+
+async def _docker_session_containers(node: Node, session: str) -> list[str]:
+    listing = await node.run(
+        ["docker", "ps", "-q", "--filter", "label=ai.backend.session-id"], check=False
+    )
+    ids: list[str] = []
+    for cid in listing.lines:
+        info = await node.run(
+            ["docker", "inspect", "--format", "{{json .Config.Labels}}", cid], check=False
+        )
+        if session in info.stdout:
             ids.append(cid)
     return ids
 
@@ -33,14 +60,20 @@ async def session_container_ids(node: Node, session_name: str) -> list[str]:
 async def task_pid(node: Node, container_id: str) -> str:
     """The host PID of a container's task -- the handle into its netns for nsenter.
 
-    From ``ctr tasks ls`` rather than a stored value: a task not in the running list has no netns to
+    From the runtime's running list rather than a stored value: a task not in it has no netns to
     enter, and asserting against a dead kernel would be meaningless.
     """
-    listing = await node.run(["ctr", "-n", "backend-ai", "tasks", "ls"])
+    listing = await node.run(["ctr", "-n", "backend-ai", "tasks", "ls"], check=False)
     for line in listing.lines:
         columns = line.split()
         if len(columns) >= 2 and columns[0] == container_id:
             return columns[1]
+    docker = await node.run(
+        ["docker", "inspect", "--format", "{{.State.Pid}}", container_id], check=False
+    )
+    pid = docker.stdout.strip()
+    if pid.isdigit() and pid != "0":
+        return pid
     raise AssertionError(f"no running task for container {container_id}:\n{listing.stdout}")
 
 

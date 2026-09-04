@@ -117,3 +117,19 @@ class TestReadinessGatesTheAdvertisedBackend:
         caps = compute_caps(tunnel_offload=True, readiness=Readiness())
         assert caps.backends == ["vxlan"]
         assert caps.readiness == []
+
+
+class TestUnreadableDevicesAreNotSilence:
+    """`ip -d` is not dependable on every host, and its failure is not a clean error: on three
+    hosts running the same iproute2 6.1.0 it SEGFAULTS, in opposite directions. Reporting "no
+    conflict" because the host could not be asked is the fail-open this check exists to remove."""
+
+    def test_an_unparseable_listing_yields_no_devices(self) -> None:
+        assert parse_vxlan_details("Segmentation fault") == ()
+
+    def test_a_conflict_is_still_found_in_a_partial_listing(self) -> None:
+        # The per-device fallback describes what it can; whatever it cannot is reported separately.
+        found = foreign_conflicts(
+            [VxlanDevice("flannel.1", 4097, 4789)], port=4789, vni_range=(4096, 16777215)
+        )
+        assert len(found) == 1
