@@ -3612,3 +3612,34 @@ class TestANodeThatCannotSeeItsOwnProtection:
         rec.calls.clear()
         await plugin.reassert_protection()
         assert link_down_args(vxlan_dev(4097)) not in rec.calls
+
+
+class TestALowVniMustNotTakeALocalBridge:
+    """`bailo<n>` names a LOCAL bridge by its node-local block INDEX, and setup also removes
+    `bailo<vni>` -- the transitional name from before that. The two share one number space:
+    indices run 0..layout.size-1, so `bailo7` is index 7's live bridge and VNI 7's old one at
+    once. The manager hands out VNIs from 4096, but the privnet's whole job is to not trust the
+    declaration: an agent naming VNI 7 would otherwise delete the bridge another session's
+    containers reach their gateway through."""
+
+    async def test_setup_does_not_delete_it(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        low = replace(_META, session_id="s-low", vni=7, subnet="10.128.7.0/24")
+        await plugin.setup_session_network(low, _SELF)
+        assert ["ip", "link", "del", local_bridge_dev(7)] not in rec.calls
+
+    async def test_setup_still_clears_its_own_local_bridge(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        low = replace(_META, session_id="s-low", vni=7, subnet="10.128.7.0/24")
+        await plugin.setup_session_network(low, _SELF)
+        index = await plugin._local_index("s-low")
+        assert ["ip", "link", "del", local_bridge_dev(index)] in rec.calls
+
+    async def test_a_vni_above_the_index_range_is_still_cleaned_up(self) -> None:
+        # Nothing can be spelled `bailo4097` but VNI 4097's own transitional device.
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_META, _SELF)
+        assert ["ip", "link", "del", local_bridge_dev(4097)] in rec.calls

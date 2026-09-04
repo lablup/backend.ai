@@ -2037,7 +2037,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         await self._delete_link_quiet(local_bridge_dev(await self._local_index(meta.session_id)))
         # Transitional: sessions created before the LOCAL bridge was named after the index carry a
         # `bailo<vni>` device instead. An agent upgraded under them would otherwise never remove it.
-        await self._delete_link_quiet(local_bridge_dev(vni))
+        #
+        # Bounded exactly as teardown bounds it, and for the same reason: the two names share a
+        # number space. LOCAL indices run 0..layout.size-1, so `bailo7` is index 7's live bridge
+        # AND VNI 7's transitional one. The manager hands out VNIs from 4096, but this process is
+        # the one that must not trust a declaration -- an agent naming VNI 7 would otherwise
+        # delete the LOCAL bridge another session's containers reach their gateway through.
+        if vni >= self._local_subnets.layout.size:
+            await self._delete_link_quiet(local_bridge_dev(vni))
         # The overlay MTU (underlay - VXLAN overhead) the manager put in the meta, applied to both
         # the vxlan device and the overlay bridge so a full-size inner frame fits the tunnel.
         # All of it or none of it. A failure partway used to leave a half-built vxlan or bridge
