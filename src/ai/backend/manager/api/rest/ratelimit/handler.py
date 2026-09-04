@@ -32,11 +32,13 @@ _RATELIMIT_WINDOW: Final = 60 * 15
 class RateLimitQuota:
     limit: int | None
     remaining: int
+    reset: int
     window: int = _RATELIMIT_WINDOW
 
     def apply_to(self, headers: CIMultiDict[str]) -> None:
         headers["X-RateLimit-Limit"] = str(self.limit)
         headers["X-RateLimit-Remaining"] = str(self.remaining)
+        headers["X-RateLimit-Reset"] = str(self.reset)
         headers["X-RateLimit-Window"] = str(self.window)
 
 
@@ -50,21 +52,27 @@ def make_rlim_middleware(
         request: web.Request,
         handler: WebRequestHandler,
     ) -> web.StreamResponse:
-        """Global middleware implementing a rolling-counter rate limiter."""
+        """Global middleware implementing a fixed-window rate limiter."""
         if request["is_authorized"]:
-            rate_limit = request["keypair"]["rate_limit"]
-            rolling_count = await valkey_client.execute_rate_limit_logic(
+            state = await valkey_client.count_request(
                 user_id=request["user"]["uuid"],
                 window=_RATELIMIT_WINDOW,
+                rate_limit=request["user"]["default_keypair_rate_limit"],
             )
-            if rate_limit is not None and rolling_count > rate_limit:
-                reserve_response_headers(request, RateLimitQuota(limit=rate_limit, remaining=0))
+            if state.limit is not None and state.count > state.limit:
+                reserve_response_headers(
+                    request, RateLimitQuota(limit=state.limit, remaining=0, reset=state.reset)
+                )
                 raise RateLimitExceeded
-            remaining = rate_limit - rolling_count if rate_limit is not None else rolling_count
-            reserve_response_headers(request, RateLimitQuota(limit=rate_limit, remaining=remaining))
+            remaining = state.limit - state.count if state.limit is not None else state.count
+            reserve_response_headers(
+                request, RateLimitQuota(limit=state.limit, remaining=remaining, reset=state.reset)
+            )
             return await handler(request)
         # No checks for rate limiting for non-authorized queries.
-        reserve_response_headers(request, RateLimitQuota(limit=1000, remaining=1000))
+        reserve_response_headers(
+            request, RateLimitQuota(limit=1000, remaining=1000, reset=_RATELIMIT_WINDOW)
+        )
         return await handler(request)
 
     return rlim_middleware
