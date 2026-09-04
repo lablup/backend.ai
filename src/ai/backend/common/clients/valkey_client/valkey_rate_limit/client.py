@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Final, Self, cast
+from typing import Self, cast
 
 from glide import Batch, ExpireOptions
 
@@ -38,8 +38,6 @@ valkey_rate_limit_resilience = Resilience(
         ),
     ]
 )
-
-_DEFAULT_RATE_LIMIT_WINDOW: Final = 60 * 15
 
 
 @dataclass(frozen=True)
@@ -99,7 +97,7 @@ class ValkeyRateLimitClient:
     async def consume(
         self,
         user_id: UserID,
-        window: int = _DEFAULT_RATE_LIMIT_WINDOW,
+        window: int,
     ) -> RateLimitState:
         """
         Consume one request of the user's current window and return its state.
