@@ -16,7 +16,9 @@ from typing import Any, cast
 
 import pytest
 
+from ai.backend.agent.errors.network import OverlayEncryptionUnavailable
 from ai.backend.agent.network.session_network import SessionNetwork
+from ai.backend.common.network.types import NetworkBackendKind, SessionNetMeta
 
 
 class _Backend:
@@ -127,3 +129,70 @@ class TestRecoveryFailuresReachReadiness:
     async def test_a_healthy_node_reports_nothing(self) -> None:
         network = _network(vxlan=_Backend())
         assert network.recovery_problems() == {}
+
+
+class TestRecoveryIsRetriedNotJustReported:
+    """A transient container-runtime or metadata error used to leave a session unmanaged -- and
+    the node unable to take overlay work -- until the process restarted, because nothing ever came
+    back to it."""
+
+    async def test_a_whole_failed_recovery_is_attempted_again(self) -> None:
+        backend = _Backend()
+        network = _network(vxlan=backend)
+        network.mark_recovery_failed("containerd was unreachable")
+        try:
+            await network.retry_recovery_fail_close()
+        except Exception:
+            pass  # the container source is still not real here; the point is that it TRIED
+        assert backend.preflight_calls >= 1, "the retry did not re-attempt recovery at all"
+
+    async def test_the_problem_stays_until_recovery_actually_succeeds(self) -> None:
+        network = _network(vxlan=_Backend())
+        network.mark_recovery_failed("containerd was unreachable")
+        try:
+            await network.retry_recovery_fail_close()
+        except Exception:
+            pass
+        assert "session:recovery" in network.recovery_problems()
+
+    async def test_a_node_mid_recovery_refuses_a_new_overlay_session(self) -> None:
+        # Readiness tells the manager, but a request decided before it read the new capabilities
+        # still arrives here, and would build a new VXLAN beside state this node can neither
+        # converge nor tear down.
+
+        network = _network(vxlan=_Backend())
+        network.mark_recovery_failed("containerd was unreachable")
+        meta = SessionNetMeta(
+            session_id="s1",
+            backend=NetworkBackendKind.VXLAN,
+            subnet="10.128.0.0/24",
+            vni=4096,
+            mtu=1450,
+        )
+        with pytest.raises(OverlayEncryptionUnavailable):
+            network._refuse_while_unrecovered(meta)
+
+    async def test_a_node_local_session_is_not_refused(self) -> None:
+        # A bridge session shares nothing with the unrecovered overlay state.
+
+        network = _network(vxlan=_Backend())
+        network.mark_recovery_failed("containerd was unreachable")
+        meta = SessionNetMeta(
+            session_id="s1",
+            backend=NetworkBackendKind.BRIDGE,
+            subnet="172.30.0.0/26",
+            vni=None,
+            mtu=1500,
+        )
+        network._refuse_while_unrecovered(meta)  # must not raise
+
+    async def test_a_recovered_node_accepts_again(self) -> None:
+        network = _network(vxlan=_Backend())
+        meta = SessionNetMeta(
+            session_id="s1",
+            backend=NetworkBackendKind.VXLAN,
+            subnet="10.128.0.0/24",
+            vni=4096,
+            mtu=1450,
+        )
+        network._refuse_while_unrecovered(meta)  # must not raise
