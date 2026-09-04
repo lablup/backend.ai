@@ -11,13 +11,14 @@ import time
 from collections import deque
 from collections.abc import AsyncIterator, Sequence
 from pathlib import Path, PurePosixPath
-from typing import Any, final, override
+from typing import Any, ClassVar, final, override
 
 import aiofiles.os
 import janus
 import trafaret as t
 
 from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
@@ -396,7 +397,7 @@ class BaseFSOpModel(AbstractFSOpModel):
 
 
 class BaseVolume(AbstractVolume):
-    name = "vfs"
+    name: ClassVar[StorageBackendType] = StorageBackendType.VFS
 
     @override
     def info(self) -> VolumeInfo:
