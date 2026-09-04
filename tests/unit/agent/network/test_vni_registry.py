@@ -8,6 +8,7 @@ declaration from reaching into another session's data plane.
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ from ai.backend.agent.network.vni_registry import (
     VniConflict,
     VniHolder,
     VniRegistry,
+    VniStillBound,
     config_digest,
 )
 
@@ -278,3 +280,34 @@ class TestHoldingNothingIsNotPermission:
                 claim.unlink()
         async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)) as freed:
             assert freed is None
+
+
+class TestAClaimThatWillNotGo:
+    """The devices are gone and the claim is not. Logged and swallowed, the session's journal
+    record goes with the teardown and the stale claim refuses that VNI to every later session
+    until something else clears it."""
+
+    async def test_it_is_raised_so_the_caller_keeps_the_record(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path / "vni")
+        await _bind(registry, "a1", "s1", _CONFIG)
+
+        directory = tmp_path / "vni" / "vni4138"
+        with pytest.raises(VniStillBound, match="VNI 4138"):
+            async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)) as freed:
+                assert freed is True
+                # The claim becomes unremovable while the caller is tearing the devices down.
+                directory.chmod(0o500)
+        directory.chmod(0o700)
+
+    async def test_the_retry_finishes_the_job(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path / "vni")
+        await _bind(registry, "a1", "s1", _CONFIG)
+        directory = tmp_path / "vni" / "vni4138"
+        with contextlib.suppress(VniStillBound):
+            async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)):
+                directory.chmod(0o500)
+        directory.chmod(0o700)
+
+        async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)) as freed:
+            assert freed is True
+        assert await _bind(registry, "a2", "s2", _CONFIG) is True
