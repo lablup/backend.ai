@@ -337,9 +337,12 @@ class PrivNetServer:
         `recover()` begins by bringing down every tunnel on this node and pruning every claim,
         which is correct exactly once, before anything is trusted. On a timer it is destructive:
         one session that keeps failing would take every healthy VXLAN down and up again every
-        thirty seconds. So this re-reads the journal if that is what failed, and otherwise
-        re-adopts only the sessions that did not adopt -- under the same per-session lock the RPC
-        verbs take, so a session being SET UP right now is not mistaken for a dead one.
+        thirty seconds. So this re-reads the journal and re-adopts only what still needs it --
+        under the same per-session lock the RPC verbs take, so a session being SET UP right now is
+        not mistaken for a dead one.
+
+        "What still needs it" is every live session when the first pass could not read its inputs
+        at all, and the sessions that failed individually otherwise.
         """
         try:
             live = await self._live_containers()
@@ -349,8 +352,22 @@ class PrivNetServer:
         except Exception as e:
             self._recovery_failed = str(e)
             return
+        # A first pass that could not read its inputs adopted NOTHING, so there is no per-session
+        # mark to work from and every live session still needs adopting -- the tunnels are all
+        # down and the registry is empty, which is safe but is not a recovery. Iterating the empty
+        # mark set would have cleared the failure flag and left the node exactly there.
+        never_adopted = self._recovery_failed is not None
         self._recovery_failed = None
-        for session_id in sorted(self._unrecovered_sessions):
+        pending = (
+            {
+                session_id
+                for session_id, cfg in journalled_sessions.items()
+                if any(sid == session_id for sid in live.values())
+            }
+            if never_adopted
+            else set(self._unrecovered_sessions)
+        )
+        for session_id in sorted(pending):
             if session_id not in journalled_sessions:
                 # Gone while we were failing to adopt it: there is nothing left to recover, and
                 # keeping the mark would hold this node out of service for a session that ended.
@@ -834,6 +851,9 @@ class PrivNetServer:
                     case PrivNetOp.TEARDOWN_SESSION:
                         await self._teardown(session_id)
                         return PrivNetResponse(ok=True)
+                    case PrivNetOp.WITHDRAW_SESSION:
+                        await self._withdraw(session_id)
+                        return PrivNetResponse(ok=True)
                     case PrivNetOp.ATTACH_CONTAINER:
                         assigned = await self._attach(
                             session_id, req.container_id, req.ip, req.local_ip
@@ -902,6 +922,22 @@ class PrivNetServer:
         await self._journal.record_session(session_id, dict(raw_config))
         await backend.setup_session_network(meta, self._self_member(cfg.backend))
         self._sessions[session_id] = _SessionEntry(meta, backend)
+
+    async def _withdraw(self, session_id: str) -> None:
+        """Drop this node's ownership of a session whose devices must stay.
+
+        The agent asking has no kernels of it left, but a co-located agent does -- so nothing on
+        the host is removed. What goes is this process's belief that it is responsible: without
+        that, its protection watchdog keeps reprogramming a session it no longer serves and its
+        ESP pair claim outlives the last agent that had one.
+        """
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            return
+        backend = self._backends.get(str(entry.meta.backend))
+        if backend is not None:
+            await backend.withdraw_session_network(session_id)
+        self._sessions.pop(session_id, None)
 
     async def _teardown(self, session_id: str) -> None:
         # The lock is NOT popped here: `_session_locked` owns its lifecycle (dropping it only when
