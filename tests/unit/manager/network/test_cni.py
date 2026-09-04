@@ -52,6 +52,18 @@ class FakeEtcd:
     async def delete(self, key: str, **kwargs: Any) -> None:
         self.store.pop(key, None)
 
+    async def delete_if_value(self, key: str, expected: str, **kwargs: Any) -> bool:
+        if self.store.get(key) != expected:
+            return False
+        del self.store[key]
+        return True
+
+    async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
+        head = prefix.rstrip("/") + "/"
+        return {
+            key[len(head) :]: value for key, value in self.store.items() if key.startswith(head)
+        }
+
     async def delete_prefix(self, prefix: str, **kwargs: Any) -> None:
         for key in [k for k in self.store if k.startswith(prefix)]:
             del self.store[key]
@@ -82,7 +94,7 @@ class TestSubnetAllocator:
         allocator = _subnet_allocator(etcd)
         first = await allocator.acquire("s1")
         await allocator.acquire("s2")
-        await allocator.release(first)
+        await allocator.release(first, "s1")
         # first free block is again the released one
         assert await allocator.acquire("s3") == first
 
@@ -105,7 +117,7 @@ class TestVNIAllocator:
         etcd = FakeEtcd()
         allocator = _vni_allocator(etcd, vni_range=(4096, 4098))
         v = await allocator.acquire("s1")
-        await allocator.release(v)
+        await allocator.release(v, "s1")
         assert await allocator.acquire("s2") == v
 
     async def test_exhaustion_raises(self) -> None:
@@ -168,7 +180,7 @@ class TestVariableSubnetSizing:
         etcd = FakeEtcd()
         allocator = _subnet_allocator(etcd)
         wide = await allocator.acquire("s1", host_count=300)
-        await allocator.release(wide)
+        await allocator.release(wide, "s1")
         # every /24 unit is free again, so a /24 request reuses the block's start
         assert await allocator.acquire("s2") == "10.128.0.0/24"
         assert await allocator.acquire("s3") == "10.128.1.0/24"
@@ -538,3 +550,67 @@ class TestDestroyNetwork:
         etcd = FakeEtcd()
         plugin = _plugin_with(etcd)
         await plugin.destroy_network("does-not-exist")  # must not raise
+
+    async def test_a_node_that_has_not_confirmed_teardown_holds_the_vni(self) -> None:
+        """A member record still published means that node may still hold this VNI's devices,
+        XFRM state and firewall rules. Handing the VNI on then gives the next session a
+        stranger's rules, and lets the laggard's retry tear down the new session's data plane."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+        etcd.store["network/session/s1/members/i-slow"] = json.dumps({"host_ip": "10.0.0.1"})
+
+        await plugin.destroy_network("s1")
+        assert any(k.startswith("network/ipam/vni/") for k in etcd.store)
+        # and the session's own keys stay, so a later destroy can finish the job
+        assert any(k.startswith("network/session/s1") for k in etcd.store)
+
+    async def test_the_release_happens_once_the_last_node_confirms(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+        etcd.store["network/session/s1/members/i-slow"] = json.dumps({"host_ip": "10.0.0.1"})
+        await plugin.destroy_network("s1")
+
+        del etcd.store["network/session/s1/members/i-slow"]
+        await plugin.destroy_network("s1")
+        assert not any(k.startswith("network/ipam/vni/") for k in etcd.store)
+        assert not any(k.startswith("network/session/s1") for k in etcd.store)
+
+
+class TestAllocationOwnership:
+    """An unconditional release frees whatever holds the key NOW. After a reuse that is the next
+    session's claim, and dropping it hands the same resource to a third -- two live sessions on
+    one VNI, where either one's teardown removes the other's rules and devices."""
+
+    async def test_a_vni_reclaimed_by_another_session_is_not_released(self) -> None:
+        etcd = FakeEtcd()
+        allocator = _vni_allocator(etcd, vni_range=(4096, 4098))
+        vni = await allocator.acquire("s1")
+        await allocator.release(vni, "s1")
+        assert await allocator.acquire("s2") == vni  # reused
+
+        assert await allocator.release(vni, "s1") is False  # s1 retrying its teardown
+        assert etcd.store[f"network/ipam/vni/{vni}"] == json.dumps({"session_id": "s2"})
+
+    async def test_releasing_a_vni_it_owns_succeeds(self) -> None:
+        etcd = FakeEtcd()
+        allocator = _vni_allocator(etcd, vni_range=(4096, 4098))
+        vni = await allocator.acquire("s1")
+        assert await allocator.release(vni, "s1") is True
+
+    async def test_a_subnet_reclaimed_by_another_session_is_not_released(self) -> None:
+        etcd = FakeEtcd()
+        allocator = _subnet_allocator(etcd)
+        subnet = await allocator.acquire("s1")
+        await allocator.release(subnet, "s1")
+        assert await allocator.acquire("s2") == subnet
+
+        assert await allocator.release(subnet, "s1") is False
+        assert any(v == json.dumps({"session_id": "s2"}) for v in etcd.store.values())
+
+    async def test_releasing_a_subnet_it_owns_succeeds(self) -> None:
+        etcd = FakeEtcd()
+        allocator = _subnet_allocator(etcd)
+        subnet = await allocator.acquire("s1")
+        assert await allocator.release(subnet, "s1") is True

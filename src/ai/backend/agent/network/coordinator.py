@@ -158,9 +158,13 @@ class SessionNetworkCoordinator:
                     # It already died of something else. Log it and carry on: re-raising here would
                     # skip the teardown below and leak this node's membership key and its devices.
                     log.exception("session network task for {} ended in error", session_id)
-        await self._etcd.delete(member_key(session_id, self._agent_id))
+        # The member record is this node's teardown acknowledgement: the manager reads it to
+        # decide whether the session's VNI may be handed to somebody else. Removing it before
+        # the data plane is actually gone is what lets a VNI be reused over live devices, so it
+        # goes only once teardown has returned without leaving state behind.
         if teardown_data_plane:
             await self._backend.teardown_session_network(session_id)
+        await self._etcd.delete(member_key(session_id, self._agent_id))
         self._applied.pop(session_id, None)
         self._applied_endpoints.pop(session_id, None)
         self._names.pop(session_id, None)
