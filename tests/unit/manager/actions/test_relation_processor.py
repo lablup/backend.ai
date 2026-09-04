@@ -162,7 +162,7 @@ class TestEveryEndMustPermitTheRun:
         async def check(keys: list[Any], permission: Any) -> dict[Any, bool]:
             return {key: key.entity in permitted for key in keys}
 
-        repository.check_bulk_permission_via_virtual_entity = check
+        repository.check_owned_all = check
         config_provider = MagicMock()
         config_provider.config.manager.rbac.enforcement_enabled = True
         return VirtualEntityRelationActionRBACValidator(repository, config_provider)

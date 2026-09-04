@@ -36,8 +36,8 @@ from ai.backend.manager.data.permission.types import (
     ScopeType as PermScopeType,
 )
 from ai.backend.manager.data.permission.virtual_entity import (
-    EntityPermissionCheckKey,
-    ScopePermissionCheckKey,
+    GovernCheckKey,
+    OwnCheckKey,
 )
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
@@ -418,11 +418,11 @@ class TestCheckPermissionViaVirtualEntity:
         permission: Permission,
         expected: bool,
     ) -> None:
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_entity(key, permission)
+        result = await db_source.check_owned(key, permission)
         assert result is expected
 
     @pytest.mark.parametrize(
@@ -451,11 +451,11 @@ class TestCheckPermissionViaVirtualEntity:
         chain: VSChainFixture,
         expected: Permission,
     ) -> None:
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        resolved = await db_source.resolve_effective_permissions_via_virtual_entity([key])
+        resolved = await db_source.owned_permissions([key])
         assert resolved[key] == expected
 
     @pytest.mark.parametrize(
@@ -468,17 +468,15 @@ class TestCheckPermissionViaVirtualEntity:
         db_source: PermissionDBSource,
         chain: VSChainFixture,
     ) -> None:
-        reachable = EntityPermissionCheckKey(
+        reachable = OwnCheckKey(
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        unreachable = EntityPermissionCheckKey(
+        unreachable = OwnCheckKey(
             user_id=chain.user_id,
             entity=VFolderUUID(uuid.uuid4()),
         )
-        result = await db_source.check_bulk_permission_via_virtual_entity(
-            [reachable, unreachable], Permission.READ
-        )
+        result = await db_source.check_owned_all([reachable, unreachable], Permission.READ)
         assert result == {reachable: True, unreachable: False}
 
     @pytest.mark.parametrize(
@@ -496,13 +494,11 @@ class TestCheckPermissionViaVirtualEntity:
         db_source: PermissionDBSource,
         chain: VSChainFixture,
     ) -> None:
-        reachable = EntityPermissionCheckKey(
+        reachable = OwnCheckKey(
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_bulk_permission_via_virtual_entity(
-            [reachable], Permission.CREATE | Permission.UPDATE
-        )
+        result = await db_source.check_owned_all([reachable], Permission.CREATE | Permission.UPDATE)
         assert result == {reachable: False}
 
     @pytest.mark.parametrize(
@@ -515,13 +511,11 @@ class TestCheckPermissionViaVirtualEntity:
         db_source: PermissionDBSource,
         chain: VSChainFixture,
     ) -> None:
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=UserID(uuid.uuid4()),
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_entity(
-            key, Permission.READ
-        )
+        result = await db_source.check_owned(key, Permission.READ)
         assert result is False
 
     async def _build_unmapped_chain(
@@ -570,11 +564,11 @@ class TestCheckPermissionViaVirtualEntity:
         await self._create_user_and_role(db_with_rbac_tables, fixture_ids, RoleStatus.ACTIVE)
         await self._build_unmapped_chain(db_with_rbac_tables, fixture_ids)
 
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=fixture_ids.user_id,
             entity=RolePresetID(fixture_ids.entity_id),
         )
-        resolved = await db_source.resolve_effective_permissions_via_virtual_entity([key])
+        resolved = await db_source.owned_permissions([key])
         assert resolved[key] == Permission.READ
 
     async def test_stored_unmapped_entity_type_reads_back(
@@ -802,13 +796,11 @@ class TestUserRosterEnrollment:
         await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
         await self._own_vfolder_in_user_vs(db_with_rbac_tables, ids)
 
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=ids.user_id,
             entity=VFolderUUID(ids.entity_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_entity(
-            key, Permission.READ
-        )
+        result = await db_source.check_owned(key, Permission.READ)
         assert result is False
 
     async def test_project_grant_reaches_an_entity_enrolled_in_the_project(
@@ -835,13 +827,11 @@ class TestUserRosterEnrollment:
             db_with_rbac_tables, ids.owner_scope_id, session_id
         )
 
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=ids.user_id,
             entity=SessionID(session_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_entity(
-            key, Permission.READ
-        )
+        result = await db_source.check_owned(key, Permission.READ)
         assert result is True
 
     async def _put_vfolder_in_project_vs(
@@ -899,12 +889,12 @@ class TestUserRosterEnrollment:
             db_with_rbac_tables, ids.owner_scope_id, vfolder_id, cap
         )
 
-        key = ScopePermissionCheckKey(
+        key = GovernCheckKey(
             user_id=ids.user_id,
             scope=ScopeRef(scope_type=ScopeType(VFOLDER_ENTITY_TYPE), scope_id=vfolder_id),
             entity_type=SESSION_ENTITY_TYPE,
         )
-        result = await db_source.check_scope_permission_via_virtual_entity([key], Permission.READ)
+        result = await db_source.check_governed([key], Permission.READ)
         assert result[key] is reaches
 
     async def _govern_resource_group_from_project(
@@ -981,10 +971,8 @@ class TestUserRosterEnrollment:
             db_with_rbac_tables, ids.owner_scope_id, other_project_id, cap
         )
 
-        key = EntityPermissionCheckKey(user_id=ids.user_id, entity=ProjectID(other_project_id))
-        result = await db_source.check_single_entity_permission_via_virtual_entity(
-            key, Permission.READ
-        )
+        key = OwnCheckKey(user_id=ids.user_id, entity=ProjectID(other_project_id))
+        result = await db_source.check_owned(key, Permission.READ)
         assert result is reaches
 
     async def test_roster_cap_clips_the_grant_over_the_member_user(
@@ -1009,6 +997,6 @@ class TestUserRosterEnrollment:
 
         await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
 
-        key = EntityPermissionCheckKey(user_id=ids.user_id, entity=UserID(ids.user_id))
-        resolved = await db_source.resolve_effective_permissions_via_virtual_entity([key])
+        key = OwnCheckKey(user_id=ids.user_id, entity=UserID(ids.user_id))
+        resolved = await db_source.owned_permissions([key])
         assert resolved[key] == Permission.READ

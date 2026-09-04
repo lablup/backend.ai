@@ -7,24 +7,19 @@ from ai.backend.common.data.entity.user import UserID
 
 
 @dataclass(frozen=True)
-class EntityPermissionCheckKey:
-    """Identifies a ``(user, entity)`` target for virtual-entity-chain
-    permission resolution.
-    """
+class OwnCheckKey:
+    """A ``(user, entity)`` pair for the own check: which bits the user holds on the
+    entity through the scopes that govern a virtual entity owning it."""
 
     user_id: UserID
     entity: EntityIdentifier
 
 
 @dataclass(frozen=True)
-class ScopePermissionCheckKey:
-    """Identifies a ``(user, scope)`` target for virtual-entity-chain
-    permission resolution.
-
-    The scope itself is walked as an entity (reachable through its own and its
-    ancestors' virtual entities), while permission rows are matched on
-    ``entity_type`` — the type of entity acted on within the scope.
-    """
+class GovernCheckKey:
+    """A ``(user, scope, entity_type)`` triple for the govern check: which bits the
+    user holds on ``entity_type`` within the scope, through the scopes governing the
+    scope's virtual entity (itself included)."""
 
     user_id: UserID
     scope: ScopeRef

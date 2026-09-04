@@ -46,8 +46,8 @@ from ai.backend.manager.data.permission.types import (
     ScopeListResult,
 )
 from ai.backend.manager.data.permission.virtual_entity import (
-    EntityPermissionCheckKey,
-    ScopePermissionCheckKey,
+    GovernCheckKey,
+    OwnCheckKey,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
@@ -429,49 +429,48 @@ class PermissionControllerRepository:
         return await self._db_source.check_bulk_permission_with_scope_chain(data)
 
     @permission_controller_repository_resilience.apply()
-    async def check_single_entity_permission_via_virtual_entity(
+    async def check_owned(
         self,
-        key: EntityPermissionCheckKey,
+        key: OwnCheckKey,
         permission: Permission,
     ) -> bool:
-        """Permission check on a single entity through the virtual-entity chain.
+        """The own check on one entity: does the user hold every bit of ``permission``
+        on it through the scopes governing a virtual entity that owns it.
 
         Resolves the effective permission via
         ``entity -> entity_memberships -> scope_bindings -> scope`` with per-hop
         cap clipping and grants only when it covers every bit of ``permission``,
         which may be a mask (``UPSERT`` requires ``CREATE | UPDATE``).
         """
-        return await self._db_source.check_single_entity_permission_via_virtual_entity(
-            key, permission
-        )
+        return await self._db_source.check_owned(key, permission)
 
     @permission_controller_repository_resilience.apply()
-    async def check_bulk_permission_via_virtual_entity(
+    async def check_owned_all(
         self,
-        keys: Collection[EntityPermissionCheckKey],
+        keys: Collection[OwnCheckKey],
         permission: Permission,
-    ) -> Mapping[EntityPermissionCheckKey, bool]:
-        """Batch permission check on multiple entities through the virtual-entity chain.
+    ) -> Mapping[OwnCheckKey, bool]:
+        """The own check on several entities in one go.
 
-        Same semantics as check_single_entity_permission_via_virtual_entity but
+        Same semantics as check_owned but
         for an arbitrary collection of per-entity keys, batched per
         ``(user_id, entity_type)`` group.
         """
-        return await self._db_source.check_bulk_permission_via_virtual_entity(keys, permission)
+        return await self._db_source.check_owned_all(keys, permission)
 
     @permission_controller_repository_resilience.apply()
-    async def check_scope_permission_via_virtual_entity(
+    async def check_governed(
         self,
-        keys: Collection[ScopePermissionCheckKey],
+        keys: Collection[GovernCheckKey],
         permission: Permission,
-    ) -> Mapping[ScopePermissionCheckKey, bool]:
-        """Permission check on target scopes through the virtual-entity chain.
+    ) -> Mapping[GovernCheckKey, bool]:
+        """The govern check on several scopes in one go.
 
         Each scope is walked as an entity while permission rows are matched on
         the key's ``entity_type``, batched per
         ``(user_id, scope_type, entity_type)`` group.
         """
-        return await self._db_source.check_scope_permission_via_virtual_entity(keys, permission)
+        return await self._db_source.check_governed(keys, permission)
 
     @permission_controller_repository_resilience.apply()
     async def resolve_effective_permissions(

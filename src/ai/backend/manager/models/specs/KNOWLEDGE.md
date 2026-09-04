@@ -159,6 +159,32 @@ updater's fields rather than about a column name.
 - govern: scope 가 ve 를 다스린다. scope 의 role 이 그 ve 가 own 한 것 전부에 닿는다. own 보다
   큰 관계다.
 - 해석기는 `entity → 그 entity 를 own 한 ve → 그 ve 를 govern 한 scope → role` 로 한 홉 걷는다.
+  판정도 ops 에 있다(`PermissionReadOps`, `PermissionOpsProvider` 의 read 쪽). `PermissionDBSource`
+  는 거기에 위임만 한다 — 그래프는 ops 로만 쓰고 읽는다.
+- 판정은 둘이고 이름이 관계 이름과 같다.
+
+| 판정 | 질문 | 재료 | 판정 |
+|---|---|---|---|
+| own 판정 | 내 role 이 있는 scope 가 govern 하는 ve 가 이 entity 를 own(cap 포함) 하는가 — "내가 이 entity 를 이 비트로 own 하는가" | `owned_permissions(keys)`: 키마다 경로들의 `permission & govern cap & share cap` 을 OR 한 마스크 | `check_owned(key, bits)` / `check_owned_all(keys, bits)` |
+| govern 판정 | 내 role 이 있는 scope 가 이 scope 의 ve 를 govern 하는가(자기 govern 포함), 그 안의 entity 종류에 이 비트를 주는가 — "내가 이 scope 를 이 종류·이 비트로 govern 하는가" | `governed_permissions(keys)` | `check_governed(keys, bits)` |
+
+  entity 생성·검색은 govern 판정(만들면 그 scope 가 own 하게 된다), 개별 entity 동작·bulk·relation
+  은 own 판정, global 은 그래프 밖(superadmin)이다. 필드 판정과 목록 필터(BEP-1077 5.2, 5.4)는 후속.
+- own 판정 쿼리의 비용은 홉당 인덱스 조회이고, 결과는 entity 당 한 행이다.
+
+| 측정 | 방법 |
+|---|---|
+| 동일성 | `tests/unit/manager/repositories/permission_controller/test_own_check_query.py` — 옛 쿼리(경로·비트마다 한 행, 파이썬에서 OR)를 함수로 보존해 세 모양(own 사슬, share, role 많음)에서 같은 답인지 CI 마다 확인 |
+| 벤치마크 | 같은 파일. `BAI_BENCHMARK=1 … -s` 는 entity 1,000개, `BAI_BENCHMARK_SCALE=1 … -s` 는 COPY 로 시드한 규모(domain 10, project 1,000, user 10,000, session 100만, vfolder 100만, 공유 30만, role 10,000, permission 10만, user_role 10만; 관계 행 약 1,300만, 시드 약 4분, pants 는 `--test-timeout-default=3600 --test-attempts-default=1`). 워밍업 뒤 두 쿼리를 번갈아 돌려 min / median / p95 와 `EXPLAIN (ANALYZE, BUFFERS)` 를 찍는다 |
+
+| 규모 측정 (로컬 컨테이너, 세 번 실행 중 정상 두 번의 범위) | 옛 쿼리 median | 지금 median | DB 안 실행 시간 |
+|---|---|---|---|
+| session 2,000개 (own 1,000 + 남의 것 1,000, 전부 도달) | 71 ~ 74 ms | 56 ~ 59 ms | 41 ms vs 42 ms |
+| vfolder 500개 (도달 261개) | 13 ms | 13 ms | 6.7 ms vs 7.2 ms |
+
+- plan 은 두 쿼리가 같다: entity unique 인덱스 → own 인덱스 → govern index-only → governor PK → user 의 permission(수십 행) hash join. 홉마다 인덱스 조회라 seq scan 은 없고, 41 ms 중 31 ms 가 2,000 entity × 경로 약 7개의 중첩 루프다.
+- 벽시계 차이는 전부 결과 행 수(5,260 → 2,000)와 파이썬 OR 루프가 없어진 몫이다. `bit_or … GROUP BY` 가 그 대가로 Sort + GroupAggregate 약 1 ms 를 더한다. user 의 permission 을 CTE 로 앞세우는 것은 planner 가 이미 그렇게 하고 있어 이득이 없었고 넣지 않았다.
+- 한 번은 같은 데이터에서 두 쿼리 모두 median 29 초가 나왔다(COPY 직후 컨테이너 DB 상태로 추정). 재현되지 않았지만, 운영 규모 판단은 운영 통계로 plan 을 다시 봐야 한다.
   모든 entity 는 자기 ve 가 자기를 own 하고 자기 scope 가 자기 ve 를 govern 한다(`_provision_entities`).
 - `created_in`(session → project·user): 만든 곳이 own 하고 govern 한다. own 으로 project role 이
   session 에 닿고 목록에 오르며, govern 으로 session 이 own 한 것(초대)에도 닿는다. domain 은 user
