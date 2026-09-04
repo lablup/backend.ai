@@ -74,6 +74,12 @@ from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorC
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import CreatorSpec
@@ -103,6 +109,7 @@ from ai.backend.manager.repositories.permission_controller.role_manager import (
     ScopeSystemRoleData,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 # ORM cluster registration: create()/flush triggers configure_mappers() over the whole
 # registry, and importing the RBAC ops provider registers RoleRow/UserRoleRow whose
@@ -297,6 +304,8 @@ _SCOPE_TABLES = [
     OpsRBACScopeRow,
     VirtualEntityRow,
     EntityMembershipRow,
+    EntityMembershipCapRow,
+    EntityMembershipFieldRow,
     ScopeBindingRow,
     EntityLabelRow,
     # create_scope provisions preset-derived roles, so it reads these even when empty.
@@ -327,6 +336,8 @@ async def rbac_ops_tables(
 _ENTITY_MEMBER_TABLES = [
     VirtualEntityRow,
     EntityMembershipRow,
+    EntityMembershipCapRow,
+    EntityMembershipFieldRow,
     ScopeBindingRow,
     AssociationScopesEntitiesRow,
 ]
@@ -424,7 +435,7 @@ class TestScopeCreationVirtualEntity:
         membership = membership_rows[0]
         assert membership.virtual_entity_id == ve.id
         assert membership.member_entity_id == ve.id
-        assert membership.permission_cap is None
+        assert membership.capped is False
 
         assert len(binding_rows) == 1
         binding = binding_rows[0]
@@ -458,7 +469,7 @@ class TestScopeCreationVirtualEntity:
         for membership in membership_rows:
             assert membership.virtual_entity_id in node_ids
             assert membership.member_entity_id == membership.virtual_entity_id
-            assert membership.permission_cap is None
+            assert membership.capped is False
 
         assert len(binding_rows) == 3
         for binding in binding_rows:
@@ -893,6 +904,12 @@ class TestAddBulkMembers:
                 .all()
             )
             entity_by_node = await _entity_by_node(sess)
+            caps_by_entity = {
+                entity_by_node[m.member_entity_id]: await VirtualEntitySeeder().edge_cap(
+                    sess, m.virtual_entity_id, m.member_entity_id
+                )
+                for m in membership_rows
+            }
             assoc_count = await sess.scalar(
                 sa.select(sa.func.count())
                 .select_from(AssociationScopesEntitiesRow)
@@ -902,9 +919,6 @@ class TestAddBulkMembers:
         # the scope's self membership and the member's
         assert len(membership_rows) == 2
         assert assoc_count == 1
-        caps_by_entity = {
-            entity_by_node[m.member_entity_id]: m.permission_cap for m in membership_rows
-        }
         assert caps_by_entity == {
             scope_id: None,  # self membership
             member_id: Permission.READ,
@@ -986,11 +1000,8 @@ class TestUserRosterEnrollment:
                 ve.entity_id: ve.id
                 for ve in (await sess.execute(sa.select(VirtualEntityRow))).scalars().all()
             }
-            cap = await sess.scalar(
-                sa.select(EntityMembershipRow.permission_cap).where(
-                    EntityMembershipRow.virtual_entity_id == ve_by_scope[scope.scope_id],
-                    EntityMembershipRow.member_entity_id == ve_by_scope[user_id],
-                )
+            cap = await VirtualEntitySeeder().edge_cap(
+                sess, ve_by_scope[scope.scope_id], ve_by_scope[user_id]
             )
             user_vs_bindings = {
                 b.scope_entity_id
@@ -1283,7 +1294,7 @@ class TestRemoveBulkMembers:
                 EntityMembershipRow(
                     virtual_entity_id=scope_ve.id,
                     member_entity_id=member_node.id,
-                    permission_cap=None,
+                    capped=False,
                 )
             )
             sess.add(
@@ -1477,6 +1488,8 @@ _SCOPE_DELETE_TABLES = [
     OpsRBACScopeRow,
     VirtualEntityRow,
     EntityMembershipRow,
+    EntityMembershipCapRow,
+    EntityMembershipFieldRow,
     ScopeBindingRow,
     RolePresetRow,
     RolePermissionPresetRow,

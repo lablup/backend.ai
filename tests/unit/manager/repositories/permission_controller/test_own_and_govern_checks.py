@@ -15,12 +15,13 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
 from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE, RolePresetID
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
-from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE, VFolderUUID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
@@ -34,7 +35,10 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as PermScopeType,
 )
-from ai.backend.manager.data.permission.virtual_entity import EntityPermissionCheckKey
+from ai.backend.manager.data.permission.virtual_entity import (
+    GovernCheckKey,
+    OwnCheckKey,
+)
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 
@@ -60,6 +64,12 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.rbac.provider import (
@@ -70,7 +80,11 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 _ORM_CLUSTER = (
     AgentRow,
@@ -156,6 +170,8 @@ class TestCheckPermissionViaVirtualEntity:
                 ScopeBindingRow,
                 EntityLabelRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -265,12 +281,8 @@ class TestCheckPermissionViaVirtualEntity:
                 )
             )
             if spec.attach_membership:
-                db_sess.add(
-                    EntityMembershipRow(
-                        virtual_entity_id=ids.virtual_entity_id,
-                        member_entity_id=ids.entity_node_id,
-                        permission_cap=spec.entity_cap,
-                    )
+                await VirtualEntitySeeder().cap_edge(
+                    db_sess, ids.virtual_entity_id, ids.entity_node_id, spec.entity_cap
                 )
             db_sess.add_all(
                 _single_bit_rows(
@@ -349,8 +361,8 @@ class TestCheckPermissionViaVirtualEntity:
                     entity_cap=Permission.READ,
                 ),
                 Permission.READ,
-                True,
-                id="entity-cap-keeps-read",
+                False,
+                id="share-not-reached-through-another-scope-s-govern",
             ),
             pytest.param(
                 VSChainSpec(granted=Permission.READ | Permission.UPDATE),
@@ -409,11 +421,13 @@ class TestCheckPermissionViaVirtualEntity:
         permission: Permission,
         expected: bool,
     ) -> None:
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_entity(key, permission)
+        result = (
+            (await db_source.owned_permissions([key])).get(key, Permission.NONE).covers(permission)
+        )
         assert result is expected
 
     @pytest.mark.parametrize(
@@ -430,8 +444,8 @@ class TestCheckPermissionViaVirtualEntity:
                     scope_cap=Permission.READ | Permission.UPDATE,
                     entity_cap=Permission.READ,
                 ),
-                Permission.READ,
-                id="clipped-by-both-hops",
+                Permission.NONE,
+                id="share-answers-nothing-through-another-scope-s-govern",
             ),
         ],
         indirect=["chain"],
@@ -442,11 +456,11 @@ class TestCheckPermissionViaVirtualEntity:
         chain: VSChainFixture,
         expected: Permission,
     ) -> None:
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        resolved = await db_source.resolve_effective_permissions_via_virtual_entity([key])
+        resolved = await db_source.owned_permissions([key])
         assert resolved[key] == expected
 
     @pytest.mark.parametrize(
@@ -459,18 +473,16 @@ class TestCheckPermissionViaVirtualEntity:
         db_source: PermissionDBSource,
         chain: VSChainFixture,
     ) -> None:
-        reachable = EntityPermissionCheckKey(
+        reachable = OwnCheckKey(
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        unreachable = EntityPermissionCheckKey(
+        unreachable = OwnCheckKey(
             user_id=chain.user_id,
             entity=VFolderUUID(uuid.uuid4()),
         )
-        result = await db_source.check_bulk_permission_via_virtual_entity(
-            [reachable, unreachable], Permission.READ
-        )
-        assert result == {reachable: True, unreachable: False}
+        result = await db_source.owned_permissions([reachable, unreachable])
+        assert result == {reachable: Permission.READ, unreachable: Permission.NONE}
 
     @pytest.mark.parametrize(
         ("chain",),
@@ -487,14 +499,12 @@ class TestCheckPermissionViaVirtualEntity:
         db_source: PermissionDBSource,
         chain: VSChainFixture,
     ) -> None:
-        reachable = EntityPermissionCheckKey(
+        reachable = OwnCheckKey(
             user_id=chain.user_id,
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_bulk_permission_via_virtual_entity(
-            [reachable], Permission.CREATE | Permission.UPDATE
-        )
-        assert result == {reachable: False}
+        result = await db_source.owned_permissions([reachable])
+        assert not result[reachable].covers(Permission.CREATE | Permission.UPDATE)
 
     @pytest.mark.parametrize(
         ("chain",),
@@ -506,12 +516,14 @@ class TestCheckPermissionViaVirtualEntity:
         db_source: PermissionDBSource,
         chain: VSChainFixture,
     ) -> None:
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=UserID(uuid.uuid4()),
             entity=VFolderUUID(chain.entity_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_entity(
-            key, Permission.READ
+        result = (
+            (await db_source.owned_permissions([key]))
+            .get(key, Permission.NONE)
+            .covers(Permission.READ)
         )
         assert result is False
 
@@ -561,11 +573,11 @@ class TestCheckPermissionViaVirtualEntity:
         await self._create_user_and_role(db_with_rbac_tables, fixture_ids, RoleStatus.ACTIVE)
         await self._build_unmapped_chain(db_with_rbac_tables, fixture_ids)
 
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=fixture_ids.user_id,
             entity=RolePresetID(fixture_ids.entity_id),
         )
-        resolved = await db_source.resolve_effective_permissions_via_virtual_entity([key])
+        resolved = await db_source.owned_permissions([key])
         assert resolved[key] == Permission.READ
 
     async def test_stored_unmapped_entity_type_reads_back(
@@ -624,6 +636,8 @@ class TestUserRosterEnrollment:
                 VirtualEntityRow,
                 ScopeBindingRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -645,6 +659,13 @@ class TestUserRosterEnrollment:
     @pytest.fixture
     def ids(self) -> VSChainFixture:
         return VSChainFixture()
+
+    @pytest.fixture
+    def repository(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> PermissionControllerRepository:
+        return PermissionControllerRepository(db_with_rbac_tables)
 
     async def _grant_on_project(
         self,
@@ -727,7 +748,7 @@ class TestUserRosterEnrollment:
                 EntityMembershipRow(
                     virtual_entity_id=user_vs_id,
                     member_entity_id=ids.entity_node_id,
-                    permission_cap=None,
+                    capped=False,
                 )
             )
             await db_sess.flush()
@@ -754,7 +775,7 @@ class TestUserRosterEnrollment:
                 EntityMembershipRow(
                     virtual_entity_id=project_ve_id,
                     member_entity_id=session_node.id,
-                    permission_cap=None,
+                    capped=False,
                 )
             )
             await db_sess.flush()
@@ -791,12 +812,14 @@ class TestUserRosterEnrollment:
         await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
         await self._own_vfolder_in_user_vs(db_with_rbac_tables, ids)
 
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=ids.user_id,
             entity=VFolderUUID(ids.entity_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_entity(
-            key, Permission.READ
+        result = (
+            (await db_source.owned_permissions([key]))
+            .get(key, Permission.NONE)
+            .covers(Permission.READ)
         )
         assert result is False
 
@@ -824,14 +847,162 @@ class TestUserRosterEnrollment:
             db_with_rbac_tables, ids.owner_scope_id, session_id
         )
 
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=ids.user_id,
             entity=SessionID(session_id),
         )
-        result = await db_source.check_single_entity_permission_via_virtual_entity(
-            key, Permission.READ
+        result = (
+            (await db_source.owned_permissions([key]))
+            .get(key, Permission.NONE)
+            .covers(Permission.READ)
         )
         assert result is True
+
+    async def _put_vfolder_in_project_vs(
+        self,
+        db: ExtendedAsyncSAEngine,
+        project_id: uuid.UUID,
+        vfolder_id: uuid.UUID,
+        cap: Permission | None,
+    ) -> None:
+        """Put a vfolder into the project's virtual entity: shared under ``cap``, or
+        owned for ``None``."""
+        async with db.begin_session() as db_sess:
+            project_ve_id = await db_sess.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_id == project_id,
+                )
+            )
+            assert project_ve_id is not None
+            vfolder_node = VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id)
+            db_sess.add(vfolder_node)
+            await db_sess.flush()
+            await VirtualEntitySeeder().cap_edge(db_sess, project_ve_id, vfolder_node.id, cap)
+
+    @pytest.mark.parametrize(
+        ("cap", "reaches"),
+        [
+            pytest.param(None, True, id="owned"),
+            pytest.param(Permission.READ, False, id="shared"),
+        ],
+    )
+    async def test_a_share_never_makes_the_shared_entity_a_scope(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        db_source: PermissionDBSource,
+        ops_provider: RBACOpsProvider,
+        repository: PermissionControllerRepository,
+        ids: VSChainFixture,
+        cap: Permission | None,
+        reaches: bool,
+    ) -> None:
+        """A project role holding session READ reaches sessions under a vfolder the
+        project owns, and not under one merely shared into it: a share answers for
+        the shared entity's own type only."""
+        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
+        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        vfolder_id = uuid.uuid4()
+        await self._grant_on_project(
+            db_with_rbac_tables,
+            ids,
+            ids.owner_scope_id,
+            entity_type=PermEntityType.SESSION,
+        )
+        await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
+        await self._put_vfolder_in_project_vs(
+            db_with_rbac_tables, ids.owner_scope_id, vfolder_id, cap
+        )
+
+        key = GovernCheckKey(
+            user_id=ids.user_id,
+            scope=ScopeRef(scope_type=ScopeType(VFOLDER_ENTITY_TYPE), scope_id=vfolder_id),
+            entity_type=SESSION_ENTITY_TYPE,
+        )
+        result = await repository.governed_permissions([key])
+        assert result[key] == (Permission.READ if reaches else Permission.NONE)
+
+    async def _govern_resource_group_from_project(
+        self,
+        db: ExtendedAsyncSAEngine,
+        project_id: uuid.UUID,
+        other_project_id: uuid.UUID,
+        cap: Permission | None,
+    ) -> None:
+        """A resource group the project governs under READ, holding another project:
+        owned for ``None``, shared under ``cap`` otherwise."""
+        async with db.begin_session() as db_sess:
+            project_ve_id = await db_sess.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_id == project_id,
+                )
+            )
+            assert project_ve_id is not None
+            rg_node = VirtualEntityRow(
+                entity_type=RESOURCE_GROUP_ENTITY_TYPE, entity_id=uuid.uuid4()
+            )
+            other_node = VirtualEntityRow(
+                entity_type=PROJECT_ENTITY_TYPE, entity_id=other_project_id
+            )
+            db_sess.add_all([rg_node, other_node])
+            await db_sess.flush()
+            db_sess.add(
+                ScopeBindingRow(
+                    virtual_entity_id=rg_node.id,
+                    scope_entity_id=rg_node.id,
+                    permission_cap=None,
+                )
+            )
+            db_sess.add(
+                ScopeBindingRow(
+                    virtual_entity_id=rg_node.id,
+                    scope_entity_id=project_ve_id,
+                    permission_cap=Permission.READ,
+                )
+            )
+            await VirtualEntitySeeder().cap_edge(db_sess, rg_node.id, other_node.id, cap)
+
+    @pytest.mark.parametrize(
+        ("cap", "reaches"),
+        [
+            pytest.param(None, True, id="owned"),
+            pytest.param(Permission.READ, False, id="shared"),
+        ],
+    )
+    async def test_a_share_answers_only_to_the_scope_it_was_shared_to(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        db_source: PermissionDBSource,
+        ops_provider: RBACOpsProvider,
+        ids: VSChainFixture,
+        cap: Permission | None,
+        reaches: bool,
+    ) -> None:
+        """A project governing a resource group under READ reaches what the resource
+        group owns, and not what was merely shared to the resource group: a share
+        answers to the resource group's own scope only."""
+        project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
+        user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
+        other_project_id = uuid.uuid4()
+        await self._grant_on_project(
+            db_with_rbac_tables,
+            ids,
+            ids.owner_scope_id,
+            entity_type=PermEntityType.PROJECT,
+        )
+        await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
+        await self._govern_resource_group_from_project(
+            db_with_rbac_tables, ids.owner_scope_id, other_project_id, cap
+        )
+
+        key = OwnCheckKey(user_id=ids.user_id, entity=ProjectID(other_project_id))
+        result = (
+            (await db_source.owned_permissions([key]))
+            .get(key, Permission.NONE)
+            .covers(Permission.READ)
+        )
+        assert result is reaches
 
     async def test_roster_cap_clips_the_grant_over_the_member_user(
         self,
@@ -855,6 +1026,6 @@ class TestUserRosterEnrollment:
 
         await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
 
-        key = EntityPermissionCheckKey(user_id=ids.user_id, entity=UserID(ids.user_id))
-        resolved = await db_source.resolve_effective_permissions_via_virtual_entity([key])
+        key = OwnCheckKey(user_id=ids.user_id, entity=UserID(ids.user_id))
+        resolved = await db_source.owned_permissions([key])
         assert resolved[key] == Permission.READ

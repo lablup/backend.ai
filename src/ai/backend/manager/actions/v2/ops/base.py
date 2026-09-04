@@ -18,6 +18,7 @@ from ai.backend.manager.models.specs.creator import (
     FieldCreator,
     GlobalEntityCreator,
     RoleManagedEntityCreator,
+    RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.purger import (
@@ -303,8 +304,8 @@ class EntityWithFieldsCreateOpsAction[TRow: Base, TData, TFieldRow: Base, TField
 
 
 class RoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the role-managed entity insert spec: the entity create plus the
-    preset-role provisioning the combined spec declares."""
+    """Carries the role-managed entity insert spec: the entity create in its scopes
+    plus the preset-role provisioning the combined spec declares."""
 
     @abstractmethod
     def to_creator(self) -> RoleManagedEntityCreator[TRow, TData]:
@@ -313,11 +314,11 @@ class RoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class GlobalRoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the role-managed entity insert spec of an entity that goes under no
-    other scope: the row, its preset roles, and no membership to join."""
+    """Carries the role-managed entity insert spec of an entity created in no
+    scope: the row and its preset roles."""
 
     @abstractmethod
-    def to_creator(self) -> RoleManagedEntityCreator[TRow, TData]:
+    def to_creator(self) -> RoleManagedGlobalEntityCreator[TRow, TData]:
         """Return the insert spec this action executes."""
         raise NotImplementedError
 

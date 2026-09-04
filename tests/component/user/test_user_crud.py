@@ -451,7 +451,7 @@ class TestUserCreateAutoAssignRoles:
                 sa.insert(EntityMembershipRow.__table__).values(
                     virtual_entity_id=virtual_entity_id,
                     member_entity_id=virtual_entity_id,
-                    permission_cap=None,
+                    capped=False,
                 )
             )
             await conn.execute(

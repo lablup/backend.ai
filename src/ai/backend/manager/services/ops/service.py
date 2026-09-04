@@ -497,7 +497,7 @@ class EntityCreateWithFieldsService[TData: EntityData]:
 
 
 class RoleManagedEntityCreateService[TData: EntityData]:
-    """Inserts the role-managed entity row, preset roles included."""
+    """Inserts the role-managed entity row in its scopes, preset roles included."""
 
     _repository: OpsRepository[TData]
 
@@ -513,7 +513,8 @@ class RoleManagedEntityCreateService[TData: EntityData]:
 
 
 class GlobalRoleManagedEntityCreateService[TData: EntityData]:
-    """Inserts the top-level role-managed entity row, preset roles included."""
+    """Inserts the role-managed entity row created in no scope, preset roles
+    included."""
 
     _repository: OpsRepository[TData]
 
@@ -524,7 +525,7 @@ class GlobalRoleManagedEntityCreateService[TData: EntityData]:
         self, action: GlobalRoleManagedEntityCreateOpsAction[Any, TData]
     ) -> CreatedEntityOpsResult[TData]:
         return CreatedEntityOpsResult(
-            data=await self._repository.create_role_managed_entity(action.to_creator())
+            data=await self._repository.create_role_managed_global_entity(action.to_creator())
         )
 
 

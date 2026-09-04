@@ -2,13 +2,14 @@ from typing import override
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.v2.single_entity.trigger import (
     SingleEntityActionTriggerMeta,
 )
 from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.permission.virtual_entity import EntityPermissionCheckKey
+from ai.backend.manager.data.permission.virtual_entity import OwnCheckKey
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -16,7 +17,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 
 
 class VirtualEntitySingleEntityActionRBACValidator(SingleEntityActionValidator):
-    """Single-entity RBAC validator resolving permissions via the virtual-entity chain."""
+    """Single-entity RBAC validator: the own check on the action's entity."""
 
     _repository: PermissionControllerRepository
     _config_provider: ManagerConfigProvider
@@ -40,15 +41,13 @@ class VirtualEntitySingleEntityActionRBACValidator(SingleEntityActionValidator):
         if user.is_superadmin:
             return
 
-        key = EntityPermissionCheckKey(
+        key = OwnCheckKey(
             user_id=UserID(user.user_id),
             entity=meta.entity,
         )
         permission = meta.operation_type.to_permission()
-        allowed = await self._repository.check_single_entity_permission_via_virtual_entity(
-            key, permission
-        )
-        if not allowed:
+        owned = await self._repository.owned_permissions([key])
+        if not owned.get(key, Permission.NONE).covers(permission):
             raise NotEnoughPermission(
                 f"User {user.user_id} lacks permission {permission!r} "
                 f"on {meta.entity.entity_type()} {meta.entity}"

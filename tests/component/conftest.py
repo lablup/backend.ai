@@ -613,7 +613,7 @@ async def domain_fixture(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
                 member_entity_id=virtual_entity_id,
-                permission_cap=None,
+                capped=False,
             )
         )
         await conn.execute(
@@ -820,7 +820,7 @@ async def group_fixture(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
                 member_entity_id=virtual_entity_id,
-                permission_cap=None,
+                capped=False,
             )
         )
         await conn.execute(
@@ -867,7 +867,7 @@ class VirtualEntitySeeder:
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
                 member_entity_id=virtual_entity_id,
-                permission_cap=None,
+                capped=False,
             )
         )
         await conn.execute(
@@ -905,7 +905,7 @@ class VirtualEntitySeeder:
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=project_scope_id,
                 member_entity_id=user_scope_id,
-                permission_cap=None,
+                capped=False,
             )
         )
 

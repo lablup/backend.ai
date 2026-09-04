@@ -154,14 +154,14 @@ class EntityMembershipCreatorSpec(DependentCreatorSpec[VirtualEntityID, EntityMe
     as the dependency."""
 
     member_entity_id: VirtualEntityID
-    permission_cap: Permission | None = None
+    capped: bool = False
 
     @override
     def build_row(self, dependency: VirtualEntityID) -> EntityMembershipRow:
         return EntityMembershipRow(
             virtual_entity_id=dependency,
             member_entity_id=self.member_entity_id,
-            permission_cap=self.permission_cap,
+            capped=self.capped,
         )
 
 

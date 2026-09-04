@@ -14,11 +14,9 @@ from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
     ArtifactRegistryOpsProvider,
 )
-from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
-    ContainerRegistryOpsProvider,
-)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
 from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
 from ai.backend.manager.repositories.ops.v2.secret.provider import SecretOpsProvider
@@ -30,7 +28,7 @@ class RepositoryArgs:
     db: ExtendedAsyncSAEngine
     ops_provider: DBOpsProvider
     v2_ops_provider: V2DBOpsProvider
-    container_registry_ops_provider: ContainerRegistryOpsProvider
+    relation_ops_provider: RelationOpsProvider
     reconcile_ops_provider: ReconcileOpsProvider
     artifact_registry_ops_provider: ArtifactRegistryOpsProvider
     replica_group_ops_provider: ReplicaGroupOpsProvider

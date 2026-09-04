@@ -51,7 +51,7 @@ class ModelCardScanUpserter(EntityUpserter[ModelCardRow, ModelCardData]):
         return ModelCardID(row.id)
 
     @override
-    def member_of(self, row: ModelCardRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: ModelCardRow) -> Collection[EntityIdentifier]:
         return (ProjectID(self.project_id),)
 
     @override

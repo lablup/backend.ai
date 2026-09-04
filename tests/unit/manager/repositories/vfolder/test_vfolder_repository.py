@@ -19,7 +19,7 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
-from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE, VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
     ClusterMode,
@@ -102,9 +102,15 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
@@ -181,6 +187,8 @@ class TestVfolderRepository:
                 AssociationScopesEntitiesRow,
                 VirtualEntityRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
                 ScopeBindingRow,
                 EntityLabelRow,
                 ObjectPermissionRow,
@@ -363,7 +371,7 @@ class TestVfolderRepository:
     ) -> AsyncGenerator[VfolderRepository, None]:
         """Create VfolderRepository instance with database"""
         repo = VfolderRepository(
-            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
         )
         yield repo
 
@@ -564,7 +572,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
     ) -> VfolderRepository:
         """Create VfolderRepository instance."""
         return VfolderRepository(
-            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
         )
 
     async def test_get_allowed_vfolder_hosts_returns_vfolder_host_permission_map(
@@ -795,7 +803,7 @@ class TestVfolderRepositoryPurge:
     ) -> VfolderRepository:
         """Create VfolderRepository instance."""
         return VfolderRepository(
-            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
         )
 
     async def _create_vfolder_in_db(
@@ -830,6 +838,7 @@ class TestVfolderRepositoryPurge:
                 status=status,
             )
             db_sess.add(vfolder)
+            db_sess.add(VirtualEntityRow(entity_type=VFOLDER_ENTITY_TYPE, entity_id=vfolder_id))
             await db_sess.flush()
 
     async def _vfolder_exists(self, db: ExtendedAsyncSAEngine, vfolder_id: uuid.UUID) -> bool:
@@ -1198,7 +1207,7 @@ class TestVfolderRepositoryDeleteForever:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
         return VfolderRepository(
-            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
         )
 
     async def _create_vfolder(
@@ -1964,7 +1973,7 @@ class TestVFolderRepositoryTrashAndRestore:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
         return VfolderRepository(
-            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
         )
 
     @pytest.fixture

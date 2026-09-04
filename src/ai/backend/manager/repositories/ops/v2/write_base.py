@@ -1,14 +1,14 @@
 """Write primitives every v2 write concern shares.
 
-Row insert/delete/upsert with spec-declared check execution, integrity-error
-parsing and matching, and membership recording/removal with the transitional
-dual-write. No public operation lives here — the per-concern write ops inherit
-these on top of :class:`~.base.V2OpsBase`.
+Row insert/delete/upsert with spec-declared check execution, and integrity-error
+parsing and matching. No public operation and no graph relation lives here — the
+per-concern write ops inherit these on top of :class:`~.base.V2OpsBase`; the graph
+is :class:`~.graph_write.V2GraphWriteOpsBase`, and the relations over existing
+entities are the share and relation write ops.
 """
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import Any, ClassVar, NoReturn, cast
 
@@ -17,12 +17,6 @@ from asyncpg.exceptions import PostgresError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    EntityType,
-)
-from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
-from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import (
     CheckConstraintViolationError,
     ExclusionViolationError,
@@ -33,88 +27,12 @@ from ai.backend.manager.errors.repository import (
     UpsertEmptyResultError,
 )
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
 
 class V2WriteOpsBase(V2OpsBase):
     """The shared write primitives, bound to a single session."""
-
-    async def _provision_entities(self, entities: Sequence[EntityIdentifier]) -> None:
-        """Put each entity into the RBAC graph: its virtual entity node, its self
-        entity-membership and its self scope-binding (permission_cap NULL). The reverse
-        of :meth:`_teardown_entity`. Idempotent: an existing node is a no-op."""
-        if not entities:
-            return
-        values = [{"entity_type": e.entity_type(), "entity_id": e} for e in entities]
-        insert_stmt = (
-            pg_insert(VirtualEntityRow)
-            .values(values)
-            .on_conflict_do_nothing(index_elements=["entity_type", "entity_id"])
-            .returning(
-                VirtualEntityRow.id,
-                VirtualEntityRow.entity_type,
-                VirtualEntityRow.entity_id,
-            )
-        )
-        inserted = (await self._sess.execute(insert_stmt)).all()
-        if not inserted:
-            return
-        membership_stmt = (
-            pg_insert(EntityMembershipRow)
-            .values([
-                {
-                    "virtual_entity_id": row.id,
-                    "member_entity_id": row.id,
-                    "permission_cap": None,
-                }
-                for row in inserted
-            ])
-            .on_conflict_do_nothing()
-        )
-        await self._sess.execute(membership_stmt)
-        binding_stmt = (
-            pg_insert(ScopeBindingRow)
-            .values([
-                {
-                    "virtual_entity_id": row.id,
-                    "scope_entity_id": row.id,
-                    "permission_cap": None,
-                }
-                for row in inserted
-            ])
-            .on_conflict_do_nothing()
-        )
-        await self._sess.execute(binding_stmt)
-
-    async def _teardown_entity(self, entity: EntityIdentifier) -> None:
-        """Remove what the entity left: permissions granted on it, its virtual entity
-        node (every edge naming the node goes with it by FK), and the labels put on it.
-
-        The permission delete keys on the id alone, which is a UUID and so already
-        names one entity; the type would only narrow it to what it already is.
-        """
-        await self._sess.execute(
-            sa.delete(PermissionRow).where(PermissionRow.scope_id == str(entity))
-        )
-        await self._sess.execute(
-            sa.delete(VirtualEntityRow).where(
-                VirtualEntityRow.entity_type == entity.entity_type(),
-                VirtualEntityRow.entity_id == entity,
-            )
-        )
-        await self._sess.execute(
-            sa.delete(EntityLabelRow).where(
-                EntityLabelRow.entity_type == entity.entity_type(),
-                EntityLabelRow.entity_id == entity,
-            )
-        )
 
     _SQLSTATE_TO_ERROR: ClassVar[Mapping[str, type[RepositoryIntegrityError]]] = {
         "23505": UniqueConstraintViolationError,
@@ -365,74 +283,6 @@ class V2WriteOpsBase(V2OpsBase):
         stmt = pg_insert(row_cls).values(values_list).on_conflict_do_nothing()
         await self._sess.execute(stmt)
         await self._sess.flush()
-
-    async def _record_memberships(self, entries: Sequence[EntityMembershipEntry]) -> None:
-        """Record declared memberships in the parents' virtual entities, idempotently;
-        a parent or member without a virtual entity fails (resolve-or-fail)."""
-        if not entries:
-            return
-        node_ids = await self._resolve_virtual_entity_ids([
-            *(e.parent for e in entries),
-            *(e.member for e in entries),
-        ])
-        await self._bulk_insert_ignore_conflicts(
-            [
-                EntityMembershipRow(
-                    virtual_entity_id=node_ids[(entry.parent.entity_type(), entry.parent)],
-                    member_entity_id=node_ids[(entry.member.entity_type(), entry.member)],
-                    permission_cap=None,
-                )
-                for entry in entries
-            ],
-        )
-
-    async def _remove_memberships(self, members: Sequence[EntityIdentifier]) -> None:
-        """Remove every membership the members hold, so a purge cannot leave
-        orphan registrations behind."""
-        if not members:
-            return
-        await self._sess.execute(
-            sa.delete(EntityMembershipRow).where(
-                EntityMembershipRow.member_entity_id.in_(self._virtual_entity_ids_query(members))
-            )
-        )
-
-    def _virtual_entity_ids_query(
-        self, entities: Sequence[EntityIdentifier]
-    ) -> sa.Select[tuple[VirtualEntityID]]:
-        """The ids of the entities' virtual entity nodes; an entity without one
-        contributes nothing, so a delete keyed on it matches nothing."""
-        return sa.select(VirtualEntityRow.id).where(
-            sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
-                (e.entity_type(), e) for e in entities
-            ])
-        )
-
-    async def _resolve_virtual_entity_ids(
-        self, entities: Sequence[EntityIdentifier]
-    ) -> dict[tuple[EntityType, uuid.UUID], VirtualEntityID]:
-        """Resolve-or-fail, never get-or-create: a declared parent without a virtual
-        scope raises :class:`VirtualEntityNotFound` naming every missing scope."""
-        stmt = sa.select(
-            VirtualEntityRow.entity_type,
-            VirtualEntityRow.entity_id,
-            VirtualEntityRow.id,
-        ).where(
-            sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
-                (e.entity_type(), e) for e in entities
-            ])
-        )
-        resolved = {
-            (row.entity_type, row.entity_id): row.id
-            for row in (await self._sess.execute(stmt)).all()
-        }
-        missing = [e for e in entities if (e.entity_type(), e) not in resolved]
-        if missing:
-            raise VirtualEntityNotFound(
-                "No virtual entity for entities: "
-                + ", ".join(f"{e.entity_type()}:{e}" for e in missing)
-            )
-        return resolved
 
     async def _batch_purge_returning[TRow: Base, TData](
         self,

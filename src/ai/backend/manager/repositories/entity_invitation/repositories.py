@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.manager.repositories.entity_invitation.repository import EntityInvitationRepository
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.types import RepositoryArgs
 
 
@@ -12,5 +13,5 @@ class EntityInvitationRepositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         return cls(
-            repository=EntityInvitationRepository(args.v2_ops_provider),
+            repository=EntityInvitationRepository(ShareOpsProvider(args.db)),
         )

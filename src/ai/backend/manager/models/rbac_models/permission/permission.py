@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from typing import Self
 
 import sqlalchemy as sa
@@ -8,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.permission.id import PermissionID
 from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
 from ai.backend.manager.data.permission.types import Permission
@@ -42,10 +42,12 @@ class PermissionRow(CreatedAtMixin, Base):
             "permission > 0 AND (permission & (permission - 1)) = 0",
             name="single_bit",
         ),
+        # Only READ and UPDATE state a field scope; every other bit covers all fields.
+        sa.CheckConstraint("all_fields OR permission IN (1, 2)", name="field_scope"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[PermissionID] = mapped_column(
+        "id", GUID(PermissionID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     role_id: Mapped[RoleID] = mapped_column(
         "role_id",
@@ -63,6 +65,10 @@ class PermissionRow(CreatedAtMixin, Base):
     # One row per operation bit; the bit is the row's identity.
     permission: Mapped[Permission] = mapped_column(
         "permission", IntFlagType(Permission), nullable=False
+    )
+    # True: the operation on every field. False: on the permission_fields paths only.
+    all_fields: Mapped[bool] = mapped_column(
+        "all_fields", sa.Boolean, nullable=False, server_default=sa.true()
     )
 
     @classmethod

@@ -9,7 +9,6 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
-from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import (
     RBACElementType,
@@ -62,8 +61,8 @@ from ai.backend.manager.data.permission.types import (
     ScopeType as LegacyScopeType,
 )
 from ai.backend.manager.data.permission.virtual_entity import (
-    EntityPermissionCheckKey,
-    ScopePermissionCheckKey,
+    GovernCheckKey,
+    OwnCheckKey,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.permission import RoleNotAssigned, RoleNotFound
@@ -80,9 +79,6 @@ from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScop
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
     BulkCreatorResultWithFailures,
@@ -102,6 +98,7 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.permission_controller.creators import (
     ObjectPermissionCreatorSpec,
     PermissionCreatorSpec,
@@ -138,24 +135,13 @@ class _PermissionGroupKey:
     subject_entity_type: RBACElementType
 
 
-@dataclass(frozen=True)
-class _VirtualEntityPermissionGroupKey:
-    """Group key for batching virtual-entity-chain resolution inputs.
-
-    ``entity_type`` matches membership rows; ``subject_entity_type`` matches
-    permission rows.
-    """
-
-    user_id: uuid.UUID
-    entity_type: EntityType
-    subject_entity_type: EntityType
-
-
 class PermissionDBSource:
     _db: ExtendedAsyncSAEngine
+    _ops: PermissionOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._ops = PermissionOpsProvider(db)
 
     # ------------------------------------------------------------------ role CRUD
 
@@ -553,6 +539,7 @@ class PermissionDBSource:
                         PermissionRow.scope_id == scope_id.scope_id,
                     ),
                     PermissionRow.permission == permission,
+                    PermissionRow.all_fields.is_(True),
                 )
             )
         )
@@ -591,10 +578,12 @@ class PermissionDBSource:
                         sa.and_(
                             PermissionRow.scope_type == LegacyScopeType.GLOBAL,
                             PermissionRow.permission == Permission.from_operation(operation),
+                            PermissionRow.all_fields.is_(True),
                         ),
                         sa.and_(
                             AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),
                             PermissionRow.permission == Permission.from_operation(operation),
+                            PermissionRow.all_fields.is_(True),
                         ),
                         sa.and_(
                             ObjectPermissionRow.entity_id.in_(object_id_for_cond),
@@ -1086,6 +1075,7 @@ class PermissionDBSource:
             user_roles.c.user_id == group_key.user_id,
             roles.c.status == RoleStatus.ACTIVE,
             perm.c.entity_type == group_key.subject_entity_type.to_entity_type(),
+            perm.c.all_fields.is_(True),
         ]
         if permission_filter is not None:
             filters.append(perm.c.permission.op("&")(permission_filter) != 0)
@@ -1135,6 +1125,7 @@ class PermissionDBSource:
             perm.c.scope_type == group_key.element_type.to_scope_type(),
             perm.c.scope_id.in_(entity_ids),
             perm.c.entity_type == group_key.subject_entity_type.to_entity_type(),
+            perm.c.all_fields.is_(True),
         ]
         if permission_filter is not None:
             filters.append(perm.c.permission.op("&")(permission_filter) != 0)
@@ -1171,183 +1162,25 @@ class PermissionDBSource:
 
     # ------------------------------------------------ virtual-entity-chain checks
 
-    async def check_single_entity_permission_via_virtual_entity(
+    async def owned_permissions(
         self,
-        key: EntityPermissionCheckKey,
-        permission: Permission,
-    ) -> bool:
-        """Return whether the user holds *permission* on the key's entity via a virtual entity.
-
-        Resolves the effective permission through the virtual-entity chain and tests
-        that it covers *every* bit of ``permission``, which may be a mask
-        (``UPSERT`` requires ``CREATE | UPDATE``) rather than a single bit.
-        """
-        resolved = await self.resolve_effective_permissions_via_virtual_entity([key])
-        return resolved.get(key, Permission.NONE).covers(permission)
-
-    async def check_bulk_permission_via_virtual_entity(
-        self,
-        keys: Collection[EntityPermissionCheckKey],
-        permission: Permission,
-    ) -> Mapping[EntityPermissionCheckKey, bool]:
-        """Check *permission* on each target entity through the virtual-entity chain in one go.
-
-        Returns a mapping from each input key to whether every bit of ``permission``
-        is granted.
-        """
+        keys: Collection[OwnCheckKey],
+    ) -> Mapping[OwnCheckKey, Permission]:
+        """The bits each user holds on each entity; the walk is
+        :meth:`PermissionReadOps.owned_permissions`."""
         if not keys:
             return {}
-        resolved = await self.resolve_effective_permissions_via_virtual_entity(keys)
-        return {key: resolved.get(key, Permission.NONE).covers(permission) for key in keys}
+        async with self._ops.read_ops() as r:
+            return await r.owned_permissions(keys)
 
-    async def check_scope_permission_via_virtual_entity(
+    async def governed_permissions(
         self,
-        keys: Collection[ScopePermissionCheckKey],
-        permission: Permission,
-    ) -> Mapping[ScopePermissionCheckKey, bool]:
-        """Check *permission* on each target scope through the virtual-entity chain in one go.
-
-        Returns a mapping from each input key to whether every bit of ``permission``
-        is granted.
-        """
+        keys: Collection[GovernCheckKey],
+    ) -> Mapping[GovernCheckKey, Permission]:
         if not keys:
             return {}
-        resolved = await self._resolve_effective_scope_permissions_via_virtual_entity(keys)
-        return {key: resolved.get(key, Permission.NONE).covers(permission) for key in keys}
-
-    async def resolve_effective_permissions_via_virtual_entity(
-        self,
-        keys: Collection[EntityPermissionCheckKey],
-    ) -> Mapping[EntityPermissionCheckKey, Permission]:
-        """Resolve each target entity's effective :class:`Permission` through the
-        virtual-entity chain.
-
-        Walks ``entity -> entity_memberships -> scope_bindings -> scope`` and
-        OR-combines the granted bitmask at each resolved scope, clipping every
-        path by both hop caps (``granted & scope_cap & entity_cap``; ``None`` = no
-        ceiling). Permission rows are matched on the entity's own type. Keys
-        sharing ``(user_id, entity_type)`` share one round-trip; keys with no
-        reachable grant map to :attr:`Permission.NONE`.
-        """
-        if not keys:
-            return {}
-        groups: defaultdict[_VirtualEntityPermissionGroupKey, list[EntityPermissionCheckKey]] = (
-            defaultdict(list)
-        )
-        for key in keys:
-            groups[
-                _VirtualEntityPermissionGroupKey(
-                    user_id=key.user_id,
-                    entity_type=key.entity.entity_type(),
-                    subject_entity_type=key.entity.entity_type(),
-                )
-            ].append(key)
-
-        result: dict[EntityPermissionCheckKey, Permission] = {}
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            for group_key, members in groups.items():
-                granted = await self._resolve_permissions_for_virtual_entity_group(
-                    db_session=db_session,
-                    group_key=group_key,
-                    entity_ids=[k.entity for k in members],
-                )
-                for key in members:
-                    result[key] = granted.get(key.entity, Permission.NONE)
-        return result
-
-    async def _resolve_effective_scope_permissions_via_virtual_entity(
-        self,
-        keys: Collection[ScopePermissionCheckKey],
-    ) -> Mapping[ScopePermissionCheckKey, Permission]:
-        """Resolve each target scope's effective :class:`Permission` through the
-        virtual-entity chain."""
-        if not keys:
-            return {}
-        groups: defaultdict[_VirtualEntityPermissionGroupKey, list[ScopePermissionCheckKey]] = (
-            defaultdict(list)
-        )
-        for key in keys:
-            groups[
-                _VirtualEntityPermissionGroupKey(
-                    user_id=key.user_id,
-                    entity_type=EntityType(key.scope.scope_type),
-                    subject_entity_type=key.entity_type,
-                )
-            ].append(key)
-
-        result: dict[ScopePermissionCheckKey, Permission] = {}
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            for group_key, members in groups.items():
-                granted = await self._resolve_permissions_for_virtual_entity_group(
-                    db_session=db_session,
-                    group_key=group_key,
-                    entity_ids=[k.scope.scope_id for k in members],
-                )
-                for key in members:
-                    result[key] = granted.get(key.scope.scope_id, Permission.NONE)
-        return result
-
-    async def _resolve_permissions_for_virtual_entity_group(
-        self,
-        *,
-        db_session: SASession,
-        group_key: _VirtualEntityPermissionGroupKey,
-        entity_ids: Sequence[EntityID],
-    ) -> Mapping[EntityID, Permission]:
-        """Run the virtual-entity-chain query for a single ``(user_id, entity_type,
-        subject_entity_type)`` group with N entity_ids.
-
-        Returns a mapping from entity_id to its effective (cap-clipped, OR-combined)
-        :class:`Permission`. Entities with no reachable grant are absent from the map.
-        """
-        em = EntityMembershipRow.__table__
-        sb = ScopeBindingRow.__table__
-        member = VirtualEntityRow.__table__.alias("member_virtual_entity")
-        scope = VirtualEntityRow.__table__.alias("scope_virtual_entity")
-        perm = PermissionRow.__table__
-        roles = RoleRow.__table__
-        user_roles = UserRoleRow.__table__
-
-        query = (
-            sa.select(
-                member.c.entity_id,
-                perm.c.permission,
-                sb.c.permission_cap.label("scope_cap"),
-                em.c.permission_cap.label("entity_cap"),
-            )
-            .select_from(
-                em.join(member, member.c.id == em.c.member_entity_id)
-                .join(sb, sb.c.virtual_entity_id == em.c.virtual_entity_id)
-                .join(scope, scope.c.id == sb.c.scope_entity_id)
-                .join(
-                    perm,
-                    sa.and_(
-                        perm.c.scope_type == scope.c.entity_type,
-                        # virtual_entities.entity_id is a native UUID; permissions.scope_id
-                        # stores its canonical string form. Cast to compare.
-                        perm.c.scope_id == sa.cast(scope.c.entity_id, sa.String),
-                        perm.c.entity_type == group_key.subject_entity_type,
-                    ),
-                )
-                .join(roles, roles.c.id == perm.c.role_id)
-                .join(user_roles, user_roles.c.role_id == roles.c.id)
-            )
-            .where(
-                member.c.entity_type == group_key.entity_type,
-                member.c.entity_id.in_(entity_ids),
-                user_roles.c.user_id == group_key.user_id,
-                roles.c.status == RoleStatus.ACTIVE,
-            )
-        )
-
-        full_cap = Permission.full()
-        granted: defaultdict[EntityID, Permission] = defaultdict(lambda: Permission.NONE)
-        result = await db_session.execute(query)
-        for row in result:
-            scope_cap = row.scope_cap if row.scope_cap is not None else full_cap
-            entity_cap = row.entity_cap if row.entity_cap is not None else full_cap
-            granted[row.entity_id] |= row.permission & scope_cap & entity_cap
-        return granted
+        async with self._ops.read_ops() as r:
+            return await r.governed_permissions(keys)
 
     async def bulk_assign_role(
         self, bulk_creator: BulkCreator[UserRoleRow]

@@ -18,6 +18,7 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import PermissionDeniedError
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
@@ -159,10 +160,13 @@ class TestEveryEndMustPermitTheRun:
     def _validator(self, permitted: set[uuid.UUID]) -> VirtualEntityRelationActionRBACValidator:
         repository = MagicMock()
 
-        async def check(keys: list[Any], permission: Any) -> dict[Any, bool]:
-            return {key: key.entity in permitted for key in keys}
+        async def owned(keys: list[Any]) -> dict[Any, Permission]:
+            return {
+                key: Permission.full() if key.entity in permitted else Permission.NONE
+                for key in keys
+            }
 
-        repository.check_bulk_permission_via_virtual_entity = check
+        repository.owned_permissions = owned
         config_provider = MagicMock()
         config_provider.config.manager.rbac.enforcement_enabled = True
         return VirtualEntityRelationActionRBACValidator(repository, config_provider)

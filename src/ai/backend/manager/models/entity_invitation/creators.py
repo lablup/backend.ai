@@ -39,7 +39,7 @@ class EntityInvitationCreator(EntityCreator[EntityInvitationRow, EntityInvitatio
         return EntityInvitationID(row.id)
 
     @override
-    def member_of(self, row: EntityInvitationRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: EntityInvitationRow) -> Collection[EntityIdentifier]:
         return (self.target,)
 
     @override

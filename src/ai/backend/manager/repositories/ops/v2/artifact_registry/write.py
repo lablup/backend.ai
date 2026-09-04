@@ -34,7 +34,7 @@ class ArtifactRegistryWriteOps(V2WriteOps):
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         registry_id = ArtifactRegistryID(creator.entity_id(row))
-        await self._provision_entities([registry_id])
+        await self._provision([registry_id])
         await self._insert_row(meta_creator.build_row(registry_id), ())
         await self._sess.refresh(row, ["meta"])
         return creator.to_data(row)

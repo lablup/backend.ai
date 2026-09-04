@@ -14,7 +14,6 @@ from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder_invitation import VFOLDER_INVITATION_ENTITY_TYPE
 from ai.backend.common.data.permission.types import (
     EntityType,
-    OperationType,
     Permission,
     RelationType,
     RoleStatus,
@@ -65,7 +64,11 @@ from ai.backend.manager.models.vfolder import (
     vfolder_permissions,
     vfolders,
 )
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -121,7 +124,7 @@ def vfolder_processors(
     valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderProcessors:
-    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
     user_repository = UserRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
@@ -146,7 +149,7 @@ def vfolder_file_processors(
     storage_manager: StorageSessionManager,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderFileProcessors:
-    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
     user_repository = UserRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
@@ -167,7 +170,7 @@ def vfolder_invite_processors(
     config_provider: ManagerConfigProvider,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderInviteProcessors:
-    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
     user_repository = UserRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
@@ -189,7 +192,7 @@ def vfolder_sharing_processors(
     config_provider: ManagerConfigProvider,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderSharingProcessors:
-    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
     user_repository = UserRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
@@ -316,6 +319,23 @@ async def vfolder_factory(
         defaults.update(overrides)
         async with db_engine.begin() as conn:
             await conn.execute(sa.insert(vfolders).values(**defaults))
+            # The node a create writes: the vfolder owns and governs itself.
+            node_id = uuid.uuid4()
+            await conn.execute(
+                sa.insert(VirtualEntityRow.__table__).values(
+                    id=node_id, entity_type=VFOLDER_ENTITY_TYPE, entity_id=defaults["id"]
+                )
+            )
+            await conn.execute(
+                sa.insert(EntityMembershipRow.__table__).values(
+                    virtual_entity_id=node_id, member_entity_id=node_id, capped=False
+                )
+            )
+            await conn.execute(
+                sa.insert(ScopeBindingRow.__table__).values(
+                    virtual_entity_id=node_id, scope_entity_id=node_id, permission_cap=None
+                )
+            )
         created_ids.append(defaults["id"])
         return defaults
 
@@ -324,6 +344,12 @@ async def vfolder_factory(
     # Cleanup: remove related rows first, then vfolders
     async with db_engine.begin() as conn:
         for vid in reversed(created_ids):
+            await conn.execute(
+                VirtualEntityRow.__table__.delete().where(
+                    VirtualEntityRow.__table__.c.entity_type == VFOLDER_ENTITY_TYPE,
+                    VirtualEntityRow.__table__.c.entity_id == vid,
+                )
+            )
             await conn.execute(
                 vfolder_invitations.delete().where(vfolder_invitations.c.vfolder == vid)
             )
@@ -430,15 +456,16 @@ async def user_system_role(
             )
         )
         for entity_type in EntityType.owner_accessible_entity_types_in_user():
-            for operation in OperationType.owner_operations():
+            for bit in Permission:
+                if not bit:
+                    continue
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
                         scope_type=ScopeType.USER,
                         scope_id=str(user_uuid),
                         entity_type=entity_type,
-                        operation=operation,
-                        permission=Permission.from_operation(operation),
+                        permission=bit,
                     )
                 )
 

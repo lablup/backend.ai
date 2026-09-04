@@ -20,14 +20,18 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 
 
-class RelationCreator[TRow: Base](ABC):
+class RelationCreator[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](ABC):
     """Insert spec of a row linking two entities.
 
     Takes both ids rather than an owner: the pair is what names the row, and the caller
-    holds the pair and not the row's id.
+    holds the pair and not the row's id. Typed by the pair's id types, so a spec reads
+    each id as what it is.
 
     Answers no ``data``. A relation is not returned to a caller — what a read answers
     with is the entities the relation reaches, never the relation.
+
+    A pair already linked, switched off or not, is a unique violation the spec maps to a
+    domain error; switching it back on is the restore updater's, not the create's.
     """
 
     @abstractmethod
@@ -35,28 +39,8 @@ class RelationCreator[TRow: Base](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def build_row(self, left: EntityIdentifier, right: EntityIdentifier) -> TRow:
-        """Build the row linking the two entities."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def index_elements(self) -> list[str]:
-        """The column names conflict detection keys on.
-
-        Whether a soft-deleted row occupies the pair is a property of the table's own
-        unique constraint, so what conflicts is declared here rather than assumed.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def build_conflict_values(self) -> dict[str, Any] | None:
-        """What to write when the pair is already taken.
-
-        ``None`` leaves the existing row alone. A mapping revives it — which is what a
-        table whose unique constraint covers the bare pair needs, since a soft-deleted
-        row still occupies it and an insert that did nothing would leave the relation
-        switched off.
-        """
+    def build_row(self, scope: TScope, target: TTarget) -> TRow:
+        """Build the row linking the scope to the target."""
         raise NotImplementedError
 
     @abstractmethod
@@ -64,7 +48,9 @@ class RelationCreator[TRow: Base](ABC):
         raise NotImplementedError
 
 
-class RelationLifecycleUpdater[TRow: Base](ABC):
+class RelationLifecycleUpdater[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](
+    ABC
+):
     """Update spec that switches one relation off or back on.
 
     ``build_values`` returns a constant, as the entity soft delete's updaters do: a
@@ -72,6 +58,8 @@ class RelationLifecycleUpdater[TRow: Base](ABC):
     relation declares one class per direction, and which of the two an operation is
     comes from the ops method it is handed to.
 
+    Switching touches the row alone: what each side reads of the other stays, so a
+    relation switched off is still listed on both sides and can be switched back on.
     Only relations carrying a lifecycle column declare these. A relation without one is
     linked and purged, and has nothing to switch.
     """
@@ -81,9 +69,7 @@ class RelationLifecycleUpdater[TRow: Base](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def conditions(
-        self, left: EntityIdentifier, right: EntityIdentifier
-    ) -> Sequence[QueryCondition]:
+    def conditions(self, scope: TScope, target: TTarget) -> Sequence[QueryCondition]:
         """Return the conditions naming the pair's row, AND combined."""
         raise NotImplementedError
 
@@ -93,11 +79,12 @@ class RelationLifecycleUpdater[TRow: Base](ABC):
         raise NotImplementedError
 
 
-class RelationPurger[TRow: Base](ABC):
+class RelationPurger[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](ABC):
     """Delete spec of the row linking two entities.
 
     Names the row by the pair, never by its own id: a relation row holds nothing in the
-    graph, and nothing outside it holds that id.
+    graph, and nothing outside it holds that id. An entity going away takes its rows
+    with it through the table's foreign keys, so nothing names a whole side.
     """
 
     @abstractmethod
@@ -105,9 +92,7 @@ class RelationPurger[TRow: Base](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def conditions(
-        self, left: EntityIdentifier, right: EntityIdentifier
-    ) -> Sequence[QueryCondition]:
+    def conditions(self, scope: TScope, target: TTarget) -> Sequence[QueryCondition]:
         """Return the conditions naming the pair's row, AND combined."""
         raise NotImplementedError
 

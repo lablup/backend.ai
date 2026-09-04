@@ -107,25 +107,27 @@ BEP-1076 covers it.
 ### ops
 
 ```
-create_relation (left, right, creator)
-delete_relation (left, right, updater)     writes the lifecycle column as a constant
-restore_relation(left, right, updater)     its reverse
-purge_relation  (left, right, purger)      removes the row
+create_relation (scope, target, creator)   the row, the scope governs the target under READ, the target reads the scope
+delete_relation (scope, target, updater)   writes the lifecycle column as a constant; both reads stay
+restore_relation(scope, target, updater)   its reverse
+purge_relation  (scope, target, purger)    removes the row and both reads
 ```
 
 The middle two are wired only for relations that declare a lifecycle column. Whoever holds the
 permission on both scopes may turn a relation off and back on — turning it off is the same
 permission as unlinking.
 
-### The spec declares
+### What the spec decides
 
-Conflict handling and the lifecycle differ per relation, so ops does not decide them.
-
-- With the unique constraint on the bare pair, a soft-deleted row occupies it — the create has to
-  revive it
-- With a partial index on (pair, alive), a new row is inserted and the history is kept
-
-Which one it is comes from the create spec, as `index_elements` and what to do on conflict.
+- Create inserts a new row only. A pair already linked, switched off or not, is a
+  unique violation the spec's `integrity_error_checks` maps to a domain error. Restore
+  is what switches it back on, so create has no upsert.
+- Switching off / restoring writes the lifecycle column alone. What each side reads of
+  the other (the scope's govern READ, the target's share READ) stays — a relation
+  switched off is still listed on both sides as off, which is what lets it be switched
+  back on. Only purge removes access. Honouring the off state is the reader's job (the
+  scheduler picking resource groups, the idle checker applying).
+- A relation without a lifecycle column has create and purge only.
 
 ### The relation value is not exposed
 

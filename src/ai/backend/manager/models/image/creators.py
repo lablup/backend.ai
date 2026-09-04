@@ -51,7 +51,7 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
         return ImageID(row.id)
 
     @override
-    def member_of(self, row: ImageRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: ImageRow) -> Collection[EntityIdentifier]:
         owner = self._customized_owner()
         if owner is None:
             return (self.registry_id,)

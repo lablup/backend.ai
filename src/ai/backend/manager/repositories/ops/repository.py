@@ -27,6 +27,7 @@ from ai.backend.manager.models.specs.creator import (
     GlobalEntityCreator,
     NestedFieldCreator,
     RoleManagedEntityCreator,
+    RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.lookup import (
     DataLookup,
@@ -261,11 +262,18 @@ class OpsRepository[TData]:
             fields = await w.atomic_create_field_entities(data.entity_id(), field_creators)
             return EntityWithFieldsResult(data=data, fields=fields)
 
+    async def create_role_managed_global_entity(
+        self, creator: RoleManagedGlobalEntityCreator[Any, TData]
+    ) -> TData:
+        """Insert one role-managed row created in no scope, preset roles included."""
+        async with self._ops.write_ops() as w:
+            return await w.create_role_managed_global_entity(creator)
+
     async def create_role_managed_entity(
         self, creator: RoleManagedEntityCreator[Any, TData]
     ) -> TData:
-        """Insert one role-managed entity row, additionally provisioning the roles
-        its scope type's active presets call for."""
+        """Insert one role-managed entity row, owned and governed by the scopes it is
+        created in, preset roles included."""
         async with self._ops.write_ops() as w:
             return await w.create_role_managed_entity(creator)
 
@@ -290,10 +298,19 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_entities(creators)
 
+    async def atomic_create_role_managed_global_entities(
+        self, creators: Sequence[RoleManagedGlobalEntityCreator[Any, TData]]
+    ) -> list[TData]:
+        """Insert several role-managed rows created in no scope atomically, preset
+        roles included."""
+        async with self._ops.write_ops() as w:
+            return await w.atomic_create_role_managed_global_entities(creators)
+
     async def atomic_create_role_managed_entities(
         self, creators: Sequence[RoleManagedEntityCreator[Any, TData]]
     ) -> list[TData]:
-        """Insert several role-managed entity rows atomically, preset roles included."""
+        """Insert several role-managed entity rows atomically, each owned and governed
+        by the scopes it is created in, preset roles included."""
         async with self._ops.write_ops() as w:
             return await w.atomic_create_role_managed_entities(creators)
 

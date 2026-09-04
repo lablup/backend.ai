@@ -90,12 +90,19 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 _ORM_CLUSTER = (
     AgentRow,
@@ -382,13 +389,7 @@ async def _seed_vs_chain(
             )
         )
         for node_id in member_node_ids:
-            db_sess.add(
-                EntityMembershipRow(
-                    virtual_entity_id=ve_id,
-                    member_entity_id=node_id,
-                    permission_cap=entity_cap,
-                )
-            )
+            await VirtualEntitySeeder().cap_edge(db_sess, ve_id, node_id, entity_cap)
         await db_sess.flush()
 
 
@@ -499,6 +500,8 @@ async def db_with_rbac_tables(
             ScopeBindingRow,
             EntityLabelRow,
             EntityMembershipRow,
+            EntityMembershipCapRow,
+            EntityMembershipFieldRow,
         ],
     ):
         yield database_connection

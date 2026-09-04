@@ -53,13 +53,22 @@
 - A primitive only one domain uses does NOT go on the general ops. Write ops extending
   `V2WriteOps` and a provider extending `V2DBOpsProvider` that overrides `write_ops()`,
   and inject that provider only into the repositories needing the primitive
-  (`ops/v2/reconciler/`, `ops/v2/container_registry/`, `ops/rbac/`, `ops/user/`).
+  (`ops/v2/reconciler/`, `ops/rbac/`, `ops/user/`).
 - Separating into a repository is the default; internal operations may use db directly.
 - ops methods take only spec types (Querier/Creator/Updater/Upserter/Purger, `DependentCreatorSpec`).
   A single spec owns only a single table.
 - Do NOT do multi-table writes inside a spec. The repository creates the parent first, then composes the dependent values
   from the result and passes them to `create_dependent` / `bulk_create_dependent` as a `DependentCreatorSpec`.
 - The read default is `batch_query_with_scopes`. `batch_query_in_global` is for superadmin/internal paths only.
+- Graph relations are written through three provider / ops pairs only. Entity write
+  (`V2DBOpsProvider` / `V2WriteOps`: create and delete, own and govern written at
+  creation), relation write (`RelationOpsProvider` / `V2RelationWriteOps`: create and
+  purge a relation), share write (`ShareOpsProvider` / `V2ShareWriteOps`: share, widen,
+  narrow, unshare, accept an invitation, transfer). A repository is injected the one
+  pair it needs.
+- Do NOT assume the graph ops are reachable from anywhere. The own and govern
+  primitives live on the base the three ops share (`V2GraphWriteOpsBase`), and no
+  provider hands that base out.
 
 ## Transactions
 

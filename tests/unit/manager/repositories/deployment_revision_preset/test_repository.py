@@ -46,6 +46,12 @@ from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
@@ -100,6 +106,8 @@ async def database(
         [
             VirtualEntityRow,
             EntityMembershipRow,
+            EntityMembershipCapRow,
+            EntityMembershipFieldRow,
             ScopeBindingRow,
             EntityLabelRow,
             RoleRow,

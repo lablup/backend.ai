@@ -89,7 +89,7 @@ async def test_group_for_deletion(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
                 member_entity_id=virtual_entity_id,
-                permission_cap=None,
+                capped=False,
             )
         )
         await conn.execute(
@@ -155,7 +155,7 @@ async def group_with_vfolder_mounted(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
                 member_entity_id=virtual_entity_id,
-                permission_cap=None,
+                capped=False,
             )
         )
         await conn.execute(
@@ -288,7 +288,7 @@ async def group_with_active_kernel(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
                 member_entity_id=virtual_entity_id,
-                permission_cap=None,
+                capped=False,
             )
         )
         await conn.execute(
@@ -404,7 +404,7 @@ async def group_with_active_endpoint(
             sa.insert(EntityMembershipRow.__table__).values(
                 virtual_entity_id=virtual_entity_id,
                 member_entity_id=virtual_entity_id,
-                permission_cap=None,
+                capped=False,
             )
         )
         await conn.execute(
@@ -518,7 +518,7 @@ async def multiple_test_groups(
                 sa.insert(EntityMembershipRow.__table__).values(
                     virtual_entity_id=virtual_entity_id,
                     member_entity_id=virtual_entity_id,
-                    permission_cap=None,
+                    capped=False,
                 )
             )
             await conn.execute(

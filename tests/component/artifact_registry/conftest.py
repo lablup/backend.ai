@@ -46,6 +46,7 @@ from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
     ArtifactRegistryOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
@@ -142,7 +143,7 @@ def artifact_revision_processors(
     reservoir_repository = ReservoirRegistryRepository(
         database_engine, ArtifactRegistryOpsProvider(database_engine)
     )
-    vfolder_repository = VfolderRepository(database_engine, V2DBOpsProvider(database_engine))
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
     service = ArtifactRevisionService(
         artifact_repository=artifact_repository,
         revision_ops=OpsRepository(V2DBOpsProvider(database_engine)),

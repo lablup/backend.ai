@@ -49,9 +49,7 @@ from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.image.creators import ImageCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
-    ContainerRegistryOpsProvider,
-)
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
@@ -75,7 +73,7 @@ if TYPE_CHECKING:
 
 class BaseContainerRegistry(metaclass=ABCMeta):
     db: ExtendedAsyncSAEngine
-    _ops_provider: ContainerRegistryOpsProvider
+    _ops_provider: V2DBOpsProvider
     registry_name: str
     registry_info: ContainerRegistryRow
     registry_url: yarl.URL
@@ -109,7 +107,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         ssl_verify: bool = True,
     ) -> None:
         self.db = db
-        self._ops_provider = ContainerRegistryOpsProvider(db)
+        self._ops_provider = V2DBOpsProvider(db)
         self.registry_name = registry_name
         self.registry_info = registry_info
         self.registry_url = yarl.URL(registry_info.url)
@@ -254,15 +252,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         return scanned_images
 
     async def _create_scanned_images(self, creators: list[ImageCreator]) -> list[ImageData]:
-        """Insert the images the scan found, each joining the registry it came from.
-
-        A registry created before the virtual-entity rollout has no node to join, so it
-        is put into the graph first.
-        """
+        """Insert the images the scan found, each joining the registry it came from."""
         if not creators:
             return []
         async with self._ops_provider.write_ops() as w:
-            await w.provision_registry(ContainerRegistryID(self.registry_info.id))
             created = await w.atomic_create_entities(creators)
         for image in created:
             progress_msg = (

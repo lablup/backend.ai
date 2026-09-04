@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import ClassVar, override
 
@@ -14,12 +14,12 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
+from ai.backend.manager.models.specs.creator import RoleManagedGlobalEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class DomainCreator(RoleManagedEntityCreator[DomainRow, DomainData]):
+class DomainCreator(RoleManagedGlobalEntityCreator[DomainRow, DomainData]):
     """Registers a domain, the top-level scope everything else is created under."""
 
     name: str
@@ -43,10 +43,6 @@ class DomainCreator(RoleManagedEntityCreator[DomainRow, DomainData]):
     @override
     def entity_id(self, row: DomainRow) -> EntityIdentifier:
         return DomainID(row.id)
-
-    @override
-    def member_of(self, row: DomainRow) -> Collection[EntityIdentifier]:
-        return ()
 
     @override
     def template_value(self, row: DomainRow) -> ScopeTemplateValue:

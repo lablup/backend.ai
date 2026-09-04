@@ -79,9 +79,9 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | ✅ | Actual list behavior sits in the legacy path and branches only on three roles. It is cleanup material — `api/gql_legacy/base.py:548` |
 | ✅ | Global search serves superadmin and globally shared values only and skips permissions; that stays. The user data loader also skips permissions; that is to be fixed — `repositories/ops/repository.py:199`, `api/gql/data_loader/data_loaders.py:669` |
 | ➕ | Backfill existing resource entities into the graph and **remove every path that is not `scope -> virtual_scope -> entity`**: the legacy recursive path, `association_scopes_entities`, `object_permissions`, `RBACElementType` (BA-7204) |
-| ➕ | Membership enrollment writes the roster only. No row binds a user's virtual scope into a scope — the existing user bindings are removed. Reaching what a user owns goes only through each entity's own enrollment |
+| ➕ | The graph has two relations, own and govern. Creation (`created_in`) writes both; a share writes a capped own only. Projects and users are created in their domain. A user's virtual entity is governed by its domain only; a user on a project roster is a READ-capped share |
 | ➕ | Add a `field_permissions` table as a child of permission rows, and declare a catalog (fields, default-visible set) per entity. Checks always name the owning entity — the former colon sub-target names are fields |
-| ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows granted via `EntityGrant` to the accessible set |
+| ➕ | Switch the list-membership condition from the owner column to graph enrollment, and add rows shared via `replace_share` to the accessible set |
 | ➕ | Blank unreadable fields and refuse filtering or sorting by them. Replace the data loaders with permission-aware bulk queries |
 
 ### 4.3 Reaching an entity from another scope
@@ -91,7 +91,7 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | | Content |
 |---|---|
 | ✅ | Only virtual-folder invitations exist, on two legacy tables. Sessions, deployments, images, and model cards have none |
-| ✅ | The grant primitive takes the recipient as an entity identifier. The invitation table assumes an email recipient and has no expiry — `models/specs/membership.py:21`, `models/entity_invitation/row.py:32` |
+| ✅ | The share primitive takes the recipient as an entity identifier. The invitation table assumes an email recipient and has no expiry — `models/specs/membership.py:21`, `models/entity_invitation/row.py:32` |
 | ✅ | `permission_cap` carries only operation bits, so it cannot express which fields are handed over |
 | ➕ | A sharing-record table and named caps carrying a field axis |
 | ➕ | Add sessions, deployments, images, and model cards as sharing targets |
@@ -136,14 +136,15 @@ Quota scope keeps the folder row's `quota_scope_id` as is. The existing user quo
 
 Sharing puts an entity into a virtual scope, not a person into a project. Sharing into someone else's personal project adds no member to it. Sharing only adds rows to `entity_memberships` and never changes the project column, so the target of resource policies never changes.
 
-Two invariants:
+The graph has two relations. **own** is a virtual entity holding an entity: the entity is on that virtual entity's list and one hop away. **govern** is a scope ruling a virtual entity: the scope's roles reach everything that virtual entity owns. govern is the wider of the two. Creation and sharing compose them.
 
-`entity_memberships` rows arise on two paths: written at creation via `EntityMembershipEntry`, or granted later via `EntityGrant`. For the former, two rules hold.
+| Declaration | own | govern | Rule |
+|---|---|---|---|
+| `created_in` at creation | yes | yes | A session is created in its project and user, a project and a user in their domain. It is on the creator's list, and the creator's roles reach what is under it (invitations). Not removed by unsharing. Ownership moves with `transfer(from_scopes, to_scopes, entity)`. A user's virtual entity is governed by its domain only, never by a project — so what the user owns does not leak into the project |
+| relation `create_relation(scope, target)` | the target holds the scope under cap READ | the scope governs the target under cap READ | A project reads a resource group or registry and the agents or images it owns; the resource group or registry reads the project itself only. The only place a govern-side cap is written |
+| share `replace_share(scope, entity, cap)` / `replace_share_fields(scope, entity, {READ: paths, UPDATE: paths})` | yes, capped | no | `replace_share` covers every field up to the cap — the cap is always explicit, 0 included. `replace_share_fields` puts READ/UPDATE on field paths only (5.2). Removed by `unshare`. A share is lent to the receiving scope, so it answers through that scope's own govern only and for the shared entity itself only |
 
-- It cannot be removed by unsharing.
-- It carries no `permission_cap`. Permissions do not vary per row within one scope.
-
-A scope-membership enrollment (a user joining a scope's roster) may carry a per-scope-kind constant cap, identical on every member row: user-to-project enrollments are capped to read, user-to-domain enrollments carry none. Per-row variance stays forbidden either way.
+A user on a project roster is a share: `replace_share_fields(project, user, {READ: the default public fields})`. There is no domain roster — a user is created in its domain. Granting auto_assign roles on joining is a separate primitive.
 
 | Question | Answered by |
 |---|---|
@@ -151,7 +152,7 @@ A scope-membership enrollment (a user joining a scope's roster) may carry a per-
 | What can be done with it | Permission resolution walking `scope -> virtual_scope -> entity` |
 | Which view does it appear in | Graph enrollment: the union of creation enrollment and share enrollment (5.4) |
 
-Business-logic relations — resource groups, container registries — plus quota and resource-policy applicability are not expressed through virtual scopes. Relation tables and entity rows answer them.
+Relations with resource groups and container registries go on the graph per the table above. A resource group seeing sessions and deployments is answered by sharing the session to the resource group under READ at scheduling (follow-up). Whether quota and resource policies apply is answered by the relation tables and the entity row, not by the graph.
 
 ### 5.2 FieldPermission
 
@@ -231,14 +232,14 @@ Project-view query = entities enrolled in that project  AND  entities accessible
 
 Membership judgment moves from the owner column to graph enrollment — the union of creation enrollment and share enrollment. The view filter and permission resolution walk the same graph, so the two criteria cannot diverge. The owner column remains dedicated to resource-policy and quota judgment.
 
-The accessible set has three sources: self-ownership, scope permission, and individual grants. Scope permission does not vary per row and is a constant; only individual grants vary per row.
+The accessible set has three sources: self-ownership, scope permission, and individual shares. Scope permission does not vary per row and is a constant; only individual shares vary per row.
 
 Every resource-entity query is a project view. The only difference is whether one looks at their own personal project or another project.
 
 | View | Condition |
 |---|---|
 | Project view | Enrollment AND accessible |
-| Shared with me | Individual grants only |
+| Shared with me | Individual shares only |
 
 Conditions attach in exactly one place: scoped search. Global search remains dedicated to superadmin and globally shared values and skips permissions. It does not enter the searcher specs. Input names only the scope; whether the requester holds permission is fixed internally. User data loaders are replaced with permission-aware bulk queries.
 
@@ -277,7 +278,7 @@ An invisible target cannot be named.
 
 To give to an outside team, give to a person on that team who then puts it into their own team. What is given to a person lands in that person's personal project.
 
-Caps are named references. A named cap carries operation bits and a field list, and a grant row references a cap by name instead of holding an inline bitmask — sharing a deployment without its token is a cap whose field list excludes it. Effective fields are the role's field list intersected with the field lists of the caps along the path.
+A cap is a row per bit on each share row. `replace_share(scope, entity, cap)` writes one "every field" row per bit of the cap; `replace_share_fields(scope, entity, fields)` writes "path" rows on the READ/UPDATE bits — sharing a deployment without its token is `replace_share_fields` with the token path left out. A path covers its descendants, and there is no deny. The effective fields are the intersection of the role's field scope and the field scopes of the caps on the path. A named cap (a preset) is a convenience calling these two; it is not a stored unit.
 
 | Place | Meaning | Composition |
 |---|---|---|
@@ -294,9 +295,9 @@ A shareable kind must exist in the recipient's own-scope role. Caps only narrow,
 
 Re-sharing is expressed by the cap's create bit and defaults to closed. Opening it requires cascading revocation, which requires recording the parent share. No combination opens re-sharing without the cascade. Fields one does not hold cannot be passed on.
 
-Revocation can be done both by anyone who can grant and by the recipient, and is not retroactive on running work.
+Revocation can be done both by anyone who can share and by the recipient, and is not retroactive on running work.
 
-Invitations, grants, and revocations live in one table, separate from `entity_memberships`.
+Invitations, shares, and revocations live in one table, separate from `entity_memberships`.
 
 | State | Graph row |
 |---|---|
@@ -305,7 +306,7 @@ Invitations, grants, and revocations live in one table, separate from `entity_me
 | Declined, expired | None |
 | Revoked | Deleted |
 
-A direct grant skips the invited state and starts active. Nothing about the recipient is exposed beyond what the inviter already knows. The recipient's user identifier is not recorded; email reuse is blocked by expiry and cleanup at user purge.
+A direct share skips the invited state and starts active. Nothing about the recipient is exposed beyond what the inviter already knows. The recipient's user identifier is not recorded; email reuse is blocked by expiry and cleanup at user purge.
 
 Deletion is defined by BEP-1069. The sharing side decides three things.
 
@@ -382,19 +383,19 @@ Opening project-folder creation and narrowing user information are the intended 
 | Quota scope | `quota_scope_id` kept; the user quota scope reinterpreted as the personal project's. No physical moves |
 | A user's own information | Not a resource entity; stays under the user |
 | Column vs. graph | The column answers resource policy and quota, permission resolution answers capability, graph enrollment answers view membership |
-| Membership and bindings | A user's virtual scope is never bound into a scope; joining enrolls the user in the roster only. Belongings are reached only through each entity's own enrollment |
-| Roster caps | Per-scope-kind constants: user-to-project enrollment capped to read, user-to-domain uncapped. Field narrowing stays with FieldPermission |
+| Relations | own and govern. `created_in` writes both; a share and a relation write a capped own only. A user's virtual entity is governed by its domain only |
+| Rosters | A user on a project roster is a READ-capped share (the default public fields). domain → user is govern |
 | Joining a project | Project admins invite, with the invitee's acceptance; direct registration is a domain-admin operation (BEP-1076) |
 | Credential secrets | Never readable by any administrator; administration is reissue and disable. The secret is shown once to its owner at issuance |
-| Business-logic relations | Resource groups, registries, and quota are not expressed through virtual scopes; relation tables answer |
-| Rows from `EntityMembershipEntry` | Cannot be removed by unsharing and carry no `permission_cap` |
+| relation | The scope governs the target under READ; the target holds the scope under a READ share. Resource groups and container registries alike. Quota is answered by the relation table |
+| The `created_in` rows | Not removed by unsharing, and carry no cap |
 | Former colon sub-targets | Fields of their owning entity — none is promoted to an entity type; the colon declarations retire with `RBACElementType` |
 | Fields | `FieldPermission` — child of a permission row, read and update. Absent means all fields; present means only the list |
 | Catalog | Declared per entity; unlisted names get no permission and unlisted fields are invisible |
 | Visibility | Roles answer. Resource entities use the permission axis only; person fields use permission or the subject's disclosure range |
 | Member default preset | All operations on project folders; create-only for sessions and deployments; none for images and model cards |
 | Person-field disclosure | self / project / domain / authenticated users. The project policy sets the minimum; subjects can only widen |
-| Queries | Graph enrollment AND accessible (self-owned / scope permission / individual grant), in one scoped-search spot. Every query is a project view |
+| Queries | Graph enrollment AND accessible (self-owned / scope permission / individual share), in one scoped-search spot. Every query is a project view |
 | Global search and data loaders | Global search stays superadmin- and global-share-only; data loaders replaced with permission-aware bulk queries |
 | Where resolution runs | Only the admission decision at the API boundary; internal calls run no permission queries |
 | Cap-0 sharing | Leaves enrollment only and grants nothing; for surfacing in the owner's project view |
@@ -402,7 +403,7 @@ Opening project-folder creation and narrowing user information are the intended 
 | Scoped reads | Filter instead of rejecting; write actions keep rejecting |
 | Sharing address | Invisible targets cannot be named. People by email, projects only those I am a member of |
 | Share acceptance | Unneeded when only capability grows; projects answer with an acceptance setting |
-| Share caps | Named references carrying operation bits and a field list; grant rows reference them instead of an inline bitmask |
+| Share caps | One cap row per bit on each share row. `replace_share` covers every field, `replace_share_fields` field paths. A named cap is a convenience calling both |
 | Re-sharing | Closed by default; opening requires cascading revocation |
 | Sharing records | Separate from `entity_memberships`; the invited state has no graph row |
 | Non-owning projects | No delete operation, only unshare |

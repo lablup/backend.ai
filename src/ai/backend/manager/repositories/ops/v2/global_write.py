@@ -8,10 +8,10 @@ from collections.abc import Sequence
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
-from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
+from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOpsBase
 
 
-class V2GlobalWriteOps(V2WriteOpsBase):
+class V2GlobalWriteOps(V2GraphWriteOpsBase):
     """Global writes, bound to a single session."""
 
     async def create_global_entity[TRow: Base, TData](
@@ -21,7 +21,7 @@ class V2GlobalWriteOps(V2WriteOpsBase):
         nothing."""
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
-        await self._provision_entities([creator.entity_id(row)])
+        await self._provision([creator.entity_id(row)])
         return creator.to_data(row)
 
     async def atomic_create_global_entities[TRow: Base, TData](
@@ -34,7 +34,7 @@ class V2GlobalWriteOps(V2WriteOpsBase):
         rows = [creator.build_row() for creator in creators]
         # First creator's checks: all specs share the same creator subclass.
         await self._insert_rows(rows, creators[0].integrity_error_checks())
-        await self._provision_entities([
+        await self._provision([
             creator.entity_id(row) for creator, row in zip(creators, rows, strict=True)
         ])
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
@@ -61,7 +61,7 @@ class V2GlobalWriteOps(V2WriteOpsBase):
             )
             for upserter in upserters
         ]
-        await self._provision_entities([
+        await self._provision([
             upserter.entity_id(row) for upserter, row in zip(upserters, rows, strict=True)
         ])
         return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
@@ -78,5 +78,5 @@ class V2GlobalWriteOps(V2WriteOpsBase):
             upserter.build_update_values(),
             upserter.integrity_error_checks(),
         )
-        await self._provision_entities([upserter.entity_id(row)])
+        await self._provision([upserter.entity_id(row)])
         return upserter.to_data(row)

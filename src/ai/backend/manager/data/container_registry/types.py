@@ -3,9 +3,7 @@ from typing import Any, override
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.data.entity.container_registry_group import ContainerRegistryGroupID
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.types import EntityData, FieldData
+from ai.backend.common.data.entity.types import EntityData
 
 
 @dataclass
@@ -25,15 +23,6 @@ class ContainerRegistryData(EntityData):
     @override
     def entity_id(self) -> ContainerRegistryID:
         return self.id
-
-
-@dataclass
-class ContainerRegistryGroupData(FieldData):
-    """One project a container registry is reachable from."""
-
-    id: ContainerRegistryGroupID
-    registry_id: ContainerRegistryID
-    project_id: ProjectID
 
 
 @dataclass

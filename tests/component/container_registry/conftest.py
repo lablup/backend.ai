@@ -23,9 +23,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.ops.v2.container_registry.provider import (
-    ContainerRegistryOpsProvider,
-)
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
@@ -35,9 +33,7 @@ def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(
-        database_engine, ContainerRegistryOpsProvider(database_engine)
-    )
+    repo = ContainerRegistryRepository(database_engine, RelationOpsProvider(database_engine))
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
         processor_registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), service
