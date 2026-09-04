@@ -231,12 +231,26 @@ class TestHostileNeighbours:
         async with asyncio.timeout(5):
             assert await _claim(PairJournal(root), key, "agent-a", "s1") is False
 
-    async def test_the_root_is_world_writable(self, tmp_path: Path) -> None:
-        # Created by `mkdir(parents=True)` it carries the process umask, and a root at 0o775 is
-        # one a co-located agent running as another user cannot create a new pair in.
+    async def test_the_journal_is_not_world_writable(self, tmp_path: Path) -> None:
+        # It used to be 0o1777 so agents running as different users could each add claims. A local
+        # user who created a pair's directory first then OWNED it, and could unlink and recreate
+        # the `.lock` inside -- after which a second holder locked the new inode while the first
+        # still held the old one. Reproduced. The namespace is closed instead.
         root = tmp_path / "net-esp-pair"
-        await _claim(_journal(tmp_path), pair_key("10.0.0.1", "10.0.0.2", 4789), "a", "s1")
-        assert stat.S_IMODE(root.stat().st_mode) == 0o1777
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(_journal(tmp_path), key, "a", "s1")
+        assert stat.S_IMODE(root.stat().st_mode) & 0o002 == 0
+        assert stat.S_IMODE((root / key).stat().st_mode) & 0o002 == 0
+
+    async def test_an_unusable_journal_says_why(self, tmp_path: Path) -> None:
+        blocked = tmp_path / "file"
+        blocked.write_text("not a directory")
+        reason = PairJournal(blocked / "net-esp-pair").unusable_reason()
+        assert reason is not None
+        assert "cannot be created or opened" in reason
+
+    async def test_a_usable_journal_reports_nothing(self, tmp_path: Path) -> None:
+        assert _journal(tmp_path).unusable_reason() is None
 
     async def test_the_lock_is_readable_by_other_agents(self, tmp_path: Path) -> None:
         # `open`'s mode is masked by umask; a lock left at 0o600 is one no other agent can open.
