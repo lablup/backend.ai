@@ -740,6 +740,42 @@ class AsyncEtcd(AbstractKVStore):
 
             return cast(bool, result.succeeded())
 
+    async def delete_if_value(
+        self,
+        key: str,
+        expected: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """
+        Atomically delete a single key only if it still holds ``expected``.
+
+        The counterpart of :meth:`put_if_absent` for pooled resources: a plain delete releases
+        whatever is there now, which after a reuse is somebody else's claim.
+
+        :return: ``True`` if this call deleted the key, ``False`` if it held something else
+                 (or nothing).
+        """
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        async with self.etcd.connect() as communicator:
+            result = await communicator.txn(
+                EtcdTransactionAction()
+                .when([
+                    Compare.value(
+                        mangled_key.encode(self.encoding),
+                        CompareOp.EQUAL,
+                        str(expected).encode(self.encoding),
+                    ),
+                ])
+                .and_then([TxnOp.delete(mangled_key.encode(self.encoding))])
+                .or_else([])
+            )
+
+            return cast(bool, result.succeeded())
+
     @override
     async def delete(
         self,

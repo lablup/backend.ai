@@ -20,6 +20,7 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.network.keys import (
     agent_vtep_key,
     member_key,
+    members_prefix,
     session_meta_key,
     session_prefix,
 )
@@ -218,11 +219,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             log.exception("rollback: failed to delete session keys for {}", session_id)
         if vni is not None:
             try:
-                await self._vni_allocator.release(vni)
+                await self._vni_allocator.release(vni, session_id)
             except Exception:
                 log.exception("rollback: failed to release VNI {} for {}", vni, session_id)
         try:
-            await self._subnet_allocator.release(subnet)
+            await self._subnet_allocator.release(subnet, session_id)
         except Exception:
             log.exception("rollback: failed to release subnet {} for {}", subnet, session_id)
 
@@ -241,15 +242,45 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
 
     @override
     async def destroy_network(self, network_id: str) -> None:
+        """Release the session's VNI and subnet, but only once its nodes have let go of them.
+
+        A node removes its member record when its teardown has actually completed, so a record
+        that is still there means that node may still hold this VNI's devices, XFRM state and
+        firewall rules. Handing the VNI out then gives the next session a stranger's rules and
+        lets the laggard's retry tear down the new session's data plane. So the allocation is
+        kept -- it stays this session's, which is what stops the reuse -- and the session keys
+        are left with it so a later destroy can finish the job.
+        """
         etcd = self._require_etcd()
+        pending = await self._members_still_holding(network_id)
+        if pending:
+            log.warning(
+                "not releasing session {}'s overlay allocation yet: {} have not confirmed"
+                " teardown ({})",
+                network_id,
+                len(pending),
+                ", ".join(sorted(pending)),
+            )
+            return
         raw = await etcd.get(session_meta_key(network_id), scope=ConfigScopes.GLOBAL)
         if raw is not None:
             meta = json.loads(raw)
             if subnet := meta.get("subnet"):
-                await self._subnet_allocator.release(subnet)
+                await self._subnet_allocator.release(subnet, network_id)
             if (vni := meta.get("vni")) is not None:
-                await self._vni_allocator.release(int(vni))
+                await self._vni_allocator.release(int(vni), network_id)
         await etcd.delete_prefix(session_prefix(network_id).rstrip("/"), scope=ConfigScopes.GLOBAL)
+
+    async def _members_still_holding(self, session_id: str) -> set[str]:
+        """The agents whose member record is still published for this session.
+
+        The record IS the teardown acknowledgement: an agent writes it when it joins and removes
+        it only after `teardown_session_network` returned without leaving state behind.
+        """
+        found = await self._require_etcd().get_prefix(
+            members_prefix(session_id).rstrip("/"), scope=ConfigScopes.GLOBAL
+        )
+        return {str(agent_id) for agent_id in found.keys() if agent_id}
 
     async def _require_members_cni_capable(self, member_agents: list[str]) -> None:
         """Refuse a member agent whose backend cannot serve the 'cni' driver.
