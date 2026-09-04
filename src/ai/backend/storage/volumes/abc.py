@@ -11,6 +11,7 @@ from typing import (
     final,
 )
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -193,7 +194,7 @@ class AbstractFSOpModel(metaclass=ABCMeta):
 class AbstractVolume(metaclass=ABCMeta):
     quota_model: AbstractQuotaModel
     fsop_model: AbstractFSOpModel
-    name: ClassVar[str] = "undefined"
+    name: ClassVar[StorageBackendType]
 
     def __init__(
         self,

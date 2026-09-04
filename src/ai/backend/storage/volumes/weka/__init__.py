@@ -5,10 +5,11 @@ import logging
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 import aiofiles.os
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
@@ -121,7 +122,7 @@ class WekaQuotaModel(BaseQuotaModel):
 class WekaVolume(BaseVolume):
     api_client: WekaAPIClient
 
-    name = "weka"
+    name: ClassVar[StorageBackendType] = StorageBackendType.WEKA
 
     _fs_uid: str
 

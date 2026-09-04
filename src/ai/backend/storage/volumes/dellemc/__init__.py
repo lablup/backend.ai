@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast, override
+from typing import Any, ClassVar, cast, override
 
 import aiofiles.os
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaScopeID
@@ -154,7 +155,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
 
 
 class DellEMCOneFSVolume(BaseVolume):
-    name = "dellemc-onefs"
+    name: ClassVar[StorageBackendType] = StorageBackendType.DELLEMC_ONEFS
     endpoint: str
     dell_admin: str
     dell_password: str

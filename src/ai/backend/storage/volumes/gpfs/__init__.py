@@ -1,8 +1,9 @@
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal, override
+from typing import Any, ClassVar, Literal, override
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
@@ -139,7 +140,7 @@ class GPFSOpModel(BaseFSOpModel):
 
 
 class GPFSVolume(BaseVolume):
-    name = "gpfs"
+    name: ClassVar[StorageBackendType] = StorageBackendType.GPFS
     api_client: GPFSAPIClient
 
     fs: str

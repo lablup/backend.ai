@@ -26,6 +26,29 @@ class NamedStorageTarget(BackendAISchema):
 ArtifactStorageTarget = NamedStorageTarget | VFolderStorageTarget
 
 
+class StorageBackendType(enum.StrEnum):
+    """The storage backend implementations a volume can be served by.
+
+    The value is what a storage-proxy volume config names under ``backend`` and what the
+    ``storage_backends.type`` column stores.
+    """
+
+    VFS = "vfs"
+    XFS = "xfs"
+    CEPHFS = "cephfs"
+    PURESTORAGE = "purestorage"
+    NETAPP = "netapp"
+    WEKA = "weka"
+    GPFS = "gpfs"
+    SPECTRUMSCALE = "spectrumscale"
+    DELLEMC_ONEFS = "dellemc-onefs"
+    VAST = "vast"
+    EXASCALER = "exascaler"
+    HAMMERSPACE = "hammerspace"
+    HAMMERSPACE_BASE = "hammerspace-base"
+    NOOP = "noop"
+
+
 class ArtifactStorageType(enum.StrEnum):
     OBJECT_STORAGE = "object_storage"
     VFS_STORAGE = "vfs_storage"
@@ -36,3 +59,18 @@ class ArtifactStorageImportStep(enum.StrEnum):
     DOWNLOAD = "download"
     VERIFY = "verify"
     ARCHIVE = "archive"
+
+
+class ServiceStorageStatus(enum.StrEnum):
+    """How a service currently sees a storage backend or volume it relates to.
+
+    healthy: the last check found no problem.
+    unhealthy: the check found a problem.
+    stale: no check has landed for a while.
+    detached: the relationship was removed outright.
+    """
+
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    STALE = "stale"
+    DETACHED = "detached"

@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from typing import Self
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
@@ -42,7 +43,7 @@ _DEFAULT_BACKENDS: Mapping[str, type[AbstractVolume]] = {
     DellEMCOneFSVolume.name: DellEMCOneFSVolume,
     WekaVolume.name: WekaVolume,
     GPFSVolume.name: GPFSVolume,  # IBM SpectrumScale or GPFS
-    "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
+    StorageBackendType.SPECTRUMSCALE: GPFSVolume,  # IBM SpectrumScale or GPFS
     CephFSVolume.name: CephFSVolume,
     VASTVolume.name: VASTVolume,
     EXAScalerFSVolume.name: EXAScalerFSVolume,

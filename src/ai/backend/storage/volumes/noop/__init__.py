@@ -1,9 +1,10 @@
 from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, override
+from typing import Any, ClassVar, override
 
-from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_BACKEND_TYPE
+from ai.backend.common.data.storage.types import StorageBackendType
+from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
@@ -132,12 +133,12 @@ class NoopFSOpModel(AbstractFSOpModel):
 
 
 class NoopVolume(AbstractVolume):
-    name = NOOP_STORAGE_BACKEND_TYPE
+    name: ClassVar[StorageBackendType] = StorageBackendType.NOOP
 
     @override
     def info(self) -> VolumeInfo:
         return VolumeInfo(
-            backend=NOOP_STORAGE_BACKEND_TYPE,
+            backend=StorageBackendType.NOOP,
             path=self.mount_path,
             fsprefix=None,
             options=None,
