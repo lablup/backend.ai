@@ -3643,3 +3643,86 @@ class TestALowVniMustNotTakeALocalBridge:
         plugin = _plugin(rec)
         await plugin.setup_session_network(_META, _SELF)
         assert ["ip", "link", "del", local_bridge_dev(4097)] in rec.calls
+
+
+class TestAPlaintextTunnelSomethingElseTookDown:
+    """`prepare_recovery` holds every `baivx*` on the host down -- ours and a co-located agent's
+    alike, because at that moment nothing can tell them apart. The agent that restarted raises its
+    own again. Nobody raised anyone else's, and the drift pass only ever looked at encrypted
+    sessions, so a plaintext session owned by another process on the host lost its cross-node
+    traffic until whichever process owned it happened to restart."""
+
+    async def test_the_pass_raises_it(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_META, _SELF)
+        plugin._reader = _protection_reader(plugin, vni=None)  # the device reads as down
+        rec.calls.clear()
+        await plugin.reassert_protection()
+        assert link_up_args(vxlan_dev(4097)) in rec.calls
+
+    async def test_a_tunnel_that_is_up_is_left_alone(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_META, _SELF)
+        plugin._reader = _protection_reader(plugin, vni=4097)
+        rec.calls.clear()
+        await plugin.reassert_protection()
+        assert link_up_args(vxlan_dev(4097)) not in rec.calls
+
+    async def test_a_node_with_only_plaintext_sessions_still_runs_the_pass(
+        self, tmp_path: Path
+    ) -> None:
+        # The early return on "nothing encrypted" is what left this whole case unlooked at.
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_META, _SELF)
+        reader = _protection_reader(plugin, vni=None)
+        plugin._reader = reader
+        reader.calls.clear()
+        await plugin.reassert_protection()
+        assert reader.calls, "the pass returned without reading anything"
+
+
+class TestTheChainsBelongToTheHost:
+    """`BAI-VXLAN-IN`, `-GUARD` and `-MARK` are host-global, and a co-located agent's encrypted
+    sessions keep their plaintext drop and egress guard in them. Deleting them at this process's
+    exit takes that agent's protection with it, silently."""
+
+    def _reader_with(self, rules: dict[str, list[str]]) -> _Listing:
+        """A host whose owned chains hold exactly ``rules``, as `iptables -S CHAIN` prints them."""
+
+        def _listing(argv: Sequence[str]) -> str | None:
+            chain = argv[-1]
+            if "-S" not in argv or chain not in rules:
+                return None
+            return f"-N {chain}\n" + "".join(f"-A {chain} {rule}\n" for rule in rules[chain])
+
+        return _Listing(_listing)
+
+    async def test_chains_that_still_carry_rules_stay(self) -> None:
+        rec = Recorder()
+        rules: dict[str, list[str]] = {chain: [] for _t, _b, chain in OWNED_CHAINS}
+        rules[CHAIN_IN] = ["-p udp -m udp --dport 4789 -j DROP"]  # somebody's plaintext drop
+        plugin = _plugin(rec, reader=self._reader_with(rules))
+        await plugin.cleanup()
+        assert not any("-X" in c for c in rec.calls), "a co-located agent's protection went with it"
+        assert not any("-D" in c for c in rec.calls)
+
+    async def test_empty_chains_are_withdrawn(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, reader=self._reader_with({c: [] for _t, _b, c in OWNED_CHAINS}))
+        await plugin.cleanup()
+        deleted = {c[-1] for c in rec.calls if "-X" in c}
+        assert deleted == {chain for _t, _b, chain in OWNED_CHAINS}
+
+    async def test_an_unreadable_chain_is_not_assumed_empty(self) -> None:
+        def _unreadable(argv: Sequence[str]) -> str | None:
+            if "-S" in argv:
+                raise RuntimeError("xtables lock held")
+            return None
+
+        rec = Recorder()
+        plugin = _plugin(rec, reader=_Listing(_unreadable))
+        await plugin.cleanup()
+        assert not any("-X" in c for c in rec.calls)

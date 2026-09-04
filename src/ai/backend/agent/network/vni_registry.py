@@ -173,6 +173,12 @@ class VniRegistry:
         Raises `VniConflict` when the VNI is already another session's, or the same session's
         under a different configuration. Nothing is written in that case.
         """
+        if not owner:
+            # An anonymous claim is one no reader can attribute, and one that cannot be attributed
+            # cannot be counted. Refusing here rather than writing it keeps the store readable.
+            log.error("refusing to bind VNI {} for session {}: no agent id", vni, session_id)
+            yield Binding(recorded=False, already_held=False)
+            return
         async with self._journal.holding(vni_key(vni)) as claims:
             if claims is None:
                 yield Binding(recorded=False, already_held=False)
@@ -187,7 +193,13 @@ class VniRegistry:
             for entry in existing:
                 holder = VniHolder.parse(entry)
                 if holder is None:
-                    continue
+                    # Something holds this VNI and we cannot say what. Skipping it is how the VNI
+                    # reads as free and setup deletes the devices behind it -- an agent with no id
+                    # writes exactly such a claim, and so does the format of a previous release.
+                    raise VniConflict(
+                        f"VNI {vni} on this node carries a claim this agent cannot read"
+                        f" ({entry!r}); refusing rather than treating it as free"
+                    )
                 if holder.session_id == session_id and holder.digest == digest:
                     already_held = already_held or holder.built
                     continue
@@ -223,20 +235,30 @@ class VniRegistry:
         off the network, and its own locator cannot even see them.
 
         The lock spans the caller's block, so the answer cannot go stale between being given and
-        being acted on.
+        being acted on. And the claim is dropped only when that block RETURNS: a teardown that
+        raised did not finish, its devices may still be up, and a claim already removed lets the
+        next session on this node take a VNI that is still carrying traffic.
         """
         async with self._journal.holding(vni_key(vni)) as claims:
             if claims is None:
                 yield None
                 return
-            # Both states: which one this agent left behind depends on whether its build finished.
-            dropped = claims.remove(owner, _claim_id(_BUILT, session_id, digest))
-            dropped = claims.remove(owner, _claim_id(_HELD, session_id, digest)) and dropped
-            if not dropped:
+            existing = claims.users()
+            if existing is None:
                 yield None
                 return
-            remaining = claims.users()
-            yield None if remaining is None else not remaining
+            mine = {f"{owner}/{_claim_id(state, session_id, digest)}" for state in (_HELD, _BUILT)}
+            yield not (existing - mine)
+            # Reached only on a clean exit from the caller's block.
+            for state in (_BUILT, _HELD):
+                if not claims.remove(owner, _claim_id(state, session_id, digest)):
+                    log.warning(
+                        "could not drop this agent's {} binding on VNI {} for session {}; it will"
+                        " refuse that VNI to later sessions until the next startup prunes it",
+                        state,
+                        vni,
+                        session_id,
+                    )
 
     async def prune(self, owner: str, live: Collection[tuple[str, str]]) -> int:
         """Drop this agent's bindings for sessions it no longer has.

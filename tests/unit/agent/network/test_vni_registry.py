@@ -195,3 +195,58 @@ class TestHolders:
         assert VniHolder.parse("no-separator") is None
         assert VniHolder.parse("a1/s1") is None
         assert VniHolder.parse("a1/nonsense#s1#abc") is None
+
+
+class TestAClaimThisAgentCannotRead:
+    """A claim whose owner or state cannot be made out still means somebody holds the VNI. Skipping
+    it is how the registry reports the VNI as free and setup deletes the devices behind it -- and
+    an agent started with no id writes exactly such a claim, as does the claim format of an
+    earlier release."""
+
+    async def test_it_is_a_conflict_not_a_blank(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path / "vni")
+        await _bind(registry, "a1", "s1", _CONFIG)
+        # Rename the claim into a shape this version cannot parse, as an older one would have
+        # written it.
+        directory = tmp_path / "vni" / "vni4138"
+        claim = next(f for f in directory.iterdir() if f.name != ".lock")
+        claim.rename(directory / "s1#deadbeef")
+        with pytest.raises(VniConflict, match="cannot read"):
+            await _bind(registry, "a2", "s2", _CONFIG)
+
+    async def test_an_agent_with_no_id_binds_nothing(self, tmp_path: Path) -> None:
+        # Rather than write the unattributable claim in the first place.
+        registry = VniRegistry(tmp_path / "vni")
+        assert await _bind(registry, "", "s1", _CONFIG) is False
+        assert await registry.holders(4138) == frozenset()
+
+
+class TestTheClaimIsCommittedAfterTheTeardown:
+    """`releasing` is held across the caller's teardown. If that teardown raises, the devices may
+    still be up -- and a claim already gone lets the next session on this node take a VNI that is
+    still carrying traffic."""
+
+    async def test_a_failed_teardown_keeps_the_claim(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path / "vni")
+        await _bind(registry, "a1", "s1", _CONFIG)
+        with pytest.raises(RuntimeError):
+            async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)) as freed:
+                assert freed is True
+                raise RuntimeError("ip link del failed")
+        with pytest.raises(VniConflict):
+            await _bind(registry, "a2", "s2", _CONFIG)
+
+    async def test_a_successful_teardown_drops_it(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path / "vni")
+        await _bind(registry, "a1", "s1", _CONFIG)
+        async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)) as freed:
+            assert freed is True
+        assert await _bind(registry, "a2", "s2", _CONFIG) is True
+
+    async def test_the_answer_ignores_our_own_claim(self, tmp_path: Path) -> None:
+        # "Would anyone be left?" -- not "is anyone here?", which is always yes while we are.
+        registry = VniRegistry(tmp_path / "vni")
+        await _bind(registry, "a1", "s1", _CONFIG)
+        await _bind(registry, "a2", "s1", _CONFIG)
+        async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)) as freed:
+            assert freed is False

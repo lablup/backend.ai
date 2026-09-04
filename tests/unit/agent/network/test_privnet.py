@@ -15,7 +15,8 @@ import itertools
 import os
 import subprocess
 import tempfile
-from collections.abc import Iterator, Mapping
+from collections.abc import AsyncIterator, Iterator, Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast, override
 
@@ -40,7 +41,7 @@ from ai.backend.agent.network.privnet.policy import (
 )
 from ai.backend.agent.network.privnet.protocol import PrivNetOp, PrivNetRequest, PrivNetResponse
 from ai.backend.agent.network.privnet.server import PrivNetServer
-from ai.backend.agent.network.vni_registry import VniRegistry, config_digest
+from ai.backend.agent.network.vni_registry import Binding, VniRegistry, config_digest
 from ai.backend.common.network.types import (
     AttachKind,
     EndpointPlan,
@@ -2079,3 +2080,114 @@ class TestRecoveryDoesNotAdoptAVniItCouldNotBind:
             await restarted.server._retry_recovery()
             assert restarted.backend.adopt_calls == ["s1"]
             assert restarted.server._unrecovered_sessions == {}
+
+
+class TestABuildTheRegistryWillNotVouchFor:
+    """The devices exist and the store will not say so. Left there, a co-located agent's setup of
+    this same session reads "not built", takes the build path, and deletes the devices out from
+    under whatever is already on them."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    async def test_setup_gives_the_devices_back_and_fails(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            registry = h.server._vni_registry
+
+            class _WontMark(VniRegistry):
+                @override
+                @contextlib.asynccontextmanager
+                async def binding(
+                    self, vni: int, owner: str, session_id: str, digest: str
+                ) -> AsyncIterator[Binding]:
+                    async with registry.binding(vni, owner, session_id, digest) as bound:
+                        yield replace(bound, _claims=None)  # every mark_built() now fails
+
+            h.server._vni_registry = _WontMark(tmp_path / "vni")
+            with pytest.raises(PrivNetClientError, match="could not be recorded as built"):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+            assert h.backend.teardown_calls == ["s1"], "the devices were left for someone to delete"
+            assert "s1" not in await h.journal.sessions()
+            assert "s1" not in h.server._sessions
+
+    async def test_the_reservation_it_leaves_is_cleared_by_the_next_startup(
+        self, tmp_path: Path
+    ) -> None:
+        # A store that will not take the "built" write will not take the removal either, so the
+        # reservation stays -- which refuses the VNI rather than handing it out over devices that
+        # may not be gone. The startup prune is what gives it back, having found no session
+        # behind it.
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            registry = h.server._vni_registry
+
+            class _WontMark(VniRegistry):
+                @override
+                @contextlib.asynccontextmanager
+                async def binding(
+                    self, vni: int, owner: str, session_id: str, digest: str
+                ) -> AsyncIterator[Binding]:
+                    async with registry.binding(vni, owner, session_id, digest) as bound:
+                        yield replace(bound, _claims=None)
+
+            h.server._vni_registry = _WontMark(tmp_path / "vni")
+            with contextlib.suppress(PrivNetClientError):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+            h.server._vni_registry = registry
+            with pytest.raises(PrivNetClientError, match="already held by session s1"):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s2", network_config=dict(self._VXLAN))
+                )
+
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as restarted:
+            resp = await restarted.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s2", network_config=dict(self._VXLAN))
+            )
+            assert resp.ok, resp.error
+
+
+class TestAnAnonymousPrivnetOwnsNothing:
+    def test_the_server_refuses_to_start_without_an_agent_id(self, tmp_path: Path) -> None:
+        # The agent id is the owner half of every node-wide claim. An empty one writes claims no
+        # reader can attribute, and a VNI whose holders cannot be counted reads as free.
+        with pytest.raises(ValueError, match="non-empty agent id"):
+            _Harness(_StubRuntime(), state_dir=tmp_path, agent_id="  ")
+
+
+class TestAFailedTeardownKeepsTheVni:
+    """The claim is committed when the teardown returns, not before it runs. A device that would
+    not go down is still carrying traffic, and a VNI already released is one the next session on
+    this node is free to build over."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    async def test_the_next_session_cannot_take_it(self, tmp_path: Path) -> None:
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path, teardown_failures=1
+        ) as h:
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            with pytest.raises(PrivNetClientError):
+                await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+            with pytest.raises(PrivNetClientError, match="already held by session s1"):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s2", network_config=dict(self._VXLAN))
+                )
+
+    async def test_the_retry_completes_it(self, tmp_path: Path) -> None:
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path, teardown_failures=1
+        ) as h:
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            with contextlib.suppress(PrivNetClientError):
+                await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+            await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+            resp = await h.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s2", network_config=dict(self._VXLAN))
+            )
+            assert resp.ok, resp.error
