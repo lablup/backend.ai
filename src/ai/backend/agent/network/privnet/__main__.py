@@ -12,19 +12,30 @@ Capabilities needed (all four, for the reasons noted):
                     /sys/fs/cgroup/backend-ai. Not a widening in practice: a process holding
                     CAP_SYS_ADMIN can already reach anything this would
 
-Run as a systemd service scoped to exactly those:
+**Run it as its OWN user, not the agent's.** This daemon exists to contain the agent, and it
+holds CAP_NET_ADMIN and CAP_DAC_OVERRIDE. Sharing a uid with the process it contains means that
+process can unlink and rewrite this one's journal, its node-wide claim files and its socket --
+after which the containment is a description rather than a boundary. The daemon logs a warning at
+startup when it detects that shape.
 
     [Service]
-    User=backendai-agent
+    User=backendai-privnet
     AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
     CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
     NoNewPrivileges=yes
+    Environment=BACKENDAI_PRIVNET_UID=<the agent's uid>
+    Environment=BACKENDAI_PRIVNET_AGENT_ID=<this node's agent id>
     ExecStart=/usr/bin/python -m ai.backend.agent.network.privnet ...
 
-For local development, ``setpriv`` drops to the agent's uid while keeping those caps ambient. Two
-gotchas: ``--bounding-set`` tokens need the ``+`` prefix (unlike ``--ambient-caps``, a bare name
-is "bad capability string"), and dropping to the agent uid with ``--reuid`` is what makes the
-socket owned by — and so connectable by — the agent (a root-owned 0600 socket is not):
+With that split, give ``backendai-privnet`` sole ownership (0700) of the privnet state directory
+and the node-wide claim trees, and the agent nothing but the socket: the daemon chowns it to the
+agent's primary group at 0660, and `SO_PEERCRED` still gates every connection on the exact uid.
+
+For local development, ``setpriv`` drops to the agent's uid while keeping those caps ambient.
+That is the same-uid shape above — convenient, and not a boundary. Two gotchas:
+``--bounding-set`` tokens need the ``+`` prefix (unlike ``--ambient-caps``, a bare name is "bad
+capability string"), and dropping to the agent uid with ``--reuid`` is what makes the socket owned
+by — and so connectable by — the agent (a root-owned 0600 socket is not):
 
     CAPS=+net_admin,+sys_admin,+sys_ptrace,+dac_read_search,+dac_override
     sudo setpriv --reuid "$AGENT_UID" --regid "$AGENT_GID" --clear-groups \
@@ -36,7 +47,9 @@ Configuration comes from environment variables so the launcher stays trivial:
     BACKENDAI_PRIVNET_SOCKET   unix socket path override (otherwise taken from the agent
                                  config's [agent] network-privnet-socket, else /run default)
     BACKENDAI_PRIVNET_CONFIG   agent config file to read the socket path from (optional)
-    BACKENDAI_PRIVNET_UID      uid allowed to connect (default: the invoking SUDO_UID)
+    BACKENDAI_PRIVNET_UID      the AGENT's uid: the only one allowed to connect (default: the
+                                 invoking SUDO_UID). When it differs from this process's own uid
+                                 the socket is chowned to that uid's primary group at 0660
     BACKENDAI_PRIVNET_AGENT_ID this node's agent id (REQUIRED: it is the owner half of
                                  every node-wide claim, so an empty one lets two agents
                                  on a host delete each other's networks)
