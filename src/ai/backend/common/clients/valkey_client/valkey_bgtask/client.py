@@ -27,7 +27,6 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
-from ai.backend.common.clients.valkey_client.script import create_script
 from ai.backend.common.data.bgtask.defs import (
     TASK_FINISHED_TTL,
     TASK_METADATA_TTL,
@@ -514,4 +513,4 @@ class ValkeyBgtaskClient:
             return '{_ScriptResult.TTL_SUFFICIENT}'
         end
         """)
-        return create_script(code)
+        return Script(code)
