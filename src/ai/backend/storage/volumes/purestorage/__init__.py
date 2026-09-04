@@ -4,8 +4,9 @@ import asyncio
 import contextlib
 import logging
 import re
-from typing import Any, override
+from typing import Any, ClassVar, override
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import (
@@ -34,7 +35,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class FlashBladeVolume(BaseVolume):
-    name = "purestorage"
+    name: ClassVar[StorageBackendType] = StorageBackendType.PURESTORAGE
     _toolkit_version: int | None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

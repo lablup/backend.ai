@@ -3,11 +3,12 @@ import logging
 from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Final, Literal, cast, override
+from typing import Any, ClassVar, Final, Literal, cast, override
 
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
@@ -218,7 +219,7 @@ class VASTQuotaModel(BaseQuotaModel):
 class VASTVolume(BaseVolume):
     api_client: VASTAPIClient
 
-    name = "vast"
+    name: ClassVar[StorageBackendType] = StorageBackendType.VAST
 
     def __init__(
         self,
