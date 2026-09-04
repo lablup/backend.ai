@@ -4,11 +4,12 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.exception import InvalidConfigError
@@ -293,7 +294,7 @@ class XfsVolume(BaseVolume):
     `xfs_quota` command and write to `/etc/projects` and `/etc/projid`.
     """
 
-    name = "xfs"
+    name: ClassVar[StorageBackendType] = StorageBackendType.XFS
 
     project_registry: XfsProjectRegistry
 

@@ -3,10 +3,11 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 import aiofiles.os
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.types import BinarySize, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import CephNotInstalledError, QuotaScopeNotFoundError
@@ -137,7 +138,7 @@ class CephFSOpModel(BaseFSOpModel):
 
 
 class CephFSVolume(BaseVolume):
-    name = "cephfs"
+    name: ClassVar[StorageBackendType] = StorageBackendType.CEPHFS
     loop: asyncio.AbstractEventLoop
     registry: dict[str, int]
     project_id_pool: list[int]

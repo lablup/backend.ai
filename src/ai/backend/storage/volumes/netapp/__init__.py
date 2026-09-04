@@ -10,7 +10,7 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import aclosing
 from pathlib import Path
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 import aiofiles
 import aiofiles.os
@@ -23,6 +23,7 @@ from tenacity import (
     wait_fixed,
 )
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import (
@@ -436,7 +437,7 @@ class XCPFSOpModel(BaseFSOpModel):
 
 
 class NetAppVolume(BaseVolume):
-    name = "netapp"
+    name: ClassVar[StorageBackendType] = StorageBackendType.NETAPP
     ontap_endpoint: str
     netapp_user: str
     netapp_password: str
