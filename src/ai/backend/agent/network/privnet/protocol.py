@@ -57,6 +57,10 @@ class PrivNetOp(enum.StrEnum):
     # assigned (to write /etc/hosts for a single-node cluster), it does not declare one — the
     # inverse of the trust concern the rest of this protocol guards against.
     LOCAL_SUBNET = "local_subnet"
+    # Read-only: what this privnet knows it has NOT been able to recover. The agent's readiness
+    # probe asks, because a node whose privnet cannot manage a session that is running on it looks
+    # healthy from every other angle -- and that session's VNI can be handed out underneath it.
+    RECOVERY_STATUS = "recovery_status"
     # Cluster DNS: redirect the session gateway's :53 to the agent's unprivileged resolver, which
     # binds an ephemeral loopback port (127.0.0.1:<dns_port>) and sends that port here. The privnet
     # derives the gateway/bridge from the session it owns; the agent supplies only the loopback port
@@ -269,6 +273,9 @@ class PrivNetResponse:
     forwards: tuple[tuple[str, int, str, int], ...] | None = None
     # LOCAL_SUBNET: the session's node-local LOCAL CIDR, or None when it holds no block.
     subnet: str | None = None
+    # RECOVERY_STATUS: {what could not be recovered: why}. Empty means this privnet is on top of
+    # everything it owns.
+    problems: dict[str, str] | None = None
     error: str | None = None
 
     def encode(self) -> bytes:
@@ -281,6 +288,8 @@ class PrivNetResponse:
             payload["forwards"] = [list(f) for f in self.forwards]
         if self.subnet is not None:
             payload["subnet"] = self.subnet
+        if self.problems is not None:
+            payload["problems"] = self.problems
         if self.error is not None:
             payload["error"] = self.error
         return json.dumps(payload, separators=(",", ":")).encode() + b"\n"
@@ -304,6 +313,12 @@ class PrivNetResponse:
         subnet = data.get("subnet")
         if subnet is not None and not isinstance(subnet, str):
             raise ProtocolError("subnet must be a string or null")
+        problems = data.get("problems")
+        if problems is not None and not (
+            isinstance(problems, dict)
+            and all(isinstance(k, str) and isinstance(v, str) for k, v in problems.items())
+        ):
+            raise ProtocolError("problems must be an object of strings")
         error = data.get("error")
         return cls(
             ok=bool(data["ok"]),
@@ -311,5 +326,6 @@ class PrivNetResponse:
             host_ports=tuple(raw_ports) if raw_ports is not None else None,
             forwards=_decode_forwards(data.get("forwards")),
             subnet=subnet,
+            problems=problems,
             error=error,
         )
