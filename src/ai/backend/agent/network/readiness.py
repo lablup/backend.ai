@@ -13,7 +13,6 @@ import logging
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Final
 
 from ai.backend.agent.errors.network import UndescribableVxlanDevice
@@ -121,42 +120,31 @@ def foreign_conflicts(
 #: Present exactly when the kernel has the XFRM framework compiled in. Reading it needs no
 #: privilege, which matters: on a privnet-backed node this probe runs in the AGENT, which holds no
 #: CAP_NET_ADMIN and so cannot ask netlink the same question.
-#: The AEAD every overlay SA is built with; the backend programs this exact string.
-_ESP_AEAD = "rfc4106(gcm(aes))"
-_XFRM_STAT = Path("/proc/net/xfrm_stat")
-#: Every algorithm the kernel's crypto API can instantiate, one `name : <value>` line each.
-_PROC_CRYPTO = Path("/proc/crypto")
-
-
-def _encryption_problems() -> list[str]:
+async def _encryption_problems(privnet_socket: str | None) -> list[str]:
     """What would stop this node holding up its end of an ESP tunnel.
 
-    Static, not functional: it reads what the kernel says it has rather than installing an SA and
-    watching a packet. A real self-test would need CAP_NET_ADMIN and a namespace to do it in, and
-    on a privnet-backed node this code runs in the agent, which has neither. What it does catch is
-    the two ways a node genuinely cannot do this -- no XFRM in the kernel, no AES-GCM in its
-    crypto API -- which is what a node advertising the profile would otherwise have claimed.
+    Answered by TRYING: the overlay's real SA and outbound policy are installed on documentation
+    addresses, read back, and removed. Nothing short of that answers it. /proc/net/xfrm_stat is
+    CONFIG_XFRM_STATISTICS, which is neither necessary nor sufficient for the CONFIG_XFRM_USER
+    interface `ip xfrm` actually needs; and a name in /proc/crypto is neither necessary (the crypto
+    API loads a module on first use) nor sufficient (the listing carries internal `__`-prefixed
+    implementations that cannot be allocated by that name).
+
+    It needs CAP_NET_ADMIN. On a privnet-backed node this process has none, so the privnet -- which
+    does -- runs it and sends back what it found. Where there is no privnet the backend runs
+    in-process with the capability, so it is run here.
     """
-    problems: list[str] = []
-    if not _XFRM_STAT.exists():
-        problems.append(
-            "this kernel has no XFRM framework (/proc/net/xfrm_stat is absent), so it cannot"
-            " install the ESP state an encrypted overlay is built from."
-        )
+    if privnet_socket is not None:
+        from ai.backend.agent.network.privnet.client import PrivNetClient
+
+        return list((await PrivNetClient(privnet_socket).encryption_problems()).values())
+    from ai.backend.agent.network.backends import vxlan
+
     try:
-        crypto = _PROC_CRYPTO.read_text()
-    except OSError:
-        problems.append(
-            "this node's /proc/crypto cannot be read, so whether the kernel offers"
-            f" {_ESP_AEAD} for the overlay's ESP cannot be established."
-        )
-    else:
-        if _ESP_AEAD not in crypto:
-            problems.append(
-                f"this kernel's crypto API does not offer {_ESP_AEAD}, which is the AEAD every"
-                " overlay SA is built with."
-            )
-    return problems
+        return await vxlan.probe_encryption_support(vxlan._run_command, vxlan._read_command)
+    except Exception as e:
+        log.exception("the overlay encryption probe failed")
+        return [f"this node's overlay encryption probe did not complete ({e})"]
 
 
 async def _binary_present(name: str) -> bool:
@@ -278,7 +266,7 @@ async def probe_readiness(
     scheduled here and fails on one node with it buried in a create-time traceback.
     """
     blocking: list[str] = []
-    encryption_blocking = _encryption_problems()
+    encryption_blocking = await _encryption_problems(privnet_socket)
     for binary in _REQUIRED_BINARIES:
         if not await _binary_present(binary):
             blocking.append(

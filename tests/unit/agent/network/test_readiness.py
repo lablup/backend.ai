@@ -7,11 +7,10 @@ the kernel, and the attribute line carries a bare `fan-map` token between the id
 
 from __future__ import annotations
 
-from pathlib import Path
+from collections.abc import Sequence
+from typing import Any
 
-import pytest
-
-import ai.backend.agent.network.readiness as readiness
+from ai.backend.agent.network.backends import vxlan
 from ai.backend.agent.network.caps import compute_caps
 from ai.backend.agent.network.readiness import (
     Readiness,
@@ -141,43 +140,93 @@ class TestUnreadableDevicesAreNotSilence:
 
 
 class TestWhetherThisNodeCanEncryptAtAll:
-    """The generic checks -- ip, bridge, iptables, u32 -- say nothing about ESP. A kernel with no
-    XFRM or no AES-GCM passes every one of them and then cannot install a single SA, so a node
-    advertising the encryption profile off the back of them claimed something nobody looked at."""
+    """The generic checks -- ip, bridge, iptables, u32 -- say nothing about ESP, so the answer is
+    found by TRYING: the overlay's real SA and outbound policy are installed on documentation
+    addresses, read back, and removed.
 
-    def test_a_kernel_without_xfrm_cannot(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(readiness, "_XFRM_STAT", Path("/nonexistent/xfrm_stat"))
-        problems = readiness._encryption_problems()
-        assert any("XFRM" in p for p in problems)
+    Reading /proc instead was wrong twice over: `xfrm_stat` is CONFIG_XFRM_STATISTICS, which is
+    neither necessary nor sufficient for the CONFIG_XFRM_USER interface `ip xfrm` needs, and a
+    name in /proc/crypto is neither necessary (the crypto API loads a module on first use) nor
+    sufficient (the listing carries internal `__`-prefixed implementations)."""
 
-    def test_a_kernel_without_the_aead_cannot(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
-        crypto = tmp_path / "crypto"
-        crypto.write_text("name         : cbc(aes)\ndriver       : cbc-aes-aesni\n")
-        monkeypatch.setattr(readiness, "_PROC_CRYPTO", crypto)
-        problems = readiness._encryption_problems()
-        assert any("rfc4106(gcm(aes))" in p for p in problems)
+    def _probe(self, rec: Any, listing: tuple[str, str]) -> Any:
+        state, policy = listing
 
-    def test_an_unreadable_crypto_list_is_not_a_yes(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
-        monkeypatch.setattr(readiness, "_PROC_CRYPTO", tmp_path / "gone")
-        assert readiness._encryption_problems()
+        async def _reader(argv: Sequence[str]) -> str:
+            return policy if list(argv[:3]) == ["ip", "xfrm", "policy"] else state
 
-    def test_a_kernel_with_both_can(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-        stat = tmp_path / "xfrm_stat"
-        stat.write_text("XfrmInError 0\n")
-        crypto = tmp_path / "crypto"
-        crypto.write_text("name         : rfc4106(gcm(aes))\ndriver       : rfc4106-gcm-aesni\n")
-        monkeypatch.setattr(readiness, "_XFRM_STAT", stat)
-        monkeypatch.setattr(readiness, "_PROC_CRYPTO", crypto)
-        assert readiness._encryption_problems() == []
+        return vxlan.probe_encryption_support(rec, _reader)
+
+    async def test_a_kernel_that_installs_and_reports_it_back_can(self) -> None:
+        calls: list[list[str]] = []
+
+        async def _runner(argv: Sequence[str]) -> None:
+            calls.append(list(argv))
+
+        assert await self._probe(_runner, _installed()) == []
+        assert any(c[:4] == ["ip", "xfrm", "state", "add"] for c in calls)
+        assert any(c[:4] == ["ip", "xfrm", "policy", "update"] for c in calls)
+
+    async def test_a_kernel_that_refuses_the_state_cannot(self) -> None:
+        async def _runner(argv: Sequence[str]) -> None:
+            if argv[:4] == ["ip", "xfrm", "state", "add"]:
+                raise RuntimeError("RTNETLINK answers: Operation not supported")
+
+        problems = await self._probe(_runner, ("", ""))
+        assert any("cannot install" in p for p in problems)
+
+    async def test_a_kernel_that_accepts_but_does_not_report_esn_cannot(self) -> None:
+        # It accepts the SA and then holds something weaker. Only reading it back finds that.
+        async def _runner(argv: Sequence[str]) -> None:
+            return None
+
+        problems = await self._probe(_runner, _installed(esn=False))
+        assert any("ESN" in p for p in problems)
+
+    async def test_a_kernel_that_loses_the_policy_cannot(self) -> None:
+        async def _runner(argv: Sequence[str]) -> None:
+            return None
+
+        problems = await self._probe(_runner, _installed(policy=False))
+        assert any("policy" in p for p in problems)
+
+    async def test_the_probe_cleans_up_after_itself(self) -> None:
+        calls: list[list[str]] = []
+
+        async def _runner(argv: Sequence[str]) -> None:
+            calls.append(list(argv))
+
+        await self._probe(_runner, _installed())
+        assert any(c[:4] == ["ip", "xfrm", "state", "del"] for c in calls)
+        assert any(c[:4] == ["ip", "xfrm", "policy", "del"] for c in calls)
+
+    async def test_it_cleans_up_after_a_failure_too(self) -> None:
+        calls: list[list[str]] = []
+
+        async def _runner(argv: Sequence[str]) -> None:
+            calls.append(list(argv))
+            if argv[:4] == ["ip", "xfrm", "policy", "update"]:
+                raise RuntimeError("no")
+
+        await self._probe(_runner, ("", ""))
+        assert any(c[:4] == ["ip", "xfrm", "state", "del"] for c in calls)
+
+    async def test_it_only_ever_touches_documentation_addresses(self) -> None:
+        # A leftover after a crash must select nothing real. TEST-NET-1 is never routed and never
+        # a VTEP.
+        calls: list[list[str]] = []
+
+        async def _runner(argv: Sequence[str]) -> None:
+            calls.append(list(argv))
+
+        await self._probe(_runner, _installed())
+        addresses = {c[i + 1] for c in calls for i, t in enumerate(c) if t in ("src", "dst")}
+        assert addresses <= {"192.0.2.1", "192.0.2.2", "192.0.2.1/32", "192.0.2.2/32"}
 
     def test_the_two_answers_are_separate(self) -> None:
         # A cluster may legitimately run unencrypted on a kernel with no ESP, so "cannot encrypt"
         # must not read as "cannot serve the overlay".
-        findings = Readiness(encryption_blocking=("this kernel has no XFRM framework",))
+        findings = Readiness(encryption_blocking=("this node cannot install the ESP state",))
         assert findings.can_serve_overlay is True
         assert findings.can_encrypt_overlay is False
 
@@ -186,5 +235,24 @@ class TestWhetherThisNodeCanEncryptAtAll:
         assert findings.can_encrypt_overlay is False
 
     def test_the_reason_is_published(self) -> None:
-        findings = Readiness(encryption_blocking=("this kernel has no XFRM framework",))
-        assert "this kernel has no XFRM framework" in findings.problems
+        findings = Readiness(encryption_blocking=("this node cannot install the ESP state",))
+        assert "this node cannot install the ESP state" in findings.problems
+
+
+def _installed(*, esn: bool = True, policy: bool = True) -> tuple[str, str]:
+    """`(ip xfrm state, ip xfrm policy)` output for a probe the kernel accepted as asked."""
+    spi = vxlan._esp_spi("192.0.2.1", "192.0.2.2")
+    state = (
+        "src 192.0.2.1 dst 192.0.2.2\n"
+        f"\tproto esp spi {spi:#x} reqid {vxlan.XFRM_REQID} mode transport\n"
+        + ("\treplay-window 0 flag esn\n" if esn else "\treplay-window 0\n")
+        + "\taead rfc4106(gcm(aes)) 0xdeadbeef 128\n"
+    )
+    rule = (
+        "src 192.0.2.1/32 dst 192.0.2.2/32 proto udp dport 4789 \n"
+        "\tdir out priority 0 \n"
+        f"\tmark {vxlan.XFRM_MARK:#x}/0xffffffff \n"
+        f"\ttmpl src 192.0.2.1 dst 192.0.2.2 proto esp spi {spi:#x}"
+        f" reqid {vxlan.XFRM_REQID} mode transport\n"
+    )
+    return state, (rule if policy else "")

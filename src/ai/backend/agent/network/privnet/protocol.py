@@ -25,8 +25,8 @@ from typing import Any
 #: inference from an error string -- and a caller that needs a newer verb refuses instead of
 #: reading a failure as an answer.
 #:
-#: 1: the original verb set. 2: RECOVERY_STATUS.
-PROTOCOL_VERSION: int = 2
+#: 1: the original verb set. 2: RECOVERY_STATUS. 3: ENCRYPTION_PROBE.
+PROTOCOL_VERSION: int = 3
 
 
 class PrivNetOp(enum.StrEnum):
@@ -69,6 +69,10 @@ class PrivNetOp(enum.StrEnum):
     # probe asks, because a node whose privnet cannot manage a session that is running on it looks
     # healthy from every other angle -- and that session's VNI can be handed out underneath it.
     RECOVERY_STATUS = "recovery_status"
+    # Read-only in effect: install the overlay's real ESP state on documentation addresses, read
+    # it back, remove it. It lives here because it needs CAP_NET_ADMIN, which the agent that wants
+    # the answer does not have.
+    ENCRYPTION_PROBE = "encryption_probe"
     # Cluster DNS: redirect the session gateway's :53 to the agent's unprivileged resolver, which
     # binds an ephemeral loopback port (127.0.0.1:<dns_port>) and sends that port here. The privnet
     # derives the gateway/bridge from the session it owns; the agent supplies only the loopback port

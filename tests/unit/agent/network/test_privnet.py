@@ -82,6 +82,8 @@ class _StubBackend:
         self.withdraw_calls: list[str] = []
         self.unclosed: frozenset[str] = frozenset()
         self.withdraw_failures = 0
+        self.encryption_problems: list[str] = []
+        self.encryption_probe_error: Exception | None = None
         self.recovery_preparations = 0
         self.recovery_error = recovery_error
         self.teardown_failures = teardown_failures
@@ -95,6 +97,11 @@ class _StubBackend:
 
     def unclosed_devices(self) -> frozenset[str]:
         return self.unclosed
+
+    async def probe_encryption_support(self) -> list[str]:
+        if self.encryption_probe_error is not None:
+            raise self.encryption_probe_error
+        return list(self.encryption_problems)
 
     async def prepare_recovery(self) -> None:
         self.recovery_preparations += 1
@@ -3116,3 +3123,66 @@ class TestAWithdrawalTheBackendRefuses:
             with pytest.raises(PrivNetClientError):
                 await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
             assert await h.vni_registry.holders(4138)
+
+
+class TestAskingWhetherThisNodeCanEncrypt:
+    """It needs CAP_NET_ADMIN, which the agent asking does not have -- so the privnet installs the
+    overlay's real ESP state on documentation addresses, reads it back, removes it, and sends the
+    answer over the socket."""
+
+    async def test_a_capable_node_reports_nothing(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            resp = await h.client().call(PrivNetRequest(PrivNetOp.ENCRYPTION_PROBE, "probe"))
+            assert resp.ok
+            assert resp.problems == {}
+
+    async def test_what_the_backend_found_comes_back(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            h.backend.encryption_problems = ["this kernel cannot install an ESP SA"]
+            resp = await h.client().call(PrivNetRequest(PrivNetOp.ENCRYPTION_PROBE, "probe"))
+            assert list((resp.problems or {}).values()) == ["this kernel cannot install an ESP SA"]
+
+    async def test_a_probe_that_raises_is_a_problem_not_a_pass(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            h.backend.encryption_probe_error = RuntimeError("netlink is not answering")
+            resp = await h.client().call(PrivNetRequest(PrivNetOp.ENCRYPTION_PROBE, "probe"))
+            assert resp.ok
+            assert "privnet:encryption" in (resp.problems or {})
+
+    async def test_it_does_not_queue_behind_a_recovery_pass(self, tmp_path: Path) -> None:
+        # It is asked while the node is deciding whether it may serve at all.
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            await h.server._mutation_lock.acquire()
+            try:
+                resp = await asyncio.wait_for(
+                    h.client().call(PrivNetRequest(PrivNetOp.ENCRYPTION_PROBE, "probe")), 2
+                )
+                assert resp.ok
+            finally:
+                h.server._mutation_lock.release()
+
+    async def test_a_daemon_too_old_to_answer_is_told_apart_by_its_version(
+        self, tmp_path: Path
+    ) -> None:
+        socket_path = _short_socket_path()
+
+        async def _old_daemon(reader: Any, writer: Any) -> None:
+            await reader.readline()
+            writer.write(PrivNetResponse(ok=True).encode())  # no version field
+            await writer.drain()
+            writer.close()
+
+        server = await asyncio.start_unix_server(_old_daemon, path=socket_path)
+        try:
+            problems = await PrivNetClient(socket_path).encryption_problems()
+            assert "protocol 1" in problems["privnet:encryption"]
+        finally:
+            server.close()
+            await server.wait_closed()
+            with contextlib.suppress(OSError):
+                os.unlink(socket_path)
+
+    async def test_a_privnet_that_cannot_be_asked_is_a_problem(self, tmp_path: Path) -> None:
+        # "I could not find out" is not "it can".
+        problems = await PrivNetClient(str(tmp_path / "gone.sock")).encryption_problems()
+        assert "privnet:encryption" in problems
