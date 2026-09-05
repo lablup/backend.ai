@@ -123,7 +123,11 @@ The two probes are distinct because they fail independently: a vendor appliance 
 | Marker file holding the volume name | The mounting service | The path is serving different storage than declared |
 | `get_hwinfo()` | Storage proxy | The backend appliance itself |
 
-Mount failures are not written onto the agent. They are published as events that an administrator can subscribe to through a notification rule.
+Each probe runs on its own periodic loop and leaves its latest result, with the time it was taken, in the service's memory; the heartbeat carries that snapshot. Probe cadence and heartbeat cadence stay independent, so a slow or hung probe never delays a heartbeat and never makes a healthy service look dead. Because every entry carries its check time, a service reports no separate unknown state — the manager decides fresh from stale itself, and a volume never yet probed is still declared, without one.
+
+Probes run independently per volume: a dead network mount blocks in its system call, and walking the volumes in one loop would let a single one starve the rest. A probe that timed out is not retried while the previous attempt is outstanding, because cancelling the await does not release the executor thread.
+
+Mount failures are not written onto the agent. They reach an administrator through a notification rule.
 
 ### How records are created and change
 
@@ -164,9 +168,9 @@ Once a service is confirmed down, its relationships are left in place but are no
 
 | When | Calls | Purpose |
 |------|-------|---------|
-| On start, then periodically | Event bus | Heartbeat declaring its backends and the volumes it mounts, each with this proxy's mount path |
-| Periodically | Its own filesystem | Mount probe. The result is published as an event, not written directly |
-| Periodically | The backend appliance | `get_hwinfo()`, for the appliance's reachability from this proxy |
+| On start, then periodically | Event bus | Heartbeat declaring its backends and the volumes it mounts, each with this proxy's mount path and the latest probe result held in memory |
+| Periodically, independently per volume | Its own filesystem | Mount probe. The result is kept in memory and rides the next heartbeat |
+| Periodically | The backend appliance | `get_hwinfo()`, for the appliance's reachability from this proxy. Also kept in memory |
 | On request from the manager | — | Serves the volume verification endpoint. **New** — the existing volume listing only echoes configuration and cannot answer whether a volume is ready |
 | On request from a client | — | Serves the existing vfolder file APIs, unchanged |
 
@@ -174,18 +178,18 @@ Once a service is confirmed down, its relationships are left in place but are no
 
 | When | Calls | Purpose |
 |------|-------|---------|
-| On start, then periodically | Event bus | Heartbeat declaring the volumes it mounts, each with this agent's mount path. **New** — agents have no volume concept today |
-| Periodically | Its own filesystem | Mount probe, published as an event |
+| On start, then periodically | Event bus | Heartbeat declaring the volumes it mounts, each with this agent's mount path and the latest probe result. **New** — agents have no volume concept today |
+| Periodically, independently per volume | Its own filesystem | Mount probe. The result is kept in memory and rides the next heartbeat |
 | On session start | — | Binds the host path the manager supplies, unchanged |
 
 **Manager**
 
 | When | Calls | Purpose |
 |------|-------|---------|
-| On every heartbeat and health event | Its own database | Writes the catalog record and the storage relationships |
+| On every heartbeat | Its own database | Writes the catalog record and the storage relationships, including the probe results the heartbeat carried |
 | Whenever it needs a proxy address | Its own database | Service catalog lookup by role and scope, replacing the address previously held in etcd |
 | Periodically, for records with an aged heartbeat | The service itself | Direct probe before declaring it down |
-| Periodically | Storage proxy | Volume verification, to move a relationship into a verified state |
+| When a heartbeat has not arrived | Storage proxy | Volume verification, on demand. Routine state arrives with the heartbeat, so this endpoint exists for the case where it has stopped |
 | On session start | Its own database | Computes the agent's host path from that agent's volume relationship. **This replaces a synchronous call to the storage proxy** |
 | On folder create, delete, clone, quota change | Storage proxy | Existing manager-facing APIs, unchanged |
 
@@ -236,6 +240,7 @@ Data migration runs through a manager CLI command, not an Alembic migration, so 
 | 2026-09-04 | Credentials never travel in a heartbeat | The event bus is readable by every component that consumes events |
 | 2026-09-04 | The manager computes `host_path` | The layout is fixed and the inputs are already in the database |
 | 2026-09-04 | A stale service is probed before being declared down | A missed heartbeat can mean a lagging event bus rather than a dead service |
+| 2026-09-05 | Probe results ride the heartbeat rather than a separate health event | One payload and one cadence to reason about; the heartbeat is already an event |
 | 2026-09-04 | Services and their relationships are soft-deleted | A returning service reattaches, and the record of what was mounted where survives |
 | 2026-09-04 | Mount failures raise notifications rather than writing agent state | Keeps one owner for agent state and lets operators choose the response |
 
