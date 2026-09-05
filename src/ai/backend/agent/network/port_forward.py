@@ -19,13 +19,13 @@ function of the container id.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
 from ai.backend.agent.errors.network import PortForwardError
+from ai.backend.agent.network import command
 
 _COMMENT_PREFIX = "bai:"
 
@@ -213,11 +213,12 @@ Runner = Callable[..., Awaitable[tuple[int, bytes, bytes]]]
 
 
 async def _run_iptables(argv: Sequence[str], *, check: bool = True) -> tuple[int, bytes, bytes]:
-    proc = await asyncio.create_subprocess_exec(
-        *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-    )
-    out, err = await proc.communicate()
-    rc = proc.returncode or 0
+    try:
+        rc, out, err = await command.run(argv)
+    except command.CommandTimeout as e:
+        # An xtables lock somebody else is holding. These run under the privnet's node-wide
+        # barrier, so one that never returns stops every session operation on the node.
+        raise PortForwardError(f"{e}: {' '.join(argv)}") from e
     if check and rc != 0:
         raise PortForwardError(
             f"command failed (rc={rc}): {' '.join(argv)}: {err.decode(errors='replace').strip()}"
