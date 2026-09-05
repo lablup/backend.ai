@@ -150,15 +150,16 @@ class TestWhetherThisNodeCanEncryptAtAll:
     name in /proc/crypto is neither necessary (the crypto API loads a module on first use) nor
     sufficient (the listing carries internal `__`-prefixed implementations)."""
 
-    def _probe(self, runner: Any, listing: tuple[str, str], netns: str = "") -> Any:
+    def _probe(self, runner: Any, listing: tuple[str, str]) -> Any:
         state, policy = listing
 
         async def _reader(argv: Sequence[str]) -> str:
-            if list(argv[:3]) == ["ip", "netns", "list"]:
-                return netns
             return policy if argv[-1] == "policy" else state
 
-        return vxlan.probe_encryption_support(runner, _reader)
+        async def _no_namespaces() -> list[str]:
+            return []
+
+        return vxlan.probe_encryption_support(runner, _reader, netns_lister=_no_namespaces)
 
     async def test_a_kernel_that_installs_and_reports_it_back_can(self) -> None:
         calls: list[list[str]] = []
@@ -346,16 +347,17 @@ class TestReapingProbeNamespaces:
     removal that keeps failing, or a SIGKILL between creating a namespace and removing it,
     accumulates them for as long as the node runs. Nothing came back for them."""
 
-    def _probe(self, runner: Any, netns_list: str) -> Any:
+    def _probe(self, runner: Any, netns_list: list[str] | None) -> Any:
         async def _reader(argv: Sequence[str]) -> str:
-            if list(argv[:3]) == ["ip", "netns", "list"]:
-                return netns_list
             state, policy = _installed()
             return policy if argv[-1] == "policy" else state
 
-        return vxlan.probe_encryption_support(runner, _reader)
+        async def _lister() -> list[str] | None:
+            return netns_list
 
-    async def _deletions(self, netns_list: str) -> list[str]:
+        return vxlan.probe_encryption_support(runner, _reader, netns_lister=_lister)
+
+    async def _deletions(self, netns_list: list[str]) -> list[str]:
         """The namespaces this probe REAPED, without the one it made for itself."""
         deleted: list[str] = []
         made: list[str] = []
@@ -372,26 +374,25 @@ class TestReapingProbeNamespaces:
     async def test_a_dead_processes_namespace_is_reaped(self) -> None:
         # pid 1 is alive; a pid that is not is what a killed agent leaves behind.
         dead = _free_pid()
-        deleted = await self._deletions(f"bai-encprobe-{dead}-abcd (id: 3)\n")
+        deleted = await self._deletions([f"bai-encprobe-{dead}-abcd"])
         assert f"bai-encprobe-{dead}-abcd" in deleted
 
     async def test_a_live_co_located_agents_namespace_is_left(self) -> None:
         # Its probe is running right now; reaping it would break that agent's answer.
-        deleted = await self._deletions("bai-encprobe-1-abcd (id: 3)\n")
+        deleted = await self._deletions(["bai-encprobe-1-abcd"])
         assert "bai-encprobe-1-abcd" not in deleted
 
     async def test_our_own_leftovers_are_reaped(self) -> None:
         # `_probe_lock` means no other probe of this process is running, so anything of ours is
         # finished with.
         mine = f"bai-encprobe-{os.getpid()}-abcd"
-        assert mine in await self._deletions(f"{mine}\n")
+        assert mine in await self._deletions([mine])
 
     async def test_a_namespace_from_before_the_pid_was_in_the_name_is_reaped(self) -> None:
-        assert "bai-encprobe-abcd" in await self._deletions("bai-encprobe-abcd\n")
+        assert "bai-encprobe-abcd" in await self._deletions(["bai-encprobe-abcd"])
 
     async def test_nothing_else_is_touched(self) -> None:
-        listing = "bai-encprobe-1-live\ncni-1234\nsomeone-elses-netns (id: 0)\n"
-        deleted = await self._deletions(listing)
+        deleted = await self._deletions(["bai-encprobe-1-live", "cni-1234", "someone-elses"])
         assert deleted == [], "it reaped a namespace that is not a probe's"
 
     async def test_one_that_will_not_go_is_reported(self) -> None:
@@ -401,21 +402,22 @@ class TestReapingProbeNamespaces:
             if list(argv[:3]) == ["ip", "netns", "del"] and argv[3].endswith("-abcd"):
                 raise RuntimeError("Device or resource busy")
 
-        problems = await self._probe(_runner, f"bai-encprobe-{dead}-abcd\n")
+        problems = await self._probe(_runner, [f"bai-encprobe-{dead}-abcd"])
         assert any("leftover encryption probe namespace" in p for p in problems)
 
-    async def test_an_unlistable_namespace_set_does_not_stop_the_probe(self) -> None:
-        # Not knowing what is lying around is no reason to refuse to answer the question asked.
+    async def test_an_unlistable_namespace_set_stops_the_probe(self) -> None:
+        # Not knowing what is lying around means not knowing whether adding one more is safe, and
+        # this runs every minute. `_read_command` reports a failed command and an empty listing
+        # the same way, which is why the lister answers None rather than "".
+        made: list[str] = []
+
         async def _runner(argv: Sequence[str]) -> None:
-            return None
+            if list(argv[:3]) == ["ip", "netns", "add"]:
+                made.append(argv[3])
 
-        async def _reader(argv: Sequence[str]) -> str:
-            if list(argv[:3]) == ["ip", "netns", "list"]:
-                raise RuntimeError("no")
-            state, policy = _installed()
-            return policy if argv[-1] == "policy" else state
-
-        assert await vxlan.probe_encryption_support(_runner, _reader) == []
+        problems = await self._probe(_runner, None)
+        assert any("cannot list its network namespaces" in p for p in problems)
+        assert made == [], "it built another one without knowing what was already there"
 
     async def test_the_name_carries_this_process(self) -> None:
         made: list[str] = []
@@ -424,8 +426,38 @@ class TestReapingProbeNamespaces:
             if list(argv[:3]) == ["ip", "netns", "add"]:
                 made.append(argv[3])
 
-        await self._probe(_runner, "")
+        await self._probe(_runner, [])
         assert made and made[0].startswith(f"bai-encprobe-{os.getpid()}-")
+
+    async def test_a_reap_that_failed_stops_this_probe_building_another(self) -> None:
+        # The bug this shape exists for. Reporting the leftover and then adding one more turns an
+        # unbounded leak into a well-documented unbounded leak -- once a minute, for as long as
+        # `ip netns del` is broken on that host.
+        dead = _free_pid()
+        made: list[str] = []
+
+        async def _runner(argv: Sequence[str]) -> None:
+            if list(argv[:3]) == ["ip", "netns", "del"]:
+                raise RuntimeError("Device or resource busy")
+            if list(argv[:3]) == ["ip", "netns", "add"]:
+                made.append(argv[3])
+
+        problems = await self._probe(_runner, [f"bai-encprobe-{dead}-abcd"])
+        assert problems, "it reported nothing"
+        assert made == [], "it built another namespace it could not account for"
+
+    async def test_the_node_then_reads_as_unable_to_encrypt(self) -> None:
+        # Which is what stops the manager placing an encrypted session here until it is fixed.
+        dead = _free_pid()
+
+        async def _runner(argv: Sequence[str]) -> None:
+            if list(argv[:3]) == ["ip", "netns", "del"]:
+                raise RuntimeError("busy")
+
+        findings = Readiness(
+            encryption_blocking=tuple(await self._probe(_runner, [f"bai-encprobe-{dead}-abcd"]))
+        )
+        assert findings.can_encrypt_overlay is False
 
 
 def _free_pid() -> int:
