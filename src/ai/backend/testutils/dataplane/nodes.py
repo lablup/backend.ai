@@ -276,7 +276,7 @@ class SshNode:
     _target: str
     _ssh_options: tuple[str, ...]
     _limit_sec: float
-    _slots: asyncio.Semaphore
+    _slots: dict[asyncio.AbstractEventLoop, asyncio.Semaphore]
 
     def __init__(
         self,
@@ -289,7 +289,7 @@ class SshNode:
         self._name = name or target
         self._target = target
         self._ssh_options = _default_ssh_options() if ssh_options is None else ssh_options
-        self._slots = asyncio.Semaphore(SSH_MAX_CONCURRENCY)
+        self._slots = {}
         self._limit_sec = limit_sec
 
     @property
@@ -299,8 +299,21 @@ class SshNode:
     def wire_argv(self, argv: list[str]) -> list[str]:
         return ["ssh", *self._ssh_options, self._target, "--", shlex.join(argv)]
 
+    def _limiter(self) -> asyncio.Semaphore:
+        """The concurrency bound for the loop we are on.
+
+        A node outlives any one test: the fixture is session-scoped and each test gets its own
+        loop, so a semaphore made once in `__init__` belongs to a loop that is gone by the time
+        the second test uses it -- which asyncio reports, from inside a fixture, as an error with
+        nothing to do with ssh.
+        """
+        loop = asyncio.get_running_loop()
+        if (limiter := self._slots.get(loop)) is None:
+            limiter = self._slots[loop] = asyncio.Semaphore(SSH_MAX_CONCURRENCY)
+        return limiter
+
     async def run(self, argv: list[str], *, check: bool = True) -> CommandResult:
-        async with self._slots:
+        async with self._limiter():
             for remaining in reversed(range(SSH_TRANSPORT_RETRIES)):
                 result = await _exec(
                     self._name, argv, self.wire_argv(argv), check=False, limit_sec=self._limit_sec
