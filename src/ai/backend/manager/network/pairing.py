@@ -17,7 +17,7 @@ from collections.abc import Iterable
 
 from ai.backend.common.etcd import AbstractKVStore, AsyncEtcd, ConfigScopes
 from ai.backend.common.network.keys import agent_backend_key, agent_caps_key
-from ai.backend.common.network.types import AgentNetworkCaps
+from ai.backend.common.network.types import OVERLAY_ENCRYPTION_PROFILE, AgentNetworkCaps
 from ai.backend.manager.errors.network import NetworkBackendMismatch
 
 # Which agent backend can serve which inter-container network driver.
@@ -132,3 +132,41 @@ async def require_members_overlay_ready(etcd: AsyncEtcd, member_agents: Iterable
             f"agent '{agent_id}' does not advertise the 'vxlan' data-plane backend, so a "
             f"multi-node overlay session placed on it cannot come up: {reasons}"
         )
+
+
+async def members_can_encrypt(etcd: AsyncEtcd, member_agents: Iterable[str]) -> str | None:
+    """Why this session's nodes cannot all hold up an encrypted overlay, or None if they can.
+
+    Unlike every other check in this module, silence here is NOT consent. An agent that publishes
+    no capabilities, or one whose record does not name `OVERLAY_ENCRYPTION_PROFILE`, is an agent
+    from before this contract existed -- and the two ends of an ESP tunnel must agree on all of
+    it. One that cannot do ESN cannot decrypt what one that can sends, so the session comes up
+    carrying nothing, on the node nobody was looking at.
+
+    That is exactly what a rolling upgrade produces now that encryption is the default rather than
+    something an operator turned on node by node. So the answer to "I cannot tell" is to leave
+    this session unencrypted and say why, not to encrypt it and find out.
+    """
+    for agent_id in member_agents:
+        raw = await etcd.get(agent_caps_key(agent_id), scope=ConfigScopes.GLOBAL)
+        if raw is None:
+            return (
+                f"agent '{agent_id}' has published no network capabilities, so this manager cannot"
+                " tell whether it speaks the overlay encryption profile"
+                f" {OVERLAY_ENCRYPTION_PROFILE!r}"
+            )
+        try:
+            caps = AgentNetworkCaps(**json.loads(raw))
+        except (ValueError, TypeError):
+            return (
+                f"agent '{agent_id}' published a capability record this manager cannot read, so"
+                " its overlay encryption profile is unknown"
+            )
+        if OVERLAY_ENCRYPTION_PROFILE not in caps.encryption_profiles:
+            return (
+                f"agent '{agent_id}' does not speak the overlay encryption profile"
+                f" {OVERLAY_ENCRYPTION_PROFILE!r} (it advertises"
+                f" {caps.encryption_profiles or 'none'}); an ESP tunnel needs both ends to agree"
+                " on all of it, so a session mixing versions comes up and carries nothing"
+            )
+    return None

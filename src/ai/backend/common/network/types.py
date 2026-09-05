@@ -11,7 +11,7 @@ import ipaddress
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import Any, Final
 
 # --- tunnel constants, shared by the manager (which computes the overlay MTU) and the agent
 # (which builds the devices and checks the result against the real path) ---
@@ -114,9 +114,10 @@ class SessionNetMeta:
     """
     encryption_key: str | None = None
     """Hex-encoded 256-bit cluster root for kernel IPSec (ESP/AES-GCM) traffic-key derivation, or
-    ``None`` for a plaintext overlay (the default). The root is distributed via etcd like ``vni``;
-    the backend derives pair-and-12-hour-generation keys and programs only those into XFRM. See
-    overlay-encryption.md."""
+    ``None`` for a plaintext overlay -- which a VXLAN session is only when something asked for it,
+    since the manager encrypts by default (see `CNINetworkPlugin._encryption_enabled`). The root is
+    distributed via etcd like ``vni``; the backend derives pair-and-12-hour-generation keys and
+    programs only those into XFRM. See overlay-encryption.md."""
 
 
 @dataclass(frozen=True)
@@ -254,6 +255,20 @@ class EndpointPlan:
         return next((a for a in self.attachments if a.role is NetworkRole.OVERLAY), None)
 
 
+#: The wire contract of an encrypted overlay: transport-mode ESP with AES-GCM, extended sequence
+#: numbers, and traffic keys derived per node pair and generation.
+#:
+#: Named and versioned because the two ends of a tunnel must agree on ALL of it. An agent from
+#: before ESN cannot decrypt what one with it sends, so a session that mixes them comes up and
+#: carries nothing -- which is what a rolling upgrade produces the moment encryption stops being
+#: something an operator opted into node by node. The manager refuses to encrypt a session unless
+#: every node it lands on publishes this exact string.
+#:
+#: Bump it when the derivation, the algorithm or the replay handling changes, so that a mixed
+#: cluster fails at placement with a reason instead of at first packet without one.
+OVERLAY_ENCRYPTION_PROFILE: Final = "esp-aesgcm-esn-v1"
+
+
 @dataclass(frozen=True)
 class AgentNetworkCaps:
     """Per-agent networking capabilities used by the control plane to select a backend.
@@ -268,3 +283,6 @@ class AgentNetworkCaps:
     #: cannot protect when one arrives, and that guard belongs in the data-plane backend. This is
     #: so the reason is visible BEFORE a session is scheduled here and fails on one node.
     readiness: list[str] = field(default_factory=list)
+    #: The overlay encryption profiles this node can hold up ITS end of. Absent -- which is what an
+    #: agent from before this field publishes -- means none: see `OVERLAY_ENCRYPTION_PROFILE`.
+    encryption_profiles: list[str] = field(default_factory=list)

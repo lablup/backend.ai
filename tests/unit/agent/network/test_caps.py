@@ -8,8 +8,9 @@ from ai.backend.agent.network.caps import (
     publish_caps,
     publish_vtep,
 )
+from ai.backend.agent.network.readiness import Readiness
 from ai.backend.common.etcd import AbstractKVStore
-from ai.backend.common.network.types import AgentNetworkCaps
+from ai.backend.common.network.types import OVERLAY_ENCRYPTION_PROFILE, AgentNetworkCaps
 
 _ETHTOOL_OFF_FIXED = """\
 Features for enp4s0:
@@ -95,3 +96,27 @@ class TestPublishCaps:
         payload = json.loads(raw)
         assert payload["backends"] == ["vxlan"]
         assert payload["tunnel_offload"] is False
+
+
+class TestTheOverlayEncryptionProfile:
+    """The manager will not encrypt a session unless every node it lands on names this exact
+    string. It says the node can hold up its end of an ESP tunnel built the way this version
+    builds it -- transport mode, AES-GCM, ESN, per-pair-and-generation keys."""
+
+    def test_a_node_that_can_serve_the_overlay_publishes_it(self) -> None:
+        caps = compute_caps(tunnel_offload=False, readiness=Readiness())
+        assert caps.encryption_profiles == [OVERLAY_ENCRYPTION_PROFILE]
+
+    def test_a_node_that_cannot_serve_it_publishes_none(self) -> None:
+        # No `u32`, no `policy` match: it cannot hold up an ENCRYPTED tunnel either, and saying so
+        # is what keeps the manager from placing an encrypted session here.
+        caps = compute_caps(
+            tunnel_offload=False,
+            readiness=Readiness(blocking=("iptables has no `u32` match",)),
+        )
+        assert caps.encryption_profiles == []
+        assert caps.backends == []
+
+    def test_an_absent_field_defaults_to_none(self) -> None:
+        # What an agent from before this contract published; the manager reads it as "cannot".
+        assert AgentNetworkCaps(tunnel_offload=False).encryption_profiles == []
