@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import shlex
+import signal
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
@@ -66,20 +68,86 @@ class Node(Protocol):
     async def run(self, argv: list[str], *, check: bool = True) -> CommandResult: ...
 
 
-async def _reap(proc: asyncio.subprocess.Process) -> None:
-    """Kill a child and wait for it, shielded from the cancellation that brought us here.
+REAP_LIMIT_SEC = 5.0
+"""Seconds to wait for a killed child. A child that outlives this is left to the OS: waiting on
+it without a bound is what turned one unkillable process into a run that never ended."""
 
-    `proc.wait()` on the cancellation path would itself be cancelled immediately, leaving a
-    zombie and an open transport — so the wait has to be shielded.
+
+async def _kill_group(proc: asyncio.subprocess.Process, *, privileged: bool) -> None:
+    """SIGKILL the child's whole process group.
+
+    The group, not the process: killing `sudo` alone leaves the command it exec'd, and killing
+    `ssh` alone leaves the remote command running. `privileged` escalates through `sudo`, which
+    is what a collector's root child needs -- an unprivileged signal to it is EPERM, and a group
+    holding both ours and root's reports success while the root half keeps running.
     """
-    if proc.returncode is not None:
+    if privileged:
+        escalated = await asyncio.create_subprocess_exec(
+            "sudo",
+            "-n",
+            "kill",
+            "-KILL",
+            "--",
+            f"-{proc.pid}",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        with contextlib.suppress(BaseException):
+            await escalated.wait()
         return
-    proc.kill()
-    # Awaiting inside an already-cancelling task re-raises at once; the shielded wait still runs
-    # to completion in the background, which is all the reaping needs. The caller re-raises, so
-    # nothing is swallowed here.
-    with contextlib.suppress(asyncio.CancelledError):
-        await asyncio.shield(proc.wait())
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(proc.pid, signal.SIGKILL)
+
+
+async def _wait_briefly(proc: asyncio.subprocess.Process) -> bool:
+    """Wait out `REAP_LIMIT_SEC` for the child, leaving no task behind either way.
+
+    The wait cannot simply be shielded: a shield leaves the inner wait running as its own task,
+    and a child that never exits then keeps the event loop from ever closing -- the run hangs
+    rather than reporting whatever brought us here.
+    """
+    waiter = asyncio.ensure_future(proc.wait())
+    try:
+        await asyncio.wait({waiter}, timeout=REAP_LIMIT_SEC)
+    finally:
+        if not waiter.done():
+            waiter.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await waiter
+    return proc.returncode is not None
+
+
+def _group_alive(pgid: int) -> bool:
+    """Whether any process of the group is still running.
+
+    EPERM answers the question as well as success does -- it is a member we are not allowed to
+    signal, which is exactly the case worth escalating for.
+    """
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+async def _reap(proc: asyncio.subprocess.Process) -> None:
+    """Kill a child's group and wait for it, bounded, whatever the cancellation state of the
+    caller.
+
+    The direct child going is not the end of it: `sudo` keeps our real uid until it execs, so a
+    plain group kill takes `sudo` and leaves the root command it started -- with our waiter
+    already satisfied. The group is what has to be empty.
+    """
+    if proc.returncode is not None and not _group_alive(proc.pid):
+        return
+    await _kill_group(proc, privileged=False)
+    await _wait_briefly(proc)
+    if not _group_alive(proc.pid):
+        return
+    await _kill_group(proc, privileged=True)
+    await _wait_briefly(proc)
 
 
 async def _exec(
@@ -94,6 +162,9 @@ async def _exec(
         *wire_argv,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        # Its own process group, so a reap can take the whole tree -- `sudo` and what it exec'd,
+        # `ssh` and the remote command it is carrying.
+        start_new_session=True,
     )
     try:
         async with asyncio.timeout(limit_sec):

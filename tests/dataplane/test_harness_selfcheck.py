@@ -6,10 +6,12 @@ running this branch, and the guard is checked against the two ways it could lie:
 pre-existing resource as a leak, and reporting a leaking host as clean.
 
 These run with no privileges and no `BAI_DATAPLANE_NODES`, so they execute in ordinary CI.
+The two that exercise reaping a root child skip themselves where `sudo -n` does not work.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
@@ -40,8 +42,10 @@ from ai.backend.testutils.dataplane.nodes import (
     SSH_TRANSPORT_RETRIES,
     CommandFailed,
     CommandResult,
+    LocalNode,
     Node,
     SshNode,
+    SudoNode,
     is_transport_failure,
     parse_node_specs,
 )
@@ -865,3 +869,50 @@ class TestTellingASshDropFromACommandFailure:
 
     def test_the_retry_count_leaves_room_for_one_drop(self) -> None:
         assert SSH_TRANSPORT_RETRIES >= 2
+
+
+async def _sudo_works() -> bool:
+    probe = await asyncio.create_subprocess_exec(
+        "sudo",
+        "-n",
+        "true",
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    return await probe.wait() == 0
+
+
+async def _pids_of(pattern: str) -> list[str]:
+    found = await asyncio.create_subprocess_exec(
+        "pgrep", "-f", pattern, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
+    )
+    out, _ = await found.communicate()
+    return out.decode().split()
+
+
+class TestReapingAPrivilegedChild:
+    """Collectors run under `sudo -n`, so a command that overruns its limit has to be killed as
+    root. Getting this wrong hung whole runs: the killed `sudo` satisfied the waiter while the
+    root command it started kept the pipes -- and the event loop -- open."""
+
+    _MARKER = "bai-dataplane-reap-selfcheck"
+
+    async def test_the_command_is_gone_and_nothing_is_left_running(self) -> None:
+        if not await _sudo_works():
+            pytest.skip("passwordless sudo is not available here")
+        node = SudoNode(LocalNode("local", limit_sec=1.0))
+        before = set(await _pids_of(self._MARKER))
+        with pytest.raises(CommandFailed, match="timed out"):
+            await node.run(["sh", "-c", f": {self._MARKER}; sleep 60"])
+        assert set(await _pids_of(self._MARKER)) <= before
+
+    async def test_it_leaves_no_task_behind_to_hold_the_loop_open(self) -> None:
+        if not await _sudo_works():
+            pytest.skip("passwordless sudo is not available here")
+        node = SudoNode(LocalNode("local", limit_sec=1.0))
+        mine = asyncio.current_task()
+        before = {task for task in asyncio.all_tasks() if task is not mine}
+        with pytest.raises(CommandFailed, match="timed out"):
+            await node.run(["sh", "-c", f": {self._MARKER}; sleep 60"])
+        leftover = {task for task in asyncio.all_tasks() if task is not mine and task not in before}
+        assert not leftover, f"a reap left {len(leftover)} task(s) running"
