@@ -2412,6 +2412,23 @@ class TestTheNodeSaysWhatItCouldNotRecover:
             await h.server._retry_recovery()
             assert "ghost" in h.server._unrecovered_sessions
 
+    async def test_an_orphan_keeps_the_retry_running(self, tmp_path: Path) -> None:
+        # An empty journal is a complete answer, so recovery returned right after recording the
+        # orphan -- without the timer that is the only thing able to clear the mark. The node
+        # stayed out of service for a container that had since gone.
+        async with _Harness(_StubRuntime(live={"c1": "ghost"}), state_dir=tmp_path) as h:
+            task = h.server._recovery_retry_task
+            assert task is not None and not task.done()
+
+    async def test_the_node_comes_back_once_the_orphan_is_gone(self, tmp_path: Path) -> None:
+        runtime = _StubRuntime(live={"c1": "ghost"})
+        async with _Harness(runtime, state_dir=tmp_path) as h:
+            assert "ghost" in h.server._unrecovered_sessions
+            runtime._live.clear()
+            await h.server._retry_recovery()
+            resp = await h.client().call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
+            assert resp.problems == {}
+
     async def test_an_orphan_stops_the_prune(self, tmp_path: Path) -> None:
         # The prune's premise is that the journal is the whole list of what this agent owns, and
         # an orphan is exactly a counterexample.
