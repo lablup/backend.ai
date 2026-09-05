@@ -1,4 +1,4 @@
-"""What a Docker agent advertises about its overlay identity at startup (BEP-1062).
+"""What a Docker agent advertises about its overlay identity at startup (BEP-1078).
 
 The manager pre-seeds session membership straight from the published VTEP, and pairs the
 cluster-network driver against the published backend. Both guards fall back to "allow" on an

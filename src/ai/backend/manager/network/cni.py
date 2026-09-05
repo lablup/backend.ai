@@ -4,7 +4,7 @@ Replaces the Swarm-based `OverlayNetworkPlugin` for containerd and other host-na
 runtimes. This plugin owns the *control plane*: it allocates a per-session subnet
 (and a VNI for the vxlan backend), selects the data-plane backend (the portable vxlan
 overlay unless the operator pins one), and writes the session network descriptor to etcd.
-The data plane itself is realized by the agent-side v2 plugins (see BEP-1062/agent-plugin-v2.md).
+The data plane itself is realized by the agent-side v2 plugins (see BEP-1078, agent plugin).
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ _ESP_OVERHEAD = ESP_OVERHEAD
 
 
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
-    """Control-plane plugin for the runtime-neutral cluster network (BEP-1062)."""
+    """Control-plane plugin for the runtime-neutral cluster network (BEP-1078)."""
 
     _etcd: AsyncEtcd | None
     _subnet_allocator: SubnetAllocator
@@ -130,7 +130,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         forced_raw = options.get("forced_backend")
         forced_backend = NetworkBackendKind(forced_raw) if forced_raw else None
         # Each endpoint = one container: {"container_id", "agent_id"}. The manager assigns
-        # its overlay IP centrally (BEP-1062) so per-node IPs are disjoint.
+        # its overlay IP centrally (BEP-1078) so per-node IPs are disjoint.
         endpoints = list(options.get("endpoints", []))
         # Optional explicit subnet (like `docker network create --subnet`): when set, the
         # allocator claims exactly this block and fails on overlap instead of auto-sizing.

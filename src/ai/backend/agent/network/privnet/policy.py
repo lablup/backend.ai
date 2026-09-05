@@ -1,4 +1,4 @@
-"""Input policy for the privnet daemon (BEP-1062).
+"""Input policy for the privnet daemon (BEP-1078).
 
 Pure, side-effect-free validation of everything the (untrusted) agent sends before
 the privnet acts on it. Two design rules keep this small and race-free:
