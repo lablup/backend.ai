@@ -117,22 +117,21 @@ def foreign_conflicts(
     return problems
 
 
-#: Present exactly when the kernel has the XFRM framework compiled in. Reading it needs no
-#: privilege, which matters: on a privnet-backed node this probe runs in the AGENT, which holds no
-#: CAP_NET_ADMIN and so cannot ask netlink the same question.
 async def _encryption_problems(privnet_socket: str | None) -> list[str]:
     """What would stop this node holding up its end of an ESP tunnel.
 
-    Answered by TRYING: the overlay's real SA and outbound policy are installed on documentation
-    addresses, read back, and removed. Nothing short of that answers it. /proc/net/xfrm_stat is
-    CONFIG_XFRM_STATISTICS, which is neither necessary nor sufficient for the CONFIG_XFRM_USER
-    interface `ip xfrm` actually needs; and a name in /proc/crypto is neither necessary (the crypto
-    API loads a module on first use) nor sufficient (the listing carries internal `__`-prefixed
-    implementations that cannot be allocated by that name).
+    Answered by TRYING, in a throwaway network namespace: the overlay's real SA pair and outbound
+    policy are installed, read back, and thrown away with the namespace. Nothing short of that
+    answers it. /proc/net/xfrm_stat is CONFIG_XFRM_STATISTICS, which is neither necessary nor
+    sufficient for the CONFIG_XFRM_USER interface `ip xfrm` actually needs; and a name in
+    /proc/crypto is neither necessary (the crypto API loads a module on first use) nor sufficient
+    (the listing carries internal `__`-prefixed implementations that cannot be allocated by that
+    name).
 
-    It needs CAP_NET_ADMIN. On a privnet-backed node this process has none, so the privnet -- which
-    does -- runs it and sends back what it found. Where there is no privnet the backend runs
-    in-process with the capability, so it is run here.
+    It needs CAP_NET_ADMIN to install the state and CAP_SYS_ADMIN to make the namespace. On a
+    privnet-backed node this process holds neither, so the privnet -- which holds both -- runs it
+    and sends back what it found. Where there is no privnet the backend runs in-process with the
+    capabilities, so it is run here.
     """
     if privnet_socket is not None:
         from ai.backend.agent.network.privnet.client import PrivNetClient

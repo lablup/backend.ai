@@ -369,17 +369,18 @@ def xfrm_policy_add_args(
     ]  # fmt: skip
 
 
-#: The two ends of the probe SA. TEST-NET-1 (RFC 5737): documentation addresses, never routed and
-#: never a real VTEP, so the SA and policy this installs select nothing that exists and a leftover
-#: after a crash carries no traffic and collides with no pair.
-#: The two ends of the probe SA. TEST-NET-1 (RFC 5737): documentation addresses. They are chosen
-#: for legibility only -- the isolation comes from the namespace below, not from the numbers.
+#: The two ends of the probe SA. TEST-NET-1 (RFC 5737): documentation addresses. Chosen for
+#: legibility only -- the isolation comes from the namespace, not from the numbers.
 _PROBE_SELF: Final = "192.0.2.1"
 _PROBE_PEER: Final = "192.0.2.2"
 _PROBE_KEY: Final = "00" * 32
-#: Prefix for the throwaway network namespace each probe runs in. The suffix is random so two
-#: probes -- two agents on one host, or a retry overlapping its predecessor -- cannot collide.
+#: Names the throwaway namespace each probe runs in: `bai-encprobe-<pid>-<random>`. The pid is
+#: what lets a later probe tell a namespace whose process is gone from one another agent on this
+#: host is using right now; the random half keeps two probes of the same process apart.
 _PROBE_NETNS_PREFIX: Final = "bai-encprobe-"
+#: One probe at a time per process, so anything of OURS that is still lying around is finished
+#: with and safe to reap.
+_probe_lock = asyncio.Lock()
 
 
 async def probe_encryption_support(runner: Runner, reader: Reader) -> list[str]:
@@ -402,23 +403,89 @@ async def probe_encryption_support(runner: Runner, reader: Reader) -> list[str]:
     Needs CAP_NET_ADMIN and CAP_SYS_ADMIN, so on a privnet-backed node it runs THERE and the answer
     is carried back over the socket -- the agent that asks holds neither.
     """
-    netns = f"{_PROBE_NETNS_PREFIX}{secrets.token_hex(4)}"
-    try:
-        await runner(["ip", "netns", "add", netns])
-    except (RuntimeError, OSError) as e:
-        return [
-            f"this node cannot create a network namespace to test overlay encryption in ({e}), so"
-            " whether it could carry an encrypted session is unknown."
-        ]
-    try:
-        return await _probe_in_netns(runner, reader, netns)
-    finally:
+    async with _probe_lock:
+        stale = await _reap_probe_netns(runner, reader)
+        netns = f"{_PROBE_NETNS_PREFIX}{os.getpid()}-{secrets.token_hex(4)}"
         try:
-            await runner(["ip", "netns", "del", netns])
+            await runner(["ip", "netns", "add", netns])
         except (RuntimeError, OSError) as e:
-            # Not fatal to the answer, but it is a leak with this node's name on it and nothing
-            # else will come back for it.
-            log.warning("could not remove the encryption probe namespace {}: {}", netns, e)
+            return [
+                *stale,
+                f"this node cannot create a network namespace to test overlay encryption in ({e}),"
+                " so whether it could carry an encrypted session is unknown.",
+            ]
+        try:
+            return [*stale, *await _probe_in_netns(runner, reader, netns)]
+        finally:
+            try:
+                await runner(["ip", "netns", "del", netns])
+            except (RuntimeError, OSError) as e:
+                # The next probe reaps it. Reported by that one rather than this: what this call
+                # was asked is whether the node can encrypt, and it found that out.
+                log.warning("could not remove the encryption probe namespace {}: {}", netns, e)
+
+
+async def _reap_probe_netns(runner: Runner, reader: Reader) -> list[str]:
+    """Remove probe namespaces left behind, and report any that will not go.
+
+    A probe runs every time capabilities are refreshed -- once a minute on a busy agent -- so a
+    removal that keeps failing, or a SIGKILL between creating one and removing it, accumulates
+    namespaces for as long as the node runs. Reaping before the next probe rather than after the
+    last one is what makes a killed process's leftovers somebody's responsibility.
+
+    Only namespaces whose process is gone, plus our own: the pid in the name is what tells a
+    co-located agent's live probe from a dead one's remains, and `_probe_lock` is what makes our
+    own safe -- inside it, no other probe of this process is running.
+    """
+    try:
+        listing = await reader(["ip", "netns", "list"])
+    except (RuntimeError, OSError) as e:
+        log.warning("could not list network namespaces to reap old encryption probes: {}", e)
+        return []
+    problems: list[str] = []
+    for name in _stale_probe_netns(listing):
+        try:
+            await runner(["ip", "netns", "del", name])
+        except (RuntimeError, OSError) as e:
+            problems.append(
+                f"this node has a leftover encryption probe namespace {name} that will not go"
+                f" ({e}); they accumulate for as long as that is true."
+            )
+    return problems
+
+
+def _stale_probe_netns(listing: str) -> list[str]:
+    """The probe namespaces in an `ip netns list` that are nobody's any more.
+
+    `ip netns list` prints `<name>` or `<name> (id: N)` per line.
+    """
+    stale: list[str] = []
+    for line in listing.splitlines():
+        name = line.split()[0] if line.split() else ""
+        if not name.startswith(_PROBE_NETNS_PREFIX):
+            continue
+        _, _, suffix = name.partition(_PROBE_NETNS_PREFIX)
+        raw_pid, _, _ = suffix.partition("-")
+        try:
+            pid = int(raw_pid)
+        except ValueError:
+            stale.append(name)  # from before the pid was in the name; nobody can claim it
+            continue
+        if pid == os.getpid() or not _process_alive(pid):
+            stale.append(name)
+    return stale
+
+
+def _process_alive(pid: int) -> bool:
+    """Whether a process with this id exists. Not whether it is the one that made the namespace --
+    a recycled pid costs one skipped reap, which the next pass gets."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True  # it exists and is not ours to signal
+    return True
 
 
 async def _probe_in_netns(runner: Runner, reader: Reader, netns: str) -> list[str]:
