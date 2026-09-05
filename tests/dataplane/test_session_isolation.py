@@ -32,10 +32,23 @@ from ai.backend.testutils.dataplane.session import (
 
 @pytest.fixture
 def pinned_spec(session_spec: SessionSpec, primary_agent_id: str) -> SessionSpec:
-    """A single-node session pinned to the node the co-location scenarios inspect. With a second
-    agent registered in the group the scheduler is otherwise free to place it elsewhere, and a read
-    of the inspected node would find no kernel."""
-    return replace(session_spec, agent_list=(primary_agent_id,))
+    """A single-node cluster session pinned to the node the co-location scenarios inspect.
+
+    Pinned because with a second agent registered in the group the scheduler is otherwise free to
+    place it elsewhere, and a read of the inspected node would find no kernel.
+
+    Two kernels because that is what gives a session a LOCAL bridge of its own: the manager builds
+    a per-session network for a SINGLE_NODE session only when it has more than one kernel
+    (`launcher.py`). A one-kernel session gets Docker's default bridge, which every other such
+    session is on too -- so a cross-session isolation scenario built on those was asserting a
+    separation nothing had claimed to provide.
+    """
+    return replace(
+        session_spec,
+        cluster_size=2,
+        cluster_mode=ClusterModeEnum.SINGLE_NODE,
+        agent_list=(primary_agent_id,),
+    )
 
 
 class TestCrossSessionIsolation:
@@ -184,7 +197,7 @@ class TestRepeatedLifecycleLeavesNoResidue:
 
 async def _local_endpoint(node: Node, session: SessionHandle) -> tuple[str, str, str]:
     """``(task pid, LOCAL eth0 address, LOCAL gateway)`` for a single-node session's one kernel."""
-    return await _endpoint_of(node, await _sole_container_id(node, session))
+    return await _endpoint_of(node, await _a_container_id(node, session))
 
 
 async def _endpoint_of(node: Node, container_id: str) -> tuple[str, str, str]:
@@ -197,9 +210,9 @@ async def _endpoint_of(node: Node, container_id: str) -> tuple[str, str, str]:
     )
 
 
-async def _sole_container_id(node: Node, session: SessionHandle) -> str:
+async def _a_container_id(node: Node, session: SessionHandle) -> str:
+    """One of the session's kernels on this node. Which one does not matter: they share the
+    session's LOCAL bridge, so any of them answers what these scenarios ask."""
     ids = await probe.session_container_ids(node, session)
-    assert len(ids) == 1, (
-        f"expected exactly one kernel for {session.name} on this node, found {len(ids)}: {ids}"
-    )
-    return ids[0]
+    assert ids, f"expected a kernel for {session.name} on this node, found none"
+    return sorted(ids)[0]
