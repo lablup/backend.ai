@@ -22,10 +22,12 @@ from typing import Any, cast, override
 
 import pytest
 
+import ai.backend.agent.network.privnet.client as client_mod
 import ai.backend.agent.network.privnet.server as server_mod
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.locator import ContainerLocator, LiveContainer
 from ai.backend.agent.network.native_attacher import HostLocalIpam
+from ai.backend.agent.network.pair_journal import PairJournal
 from ai.backend.agent.network.privnet.client import (
     PrivNetBackendProxy,
     PrivNetClient,
@@ -76,6 +78,7 @@ class _StubBackend:
         self.attach_kernel_configs: list[Any] = []  # kernel_config each attach_endpoint received
         self.self_members: list[Any] = []  # the membership the server publishes for this node
         self.withdraw_calls: list[str] = []
+        self.unclosed: frozenset[str] = frozenset()
         self.recovery_preparations = 0
         self.recovery_error = recovery_error
         self.teardown_failures = teardown_failures
@@ -83,6 +86,9 @@ class _StubBackend:
     async def withdraw_session_network(self, session_id: str) -> None:
         self.withdraw_calls.append(session_id)
         self._known_sessions.discard(session_id)
+
+    def unclosed_devices(self) -> frozenset[str]:
+        return self.unclosed
 
     async def prepare_recovery(self) -> None:
         self.recovery_preparations += 1
@@ -2390,3 +2396,180 @@ class TestTheNodeSaysWhatItCouldNotRecover:
         async with _Harness(_StubRuntime(live={"c9": "ghost"}), state_dir=tmp_path) as restarted:
             assert restarted.server._unrecovered_sessions.keys() >= {"ghost"}
             assert await restarted.vni_registry.holders(4999)
+
+
+class TestAWithdrawalWhoseClaimWouldNotGo:
+    """`releasing` drops the claim when the caller's block RETURNS. Anything that drops this
+    node's record of the session therefore belongs after that block, not inside it: done inside,
+    a failed unlink leaves the retry with no entry and no journal record, so it returns success
+    over a claim that is still there."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    def _wedge(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Make the VNI claim files refuse to be unlinked, as a full or read-only tree would."""
+        original = PairJournal._remove_claim
+
+        def _refuse(journal: PairJournal, held: Any, owner: str, session_id: str) -> bool:
+            if held.key.startswith("vni"):
+                return False
+            return original(journal, held, owner, session_id)
+
+        monkeypatch.setattr(PairJournal, "_remove_claim", _refuse)
+
+    async def test_the_record_survives_so_the_retry_has_something_to_use(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(
+                _StubRuntime(pid=4242, live={"c1": "s1"}),
+                state_dir=tmp_path / "b",
+                agent_id="i-b",
+            ) as b:
+                await b.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+                with monkeypatch.context() as wedged:
+                    self._wedge(wedged)
+                    with pytest.raises(PrivNetClientError):
+                        await b.client().call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "s1"))
+                    assert "s1" in b.server._sessions
+                    assert "s1" in await b.journal.sessions()
+
+                # And the retry finishes it, because it still has what it needs.
+                await b.client().call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "s1"))
+                assert "s1" not in b.server._sessions
+                assert {h.agent_id for h in await b.vni_registry.holders(4138)} == {"i-test"}
+
+    async def test_a_teardown_that_becomes_a_withdrawal_keeps_it_too(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            async with _Harness(
+                _StubRuntime(pid=4242, live={"c1": "s1"}),
+                state_dir=tmp_path / "b",
+                agent_id="i-b",
+            ) as b:
+                await b.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+                with monkeypatch.context() as wedged:
+                    self._wedge(wedged)
+                    with pytest.raises(PrivNetClientError):
+                        await b.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+                    assert "s1" in await b.journal.sessions()
+                    assert b.backend.teardown_calls == []
+
+
+class TestTheNodeReportsWhatItCouldNotClose:
+    """A tunnel the recovery preflight could not bring down makes `_require_closed` refuse every
+    new session on that backend. A node advertising itself ready over one is advertising a lie."""
+
+    async def test_an_unclosed_device_is_a_recovery_problem(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            h.backend.unclosed = frozenset({"baivx4097"})
+            resp = await h.client().call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
+            assert "privnet:unclosed:baivx4097" in (resp.problems or {})
+
+    async def test_a_node_with_nothing_left_open_reports_nothing(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            resp = await h.client().call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
+            assert resp.problems == {}
+
+
+class TestAReclaimReChecksTheRuntime:
+    """The node-wide barrier holds off other privnet requests. It holds off nothing in containerd:
+    a container can start between the snapshot this pass reads and the moment it deletes that
+    container's veth and address."""
+
+    async def test_a_container_that_came_back_is_not_reclaimed(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "s1", container_id="c1")
+            )
+
+        runtime = _StubRuntime(pid=4242, live={"c1": "s1"})
+        async with _Harness(runtime, state_dir=tmp_path, forwarder=_RecordingForwarder()) as h2:
+            # Journalled as attached, absent from the snapshot the pass reads, back by the time
+            # it acts.
+            h2.server._unreclaimed_containers["c1"] = "was failing"
+            await h2.server._retry_recovery()
+            assert h2.forwarder.removed == []
+            assert "c1" in await h2.journal.attachments()
+
+    async def test_a_session_that_came_back_is_not_reclaimed(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+
+        runtime = _StubRuntime(pid=4242, live={"c1": "s1"})
+        async with _Harness(runtime, state_dir=tmp_path) as h2:
+            h2.server._sessions.clear()  # as a failed adoption would leave it
+            await h2.server._reclaim_dead_session(
+                "s1", {"backend": "bridge", "subnet": "172.30.9.0/24"}, ()
+            )
+            assert h2.backend.teardown_calls == []
+            assert "s1" in await h2.journal.sessions()
+
+
+class TestAPrivnetThatStopsAnswering:
+    """The far side runs privileged commands under a node-wide lock. One wedged there answers
+    nothing and closes nothing, and the agent used to wait on it forever -- holding whatever it
+    was doing for that session with no deadline and no log line."""
+
+    async def test_a_call_gives_up(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        socket_path = _short_socket_path()
+        stop = asyncio.Event()
+
+        async def _never_answer(reader: Any, writer: Any) -> None:
+            await reader.readline()
+            await stop.wait()  # the wedged privnet: reads the request, answers nothing
+
+        server = await asyncio.start_unix_server(_never_answer, path=socket_path)
+        monkeypatch.setattr(client_mod, "_CALL_TIMEOUT_SEC", 0.2)
+        try:
+            with pytest.raises(PrivNetClientError, match="did not answer"):
+                await PrivNetClient(socket_path).call(
+                    PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1")
+                )
+        finally:
+            stop.set()
+            server.close()
+            await server.wait_closed()
+            with contextlib.suppress(OSError):
+                os.unlink(socket_path)
+
+    async def test_a_status_query_that_fails_is_not_a_clean_bill_of_health(
+        self, tmp_path: Path
+    ) -> None:
+        # Empty means "asked, nothing outstanding", and readiness turns that into "may take
+        # sessions". A privnet that cannot say must not be read as one with nothing to say.
+        problems = await PrivNetClient(str(tmp_path / "gone.sock")).recovery_problems()
+        assert "privnet:status" in problems
+
+    async def test_a_daemon_too_old_to_answer_is_told_apart_by_its_version(
+        self, tmp_path: Path
+    ) -> None:
+        socket_path = _short_socket_path()
+
+        async def _old_daemon(reader: Any, writer: Any) -> None:
+            await reader.readline()
+            writer.write(PrivNetResponse(ok=True).encode())  # no version field
+            await writer.drain()
+            writer.close()
+
+        server = await asyncio.start_unix_server(_old_daemon, path=socket_path)
+        try:
+            problems = await PrivNetClient(socket_path).recovery_problems()
+            assert "protocol 1" in problems["privnet:status"]
+        finally:
+            server.close()
+            await server.wait_closed()
+            with contextlib.suppress(OSError):
+                os.unlink(socket_path)

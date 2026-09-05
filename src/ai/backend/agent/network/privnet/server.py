@@ -44,6 +44,7 @@ import pwd
 import socket
 import struct
 from collections.abc import AsyncIterator, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -62,6 +63,7 @@ from ai.backend.agent.network.privnet import netns as netns_mod
 from ai.backend.agent.network.privnet import policy
 from ai.backend.agent.network.privnet.journal import AttachRecord, PrivNetJournal
 from ai.backend.agent.network.privnet.protocol import (
+    PROTOCOL_VERSION,
     PrivNetOp,
     PrivNetRequest,
     PrivNetResponse,
@@ -602,6 +604,19 @@ class PrivNetServer:
             problems[f"privnet:dead-session:{session_id}"] = reason
         for container_id, reason in self._unreclaimed_containers.items():
             problems[f"privnet:dead-container:{container_id}"] = reason
+        for name, backend in self._backends.items():
+            unclosed = getattr(backend, "unclosed_devices", None)
+            if unclosed is None:
+                continue
+            for device in sorted(unclosed()):
+                # A tunnel the recovery preflight could not bring down. Until it is down, what it
+                # carries is unknown -- and every new session on this backend is refused by
+                # `_require_closed` anyway, so a node advertising itself ready over one is
+                # advertising a lie.
+                problems[f"privnet:unclosed:{device}"] = (
+                    f"the {name} backend could not bring down a tunnel that survived a previous"
+                    " life on this node"
+                )
         return problems
 
     def _recovery_pending(self) -> bool:
@@ -1061,11 +1076,15 @@ class PrivNetServer:
         devices, and the node-local block they hold is finite."""
         meta = self._meta_of(session_id, raw_config)
         if meta.vni is None:
+            if not await self._session_still_gone(session_id):
+                return
             await self._reclaim_devices(session_id, meta, peer_vteps)
             await self._journal.forget_session(session_id)
             log.info("reclaimed the network of dead session {}", session_id)
             return
         digest = config_digest(raw_config)
+        if not await self._session_still_gone(session_id):
+            return
         # Before the adopt, not after the teardown. Adoption holds an encrypted tunnel DOWN, so
         # even reaching that far for a session another agent is still running would take its
         # traffic with it -- and this pass runs precisely because this node's own runtime shows no
@@ -1090,6 +1109,37 @@ class PrivNetServer:
             await self._reclaim_devices(session_id, meta, peer_vteps)
         await self._journal.forget_session(session_id)
         log.info("reclaimed the network of dead session {}", session_id)
+
+    async def _still_gone(self, container_id: str) -> bool:
+        """Whether the container is still absent from the runtime, asked again just now.
+
+        The node-wide barrier holds off other privnet requests; it holds off nothing in
+        containerd. A container can be started between the snapshot this pass reads and the
+        moment it acts, and the act is deleting that container's veth and address.
+        """
+        try:
+            live = await self._live_containers()
+        except Exception:
+            # Unable to ask is not "it is gone". Leave it for the retry, which is what the
+            # unreclaimed marker exists for.
+            log.warning("could not re-check the runtime before reclaiming {}", container_id)
+            return False
+        if container_id in live:
+            log.info("not reclaiming {}: it is running again", container_id)
+            return False
+        return True
+
+    async def _session_still_gone(self, session_id: str) -> bool:
+        """Whether nothing of this session is running here, asked again just now."""
+        try:
+            live = await self._live_containers()
+        except Exception:
+            log.warning("could not re-check the runtime before reclaiming session {}", session_id)
+            return False
+        if session_id in set(live.values()):
+            log.info("not reclaiming session {}: a container of it is running again", session_id)
+            return False
+        return True
 
     async def _reclaim_devices(
         self, session_id: str, meta: SessionNetMeta, peer_vteps: Sequence[str] | None
@@ -1117,6 +1167,8 @@ class PrivNetServer:
         """Give back the host veth, the LOCAL address and the DNAT rules of a container that died
         while we were down. The container's own netns took its end of the veth with it; the host
         side, its address and its rules are ours to release."""
+        if not await self._still_gone(container_id):
+            return
         try:
             await self._forwarder.remove_container(container_id)
             raw_config = journalled_sessions.get(record.session_id)
@@ -1210,7 +1262,9 @@ class PrivNetServer:
             if not line:
                 return
             resp = await self._dispatch(line)
-            writer.write(resp.encode())
+            # Stamped here rather than at each `return`: it is a property of the daemon, not of
+            # the verb, and a caller uses it to tell "does not know this verb" from "said no".
+            writer.write(replace(resp, version=PROTOCOL_VERSION).encode())
             await writer.drain()
         except Exception:
             log.exception("privnet connection handler failed")
@@ -1522,7 +1576,11 @@ class PrivNetServer:
                     f"session {session_id} could not release this node's binding on VNI {vni};"
                     " this agent has not let the session go"
                 )
-            await self._withdraw_bound(session_id, entry)
+        # Outside, so it runs only if the claim actually went: `releasing` drops the claim when the
+        # block RETURNS and raises when it could not. Dropping the journal record and the session
+        # entry inside would leave the retry nothing to work from -- it would find no entry, return
+        # success, and the stale claim would refuse this VNI until the next restart.
+        await self._withdraw_bound(session_id, entry)
 
     async def _withdraw_bound(self, session_id: str, entry: _SessionEntry) -> None:
         """Let go of a session, with its VNI binding already released."""
@@ -1559,6 +1617,7 @@ class PrivNetServer:
             await self._journal.forget_session(session_id)
             return
         vni, digest = binding
+        withdraw_instead = False
         async with self._vni_registry.releasing(vni, self._agent_id, session_id, digest) as freed:
             if freed is None:
                 raise PrivNetError(
@@ -1568,20 +1627,24 @@ class PrivNetServer:
                 )
             if not freed:
                 # Another agent on this host still has kernels on these devices. Everything this
-                # agent owns goes; nothing on the host does. Our claim is already gone -- that is
-                # what `releasing` did -- so this is exactly a withdrawal.
+                # agent owns goes; nothing on the host does -- so this is exactly a withdrawal,
+                # and it happens outside, once the claim has actually gone.
                 log.info(
                     "not tearing session {} down: another agent on this node still holds VNI {};"
                     " withdrawing this agent's ownership instead",
                     session_id,
                     vni,
                 )
-                if entry is not None:
-                    await self._withdraw_bound(session_id, entry)
-                else:
-                    await self._journal.forget_session(session_id)
-                return
-            await self._teardown_data_plane(session_id, entry, raw_config)
+                withdraw_instead = True
+            else:
+                # Inside, because this deletes the host's devices and the claim is what says we
+                # may: the answer must not go stale between being given and being acted on.
+                await self._teardown_data_plane(session_id, entry, raw_config)
+        # Both paths reach here only if the claim went. Anything that drops our record of the
+        # session belongs after that, or a failed unlink leaves nothing for the retry to use.
+        if withdraw_instead and entry is not None:
+            await self._withdraw_bound(session_id, entry)
+            return
         await self._journal.forget_session(session_id)
 
     async def _teardown_data_plane(

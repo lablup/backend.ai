@@ -204,6 +204,10 @@ XFRM_REPLAY_WINDOW: Final = 128
 #: mark went with the rules -- traffic stops; affordable, because one pass reads the
 #: whole node's state in four commands and changes only what drifted.
 PROTECTION_INTERVAL_SEC: Final = 3.0
+#: How long one `ip`/`iptables` invocation may take. Generous next to anything these normally do
+#: (milliseconds), and finite because they run under a node-wide barrier: one that never returns
+#: stops every session operation on the node with nothing to say why.
+_COMMAND_TIMEOUT_SEC: Final = 30.0
 KEY_ROTATION_INTERVAL_SEC: Final = 12 * 60 * 60
 _KEYRING_SIZE: Final = 3
 #: Consecutive protection passes that may fail to read the node's state before every encrypted
@@ -1130,10 +1134,36 @@ async def _read_command(argv: Sequence[str]) -> str:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
-        stdout, _ = await proc.communicate()
     except OSError:
         return ""
+    try:
+        async with asyncio.timeout(_COMMAND_TIMEOUT_SEC):
+            stdout, _ = await proc.communicate()
+    except TimeoutError:
+        await _kill(proc)
+        return ""
     return stdout.decode(errors="replace") if proc.returncode == 0 else ""
+
+
+async def _kill(proc: asyncio.subprocess.Process) -> None:
+    """End a command that has run past its deadline, and reap it.
+
+    SIGKILL rather than SIGTERM: these are `ip` and `iptables`, which have nothing to clean up,
+    and one already stuck on a lock is unlikely to act on a catchable signal.
+    """
+    with contextlib.suppress(ProcessLookupError):
+        proc.kill()
+    with contextlib.suppress(Exception):
+        await proc.wait()
+
+
+def _redacted(argv: Sequence[str]) -> str:
+    """The command as it may be logged: the derived pair key never leaves this process."""
+    shown = list(argv)
+    for index, value in enumerate(shown):
+        if value == "aead" and index + 2 < len(shown):
+            shown[index + 2] = "[REDACTED]"
+    return " ".join(shown)
 
 
 async def _run_command(argv: Sequence[str]) -> None:
@@ -1142,7 +1172,18 @@ async def _run_command(argv: Sequence[str]) -> None:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    _, stderr = await proc.communicate()
+    try:
+        async with asyncio.timeout(_COMMAND_TIMEOUT_SEC):
+            _, stderr = await proc.communicate()
+    except TimeoutError as e:
+        # `iptables` waiting on an xtables lock somebody else is holding, `ip` blocked on a
+        # netlink socket. Every one of these runs under a node-wide barrier, so one that never
+        # returns stops every session operation on this node. Kill it and report -- the caller's
+        # retry is what this backend is built around.
+        await _kill(proc)
+        raise RuntimeError(
+            f"command timed out after {_COMMAND_TIMEOUT_SEC:.0f}s: {_redacted(argv)}"
+        ) from e
     if proc.returncode != 0:
         display_argv = list(argv)
         secrets: set[str] = set()

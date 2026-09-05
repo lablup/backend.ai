@@ -49,6 +49,15 @@ class PrivNetClientError(RuntimeError):
     """The privnet refused or failed a request. Carries the privnet's generic reason."""
 
 
+#: The protocol version that introduced RECOVERY_STATUS. A daemon below it cannot answer, and
+#: "did not answer" is not "nothing to report".
+_RECOVERY_STATUS_VERSION = 2
+#: How long one privnet verb may take. Generous, because the far side runs real privileged
+#: commands under a node-wide lock; finite, because without it one wedged command stops every
+#: session operation on this agent with nothing in the log to say why.
+_CALL_TIMEOUT_SEC = 120.0
+
+
 class PrivNetUnreachable(PrivNetClientError):
     """The privileged helper could not be reached at all, rather than refusing one request.
 
@@ -67,14 +76,30 @@ class PrivNetClient:
     async def recovery_problems(self) -> dict[str, str]:
         """What the privnet says it could not take charge of.
 
-        Empty on any failure to ask, including a daemon too old to know the verb: `reachable`
-        already reports a privnet that is not answering at all, and reporting this as a problem
-        too would turn one fault into two lines about the same thing.
+        Never empty-on-failure. Empty means "asked, and it has nothing outstanding" -- and that is
+        what the readiness probe turns into "this node may take sessions". A privnet that died
+        between the reachability check and this call, or that answered with an internal error,
+        knows nothing about its own state, and reporting that as health is how the manager keeps
+        scheduling onto a node whose data plane is unmanaged.
+
+        A daemon too old to know the verb is told apart by `version`, not by the shape of its
+        error: it cannot report what it does not track, so its silence is not an answer either.
         """
         try:
             resp = await self.call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
-        except (PrivNetClientError, OSError):
-            return {}
+        except (PrivNetClientError, OSError) as e:
+            return {
+                "privnet:status": f"this node's privnet could not report its recovery state ({e})"
+            }
+        if resp.version is None or resp.version < _RECOVERY_STATUS_VERSION:
+            return {
+                "privnet:status": (
+                    "this node's privnet speaks protocol"
+                    f" {resp.version if resp.version is not None else 1}, which cannot report what"
+                    f" it failed to recover (protocol {_RECOVERY_STATUS_VERSION} does); restart it"
+                    " on the agent's version"
+                )
+            }
         return dict(resp.problems or {})
 
     async def reachable(self) -> str | None:
@@ -109,6 +134,19 @@ class PrivNetClient:
         return None
 
     async def call(self, req: PrivNetRequest) -> PrivNetResponse:
+        try:
+            async with asyncio.timeout(_CALL_TIMEOUT_SEC):
+                return await self._call(req)
+        except TimeoutError as e:
+            # A privnet wedged inside a privileged command answers nothing and closes nothing. The
+            # agent side of that used to wait forever, holding whatever it was doing for the
+            # session; the deadline turns it into a failure the caller can retry or report.
+            raise PrivNetClientError(
+                f"the privileged network helper at {self._socket_path} did not answer"
+                f" {req.op} within {_CALL_TIMEOUT_SEC:.0f}s"
+            ) from e
+
+    async def _call(self, req: PrivNetRequest) -> PrivNetResponse:
         try:
             reader, writer = await asyncio.open_unix_connection(self._socket_path)
         except OSError as e:

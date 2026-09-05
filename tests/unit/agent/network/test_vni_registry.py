@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+from ai.backend.agent.network.pair_journal import PairJournal
 from ai.backend.agent.network.vni_registry import (
     VniConflict,
     VniHolder,
@@ -311,3 +312,46 @@ class TestAClaimThatWillNotGo:
         async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)) as freed:
             assert freed is True
         assert await _bind(registry, "a2", "s2", _CONFIG) is True
+
+
+class TestABuiltClaimThatLandedIsCommitted:
+    """`mark_built` writes the BUILT claim and then drops the reservation. Reporting the whole
+    thing failed because only the second step did made the caller tear down a data plane the store
+    had already vouched for -- after which the next setup adopted devices that no longer exist."""
+
+    async def test_a_failed_tidy_up_does_not_undo_the_mark(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(PairJournal, "_remove_claim", lambda *args, **kwargs: False)
+        registry = VniRegistry(tmp_path / "vni")
+        async with registry.binding(4138, "a1", "s1", config_digest(_CONFIG)) as bound:
+            assert bound.mark_built() is True
+
+    async def test_the_leftover_reservation_conflicts_with_nobody(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        with monkeypatch.context() as wedged:
+            wedged.setattr(PairJournal, "_remove_claim", lambda *args, **kwargs: False)
+            registry = VniRegistry(tmp_path / "vni")
+            async with registry.binding(4138, "a1", "s1", config_digest(_CONFIG)) as bound:
+                bound.mark_built()
+
+        # It names the same session and the same configuration, so the data plane still reads as
+        # built and a second agent on the same session still adopts.
+        registry = VniRegistry(tmp_path / "vni")
+        async with registry.binding(4138, "a2", "s1", config_digest(_CONFIG)) as second:
+            assert second.already_held is True
+
+    async def test_the_release_clears_both(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        with monkeypatch.context() as wedged:
+            wedged.setattr(PairJournal, "_remove_claim", lambda *args, **kwargs: False)
+            registry = VniRegistry(tmp_path / "vni")
+            async with registry.binding(4138, "a1", "s1", config_digest(_CONFIG)) as bound:
+                bound.mark_built()
+
+        registry = VniRegistry(tmp_path / "vni")
+        async with registry.releasing(4138, "a1", "s1", config_digest(_CONFIG)) as freed:
+            assert freed is True
+        assert await registry.holders(4138) == frozenset()
