@@ -1043,6 +1043,35 @@ def parse_owned_policies(listing: str, mark: str) -> dict[tuple[str, str, int], 
         if header is not None and outbound and marked and templated and tmpl_spi is not None:
             found[header] = tmpl_spi
 
+    #: The template's own fields, which `ip xfrm policy` prints on a CONTINUATION line under
+    #: `tmpl`. Carried across lines because that is how the kernel's own tool renders them.
+    tmpl_src: str | None = None
+    tmpl_dst: str | None = None
+    in_tmpl = False
+
+    def _consider_tmpl(tokens: Sequence[str]) -> None:
+        """Judge the template from whichever line carries its protocol fields."""
+        nonlocal templated, tmpl_spi
+        raw_reqid = _value_after(tokens, "reqid")
+        raw_spi = _value_after(tokens, "spi")
+        try:
+            tmpl_spi = int(raw_spi, 0) if raw_spi is not None else None
+        except ValueError:
+            tmpl_spi = None
+        templated = (
+            header is not None
+            and raw_reqid is not None
+            and int(raw_reqid, 0) == XFRM_REQID
+            and _value_after(tokens, "proto") == "esp"
+            and "transport" in tokens
+            # `level use` makes the template optional: with no matching SA the packet leaves
+            # unprotected instead of being dropped. iproute2 prints the level only when it is
+            # not the default (`required`), so its absence is the safe state.
+            and _value_after(tokens, "level") != "use"
+            and tmpl_src == header[0]
+            and tmpl_dst == header[1]
+        )
+
     for line in listing.splitlines():
         if line.startswith("src "):
             _flush()
@@ -1059,6 +1088,8 @@ def parse_owned_policies(listing: str, mark: str) -> dict[tuple[str, str, int], 
             )
             outbound = marked = templated = False
             tmpl_spi = None
+            tmpl_src = tmpl_dst = None
+            in_tmpl = False
             continue
         if header is None:
             continue
@@ -1069,24 +1100,20 @@ def parse_owned_policies(listing: str, mark: str) -> dict[tuple[str, str, int], 
             value, _, mask = raw.partition("/")
             marked = value == mark and (not mask or int(mask, 0) == 0xFFFFFFFF)
         if "tmpl" in tokens:
-            raw_reqid = _value_after(tokens, "reqid")
-            raw_spi = _value_after(tokens, "spi")
-            try:
-                tmpl_spi = int(raw_spi, 0) if raw_spi is not None else None
-            except ValueError:
-                tmpl_spi = None
-            templated = (
-                raw_reqid is not None
-                and int(raw_reqid, 0) == XFRM_REQID
-                and _value_after(tokens, "proto") == "esp"
-                and "transport" in tokens
-                # `level use` makes the template optional: with no matching SA the packet leaves
-                # unprotected instead of being dropped. iproute2 prints the level only when it is
-                # not the default (`required`), so its absence is the safe state.
-                and _value_after(tokens, "level") != "use"
-                and _value_after(tokens, "src") == header[0]
-                and _value_after(tokens, "dst") == header[1]
-            )
+            # `tmpl src A dst B` and then, on the next line, `proto esp spi ... reqid ... mode ...`
+            # -- which is what a real `ip xfrm policy` prints. Reading only this line found a
+            # template with no protocol and judged every policy on the host unrecognised: the
+            # drift pass then saw every pair as broken, and the encryption probe saw a kernel that
+            # had lost the policy it had just installed. Measured on iproute2 6.1 and 6.8.
+            tmpl_src = _value_after(tokens, "src")
+            tmpl_dst = _value_after(tokens, "dst")
+            in_tmpl = True
+            if "proto" in tokens:
+                _consider_tmpl(tokens)  # some versions keep it on one line
+            continue
+        if in_tmpl and tokens[:1] == ["proto"]:
+            _consider_tmpl(tokens)
+            in_tmpl = False
     _flush()
     return found
 
