@@ -2243,13 +2243,20 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             raise OverlayEncryptionUnavailable(
                 f"could not enumerate surviving {VXLAN_DEV_PREFIX} tunnels before recovery: {e}"
             ) from e
+        survivors = sorted(name for name in devices if name.startswith(VXLAN_DEV_PREFIX))
+        # Every survivor is recorded as unclosed BEFORE the first one is touched, and cleared only
+        # once it is proven down. Recording them afterwards is only correct if this loop runs to
+        # completion, and it is under a startup deadline: cancelled partway, the devices it had
+        # not reached yet were UP, unrecorded, with no fail-close retry armed for them -- and the
+        # next recovery pass, which does not re-run this preflight, would clear the failure flag
+        # and report the node healthy over a tunnel whose protection nothing had established.
+        self._unclosed_devices.update(survivors)
         failed: list[str] = []
-        for device in sorted(name for name in devices if name.startswith(VXLAN_DEV_PREFIX)):
+        for device in survivors:
             if await self._hold_vxlan_down_or_absent(device):
                 self._unclosed_devices.discard(device)
             else:
                 failed.append(device)
-        self._unclosed_devices.update(failed)
         if failed:
             # Do NOT prune. A claim is what stops another agent removing the SAs of a pair still
             # in use, and a tunnel that would not go down is exactly a pair that may still be

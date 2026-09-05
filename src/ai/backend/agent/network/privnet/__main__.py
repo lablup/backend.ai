@@ -253,9 +253,10 @@ async def _amain() -> None:
     Path(socket_path).parent.mkdir(parents=True, exist_ok=True)
 
     runtime = _build_locator(raw_cfg)
-    # The rootless runtimes keep their container->PID map in memory, rebuilt from the on-disk
-    # journal; opening here is what lets THIS process see containers the agent created.
-    await runtime.open()
+    # NOT opened here. `serve_forever` owns the runtime's lifecycle: it opens under the startup
+    # deadline and closes in its own `finally`. Opening it here too meant a hang before any
+    # deadline existed, and -- because the Docker locator replaces its client on every open -- a
+    # second open that discarded the first one's working client and leaked its connections.
     # One privnet per agent, but the node-local pool is per NODE: the index it hands out names the
     # bridge device `bailo<index>`, which every process on this host shares. So this reads the
     # node-wide store and tags its claims with the agent it serves, rather than keeping a private
