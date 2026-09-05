@@ -13,11 +13,13 @@ from typing import (
 
 from yarl import URL
 
+from ai.backend.common.data.storage.types import VolumeName
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.volume.broadcast import DoVolumeMountEvent
 from ai.backend.common.types import QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.config.unified import StorageProxyConfig
 from ai.backend.storage.types import CapacityUsage, QuotaUsage
 from ai.backend.storage.volumes.abc import (
     CAP_QUOTA,
@@ -165,19 +167,25 @@ class HammerspaceVolume(BaseHammerspaceVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        volume_name: VolumeName,
+        storage_proxy_config: StorageProxyConfig,
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         watcher: WatcherClient | None = None,
         options: Mapping[str, Any] | None = None,
     ) -> None:
-        self.local_config = local_config
-        self.mount_path = mount_path
-        self.config = options or {}
-        self.etcd = etcd
-        self.event_dispatcher = event_dispatcher
-        self.event_producer = event_producer
-        self.watcher = watcher
+        super().__init__(
+            local_config,
+            mount_path,
+            volume_name=volume_name,
+            storage_proxy_config=storage_proxy_config,
+            etcd=etcd,
+            event_dispatcher=event_dispatcher,
+            event_producer=event_producer,
+            watcher=watcher,
+            options=options,
+        )
 
         address = self.config.get("address")
         if address is None:

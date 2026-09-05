@@ -23,7 +23,12 @@ from ai.backend.common.configs import (
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -473,6 +478,82 @@ class VolumeStatsConfig(BaseConfigSchema):
     ]
 
 
+class VolumeHealthConfig(BaseConfigSchema):
+    """Configuration for mount and backend appliance health probes."""
+
+    mount_probe_interval: Annotated[
+        float,
+        Field(
+            default=30.0,
+            ge=1.0,
+            validation_alias=AliasChoices("mount-probe-interval", "mount_probe_interval"),
+            serialization_alias="mount-probe-interval",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Interval in seconds between mount probes. Each volume is probed on its own "
+                "loop, staggered across this interval so that all mounts are not queried at "
+                "the same instant."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+    mount_probe_timeout: Annotated[
+        float,
+        Field(
+            default=5.0,
+            ge=1.0,
+            validation_alias=AliasChoices("mount-probe-timeout", "mount_probe_timeout"),
+            serialization_alias="mount-probe-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for a single mount probe, and for the baseline capture "
+                "at startup. A dead network mount surfaces as a timeout instead of hanging "
+                "the caller; the volume is then reported as hung until the probe returns."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="5.0", prod="5.0"),
+        ),
+    ]
+    backend_probe_interval: Annotated[
+        float,
+        Field(
+            default=60.0,
+            ge=1.0,
+            validation_alias=AliasChoices("backend-probe-interval", "backend_probe_interval"),
+            serialization_alias="backend-probe-interval",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Interval in seconds between backend appliance probes. Kept separate from the "
+                "mount probe interval because a vendor appliance can answer its management API "
+                "while a network mount has silently dropped."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="60.0", prod="60.0"),
+        ),
+    ]
+    backend_probe_timeout: Annotated[
+        float,
+        Field(
+            default=10.0,
+            ge=1.0,
+            validation_alias=AliasChoices("backend-probe-timeout", "backend_probe_timeout"),
+            serialization_alias="backend-probe-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for a single backend appliance probe. On a timeout the "
+                "appliance is reported as offline from this proxy."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="10.0", prod="10.0"),
+        ),
+    ]
+
+
 class StorageProxyConfig(BaseConfigSchema):
     ipc_base_path: Annotated[
         AutoDirectoryPath,
@@ -779,6 +860,21 @@ class StorageProxyConfig(BaseConfigSchema):
                 "storage volumes and caches them in Redis."
             ),
             added_version="25.12.0",
+        ),
+    ]
+    volume_health: Annotated[
+        VolumeHealthConfig,
+        Field(
+            default_factory=lambda: VolumeHealthConfig(),
+            validation_alias=AliasChoices("volume-health", "volume_health"),
+            serialization_alias="volume-health",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Configuration for the mount and backend appliance health probes whose latest "
+                "results are kept in memory and shipped with the heartbeat."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
         ),
     ]
 

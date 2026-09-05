@@ -10,12 +10,14 @@ import aioboto3
 import pytest
 from botocore.exceptions import ClientError
 
+from ai.backend.common.data.storage.types import VolumeName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import HostPortPair, QuotaScopeID, QuotaScopeType
 from ai.backend.logging import LogLevel
 from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.loaders import load_local_config
+from ai.backend.storage.config.unified import StorageProxyConfig
 from ai.backend.storage.types import VFolderID
 from ai.backend.storage.volumes.abc import AbstractVolume
 from ai.backend.storage.volumes.cephfs import CephFSVolume
@@ -113,6 +115,11 @@ async def volume(
             raise RuntimeError(f"Unknown volume backend: {request.param}")
     mock_event_dispatcher = MagicMock()
     mock_event_producer = MagicMock()
+    storage_proxy_config = StorageProxyConfig.model_validate({
+        "node-id": "test-storage-proxy",
+        "secret": "test-secret",
+        "session-expire": "1h",
+    })
     volume = volume_cls(
         {
             "storage-proxy": {
@@ -120,6 +127,8 @@ async def volume(
             },
         },
         volume_path,
+        volume_name=VolumeName(request.param),
+        storage_proxy_config=storage_proxy_config,
         etcd=mock_etcd,
         options=backend_options,
         event_dispatcher=mock_event_dispatcher,
