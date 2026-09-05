@@ -101,12 +101,6 @@ def _get_keypairs_join_condition() -> Any:
     return foreign(KeyPairRow.user) == UserRow.uuid
 
 
-def _get_default_keypair_join_condition() -> Any:
-    from ai.backend.manager.models.keypair import KeyPairRow
-
-    return (foreign(KeyPairRow.user) == UserRow.uuid) & KeyPairRow.is_default
-
-
 class UserRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "users"
 
@@ -212,13 +206,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
         foreign_keys="KeyPairRow.user",
     )
 
-    default_keypair: Mapped[KeyPairRow | None] = relationship(
-        "KeyPairRow",
-        primaryjoin=_get_default_keypair_join_condition,
-        foreign_keys="KeyPairRow.user",
-        viewonly=True,
-    )
-
     @classmethod
     def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
         return cls.uuid
@@ -232,14 +219,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
         from ai.backend.manager.models.keypair import KeyPairRow
 
         return selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.resource_policy_row))
-
-    @classmethod
-    def load_default_keypair(cls) -> _AbstractLoad:
-        from ai.backend.manager.models.keypair import KeyPairRow
-
-        return joinedload(UserRow.default_keypair).options(
-            joinedload(KeyPairRow.resource_policy_row)
-        )
 
     @classmethod
     def load_resource_policy(cls) -> _AbstractLoad:
@@ -302,7 +281,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
             [by_user_uuid(user_uuid)],
             [
                 load_related_field(cls.load_keypairs()),
-                load_related_field(cls.load_default_keypair()),
                 load_related_field(cls.load_resource_policy()),
             ],
             db=db,

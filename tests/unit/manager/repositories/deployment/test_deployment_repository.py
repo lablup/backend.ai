@@ -1455,7 +1455,7 @@ class TestDeploymentRevisionOperations:
                 RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
-                KeyPairRow,  # UserRow.default_keypair relationship target
+                KeyPairRow,  # keypairs.user foreign key target
                 ProjectRow,
                 VFolderRow,
                 ContainerRegistryRow,

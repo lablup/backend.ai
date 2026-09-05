@@ -44,6 +44,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import (
     VFolderDeletionNotAllowed,
     VFolderFilterStatusFailed,
@@ -431,6 +432,8 @@ class TestVfolderRepositoryAllowedVfolderHosts:
                 UserRow,
                 KeyPairRow,
                 ProjectRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -666,6 +669,153 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         """Unknown user UUID raises UserNotFound."""
         with pytest.raises(UserNotFound):
             await vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(uuid.uuid4())
+
+    # -- default keypair policy --
+
+    @pytest.fixture
+    async def user_with_default_keypair(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user: uuid.UUID,
+        keypair_policy_with_hosts: str,
+    ) -> uuid.UUID:
+        """Bind a default keypair (pointing to keypair_policy_with_hosts) to ``test_user``."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                KeyPairRow(
+                    user=test_user,
+                    access_key=f"DK{test_user.hex[:14]}",
+                    secret_key=SecretValue("test-secret"),
+                    is_active=True,
+                    is_admin=False,
+                    is_default=True,
+                    resource_policy=keypair_policy_with_hosts,
+                    rate_limit=1000,
+                )
+            )
+            await db_sess.flush()
+        return test_user
+
+    async def test_get_allowed_vfolder_hosts_reads_the_default_keypair_policy(
+        self,
+        vfolder_repository: VfolderRepository,
+        user_with_default_keypair: uuid.UUID,
+    ) -> None:
+        """Without a group, the hosts come from the default keypair's resource policy."""
+        result = await vfolder_repository.get_allowed_vfolder_hosts(
+            user_uuid=user_with_default_keypair,
+            group_uuid=None,
+        )
+
+        assert result["local:volume1"] == {
+            VFolderHostPermission.CREATE,
+            VFolderHostPermission.MODIFY,
+        }
+
+    @pytest.fixture
+    async def user_with_default_keypair_on_empty_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user: uuid.UUID,
+    ) -> uuid.UUID:
+        """Bind a default keypair whose resource policy allows no host at all."""
+        policy_name = f"test-kp-empty-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                KeyPairResourcePolicyRow(
+                    name=policy_name,
+                    default_for_unspecified=DefaultForUnspecified.LIMITED,
+                    total_resource_slots=ResourceSlot(),
+                    max_session_lifetime=0,
+                    max_concurrent_sessions=10,
+                    max_concurrent_sftp_sessions=1,
+                    max_containers_per_session=1,
+                    idle_timeout=0,
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                KeyPairRow(
+                    user=test_user,
+                    access_key=f"EK{test_user.hex[:14]}",
+                    secret_key=SecretValue("test-secret"),
+                    is_active=True,
+                    is_admin=False,
+                    is_default=True,
+                    resource_policy=policy_name,
+                    rate_limit=1000,
+                )
+            )
+            await db_sess.flush()
+        return test_user
+
+    async def test_get_allowed_vfolder_hosts_accepts_a_policy_allowing_no_host(
+        self,
+        vfolder_repository: VfolderRepository,
+        user_with_default_keypair_on_empty_policy: uuid.UUID,
+    ) -> None:
+        """A default keypair whose policy allows no host returns an empty map, not an error."""
+        result = await vfolder_repository.get_allowed_vfolder_hosts(
+            user_uuid=user_with_default_keypair_on_empty_policy,
+            group_uuid=None,
+        )
+
+        assert result == VFolderHostPermissionMap()
+
+    async def test_get_allowed_vfolder_hosts_ignores_a_non_default_keypair(
+        self,
+        vfolder_repository: VfolderRepository,
+        user_with_active_keypair: uuid.UUID,
+    ) -> None:
+        """A keypair that is not the default one does not supply the policy."""
+        with pytest.raises(ObjectNotFound):
+            await vfolder_repository.get_allowed_vfolder_hosts(
+                user_uuid=user_with_active_keypair,
+                group_uuid=None,
+            )
+
+    async def test_get_allowed_vfolder_hosts_user_not_found(
+        self,
+        vfolder_repository: VfolderRepository,
+    ) -> None:
+        """Unknown user UUID raises UserNotFound rather than ObjectNotFound."""
+        with pytest.raises(UserNotFound):
+            await vfolder_repository.get_allowed_vfolder_hosts(
+                user_uuid=uuid.uuid4(),
+                group_uuid=None,
+            )
+
+    async def test_get_user_storage_host_permissions_unions_the_default_keypair_policy(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        user_with_default_keypair: uuid.UUID,
+    ) -> None:
+        """The default keypair's hosts join the domain and group hosts."""
+        result = await vfolder_repository.get_user_storage_host_permissions(
+            user_uuid=user_with_default_keypair,
+            domain_name=test_domain.domain_name,
+        )
+
+        assert result["local:volume1"] == {
+            VFolderHostPermission.CREATE,
+            VFolderHostPermission.MODIFY,
+        }
+
+    async def test_get_user_storage_host_permissions_without_a_default_keypair(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+    ) -> None:
+        """A user with no default keypair contributes no keypair hosts, and does not raise."""
+        result = await vfolder_repository.get_user_storage_host_permissions(
+            user_uuid=test_user,
+            domain_name=test_domain.domain_name,
+        )
+
+        assert result == VFolderHostPermissionMap()
 
 
 class TestVfolderRepositoryPurge:

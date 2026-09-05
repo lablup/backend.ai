@@ -301,23 +301,43 @@ class VfolderRepository:
 
                 return group_row.allowed_vfolder_hosts
 
-            user_row: UserRow | None = await db_session.scalar(
-                sa.select(UserRow)
-                .where(UserRow.uuid == user_uuid)
-                .options(
-                    selectinload(UserRow.default_keypair).selectinload(
-                        KeyPairRow.resource_policy_row
-                    )
-                )
-            )
-            if user_row is None:
-                raise UserNotFound(f"User with UUID {user_uuid} not found.")
-            if user_row.default_keypair is None:
+            allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
+            if allowed_hosts is None:
                 raise ObjectNotFound(object_name="User keypair")
-            if user_row.default_keypair.resource_policy_row is None:
-                raise ObjectNotFound(object_name="User keypair resource policy")
+            return allowed_hosts
 
-            return user_row.default_keypair.resource_policy_row.allowed_vfolder_hosts
+    async def _fetch_default_keypair_vfolder_hosts(
+        self, db_session: SASession, user_uuid: uuid.UUID
+    ) -> VFolderHostPermissionMap | None:
+        """
+        Read ``allowed_vfolder_hosts`` from the resource policy of the user's default
+        keypair. Returns ``None`` when the user has no default keypair.
+        """
+        stmt = (
+            sa.select(
+                KeyPairRow.access_key,
+                keypair_resource_policies.c.allowed_vfolder_hosts,
+            )
+            .select_from(UserRow)
+            .outerjoin(
+                KeyPairRow,
+                sa.and_(KeyPairRow.user == UserRow.uuid, KeyPairRow.is_default),
+            )
+            .outerjoin(
+                keypair_resource_policies,
+                keypair_resource_policies.c.name == KeyPairRow.resource_policy,
+            )
+            .where(UserRow.uuid == user_uuid)
+        )
+        row = (await db_session.execute(stmt)).first()
+        if row is None:
+            raise UserNotFound(f"User with UUID {user_uuid} not found.")
+        # The host-permission column reads a SQL NULL back as an empty map, so the
+        # keypair's own key is what tells an unmatched join apart from an empty policy.
+        if row.access_key is None:
+            return None
+        allowed_hosts: VFolderHostPermissionMap = row.allowed_vfolder_hosts
+        return allowed_hosts
 
     @vfolder_repository_resilience.apply()
     async def get_user_with_keypair_policy_vfolder_hosts(
@@ -2013,28 +2033,12 @@ class VfolderRepository:
         depend on volume availability must intersect with ``StorageSessionManager``.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            user_row: UserRow | None = await db_session.scalar(
-                sa.select(UserRow)
-                .where(UserRow.uuid == user_uuid)
-                .options(
-                    selectinload(UserRow.default_keypair).selectinload(
-                        KeyPairRow.resource_policy_row
-                    )
-                )
-            )
-            if user_row is None:
-                raise UserNotFound(f"User with UUID {user_uuid} not found.")
-            if (
-                user_row.default_keypair is None
-                or user_row.default_keypair.resource_policy_row is None
-            ):
-                resource_policy: Mapping[str, Any] = {
-                    "allowed_vfolder_hosts": VFolderHostPermissionMap(),
-                }
-            else:
-                resource_policy = {
-                    "allowed_vfolder_hosts": user_row.default_keypair.resource_policy_row.allowed_vfolder_hosts,
-                }
+            allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
+            resource_policy: Mapping[str, Any] = {
+                "allowed_vfolder_hosts": allowed_hosts
+                if allowed_hosts is not None
+                else VFolderHostPermissionMap(),
+            }
             conn = await db_session.connection()
             return await get_allowed_vfolder_hosts_by_user(
                 conn=conn,
