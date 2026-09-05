@@ -3,7 +3,8 @@
 Capabilities needed (all four, for the reasons noted):
 
 - CAP_NET_ADMIN   — iproute2 / iptables: bridges, veth, FDB/ARP, the service DNAT rules
-- CAP_SYS_ADMIN   — enter a container's network namespace (setns) to attach its interface
+- CAP_SYS_ADMIN   — enter a container's network namespace (setns) to attach its interface, and
+                    create the throwaway one the overlay encryption probe runs in
 - CAP_SYS_PTRACE  — open ``/proc/<pid>/ns/net`` of a container whose task runs as root, when the
                     privnet itself runs as a non-root uid (omitting it fails "cannot open container
                     netns")
