@@ -7,6 +7,7 @@ the kernel, and the attribute line carries a bare `fan-map` token between the id
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from typing import Any
 
@@ -149,10 +150,12 @@ class TestWhetherThisNodeCanEncryptAtAll:
     name in /proc/crypto is neither necessary (the crypto API loads a module on first use) nor
     sufficient (the listing carries internal `__`-prefixed implementations)."""
 
-    def _probe(self, runner: Any, listing: tuple[str, str]) -> Any:
+    def _probe(self, runner: Any, listing: tuple[str, str], netns: str = "") -> Any:
         state, policy = listing
 
         async def _reader(argv: Sequence[str]) -> str:
+            if list(argv[:3]) == ["ip", "netns", "list"]:
+                return netns
             return policy if argv[-1] == "policy" else state
 
         return vxlan.probe_encryption_support(runner, _reader)
@@ -237,9 +240,9 @@ class TestWhetherThisNodeCanEncryptAtAll:
         await self._probe(_runner, ("", ""))
         assert any(c[:3] == ["ip", "netns", "del"] for c in calls)
 
-    async def test_a_namespace_that_will_not_go_does_not_change_the_answer(self) -> None:
-        # It is a leak with this node's name on it, logged -- but the question asked was whether
-        # this node can encrypt, and it answered.
+    async def test_a_namespace_that_will_not_go_does_not_change_this_answer(self) -> None:
+        # The question asked was whether this node can encrypt, and it found that out. The leak is
+        # the NEXT probe's to report -- see `TestReapingProbeNamespaces`.
         async def _runner(argv: Sequence[str]) -> None:
             if argv[:3] == ["ip", "netns", "del"]:
                 raise RuntimeError("busy")
@@ -336,3 +339,102 @@ def _installed(*, esn: bool = True, inbound: bool = True, policy: str = "probe")
         "": "",
     }
     return state, rules[policy]
+
+
+class TestReapingProbeNamespaces:
+    """A probe runs every time capabilities are refreshed -- once a minute on a busy agent -- so a
+    removal that keeps failing, or a SIGKILL between creating a namespace and removing it,
+    accumulates them for as long as the node runs. Nothing came back for them."""
+
+    def _probe(self, runner: Any, netns_list: str) -> Any:
+        async def _reader(argv: Sequence[str]) -> str:
+            if list(argv[:3]) == ["ip", "netns", "list"]:
+                return netns_list
+            state, policy = _installed()
+            return policy if argv[-1] == "policy" else state
+
+        return vxlan.probe_encryption_support(runner, _reader)
+
+    async def _deletions(self, netns_list: str) -> list[str]:
+        """The namespaces this probe REAPED, without the one it made for itself."""
+        deleted: list[str] = []
+        made: list[str] = []
+
+        async def _runner(argv: Sequence[str]) -> None:
+            if list(argv[:3]) == ["ip", "netns", "add"]:
+                made.append(argv[3])
+            if list(argv[:3]) == ["ip", "netns", "del"]:
+                deleted.append(argv[3])
+
+        await self._probe(_runner, netns_list)
+        return [name for name in deleted if name not in made]
+
+    async def test_a_dead_processes_namespace_is_reaped(self) -> None:
+        # pid 1 is alive; a pid that is not is what a killed agent leaves behind.
+        dead = _free_pid()
+        deleted = await self._deletions(f"bai-encprobe-{dead}-abcd (id: 3)\n")
+        assert f"bai-encprobe-{dead}-abcd" in deleted
+
+    async def test_a_live_co_located_agents_namespace_is_left(self) -> None:
+        # Its probe is running right now; reaping it would break that agent's answer.
+        deleted = await self._deletions("bai-encprobe-1-abcd (id: 3)\n")
+        assert "bai-encprobe-1-abcd" not in deleted
+
+    async def test_our_own_leftovers_are_reaped(self) -> None:
+        # `_probe_lock` means no other probe of this process is running, so anything of ours is
+        # finished with.
+        mine = f"bai-encprobe-{os.getpid()}-abcd"
+        assert mine in await self._deletions(f"{mine}\n")
+
+    async def test_a_namespace_from_before_the_pid_was_in_the_name_is_reaped(self) -> None:
+        assert "bai-encprobe-abcd" in await self._deletions("bai-encprobe-abcd\n")
+
+    async def test_nothing_else_is_touched(self) -> None:
+        listing = "bai-encprobe-1-live\ncni-1234\nsomeone-elses-netns (id: 0)\n"
+        deleted = await self._deletions(listing)
+        assert deleted == [], "it reaped a namespace that is not a probe's"
+
+    async def test_one_that_will_not_go_is_reported(self) -> None:
+        dead = _free_pid()
+
+        async def _runner(argv: Sequence[str]) -> None:
+            if list(argv[:3]) == ["ip", "netns", "del"] and argv[3].endswith("-abcd"):
+                raise RuntimeError("Device or resource busy")
+
+        problems = await self._probe(_runner, f"bai-encprobe-{dead}-abcd\n")
+        assert any("leftover encryption probe namespace" in p for p in problems)
+
+    async def test_an_unlistable_namespace_set_does_not_stop_the_probe(self) -> None:
+        # Not knowing what is lying around is no reason to refuse to answer the question asked.
+        async def _runner(argv: Sequence[str]) -> None:
+            return None
+
+        async def _reader(argv: Sequence[str]) -> str:
+            if list(argv[:3]) == ["ip", "netns", "list"]:
+                raise RuntimeError("no")
+            state, policy = _installed()
+            return policy if argv[-1] == "policy" else state
+
+        assert await vxlan.probe_encryption_support(_runner, _reader) == []
+
+    async def test_the_name_carries_this_process(self) -> None:
+        made: list[str] = []
+
+        async def _runner(argv: Sequence[str]) -> None:
+            if list(argv[:3]) == ["ip", "netns", "add"]:
+                made.append(argv[3])
+
+        await self._probe(_runner, "")
+        assert made and made[0].startswith(f"bai-encprobe-{os.getpid()}-")
+
+
+def _free_pid() -> int:
+    """A pid no process holds, for standing in as a killed agent's."""
+    for candidate in range(4_000_000, 4_000_100):
+        try:
+            os.kill(candidate, 0)
+        except ProcessLookupError:
+            return candidate
+        except OSError:
+            continue
+    raise AssertionError("no free pid to test with")
