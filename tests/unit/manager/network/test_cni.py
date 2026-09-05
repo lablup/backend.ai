@@ -322,6 +322,21 @@ class TestSelectBackend:
             plugin._select_backend(NetworkBackendKind.BRIDGE)
 
 
+def _encryption_capable(etcd: FakeEtcd, *agent_ids: str) -> None:
+    """Publish caps saying these agents speak the current overlay encryption profile.
+
+    Needed by any test with member agents that is not ABOUT encryption: the default policy is
+    `required`, so a member that cannot encrypt refuses the session -- which is the point.
+    """
+    for agent_id in agent_ids:
+        etcd.store[f"network/agent/{agent_id}/caps"] = json.dumps({
+            "tunnel_offload": False,
+            "backends": ["vxlan"],
+            "readiness": [],
+            "encryption_profiles": [OVERLAY_ENCRYPTION_PROFILE],
+        })
+
+
 class TestCreateNetwork:
     def test_instantiates_with_no_forced_backend(self) -> None:
         plugin = CNINetworkPlugin({}, {})
@@ -478,6 +493,7 @@ class TestCreateNetwork:
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/vtep"] = "192.168.105.7"
         etcd.store["network/agent/a2/vtep"] = "192.168.105.8"
+        _encryption_capable(etcd, "a1", "a2")
         plugin = _plugin_with(etcd)
         await plugin.create_network(
             identifier="s1",
@@ -498,7 +514,8 @@ class TestCreateNetwork:
 
     async def test_preseed_skips_agents_without_published_vtep(self) -> None:
         etcd = FakeEtcd()
-        etcd.store["network/agent/a1/vtep"] = "192.168.105.7"  # a2 has not published
+        etcd.store["network/agent/a1/vtep"] = "192.168.105.7"  # a2 has not published a VTEP
+        _encryption_capable(etcd, "a1", "a2")
         plugin = _plugin_with(etcd)
         await plugin.create_network(
             identifier="s1",
@@ -547,6 +564,7 @@ class TestMemberBackendCompat:
     async def test_containerd_member_ok(self) -> None:
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/backend"] = "containerd"
+        _encryption_capable(etcd, "a1")
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(
             identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
@@ -558,6 +576,7 @@ class TestMemberBackendCompat:
         # by PID, which is a kernel operation and not a containerd one.
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/backend"] = "docker"
+        _encryption_capable(etcd, "a1")
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(
             identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
@@ -577,6 +596,7 @@ class TestMemberBackendCompat:
     async def test_unpublished_backend_is_allowed(self) -> None:
         # safe before the agent publish path is wired: unknown -> allowed
         etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(
             identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
@@ -704,15 +724,6 @@ class TestEncryptingOnlyWhereEveryNodeCan:
     Before encryption was the default that could not happen -- an operator turned it on once the
     nodes were ready. Now it is what a rolling upgrade produces on its own."""
 
-    def _capable(self, etcd: FakeEtcd, *agent_ids: str) -> None:
-        for agent_id in agent_ids:
-            etcd.store[f"network/agent/{agent_id}/caps"] = json.dumps({
-                "tunnel_offload": False,
-                "backends": ["vxlan"],
-                "readiness": [],
-                "encryption_profiles": [OVERLAY_ENCRYPTION_PROFILE],
-            })
-
     def _old(self, etcd: FakeEtcd, *agent_ids: str) -> None:
         """An agent from before the profile existed: it publishes caps, but not that field."""
         for agent_id in agent_ids:
@@ -722,9 +733,17 @@ class TestEncryptingOnlyWhereEveryNodeCan:
                 "readiness": [],
             })
 
+    def _with_policy(self, etcd: FakeEtcd, policy: object) -> CNINetworkPlugin:
+        plugin = CNINetworkPlugin({"overlay-encryption": policy}, {})
+        plugin._etcd = cast(AsyncEtcd, etcd)
+        plugin._subnet_allocator = SubnetAllocator(cast(AsyncEtcd, etcd))
+        plugin._vni_allocator = VNIAllocator(cast(AsyncEtcd, etcd))
+        plugin._endpoint_allocator = EndpointAllocator(cast(AsyncEtcd, etcd))
+        return plugin
+
     async def test_every_node_capable_encrypts(self) -> None:
         etcd = FakeEtcd()
-        self._capable(etcd, "a1", "a2")
+        _encryption_capable(etcd, "a1", "a2")
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(
             identifier="s1",
@@ -732,13 +751,78 @@ class TestEncryptingOnlyWhereEveryNodeCan:
         )
         assert info.options["encryption_key"] is not None
 
-    async def test_one_old_node_leaves_the_session_unencrypted(self) -> None:
-        # Not an error: a manager upgrade alone would otherwise stop every multi-node session on a
-        # cluster whose agents have not been upgraded yet.
+    async def test_the_default_refuses_rather_than_downgrading(self) -> None:
+        # The regression this class exists for. An operator who did not touch the setting gets
+        # encryption; a node that cannot manage it is an error naming the node, not a plaintext
+        # overlay and a log line nobody was reading.
         etcd = FakeEtcd()
-        self._capable(etcd, "a1")
+        _encryption_capable(etcd, "a1")
         self._old(etcd, "a2")
         plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch, match="a2"):
+            await plugin.create_network(
+                identifier="s1",
+                options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
+            )
+
+    async def test_an_explicit_true_refuses_too(self) -> None:
+        # `true` was written by somebody who meant "these sessions are confidential".
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        self._old(etcd, "a2")
+        plugin = self._with_policy(etcd, True)
+        with pytest.raises(NetworkBackendMismatch):
+            await plugin.create_network(
+                identifier="s1",
+                options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
+            )
+
+    async def test_required_refuses_a_node_that_published_nothing(self) -> None:
+        # Silence is consent everywhere else in `pairing`; here it is an agent from before the
+        # contract, and encrypting anyway is the failure this check exists for.
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = self._with_policy(etcd, "required")
+        with pytest.raises(NetworkBackendMismatch, match="published no network capabilities"):
+            await plugin.create_network(
+                identifier="s1",
+                options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
+            )
+
+    async def test_required_refuses_an_unreadable_record(self) -> None:
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        etcd.store["network/agent/a2/caps"] = "{not json"
+        plugin = self._with_policy(etcd, "required")
+        with pytest.raises(NetworkBackendMismatch, match="cannot read"):
+            await plugin.create_network(
+                identifier="s1",
+                options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
+            )
+
+    async def test_required_refuses_an_unknown_profile(self) -> None:
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        etcd.store["network/agent/a2/caps"] = json.dumps({
+            "tunnel_offload": False,
+            "backends": ["vxlan"],
+            "readiness": [],
+            "encryption_profiles": ["esp-aesgcm-esn-v99"],
+        })
+        plugin = self._with_policy(etcd, "required")
+        with pytest.raises(NetworkBackendMismatch, match="esp-aesgcm-esn-v99"):
+            await plugin.create_network(
+                identifier="s1",
+                options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
+            )
+
+    async def test_prefer_is_what_falls_back(self) -> None:
+        # The rolling-upgrade setting, and the only one that yields a plaintext overlay from a
+        # cluster that asked for encryption. Chosen deliberately, by name.
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        self._old(etcd, "a2")
+        plugin = self._with_policy(etcd, "prefer")
         info = await plugin.create_network(
             identifier="s1",
             options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
@@ -746,37 +830,23 @@ class TestEncryptingOnlyWhereEveryNodeCan:
         assert info.options["encryption_key"] is None
         assert info.options["mtu"] == 1450, "and it gets the unencrypted MTU to match"
 
-    async def test_a_node_that_published_nothing_is_not_assumed_capable(self) -> None:
-        # Silence is consent everywhere else in this module; here it is an agent from before the
-        # contract, and encrypting anyway is the failure this check exists for.
+    async def test_prefer_still_encrypts_where_it_can(self) -> None:
         etcd = FakeEtcd()
-        self._capable(etcd, "a1")
-        plugin = _plugin_with(etcd)
+        _encryption_capable(etcd, "a1", "a2")
+        plugin = self._with_policy(etcd, "prefer")
         info = await plugin.create_network(
             identifier="s1",
             options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
         )
-        assert info.options["encryption_key"] is None
+        assert info.options["encryption_key"] is not None
 
-    async def test_an_unreadable_record_is_not_assumed_capable(self) -> None:
+    async def test_a_caller_that_asked_for_encryption_overrides_prefer(self) -> None:
+        # It stated a requirement; `prefer` is the operator's fallback, not the caller's.
         etcd = FakeEtcd()
-        self._capable(etcd, "a1")
-        etcd.store["network/agent/a2/caps"] = "{not json"
-        plugin = _plugin_with(etcd)
-        info = await plugin.create_network(
-            identifier="s1",
-            options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
-        )
-        assert info.options["encryption_key"] is None
-
-    async def test_a_caller_that_asked_for_encryption_gets_an_error(self) -> None:
-        # It stated a requirement this cluster cannot meet; handing back a plaintext overlay would
-        # be answering a different question.
-        etcd = FakeEtcd()
-        self._capable(etcd, "a1")
+        _encryption_capable(etcd, "a1")
         self._old(etcd, "a2")
-        plugin = _plugin_with(etcd)
-        with pytest.raises(NetworkBackendMismatch, match="asked for an encrypted overlay"):
+        plugin = self._with_policy(etcd, "prefer")
+        with pytest.raises(NetworkBackendMismatch):
             await plugin.create_network(
                 identifier="s1",
                 options={
@@ -786,23 +856,17 @@ class TestEncryptingOnlyWhereEveryNodeCan:
                 },
             )
 
-    async def test_an_unknown_profile_is_refused(self) -> None:
+    async def test_disabled_asks_nothing_of_the_nodes(self) -> None:
         etcd = FakeEtcd()
-        self._capable(etcd, "a1")
-        etcd.store["network/agent/a2/caps"] = json.dumps({
-            "tunnel_offload": False,
-            "backends": ["vxlan"],
-            "readiness": [],
-            "encryption_profiles": ["esp-aesgcm-esn-v99"],
-        })
-        plugin = _plugin_with(etcd)
+        self._old(etcd, "a1")
+        plugin = self._with_policy(etcd, "disabled")
         info = await plugin.create_network(
             identifier="s1",
-            options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
+            options={"forced_backend": "vxlan", "member_agents": ["a1"]},
         )
         assert info.options["encryption_key"] is None
 
-    async def test_encryption_turned_off_asks_nothing_of_the_nodes(self) -> None:
+    async def test_a_per_session_opt_out_asks_nothing_either(self) -> None:
         etcd = FakeEtcd()
         self._old(etcd, "a1")
         plugin = _plugin_with(etcd)
