@@ -272,6 +272,19 @@ class SessionNetwork:
         if retry_tasks:
             await asyncio.gather(*retry_tasks, return_exceptions=True)
         self._teardown_retry_tasks.clear()
+        # Symmetric with `open()`, which calls `init()` on each of them. Without this the
+        # backends' own background work -- the VXLAN protection watchdog, which reprograms
+        # firewall and XFRM state every three seconds -- kept running through a graceful
+        # shutdown, against a host the agent had stopped managing.
+        for backend in self._backends.values():
+            try:
+                await backend.cleanup()
+            except Exception:
+                log.warning(
+                    "network backend {} did not shut down cleanly",
+                    type(backend).__name__,
+                    exc_info=True,
+                )
         await self._locator.close()
         if self._runtime is not None:
             await self._runtime.close()

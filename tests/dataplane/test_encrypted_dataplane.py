@@ -274,6 +274,65 @@ class TestFirewallOwnership:
             )
 
 
+class TestOwnershipOfADeviceTheHostShares:
+    """`baivx*` names are node-global and the recovery preflight downs EVERY one of them, because
+    at that moment nothing on the node can tell whose is whose. On a host running two agents that
+    means one agent's restart takes the OTHER agent's overlay down.
+
+    The question this settles is what happens next: whether the owner notices. Simulated by
+    downing a live device exactly as that preflight does -- from outside the process that owns it,
+    with no notification -- because that is the whole of what a co-located agent's restart does to
+    it.
+    """
+
+    async def test_g24_a_device_downed_by_something_else_comes_back(
+        self,
+        leak_guard: LeakGuard,
+        session_driver: SessionDriver,
+        encrypted_spec: SessionSpec,
+        node_pair: tuple[Node, Node],
+    ) -> None:
+        async with session_driver.session(encrypted_spec, "dp-g24") as handle:
+            placed = await _spread_or_skip(node_pair, str(handle.session_id))
+            node = placed.node_a
+            device = f"baivx{await _vni_on(node)}"
+            assert await _device_is_up(node, device), (
+                "the session's tunnel was not up to begin with"
+            )
+
+            await node.run(["sudo", "-n", "ip", "link", "set", device, "down"], check=False)
+            assert not await _device_is_up(node, device), "the down did not take"
+
+            assert await _wait_for(lambda: _device_is_up(node, device)), (
+                f"{device} was still down long after another process downed it. A co-located"
+                " agent's restart downs every baivx on the host, so an owner that does not raise"
+                " its own device again leaves that session dark until it restarts too."
+            )
+
+    async def test_g24_traffic_crosses_again_afterwards(
+        self,
+        leak_guard: LeakGuard,
+        session_driver: SessionDriver,
+        encrypted_spec: SessionSpec,
+        node_pair: tuple[Node, Node],
+    ) -> None:
+        """The device being UP is not the claim; the session carrying traffic again is."""
+        async with session_driver.session(encrypted_spec, "dp-g24b") as handle:
+            placed = await _spread_or_skip(node_pair, str(handle.session_id))
+            node = placed.node_a
+            device = f"baivx{await _vni_on(node)}"
+            await node.run(["sudo", "-n", "ip", "link", "set", device, "down"], check=False)
+            assert await _wait_for(lambda: _device_is_up(node, device))
+            await probe.reaches(node, placed.pid_a, placed.ip_b)
+
+
+async def _device_is_up(node: Node, device: str) -> bool:
+    """Whether the link carries IFF_UP, read from the flags `ip -o link` prints."""
+    result = await node.run(["ip", "-o", "link", "show", "dev", device], check=False)
+    head, _, _ = result.stdout.partition(" mtu ")
+    return "UP" in head.split("<")[-1].split(">")[0].split(",") if "<" in head else False
+
+
 async def _is_encrypted(node: Node) -> bool:
     """Whether this node programmed ESP for the session, i.e. the cluster has a key configured."""
     result = await node.run(["sudo", "-n", "ip", "xfrm", "state"], check=False)
