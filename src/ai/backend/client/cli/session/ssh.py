@@ -4,6 +4,7 @@ import secrets
 import signal
 import subprocess
 import sys
+import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -25,19 +26,31 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     ssh_dir = Path("~/.ssh").expanduser()
     ssh_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     key_path = ssh_dir / f"id_{random_id}"
-    try:
-        subprocess.run(
-            [*CLI_EXECUTABLE, "session", "download", session_ref, key_filename],
-            shell=False,
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-        )
-    except subprocess.CalledProcessError as e:
-        print_fail(f"Failed to download the SSH key from the session (exit: {e.returncode}):")
-        print(e.stdout.decode())
-        sys.exit(ExitCode.FAILURE)
-    Path(key_filename).rename(key_path)
+    # `session download` keeps the container-side basename, so concurrent invocations
+    # sharing a destination directory race on the same file. Give each one its own
+    # directory, inside `ssh_dir` to keep the rename below on a single filesystem.
+    with tempfile.TemporaryDirectory(dir=ssh_dir) as download_dir:
+        try:
+            subprocess.run(
+                [
+                    *CLI_EXECUTABLE,
+                    "session",
+                    "download",
+                    "--dest",
+                    download_dir,
+                    session_ref,
+                    key_filename,
+                ],
+                shell=False,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+        except subprocess.CalledProcessError as e:
+            print_fail(f"Failed to download the SSH key from the session (exit: {e.returncode}):")
+            print(e.stdout.decode())
+            sys.exit(ExitCode.FAILURE)
+        (Path(download_dir) / key_filename).rename(key_path)
     print_info(f"running a temporary sshd proxy at localhost:{port} ...", file=sys.stderr)
     # proxy_proc is a background process
     proxy_proc = subprocess.Popen(
