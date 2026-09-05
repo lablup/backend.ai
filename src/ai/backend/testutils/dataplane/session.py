@@ -34,6 +34,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
 )
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 
 RUNNING = "RUNNING"
 TERMINATED = "TERMINATED"
@@ -74,7 +75,13 @@ class SessionSpec:
     agent_list: tuple[str, ...] = ()
     """Agents the session is restricted to, empty for the scheduler's own choice. A two-node
     scenario names both real nodes so a stale agent still registered in the group cannot be
-    scheduled onto; a filler names one so it lands where the scenario needs the pressure."""
+    scheduled onto; a filler names one so it lands where the scenario needs the pressure.
+
+    Enforced strictly: a scenario that says "these kernels, on these nodes" is checking something
+    about those nodes, and a session that landed elsewhere does not fail it -- it makes it
+    meaningless, and it reads as a pass or as an unrelated assertion error. Strict turns a
+    placement the cluster cannot satisfy into a schedule that does not happen, which the driver
+    reports as a timeout naming the session."""
 
     def to_enqueue_input(self, name: str) -> EnqueueSessionInput:
         """Build the manager's own request model, never a hand-written dict.
@@ -97,6 +104,7 @@ class SessionSpec:
             cluster_mode=self.cluster_mode,
             cluster_size=self.cluster_size,
             agent_list=list(self.agent_list) or None,
+            agent_selection_policy=(AgentSelectionPolicyEnum.STRICT if self.agent_list else None),
         )
 
 
