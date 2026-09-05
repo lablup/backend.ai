@@ -87,15 +87,15 @@ def compute_caps(*, tunnel_offload: bool, readiness: Readiness | None = None) ->
     node that cannot serve the backend still gets handed sessions that fail on it alone.
     """
     findings = readiness or Readiness()
-    can_serve = findings.can_serve_overlay
     return AgentNetworkCaps(
         tunnel_offload=tunnel_offload,
-        backends=["vxlan"] if can_serve else [],
+        backends=["vxlan"] if findings.can_serve_overlay else [],
         readiness=findings.problems,
-        # Only alongside the backend. The profile says this node can hold up its end of an
-        # encrypted tunnel, and a node that cannot serve the overlay at all -- no `u32`, no
-        # `policy` match -- cannot hold up an encrypted one either.
-        encryption_profiles=[OVERLAY_ENCRYPTION_PROFILE] if can_serve else [],
+        # A separate question from serving the overlay at all. The profile says this node can hold
+        # up its end of an ESP tunnel, and advertising it off the back of the generic checks -- ip,
+        # bridge, iptables, u32 -- claimed something none of them looked at: a kernel with no XFRM
+        # or no AES-GCM passes every one of them and then cannot install a single SA.
+        encryption_profiles=([OVERLAY_ENCRYPTION_PROFILE] if findings.can_encrypt_overlay else []),
     )
 
 

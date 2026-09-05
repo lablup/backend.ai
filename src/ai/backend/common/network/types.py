@@ -8,10 +8,15 @@ proposals/BEP-1062 and its sub-documents `control-plane.md` and `agent-plugin-v2
 from __future__ import annotations
 
 import ipaddress
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Final
+
+from ai.backend.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # --- tunnel constants, shared by the manager (which computes the overlay MTU) and the agent
 # (which builds the devices and checks the result against the real path) ---
@@ -253,6 +258,43 @@ class EndpointPlan:
     def overlay(self) -> NetworkAttachSpec | None:
         """Return the OVERLAY attachment for multi-node sessions, or None for single-node."""
         return next((a for a in self.attachments if a.role is NetworkRole.OVERLAY), None)
+
+
+class OverlayEncryptionPolicy(StrEnum):
+    """What an operator means by asking for overlay encryption.
+
+    A boolean could not hold both "encrypt this" and "encrypt this if you can", so it meant the
+    weaker one for everybody: an operator who wrote `true` because these sessions are confidential
+    was handed plain VXLAN and a log line the moment one agent turned out to be old.
+    """
+
+    #: Encrypt, and refuse the session if any node it lands on cannot. The default.
+    REQUIRED = "required"
+    #: Encrypt where every node can; fall back to plain VXLAN, loudly, where they cannot. For a
+    #: cluster mid-upgrade, chosen deliberately.
+    PREFER = "prefer"
+    #: Never encrypt.
+    DISABLED = "disabled"
+
+    @classmethod
+    def parse(cls, value: Any) -> OverlayEncryptionPolicy:
+        """The policy an operator's configuration asks for, defaulting to `REQUIRED`.
+
+        Booleans are accepted because that is what this setting used to be: `true` is `REQUIRED`
+        and `false` is `DISABLED`, which is what each meant to whoever wrote it. An unrecognised
+        value is `REQUIRED` too -- a typo in a security setting must not be read as permission.
+        """
+        if value is None:
+            return cls.REQUIRED
+        if isinstance(value, bool):
+            return cls.REQUIRED if value else cls.DISABLED
+        try:
+            return cls(str(value).strip().lower())
+        except ValueError:
+            log.warning(
+                "unrecognised overlay-encryption policy {!r}; using {!r}", value, cls.REQUIRED.value
+            )
+            return cls.REQUIRED
 
 
 #: The wire contract of an encrypted overlay: transport-mode ESP with AES-GCM, extended sequence
