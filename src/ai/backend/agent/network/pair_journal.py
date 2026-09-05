@@ -300,17 +300,32 @@ class PairJournal:
         "leave it". Of the two ways to be wrong, a stale SA keeps traffic encrypted while a
         deleted one takes down whoever else was on it.
 
-        The lock spans the caller's block so the answer cannot go stale inside it.
+        The lock spans the caller's block so the answer cannot go stale inside it, and the claim
+        is dropped only when that block RETURNS. Dropping it first meant a caller that failed or
+        was cancelled had already given up the one thing that stops a co-located agent deleting
+        the SAs it is still using, with nothing left to restore it.
         """
         async with self.holding(key) as claims:
             if claims is None:
                 yield None
                 return
-            if not claims.remove(owner, session_id):
+            existing = claims.users()
+            if existing is None:
                 yield None
                 return
-            remaining = claims.users()
-            yield None if remaining is None else not remaining
+            mine = _claim_name(owner, session_id)
+            if not any(entry.replace("/", _CLAIM_SEP, 1) == mine for entry in existing):
+                # We are not on this pair, so we are in no position to say whether anyone else is.
+                yield None
+                return
+            yield len(existing) == 1
+            # Reached only on a clean exit from the caller's block.
+            if not claims.remove(owner, session_id):
+                log.warning(
+                    "could not drop this agent's claim on {}; it will keep the pair alive until"
+                    " the next startup prunes it",
+                    key,
+                )
 
     async def users(self, key: str) -> frozenset[str]:
         """Everyone on this node currently claiming the key, for diagnostics."""

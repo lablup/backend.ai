@@ -9,7 +9,6 @@ they are already looking.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
 from collections.abc import Mapping, Sequence
@@ -17,6 +16,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from ai.backend.agent.errors.network import UndescribableVxlanDevice
+from ai.backend.agent.network import command
 from ai.backend.logging import BraceStyleAdapter
 
 #: Devices this backend made. Anything else on our port or in our VNI range belongs to someone
@@ -119,47 +119,35 @@ def foreign_conflicts(
 
 async def _binary_present(name: str) -> bool:
     try:
-        proc = await asyncio.create_subprocess_exec(
-            name,
-            "-V",
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-    except OSError:
+        await command.run([name, "-V"], capture_stderr=False)
+    except (OSError, command.CommandTimeout):
+        # A binary that will not answer is one this node cannot rely on, and a probe that hangs
+        # stops the agent's startup: every one of these runs before the node is ready to serve.
         return False
-    await proc.communicate()
     return True
 
 
 async def _match_present(name: str) -> bool:
     """Whether iptables can load a match. Needs no privilege and mutates nothing."""
     try:
-        proc = await asyncio.create_subprocess_exec(
-            "iptables",
-            "-m",
-            name,
-            "--help",
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-    except OSError:
+        rc, _, _ = await command.run(["iptables", "-m", name, "--help"], capture_stderr=False)
+    except (OSError, command.CommandTimeout):
         return False
-    await proc.communicate()
-    return proc.returncode == 0
+    return rc == 0
 
 
 async def _run(argv: Sequence[str]) -> str | None:
-    """The command's stdout, or None when it did not complete successfully."""
+    """The command's stdout, or None when it did not complete successfully.
+
+    A command that hangs answers None like any other failure. These run while the agent is
+    deciding whether it may serve at all, so waiting forever is not the cautious option -- it is a
+    node that never finishes starting and never says why.
+    """
     try:
-        proc = await asyncio.create_subprocess_exec(
-            *argv,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        stdout, _ = await proc.communicate()
-    except OSError:
+        rc, stdout, _ = await command.run(argv, capture_stderr=False)
+    except (OSError, command.CommandTimeout):
         return None
-    return stdout.decode(errors="replace") if proc.returncode == 0 else None
+    return stdout.decode(errors="replace") if rc == 0 else None
 
 
 async def _vxlan_names() -> tuple[str, ...]:
