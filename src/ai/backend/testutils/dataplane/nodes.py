@@ -19,7 +19,9 @@ import contextlib
 import os
 import shlex
 import signal
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 DEFAULT_COMMAND_LIMIT = 30.0
@@ -215,40 +217,79 @@ SSH_TRANSPORT_RETRIES = 3
 SSH_RETRY_DELAY_SEC = 1.0
 
 
+#: What ssh writes when it could not carry the command, rather than the command failing. The mux
+#: line is the shared connection refusing another session, which is sshd's per-connection limit.
+_TRANSPORT_MARKERS = ("mux_client_request_session", "Connection closed by", "Connection timed out")
+
+
 def is_transport_failure(result: CommandResult) -> bool:
     """Whether ssh itself failed to run the command, rather than the command failing.
 
     ssh exits 255 for its own errors and passes any other exit code through from the remote
-    command, so 255 with nothing written is the connection dropping -- which one dual-homed node
-    on a busy rig does often enough to fail a run that found nothing wrong. A remote command that
-    genuinely exits 255 says something while doing it.
+    command, so a 255 that says nothing -- or says one of the things ssh says about its own
+    transport -- is the connection, not the command. A remote command that genuinely exits 255
+    reports its own reason.
     """
-    return result.returncode == 255 and not result.stdout and not result.stderr
+    if result.returncode != 255:
+        return False
+    if not result.stdout and not result.stderr:
+        return True
+    return any(marker in result.stderr for marker in _TRANSPORT_MARKERS)
+
+
+def _default_ssh_options() -> tuple[str, ...]:
+    """``BatchMode=yes`` keeps a missing key a fast failure instead of a password prompt that hangs
+    the suite; the harness is meant to run unattended.
+
+    The rest is connection multiplexing. A leak-guard snapshot runs every collector at once, which
+    is a dozen simultaneous handshakes per node -- past sshd's default `MaxStartups`, where it
+    starts refusing connections at random. Those arrived as a collector failing with no output,
+    which reads like the node dropping off the network. One shared connection per node has no
+    startup burst to throttle.
+    """
+    control = Path(tempfile.gettempdir()) / f"bai-dataplane-ssh-{os.getpid()}-%C"
+    return (
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "LogLevel=ERROR",
+        "-o",
+        "ControlMaster=auto",
+        "-o",
+        f"ControlPath={control}",
+        "-o",
+        "ControlPersist=120s",
+    )
+
+
+#: Commands one node runs at a time. A leak-guard snapshot asks for a dozen at once, and sshd
+#: allows ten sessions on a connection by default -- past that it refuses, and a collector that
+#: was never run is indistinguishable from a node that answered "nothing here". Bounded on this
+#: side so the answer does not depend on the remote's configuration.
+SSH_MAX_CONCURRENCY = 6
 
 
 class SshNode:
-    """A peer node reached over SSH.
-
-    ``BatchMode=yes`` keeps a missing key a fast failure instead of a password prompt that hangs
-    the suite; the harness is meant to run unattended.
-    """
+    """A peer node reached over SSH."""
 
     _name: str
     _target: str
     _ssh_options: tuple[str, ...]
     _limit_sec: float
+    _slots: asyncio.Semaphore
 
     def __init__(
         self,
         target: str,
         *,
         name: str | None = None,
-        ssh_options: tuple[str, ...] = ("-o", "BatchMode=yes", "-o", "LogLevel=ERROR"),
+        ssh_options: tuple[str, ...] | None = None,
         limit_sec: float = DEFAULT_COMMAND_LIMIT,
     ) -> None:
         self._name = name or target
         self._target = target
-        self._ssh_options = ssh_options
+        self._ssh_options = _default_ssh_options() if ssh_options is None else ssh_options
+        self._slots = asyncio.Semaphore(SSH_MAX_CONCURRENCY)
         self._limit_sec = limit_sec
 
     @property
@@ -259,15 +300,16 @@ class SshNode:
         return ["ssh", *self._ssh_options, self._target, "--", shlex.join(argv)]
 
     async def run(self, argv: list[str], *, check: bool = True) -> CommandResult:
-        for remaining in reversed(range(SSH_TRANSPORT_RETRIES)):
-            result = await _exec(
-                self._name, argv, self.wire_argv(argv), check=False, limit_sec=self._limit_sec
-            )
-            if not (remaining and is_transport_failure(result)):
-                if check:
-                    result.check()
-                return result
-            await asyncio.sleep(SSH_RETRY_DELAY_SEC)
+        async with self._slots:
+            for remaining in reversed(range(SSH_TRANSPORT_RETRIES)):
+                result = await _exec(
+                    self._name, argv, self.wire_argv(argv), check=False, limit_sec=self._limit_sec
+                )
+                if not (remaining and is_transport_failure(result)):
+                    if check:
+                        result.check()
+                    return result
+                await asyncio.sleep(SSH_RETRY_DELAY_SEC)
         raise AssertionError("unreachable")
 
 
