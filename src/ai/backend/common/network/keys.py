@@ -57,8 +57,12 @@ def endpoint_key(session_id: str, container_id: str) -> str:
     return f"{endpoints_prefix(session_id)}{container_id}"
 
 
+def session_ipam_prefix(session_id: str) -> str:
+    return f"{session_prefix(session_id)}ipam/"
+
+
 def session_ipam_key(session_id: str, ip: str) -> str:
-    return f"{session_prefix(session_id)}ipam/{ip}"
+    return f"{session_ipam_prefix(session_id)}{ip}"
 
 
 # --- per-agent: network/agent/{agent_id}/... ---
