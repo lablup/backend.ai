@@ -1,4 +1,4 @@
-"""EndpointPlan -> CNI attach chain (BEP-1062).
+"""EndpointPlan -> CNI attach chain (BEP-1078).
 
 Runtime-neutral consumption of a v2 backend's `EndpointPlan`: turn the ordered
 interface chain into ordered CNI ADD operations (and DEL in reverse for detach).

@@ -1,4 +1,4 @@
-"""Unit tests for the privnet cluster DNS resolver (BEP-1062).
+"""Unit tests for the privnet cluster DNS resolver (BEP-1078).
 
 The resolve logic is pure: a fake name source and a fake forwarder stand in for etcd and the
 upstream so a query can be answered/forwarded without a socket or the network.

@@ -107,7 +107,7 @@ class ContainerdObjectCollector:
 
         Record, not task: a kernel that exited still owns its scratch until its container is
         removed, so a scratch directory is orphaned only once the record is gone. The agent uses
-        the kernel id as the container id (BEP-1062), so no translation is needed.
+        the kernel id as the container id (BEP-1078), so no translation is needed.
         """
         result = await self._node.run(self._ctr("containers", "list"))
         return {row[0] for row in _rows(result.stdout, "CONTAINER")}

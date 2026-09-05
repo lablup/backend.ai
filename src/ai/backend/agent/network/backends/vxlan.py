@@ -1,4 +1,4 @@
-"""VXLAN cluster-network backend (BEP-1062).
+"""VXLAN cluster-network backend (BEP-1078).
 
 Portable default data plane: per-session VXLAN VNI + bridge, with unicast head-end
 replication (FDB) driven by the SessionNetworkCoordinator's etcd membership watch.
@@ -1294,7 +1294,7 @@ def local_cni_config(
     """CNI 'bridge' config for the host-local interface: agent<->container control
     channel plus egress NAT, carrying the default route.
 
-    Per BEP-1062 Decision Log (2026-07-03): the LOCAL bridge is **per session**, on a
+    Per BEP-1078 Decision Log (2026-07-03): the LOCAL bridge is **per session**, on a
     **node-local** NAT subnet (not the stretched overlay subnet). Cross-session isolation
     comes from separate bridges (verified §8), not ICC-off firewall rules (the stock CNI
     bridge does not implement ICC-off — §9). A node-local subnet also avoids the

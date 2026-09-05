@@ -1,10 +1,10 @@
-"""Per-session cluster-network coordinator (BEP-1062).
+"""Per-session cluster-network coordinator (BEP-1078).
 
 Owns the membership lifecycle for a session network: reads the session meta, drives
 the backend's host-level setup, publishes this agent's membership, and reconciles
 peers from the etcd ``members/`` prefix (driving the backend's idempotent
 ``add_peer``/``del_peer``). The v2 backend is a stateless data-plane executor and
-never watches etcd itself — that ownership lives here (see Decision Log, BEP-1062).
+never watches etcd itself — that ownership lives here (see Decision Log, BEP-1078).
 """
 
 from __future__ import annotations
@@ -326,7 +326,7 @@ class SessionNetworkCoordinator:
 
     def resolve_cluster_name(self, session_id: str, hostname: str) -> str | None:
         """The session-scoped ``hostname -> ip`` lookup the per-session cluster name resolver reads
-        (BEP-1062). Case-insensitive, as DNS names are. ``None`` when this session is not set up
+        (BEP-1078). Case-insensitive, as DNS names are. ``None`` when this session is not set up
         here or the name is not one it owns — the resolver then forwards the query upstream.
 
         Scoped by ``session_id``: identical cluster hostnames (every session names kernels
@@ -423,7 +423,7 @@ class SessionNetworkCoordinator:
 
 
 class SessionClusterNames:
-    """A per-session ``ClusterNameSource`` view over a coordinator (BEP-1062).
+    """A per-session ``ClusterNameSource`` view over a coordinator (BEP-1078).
 
     The cluster DNS resolver sees only bare hostnames (``sub1``), but names are unique only within
     a session — every session names kernels ``main1``/``sub1``/…. Binding a ``session_id`` here is

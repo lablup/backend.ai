@@ -1,6 +1,6 @@
 # Data-plane tests — Guardrails
 
-> Node-level tests for the containerd agent's network data plane (BEP-1062): netns, netlink
+> Node-level tests for the containerd agent's network data plane (BEP-1078): netns, netlink
 > devices, iptables, VXLAN FDB/ARP, containerd objects, and the durable state stores.
 > These need a real host (root) and a live containerd — they are NOT unit tests.
 

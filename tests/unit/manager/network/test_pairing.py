@@ -55,7 +55,7 @@ class TestOverlayDriver:
 
 class TestCniDriver:
     async def test_a_docker_agent_is_accepted(self) -> None:
-        # The BEP-1062 data plane is a vxlan device moved into the container's netns by PID, and a
+        # The BEP-1078 data plane is a vxlan device moved into the container's netns by PID, and a
         # netns does not care which daemon made it. Docker was refused here while the agent code
         # could only drive containerd; it can now.
         etcd = FakeEtcd({"agent-1": "docker"})

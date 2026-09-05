@@ -1,1 +1,1 @@
-"""Cluster-network data-plane backends (BEP-1062)."""
+"""Cluster-network data-plane backends (BEP-1078)."""

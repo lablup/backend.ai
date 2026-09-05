@@ -1,4 +1,4 @@
-"""The privnet's container-netns pinning, against real namespaces (BEP-1062).
+"""The privnet's container-netns pinning, against real namespaces (BEP-1078).
 
 This is the module that stands between a privileged operation and the wrong namespace. Entering a
 container's netns by PID is a TOCTOU: a PID is reused the moment its process dies, so a *validate

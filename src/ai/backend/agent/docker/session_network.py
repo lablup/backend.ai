@@ -1,4 +1,4 @@
-"""Session networking (BEP-1062) for the Docker backend.
+"""Session networking (BEP-1078) for the Docker backend.
 
 The data plane is the same vxlan the containerd backend uses, and so is the code that sets it up:
 ``ensure_session``, ``teardown_session`` and the restart recovery never touch a container runtime,
@@ -9,7 +9,7 @@ genuinely differs, because Docker's API takes its own container config rather th
 
 What Docker must add on top is the two-phase start the attach needs (see
 :mod:`ai.backend.agent.docker.gate`) and one decision at network-apply time: a session with a
-BEP-1062 backend gets ``NetworkMode: none`` and is attached by PID, instead of being handed to
+BEP-1078 backend gets ``NetworkMode: none`` and is attached by PID, instead of being handed to
 Docker's own networking.
 
 Measured end to end on Docker 29.1.3: two ``--network=none`` containers, a vxlan device built in
@@ -49,7 +49,7 @@ def is_session_networked(cluster_info: ClusterInfo) -> bool:
     """Whether this session's network is BAI's to build.
 
     The discriminator is the same one the containerd backend uses: a ``backend`` key in the
-    manager's network config names a BEP-1062 data plane (vxlan, or a node-local bridge). Its
+    manager's network config names a BEP-1078 data plane (vxlan, or a node-local bridge). Its
     absence means either no cluster network at all or a v1 driver -- ``mode`` names that one, and
     'overlay' there is Docker Swarm, which is Docker's to run and not ours to intercept.
     """

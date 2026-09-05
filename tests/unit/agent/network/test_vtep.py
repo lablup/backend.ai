@@ -1,4 +1,4 @@
-"""Unit tests for the VTEP validation shared by the agent and the network helper (BEP-1062).
+"""Unit tests for the VTEP validation shared by the agent and the network helper (BEP-1078).
 
 The VTEP is the address every peer programs into its FDB. Publishing one this node cannot be
 reached at does not fail — it builds an overlay that comes up, logs nothing and carries no traffic

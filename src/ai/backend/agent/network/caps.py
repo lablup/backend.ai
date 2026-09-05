@@ -1,4 +1,4 @@
-"""Agent networking capability probe (BEP-1062).
+"""Agent networking capability probe (BEP-1078).
 
 Each participating agent publishes its networking capabilities under
 ``network/agent/{id}/caps``. This module detects those capabilities and publishes them.

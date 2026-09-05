@@ -403,7 +403,7 @@ class DockerPurgeImageReq:
     noprune: bool
 
 
-#: The kernel runner's control channel. Reached at the container's own address under BEP-1062,
+#: The kernel runner's control channel. Reached at the container's own address under BEP-1078,
 #: so it is never DNAT'd onto the host and the agent dials these numbers, not a host pairing.
 _REPL_IN_PORT: Final = 2000
 _REPL_OUT_PORT: Final = 2001
@@ -441,7 +441,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None
     gwbridge_subnet: str | None
     _seccomp_profile_as_path: bool
-    #: Whether BAI builds this session's data plane (BEP-1062) instead of Docker. Decided in
+    #: Whether BAI builds this session's data plane (BEP-1078) instead of Docker. Decided in
     #: apply_network, read where the container is created and started: it is what puts the
     #: container behind a gate so a device can be moved into its netns before its command runs.
     _session_networked: bool
@@ -937,7 +937,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         if is_session_networked(cluster_info):
-            # BEP-1062: this session's data plane is BAI's, not Docker's. The container starts with
+            # BEP-1078: this session's data plane is BAI's, not Docker's. The container starts with
             # no network at all and the agent moves a vxlan (or node-local bridge) device into its
             # netns by PID, which is why it must also be held at a gate until that has happened.
             # Handing it to Docker's networking as well would put it on two networks, one of which
@@ -1571,7 +1571,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     self.computers[dev_name].alloc_map.free(device_alloc)
 
         if self._session_networked:
-            # BEP-1062: the container must exist, hold a netns and a stable PID, and NOT have run
+            # BEP-1078: the container must exist, hold a netns and a stable PID, and NOT have run
             # its command yet, so a vxlan/veth can be moved in first. Docker has no such split --
             # `docker create` reports PID 0 and no netns -- so the entrypoint becomes a wrapper
             # that parks at a FIFO after its namespaces exist. Releasing it execs the real command
@@ -1764,7 +1764,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return {
             "container_id": container._id,
             "kernel_host": kernel_host,
-            # Under BEP-1062 the repl is not published: the agent is on this node and dials the
+            # Under BEP-1078 the repl is not published: the agent is on this node and dials the
             # container's own address. None everywhere else, where Docker's loopback publishing is
             # what the kernel falls back to.
             "repl_host": self._container_ip if self._session_networked else None,
@@ -1789,7 +1789,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     checked_invalid_images: set[str]
     _seccomp_profile_as_path: bool
     _cgroup_path_cache: LRUCache[ContainerId, dict[CgroupController, Path]]
-    #: BEP-1062. The session half only — Docker keeps its own container lifecycle, so this object
+    #: BEP-1078. The session half only — Docker keeps its own container lifecycle, so this object
     #: has a locator and no runtime and refuses lifecycle calls by name.
     _session_network: SessionNetwork
     #: The address peers program into their FDB. None means this node cannot anchor a tunnel, and
@@ -1905,7 +1905,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 docker_info["CgroupVersion"],
             )
             self.docker_info = docker_info
-        # BEP-1062. host_ip keeps the overlay on the L2 the agents advertise on rather than a
+        # BEP-1078. host_ip keeps the overlay on the L2 the agents advertise on rather than a
         # hard-coded eth0; the VTEP is validated once here because it is what peers program into
         # their FDB, and an address this node cannot be reached at must never reach a session's
         # membership record.
@@ -2015,7 +2015,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 log.exception("could not refresh this agent's network capabilities")
 
     async def _publish_network_identity(self) -> None:
-        """Advertise this node's overlay identity: its capabilities and its VTEP (BEP-1062).
+        """Advertise this node's overlay identity: its capabilities and its VTEP (BEP-1078).
 
         The VTEP lets the manager pre-seed session membership, which is what removes the
         peer-publish race for a multi-node overlay. See `network/caps.py`.
@@ -2664,7 +2664,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             pass
 
             if container_id is not None:
-                # BEP-1062: before the container goes. Removing it reclaims only the container-side
+                # BEP-1078: before the container goes. Removing it reclaims only the container-side
                 # veth via netns teardown — the host veth, the host-local IPAM address and the
                 # egress MASQ rule are ours to give back, and a kernel that skips this leaks them
                 # until the agent restarts. A no-op for a container this node never attached.

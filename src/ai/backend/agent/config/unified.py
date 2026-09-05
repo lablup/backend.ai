@@ -1349,7 +1349,7 @@ class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
         ),
         BackendAIConfigMeta(
             description=(
-                "Unix socket path of the privnet daemon (BEP-1062). When set, the "
+                "Unix socket path of the privnet daemon (BEP-1078). When set, the "
                 "containerd agent delegates all CAP_NET_ADMIN/CAP_SYS_ADMIN container networking "
                 "to the privnet over this socket and needs no network privilege itself. When unset "
                 "(the default), the agent performs container networking in-process, which requires "
@@ -1761,7 +1761,7 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
         BackendAIConfigMeta(
             description=(
                 "Private IPv4 pool this node cuts every session's LOCAL (control + egress/NAT) "
-                "bridge subnet out of (BEP-1062). Node-local and behind NAT, so it never leaves "
+                "bridge subnet out of (BEP-1078). Node-local and behind NAT, so it never leaves "
                 "the host and needs no coordination with other nodes — but it must not overlap "
                 "any network the host itself routes, or containers will reach this pool instead "
                 "of the real destination. Change it on a drained node only: sessions hold blocks "
@@ -1795,7 +1795,7 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
     ]
 
     def local_subnet_layout(self) -> LocalSubnetLayout:
-        """How this node cuts its LOCAL pool into per-session blocks (BEP-1062)."""
+        """How this node cuts its LOCAL pool into per-session blocks (BEP-1078)."""
         return LocalSubnetLayout.parse(self.local_network_pool, self.local_network_block_size)
 
 
