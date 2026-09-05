@@ -27,6 +27,7 @@ from ai.backend.common.network.keys import (
 from ai.backend.common.network.types import (
     DEFAULT_VNI_RANGE,
     DEFAULT_VXLAN_PORT,
+    OVERLAY_ENCRYPTION_PROFILE,
     AgentNetworkCaps,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -86,10 +87,15 @@ def compute_caps(*, tunnel_offload: bool, readiness: Readiness | None = None) ->
     node that cannot serve the backend still gets handed sessions that fail on it alone.
     """
     findings = readiness or Readiness()
+    can_serve = findings.can_serve_overlay
     return AgentNetworkCaps(
         tunnel_offload=tunnel_offload,
-        backends=["vxlan"] if findings.can_serve_overlay else [],
+        backends=["vxlan"] if can_serve else [],
         readiness=findings.problems,
+        # Only alongside the backend. The profile says this node can hold up its end of an
+        # encrypted tunnel, and a node that cannot serve the overlay at all -- no `u32`, no
+        # `policy` match -- cannot hold up an encrypted one either.
+        encryption_profiles=[OVERLAY_ENCRYPTION_PROFILE] if can_serve else [],
     )
 
 

@@ -2522,7 +2522,6 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         )
 
     @override
-    @override
     async def withdraw_session_network(self, session_id: str) -> None:
         """Give up this node's OWNERSHIP of a session without touching the shared data plane.
 
@@ -2841,93 +2840,92 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         if meta.encryption_key is None:
             return True
         sa = (self_vtep, peer_vtep)
-        if True:
-            observed_generation = self._key_generation()
-            generation = max(
-                observed_generation,
-                self._pair_active_generations.get(sa, observed_generation),
-            )
-            target_generations = (generation - 1, generation, generation + 1)
-            target_slots = {
-                target_generation % _KEYRING_SIZE: target_generation
-                for target_generation in target_generations
-            }
-            slot_generations = self._pair_slot_generations.setdefault(sa, {})
-            if (
-                sa in self._programmed_pairs
-                and key in self._programmed_policies
-                and slot_generations == target_slots
-                and not force
-            ):
-                return True  # another session on this node already programmed this pair
-            try:
-                for target_generation in target_generations:
-                    slot = target_generation % _KEYRING_SIZE
-                    add_args = xfrm_state_add_args(
-                        self_vtep,
-                        peer_vtep,
-                        meta.encryption_key,
-                        generation=target_generation,
-                    )
-                    if slot_generations.get(slot) == target_generation:
-                        if force:
-                            for args in add_args:
-                                await self._run_xfrm(args)
-                        continue
-
-                    # A Linux XFRM state update does not replace AEAD key material reliably. The
-                    # stale generation in this slot is outside the accepted three-generation
-                    # window, so delete it and create the slot with the new key instead. A missing
-                    # delete is harmless; a failed delete followed by EEXIST on add is surfaced,
-                    # never downgraded to an in-place update with the old key.
-                    #
-                    # Filtered, like every other SA delete: `ip xfrm state del` resolves the SA by
-                    # (dst, spi, proto) and ignores the src it is given, so a delete written for
-                    # this pair removes another peer's SA when the two derived the same SPI. A
-                    # skipped delete leaves the add to fail with EEXIST, which fails this pair
-                    # closed -- which is the right end for a collision we cannot program through.
-                    for del_args in await self._own_sa_deletes(
-                        xfrm_state_del_args(self_vtep, peer_vtep, generation=target_generation),
-                        None,
-                    ):
-                        try:
-                            await self._runner(del_args)
-                        except RuntimeError:
-                            pass
-                    for args in add_args:
-                        await self._runner(args)
-                    slot_generations[slot] = target_generation
-
-                # Switch outbound traffic only after every receiving generation is installed. The
-                # exact SPI makes the policy select the current generation, while adjacent nodes
-                # whose clocks straddle the boundary can still receive previous/next traffic.
-                for args in xfrm_policy_add_args(
+        observed_generation = self._key_generation()
+        generation = max(
+            observed_generation,
+            self._pair_active_generations.get(sa, observed_generation),
+        )
+        target_generations = (generation - 1, generation, generation + 1)
+        target_slots = {
+            target_generation % _KEYRING_SIZE: target_generation
+            for target_generation in target_generations
+        }
+        slot_generations = self._pair_slot_generations.setdefault(sa, {})
+        if (
+            sa in self._programmed_pairs
+            and key in self._programmed_policies
+            and slot_generations == target_slots
+            and not force
+        ):
+            return True  # another session on this node already programmed this pair
+        try:
+            for target_generation in target_generations:
+                slot = target_generation % _KEYRING_SIZE
+                add_args = xfrm_state_add_args(
                     self_vtep,
                     peer_vtep,
-                    dstport=meta.vxlan_port,
-                    generation=generation,
+                    meta.encryption_key,
+                    generation=target_generation,
+                )
+                if slot_generations.get(slot) == target_generation:
+                    if force:
+                        for args in add_args:
+                            await self._run_xfrm(args)
+                    continue
+
+                # A Linux XFRM state update does not replace AEAD key material reliably. The
+                # stale generation in this slot is outside the accepted three-generation
+                # window, so delete it and create the slot with the new key instead. A missing
+                # delete is harmless; a failed delete followed by EEXIST on add is surfaced,
+                # never downgraded to an in-place update with the old key.
+                #
+                # Filtered, like every other SA delete: `ip xfrm state del` resolves the SA by
+                # (dst, spi, proto) and ignores the src it is given, so a delete written for
+                # this pair removes another peer's SA when the two derived the same SPI. A
+                # skipped delete leaves the add to fail with EEXIST, which fails this pair
+                # closed -- which is the right end for a collision we cannot program through.
+                for del_args in await self._own_sa_deletes(
+                    xfrm_state_del_args(self_vtep, peer_vtep, generation=target_generation),
+                    None,
                 ):
+                    try:
+                        await self._runner(del_args)
+                    except RuntimeError:
+                        pass
+                for args in add_args:
                     await self._runner(args)
-                self._pair_active_generations[sa] = generation
-            except Exception:
-                self._programmed_pairs.discard(sa)
-                self._programmed_policies.discard(key)
-                # The SA/policy belongs to every session between this node pair. A partial rekey
-                # can affect all of them, so holding down only the session that happened to run
-                # this reconcile would leave its siblings open on uncertain shared state.
-                for user_session_id in sorted(self._pair_users.get(sa, set())):
-                    if (user_meta := self._sessions.get(user_session_id)) is not None:
-                        await self._close_tunnel(
-                            user_meta,
-                            user_session_id,
-                            f"the shared ESP pair for {peer_vtep} failed to rekey",
-                        )
-                raise
-            # Only now. Anything that raised above left the pair unmarked, so the next reconcile
-            # retries it -- and the FDB entry that would have carried clear text was never
-            # appended, because add_peer programs before it opens the path.
-            self._programmed_pairs.add(sa)
-            self._programmed_policies.add(key)
+                slot_generations[slot] = target_generation
+
+            # Switch outbound traffic only after every receiving generation is installed. The
+            # exact SPI makes the policy select the current generation, while adjacent nodes
+            # whose clocks straddle the boundary can still receive previous/next traffic.
+            for args in xfrm_policy_add_args(
+                self_vtep,
+                peer_vtep,
+                dstport=meta.vxlan_port,
+                generation=generation,
+            ):
+                await self._runner(args)
+            self._pair_active_generations[sa] = generation
+        except Exception:
+            self._programmed_pairs.discard(sa)
+            self._programmed_policies.discard(key)
+            # The SA/policy belongs to every session between this node pair. A partial rekey
+            # can affect all of them, so holding down only the session that happened to run
+            # this reconcile would leave its siblings open on uncertain shared state.
+            for user_session_id in sorted(self._pair_users.get(sa, set())):
+                if (user_meta := self._sessions.get(user_session_id)) is not None:
+                    await self._close_tunnel(
+                        user_meta,
+                        user_session_id,
+                        f"the shared ESP pair for {peer_vtep} failed to rekey",
+                    )
+            raise
+        # Only now. Anything that raised above left the pair unmarked, so the next reconcile
+        # retries it -- and the FDB entry that would have carried clear text was never
+        # appended, because add_peer programs before it opens the path.
+        self._programmed_pairs.add(sa)
+        self._programmed_policies.add(key)
         return True
 
     async def _unprogram_encryption(
