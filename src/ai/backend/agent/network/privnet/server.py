@@ -96,10 +96,18 @@ _FAIL_CLOSE_RETRY_INTERVAL = 30.0
 #: How often to retry a recovery that could not complete. Same reasoning as above:
 #: what is being waited for is a runtime or filesystem coming back, not a race.
 _RECOVERY_RETRY_INTERVAL = 30.0
-#: The longest one request may hold the node-wide barrier. Well above any real operation -- each
-#: privileged command is capped far lower and a request runs a handful of them -- and finite so
-#: that a request which finds a new way to block cannot stop the whole node.
-_REQUEST_TIMEOUT_SEC = 300.0
+#: The longest one request may take, WAITING FOR THE BARRIER INCLUDED. Well above any real
+#: operation -- each privileged command is capped far lower and a request runs a handful of them.
+#:
+#: Deliberately below the agent client's own deadline (`client._CALL_TIMEOUT_SEC`). Above it, the
+#: agent gives up first and the privnet goes on working: the RPC says the operation failed while
+#: the host state says it succeeded, minutes later, and nothing reconciles the two. Below it, the
+#: server is always the one that decides, and the agent sees the answer it decided on.
+_REQUEST_TIMEOUT_SEC = 90.0
+#: The longest a recovery pass may hold the barrier. Larger than a request because it works
+#: through every session on the node, and finite for the same reason: nothing else runs while it
+#: does. What it does not finish stays on the books and the timer brings it back.
+_RECOVERY_TIMEOUT_SEC = 240.0
 #: Verbs that only read. They skip the node-wide mutation barrier, because nothing they do can
 #: race a recovery pass and a readiness probe must not wait on one.
 _READ_ONLY_OPS = frozenset({
@@ -489,12 +497,27 @@ class PrivNetServer:
         "What still needs it" is every live session when the first pass could not read its inputs
         at all, and the sessions that failed individually otherwise.
         """
-        async with self._mutation_lock:
-            await self._retry_recovery_locked()
+        try:
+            async with asyncio.timeout(_RECOVERY_TIMEOUT_SEC):
+                async with self._mutation_lock:
+                    await self._retry_recovery_locked()
+        except TimeoutError:
+            # It holds the barrier for its whole run, so a pass that will not finish is a node
+            # that serves nothing. What it did not get to is still on the books -- that is what
+            # the markers are for -- and the timer brings it back.
+            log.error(
+                "the privnet recovery pass exceeded {}s; releasing the node-wide lock and leaving"
+                " the rest for the next attempt",
+                _RECOVERY_TIMEOUT_SEC,
+            )
+            self._recovery_failed = (
+                f"a recovery pass did not finish within {_RECOVERY_TIMEOUT_SEC:.0f}s"
+            )
 
     async def _retry_recovery_locked(self) -> None:
         try:
             live = await self._live_containers()
+            owned = await self._owned_containers()
             journalled_sessions = await self._journal.sessions()
             journalled_attachments = await self._journal.attachments()
             journalled_peers = await self._journal.peers()
@@ -510,7 +533,7 @@ class PrivNetServer:
         # Recomputed every pass, and BEFORE the rebind: a session running here that this privnet
         # has no record of is not something a later pass may forget, and its VNI must not be
         # pruned on the strength of a journal that does not mention it.
-        orphans = self._orphaned_live_sessions(live, journalled_sessions)
+        orphans = self._orphaned_live_sessions(owned, journalled_sessions)
         unbound = await self._rebind_journalled(journalled_sessions, prune=not orphans)
         # Gone from the journal since the failure: another verb finished the job, and holding the
         # marker would keep this timer running for something that no longer exists.
@@ -531,11 +554,7 @@ class PrivNetServer:
                 continue
             await self._reclaim_dead_container(container_id, record, journalled_sessions)
         pending = (
-            {
-                session_id
-                for session_id, cfg in journalled_sessions.items()
-                if any(sid == session_id for sid in live.values())
-            }
+            {session_id for session_id in journalled_sessions if session_id in set(owned.values())}
             if never_adopted
             else set(self._unrecovered_sessions)
         )
@@ -556,7 +575,7 @@ class PrivNetServer:
                         session_id,
                         journalled_sessions[session_id],
                         journalled_peers.get(session_id),
-                        live,
+                        owned,
                         journalled_attachments,
                     )
                     self._sessions[session_id].built = True
@@ -571,7 +590,11 @@ class PrivNetServer:
                 except Exception as e:
                     self._unrecovered_sessions[session_id] = str(e)
                     continue
-                self._unrecovered_sessions.pop(session_id, None)
+                # BOTH markers. A session that came back is recorded as an unreclaimed dead one
+                # too, and the sweep below skips it for being in `_sessions` -- so that marker
+                # outlived the thing it described and kept the node reporting itself unrecovered
+                # over a session it had fully taken back.
+                self._now_managed(session_id)
                 log.info("privnet recovered session {} on a later attempt", session_id)
         self._unrecovered_sessions.update(orphans)
         if self._unrecovered_sessions:
@@ -609,7 +632,7 @@ class PrivNetServer:
                     )
                 except _ReclaimDeferred as e:
                     self._unreclaimed_sessions[session_id] = str(e)
-                    if session_id in set((await self._live_containers()).values()):
+                    if session_id in set((await self._owned_containers()).values()):
                         # Alive again. It is not a dead session at all, so the next pass must
                         # ADOPT it rather than keep asking whether it may be deleted.
                         self._unrecovered_sessions[session_id] = str(e)
@@ -776,6 +799,7 @@ class PrivNetServer:
                 self._start_fail_close_retry(backend)
         try:
             live = await self._live_containers()
+            owned = await self._owned_containers()
             journalled_sessions = await self._journal.sessions()
             journalled_attachments = await self._journal.attachments()
             journalled_peers = await self._journal.peers()
@@ -799,7 +823,7 @@ class PrivNetServer:
         self._recovery_failed = None
         # Before the rebind, because its prune's premise is that the journal is the whole list of
         # what this agent owns -- and an orphan is exactly a counterexample.
-        orphans = self._orphaned_live_sessions(live, journalled_sessions)
+        orphans = self._orphaned_live_sessions(owned, journalled_sessions)
         self._unrecovered_sessions = dict(orphans)
         unbound = await self._rebind_journalled(journalled_sessions, prune=not orphans)
         if not journalled_sessions and not journalled_attachments:
@@ -807,10 +831,10 @@ class PrivNetServer:
             self._unreclaimed_sessions.clear()
             return
 
+        # Ours to adopt: journalled here AND running under a container this agent owns. A
+        # co-located agent's container of the same session is not a reason for us to take it back.
         live_sessions = {
-            session_id
-            for session_id, cfg in journalled_sessions.items()
-            if any(sid == session_id for sid in live.values())
+            session_id for session_id in journalled_sessions if session_id in set(owned.values())
         }
         log.info(
             "recovering {} live session(s) of {} journalled; {} container(s) still running",
@@ -843,7 +867,7 @@ class PrivNetServer:
                     session_id,
                     journalled_sessions[session_id],
                     journalled_peers.get(session_id),
-                    live,
+                    owned,
                     journalled_attachments,
                 )
                 # `_rebind_journalled` already re-bound this VNI and recorded it as built (or it
@@ -1015,8 +1039,29 @@ class PrivNetServer:
         )
 
     async def _live_containers(self) -> dict[str, str]:
-        """``{container_id: session_id}`` for every container the backend still runs for us."""
+        """``{container_id: session_id}`` for every kernel container on this NODE.
+
+        Every one, not just this agent's. Use it to answer "would deleting this take something
+        that is running?" -- never "is this mine to adopt".
+        """
         return {cid: c.session_id for cid, c in (await self._runtime.live_sessions()).items()}
+
+    async def _owned_containers(self) -> dict[str, str]:
+        """``{container_id: session_id}`` for the containers THIS agent owns.
+
+        The two scopes answer different questions and conflating them is what let one agent adopt
+        another's session on a shared host: the adopting privnet then held the VNI binding, the ESP
+        pair claim and the watchdog responsibility for containers it does not run, and kept holding
+        them after the real owner had gone.
+
+        A container whose owner the runtime cannot name is nobody's: it is not adopted here, and
+        `_live_containers` still stops anything from deleting it.
+        """
+        return {
+            cid: c.session_id
+            for cid, c in (await self._runtime.live_sessions()).items()
+            if c.owner_agent_id == self._agent_id
+        }
 
     def _meta_of(self, session_id: str, raw_config: dict[str, Any]) -> SessionNetMeta:
         cfg = policy.validate_network_config(raw_config)
@@ -1322,26 +1367,29 @@ class PrivNetServer:
             # recovery pass that is busy re-adopting a node's worth of sessions.
             async with self._session_locked(session_id):
                 return await self._dispatch_locked(req, session_id)
-        # Global first, then per-session: the recovery retry takes them in that order too.
-        async with self._mutation_lock, self._session_locked(session_id):
-            try:
-                async with asyncio.timeout(_REQUEST_TIMEOUT_SEC):
+        try:
+            # The deadline covers WAITING for the barrier as well as holding it. Started after the
+            # acquire, a request queued behind a long recovery pass had no deadline at all -- the
+            # part of its life it is most likely to spend.
+            async with asyncio.timeout(_REQUEST_TIMEOUT_SEC):
+                # Global first, then per-session: the recovery retry takes them in that order too.
+                async with self._mutation_lock, self._session_locked(session_id):
                     return await self._dispatch_locked(req, session_id)
-            except TimeoutError:
-                # A backstop, not the primary defence: every command and lock wait beneath this is
-                # already bounded. What it guarantees is that the node-wide barrier is always
-                # given back -- one request that found a new way to block would otherwise stop
-                # every attach, teardown and peer update on this node for as long as it runs.
-                log.error(
-                    "privnet op {} for session {} exceeded {}s; releasing the node-wide lock",
-                    req.op,
-                    session_id,
-                    _REQUEST_TIMEOUT_SEC,
-                )
-                return PrivNetResponse(
-                    ok=False,
-                    error=f"the operation did not finish within {_REQUEST_TIMEOUT_SEC:.0f}s",
-                )
+        except TimeoutError:
+            # A backstop, not the primary defence: every command and lock wait beneath this is
+            # already bounded. What it guarantees is that the node-wide barrier is always given
+            # back -- one request that found a new way to block would otherwise stop every attach,
+            # teardown and peer update on this node for as long as it runs.
+            log.error(
+                "privnet op {} for session {} exceeded {}s; releasing the node-wide lock",
+                req.op,
+                session_id,
+                _REQUEST_TIMEOUT_SEC,
+            )
+            return PrivNetResponse(
+                ok=False,
+                error=f"the operation did not finish within {_REQUEST_TIMEOUT_SEC:.0f}s",
+            )
 
     async def _dispatch_locked(self, req: PrivNetRequest, session_id: str) -> PrivNetResponse:
         try:
