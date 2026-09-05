@@ -1744,7 +1744,8 @@ class PrivNetServer:
             return
         binding = self._binding_of(session_id, None)
         if binding is None:
-            await self._withdraw_bound(session_id, entry)
+            await self._release_backend_ownership(entry, session_id)
+            await self._forget_withdrawn(session_id)
             return
         vni, digest = binding
         async with self._vni_registry.releasing(vni, self._agent_id, session_id, digest) as freed:
@@ -1766,19 +1767,34 @@ class PrivNetServer:
                     )
                     + "; the session has not been let go"
                 )
-        # Outside, so it runs only if the claim actually went: `releasing` drops the claim when the
-        # block RETURNS and raises when it could not. Dropping the journal record and the session
-        # entry inside would leave the retry nothing to work from -- it would find no entry, return
-        # success, and the stale claim would refuse this VNI until the next restart.
-        await self._withdraw_bound(session_id, entry)
+            # INSIDE. The backend gives up the ESP pair claims and the watchdog responsibility,
+            # and it can legitimately refuse -- a pair whose last claim is ours, a journal it
+            # cannot read, a lock it cannot take. Done after the block, its failure left the VNI
+            # claim already committed while everything else stayed: the retry then found no
+            # binding of its own, which `releasing` answers with None, and refused before ever
+            # reaching the backend again. It never converged.
+            #
+            # Raising here keeps the VNI claim, so the retry starts from the same place it did.
+            await self._release_backend_ownership(entry, session_id)
+        # Outside, so it runs only once the VNI claim has actually gone: `releasing` commits when
+        # the block RETURNS and raises when it could not. Dropping the journal record and the
+        # session entry inside would leave that failure with nothing to retry from -- the next
+        # attempt would find no entry, return success, and the stale claim would refuse this VNI
+        # until the next restart.
+        await self._forget_withdrawn(session_id)
 
-    async def _withdraw_bound(self, session_id: str, entry: _SessionEntry) -> None:
-        """Let go of a session, with its VNI binding already released."""
+    async def _release_backend_ownership(self, entry: _SessionEntry, session_id: str) -> None:
+        """Give up the ESP pair claims and the watchdog's belief that this session is ours."""
         backend = self._backends.get(str(entry.meta.backend))
         if backend is not None:
             await backend.withdraw_session_network(session_id)
-        # The journal too, or the next restart reads it back and re-adopts a session this node has
-        # given up -- taking its ESP pair claim and its watchdog responsibility with it.
+
+    async def _forget_withdrawn(self, session_id: str) -> None:
+        """Drop this process's record of a session it has let go of.
+
+        The journal too, or the next restart reads it back and re-adopts a session this node has
+        given up -- taking its ESP pair claim and its watchdog responsibility with it.
+        """
         await self._journal.forget_session(session_id)
         self._sessions.pop(session_id, None)
 
@@ -1826,14 +1842,19 @@ class PrivNetServer:
                     vni,
                 )
                 withdraw_instead = True
+                if entry is not None:
+                    # Inside, for the same reason the data-plane teardown is: it can refuse, and
+                    # its failure must keep the VNI claim rather than leave this node holding
+                    # everything else with no binding to retry from.
+                    await self._release_backend_ownership(entry, session_id)
             else:
                 # Inside, because this deletes the host's devices and the claim is what says we
                 # may: the answer must not go stale between being given and being acted on.
                 await self._teardown_data_plane(session_id, entry, raw_config)
         # Both paths reach here only if the claim went. Anything that drops our record of the
         # session belongs after that, or a failed unlink leaves nothing for the retry to use.
-        if withdraw_instead and entry is not None:
-            await self._withdraw_bound(session_id, entry)
+        if withdraw_instead:
+            await self._forget_withdrawn(session_id)
             return
         await self._journal.forget_session(session_id)
 
