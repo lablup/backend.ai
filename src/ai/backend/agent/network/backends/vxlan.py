@@ -79,6 +79,9 @@ Runner = Callable[[Sequence[str]], Awaitable[None]]
 #: Runs a command and returns its stdout. Separate from ``Runner`` because the firewall
 #: needs to READ its own rule order to keep it, and every other command here only writes.
 Reader = Callable[[Sequence[str]], Awaitable[str]]
+#: Every network namespace on the host, or None when that could not be established -- which
+#: is a different answer from "there are none", and the caller acts on the difference.
+NetnsLister = Callable[[], Awaitable[list[str] | None]]
 MtuProbe = Callable[[str], Awaitable[int | None]]
 # (bridge, target_ip, target_mac) -> answered? / None when the probe could not run.
 ReachProbe = Callable[[str, str, str], Awaitable[bool | None]]
@@ -383,7 +386,9 @@ _PROBE_NETNS_PREFIX: Final = "bai-encprobe-"
 _probe_lock = asyncio.Lock()
 
 
-async def probe_encryption_support(runner: Runner, reader: Reader) -> list[str]:
+async def probe_encryption_support(
+    runner: Runner, reader: Reader, *, netns_lister: NetnsLister | None = None
+) -> list[str]:
     """What would stop this node holding up its end of an ESP tunnel, found out by trying.
 
     Installs the SA pair and the outbound policy this backend really installs -- same algorithm,
@@ -395,73 +400,94 @@ async def probe_encryption_support(runner: Runner, reader: Reader) -> list[str]:
 
     In a THROWAWAY NETWORK NAMESPACE, which is the whole safety argument. Run in the host's
     namespace it installed real XFRM objects at addresses nothing forbids a cluster from using as
-    VTEPs -- and its cleanup deleted them by name, without checking it had created them, every
-    sixty seconds. Two nodes whose VTEPs happened to be these would have had their SAs and their
-    policy removed under them on a timer. Nothing this probe touches is reachable from the host's
-    state, so there is nothing to check ownership of and nothing to lock against.
+    VTEPs -- and its cleanup deleted them by name, without checking it had created them. Nothing
+    this probe touches is reachable from the host's state, so there is nothing to check ownership
+    of and nothing to lock against.
+
+    And it makes NOTHING it cannot account for. A capability refresh runs this every minute, so a
+    node where `ip netns del` fails, or where the namespace list cannot be read at all, would add
+    one namespace a minute for as long as it ran -- reporting each, which turns an unbounded leak
+    into a well-documented unbounded leak. So a probe that cannot first clear what earlier ones
+    left, or cannot tell whether there is anything to clear, does not build: it says why, and the
+    node reads as unable to encrypt until somebody fixes the host.
 
     Needs CAP_NET_ADMIN and CAP_SYS_ADMIN, so on a privnet-backed node it runs THERE and the answer
     is carried back over the socket -- the agent that asks holds neither.
     """
+    lister = netns_lister or _list_netns
     async with _probe_lock:
-        stale = await _reap_probe_netns(runner, reader)
+        existing = await lister()
+        if existing is None:
+            return [
+                "this node cannot list its network namespaces, so it cannot tell what previous"
+                " overlay encryption probes left behind; it will not add another until it can."
+            ]
+        if unreaped := await _reap_probe_netns(runner, _stale_probe_netns(existing)):
+            return unreaped
         netns = f"{_PROBE_NETNS_PREFIX}{os.getpid()}-{secrets.token_hex(4)}"
         try:
             await runner(["ip", "netns", "add", netns])
         except (RuntimeError, OSError) as e:
             return [
-                *stale,
                 f"this node cannot create a network namespace to test overlay encryption in ({e}),"
-                " so whether it could carry an encrypted session is unknown.",
+                " so whether it could carry an encrypted session is unknown."
             ]
         try:
-            return [*stale, *await _probe_in_netns(runner, reader, netns)]
+            return await _probe_in_netns(runner, reader, netns)
         finally:
             try:
                 await runner(["ip", "netns", "del", netns])
             except (RuntimeError, OSError) as e:
-                # The next probe reaps it. Reported by that one rather than this: what this call
-                # was asked is whether the node can encrypt, and it found that out.
+                # The next probe reaps it, and refuses to build if it cannot. Reported there
+                # rather than here: what this call was asked is whether the node can encrypt, and
+                # it found that out.
                 log.warning("could not remove the encryption probe namespace {}: {}", netns, e)
 
 
-async def _reap_probe_netns(runner: Runner, reader: Reader) -> list[str]:
-    """Remove probe namespaces left behind, and report any that will not go.
+async def _list_netns() -> list[str] | None:
+    """Every network namespace name `ip` knows about, or None if that could not be established.
 
-    A probe runs every time capabilities are refreshed -- once a minute on a busy agent -- so a
-    removal that keeps failing, or a SIGKILL between creating one and removing it, accumulates
-    namespaces for as long as the node runs. Reaping before the next probe rather than after the
-    last one is what makes a killed process's leftovers somebody's responsibility.
-
-    Only namespaces whose process is gone, plus our own: the pid in the name is what tells a
-    co-located agent's live probe from a dead one's remains, and `_probe_lock` is what makes our
-    own safe -- inside it, no other probe of this process is running.
+    None and "there are none" are different answers and the caller acts on the difference, which
+    is why this does not go through the ordinary reader: that one reports a command that failed
+    and a command that printed nothing the same way.
     """
     try:
-        listing = await reader(["ip", "netns", "list"])
-    except (RuntimeError, OSError) as e:
-        log.warning("could not list network namespaces to reap old encryption probes: {}", e)
-        return []
+        rc, out, _ = await command.run(["ip", "netns", "list"], capture_stderr=False)
+    except (OSError, command.CommandTimeout):
+        return None
+    if rc != 0:
+        return None
+    # `ip netns list` prints `<name>` or `<name> (id: N)` per line.
+    return [line.split()[0] for line in out.decode(errors="replace").splitlines() if line.split()]
+
+
+async def _reap_probe_netns(runner: Runner, stale: Sequence[str]) -> list[str]:
+    """Remove the probe namespaces nobody is behind, and report any that will not go.
+
+    Reaping before the next probe rather than after the last one is what makes a killed process's
+    leftovers somebody's responsibility.
+    """
     problems: list[str] = []
-    for name in _stale_probe_netns(listing):
+    for name in stale:
         try:
             await runner(["ip", "netns", "del", name])
         except (RuntimeError, OSError) as e:
             problems.append(
                 f"this node has a leftover encryption probe namespace {name} that will not go"
-                f" ({e}); they accumulate for as long as that is true."
+                f" ({e}); no further probe will run until it does, so they cannot accumulate."
             )
     return problems
 
 
-def _stale_probe_netns(listing: str) -> list[str]:
-    """The probe namespaces in an `ip netns list` that are nobody's any more.
+def _stale_probe_netns(names: Sequence[str]) -> list[str]:
+    """The probe namespaces that are nobody's any more.
 
-    `ip netns list` prints `<name>` or `<name> (id: N)` per line.
+    Only ones whose process is gone, plus our own: the pid in the name is what tells a co-located
+    agent's live probe from a dead one's remains, and `_probe_lock` is what makes our own safe --
+    inside it, no other probe of this process is running.
     """
     stale: list[str] = []
-    for line in listing.splitlines():
-        name = line.split()[0] if line.split() else ""
+    for name in names:
         if not name.startswith(_PROBE_NETNS_PREFIX):
             continue
         _, _, suffix = name.partition(_PROBE_NETNS_PREFIX)
