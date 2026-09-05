@@ -1,13 +1,16 @@
 import logging
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, override
+from typing import Any, Final, Literal, override
 
+from ai.backend.common.data.storage.types import VolumeName
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.config.unified import StorageProxyConfig
 from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ai.backend.storage.volumes.abc import (
     CAP_FAST_FS_SIZE,
@@ -17,12 +20,20 @@ from ai.backend.storage.volumes.abc import (
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
+from ai.backend.storage.volumes.health.abc import AbstractBackendProber
+from ai.backend.storage.volumes.health.types import (
+    BackendProbeResult,
+    BackendStatus,
+    VolumeHealthRecord,
+)
 from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient
 
 from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
 from .types import GPFSSystemHealthState
+
+_UNHEALTHY_NODE_STATES: Final = ("FAILED", "DEGRADED", "ERROR")
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -138,6 +149,35 @@ class GPFSOpModel(BaseFSOpModel):
         )
 
 
+class GPFSBackendProber(AbstractBackendProber):
+    """Asks the nodes for their health, without the reports `get_hwinfo()` also gathers."""
+
+    _client: GPFSAPIClient
+
+    def __init__(self, client: GPFSAPIClient) -> None:
+        self._client = client
+
+    @override
+    async def probe(self) -> BackendProbeResult:
+        degraded: GPFSSystemHealthState | None = None
+        for node in await self._client.list_nodes():
+            for node_health_status in await self._client.get_node_health(node):
+                if node_health_status.state in _UNHEALTHY_NODE_STATES:
+                    degraded = node_health_status
+                    break
+        if degraded is None:
+            return BackendProbeResult(status=BackendStatus.HEALTHY, checked_at=datetime.now(UTC))
+        return BackendProbeResult(
+            status=(
+                BackendStatus.DEGRADED
+                if degraded.state == "DEGRADED"
+                else BackendStatus.UNAVAILABLE
+            ),
+            checked_at=datetime.now(UTC),
+            status_info=f"node {degraded.component} reports {degraded.state}",
+        )
+
+
 class GPFSVolume(BaseVolume):
     name = "gpfs"
     api_client: GPFSAPIClient
@@ -149,6 +189,8 @@ class GPFSVolume(BaseVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        volume_name: VolumeName,
+        storage_proxy_config: StorageProxyConfig,
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
@@ -158,6 +200,8 @@ class GPFSVolume(BaseVolume):
         super().__init__(
             local_config,
             mount_path,
+            volume_name=volume_name,
+            storage_proxy_config=storage_proxy_config,
             etcd=etcd,
             options=options,
             event_dispatcher=event_dispatcher,
@@ -203,9 +247,13 @@ class GPFSVolume(BaseVolume):
         return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
 
     @override
+    def create_backend_prober(self, record: VolumeHealthRecord) -> GPFSBackendProber:
+        return GPFSBackendProber(self.api_client)
+
+    @override
     async def get_hwinfo(self) -> HardwareMetadata:
         nodes = await self.api_client.list_nodes()
-        invalid_status = ["FAILED", "DEGRADED", "ERROR"]
+        invalid_status = _UNHEALTHY_NODE_STATES
         health_status: str | GPFSSystemHealthState = "HEALTHY"
 
         for node in nodes:

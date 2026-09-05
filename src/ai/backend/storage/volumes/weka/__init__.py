@@ -9,11 +9,13 @@ from typing import Any, override
 
 import aiofiles.os
 
+from ai.backend.common.data.storage.types import VolumeName
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.config.unified import StorageProxyConfig
 from ai.backend.storage.errors import VolumeNotInitializedError
 from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaUsage
 from ai.backend.storage.volumes.abc import (
@@ -22,6 +24,12 @@ from ai.backend.storage.volumes.abc import (
     CAP_QUOTA,
     CAP_VFOLDER,
     AbstractQuotaModel,
+)
+from ai.backend.storage.volumes.health.abc import AbstractBackendProber
+from ai.backend.storage.volumes.health.types import (
+    BackendProbeResult,
+    BackendStatus,
+    VolumeHealthRecord,
 )
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient
@@ -118,6 +126,26 @@ class WekaQuotaModel(BaseQuotaModel):
         await aiofiles.os.rmdir(qspath)
 
 
+class WekaBackendProber(AbstractBackendProber):
+    """Asks the cluster for its health, without the reports `get_hwinfo()` also gathers."""
+
+    _client: WekaAPIClient
+
+    def __init__(self, client: WekaAPIClient) -> None:
+        self._client = client
+
+    @override
+    async def probe(self) -> BackendProbeResult:
+        health_status = (await self._client.check_health()).lower()
+        if health_status == "ok":
+            return BackendProbeResult(status=BackendStatus.HEALTHY, checked_at=datetime.now(UTC))
+        return BackendProbeResult(
+            status=BackendStatus.DEGRADED,
+            checked_at=datetime.now(UTC),
+            status_info=health_status,
+        )
+
+
 class WekaVolume(BaseVolume):
     api_client: WekaAPIClient
 
@@ -130,6 +158,8 @@ class WekaVolume(BaseVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        volume_name: VolumeName,
+        storage_proxy_config: StorageProxyConfig,
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
@@ -139,6 +169,8 @@ class WekaVolume(BaseVolume):
         super().__init__(
             local_config,
             mount_path,
+            volume_name=volume_name,
+            storage_proxy_config=storage_proxy_config,
             etcd=etcd,
             options=options,
             event_dispatcher=event_dispatcher,
@@ -171,6 +203,10 @@ class WekaVolume(BaseVolume):
     @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC, CAP_FAST_FS_SIZE])
+
+    @override
+    def create_backend_prober(self, record: VolumeHealthRecord) -> WekaBackendProber:
+        return WekaBackendProber(self.api_client)
 
     @override
     async def get_hwinfo(self) -> HardwareMetadata:

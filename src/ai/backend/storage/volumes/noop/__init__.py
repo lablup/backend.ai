@@ -3,10 +3,12 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, override
 
+from ai.backend.common.data.storage.types import VolumeName
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_BACKEND_TYPE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
+from ai.backend.storage.config.unified import StorageProxyConfig
 from ai.backend.storage.types import (
     CapacityUsage,
     DirEntry,
@@ -25,6 +27,8 @@ from ai.backend.storage.volumes.abc import (
     AbstractQuotaModel,
     AbstractVolume,
 )
+from ai.backend.storage.volumes.health.probers import AliveMountProber, HealthyBackendProber
+from ai.backend.storage.volumes.health.types import VolumeHealthRecord
 
 
 async def _return_empty_dir_entry() -> AsyncIterator[DirEntry]:
@@ -131,8 +135,16 @@ class NoopFSOpModel(AbstractFSOpModel):
         return BinarySize(0)
 
 
-class NoopVolume(AbstractVolume):
+class NoopVolume(AbstractVolume[AliveMountProber, HealthyBackendProber]):
     name = NOOP_STORAGE_BACKEND_TYPE
+
+    @override
+    def create_mount_prober(self) -> AliveMountProber:
+        return AliveMountProber()
+
+    @override
+    def create_backend_prober(self, record: VolumeHealthRecord) -> HealthyBackendProber:
+        return HealthyBackendProber()
 
     @override
     def info(self) -> VolumeInfo:
@@ -316,6 +328,7 @@ class NoopVolume(AbstractVolume):
 
 
 def init_noop_volume(
+    storage_proxy_config: StorageProxyConfig,
     etcd: AsyncEtcd,
     event_dispatcher: EventDispatcher,
     event_producer: EventProducer,
@@ -323,6 +336,8 @@ def init_noop_volume(
     return NoopVolume(
         {},
         Path(),
+        volume_name=VolumeName(NOOP_STORAGE_BACKEND_TYPE),
+        storage_proxy_config=storage_proxy_config,
         etcd=etcd,
         event_dispatcher=event_dispatcher,
         event_producer=event_producer,

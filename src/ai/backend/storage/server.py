@@ -737,7 +737,9 @@ async def server_main(
             volume_stats_state=volume_stats_state,
             backends={**DEFAULT_BACKENDS},
             volumes={
-                NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
+                NOOP_STORAGE_VOLUME_NAME: init_noop_volume(
+                    local_config.storage_proxy, etcd, event_dispatcher, event_producer
+                )
             },
             artifact_verifier_ctx=ArtifactVerifierContext(),
         )

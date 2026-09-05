@@ -53,6 +53,12 @@ from ai.backend.storage.volumes.abc import (
     AbstractQuotaModel,
     AbstractVolume,
 )
+from ai.backend.storage.volumes.health.abc import AbstractBackendProber
+from ai.backend.storage.volumes.health.probers import (
+    MountDerivedBackendProber,
+    PathMountProber,
+)
+from ai.backend.storage.volumes.health.types import VolumeHealthRecord
 from ai.backend.storage.watcher import DeletePathTask, WatcherClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -403,7 +409,7 @@ class BaseFSOpModel(AbstractFSOpModel):
         return BinarySize.finite_from_str(used_bytes)
 
 
-class BaseVolume(AbstractVolume):
+class BaseVolume(AbstractVolume[PathMountProber, AbstractBackendProber]):
     name = "vfs"
 
     @override
@@ -432,10 +438,20 @@ class BaseVolume(AbstractVolume):
         return frozenset([CAP_VFOLDER])
 
     @override
+    def create_mount_prober(self) -> PathMountProber:
+        return PathMountProber(self.volume_name, self.mount_path)
+
+    @override
+    def create_backend_prober(self, record: VolumeHealthRecord) -> AbstractBackendProber:
+        # For a local filesystem the appliance is the mount itself.
+        return MountDerivedBackendProber(record)
+
+    @override
     async def get_hwinfo(self) -> HardwareMetadata:
+        result = await self._backend_prober.probe()
         return {
-            "status": "healthy",
-            "status_info": None,
+            "status": result.status.to_hwinfo_status(),
+            "status_info": result.status_info,
             "metadata": {},
         }
 
