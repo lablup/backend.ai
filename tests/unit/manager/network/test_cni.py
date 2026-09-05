@@ -6,6 +6,7 @@ delegated to etcd and verified separately against a live cluster. CNINetworkPlug
 create/destroy remain contract guards until P2 fills them in.
 """
 
+import asyncio
 import ipaddress
 import json
 from typing import Any, cast
@@ -708,7 +709,11 @@ class TestAllocationOwnership:
         assert await allocator.acquire("s2") == subnet
 
         assert await allocator.release(subnet, "s1") is False
-        assert any(v == json.dumps({"session_id": "s2"}) for v in etcd.store.values())
+        assert any(
+            json.loads(v).get("session_id") == "s2"
+            for k, v in etcd.store.items()
+            if k.startswith("network/ipam/allocated/")
+        )
 
     async def test_releasing_a_subnet_it_owns_succeeds(self) -> None:
         etcd = FakeEtcd()
@@ -875,3 +880,103 @@ class TestEncryptingOnlyWhereEveryNodeCan:
             options={"forced_backend": "vxlan", "member_agents": ["a1"], "encryption": False},
         )
         assert info.options["encryption_key"] is None
+
+
+def _pool_claims(etcd: FakeEtcd) -> list[str]:
+    """Every subnet/VNI claim standing in the shared pool."""
+    return sorted(
+        key
+        for key in etcd.store
+        if key.startswith(("network/ipam/allocated/", "network/ipam/vni/"))
+    )
+
+
+class TestCreatingTheSameSessionTwice:
+    """A session start that fails downstream is retried with the same session id.
+
+    The retry must land on the allocation the first attempt made. A second subnet and VNI would
+    be claimed by a session that no longer references them, and `destroy_network` releases only
+    what the meta records -- so the first pair would stay allocated for the cluster's lifetime.
+    """
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    async def test_the_retry_gets_the_same_subnet_vni_and_address(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        first = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        second = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        assert second.options["subnet"] == first.options["subnet"]
+        assert second.options["vni"] == first.options["vni"]
+        assert second.options["endpoint_ips"] == first.options["endpoint_ips"]
+
+    async def test_it_claims_nothing_further_from_the_pool(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        after_first = _pool_claims(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        assert _pool_claims(etcd) == after_first
+
+    async def test_a_kernel_added_between_the_attempts_still_gets_an_address(self) -> None:
+        # The first attempt assigned k1 only; the retry carries both kernels.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        second = await plugin.create_network(
+            identifier="s1",
+            options={
+                "forced_backend": "vxlan",
+                "endpoints": [
+                    {"container_id": "k1", "agent_id": "a1"},
+                    {"container_id": "k2", "agent_id": "a2"},
+                ],
+            },
+        )
+        ips = second.options["endpoint_ips"]
+        assert set(ips) == {"k1", "k2"}
+        assert ips["k1"] != ips["k2"]
+
+
+class TestACreateThatNeverFinished:
+    async def test_cancellation_gives_the_subnet_and_vni_back(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        started = asyncio.Event()
+
+        async def never_returns(session_id: str) -> int:
+            started.set()
+            await asyncio.sleep(60)
+            raise AssertionError("unreachable")
+
+        plugin._vni_allocator.acquire = never_returns  # type: ignore[method-assign]
+        task = asyncio.create_task(
+            plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+        )
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        # `except Exception` would have let the cancellation past the rollback.
+        assert _pool_claims(etcd) == []
+
+    async def test_a_subnet_left_claimed_is_reused_not_orphaned(self) -> None:
+        # The rollback itself can fail (etcd unreachable), leaving the block claimed with no
+        # session meta pointing at it. The next attempt must recognise its own claim.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        stranded = await plugin._subnet_allocator.acquire("s1")
+        info = await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+        assert info.options["subnet"] == stranded
+        assert len([k for k in etcd.store if k.startswith("network/ipam/allocated/")]) == 1
+
+    async def test_a_vni_left_claimed_is_reused_not_orphaned(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        stranded = await plugin._vni_allocator.acquire("s1")
+        info = await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+        assert info.options["vni"] == stranded
+        assert len([k for k in etcd.store if k.startswith("network/ipam/vni/")]) == 1
