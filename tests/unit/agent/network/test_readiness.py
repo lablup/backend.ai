@@ -7,6 +7,11 @@ the kernel, and the attribute line carries a bare `fan-map` token between the id
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
+import ai.backend.agent.network.readiness as readiness
 from ai.backend.agent.network.caps import compute_caps
 from ai.backend.agent.network.readiness import (
     Readiness,
@@ -133,3 +138,53 @@ class TestUnreadableDevicesAreNotSilence:
             [VxlanDevice("flannel.1", 4097, 4789)], port=4789, vni_range=(4096, 16777215)
         )
         assert len(found) == 1
+
+
+class TestWhetherThisNodeCanEncryptAtAll:
+    """The generic checks -- ip, bridge, iptables, u32 -- say nothing about ESP. A kernel with no
+    XFRM or no AES-GCM passes every one of them and then cannot install a single SA, so a node
+    advertising the encryption profile off the back of them claimed something nobody looked at."""
+
+    def test_a_kernel_without_xfrm_cannot(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(readiness, "_XFRM_STAT", Path("/nonexistent/xfrm_stat"))
+        problems = readiness._encryption_problems()
+        assert any("XFRM" in p for p in problems)
+
+    def test_a_kernel_without_the_aead_cannot(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        crypto = tmp_path / "crypto"
+        crypto.write_text("name         : cbc(aes)\ndriver       : cbc-aes-aesni\n")
+        monkeypatch.setattr(readiness, "_PROC_CRYPTO", crypto)
+        problems = readiness._encryption_problems()
+        assert any("rfc4106(gcm(aes))" in p for p in problems)
+
+    def test_an_unreadable_crypto_list_is_not_a_yes(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setattr(readiness, "_PROC_CRYPTO", tmp_path / "gone")
+        assert readiness._encryption_problems()
+
+    def test_a_kernel_with_both_can(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        stat = tmp_path / "xfrm_stat"
+        stat.write_text("XfrmInError 0\n")
+        crypto = tmp_path / "crypto"
+        crypto.write_text("name         : rfc4106(gcm(aes))\ndriver       : rfc4106-gcm-aesni\n")
+        monkeypatch.setattr(readiness, "_XFRM_STAT", stat)
+        monkeypatch.setattr(readiness, "_PROC_CRYPTO", crypto)
+        assert readiness._encryption_problems() == []
+
+    def test_the_two_answers_are_separate(self) -> None:
+        # A cluster may legitimately run unencrypted on a kernel with no ESP, so "cannot encrypt"
+        # must not read as "cannot serve the overlay".
+        findings = Readiness(encryption_blocking=("this kernel has no XFRM framework",))
+        assert findings.can_serve_overlay is True
+        assert findings.can_encrypt_overlay is False
+
+    def test_a_node_that_cannot_serve_cannot_encrypt_either(self) -> None:
+        findings = Readiness(blocking=("iptables has no `u32` match",))
+        assert findings.can_encrypt_overlay is False
+
+    def test_the_reason_is_published(self) -> None:
+        findings = Readiness(encryption_blocking=("this kernel has no XFRM framework",))
+        assert "this kernel has no XFRM framework" in findings.problems

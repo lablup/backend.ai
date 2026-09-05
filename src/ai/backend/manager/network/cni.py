@@ -30,6 +30,7 @@ from ai.backend.common.network.types import (
     VXLAN_OVERHEAD,
     Member,
     NetworkBackendKind,
+    OverlayEncryptionPolicy,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import (
@@ -153,11 +154,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # between the same pair of nodes share one policy and a per-session key was a promise
             # the data plane could not keep (see overlay_encryption_key). It still travels in the
             # session meta, exactly like the VNI, so the agents need no second source.
-            encrypt = backend is NetworkBackendKind.VXLAN and self._encryption_enabled(options)
+            policy = self._encryption_policy(options)
+            encrypt = (
+                backend is NetworkBackendKind.VXLAN
+                and policy is not OverlayEncryptionPolicy.DISABLED
+            )
             if encrypt:
-                encrypt = await self._nodes_can_encrypt(
-                    etcd, member_agents, demanded=options.get("encryption") is True
-                )
+                encrypt = await self._nodes_can_encrypt(etcd, member_agents, policy=policy)
             encryption_key = await overlay_encryption_key(etcd) if encrypt else None
             if backend is NetworkBackendKind.VXLAN:
                 vni = await self._vni_allocator.acquire(session_id)
@@ -340,31 +343,39 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             )
         return forced_backend if forced_backend is not None else NetworkBackendKind.VXLAN
 
-    def _encryption_enabled(self, options: dict[str, Any]) -> bool:
-        """Whether to encrypt this session's overlay.
+    def _encryption_policy(self, options: dict[str, Any]) -> OverlayEncryptionPolicy:
+        """What this session's overlay must be, and what to do when a node cannot manage it.
 
-        ON unless something says otherwise. A multi-node session's traffic crosses the operator's
-        underlay as plain VXLAN otherwise -- readable, and injectable, by anything on the path
-        between two nodes -- and a default that has to be found in the documentation is a default
-        that is not set. The cost is the ESP overhead in the overlay MTU and the per-packet
-        AES-GCM, which the hardware of any node running these sessions does in silicon.
+        REQUIRED by default. A multi-node session's traffic crosses the operator's underlay as
+        plain VXLAN otherwise -- readable, and injectable, by anything on the path between two
+        nodes -- and a default that has to be found in the documentation is a default that is not
+        set.
 
-        A per-network request wins, so a caller can turn it off for one session; failing that the
-        operator's ``overlay-encryption`` plugin setting applies, and only an explicit ``false``
-        turns it off cluster-wide.
+        Three values rather than a boolean, because "encrypt this" and "encrypt this if you can"
+        are different instructions and a boolean cannot hold both. An operator who wrote `true`
+        meaning "these sessions are confidential" was handed plain VXLAN and a log line when one
+        agent turned out to be old, which is the shape of failure this whole design exists to
+        refuse: quiet, and on the node nobody was watching.
 
-        A node that cannot encrypt refuses the session rather than carrying it in clear text (see
-        the agent's readiness probe and `OverlayEncryptionUnavailable`), so turning this on makes
-        the `u32` and `policy` iptables matches a requirement on every node that runs multi-node
-        sessions.
+        - ``required`` (also ``true``, and the default): encrypt, and refuse the session if any
+          node it lands on cannot. What a security requirement means.
+        - ``prefer``: encrypt where every node can, and fall back to plain VXLAN with the reason
+          in the log where they cannot. The rolling-upgrade setting, chosen deliberately.
+        - ``disabled`` (also ``false``): never encrypt.
+
+        A per-network ``encryption`` option overrides it for one session: ``True`` is ``required``,
+        ``False`` is ``disabled``. Nothing asks for ``prefer`` per session -- a caller either needs
+        confidentiality or does not.
         """
         requested = options.get("encryption")
         if requested is not None:
-            return bool(requested)
-        return bool(self.plugin_config.get("overlay-encryption", True))
+            return (
+                OverlayEncryptionPolicy.REQUIRED if requested else OverlayEncryptionPolicy.DISABLED
+            )
+        return OverlayEncryptionPolicy.parse(self.plugin_config.get("overlay-encryption"))
 
     async def _nodes_can_encrypt(
-        self, etcd: AsyncEtcd, member_agents: list[str], *, demanded: bool
+        self, etcd: AsyncEtcd, member_agents: list[str], *, policy: OverlayEncryptionPolicy
     ) -> bool:
         """Whether every node this session lands on speaks the overlay encryption profile.
 
@@ -373,19 +384,19 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         not happen -- an operator turned it on once its nodes were ready. Now it is what a rolling
         upgrade produces on its own, so it is checked.
 
-        A caller that ASKED for encryption gets an error: it stated a requirement this cluster
-        cannot meet. The default falls back to an unencrypted overlay with the reason in the log,
-        because refusing would mean a manager upgrade alone stops every multi-node session on a
-        cluster whose agents have not been upgraded yet.
+        Under ``required`` a node that cannot is an error naming the node. Only ``prefer`` falls
+        back, and only because somebody asked for that.
         """
         reason = await members_can_encrypt(etcd, member_agents)
         if reason is None:
             return True
-        if demanded:
+        if policy is OverlayEncryptionPolicy.REQUIRED:
             raise NetworkBackendMismatch(
-                f"this session asked for an encrypted overlay, and {reason}"
+                f"this session's overlay must be encrypted, and {reason}. Upgrade that agent, or"
+                " set the network plugin's `overlay-encryption` to 'prefer' to allow an"
+                " unencrypted overlay while the cluster is mid-upgrade."
             )
         log.warning(
-            "creating this session's overlay UNENCRYPTED although the default is on: {}", reason
+            "creating this session's overlay UNENCRYPTED under the 'prefer' policy: {}", reason
         )
         return False

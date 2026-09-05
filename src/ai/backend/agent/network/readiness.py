@@ -13,6 +13,7 @@ import logging
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final
 
 from ai.backend.agent.errors.network import UndescribableVxlanDevice
@@ -117,6 +118,47 @@ def foreign_conflicts(
     return problems
 
 
+#: Present exactly when the kernel has the XFRM framework compiled in. Reading it needs no
+#: privilege, which matters: on a privnet-backed node this probe runs in the AGENT, which holds no
+#: CAP_NET_ADMIN and so cannot ask netlink the same question.
+#: The AEAD every overlay SA is built with; the backend programs this exact string.
+_ESP_AEAD = "rfc4106(gcm(aes))"
+_XFRM_STAT = Path("/proc/net/xfrm_stat")
+#: Every algorithm the kernel's crypto API can instantiate, one `name : <value>` line each.
+_PROC_CRYPTO = Path("/proc/crypto")
+
+
+def _encryption_problems() -> list[str]:
+    """What would stop this node holding up its end of an ESP tunnel.
+
+    Static, not functional: it reads what the kernel says it has rather than installing an SA and
+    watching a packet. A real self-test would need CAP_NET_ADMIN and a namespace to do it in, and
+    on a privnet-backed node this code runs in the agent, which has neither. What it does catch is
+    the two ways a node genuinely cannot do this -- no XFRM in the kernel, no AES-GCM in its
+    crypto API -- which is what a node advertising the profile would otherwise have claimed.
+    """
+    problems: list[str] = []
+    if not _XFRM_STAT.exists():
+        problems.append(
+            "this kernel has no XFRM framework (/proc/net/xfrm_stat is absent), so it cannot"
+            " install the ESP state an encrypted overlay is built from."
+        )
+    try:
+        crypto = _PROC_CRYPTO.read_text()
+    except OSError:
+        problems.append(
+            "this node's /proc/crypto cannot be read, so whether the kernel offers"
+            f" {_ESP_AEAD} for the overlay's ESP cannot be established."
+        )
+    else:
+        if _ESP_AEAD not in crypto:
+            problems.append(
+                f"this kernel's crypto API does not offer {_ESP_AEAD}, which is the AEAD every"
+                " overlay SA is built with."
+            )
+    return problems
+
+
 async def _binary_present(name: str) -> bool:
     try:
         await command.run([name, "-V"], capture_stderr=False)
@@ -205,14 +247,22 @@ class Readiness:
 
     blocking: tuple[str, ...] = ()
     advisory: tuple[str, ...] = ()
+    #: What would stop this node from ENCRYPTING one. A superset of `blocking` in effect -- a node
+    #: that cannot carry an overlay cannot carry an encrypted one -- but reported apart, because a
+    #: cluster may legitimately run unencrypted on a kernel with no ESP.
+    encryption_blocking: tuple[str, ...] = ()
 
     @property
     def problems(self) -> list[str]:
-        return [*self.blocking, *self.advisory]
+        return [*self.blocking, *self.advisory, *self.encryption_blocking]
 
     @property
     def can_serve_overlay(self) -> bool:
         return not self.blocking
+
+    @property
+    def can_encrypt_overlay(self) -> bool:
+        return not self.blocking and not self.encryption_blocking
 
 
 async def probe_readiness(
@@ -228,6 +278,7 @@ async def probe_readiness(
     scheduled here and fails on one node with it buried in a create-time traceback.
     """
     blocking: list[str] = []
+    encryption_blocking = _encryption_problems()
     for binary in _REQUIRED_BINARIES:
         if not await _binary_present(binary):
             blocking.append(
@@ -281,7 +332,11 @@ async def probe_readiness(
             " VNI range cannot be ruled out here. Check by hand before co-hosting another"
             " overlay."
         )
-    return Readiness(blocking=tuple(blocking), advisory=tuple(advisory))
+    return Readiness(
+        blocking=tuple(blocking),
+        advisory=tuple(advisory),
+        encryption_blocking=tuple(encryption_blocking),
+    )
 
 
 async def conflicting_device(*, port: int, vni: int) -> str | None:
