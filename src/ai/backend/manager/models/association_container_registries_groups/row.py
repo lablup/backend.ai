@@ -30,12 +30,22 @@ class AssociationContainerRegistriesGroupsRow(Base):
     registry_id: Mapped[ContainerRegistryID] = mapped_column(
         "registry_id",
         GUID(ContainerRegistryID),
-        sa.ForeignKey("container_registries.id", ondelete="CASCADE"),
+        # Named explicitly: the naming convention would generate a 75-character name,
+        # over PostgreSQL's 63-character limit.
+        sa.ForeignKey(
+            "container_registries.id",
+            ondelete="CASCADE",
+            name="fk_association_container_registries_groups_registry_id",
+        ),
         nullable=False,
     )
     group_id: Mapped[ProjectID] = mapped_column(
         "group_id",
         GUID(ProjectID),
-        sa.ForeignKey("groups.id", ondelete="CASCADE"),
+        sa.ForeignKey(
+            "groups.id",
+            ondelete="CASCADE",
+            name="fk_association_container_registries_groups_group_id",
+        ),
         nullable=False,
     )

@@ -15,8 +15,11 @@ branch_labels = None
 depends_on = None
 
 TABLE = "association_container_registries_groups"
-FK_REGISTRY = f"fk_{TABLE}_registry_id_container_registries"
-FK_PROJECT = f"fk_{TABLE}_group_id_groups"
+# Shortened from the metadata naming convention, which would generate a 75-character
+# name for the registry key — over PostgreSQL's 63-character limit. The Row declaration
+# names both keys the same way.
+FK_REGISTRY = f"fk_{TABLE}_registry_id"
+FK_PROJECT = f"fk_{TABLE}_group_id"
 
 
 def upgrade() -> None:

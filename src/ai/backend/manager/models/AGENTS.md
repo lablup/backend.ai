@@ -62,6 +62,18 @@ live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
 - `IDColumn()`, `SessionIDColumn()` and `KernelIDColumn()` in `models/base.py` stay on v4:
   old migrations reproduce past schemas through them. Do not use them for a new table.
 
+## Constraint names
+
+- Leave a constraint unnamed and let the naming convention in `models/base.py` name it.
+- Past 63 characters — PostgreSQL's identifier limit — SQLAlchemy truncates the generated
+  name with a 4-character md5 suffix, leaving an unreadable one
+  (`fk_..._registry_id__4a21`). A foreign key joining two long table names lands there.
+  Name those explicitly with `sa.ForeignKey(..., name=...)`, within 63 characters.
+  Precedent: `association_container_registries_groups`.
+- A constraint named explicitly carries that same string into the migration. A Row
+  declaration and a migration that disagree leave a freshly created database and a
+  migrated one with different constraint names.
+
 ## Custom column types
 
 - Where possible, reuse the existing `TypeDecorator` wrappers in `models/base.py`.
