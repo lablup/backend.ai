@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -7,7 +9,10 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.data.entity.storage_backend import StorageBackendID
 from ai.backend.common.data.entity.storage_volume import StorageVolumeID
-from ai.backend.common.data.storage.types import ServiceStorageStatus
+from ai.backend.common.data.storage.types import (
+    DEFAULT_STATUS_STALE_AFTER,
+    ServiceStorageStatus,
+)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -59,6 +64,13 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
     is_default: Mapped[bool] = mapped_column(
         "is_default", sa.Boolean, nullable=False, server_default=sa.false()
     )
+    # How long this may go without a fresh check before its status counts as stale.
+    status_stale_after: Mapped[timedelta] = mapped_column(
+        "status_stale_after",
+        sa.Interval,
+        nullable=False,
+        server_default=sa.text(f"'{int(DEFAULT_STATUS_STALE_AFTER.total_seconds())} seconds'"),
+    )
 
 
 class ServiceStorageVolumeRow(LifecycleTimestampsMixin, Base):
@@ -80,10 +92,11 @@ class ServiceStorageVolumeRow(LifecycleTimestampsMixin, Base):
     )
     mount_path: Mapped[str] = mapped_column("mount_path", sa.String, nullable=False)
     status: Mapped[ServiceStorageStatus] = mapped_column(
-        "status",
-        StrEnumType(ServiceStorageStatus),
-        nullable=False,
-        server_default=ServiceStorageStatus.HEALTHY.value,
+        "status", StrEnumType(ServiceStorageStatus), nullable=False
+    )
+    # When the service measured ``status``, not when its heartbeat delivered it.
+    status_checked_at: Mapped[datetime] = mapped_column(
+        "status_checked_at", sa.DateTime(timezone=True), nullable=False
     )
 
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import enum
+from datetime import timedelta
+from typing import Final
 
 from pydantic import ConfigDict
 
@@ -59,6 +61,11 @@ class ArtifactStorageImportStep(enum.StrEnum):
     DOWNLOAD = "download"
     VERIFY = "verify"
     ARCHIVE = "archive"
+
+
+# How long a backend or volume may go without a fresh check before it counts as stale.
+# The per-row ``status_stale_after`` column overrides it; this is only its default.
+DEFAULT_STATUS_STALE_AFTER: Final[timedelta] = timedelta(hours=1)
 
 
 class ServiceStorageStatus(enum.StrEnum):

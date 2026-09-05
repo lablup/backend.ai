@@ -1,7 +1,7 @@
 """add the storage volume and backend schema
 
 Revision ID: c7d2fb1e5a90
-Revises: d5b3f8c26a41
+Revises: c7a4f1e9b023
 Create Date: 2026-09-04
 
 """
@@ -17,7 +17,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "c7d2fb1e5a90"
-down_revision = "d5b3f8c26a41"
+down_revision = "c7a4f1e9b023"
 branch_labels = None
 depends_on = None
 
@@ -71,6 +71,13 @@ def upgrade() -> None:
         sa.Column("supports_fast_fs_size", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("supports_fast_scan", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("supports_fast_size", sa.Boolean(), server_default=sa.false(), nullable=False),
+        sa.Column("status_check_enabled", sa.Boolean(), server_default=sa.true(), nullable=False),
+        sa.Column(
+            "status_stale_after",
+            sa.Interval(),
+            server_default=sa.text("'3600 seconds'"),
+            nullable=False,
+        ),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_storage_backends")),
         sa.UniqueConstraint("name", name=op.f("uq_storage_backends_name")),
@@ -80,9 +87,8 @@ def upgrade() -> None:
         "service_storage_backends",
         sa.Column("service_catalog_id", GUID(), nullable=False),
         sa.Column("storage_backend_id", GUID(), nullable=False),
-        sa.Column(
-            "status", sa.String(length=64), server_default=sa.text("'healthy'"), nullable=False
-        ),
+        sa.Column("status", sa.String(length=64), nullable=False),
+        sa.Column("status_checked_at", sa.DateTime(timezone=True), nullable=False),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint(
             "service_catalog_id",
@@ -109,6 +115,13 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=64), nullable=False),
         sa.Column("storage_backend_id", GUID(), nullable=False),
         sa.Column("is_default", sa.Boolean(), server_default=sa.false(), nullable=False),
+        sa.Column("status_check_enabled", sa.Boolean(), server_default=sa.true(), nullable=False),
+        sa.Column(
+            "status_stale_after",
+            sa.Interval(),
+            server_default=sa.text("'3600 seconds'"),
+            nullable=False,
+        ),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_storage_volumes")),
         sa.UniqueConstraint("name", name=op.f("uq_storage_volumes_name")),
@@ -132,9 +145,8 @@ def upgrade() -> None:
         sa.Column("service_catalog_id", GUID(), nullable=False),
         sa.Column("storage_volume_id", GUID(), nullable=False),
         sa.Column("mount_path", sa.String(), nullable=False),
-        sa.Column(
-            "status", sa.String(length=64), server_default=sa.text("'healthy'"), nullable=False
-        ),
+        sa.Column("status", sa.String(length=64), nullable=False),
+        sa.Column("status_checked_at", sa.DateTime(timezone=True), nullable=False),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint(
             "service_catalog_id",
