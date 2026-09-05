@@ -6,10 +6,12 @@ cluster (see the module docstring of path_mtu.py for the measured numbers).
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 
 import pytest
 
+from ai.backend.agent.network import command, path_mtu
 from ai.backend.agent.network.path_mtu import parse_route_mtus, underlay_mtu
 
 # Captured verbatim from `ip -4 route show default dev eth0` inside a pod on each CNI.
@@ -110,3 +112,34 @@ class TestUnderlayMtu:
 
         await underlay_mtu("eth0", peer_ip="10.0.0.2", read_command=read_command, read_dev_mtu=dev)
         assert seen == [["ip", "-4", "route", "get", "10.0.0.2"]]
+
+
+class TestARouteQueryThatNeverReturns:
+    """It runs inside a session setup, which in privnet mode holds the node-wide barrier. Its own
+    subprocess had no deadline at all: privnet-side the request deadline eventually cut the caller
+    loose and left the child running against the host, and in-process nothing bounded it."""
+
+    async def test_it_gives_up_and_kills_the_command(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        killed = asyncio.Event()
+
+        class _Wedged:
+            returncode = None
+
+            async def communicate(self) -> tuple[bytes, bytes]:
+                await asyncio.Event().wait()
+                raise AssertionError("unreachable")
+
+            def kill(self) -> None:
+                killed.set()
+
+            async def wait(self) -> int:
+                return -9
+
+        async def _spawn(*argv: str, **kwargs: object) -> _Wedged:
+            return _Wedged()
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _spawn)
+        monkeypatch.setattr(command, "DEFAULT_TIMEOUT_SEC", 0.05)
+        with pytest.raises(RuntimeError, match="timed out"):
+            await path_mtu._read_command(["ip", "route", "get", "10.0.0.2"])
+        assert killed.is_set()
