@@ -140,6 +140,21 @@ class LocalNode:
         return await _exec(self._name, argv, argv, check=check, limit_sec=self._limit_sec)
 
 
+SSH_TRANSPORT_RETRIES = 3
+SSH_RETRY_DELAY_SEC = 1.0
+
+
+def is_transport_failure(result: CommandResult) -> bool:
+    """Whether ssh itself failed to run the command, rather than the command failing.
+
+    ssh exits 255 for its own errors and passes any other exit code through from the remote
+    command, so 255 with nothing written is the connection dropping -- which one dual-homed node
+    on a busy rig does often enough to fail a run that found nothing wrong. A remote command that
+    genuinely exits 255 says something while doing it.
+    """
+    return result.returncode == 255 and not result.stdout and not result.stderr
+
+
 class SshNode:
     """A peer node reached over SSH.
 
@@ -173,9 +188,16 @@ class SshNode:
         return ["ssh", *self._ssh_options, self._target, "--", shlex.join(argv)]
 
     async def run(self, argv: list[str], *, check: bool = True) -> CommandResult:
-        return await _exec(
-            self._name, argv, self.wire_argv(argv), check=check, limit_sec=self._limit_sec
-        )
+        for remaining in reversed(range(SSH_TRANSPORT_RETRIES)):
+            result = await _exec(
+                self._name, argv, self.wire_argv(argv), check=False, limit_sec=self._limit_sec
+            )
+            if not (remaining and is_transport_failure(result)):
+                if check:
+                    result.check()
+                return result
+            await asyncio.sleep(SSH_RETRY_DELAY_SEC)
+        raise AssertionError("unreachable")
 
 
 class SudoNode:
