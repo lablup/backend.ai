@@ -25,12 +25,12 @@ those. Both are consulted and the smaller wins.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+from ai.backend.agent.network import command
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -52,12 +52,18 @@ def parse_route_mtus(output: str) -> list[int]:
 
 
 async def _read_command(argv: list[str]) -> str:
-    proc = await asyncio.create_subprocess_exec(
-        *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
-    )
-    out, _ = await proc.communicate()
-    if proc.returncode != 0:
-        raise RuntimeError(f"{' '.join(argv)} exited {proc.returncode}")
+    """One `ip route` read, through the shared runner.
+
+    Its own subprocess had no deadline. In privnet mode the request deadline eventually cut the
+    caller loose but left the child running against the host; in-process there was no deadline at
+    all, and a setup could wait on it forever.
+    """
+    try:
+        rc, out, _ = await command.run(argv, capture_stderr=False)
+    except command.CommandTimeout as e:
+        raise RuntimeError(f"{' '.join(argv)}: {e}") from e
+    if rc != 0:
+        raise RuntimeError(f"{' '.join(argv)} exited {rc}")
     return out.decode(errors="replace")
 
 

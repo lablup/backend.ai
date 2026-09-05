@@ -1473,12 +1473,12 @@ class TestDeferredRecovery:
         async with _Harness(runtime, state_dir=tmp_path) as h:
             await h.setup("s1")
 
-        async def _boom() -> dict[str, str]:
+        async def _boom() -> tuple[dict[str, str], dict[str, str]]:
             raise RuntimeError("containerd was unreachable")
 
         # A second daemon over the same state, whose first inventory read fails.
         async with _Harness(_StubRuntime(live={"c1": "s1"}), state_dir=tmp_path) as h2:
-            monkeypatch.setattr(h2.server, "_live_containers", _boom)
+            monkeypatch.setattr(h2.server, "_live_and_owned", _boom)
             await h2.server.recover()
             assert h2.server._recovery_failed is not None
 
@@ -2604,17 +2604,17 @@ class TestARecheckThatSaysOtherwiseIsDebt:
         """The runtime says nothing is running when the pass reads its snapshot, and says it is
         back by the time the pass acts on it.
 
-        Both scopes, because the pass asks two different questions of them: whether deleting would
-        take something running, and whether this agent should be adopting it instead."""
+        One listing gives both scopes, so this moves them together -- which is the point: two
+        snapshots that disagree about the same container are the bug the single read fixed."""
         calls = 0
 
-        async def _changing() -> dict[str, str]:
+        async def _changing() -> tuple[dict[str, str], dict[str, str]]:
             nonlocal calls
             calls += 1
-            return {} if calls <= 2 else dict(live)
+            snapshot = {} if calls == 1 else dict(live)
+            return snapshot, snapshot
 
-        monkeypatch.setattr(harness.server, "_live_containers", _changing)
-        monkeypatch.setattr(harness.server, "_owned_containers", _changing)
+        monkeypatch.setattr(harness.server, "_live_and_owned", _changing)
 
     async def test_a_container_that_came_back_stays_on_the_books(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -2654,14 +2654,14 @@ class TestARecheckThatSaysOtherwiseIsDebt:
         ) as h2:
             calls = 0
 
-            async def _fails_the_second_time() -> dict[str, str]:
+            async def _fails_the_second_time() -> tuple[dict[str, str], dict[str, str]]:
                 nonlocal calls
                 calls += 1
                 if calls > 1:
                     raise RuntimeError("containerd went away")
-                return {}
+                return {}, {}
 
-            monkeypatch.setattr(h2.server, "_live_containers", _fails_the_second_time)
+            monkeypatch.setattr(h2.server, "_live_and_owned", _fails_the_second_time)
             await h2.server._retry_recovery()
             assert "c1" in h2.server._unreclaimed_containers
 
@@ -2878,3 +2878,96 @@ class TestASessionTakenBackOwesNothingAsADeadOne:
             restarted.server._unrecovered_sessions["s1"] = "it came back"
             await restarted.server._retry_recovery()
             assert restarted.server._recovery_pending() is False
+
+
+class TestAStaleRecordOfSomebodyElsesSession:
+    """A session this agent journalled and no longer runs, whose containers are now another
+    agent's. Its devices are not ours to delete and it is not ours to adopt -- but the journal
+    record, the VNI binding and the recovery debt are ours, and nothing else will ever drop them.
+    Deferring left this agent reporting itself unrecovered, timer running, for as long as the
+    other agent's session lived."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    async def _ours_then_theirs(self, tmp_path: Path) -> _Harness:
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-a"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as first:
+            await first.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+        return first
+
+    async def test_our_record_of_it_goes(self, tmp_path: Path) -> None:
+        await self._ours_then_theirs(tmp_path)
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-b"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as restarted:
+            assert "s1" not in await restarted.journal.sessions()
+
+    async def test_its_devices_do_not(self, tmp_path: Path) -> None:
+        await self._ours_then_theirs(tmp_path)
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-b"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as restarted:
+            assert restarted.backend.teardown_calls == []
+            assert restarted.backend.adopt_calls == []
+
+    async def test_the_vni_binding_goes_with_it(self, tmp_path: Path) -> None:
+        await self._ours_then_theirs(tmp_path)
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-b"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as restarted:
+            assert {h.agent_id for h in await restarted.vni_registry.holders(4138)} == set()
+
+    async def test_the_node_stops_reporting_itself_unrecovered(self, tmp_path: Path) -> None:
+        await self._ours_then_theirs(tmp_path)
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-b"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as restarted:
+            assert restarted.server.recovery_problems() == {}
+            assert restarted.server._recovery_pending() is False
+
+
+class TestOneSnapshotForBothScopes:
+    """Two listings disagree about the same container: one that ends between them is present in
+    the first and absent from the second, so its attachment is skipped as live while its session
+    is classified as dead -- and the session's devices go while its attachment record and the
+    address it leases stay behind with nothing naming them."""
+
+    async def test_they_come_from_one_listing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            calls = 0
+            original = h.server._runtime.live_sessions
+
+            async def _counted() -> Mapping[str, LiveContainer]:
+                nonlocal calls
+                calls += 1
+                return await original()
+
+            monkeypatch.setattr(h.server._runtime, "live_sessions", _counted)
+            live, owned = await h.server._live_and_owned()
+            assert calls == 1
+            assert live == owned == {"c1": "s1"}
+
+    async def test_an_unowned_container_is_live_but_not_ours(self, tmp_path: Path) -> None:
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-b"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as h:
+            live, owned = await h.server._live_and_owned()
+            assert live == {"c1": "s1"}
+            assert owned == {}, "it would be adopted, and its VNI and claims taken with it"

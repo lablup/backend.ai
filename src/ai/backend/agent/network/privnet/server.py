@@ -147,13 +147,20 @@ class _Liveness(enum.Enum):
     """What the runtime says about something a recovery pass is about to delete."""
 
     GONE = "gone"
-    LIVE = "live"
+    #: Running again under a container THIS agent owns.
+    OURS = "ours"
+    #: Running under a container another agent on this host owns. Its devices are not ours to
+    #: delete and its session is not ours to adopt -- but our own stale record of it is ours to
+    #: drop, and nothing else will ever do it.
+    FOREIGN = "foreign"
     UNKNOWN = "unknown"
 
     @property
     def reason(self) -> str:
-        if self is _Liveness.LIVE:
+        if self is _Liveness.OURS:
             return "it is running again; this pass must adopt it rather than reclaim it"
+        if self is _Liveness.FOREIGN:
+            return "another agent on this host is running it"
         return "the runtime could not be asked whether it is still gone"
 
 
@@ -403,10 +410,24 @@ class PrivNetServer:
                 self._locks.pop(session_id, None)
 
     async def serve_forever(self) -> None:
-        await self._runtime.open()
-        # Before the socket exists, so no request can race the rebuild and be refused for a session
-        # this privnet is about to remember.
-        await self.recover()
+        # Both under a deadline, and both before the socket exists -- which is the point: nothing
+        # can race the rebuild, and nothing can reach this node while it is stuck opening a
+        # runtime that will not answer. Stuck is fail-closed, but a node that never finishes
+        # starting is a node that serves nothing, forever, with no way to say so.
+        try:
+            async with asyncio.timeout(_RECOVERY_TIMEOUT_SEC):
+                await self._runtime.open()
+                await self.recover()
+        except TimeoutError:
+            log.error(
+                "privnet startup recovery did not finish within {}s; serving with what it has and"
+                " retrying the rest",
+                _RECOVERY_TIMEOUT_SEC,
+            )
+            self._recovery_failed = (
+                f"startup recovery did not finish within {_RECOVERY_TIMEOUT_SEC:.0f}s"
+            )
+            self._start_recovery_retry()
         sock_path = Path(self._socket_path)
         if sock_path.exists():
             sock_path.unlink()
@@ -516,8 +537,7 @@ class PrivNetServer:
 
     async def _retry_recovery_locked(self) -> None:
         try:
-            live = await self._live_containers()
-            owned = await self._owned_containers()
+            live, owned = await self._live_and_owned()
             journalled_sessions = await self._journal.sessions()
             journalled_attachments = await self._journal.attachments()
             journalled_peers = await self._journal.peers()
@@ -632,7 +652,7 @@ class PrivNetServer:
                     )
                 except _ReclaimDeferred as e:
                     self._unreclaimed_sessions[session_id] = str(e)
-                    if session_id in set((await self._owned_containers()).values()):
+                    if session_id in set((await self._live_and_owned())[1].values()):
                         # Alive again. It is not a dead session at all, so the next pass must
                         # ADOPT it rather than keep asking whether it may be deleted.
                         self._unrecovered_sessions[session_id] = str(e)
@@ -798,8 +818,7 @@ class PrivNetServer:
                 # nothing ever asks.
                 self._start_fail_close_retry(backend)
         try:
-            live = await self._live_containers()
-            owned = await self._owned_containers()
+            live, owned = await self._live_and_owned()
             journalled_sessions = await self._journal.sessions()
             journalled_attachments = await self._journal.attachments()
             journalled_peers = await self._journal.peers()
@@ -1038,30 +1057,30 @@ class PrivNetServer:
             "a container of this session is running on this node, but this privnet has no journal record of it",
         )
 
+    async def _live_and_owned(self) -> tuple[dict[str, str], dict[str, str]]:
+        """``(every kernel container on this NODE, the subset this agent owns)``, from ONE listing.
+
+        The two scopes answer different questions -- "would deleting this take something that is
+        running?" and "is this mine to adopt?" -- and taking them from two listings makes them
+        disagree about the same container. Measured shape: a container that ends between the two
+        reads is present in the first and absent from the second, so its attachment is skipped as
+        live while its session is classified as dead, and the session's devices go while its
+        attachment record and the address it leases stay behind with nothing naming them.
+
+        A container whose owner the runtime cannot name is nobody's: not adopted here, and still
+        counted in the first scope, which is what stops anything deleting it.
+        """
+        live: dict[str, str] = {}
+        owned: dict[str, str] = {}
+        for container_id, container in (await self._runtime.live_sessions()).items():
+            live[container_id] = container.session_id
+            if container.owner_agent_id == self._agent_id:
+                owned[container_id] = container.session_id
+        return live, owned
+
     async def _live_containers(self) -> dict[str, str]:
-        """``{container_id: session_id}`` for every kernel container on this NODE.
-
-        Every one, not just this agent's. Use it to answer "would deleting this take something
-        that is running?" -- never "is this mine to adopt".
-        """
-        return {cid: c.session_id for cid, c in (await self._runtime.live_sessions()).items()}
-
-    async def _owned_containers(self) -> dict[str, str]:
-        """``{container_id: session_id}`` for the containers THIS agent owns.
-
-        The two scopes answer different questions and conflating them is what let one agent adopt
-        another's session on a shared host: the adopting privnet then held the VNI binding, the ESP
-        pair claim and the watchdog responsibility for containers it does not run, and kept holding
-        them after the real owner had gone.
-
-        A container whose owner the runtime cannot name is nobody's: it is not adopted here, and
-        `_live_containers` still stops anything from deleting it.
-        """
-        return {
-            cid: c.session_id
-            for cid, c in (await self._runtime.live_sessions()).items()
-            if c.owner_agent_id == self._agent_id
-        }
+        """``{container_id: session_id}`` for every kernel container on this NODE."""
+        return (await self._live_and_owned())[0]
 
     def _meta_of(self, session_id: str, raw_config: dict[str, Any]) -> SessionNetMeta:
         cfg = policy.validate_network_config(raw_config)
@@ -1162,14 +1181,22 @@ class PrivNetServer:
         devices, and the node-local block they hold is finite."""
         meta = self._meta_of(session_id, raw_config)
         if meta.vni is None:
-            if (liveness := await self._recheck(session_id, session=True)) is not _Liveness.GONE:
+            liveness = await self._recheck(session_id, session=True)
+            if liveness is _Liveness.FOREIGN:
+                await self._withdraw_stale(session_id, meta, "")
+                return
+            if liveness is not _Liveness.GONE:
                 raise _ReclaimDeferred(liveness.reason)
             await self._reclaim_devices(session_id, meta, peer_vteps)
             await self._journal.forget_session(session_id)
             log.info("reclaimed the network of dead session {}", session_id)
             return
         digest = config_digest(raw_config)
-        if (liveness := await self._recheck(session_id, session=True)) is not _Liveness.GONE:
+        liveness = await self._recheck(session_id, session=True)
+        if liveness is _Liveness.FOREIGN:
+            await self._withdraw_stale(session_id, meta, digest)
+            return
+        if liveness is not _Liveness.GONE:
             raise _ReclaimDeferred(liveness.reason)
         # Before the adopt, not after the teardown. Adoption holds an encrypted tunnel DOWN, so
         # even reaching that far for a session another agent is still running would take its
@@ -1207,15 +1234,42 @@ class PrivNetServer:
         back to it.
         """
         try:
-            live = await self._live_containers()
+            live, owned = await self._live_and_owned()
         except Exception as e:
             log.warning("could not re-check the runtime before reclaiming {}: {}", what, e)
             return _Liveness.UNKNOWN
         present = set(live.values()) if session else set(live)
-        if what in present:
+        if what not in present:
+            return _Liveness.GONE
+        ours = set(owned.values()) if session else set(owned)
+        if what in ours:
             log.info("not reclaiming {}: it is running again", what)
-            return _Liveness.LIVE
-        return _Liveness.GONE
+            return _Liveness.OURS
+        log.info("not reclaiming {}: another agent on this host is running it", what)
+        return _Liveness.FOREIGN
+
+    async def _withdraw_stale(self, session_id: str, meta: SessionNetMeta, digest: str) -> None:
+        """Drop this agent's record of a session another agent on the host is running.
+
+        Its devices are not ours to delete -- containers are on them -- and its session is not
+        ours to adopt, because we do not run any of them. But the journal record, the VNI binding
+        and the recovery debt ARE ours, and nothing else will ever drop them: deferring instead
+        left this agent reporting itself unrecovered, with its timer running, for as long as the
+        other agent's session lived.
+        """
+        if meta.vni is not None and digest:
+            async with self._vni_registry.releasing(
+                meta.vni, self._agent_id, session_id, digest
+            ) as freed:
+                if freed is None:
+                    raise _ReclaimDeferred(
+                        f"this node could not release its binding on VNI {meta.vni}"
+                    )
+        await self._journal.forget_session(session_id)
+        log.info(
+            "withdrew this agent's ownership of session {}: another agent on this host runs it",
+            session_id,
+        )
 
     async def _reclaim_devices(
         self, session_id: str, meta: SessionNetMeta, peer_vteps: Sequence[str] | None
