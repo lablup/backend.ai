@@ -9,6 +9,7 @@ The data plane itself is realized by the agent-side v2 plugins (see BEP-1062/age
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
@@ -136,6 +137,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         requested_subnet = options.get("subnet")
 
         await self._require_members_cni_capable(member_agents)
+        # A session start that failed downstream is retried with the same id, so this can be a
+        # second call for a session that already has an allocation. Allocating again would give
+        # it a second subnet and VNI and leave the first ones claimed by nobody: destroy_network
+        # releases only what the meta records. Converge on what is already there instead.
+        if (existing := await self._existing_allocation(etcd, session_id, endpoints)) is not None:
+            return existing
         backend = self._select_backend(forced_backend)
         # Size the session subnet to hold every endpoint (removes the fixed-/24 254 cap).
         # A failure to acquire the subnet claims nothing, so it needs no rollback; every
@@ -216,9 +223,47 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             return NetworkInfo(
                 network_id=session_id, options={**meta, "endpoint_ips": endpoint_ips}
             )
-        except Exception:
-            await self._rollback_create(session_id, subnet, vni)
+        except BaseException:
+            # BaseException, not Exception: a cancelled create -- the launcher's timeout, a
+            # manager shutdown -- otherwise walks away holding the subnet and the VNI. Shielded
+            # so the rollback's own awaits are not cancelled in turn and leave it half done.
+            await asyncio.shield(
+                asyncio.ensure_future(self._rollback_create(session_id, subnet, vni))
+            )
             raise
+
+    async def _existing_allocation(
+        self, etcd: AsyncEtcd, session_id: str, endpoints: list[Any]
+    ) -> NetworkInfo | None:
+        """This session's allocation as it already stands, or None if it has none yet.
+
+        Endpoints missing from the table are assigned now: a create that was interrupted partway
+        through them still owes the caller an address for every kernel.
+        """
+        raw = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
+        if raw is None:
+            return None
+        meta = json.loads(raw)
+        subnet = str(meta["subnet"])
+        endpoint_ips: dict[str, str] = {}
+        for endpoint in endpoints:
+            container_id = str(endpoint["container_id"])
+            hostname = endpoint.get("cluster_hostname")
+            ip, _mac = await self._endpoint_allocator.assign(
+                session_id,
+                container_id,
+                subnet,
+                agent_id=str(endpoint["agent_id"]),
+                cluster_hostname=str(hostname) if hostname is not None else None,
+            )
+            endpoint_ips[container_id] = ip
+        log.info(
+            "reusing the existing overlay allocation for session {} (subnet {}, vni {})",
+            session_id,
+            subnet,
+            meta.get("vni"),
+        )
+        return NetworkInfo(network_id=session_id, options={**meta, "endpoint_ips": endpoint_ips})
 
     async def _rollback_create(self, session_id: str, subnet: str, vni: int | None) -> None:
         """Undo a partially-created session network: release the VNI and subnet blocks and
