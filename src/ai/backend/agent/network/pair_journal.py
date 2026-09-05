@@ -98,6 +98,15 @@ def _sanitise(value: str) -> str:
     return value.replace("/", "-").replace(_CLAIM_SEP, "-")
 
 
+class PairStillClaimed(Exception):
+    """The caller's work is done but this agent's claim could not be dropped.
+
+    Raised rather than logged: the claim keeps the pair alive after the last agent has gone, and
+    a caller that hears nothing goes on to forget the session -- after which nothing on this node
+    knows the claim is there, and nothing will ever remove it.
+    """
+
+
 @dataclass(frozen=True)
 class ClaimSet:
     """One key's claims, with the node-wide lock held: read them, add or drop this owner's.
@@ -321,10 +330,9 @@ class PairJournal:
             yield len(existing) == 1
             # Reached only on a clean exit from the caller's block.
             if not claims.remove(owner, session_id):
-                log.warning(
-                    "could not drop this agent's claim on {}; it will keep the pair alive until"
-                    " the next startup prunes it",
-                    key,
+                raise PairStillClaimed(
+                    f"this agent's claim on {key} could not be dropped; it keeps the pair alive"
+                    " until something removes it"
                 )
 
     async def users(self, key: str) -> frozenset[str]:

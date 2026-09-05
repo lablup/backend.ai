@@ -2941,13 +2941,28 @@ class TestProtectionIsOneNodeWidePass:
 class TestWithdrawingWithoutTearingDown:
     """When a co-located agent still has kernels of the session, the devices are the node's and
     stay. This process's ownership must not: its watchdog would go on reprogramming a session it
-    no longer serves, and its ESP pair claim would outlive the last agent that had one."""
+    no longer serves, and its ESP pair claim would outlive the last agent that had one.
+
+    Every case here has a co-located claim, because that is what withdrawal MEANS. Without one
+    there is nobody the devices are being left for, and the ESP objects stay installed with our
+    claim as the last thing accounting for them -- see `TestTheLastClaimOnAnInstalledPair`."""
+
+    async def _co_located(self, journal: PairJournal) -> None:
+        """Agent B's claims on the same pair, as its own programming would have recorded them."""
+        for key in (
+            sa_key(_SELF.vtep_ip or "", _PEER.vtep_ip or ""),
+            pair_key(_SELF.vtep_ip or "", _PEER.vtep_ip or "", 4789),
+        ):
+            async with journal.claiming(key, "agent-b", "s9"):
+                pass
 
     async def test_the_devices_are_left_alone(self, tmp_path: Path) -> None:
         rec = Recorder()
-        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        journal = PairJournal(tmp_path / "pairs")
+        plugin = _plugin(rec, pair_journal=journal, journal_owner="agent-a")
         await plugin.setup_session_network(_ENC_META, _SELF)
         await plugin.add_peer("s1", _PEER)
+        await self._co_located(journal)
         rec.calls.clear()
         await plugin.withdraw_session_network("s1")
         assert not any(list(c[:3]) == ["ip", "link", "del"] for c in rec.calls)
@@ -2958,10 +2973,11 @@ class TestWithdrawingWithoutTearingDown:
         plugin = _plugin(Recorder(), pair_journal=journal, journal_owner="agent-a")
         await plugin.setup_session_network(_ENC_META, _SELF)
         await plugin.add_peer("s1", _PEER)
+        await self._co_located(journal)
         key = pair_key(_SELF.vtep_ip or "", _PEER.vtep_ip or "", 4789)
-        assert await journal.users(key) != frozenset()
+        assert "agent-a/s1" in await journal.users(key)
         await plugin.withdraw_session_network("s1")
-        assert await journal.users(key) == frozenset()
+        assert await journal.users(key) == frozenset({"agent-b/s9"})
 
     async def test_the_watchdog_stops_visiting_it(self, tmp_path: Path) -> None:
         rec = _AbsentRuleRecorder()
@@ -3138,6 +3154,12 @@ class TestAFailedWithdrawalIsNotADeparture:
         plugin = _plugin(Recorder(), pair_journal=journal, journal_owner="agent-a")
         await plugin.setup_session_network(_ENC_META, _SELF)
         await plugin.add_peer("s1", _PEER)
+        for key in (
+            sa_key(_SELF.vtep_ip or "", _PEER.vtep_ip or ""),
+            pair_key(_SELF.vtep_ip or "", _PEER.vtep_ip or "", 4789),
+        ):
+            async with journal.claiming(key, "agent-b", "s9"):
+                pass  # the co-located agent the devices are being left for
         await plugin.withdraw_session_network("s1")
         assert plugin.security_state("s1") is None
 
@@ -4007,3 +4029,163 @@ class TestTwoSessionsOnOneVni:
         await plugin.setup_session_network(_ENC_META, _SELF)
         await plugin.teardown_session_network("s1")
         await plugin.setup_session_network(replace(_ENC_META, session_id="s2"), _SELF)
+
+
+class TestTheLastClaimOnAnInstalledPair:
+    """A withdrawal leaves the SAs and the policy installed -- that is its whole point. So the last
+    claim on them must not come off: the objects are carrying a co-located agent's traffic, and a
+    pair with no claims reads as unused to the next teardown on this node, which deletes it.
+
+    That agent's claim being missing is exactly when this matters. Teardown may drop the last
+    claim because it removes the objects in the same breath; withdrawal may not."""
+
+    async def test_it_is_kept(self, tmp_path: Path) -> None:
+        journal = PairJournal(tmp_path / "pairs")
+        plugin = _plugin(Recorder(), pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.withdraw_session_network("s1")
+        assert await journal.users(sa_key("10.0.0.1", "10.0.0.2")) == frozenset({"agent-a/s1"})
+
+    async def test_the_session_is_not_forgotten(self, tmp_path: Path) -> None:
+        # Forgotten, nothing on this node knows the claim is there and nothing removes it.
+        journal = PairJournal(tmp_path / "pairs")
+        plugin = _plugin(Recorder(), pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        with contextlib.suppress(OverlayEncryptionUnavailable):
+            await plugin.withdraw_session_network("s1")
+        assert plugin.security_state("s1") is not None
+
+    async def test_teardown_may_still_drop_it(self, tmp_path: Path) -> None:
+        # It removes the objects in the same breath, so no claim is left describing anything.
+        journal = PairJournal(tmp_path / "pairs")
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        await plugin.teardown_session_network("s1")
+        assert await journal.users(sa_key("10.0.0.1", "10.0.0.2")) == frozenset()
+        assert any(c[:4] == ["ip", "xfrm", "state", "del"] for c in rec.calls)
+
+    async def test_a_partly_released_peer_set_resumes(self, tmp_path: Path) -> None:
+        # Progress is per peer and per scope: what came off stays off, so the retry finishes the
+        # rest instead of starting over against claims that are already gone.
+        journal = PairJournal(tmp_path / "pairs")
+        plugin = _plugin(Recorder(), pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        other = Member(agent_id="a3", host_ip="10.0.0.3", vtep_ip="10.0.0.3")
+        await plugin.add_peer("s1", _PEER)
+        await plugin.add_peer("s1", other)
+        # Only the first peer has a co-located holder, so only its claims may come off.
+        for key in (
+            sa_key("10.0.0.1", "10.0.0.2"),
+            pair_key("10.0.0.1", "10.0.0.2", 4789),
+        ):
+            async with journal.claiming(key, "agent-b", "s9"):
+                pass
+
+        with pytest.raises(OverlayEncryptionUnavailable, match=r"10\.0\.0\.3"):
+            await plugin.withdraw_session_network("s1")
+
+        assert await journal.users(sa_key("10.0.0.1", "10.0.0.2")) == frozenset({"agent-b/s9"})
+        assert await journal.users(sa_key("10.0.0.1", "10.0.0.3")) == frozenset({"agent-a/s1"})
+
+
+class TestAJumpThatDoesNotCatchEverything:
+    """`-A INPUT -s 127.0.0.1 -j BAI-VXLAN-IN` ends in the same two tokens as ours and sends
+    nothing from the wire through the protection chain -- which is every packet it exists to
+    inspect."""
+
+    def test_a_narrowed_jump_is_not_ours(self) -> None:
+        listing = f"-P INPUT ACCEPT\n-A INPUT -s 127.0.0.1 -j {CHAIN_IN}\n"
+        assert jump_is_first(listing, "INPUT", CHAIN_IN) is False
+
+    def test_an_interface_bound_jump_is_not_ours(self) -> None:
+        listing = f"-P INPUT ACCEPT\n-A INPUT -i lo -j {CHAIN_IN}\n"
+        assert jump_is_first(listing, "INPUT", CHAIN_IN) is False
+
+    def test_a_protocol_bound_jump_is_not_ours(self) -> None:
+        listing = f"-P OUTPUT ACCEPT\n-A OUTPUT -p tcp -j {CHAIN_MARK}\n"
+        assert jump_is_first(listing, "OUTPUT", CHAIN_MARK) is False
+
+    def test_the_unconditional_jump_is(self) -> None:
+        listing = f"-P INPUT ACCEPT\n-A INPUT -j {CHAIN_IN}\n"
+        assert jump_is_first(listing, "INPUT", CHAIN_IN) is True
+
+    def test_a_second_place_jump_is_still_not_first(self) -> None:
+        listing = f"-P INPUT ACCEPT\n-A INPUT -j SOMEONE-ELSE\n-A INPUT -j {CHAIN_IN}\n"
+        assert jump_is_first(listing, "INPUT", CHAIN_IN) is False
+
+    async def test_the_pass_puts_it_back(self, tmp_path: Path) -> None:
+        rec = Recorder()
+
+        def _narrowed(argv: Sequence[str]) -> str | None:
+            if argv[0] == "iptables-save":
+                builtin = "OUTPUT" if argv[argv.index("-t") + 1] == "mangle" else "INPUT"
+                chain = CHAIN_MARK if builtin == "OUTPUT" else CHAIN_IN
+                return f"-A {builtin} -s 127.0.0.1 -j {chain}\n"
+            if "-S" in argv:
+                chain = CHAIN_MARK if argv[-1] == "OUTPUT" else CHAIN_IN
+                return f"-P {argv[-1]} ACCEPT\n-A {argv[-1]} -s 127.0.0.1 -j {chain}\n"
+            return None
+
+        plugin = _plugin(rec, reader=_Listing(_narrowed), pair_journal=PairJournal(tmp_path / "p"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.reassert_protection()
+        assert any(c[:2] == ["iptables", "-I"] for c in rec.calls)
+
+
+class TestTwoSetupsRacingForOneVni:
+    """The check is followed by several awaits and the devices are built before the session joins
+    `_sessions`, so a plain check lets both callers through -- and the second rebuilds the first's
+    bridge and VXLAN device while its containers are on them."""
+
+    async def test_the_second_is_refused_mid_flight(self, tmp_path: Path) -> None:
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        class _Blocking(Recorder):
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                await super().__call__(argv)
+                if list(argv[:3]) == ["ip", "link", "add"]:
+                    started.set()
+                    await release.wait()
+
+        plugin = _plugin(_Blocking(), pair_journal=PairJournal(tmp_path / "pairs"))
+        first = asyncio.create_task(plugin.setup_session_network(_ENC_META, _SELF))
+        await started.wait()
+        try:
+            with pytest.raises(OverlayEncryptionUnavailable, match="already running on"):
+                await plugin.setup_session_network(replace(_ENC_META, session_id="s2"), _SELF)
+        finally:
+            release.set()
+            await first
+
+    async def test_the_reservation_is_given_back_when_setup_fails(self, tmp_path: Path) -> None:
+        # Held after a failure, the VNI would be refused to every later session for the life of
+        # the process -- including the retry of this very one.
+        rec = Recorder(fail_on=lambda argv: list(argv[:3]) == ["ip", "link", "add"])
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        with pytest.raises(RuntimeError):
+            await plugin.setup_session_network(_ENC_META, _SELF)
+        assert plugin._reserved_vnis == {}
+        rec.fail_on = None
+        await plugin.setup_session_network(replace(_ENC_META, session_id="s2"), _SELF)
+
+    async def test_a_completed_setup_holds_it_through_sessions(self, tmp_path: Path) -> None:
+        plugin = _plugin(Recorder(), pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        assert plugin._reserved_vnis == {}, "the registry of record is `_sessions` from here on"
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(replace(_ENC_META, session_id="s2"), _SELF)
+
+    async def test_a_retry_of_the_same_session_is_not_blocked_by_itself(
+        self, tmp_path: Path
+    ) -> None:
+        plugin = _plugin(Recorder(), pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.setup_session_network(_ENC_META, _SELF)

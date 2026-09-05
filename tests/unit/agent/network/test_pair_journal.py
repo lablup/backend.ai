@@ -9,6 +9,7 @@ in-process, two agents on one host each believed they were the pair's only user.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import stat
 from pathlib import Path
@@ -363,3 +364,46 @@ class TestTheClaimIsGivenUpOnlyOnSuccess:
         async with journal.releasing(key, "agent-a", "s1") as freed:
             assert freed is False
         assert await journal.users(key) == frozenset({"agent-b/s9"})
+
+
+class TestAClaimThatWillNotUnlink:
+    """The caller's work is done and the claim is still there. Logged and swallowed, the caller
+    goes on to forget the session -- after which nothing on this node knows the claim exists and
+    nothing will ever remove it."""
+
+    async def test_it_is_raised(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        journal = _journal(tmp_path)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(journal, key, "agent-a", "s1")
+        monkeypatch.setattr(PairJournal, "_remove_claim", lambda *a, **k: False)
+        with pytest.raises(pj.PairStillClaimed, match=key):
+            async with journal.releasing(key, "agent-a", "s1") as freed:
+                assert freed is True
+
+    async def test_the_claim_is_still_there_afterwards(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        journal = _journal(tmp_path)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(journal, key, "agent-a", "s1")
+        with monkeypatch.context() as wedged:
+            wedged.setattr(PairJournal, "_remove_claim", lambda *a, **k: False)
+            with contextlib.suppress(pj.PairStillClaimed):
+                async with journal.releasing(key, "agent-a", "s1"):
+                    pass
+        assert await journal.users(key) == frozenset({"agent-a/s1"})
+
+    async def test_the_retry_finishes_it(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        journal = _journal(tmp_path)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(journal, key, "agent-a", "s1")
+        with monkeypatch.context() as wedged:
+            wedged.setattr(PairJournal, "_remove_claim", lambda *a, **k: False)
+            with contextlib.suppress(pj.PairStillClaimed):
+                async with journal.releasing(key, "agent-a", "s1"):
+                    pass
+        async with journal.releasing(key, "agent-a", "s1") as freed:
+            assert freed is True
+        assert await journal.users(key) == frozenset()
