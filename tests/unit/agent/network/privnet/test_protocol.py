@@ -14,8 +14,10 @@ from typing import Any
 import pytest
 
 from ai.backend.agent.network.privnet.protocol import (
+    PROTOCOL_VERSION,
     PrivNetOp,
     PrivNetRequest,
+    PrivNetResponse,
     ProtocolError,
 )
 
@@ -77,3 +79,29 @@ class TestRequestRoundTrip:
 
         with pytest.raises(ProtocolError):
             PrivNetRequest.decode(payload)
+
+
+class TestTheProtocolVersion:
+    """A caller tells "this daemon does not know that verb" from "it said no" by the version, not
+    by the shape of an error string."""
+
+    def test_it_roundtrips(self) -> None:
+        resp = PrivNetResponse(ok=True, version=PROTOCOL_VERSION)
+        assert PrivNetResponse.decode(resp.encode()).version == PROTOCOL_VERSION
+
+    def test_a_response_without_one_decodes_as_absent(self) -> None:
+        assert PrivNetResponse.decode(PrivNetResponse(ok=True).encode()).version is None
+
+    def test_a_non_integer_version_is_refused(self) -> None:
+        with pytest.raises(ProtocolError):
+            PrivNetResponse.decode(b'{"ok": true, "version": "2"}')
+
+    def test_problems_roundtrip(self) -> None:
+        resp = PrivNetResponse(ok=True, problems={"privnet:session:s1": "no journal record"})
+        assert PrivNetResponse.decode(resp.encode()).problems == {
+            "privnet:session:s1": "no journal record"
+        }
+
+    def test_malformed_problems_are_refused(self) -> None:
+        with pytest.raises(ProtocolError):
+            PrivNetResponse.decode(b'{"ok": true, "problems": {"a": 1}}')
