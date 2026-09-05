@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.user import (
     DeleteUserRequest,
     DeleteUserResponse,
     GetUserResponse,
+    PurgeUserRequest,
     UserStatus,
 )
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -109,6 +110,81 @@ class TestUserCreateCrud:
             )
             assoc = row.fetchone()
         assert assoc is not None, "User should be associated with the given group"
+
+    async def test_s7_create_makes_a_personal_project_with_the_user_alone(
+        self,
+        user_factory: UserFactory,
+        domain_fixture: DomainFixtureData,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-7: Creating a user through the REST path creates its personal project,
+        named after the username, with that user as its only member."""
+        result = await user_factory()
+
+        async with db_engine.begin() as conn:
+            project_id = await conn.scalar(
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.domain_name == domain_fixture.domain_name,
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.name == result.user.username,
+                )
+            )
+            assert project_id is not None, "A personal project should be created"
+            member_ids = (
+                await conn.scalars(
+                    sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(project_id),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    )
+                )
+            ).all()
+            creator_id = await conn.scalar(
+                sa.select(ProjectRow.creator_id).where(ProjectRow.id == project_id)
+            )
+        assert list(member_ids) == [str(result.user.id)]
+        assert creator_id == result.user.id
+
+    async def test_s8_purging_the_user_leaves_its_personal_project_dangling(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: DomainFixtureData,
+        resource_policy_fixture: str,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-8: What the personal project holds outlives the account. The project stays
+        with no creator, which is what marks it for the retention sweep."""
+        unique = secrets.token_hex(4)
+        created = await admin_registry.user.create(
+            CreateUserRequest(
+                email=f"purge-personal-{unique}@test.local",
+                username=f"purge-personal-{unique}",
+                password="test-password-1234",
+                domain_name=domain_fixture.domain_name,
+                resource_policy=resource_policy_fixture,
+                status=UserStatus.ACTIVE,
+            )
+        )
+        async with db_engine.begin() as conn:
+            project_id = await conn.scalar(
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.name == f"purge-personal-{unique}",
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.creator_id == str(created.user.id),
+                )
+            )
+        assert project_id is not None
+
+        await admin_registry.user.purge(PurgeUserRequest(user_id=created.user.id))
+
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(ProjectRow.creator_id).where(ProjectRow.id == project_id)
+                )
+            ).first()
+        assert row is not None, "The personal project should outlive its user"
+        assert row.creator_id is None, "Its creator should be cleared"
 
     async def test_s4_create_with_status_inactive(
         self,

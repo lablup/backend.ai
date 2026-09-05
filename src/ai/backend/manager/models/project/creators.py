@@ -9,6 +9,7 @@ from typing import override
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
@@ -38,6 +39,7 @@ class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
     resource_policy: str | None = None
     container_registry: dict[str, str] | None = None
     dotfiles: bytes | None = None
+    creator_id: UserID | None = None
 
     @classmethod
     def model_store(cls, domain_id: DomainID, domain_name: str) -> ProjectCreator:
@@ -49,6 +51,22 @@ class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
             description="Model Store",
             resource_policy="default",
             type=ProjectType.MODEL_STORE,
+        )
+
+    @classmethod
+    def personal(
+        cls, name: str, domain_id: DomainID, domain_name: str, user_id: UserID
+    ) -> ProjectCreator:
+        """The personal project a user is registered with. Its resource limits are left
+        at the empty defaults; personal allowances are answered by the keypair policy."""
+        return cls(
+            name=name,
+            domain_id=domain_id,
+            domain_name=domain_name,
+            description="Personal Project",
+            resource_policy="default",
+            type=ProjectType.PERSONAL,
+            creator_id=user_id,
         )
 
     @override
@@ -103,6 +121,7 @@ class ProjectCreator(RoleManagedEntityCreator[ProjectRow, ProjectData]):
             resource_policy=self.resource_policy,
             dotfiles=self.dotfiles,
             container_registry=self.container_registry,
+            creator_id=self.creator_id,
         )
 
     @override

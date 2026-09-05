@@ -148,6 +148,14 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "groups"
     __table_args__ = (
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
+        # A user has at most one personal project. A dangling one — its creator gone —
+        # holds NULL, and NULLs do not collide here.
+        sa.Index(
+            "uq_groups_personal_creator",
+            "creator_id",
+            unique=True,
+            postgresql_where=sa.text("type = 'personal'"),
+        ),
     )
 
     id: Mapped[ProjectID] = mapped_column(
@@ -200,6 +208,15 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
         StrEnumType(ProjectType),
         nullable=False,
         default=ProjectType.GENERAL,
+    )
+    # Provenance, not ownership: ownership is the scope-virtual entity-entity path
+    # alone. Nulled when the user goes; a personal project left holding NULL is
+    # dangling and the retention sweep takes it.
+    creator_id: Mapped[UserID | None] = mapped_column(
+        "creator_id",
+        GUID(UserID),
+        sa.ForeignKey("users.uuid", ondelete="SET NULL"),
+        nullable=True,
     )
     container_registry: Mapped[dict[str, Any] | None] = mapped_column(
         "container_registry",

@@ -396,7 +396,12 @@ class UserDBSource:
         raise UserPurgeInProgress(f"User is being purged: {user_uuid}")
 
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
-        """Completely purge user and all associated data by UUID."""
+        """Completely purge user and all associated data by UUID.
+
+        The user's personal project is not among it. Its creator column is nulled by
+        the foreign key, leaving the project dangling for the retention sweep — the
+        resources it holds outlive the account rather than going with it.
+        """
         user_id = UserID(user_uuid)
         async with self._v2_ops.write_ops() as w:
             await w.batch_purge_field_entities(user_id, UserErrorLogPurger())
