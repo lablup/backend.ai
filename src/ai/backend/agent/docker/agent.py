@@ -1840,8 +1840,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if cached_distro:
                 return cached_distro
 
+            image_ref = ImageRef.from_image_config(image)
             container_config: dict[str, Any] = {
-                "Image": image["canonical"],
+                "Image": image_ref.short if image_ref.is_local else image_ref.canonical,
                 "Tty": True,
                 "Privileged": False,
                 "AttachStdin": False,
