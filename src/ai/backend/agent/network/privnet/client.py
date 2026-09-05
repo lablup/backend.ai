@@ -52,6 +52,8 @@ class PrivNetClientError(RuntimeError):
 #: The protocol version that introduced RECOVERY_STATUS. A daemon below it cannot answer, and
 #: "did not answer" is not "nothing to report".
 _RECOVERY_STATUS_VERSION = 2
+#: The protocol version that introduced ENCRYPTION_PROBE.
+_ENCRYPTION_PROBE_VERSION = 3
 #: How long one privnet verb may take. Generous, because the far side runs real privileged
 #: commands under a node-wide lock; finite, because without it one wedged command stops every
 #: session operation on this agent with nothing in the log to say why.
@@ -100,6 +102,31 @@ class PrivNetClient:
                     f" {resp.version if resp.version is not None else 1}, which cannot report what"
                     f" it failed to recover (protocol {_RECOVERY_STATUS_VERSION} does); restart it"
                     " on the agent's version"
+                )
+            }
+        return dict(resp.problems or {})
+
+    async def encryption_problems(self) -> dict[str, str]:
+        """What the privnet found when it tried to install the overlay's ESP state.
+
+        A failure to ask is itself a problem: the point of asking is to find out whether this node
+        can encrypt, and "I could not find out" is not "it can". A daemon too old to know the verb
+        is told apart by `version` rather than by the shape of its error.
+        """
+        try:
+            resp = await self.call(PrivNetRequest(PrivNetOp.ENCRYPTION_PROBE, "probe"))
+        except (PrivNetClientError, ProtocolError, OSError) as e:
+            return {
+                "privnet:encryption": (
+                    f"this node's privnet could not report whether it can encrypt an overlay ({e})"
+                )
+            }
+        if resp.version is None or resp.version < _ENCRYPTION_PROBE_VERSION:
+            return {
+                "privnet:encryption": (
+                    "this node's privnet speaks protocol"
+                    f" {resp.version if resp.version is not None else 1}, which cannot say whether"
+                    " it can encrypt an overlay; restart it on the agent's version"
                 )
             }
         return dict(resp.problems or {})

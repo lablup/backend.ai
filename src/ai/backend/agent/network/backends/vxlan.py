@@ -368,6 +368,73 @@ def xfrm_policy_add_args(
     ]  # fmt: skip
 
 
+#: The two ends of the probe SA. TEST-NET-1 (RFC 5737): documentation addresses, never routed and
+#: never a real VTEP, so the SA and policy this installs select nothing that exists and a leftover
+#: after a crash carries no traffic and collides with no pair.
+_PROBE_SELF: Final = "192.0.2.1"
+_PROBE_PEER: Final = "192.0.2.2"
+_PROBE_KEY: Final = "00" * 32
+
+
+async def probe_encryption_support(runner: Runner, reader: Reader) -> list[str]:
+    """What would stop this node holding up its end of an ESP tunnel, found out by trying.
+
+    Installs the SA and the outbound policy this backend really installs -- same algorithm, same
+    ICV, same replay window, same ESN flag, same reqid and mark -- reads them back, and removes
+    them. Nothing short of that answers the question: /proc/net/xfrm_stat is CONFIG_XFRM_STATISTICS
+    and says nothing about CONFIG_XFRM_USER, which is what `ip xfrm` needs, and a name in
+    /proc/crypto is neither necessary (the crypto API loads a module on first use) nor sufficient
+    (the listing carries internal `__`-prefixed implementations too).
+
+    Needs CAP_NET_ADMIN, so on a privnet-backed node it runs THERE and the answer is carried back
+    over the socket -- the agent that asks holds no such capability.
+    """
+    problems: list[str] = []
+    adds = [
+        *xfrm_state_add_args(_PROBE_SELF, _PROBE_PEER, _PROBE_KEY),
+        *xfrm_policy_add_args(_PROBE_SELF, _PROBE_PEER),
+    ]
+    try:
+        for argv in adds:
+            try:
+                await runner(argv)
+            except (RuntimeError, OSError) as e:
+                problems.append(
+                    f"this node cannot install the overlay's ESP state: `{_probe_verb(argv)}`"
+                    f" failed ({e}). An encrypted session placed here would be refused at setup."
+                )
+                return problems
+        # Installed is not the same as installed AS ASKED: the kernel accepts an SA and then
+        # reports what it actually holds, which is where a missing ESN or a truncated ICV shows up.
+        listing = await reader(["ip", "xfrm", "state"])
+        if (_PROBE_SELF, _PROBE_PEER, _esp_spi(_PROBE_SELF, _PROBE_PEER)) not in (
+            parse_owned_sa_endpoints(listing, XFRM_REQID)
+        ):
+            problems.append(
+                "this node installed the overlay's ESP state but the kernel does not report it"
+                f" back as {_ESP_AEAD} with ESN and a full-length ICV, so a session here would run"
+                " on protection it was not promised."
+            )
+        if not parse_owned_policies(await reader(["ip", "xfrm", "policy"]), _XFRM_MARK):
+            problems.append(
+                "this node installed the overlay's outbound ESP policy but the kernel does not"
+                " report it back, so nothing would select the SAs an encrypted session installs."
+            )
+    finally:
+        for argv in (
+            *xfrm_state_del_args(_PROBE_SELF, _PROBE_PEER),
+            *xfrm_policy_del_args(_PROBE_SELF, _PROBE_PEER),
+        ):
+            with contextlib.suppress(RuntimeError, OSError):
+                await runner(argv)
+    return problems
+
+
+def _probe_verb(argv: Sequence[str]) -> str:
+    """The command without its key material, for a message an operator will read."""
+    return " ".join(argv[:4])
+
+
 def xfrm_state_del_args(self_vtep: str, peer_vtep: str, *, generation: int = 0) -> list[list[str]]:
     spi_out = f"{_esp_spi(self_vtep, peer_vtep, generation):#x}"
     spi_in = f"{_esp_spi(peer_vtep, self_vtep, generation):#x}"
@@ -2446,6 +2513,11 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         the same hazard the recovery preflight exists to avoid.
         """
         return await self._pair_journal.prune(self._journal_owner, live_sessions)
+
+    async def probe_encryption_support(self) -> list[str]:
+        """What would stop this node holding up its end of an ESP tunnel -- see the module
+        function of the same name, which this hands its own runner and reader to."""
+        return await probe_encryption_support(self._runner, self._reader)
 
     def unclosed_devices(self) -> frozenset[str]:
         """Surviving tunnels this node has not managed to bring down, for diagnostics.
