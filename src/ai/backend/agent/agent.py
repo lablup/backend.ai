@@ -2144,7 +2144,7 @@ class AbstractAgent[
                     log.debug("Image {} is already being pulled, skipping", img_canonical)
                     return
 
-                need_to_pull = await self.check_image(
+                need_to_pull = (not img_ref.is_local) and await self.check_image(
                     img_ref, img_conf["digest"], AutoPullBehavior(img_conf["auto_pull"])
                 )
 
