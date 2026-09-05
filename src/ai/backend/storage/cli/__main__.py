@@ -69,3 +69,8 @@ def dependencies() -> None:
 @main.group(cls=LazyGroup, import_name="ai.backend.storage.cli.health:cli")
 def health() -> None:
     """Command set for health checking."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.storage.cli.volume:cli")
+def volume() -> None:
+    """Command set for volume management."""

@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import logging
 import re
+from datetime import UTC, datetime
 from typing import Any, override
 
 from ai.backend.common.types import HardwareMetadata
@@ -21,6 +22,12 @@ from ai.backend.storage.volumes.abc import (
     CAP_VFOLDER,
     AbstractFSOpModel,
 )
+from ai.backend.storage.volumes.health.abc import AbstractBackendProber
+from ai.backend.storage.volumes.health.types import (
+    BackendProbeResult,
+    BackendStatus,
+    VolumeHealthRecord,
+)
 from ai.backend.storage.volumes.vfs import BaseVolume
 
 from .purity import PurityClient
@@ -31,6 +38,21 @@ FLASHBLADE_TOOLKIT_V2_VERSION_RE = re.compile(r"version p[a-zA-Z\d]+ \(RapidFile
 FLASHBLADE_TOOLKIT_V1_VERSION_RE = re.compile(r"p[a-zA-Z\d]+ \(RapidFile Toolkit\) (1\..+)")
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class PureStorageBackendProber(AbstractBackendProber):
+    """Asks the Purity API for its metadata, the cheapest call that proves reachability."""
+
+    _client: PurityClient
+
+    def __init__(self, client: PurityClient) -> None:
+        self._client = client
+
+    @override
+    async def probe(self) -> BackendProbeResult:
+        async with self._client as client:
+            await client.get_metadata()
+        return BackendProbeResult(status=BackendStatus.HEALTHY, checked_at=datetime.now(UTC))
 
 
 class FlashBladeVolume(BaseVolume):
@@ -105,6 +127,7 @@ class FlashBladeVolume(BaseVolume):
 
     @override
     async def shutdown(self) -> None:
+        await super().shutdown()
         await self.purity_client.aclose()
 
     @override
@@ -117,6 +140,10 @@ class FlashBladeVolume(BaseVolume):
                 CAP_FAST_SCAN,
             ],
         )
+
+    @override
+    def create_backend_prober(self, record: VolumeHealthRecord) -> PureStorageBackendProber:
+        return PureStorageBackendProber(self.purity_client)
 
     @override
     async def get_hwinfo(self) -> HardwareMetadata:

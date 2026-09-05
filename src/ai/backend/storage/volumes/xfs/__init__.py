@@ -9,12 +9,14 @@ from typing import Any, override
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.data.storage.types import VolumeName
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.exception import InvalidConfigError
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.config.unified import StorageProxyConfig
 from ai.backend.storage.errors import (
     InvalidQuotaFormatError,
     InvalidQuotaScopeError,
@@ -302,6 +304,8 @@ class XfsVolume(BaseVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        volume_name: VolumeName,
+        storage_proxy_config: StorageProxyConfig,
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
@@ -311,6 +315,8 @@ class XfsVolume(BaseVolume):
         super().__init__(
             local_config,
             mount_path,
+            volume_name=volume_name,
+            storage_proxy_config=storage_proxy_config,
             etcd=etcd,
             event_dispatcher=event_dispatcher,
             event_producer=event_producer,

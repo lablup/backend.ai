@@ -2,17 +2,20 @@ import asyncio
 import logging
 from collections.abc import Mapping
 from dataclasses import asdict
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final, Literal, cast, override
 
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.data.storage.types import VolumeName
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.config.unified import StorageProxyConfig
 from ai.backend.storage.errors import (
     ExternalStorageServiceError,
     InvalidQuotaConfig,
@@ -26,6 +29,12 @@ from ai.backend.storage.volumes.abc import (
     CAP_METRIC,
     CAP_QUOTA,
     CAP_VFOLDER,
+)
+from ai.backend.storage.volumes.health.abc import AbstractBackendProber
+from ai.backend.storage.volumes.health.types import (
+    BackendProbeResult,
+    BackendStatus,
+    VolumeHealthRecord,
 )
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient
@@ -215,6 +224,41 @@ class VASTQuotaModel(BaseQuotaModel):
         await aiofiles.os.rmdir(qspath)
 
 
+class VASTBackendProber(AbstractBackendProber):
+    """Asks the cluster for its state, without the quota report `get_hwinfo()` gathers."""
+
+    _client: VASTAPIClient
+    _cluster_id: int
+
+    def __init__(self, client: VASTAPIClient, cluster_id: int) -> None:
+        self._client = client
+        self._cluster_id = cluster_id
+
+    @override
+    async def probe(self) -> BackendProbeResult:
+        now = datetime.now(UTC)
+        try:
+            cluster_info = await self._client.get_cluster_info(self._cluster_id)
+        except VASTUnknownError as e:
+            return BackendProbeResult(
+                status=BackendStatus.UNAVAILABLE, checked_at=now, status_info=str(e)
+            )
+        if cluster_info is None:
+            return BackendProbeResult(
+                status=BackendStatus.OFFLINE,
+                checked_at=now,
+                status_info=f"vast cluster not found. (id: {self._cluster_id})",
+            )
+        match cluster_info.state.lower():
+            case "online" | "healthy":
+                status = BackendStatus.HEALTHY
+            case "init":
+                status = BackendStatus.DEGRADED
+            case _:
+                status = BackendStatus.UNAVAILABLE
+        return BackendProbeResult(status=status, checked_at=now, status_info=cluster_info.state)
+
+
 class VASTVolume(BaseVolume):
     api_client: VASTAPIClient
 
@@ -225,6 +269,8 @@ class VASTVolume(BaseVolume):
         local_config: Mapping[str, Any],
         mount_path: Path,
         *,
+        volume_name: VolumeName,
+        storage_proxy_config: StorageProxyConfig,
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
@@ -234,6 +280,8 @@ class VASTVolume(BaseVolume):
         super().__init__(
             local_config,
             mount_path,
+            volume_name=volume_name,
+            storage_proxy_config=storage_proxy_config,
             etcd=etcd,
             options=options,
             event_dispatcher=event_dispatcher,
@@ -255,7 +303,7 @@ class VASTVolume(BaseVolume):
 
     @override
     async def shutdown(self) -> None:
-        pass
+        await super().shutdown()
 
     @override
     async def create_quota_model(self) -> VASTQuotaModel:
@@ -264,6 +312,10 @@ class VASTVolume(BaseVolume):
     @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_METRIC, CAP_QUOTA, CAP_FAST_FS_SIZE, CAP_FAST_SIZE])
+
+    @override
+    def create_backend_prober(self, record: VolumeHealthRecord) -> VASTBackendProber:
+        return VASTBackendProber(self.api_client, self.config["vast_cluster_id"])
 
     @override
     async def get_hwinfo(self) -> HardwareMetadata:

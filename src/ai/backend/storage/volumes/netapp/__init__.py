@@ -9,8 +9,10 @@ import subprocess
 import time
 from collections.abc import AsyncIterator
 from contextlib import aclosing
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, override
+from uuid import UUID
 
 import aiofiles
 import aiofiles.os
@@ -56,6 +58,12 @@ from ai.backend.storage.volumes.abc import (
     CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
+)
+from ai.backend.storage.volumes.health.abc import AbstractBackendProber
+from ai.backend.storage.volumes.health.types import (
+    BackendProbeResult,
+    BackendStatus,
+    VolumeHealthRecord,
 )
 from ai.backend.storage.volumes.vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 
@@ -435,6 +443,22 @@ class XCPFSOpModel(BaseFSOpModel):
         return BinarySize(usage.used_bytes)
 
 
+class NetAppBackendProber(AbstractBackendProber):
+    """Asks the ONTAP API for the volume, without the quota report `get_hwinfo()` gathers."""
+
+    _client: NetAppClient
+    _volume_id: UUID
+
+    def __init__(self, client: NetAppClient, volume_id: UUID) -> None:
+        self._client = client
+        self._volume_id = volume_id
+
+    @override
+    async def probe(self) -> BackendProbeResult:
+        await self._client.get_volume_by_id(self._volume_id, ["files"])
+        return BackendProbeResult(status=BackendStatus.HEALTHY, checked_at=datetime.now(UTC))
+
+
 class NetAppVolume(BaseVolume):
     name = "netapp"
     ontap_endpoint: str
@@ -442,7 +466,7 @@ class NetAppVolume(BaseVolume):
     netapp_password: str
     svm_name: str
     svm_id: StorageID
-    volume_name: str
+    netapp_volume_name: str
     volume_id: VolumeID
     nas_path: Path
 
@@ -488,8 +512,8 @@ class NetAppVolume(BaseVolume):
         )
         self.netapp_nfs_host = self.config["netapp_nfs_host"]
         self.netapp_xcp_cmd = self.config["netapp_xcp_cmd"]
-        self.volume_name = self.config["netapp_volume_name"]
-        volume_info = await self.netapp_client.get_volume_by_name(self.volume_name, ["svm"])
+        self.netapp_volume_name = self.config["netapp_volume_name"]
+        volume_info = await self.netapp_client.get_volume_by_name(self.netapp_volume_name, ["svm"])
         if "svm" not in volume_info:
             raise InvalidAPIParameters("Volume info does not contain svm data")
         self.volume_id = volume_info["uuid"]
@@ -520,11 +544,16 @@ class NetAppVolume(BaseVolume):
 
     @override
     async def shutdown(self) -> None:
+        await super().shutdown()
         await self.netapp_client.aclose()
 
     @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_QUOTA, CAP_METRIC])
+
+    @override
+    def create_backend_prober(self, record: VolumeHealthRecord) -> NetAppBackendProber:
+        return NetAppBackendProber(self.netapp_client, self.volume_id)
 
     @override
     async def get_hwinfo(self) -> HardwareMetadata:
