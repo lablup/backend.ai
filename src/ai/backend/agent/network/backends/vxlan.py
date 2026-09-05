@@ -19,7 +19,7 @@ import os
 import re
 import shlex
 import time
-from collections.abc import Awaitable, Callable, Collection, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, override
 
@@ -40,7 +40,12 @@ from ai.backend.agent.network.caps import probe_caps
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
 from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
 from ai.backend.agent.network.overlay_probe import arp_probe
-from ai.backend.agent.network.pair_journal import PairJournal, pair_key, sa_key
+from ai.backend.agent.network.pair_journal import (
+    PairJournal,
+    PairStillClaimed,
+    pair_key,
+    sa_key,
+)
 from ai.backend.agent.network.path_mtu import underlay_mtu
 from ai.backend.agent.network.readiness import conflicting_device
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
@@ -888,16 +893,21 @@ def _value_after(tokens: Sequence[str], key: str) -> str | None:
 
 
 def jump_is_first(listing: str, builtin: str, chain: str) -> bool:
-    """Whether our jump is the first rule of ``builtin`` in an ``iptables -S`` listing.
+    """Whether our UNCONDITIONAL jump is the first rule of ``builtin`` in an `iptables -S` listing.
 
-    Anything before it can ACCEPT the traffic and our chain never runs, which is the whole
-    failure this ownership is meant to remove -- so "present" is not the question, "first" is.
+    Anything before it can ACCEPT the traffic and our chain never runs, which is the whole failure
+    this ownership is meant to remove -- so "present" is not the question, "first" is.
+
+    And the whole rule, not its last two tokens. `-A INPUT -s 127.0.0.1 -j BAI-VXLAN-IN` ends in
+    the same two tokens and sends nothing from the wire through the protection chain, which is
+    every packet this exists to inspect. A jump narrowed by a source, an interface or a protocol
+    is a jump somebody else edited, and the repair is to put ours back at the head.
     """
     for line in listing.splitlines():
         parts = line.split()
         if len(parts) < 2 or parts[0] != "-A" or parts[1] != builtin:
             continue  # -P/-N lines and other chains
-        return parts[-2:] == ["-j", chain]
+        return parts == ["-A", builtin, "-j", chain]
     return False
 
 
@@ -1242,6 +1252,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     _pair_active_generations: dict[tuple[str, str], int]
     #: Consecutive protection passes that could not read the node's state at all.
     _unverified_passes: int
+    #: VNI -> the session whose setup is building on it right now. The check and the devices
+    #: are separated by several awaits, and a session joins `_sessions` only after they exist.
+    _reserved_vnis: dict[int, str]
     #: Whether the fail-close preflight has run to the end since this process started. False is a
     #: debt the node reports, because an empty `unclosed_devices` otherwise says "everything that
     #: survived is down" on behalf of a backend that never looked.
@@ -1327,6 +1340,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # carrying a node's worth of survivors. `owe_fail_close_preflight` is what the privnet
         # calls at startup to say this node does have one.
         self._preflight_done = True
+        self._reserved_vnis = {}
         self._pair_slot_generations = {}
         self._pair_active_generations = {}
         self._forwarding_locks = {}
@@ -2023,6 +2037,62 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._programmed_pairs.discard((self_vtep, peer_vtep))
         self._programmed_policies.discard((self_vtep, peer_vtep, meta.vxlan_port))
 
+    async def _withdraw_pair(
+        self, session_id: str, meta: SessionNetMeta, self_vtep: str, peer_vtep: str
+    ) -> bool:
+        """Drop this session's claim on one ESP pair, leaving the pair itself alone.
+
+        WITHDRAW means a co-located agent still has kernels on this data plane, so the only answer
+        that makes dropping our claim safe is the journal agreeing: somebody else holds it. True
+        says OUR claim was the last one on SAs that are still installed and still carrying that
+        agent's traffic -- its own claim lost or never made -- and dropping ours leaves the pair
+        readable as unused, after which the next teardown on this node deletes the protection out
+        from under it.
+
+        Progress is per peer and per scope: a claim that came off stays off, and the peers this
+        could not finish are the ones the caller reports, so a retry resumes rather than restarts.
+        """
+        sa = (self_vtep, peer_vtep)
+        key = (self_vtep, peer_vtep, meta.vxlan_port)
+        sa_released = await self._withdraw_claim(
+            sa_key(*sa), session_id, session_id in self._pair_users.get(sa, set())
+        )
+        if sa_released:
+            self._pair_users.get(sa, set()).discard(session_id)
+        policy_released = await self._withdraw_claim(
+            pair_key(*key), session_id, session_id in self._policy_users.get(key, set())
+        )
+        if policy_released:
+            self._policy_users.get(key, set()).discard(session_id)
+        return sa_released and policy_released
+
+    async def _withdraw_claim(self, claim_key: str, session_id: str, held: bool) -> bool:
+        """Drop one claim if the journal says somebody else still holds it. Reports whether it is
+        off -- including when it was already off, so a retry resumes rather than restarts."""
+        if not held:
+            return True  # given up on an earlier attempt
+        answer: bool | None = None
+        try:
+            async with self._pair_journal.releasing(
+                claim_key, self._journal_owner, session_id
+            ) as freed:
+                answer = freed
+                if freed is not False:
+                    # Raising keeps the claim: `releasing` commits only on a clean return.
+                    raise _PairStillOwned
+        except _PairStillOwned:
+            log.warning(
+                "not withdrawing this agent's claim on {}: the journal says it is {} -- the"
+                " objects are staying installed for another agent, so the claim stays with them",
+                claim_key,
+                "the last one on it" if answer is True else "of an undetermined count",
+            )
+            return False
+        except PairStillClaimed as e:
+            log.warning("{}", e)
+            return False
+        return True
+
     def _is_self(self, session_id: str, peer_vtep: str) -> bool:
         """Whether this "peer" is this very node.
 
@@ -2061,7 +2131,38 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # Preconditions, so they run before any side effect: a session this node cannot carry must
         # leave nothing half-built behind.
         await self._require_mtu_fits(meta)
+        # Reserved for the whole of setup, not merely checked at the top. The check is followed by
+        # several awaits and the devices are built before the session joins `_sessions`, so two
+        # sessions declaring one VNI could both pass it and the second would rebuild the first's
+        # bridge and VXLAN device under its containers.
+        async with self._reserve_vni(meta):
+            await self._build_session_network(meta, self_member, vni)
+
+    @contextlib.asynccontextmanager
+    async def _reserve_vni(self, meta: SessionNetMeta) -> AsyncIterator[None]:
+        """Hold this VNI for this session for as long as its setup runs.
+
+        The privnet's node-wide registry refuses a VNI another AGENT holds; this refuses one
+        another session of this process is building on, which is the whole of the check where the
+        backend runs in-process and has no registry to consult.
+        """
         self._require_vni_unused(meta)
+        if meta.vni is None:
+            yield
+            return
+        self._reserved_vnis[meta.vni] = meta.session_id
+        try:
+            yield
+        finally:
+            # Only if we still hold it: a completed setup is recorded in `_sessions`, which is
+            # what `_require_vni_unused` reads from then on.
+            if self._reserved_vnis.get(meta.vni) == meta.session_id:
+                del self._reserved_vnis[meta.vni]
+
+    async def _build_session_network(
+        self, meta: SessionNetMeta, self_member: Member, vni: int
+    ) -> None:
+        """The rest of `setup_session_network`, with this VNI reserved."""
         await self._require_closed(vni)
         await self._require_no_conflict(vni, meta.vxlan_port)
         if meta.encryption_key is not None and self_member.vtep_ip is None:
@@ -2380,7 +2481,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         return self.unclosed_devices()
 
     def _require_vni_unused(self, meta: SessionNetMeta) -> None:
-        """Refuse a VNI another session of THIS process already holds.
+        """Refuse a VNI another session of THIS process already holds or is building on.
 
         The devices are named after the VNI, and setup deletes what it finds under those names
         before rebuilding them -- so a second session declaring a VNI that is already up rebuilds
@@ -2390,12 +2491,17 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         process, which is the whole of the check where the backend runs in-process and has no
         registry to consult.
         """
-        for other_id, other in self._sessions.items():
-            if other_id != meta.session_id and other.vni == meta.vni:
-                raise OverlayEncryptionUnavailable(
-                    f"session {meta.session_id} declares VNI {meta.vni}, which session {other_id}"
-                    " on this node is already running on; its devices are named after it"
-                )
+        holder = self._reserved_vnis.get(meta.vni) if meta.vni is not None else None
+        if holder is None:
+            for other_id, other in self._sessions.items():
+                if other_id != meta.session_id and other.vni == meta.vni:
+                    holder = other_id
+                    break
+        if holder is not None and holder != meta.session_id:
+            raise OverlayEncryptionUnavailable(
+                f"session {meta.session_id} declares VNI {meta.vni}, which session {holder} on"
+                " this node is already running on; its devices are named after it"
+            )
 
     async def _require_closed(self, vni: int) -> None:
         """Refuse to build any overlay while a survivor from a previous life is still up.
@@ -2432,26 +2538,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             if meta is not None and self_vtep is not None:
                 unreleased: list[str] = []
                 for peer_vtep in sorted(self._encrypted_peers.get(session_id, set())):
-                    sa = (self_vtep, peer_vtep)
-                    key = (self_vtep, peer_vtep, meta.vxlan_port)
-                    # The claims, not the SAs: another agent here is still carried by them, which
-                    # is exactly what the node-wide refcount is for. Both, because the SAs and the
-                    # policy are counted separately -- see `sa_key`.
-                    async with (
-                        self._pair_journal.releasing(
-                            sa_key(*sa), self._journal_owner, session_id
-                        ) as sa_freed,
-                        self._pair_journal.releasing(
-                            pair_key(*key), self._journal_owner, session_id
-                        ) as freed,
-                    ):
-                        if sa_freed is None or freed is None:
-                            # The journal could not say. Our claim may still be on disk, and
-                            # reporting the withdrawal as done leaves it there with nobody
-                            # left to remove it.
-                            unreleased.append(peer_vtep)
-                    self._pair_users.get(sa, set()).discard(session_id)
-                    self._policy_users.get(key, set()).discard(session_id)
+                    if not await self._withdraw_pair(session_id, meta, self_vtep, peer_vtep):
+                        unreleased.append(peer_vtep)
                 if unreleased:
                     raise OverlayEncryptionUnavailable(
                         f"session {session_id} could not release its ESP pair claim for"
