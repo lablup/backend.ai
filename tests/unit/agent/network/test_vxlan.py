@@ -3778,3 +3778,46 @@ class TestACommandThatNeverReturns:
             await vx._run_command(argv)
         assert "REDACTED" in str(caught.value)
         assert argv[argv.index("aead") + 2] not in str(caught.value)
+
+
+class TestAPreflightCutShort:
+    """The fail-close preflight runs under the privnet's startup deadline. Cancelled partway, the
+    devices it had not reached are still UP -- and recording the survivors only after the loop
+    meant they were UP, unrecorded, with no retry armed, while the next recovery pass (which does
+    not re-run this preflight) cleared the failure flag and called the node healthy."""
+
+    async def test_every_survivor_is_recorded_before_any_is_touched(self) -> None:
+        seen: list[str] = []
+
+        class _SlowRecorder(Recorder):
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                await super().__call__(argv)
+                if list(argv[:3]) == ["ip", "link", "set"]:
+                    seen.append(argv[3])
+                    if len(seen) == 1:
+                        raise asyncio.CancelledError  # the startup deadline, mid-loop
+
+        plugin = _plugin(
+            _SlowRecorder(), vxlans={vxlan_dev(4097), vxlan_dev(4098), vxlan_dev(4099)}
+        )
+        with pytest.raises(asyncio.CancelledError):
+            await plugin.prepare_recovery()
+        assert plugin.unclosed_devices() == frozenset({
+            vxlan_dev(4097),
+            vxlan_dev(4098),
+            vxlan_dev(4099),
+        }), "the ones it never reached are up and nothing knows"
+
+    async def test_a_device_proven_down_is_cleared(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, vxlans={vxlan_dev(4097)})
+        await plugin.prepare_recovery()
+        assert plugin.unclosed_devices() == frozenset()
+
+    async def test_one_that_will_not_go_down_stays_recorded(self) -> None:
+        rec = Recorder(fail_on=lambda argv: list(argv[:3]) == ["ip", "link", "set"])
+        plugin = _plugin(rec, vxlans={vxlan_dev(4097)})
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.prepare_recovery()
+        assert plugin.unclosed_devices() == frozenset({vxlan_dev(4097)})
