@@ -414,6 +414,16 @@ class PrivNetServer:
         # can race the rebuild, and nothing can reach this node while it is stuck opening a
         # runtime that will not answer. Stuck is fail-closed, but a node that never finishes
         # starting is a node that serves nothing, forever, with no way to say so.
+        # Before the runtime, before anything that can block: a backend that has not completed
+        # its fail-close preflight owes this node an answer about every tunnel that survived, and
+        # the debt has to exist before the first await that could stop us reaching it. Recorded
+        # after, a startup that timed out opening the runtime left an EMPTY unclosed set, a
+        # fail-close retry that swept it and reported success, and a node that called itself
+        # healthy over tunnels it had never looked at.
+        for backend in self._backends.values():
+            preflight_owed = getattr(backend, "owe_fail_close_preflight", None)
+            if preflight_owed is not None:
+                preflight_owed()
         try:
             async with asyncio.timeout(_RECOVERY_TIMEOUT_SEC):
                 await self._runtime.open()
@@ -1738,13 +1748,23 @@ class PrivNetServer:
             return
         vni, digest = binding
         async with self._vni_registry.releasing(vni, self._agent_id, session_id, digest) as freed:
-            if freed is None:
-                # Our claim may still be on disk. Reporting the withdrawal as done leaves this
-                # node's binding on a VNI nobody is behind, and the next session that draws it is
-                # refused -- so say so instead, and let the agent retry.
+            if freed is not False:
+                # WITHDRAW means "a co-located agent still has kernels on these devices, so they
+                # stay". False is the registry agreeing: somebody else holds the VNI. True says
+                # OUR claim was the last one on a VNI whose devices are still up and carrying
+                # somebody -- their agent's claim was lost or never made -- and dropping it leaves
+                # the VNI readable as free, after which the next session to draw it deletes
+                # `baivx<vni>` out from under them. None is not knowing.
+                #
+                # Raising keeps the claim: `releasing` commits only when this block returns.
                 raise PrivNetError(
-                    f"session {session_id} could not release this node's binding on VNI {vni};"
-                    " this agent has not let the session go"
+                    f"session {session_id} cannot be withdrawn: this node's binding on VNI {vni}"
+                    + (
+                        " is the last one on it, and its devices are staying up"
+                        if freed is True
+                        else " could not be accounted for"
+                    )
+                    + "; the session has not been let go"
                 )
         # Outside, so it runs only if the claim actually went: `releasing` drops the claim when the
         # block RETURNS and raises when it could not. Dropping the journal record and the session
