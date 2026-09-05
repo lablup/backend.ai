@@ -94,9 +94,14 @@ async def _spread_or_skip(node_pair: tuple[Node, Node], session: str) -> _Placem
 
 
 @pytest.fixture
-def encrypted_spec(session_spec: SessionSpec, agent_ids: tuple[str, ...]) -> SessionSpec:
+def encrypted_spec(
+    session_spec: SessionSpec, agent_ids: tuple[str, ...], spread_cpu: str
+) -> SessionSpec:
     return replace(
         session_spec,
+        # More than half a node apiece, so the two kernels cannot share one. Nothing else makes
+        # them: there is no encryption to observe unless traffic crosses the underlay.
+        cpu=spread_cpu,
         cluster_size=2,
         cluster_mode=ClusterModeEnum.MULTI_NODE,
         agent_list=agent_ids,
