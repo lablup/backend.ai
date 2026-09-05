@@ -269,6 +269,29 @@ async def session_driver(dataplane_config: DataplaneConfig) -> AsyncIterator[Ses
 
 
 @pytest.fixture
+async def spread_cpu(node_pair: tuple[Node, Node]) -> str:
+    """A per-kernel CPU request that will not let two kernels share a node.
+
+    `MULTI_NODE` says how a session is networked, not where it is placed: nothing in the scheduler
+    makes two kernels of one session take two agents, so a cross-node scenario that does not ask
+    for the spread gets whichever the selector's rotation happened to pick, and reports it as a
+    skip. Asking for more than half a node is what leaves the scheduler no other choice.
+
+    Derived from the pair's real CPU counts rather than written down, because a number that fits
+    one rig stops scheduling on the next -- which is what a hardcoded ten did here.
+    """
+    counts = []
+    for node in node_pair:
+        result = await node.run(["nproc"])
+        counts.append(int(result.stdout.strip()))
+    # Two must not fit on the LARGER node, and one must still fit on the smaller. An unequal pair
+    # can leave no such number, and then there is nothing to ask for: the scenario falls back to
+    # the default request and skips if the selector packed it, which is what its skip says.
+    wanted = max(counts) // 2 + 1
+    return str(wanted) if wanted <= min(counts) else SessionSpec.cpu
+
+
+@pytest.fixture
 def session_spec(dataplane_config: DataplaneConfig) -> SessionSpec:
     """The image and project scenarios launch into.
 
