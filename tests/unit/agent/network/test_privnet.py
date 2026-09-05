@@ -65,7 +65,9 @@ class _StubBackend:
         *,
         recovery_error: Exception | None = None,
         teardown_failures: int = 0,
+        security_failures: int = 0,
     ) -> None:
+        self.security_failures = security_failures
         self.setup_calls: list[str] = []
         self.adopt_calls: list[str] = []
         self.teardown_calls: list[str] = []
@@ -119,6 +121,9 @@ class _StubBackend:
         self.lifecycle_calls.append(("teardown", session_id))
 
     async def ensure_session_security(self, session_id: str, peers: Any) -> None:
+        if self.security_failures:
+            self.security_failures -= 1
+            raise RuntimeError("the ESP pair could not be re-asserted")
         self.ensure_calls.append((
             session_id,
             tuple(peer.vtep_ip for peer in peers if peer.vtep_ip is not None),
@@ -317,10 +322,12 @@ class _Harness:
         agent_id: str = "i-test",
         recovery_error: Exception | None = None,
         teardown_failures: int = 0,
+        security_failures: int = 0,
     ) -> None:
         self.backend = _StubBackend(
             recovery_error=recovery_error,
             teardown_failures=teardown_failures,
+            security_failures=security_failures,
         )
         self.forwarder = forwarder or _RecordingForwarder()
         self._tmp = None if state_dir is not None else tempfile.TemporaryDirectory()
@@ -2511,9 +2518,10 @@ class TestAReclaimReChecksTheRuntime:
         runtime = _StubRuntime(pid=4242, live={"c1": "s1"})
         async with _Harness(runtime, state_dir=tmp_path) as h2:
             h2.server._sessions.clear()  # as a failed adoption would leave it
-            await h2.server._reclaim_dead_session(
-                "s1", {"backend": "bridge", "subnet": "172.30.9.0/24"}, ()
-            )
+            with pytest.raises(server_mod._ReclaimDeferred):
+                await h2.server._reclaim_dead_session(
+                    "s1", {"backend": "bridge", "subnet": "172.30.9.0/24"}, ()
+                )
             assert h2.backend.teardown_calls == []
             assert "s1" in await h2.journal.sessions()
 
@@ -2568,6 +2576,185 @@ class TestAPrivnetThatStopsAnswering:
         try:
             problems = await PrivNetClient(socket_path).recovery_problems()
             assert "protocol 1" in problems["privnet:status"]
+        finally:
+            server.close()
+            await server.wait_closed()
+            with contextlib.suppress(OSError):
+                os.unlink(socket_path)
+
+
+class TestARecheckThatSaysOtherwiseIsDebt:
+    """The runtime re-check has three answers, not two. "It is back" and "I could not ask" are
+    both reasons NOT to delete -- and treating either as a completed reclaim let the caller clear
+    the marker that brings the retry back, leaving a live session journalled, unadopted, its
+    tunnel held down, with nothing coming back to it."""
+
+    def _comes_back(
+        self, harness: _Harness, monkeypatch: pytest.MonkeyPatch, live: dict[str, str]
+    ) -> None:
+        """The runtime says nothing is running when the pass reads its snapshot, and says it is
+        back by the time the pass acts on it."""
+        calls = 0
+
+        async def _changing() -> dict[str, str]:
+            nonlocal calls
+            calls += 1
+            return {} if calls == 1 else dict(live)
+
+        monkeypatch.setattr(harness.server, "_live_containers", _changing)
+
+    async def test_a_container_that_came_back_stays_on_the_books(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "s1", container_id="c1")
+            )
+
+        # Its first reclaim fails, so the attachment is still journalled and still owed when the
+        # retry runs -- which is the only way to reach the re-check at all.
+        async with _Harness(
+            _StubRuntime(),
+            state_dir=tmp_path,
+            forwarder=_RecordingForwarder(remove_failures=1),
+        ) as h2:
+            assert "c1" in h2.server._unreclaimed_containers
+            self._comes_back(h2, monkeypatch, {"c1": "s1"})
+            await h2.server._retry_recovery()
+            assert "c1" in h2.server._unreclaimed_containers
+            assert h2.forwarder.removed == [], "it was reclaimed while it was running again"
+
+    async def test_a_runtime_that_cannot_be_asked_stays_on_the_books(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "s1", container_id="c1")
+            )
+
+        async with _Harness(
+            _StubRuntime(),
+            state_dir=tmp_path,
+            forwarder=_RecordingForwarder(remove_failures=1),
+        ) as h2:
+            calls = 0
+
+            async def _fails_the_second_time() -> dict[str, str]:
+                nonlocal calls
+                calls += 1
+                if calls > 1:
+                    raise RuntimeError("containerd went away")
+                return {}
+
+            monkeypatch.setattr(h2.server, "_live_containers", _fails_the_second_time)
+            await h2.server._retry_recovery()
+            assert "c1" in h2.server._unreclaimed_containers
+
+    async def test_a_session_that_came_back_is_queued_for_adoption(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+
+        # Its first reclaim fails, so it is still journalled and still owed when the retry runs.
+        async with _Harness(_StubRuntime(), state_dir=tmp_path, teardown_failures=1) as h2:
+            assert "s1" in h2.server._unreclaimed_sessions
+            h2.backend.teardown_calls.clear()
+            self._comes_back(h2, monkeypatch, {"c1": "s1"})
+            await h2.server._retry_recovery()
+            assert "s1" in h2.server._unrecovered_sessions, "nothing will ever adopt it"
+            assert h2.backend.teardown_calls == [], "it was reclaimed while it was running again"
+
+
+class TestASecurityRestoreThatFailed:
+    """Adoption holds an encrypted tunnel DOWN and the restore is what raises it again. Only
+    logged, the session stayed dark for the life of the process: the node reported itself
+    recovered, the retry timer never started, and nothing else asks."""
+
+    _ENC = {
+        "backend": "vxlan",
+        "subnet": "10.128.5.0/24",
+        "vni": 4138,
+        "mtu": 1412,
+        "encryption_key": "ab" * 32,
+    }
+
+    async def _set_up_with_a_peer(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._ENC))
+            )
+            # A journalled peer, or the restore declines before it starts: an unknown peer set is
+            # the one case it will not reopen a tunnel for.
+            await h.client().call(PrivNetRequest(PrivNetOp.ADD_PEER, "s1", vtep_ip="10.0.0.2"))
+
+    async def test_it_becomes_recovery_debt(self, tmp_path: Path) -> None:
+        await self._set_up_with_a_peer(tmp_path)
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
+        ) as restarted:
+            pass  # a clean restart: nothing outstanding
+        assert restarted.server._unrecovered_sessions == {}
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}),
+            state_dir=tmp_path,
+            security_failures=1,
+        ) as broken:
+            assert "s1" in broken.server._unrecovered_sessions
+            assert "protection was not restored" in broken.server._unrecovered_sessions["s1"]
+
+    async def test_the_timer_is_armed_for_it(self, tmp_path: Path) -> None:
+        await self._set_up_with_a_peer(tmp_path)
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}),
+            state_dir=tmp_path,
+            security_failures=1,
+        ) as broken:
+            task = broken.server._recovery_retry_task
+            assert task is not None and not task.done()
+            # And the retry raises the tunnel once the restore works.
+            await broken.server._retry_recovery()
+            assert broken.server._unrecovered_sessions == {}
+            assert "s1" in [sid for sid, _ in broken.backend.ensure_calls]
+
+
+class TestAnAnswerThatCannotBeParsed:
+    """A truncated line (the daemon died mid-answer) and a corrupt frame both mean this node
+    cannot say what it has not recovered. Reading either as "nothing to report" is the same
+    fail-open as an empty answer."""
+
+    async def _serving(self, reply: bytes) -> tuple[asyncio.AbstractServer, str]:
+        socket_path = _short_socket_path()
+
+        async def _handler(reader: Any, writer: Any) -> None:
+            await reader.readline()
+            writer.write(reply)
+            await writer.drain()
+            writer.close()
+
+        return await asyncio.start_unix_server(_handler, path=socket_path), socket_path
+
+    async def test_a_truncated_answer_is_a_problem(self) -> None:
+        server, socket_path = await self._serving(b"")
+        try:
+            problems = await PrivNetClient(socket_path).recovery_problems()
+            assert "privnet:status" in problems
+        finally:
+            server.close()
+            await server.wait_closed()
+            with contextlib.suppress(OSError):
+                os.unlink(socket_path)
+
+    async def test_a_corrupt_frame_is_a_problem(self) -> None:
+        server, socket_path = await self._serving(b"{not json\n")
+        try:
+            problems = await PrivNetClient(socket_path).recovery_problems()
+            assert "privnet:status" in problems
         finally:
             server.close()
             await server.wait_closed()
