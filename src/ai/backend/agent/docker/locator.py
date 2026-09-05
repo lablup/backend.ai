@@ -14,6 +14,7 @@ path this module guessed.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Mapping
 from typing import override
 
@@ -39,10 +40,26 @@ class DockerContainerLocator(ContainerLocator):
 
     @override
     async def open(self) -> None:
-        # Held for the privnet's lifetime rather than opened per request: the daemon being
-        # unreachable is a startup fact, and this is the call that surfaces it there.
-        self._docker = Docker()
-        await self._docker.version()
+        """Connect, and only then let go of whatever was connected before.
+
+        Held for the privnet's lifetime rather than opened per request: the daemon being
+        unreachable is a startup fact, and this is the call that surfaces it there.
+
+        Assigning the new client first was the bug: a second `open()` -- which the privnet's entry
+        point used to make -- replaced a working client without closing it, leaking its aiohttp
+        session over the daemon socket, and a failed re-open left the process holding a client
+        that had never answered.
+        """
+        docker = Docker()
+        try:
+            await docker.version()
+        except BaseException:
+            await docker.close()
+            raise
+        previous, self._docker = self._docker, docker
+        if previous is not None:
+            with contextlib.suppress(Exception):
+                await previous.close()
 
     @override
     async def close(self) -> None:

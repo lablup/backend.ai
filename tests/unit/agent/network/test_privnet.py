@@ -2889,54 +2889,100 @@ class TestAStaleRecordOfSomebodyElsesSession:
 
     _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
 
-    async def _ours_then_theirs(self, tmp_path: Path) -> _Harness:
+    async def _shared_then_theirs(self, tmp_path: Path) -> None:
+        """Both agents set the session up; then only B's container is left running it."""
         async with _Harness(
             _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-a"),
             state_dir=tmp_path,
             agent_id="i-a",
-        ) as first:
-            await first.client().call(
+        ) as a:
+            await a.client().call(
                 PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
             )
-        return first
+            async with _Harness(
+                _StubRuntime(pid=4242, live={"c2": "s1"}, owner="i-b"),
+                state_dir=tmp_path / "b",
+                agent_id="i-b",
+            ) as b:
+                await b.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
 
-    async def test_our_record_of_it_goes(self, tmp_path: Path) -> None:
-        await self._ours_then_theirs(tmp_path)
-        async with _Harness(
-            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-b"),
+    def _restarted_a(self, tmp_path: Path) -> _Harness:
+        return _Harness(
+            _StubRuntime(pid=4242, live={"c2": "s1"}, owner="i-b"),
             state_dir=tmp_path,
             agent_id="i-a",
-        ) as restarted:
+        )
+
+    async def test_our_record_of_it_goes(self, tmp_path: Path) -> None:
+        await self._shared_then_theirs(tmp_path)
+        async with self._restarted_a(tmp_path) as restarted:
             assert "s1" not in await restarted.journal.sessions()
 
     async def test_its_devices_do_not(self, tmp_path: Path) -> None:
-        await self._ours_then_theirs(tmp_path)
-        async with _Harness(
-            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-b"),
-            state_dir=tmp_path,
-            agent_id="i-a",
-        ) as restarted:
+        await self._shared_then_theirs(tmp_path)
+        async with self._restarted_a(tmp_path) as restarted:
             assert restarted.backend.teardown_calls == []
             assert restarted.backend.adopt_calls == []
 
-    async def test_the_vni_binding_goes_with_it(self, tmp_path: Path) -> None:
-        await self._ours_then_theirs(tmp_path)
-        async with _Harness(
-            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-b"),
-            state_dir=tmp_path,
-            agent_id="i-a",
-        ) as restarted:
-            assert {h.agent_id for h in await restarted.vni_registry.holders(4138)} == set()
+    async def test_only_our_binding_goes(self, tmp_path: Path) -> None:
+        # B's claim is what stops the next session that draws VNI 4138 from deleting the devices
+        # B's containers are on. Ours going is the whole point; B's going would be the bug.
+        await self._shared_then_theirs(tmp_path)
+        async with self._restarted_a(tmp_path) as restarted:
+            assert {h.agent_id for h in await restarted.vni_registry.holders(4138)} == {"i-b"}
 
     async def test_the_node_stops_reporting_itself_unrecovered(self, tmp_path: Path) -> None:
-        await self._ours_then_theirs(tmp_path)
+        await self._shared_then_theirs(tmp_path)
+        async with self._restarted_a(tmp_path) as restarted:
+            assert restarted.server.recovery_problems() == {}
+            assert restarted.server._recovery_pending() is False
+
+
+class TestTheLastBindingOnALiveVni:
+    """The other agent runs the session and holds no claim on its VNI -- an older privnet, or one
+    whose claim was lost. Dropping ours then leaves the registry saying the VNI is free while
+    `baivx4138` is carrying that agent's containers, and the next session to draw it deletes the
+    device out from under them."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    async def _ours_then_theirs(self, tmp_path: Path) -> None:
         async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-a"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as a:
+            await a.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+
+    def _restarted_a(self, tmp_path: Path) -> _Harness:
+        return _Harness(
             _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-b"),
             state_dir=tmp_path,
             agent_id="i-a",
-        ) as restarted:
-            assert restarted.server.recovery_problems() == {}
-            assert restarted.server._recovery_pending() is False
+        )
+
+    async def test_it_is_kept(self, tmp_path: Path) -> None:
+        await self._ours_then_theirs(tmp_path)
+        async with self._restarted_a(tmp_path) as restarted:
+            assert {h.agent_id for h in await restarted.vni_registry.holders(4138)} == {"i-a"}
+            assert "s1" in await restarted.journal.sessions()
+
+    async def test_the_devices_are_still_not_touched(self, tmp_path: Path) -> None:
+        await self._ours_then_theirs(tmp_path)
+        async with self._restarted_a(tmp_path) as restarted:
+            assert restarted.backend.teardown_calls == []
+
+    async def test_the_node_says_so(self, tmp_path: Path) -> None:
+        # An operator has to be able to see a co-located agent that is not claiming what it runs.
+        await self._ours_then_theirs(tmp_path)
+        async with self._restarted_a(tmp_path) as restarted:
+            problems = restarted.server.recovery_problems()
+            assert "privnet:dead-session:s1" in problems
+            assert "the last one on it" in problems["privnet:dead-session:s1"]
 
 
 class TestOneSnapshotForBothScopes:

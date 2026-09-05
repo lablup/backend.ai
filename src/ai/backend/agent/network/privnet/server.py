@@ -427,6 +427,11 @@ class PrivNetServer:
             self._recovery_failed = (
                 f"startup recovery did not finish within {_RECOVERY_TIMEOUT_SEC:.0f}s"
             )
+            # The preflight may have been cut short. Every device it had not reached is recorded
+            # as unclosed (see `prepare_recovery`), and this is what keeps trying to bring them
+            # down -- the ordinary recovery retry does not re-run the preflight.
+            for backend in self._backends.values():
+                self._start_fail_close_retry(backend)
             self._start_recovery_retry()
         sock_path = Path(self._socket_path)
         if sock_path.exists():
@@ -1261,9 +1266,20 @@ class PrivNetServer:
             async with self._vni_registry.releasing(
                 meta.vni, self._agent_id, session_id, digest
             ) as freed:
-                if freed is None:
+                if freed is not False:
+                    # False is the only safe answer here. True means OUR claim is the last one on
+                    # a VNI whose devices are carrying another agent's containers: dropping it
+                    # leaves the registry saying the VNI is free, and the next session to draw it
+                    # deletes `baivx<vni>` out from under them. None means we could not tell.
+                    #
+                    # Raising keeps the claim -- `releasing` drops it only when the block returns
+                    # -- and leaves the session on the books, which is where an operator can see
+                    # a co-located agent that is not claiming what it runs.
                     raise _ReclaimDeferred(
-                        f"this node could not release its binding on VNI {meta.vni}"
+                        f"another agent runs session {session_id}, but this node's binding on VNI"
+                        f" {meta.vni} is "
+                        + ("the last one on it" if freed is True else "of an undetermined count")
+                        + "; keeping it rather than leaving the VNI readable as free"
                     )
         await self._journal.forget_session(session_id)
         log.info(
