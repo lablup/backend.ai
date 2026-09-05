@@ -30,6 +30,7 @@ from ai.backend.agent.errors.network import (
     OverlayTeardownIncomplete,
 )
 from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.network import command
 from ai.backend.agent.network.backends.vxlan_security import (
     VxlanSecurityEvent,
     VxlanSecurityState,
@@ -204,10 +205,6 @@ XFRM_REPLAY_WINDOW: Final = 128
 #: mark went with the rules -- traffic stops; affordable, because one pass reads the
 #: whole node's state in four commands and changes only what drifted.
 PROTECTION_INTERVAL_SEC: Final = 3.0
-#: How long one `ip`/`iptables` invocation may take. Generous next to anything these normally do
-#: (milliseconds), and finite because they run under a node-wide barrier: one that never returns
-#: stops every session operation on the node with nothing to say why.
-_COMMAND_TIMEOUT_SEC: Final = 30.0
 KEY_ROTATION_INTERVAL_SEC: Final = 12 * 60 * 60
 _KEYRING_SIZE: Final = 3
 #: Consecutive protection passes that may fail to read the node's state before every encrypted
@@ -231,19 +228,15 @@ async def _list_vxlan_devices() -> frozenset[str]:
     Recovery relies on this to fail-close unknown surviving tunnels, so a failure is surfaced
     rather than represented as an empty host.
     """
-    proc = await asyncio.create_subprocess_exec(
-        "ip",
-        "-o",
-        "link",
-        "show",
-        "type",
-        "vxlan",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
-    out, _ = await proc.communicate()
-    if proc.returncode != 0:
-        raise RuntimeError(f"could not enumerate VXLAN links (rc={proc.returncode})")
+    try:
+        rc, out, _ = await command.run(
+            ["ip", "-o", "link", "show", "type", "vxlan"], capture_stderr=False
+        )
+    except command.CommandTimeout as e:
+        # Recovery fail-closes on this, so an unanswered question must not read as an empty host.
+        raise RuntimeError(f"could not enumerate VXLAN links: {e}") from e
+    if rc != 0:
+        raise RuntimeError(f"could not enumerate VXLAN links (rc={rc})")
     names: set[str] = set()
     for line in (out or b"").decode(errors="replace").splitlines():
         # "<index>: <name>[@<parent>]: <FLAGS> ..." -- the one part of `ip link` output that has
@@ -1129,32 +1122,10 @@ async def _read_command(argv: Sequence[str]) -> str:
     listing rather than an exception.
     """
     try:
-        proc = await asyncio.create_subprocess_exec(
-            *argv,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-    except OSError:
+        rc, stdout, _ = await command.run(argv, capture_stderr=False)
+    except (OSError, command.CommandTimeout):
         return ""
-    try:
-        async with asyncio.timeout(_COMMAND_TIMEOUT_SEC):
-            stdout, _ = await proc.communicate()
-    except TimeoutError:
-        await _kill(proc)
-        return ""
-    return stdout.decode(errors="replace") if proc.returncode == 0 else ""
-
-
-async def _kill(proc: asyncio.subprocess.Process) -> None:
-    """End a command that has run past its deadline, and reap it.
-
-    SIGKILL rather than SIGTERM: these are `ip` and `iptables`, which have nothing to clean up,
-    and one already stuck on a lock is unlikely to act on a catchable signal.
-    """
-    with contextlib.suppress(ProcessLookupError):
-        proc.kill()
-    with contextlib.suppress(Exception):
-        await proc.wait()
+    return stdout.decode(errors="replace") if rc == 0 else ""
 
 
 def _redacted(argv: Sequence[str]) -> str:
@@ -1167,24 +1138,15 @@ def _redacted(argv: Sequence[str]) -> str:
 
 
 async def _run_command(argv: Sequence[str]) -> None:
-    proc = await asyncio.create_subprocess_exec(
-        *argv,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
     try:
-        async with asyncio.timeout(_COMMAND_TIMEOUT_SEC):
-            _, stderr = await proc.communicate()
-    except TimeoutError as e:
+        returncode, _, stderr = await command.run(argv)
+    except command.CommandTimeout as e:
         # `iptables` waiting on an xtables lock somebody else is holding, `ip` blocked on a
         # netlink socket. Every one of these runs under a node-wide barrier, so one that never
-        # returns stops every session operation on this node. Kill it and report -- the caller's
-        # retry is what this backend is built around.
-        await _kill(proc)
-        raise RuntimeError(
-            f"command timed out after {_COMMAND_TIMEOUT_SEC:.0f}s: {_redacted(argv)}"
-        ) from e
-    if proc.returncode != 0:
+        # returns stops every session operation on this node. It is killed and reported -- the
+        # caller's retry is what this backend is built around.
+        raise RuntimeError(f"{e}: {_redacted(argv)}") from e
+    if returncode != 0:
         display_argv = list(argv)
         secrets: set[str] = set()
         for index, value in enumerate(display_argv):
@@ -1198,7 +1160,7 @@ async def _run_command(argv: Sequence[str]) -> None:
         for secret in secrets:
             display_stderr = display_stderr.replace(secret, "[REDACTED]")
         raise RuntimeError(
-            f"command failed (rc={proc.returncode}): {' '.join(display_argv)}: {display_stderr}"
+            f"command failed (rc={returncode}): {' '.join(display_argv)}: {display_stderr}"
         )
 
 

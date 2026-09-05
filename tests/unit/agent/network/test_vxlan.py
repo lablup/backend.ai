@@ -15,6 +15,7 @@ from ai.backend.agent.errors.network import (
     OverlayMtuTooLarge,
     OverlayTeardownIncomplete,
 )
+from ai.backend.agent.network import command
 from ai.backend.agent.network.backends import vxlan as vx
 from ai.backend.agent.network.backends.vxlan import (
     CHAIN_GUARD,
@@ -3725,37 +3726,11 @@ class TestTheChainsBelongToTheHost:
 
 
 class TestACommandThatNeverReturns:
-    """Every `ip` and `iptables` here runs under a node-wide barrier, so one that hangs -- on an
-    xtables lock somebody else holds, on a netlink socket -- stops every session operation on the
-    node, with nothing in the log to say why."""
+    """`ip` and `iptables` run under the privnet's node-wide barrier, so one that hangs stops every
+    session operation on the node. `network.command` kills it; these pin what this backend then
+    reports."""
 
-    async def test_it_is_killed_and_reported(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        killed = asyncio.Event()
-
-        class _Wedged:
-            returncode = None
-
-            async def communicate(self) -> tuple[bytes, bytes]:
-                await asyncio.Event().wait()
-                raise AssertionError("unreachable")
-
-            def kill(self) -> None:
-                killed.set()
-
-            async def wait(self) -> int:
-                return -9
-
-        async def _spawn(*argv: str, **kwargs: object) -> _Wedged:
-            return _Wedged()
-
-        monkeypatch.setattr(asyncio, "create_subprocess_exec", _spawn)
-        monkeypatch.setattr(vx, "_COMMAND_TIMEOUT_SEC", 0.05)
-        with pytest.raises(RuntimeError, match="timed out"):
-            await vx._run_command(["ip", "link", "show"])
-        assert killed.is_set()
-
-    async def test_the_reader_gives_up_too(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # A hung `iptables-save` inside the drift pass holds the barrier just as hard.
+    def _wedged(self, monkeypatch: pytest.MonkeyPatch) -> None:
         class _Wedged:
             returncode = None
 
@@ -3773,30 +3748,31 @@ class TestACommandThatNeverReturns:
             return _Wedged()
 
         monkeypatch.setattr(asyncio, "create_subprocess_exec", _spawn)
-        monkeypatch.setattr(vx, "_COMMAND_TIMEOUT_SEC", 0.05)
+        monkeypatch.setattr(command, "DEFAULT_TIMEOUT_SEC", 0.05)
+
+    async def test_a_write_is_reported_as_a_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._wedged(monkeypatch)
+        with pytest.raises(RuntimeError, match="timed out"):
+            await vx._run_command(["ip", "link", "show"])
+
+    async def test_a_read_gives_up_and_says_nothing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # The drift pass treats an empty listing as drift and reasserts; it must not hang instead.
+        self._wedged(monkeypatch)
         assert await vx._read_command(["iptables-save", "-t", "filter"]) == ""
+
+    async def test_the_device_listing_refuses_rather_than_reporting_an_empty_host(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Recovery fail-closes on surviving tunnels, so "I could not ask" must not read as "there
+        # are none".
+        self._wedged(monkeypatch)
+        with pytest.raises(RuntimeError, match="could not enumerate"):
+            await vx._list_vxlan_devices()
 
     async def test_the_key_is_not_in_the_timeout_message(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        class _Wedged:
-            returncode = None
-
-            async def communicate(self) -> tuple[bytes, bytes]:
-                await asyncio.Event().wait()
-                raise AssertionError("unreachable")
-
-            def kill(self) -> None:
-                pass
-
-            async def wait(self) -> int:
-                return -9
-
-        async def _spawn(*argv: str, **kwargs: object) -> _Wedged:
-            return _Wedged()
-
-        monkeypatch.setattr(asyncio, "create_subprocess_exec", _spawn)
-        monkeypatch.setattr(vx, "_COMMAND_TIMEOUT_SEC", 0.05)
+        self._wedged(monkeypatch)
         argv = xfrm_state_add_args("10.0.0.1", "10.0.0.2", "ab" * 32)[0]
         with pytest.raises(RuntimeError) as caught:
             await vx._run_command(argv)

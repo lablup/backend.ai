@@ -187,10 +187,15 @@ class _StubRuntime(ContainerLocator):
         live: dict[str, str] | None = None,
         *,
         cgroup_root: Path | None = None,
+        owner: str = "i-test",
     ) -> None:
         self._pid = pid
         self._live = live or {}  # container_id -> session_id
         self._cgroup_root = cgroup_root
+        # Which agent runs these. The privnet adopts only its own and refuses to delete anything
+        # of anyone else's, so a stub that reported one owner for every container hid the
+        # difference entirely.
+        self._owner = owner
 
     @override
     async def open(self) -> None:
@@ -203,7 +208,7 @@ class _StubRuntime(ContainerLocator):
     @override
     async def live_sessions(self) -> Mapping[str, LiveContainer]:
         return {
-            cid: LiveContainer(session_id=sid, owner_agent_id="i-test")
+            cid: LiveContainer(session_id=sid, owner_agent_id=self._owner)
             for cid, sid in self._live.items()
         }
 
@@ -344,6 +349,10 @@ class _Harness:
         # `_isolated_vni_registry`.
         self.vni_registry = VniRegistry()
         self.cni = _RecordingCni(self.ipam)
+        # The stub reports containers as owned by whichever agent this harness is, unless the test
+        # deliberately says otherwise.
+        if runtime is not None and runtime._owner == "i-test" and agent_id != "i-test":
+            runtime._owner = agent_id
         self.server = PrivNetServer(
             socket_path=_short_socket_path(),
             allowed_uid=os.getuid() if allowed_uid is None else allowed_uid,
@@ -2593,15 +2602,19 @@ class TestARecheckThatSaysOtherwiseIsDebt:
         self, harness: _Harness, monkeypatch: pytest.MonkeyPatch, live: dict[str, str]
     ) -> None:
         """The runtime says nothing is running when the pass reads its snapshot, and says it is
-        back by the time the pass acts on it."""
+        back by the time the pass acts on it.
+
+        Both scopes, because the pass asks two different questions of them: whether deleting would
+        take something running, and whether this agent should be adopting it instead."""
         calls = 0
 
         async def _changing() -> dict[str, str]:
             nonlocal calls
             calls += 1
-            return {} if calls == 1 else dict(live)
+            return {} if calls <= 2 else dict(live)
 
         monkeypatch.setattr(harness.server, "_live_containers", _changing)
+        monkeypatch.setattr(harness.server, "_owned_containers", _changing)
 
     async def test_a_container_that_came_back_stays_on_the_books(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -2760,3 +2773,108 @@ class TestAnAnswerThatCannotBeParsed:
             await server.wait_closed()
             with contextlib.suppress(OSError):
                 os.unlink(socket_path)
+
+
+class TestAnotherAgentsContainersAreNotOursToAdopt:
+    """The runtime says which agent runs each container, and the privnet used to throw that away.
+    Two scopes are needed and they answer different questions: what this agent may ADOPT, and what
+    is running on the node at all -- which is what stops anything being deleted."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    async def test_a_co_located_agents_session_is_not_an_orphan_of_ours(
+        self, tmp_path: Path
+    ) -> None:
+        # Reported as an orphan, it holds this node out of service for a session that is somebody
+        # else's and perfectly well managed.
+        async with _Harness(
+            _StubRuntime(live={"c1": "theirs"}, owner="i-b"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as h:
+            assert h.server._unrecovered_sessions == {}
+
+    async def test_our_own_orphan_is_still_reported(self, tmp_path: Path) -> None:
+        async with _Harness(
+            _StubRuntime(live={"c1": "ours"}, owner="i-a"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as h:
+            assert "ours" in h.server._unrecovered_sessions
+
+    async def test_a_session_left_running_by_another_agent_is_not_re_adopted(
+        self, tmp_path: Path
+    ) -> None:
+        # A shared session this agent journalled but whose last container is now the OTHER
+        # agent's. Re-adopting takes the VNI binding, the ESP pair claim and the watchdog for
+        # containers we do not run -- and keeps them after the real owner has gone.
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-a"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as first:
+            await first.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-b"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as restarted:
+            assert restarted.backend.adopt_calls == []
+            assert "s1" not in restarted.server._sessions
+
+    async def test_it_is_not_reclaimed_either(self, tmp_path: Path) -> None:
+        # Not ours to adopt is not the same as free to delete: the container is running.
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-a"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as first:
+            await first.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-b"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        ) as restarted:
+            assert restarted.backend.teardown_calls == []
+
+
+class TestASessionTakenBackOwesNothingAsADeadOne:
+    """A session that came back is recorded in BOTH books -- unreclaimed as a dead one, and
+    unrecovered as one to adopt. The sweep then skips it for being adopted, so the dead-session
+    marker outlived the thing it described and the node never reported itself recovered again."""
+
+    async def test_both_markers_go(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
+        ) as restarted:
+            restarted.server._sessions.clear()
+            restarted.server._unreclaimed_sessions["s1"] = "it came back"
+            restarted.server._unrecovered_sessions["s1"] = "it came back"
+
+            await restarted.server._retry_recovery()
+
+            assert restarted.server._unrecovered_sessions == {}
+            assert restarted.server._unreclaimed_sessions == {}
+            assert restarted.server.recovery_problems() == {}
+
+    async def test_the_timer_can_then_stop(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path) as h:
+            await h.setup("s1")
+
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
+        ) as restarted:
+            restarted.server._sessions.clear()
+            restarted.server._unreclaimed_sessions["s1"] = "it came back"
+            restarted.server._unrecovered_sessions["s1"] = "it came back"
+            await restarted.server._retry_recovery()
+            assert restarted.server._recovery_pending() is False
