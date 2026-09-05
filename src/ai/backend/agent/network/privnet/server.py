@@ -882,6 +882,11 @@ class PrivNetServer:
         if not journalled_sessions and not journalled_attachments:
             self._unreclaimed_containers.clear()
             self._unreclaimed_sessions.clear()
+            # An orphan is the one thing an empty journal can still owe: a container running here
+            # that no record accounts for. Returning without the timer left that mark with nothing
+            # to ever clear it, so the node stayed out of service after the container was gone.
+            if self._recovery_pending():
+                self._start_recovery_retry()
             return
 
         # Ours to adopt: journalled here AND running under a container this agent owns. A
