@@ -883,6 +883,19 @@ class TestTellingASshDropFromACommandFailure:
         # collector that was never run reads exactly like a node with nothing on it.
         assert 0 < SSH_MAX_CONCURRENCY < 10
 
+    def test_a_node_survives_the_loop_it_was_made_in(self) -> None:
+        # The node fixture is session-scoped and every test gets its own loop, so anything the
+        # node holds that is bound to a loop breaks on the second test -- reported from inside a
+        # fixture as an error with nothing to do with ssh.
+        node = SshNode("root@10.0.0.2")
+
+        async def take_a_slot() -> int:
+            async with node._limiter():
+                return id(asyncio.get_running_loop())
+
+        # Two separate loops, as two tests would be.
+        assert asyncio.run(take_a_slot()) != asyncio.run(take_a_slot())
+
     def test_one_connection_is_shared_per_node(self) -> None:
         options = SshNode("root@10.0.0.2").wire_argv(["true"])
         assert "ControlMaster=auto" in options
