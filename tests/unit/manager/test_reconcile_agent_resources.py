@@ -29,13 +29,17 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.db.engine import create_async_engine
@@ -84,6 +88,8 @@ class TestReconcileAgentResources:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -476,6 +482,8 @@ class TestOrphanedAllocationCleanup:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -934,6 +942,8 @@ class TestTerminalSessionKernelReconciliation:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,

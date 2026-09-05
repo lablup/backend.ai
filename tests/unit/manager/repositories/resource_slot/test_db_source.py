@@ -22,7 +22,10 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
@@ -30,6 +33,7 @@ from ai.backend.manager.models.resource_slot import (
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.resource_slot.db_source import ResourceSlotDBSource
@@ -171,6 +175,8 @@ class TestResourceAllocations:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -216,6 +222,8 @@ class TestAggregation:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -597,6 +605,8 @@ class TestComputeActualAgentResourceUsage:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,

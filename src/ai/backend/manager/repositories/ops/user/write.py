@@ -11,8 +11,11 @@ the removal of the legacy path in BA-7574.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Collection
 from dataclasses import dataclass
+from re import Pattern
+from typing import ClassVar
 
 import sqlalchemy as sa
 
@@ -22,9 +25,11 @@ from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.keypair.creators import DefaultKeypairCreator
 from ai.backend.manager.models.project import ProjectRow, ProjectType
+from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.user import UserRow, UserStatus
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
@@ -62,6 +67,14 @@ class FullUserCreationResult:
 class UserWriteOps(RBACWriteOps):
     """The RBAC write ops plus provisioning a user in full."""
 
+    # groups.name is a slug of at most 64 characters; the tail is reserved for the
+    # collision suffix a personal project's name may need.
+    _NON_SLUG_CHARS: ClassVar[Pattern[str]] = re.compile(r"[^\w.-]")
+    _SLUG_SEPARATOR_RUN: ClassVar[Pattern[str]] = re.compile(r"[._-]{2,}")
+    _SLUG_EDGE_CHARS: ClassVar[str] = "._-"
+    _PROJECT_NAME_BASE_LIMIT: ClassVar[int] = 60
+    _PROJECT_NAME_SUFFIX_LIMIT: ClassVar[int] = 1000
+
     async def create_full_user(
         self,
         full_creation: FullUserCreation,
@@ -69,13 +82,15 @@ class UserWriteOps(RBACWriteOps):
         """Provision a user end to end in one transaction.
 
         Creates the user scope (row, virtual entity, own-scope roles) and grants those
-        roles, writes the keypair the user authorizes with, then enrolls the user in
-        its domain's and projects' virtual entities.
+        roles, writes the keypair the user authorizes with, creates the personal project
+        the user alone belongs to, then enrolls the user in its domain's and projects'
+        virtual entities.
         """
         user_row = await self._create_user_scope(full_creation.creation)
         user_id = UserID(user_row.uuid)
         keypair = await self._create_default_keypair(user_id, user_row, full_creation)
         await self._enroll_in_domain(user_id, full_creation.domain_id)
+        await self._create_personal_project(user_id, user_row.username, full_creation.domain_id)
         await self._enroll_in_projects(user_id, full_creation.domain_id, full_creation.project_ids)
 
         # The insert leaves the server-default columns unloaded; reload them so callers
@@ -118,6 +133,74 @@ class UserWriteOps(RBACWriteOps):
         await self.add_bulk_members(
             EntityMembersAddition(scope=domain_scope, members=[ScopeUserMember(user_id=user_id)])
         )
+
+    async def _create_personal_project(
+        self, user_id: UserID, username: str, domain_id: DomainID
+    ) -> None:
+        """Create the user's personal project in its domain and put the user on the
+        roster as its only member. The project is created in the domain, so the domain's
+        roles reach it the way they reach every other project."""
+        domain_name = await self._domain_name(domain_id)
+        project = await self.create_role_managed_entity(
+            ProjectCreator.personal(
+                name=await self._personal_project_name(domain_name, username, user_id),
+                domain_id=domain_id,
+                domain_name=domain_name,
+                user_id=user_id,
+            )
+        )
+        await self.add_bulk_members(
+            EntityMembersAddition(
+                scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(project.id)),
+                members=[ScopeUserMember(user_id=user_id)],
+            )
+        )
+
+    async def _domain_name(self, domain_id: DomainID) -> str:
+        """The name of the domain the user was created in. The user row's own
+        ``domain_name`` is filled by the database and is not loaded yet at this point."""
+        name = await self._sess.scalar(sa.select(DomainRow.name).where(DomainRow.id == domain_id))
+        if name is None:
+            raise DomainNotFound(f"Domain '{domain_id}' does not exist.")
+        return name
+
+    async def _personal_project_name(self, domain_name: str, username: str, user_id: UserID) -> str:
+        """The username as a slug, given a numeric suffix when the domain already holds
+        a project of that name. Falls back to the user id, which no name can collide
+        with, when the username slugifies to nothing or every suffix is taken."""
+        base = self._slugify(username) or str(user_id)
+        taken = set(
+            (
+                await self._sess.scalars(
+                    sa.select(ProjectRow.name).where(
+                        ProjectRow.domain_name == domain_name,
+                        sa.or_(
+                            ProjectRow.name == base,
+                            ProjectRow.name.like(f"{self._escape_like(base)}-%", escape="\\"),
+                        ),
+                    )
+                )
+            ).all()
+        )
+        if base not in taken:
+            return base
+        for suffix in range(2, self._PROJECT_NAME_SUFFIX_LIMIT):
+            candidate = f"{base}-{suffix}"
+            if candidate not in taken:
+                return candidate
+        return str(user_id)
+
+    def _slugify(self, value: str) -> str:
+        """``value`` reduced to what the project name column accepts: every other
+        character becomes a hyphen, runs of separators collapse, and the edges are
+        trimmed. Empty when nothing survives."""
+        slug = self._SLUG_SEPARATOR_RUN.sub("-", self._NON_SLUG_CHARS.sub("-", value))
+        slug = slug.strip(self._SLUG_EDGE_CHARS)[: self._PROJECT_NAME_BASE_LIMIT]
+        return slug.rstrip(self._SLUG_EDGE_CHARS)
+
+    def _escape_like(self, value: str) -> str:
+        """``value`` as a literal LIKE prefix; a slug may carry an underscore."""
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
     async def _enroll_in_projects(
         self,

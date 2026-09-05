@@ -49,7 +49,11 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.project import ProjectRow, association_groups_users
+from ai.backend.manager.models.project import (
+    ProjectRow,
+    ProjectType,
+    association_groups_users,
+)
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -1077,6 +1081,39 @@ class TestSignup:
                 )
             )
             await conn.execute(users.delete().where(users.c.email == email))
+
+    async def test_signup_creates_a_personal_project_for_the_new_user(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: DomainFixtureData,
+        db_engine: SAEngine,
+        signup_default_project: _SignupDefaultProjectData,
+    ) -> None:
+        """Signing up creates the personal project too. Signup fills the username with
+        the e-mail address, so the project name is that address as a slug."""
+        unique = secrets.token_hex(4)
+        email = f"signup-personal-{unique}@test.local"
+        signup_default_project.cleanup_emails.append(email)
+
+        result = await admin_registry.auth.signup(
+            SignupRequest(
+                domain=domain_fixture.domain_name,
+                email=email,
+                password=f"SignupP@ss{unique}",
+            ),
+        )
+        assert isinstance(result, SignupResponse)
+
+        async with db_engine.begin() as conn:
+            user_uuid = await conn.scalar(sa.select(users.c.uuid).where(users.c.email == email))
+            creator_id = await conn.scalar(
+                sa.select(ProjectRow.creator_id).where(
+                    ProjectRow.domain_name == domain_fixture.domain_name,
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.name == email.replace("@", "-"),
+                )
+            )
+        assert creator_id == user_uuid
 
     async def test_signup_binds_user_to_default_project_via_ase(
         self,

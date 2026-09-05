@@ -482,6 +482,17 @@ class WriteOps(ReadOps):
         """
         return await V2WriteOps(self._sess).create_entity(creator)
 
+    async def create_role_managed_entity[TRow: Base, TData](
+        self, creator: specs_creator.RoleManagedEntityCreator[TRow, TData]
+    ) -> TData:
+        """Insert a role-managed entity row, provision it in the RBAC graph and create
+        its preset roles, on this session.
+
+        For the transition: a caller whose transaction still runs legacy specs
+        beside this one reaches the v2 entity write here.
+        """
+        return await V2WriteOps(self._sess).create_role_managed_entity(creator)
+
     async def create_field[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
         self, owner_id: TOwnerID, creator: specs_creator.FieldCreator[TOwnerID, TRow, TData]
     ) -> TData:

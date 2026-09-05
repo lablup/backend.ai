@@ -3,10 +3,11 @@ name: models-schema-declaration
 type: design-rationale
 description: models as the schema-declaration layer (per-domain row packages), why Rows carry no implementation, why models/specs specs are preferred over direct db-object manipulation (RBAC side effects), the rationale for avoiding direct session use and keeping implementation in repositories, why every id default is UUIDv7
 scope: src/ai/backend/manager/models
-keywords: [Row, ORM, specs, RBAC, session, repository, schema, alembic, uuid_generate_v7, server_default]
+keywords: [Row, ORM, specs, RBAC, session, repository, schema, alembic, uuid_generate_v7, server_default, creator_id, personal project, dangling]
 sources:
   - src/ai/backend/manager/models/specs
   - src/ai/backend/manager/models/uuid7.py
+  - src/ai/backend/manager/models/project/row.py
 generated:
   by: claude-code/opus-5
   at: 2026-09-05
@@ -66,3 +67,37 @@ no implementation".
   advanced. This matches PostgreSQL 18's built-in `uuidv7()`; once 18 is the minimum, the
   body becomes `RETURN uuidv7();`.
 - Because it mutates session state, it is not marked parallel safe.
+
+## Creator columns and the rows left behind
+
+Since BEP-1077, ownership is answered by the `scope -> virtual_entity -> entity` path
+alone. That is why no row carries an `owner_*` column — it would leave two answers to
+the same question, exactly the state the BEP set out to remove.
+
+`creator_id` answers a different question: **which user did this row come into being
+for**. Provenance, not ownership, so it takes no part in an access decision. The
+distinction is forced by personal projects. One is created together with its user, so
+something has to answer "which project is this user's", and reading that off the graph
+would answer an ownership question with view membership. The roster is also due to be
+rewritten as shares, so its shape moves; the column does not.
+
+### After the user is gone
+
+The foreign key is `ON DELETE SET NULL`. A user purge does not take the project.
+
+- What the project holds outlives the account. Destroying a personal folder in the same
+  transaction that removes the user row leaves no way to hand the data over.
+- Deleting a project means clearing out the resources in it, which is asynchronous work.
+  It does not belong in a synchronous purge transaction.
+- So a personal project holding a NULL creator is **dangling**, and the retention sweep
+  collects it. A delete request that wants the project gone too says so through an API
+  option; the deletion itself stays asynchronous.
+
+On a general project `creator_id` is plain audit information and an empty one means
+nothing. That is why the key is not `RESTRICT`: a team project someone created long ago
+must not block their purge.
+
+### How many
+
+A user has at most one personal project, held by a partial unique index. Dangling ones
+carry NULL, and NULLs do not collide in a unique index, so any number of them coexist.

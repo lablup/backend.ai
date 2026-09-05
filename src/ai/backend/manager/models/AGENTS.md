@@ -74,6 +74,24 @@ live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
   declaration and a migration that disagree leave a freshly created database and a
   migrated one with different constraint names.
 
+## Creator columns
+
+- Ownership is answered by the `scope -> virtual_entity -> entity` path alone
+  (BEP-1077 §5.1). Do NOT put an `owner_*` column on a row — it leaves two answers to
+  the same question.
+- To record which user a row came into being for, use **`creator_id`**. Do not coin
+  another spelling; `vfolders.creator_id` already carries this meaning.
+- It is provenance, not ownership. Do NOT use it in an access decision.
+- Always nullable, and the foreign key is `ON DELETE SET NULL`. When the user goes the
+  column empties and the row stays.
+- Do NOT add a `CHECK` requiring it, not even for one row kind. A row whose creator is
+  gone is a valid state, not a broken one — what the row holds outlives the account, and
+  a sweep collects it later. A `CHECK` turns that state into a refused user deletion.
+- `RESTRICT` is wrong for the same reason: a row the user merely created must not block
+  their purge.
+- Where a user may have at most one, lock it with a partial unique index.
+  Precedent: `groups.creator_id`.
+
 ## Custom column types
 
 - Where possible, reuse the existing `TypeDecorator` wrappers in `models/base.py`.

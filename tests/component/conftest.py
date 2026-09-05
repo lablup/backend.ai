@@ -121,7 +121,11 @@ from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
-from ai.backend.manager.models.project import ProjectRow, association_groups_users
+from ai.backend.manager.models.project import (
+    ProjectRow,
+    ProjectType,
+    association_groups_users,
+)
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -644,6 +648,7 @@ async def resource_policy_fixture(
     by the user-creation flow:
     - "default" keypair resource policy: always assigned to new keypairs
     - "default" user resource policy: always assigned to new users (e.g. signup)
+    - "default" project resource policy: assigned to the personal project
     Teardown removes both the named policies and the "default" policies.
     The "default" policies are safe to delete here because user_factory
     (which depends on this fixture) runs its teardown first, purging all
@@ -711,8 +716,44 @@ async def resource_policy_fixture(
             )
             .on_conflict_do_nothing()
         )
+        # The personal project created with every user takes "default" too.
+        await conn.execute(
+            pg_insert(ProjectResourcePolicyRow.__table__)
+            .values(
+                name=default_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            .on_conflict_do_nothing()
+        )
     yield policy_name
     async with db_engine.begin() as conn:
+        # A personal project outlives the user it was created for, so purging the
+        # users does not release the policy it holds. The fixture owning the policy
+        # clears them.
+        personal = (
+            await conn.scalars(
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.resource_policy.in_([policy_name, default_policy_name]),
+                )
+            )
+        ).all()
+        if personal:
+            await conn.execute(
+                VirtualEntityRow.__table__.delete().where(
+                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_id.in_(personal),
+                )
+            )
+            await conn.execute(
+                AssociationScopesEntitiesRow.__table__.delete().where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id.in_([str(pid) for pid in personal]),
+                )
+            )
+            await conn.execute(ProjectRow.__table__.delete().where(ProjectRow.id.in_(personal)))
         await conn.execute(
             keypair_resource_policies.delete().where(
                 keypair_resource_policies.c.name == default_policy_name
@@ -735,7 +776,7 @@ async def resource_policy_fixture(
         )
         await conn.execute(
             ProjectResourcePolicyRow.__table__.delete().where(
-                ProjectResourcePolicyRow.__table__.c.name == policy_name
+                ProjectResourcePolicyRow.__table__.c.name.in_([policy_name, default_policy_name])
             )
         )
 
