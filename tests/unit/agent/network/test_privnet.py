@@ -81,11 +81,15 @@ class _StubBackend:
         self.self_members: list[Any] = []  # the membership the server publishes for this node
         self.withdraw_calls: list[str] = []
         self.unclosed: frozenset[str] = frozenset()
+        self.withdraw_failures = 0
         self.recovery_preparations = 0
         self.recovery_error = recovery_error
         self.teardown_failures = teardown_failures
 
     async def withdraw_session_network(self, session_id: str) -> None:
+        if self.withdraw_failures:
+            self.withdraw_failures -= 1
+            raise RuntimeError("the ESP pair claim could not be released")
         self.withdraw_calls.append(session_id)
         self._known_sessions.discard(session_id)
 
@@ -3017,3 +3021,98 @@ class TestOneSnapshotForBothScopes:
             live, owned = await h.server._live_and_owned()
             assert live == {"c1": "s1"}
             assert owned == {}, "it would be adopted, and its VNI and claims taken with it"
+
+
+class TestAWithdrawalTheBackendRefuses:
+    """The backend gives up the ESP pair claims and the watchdog responsibility, and it can refuse
+    for reasons of its own -- a pair whose last claim is ours, a journal it cannot read, a lock it
+    cannot take. Done after the VNI claim was committed, that failure split this node's ownership
+    in two and the retry could never put it back together: it found no binding of its own, which
+    the registry answers with None, and refused before reaching the backend again."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    async def _shared(self, tmp_path: Path) -> tuple[_Harness, _Harness]:
+        a = _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}, owner="i-a"),
+            state_dir=tmp_path,
+            agent_id="i-a",
+        )
+        b = _Harness(
+            _StubRuntime(pid=4242, live={"c2": "s1"}, owner="i-b"),
+            state_dir=tmp_path / "b",
+            agent_id="i-b",
+        )
+        return a, b
+
+    async def test_the_vni_claim_is_kept(self, tmp_path: Path) -> None:
+        a, b = await self._shared(tmp_path)
+        async with a, b:
+            for h in (a, b):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+            b.backend.withdraw_failures = 1
+            with pytest.raises(PrivNetClientError):
+                await b.client().call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "s1"))
+            assert {h.agent_id for h in await b.vni_registry.holders(4138)} == {"i-a", "i-b"}
+
+    async def test_everything_else_is_kept_with_it(self, tmp_path: Path) -> None:
+        a, b = await self._shared(tmp_path)
+        async with a, b:
+            for h in (a, b):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+            b.backend.withdraw_failures = 1
+            with pytest.raises(PrivNetClientError):
+                await b.client().call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "s1"))
+            assert "s1" in b.server._sessions
+            assert "s1" in await b.journal.sessions()
+
+    async def test_the_retry_converges(self, tmp_path: Path) -> None:
+        # The whole point: the second attempt starts from the same place the first did, reaches
+        # the backend, and finishes.
+        a, b = await self._shared(tmp_path)
+        async with a, b:
+            for h in (a, b):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+            b.backend.withdraw_failures = 1
+            with contextlib.suppress(PrivNetClientError):
+                await b.client().call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "s1"))
+
+            resp = await b.client().call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "s1"))
+            assert resp.ok, resp.error
+            assert "s1" not in b.server._sessions
+            assert "s1" not in await b.journal.sessions()
+            assert {h.agent_id for h in await b.vni_registry.holders(4138)} == {"i-a"}
+
+    async def test_a_teardown_that_became_a_withdrawal_behaves_the_same(
+        self, tmp_path: Path
+    ) -> None:
+        a, b = await self._shared(tmp_path)
+        async with a, b:
+            for h in (a, b):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+                )
+            b.backend.withdraw_failures = 1
+            with pytest.raises(PrivNetClientError):
+                await b.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+            assert {h.agent_id for h in await b.vni_registry.holders(4138)} == {"i-a", "i-b"}
+            assert b.backend.teardown_calls == [], "somebody else's containers are on them"
+
+    async def test_a_failed_data_plane_teardown_keeps_the_claim_too(self, tmp_path: Path) -> None:
+        # The lone-agent case: the delete is inside the same block, so its failure is what keeps
+        # this node's binding on a VNI whose devices are still up.
+        async with _Harness(
+            _StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path, teardown_failures=1
+        ) as h:
+            await h.client().call(
+                PrivNetRequest(PrivNetOp.SETUP_SESSION, "s1", network_config=dict(self._VXLAN))
+            )
+            with pytest.raises(PrivNetClientError):
+                await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+            assert await h.vni_registry.holders(4138)
