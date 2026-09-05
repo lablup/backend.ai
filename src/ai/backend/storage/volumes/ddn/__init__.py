@@ -3,11 +3,12 @@ import logging
 from collections.abc import Mapping
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Any, Final, override
+from typing import Any, ClassVar, Final, override
 
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
@@ -239,7 +240,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
 
 
 class EXAScalerFSVolume(BaseVolume):
-    name = "exascaler"
+    name: ClassVar[StorageBackendType] = StorageBackendType.EXASCALER
 
     @override
     async def create_quota_model(self) -> AbstractQuotaModel:
