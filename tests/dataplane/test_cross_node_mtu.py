@@ -44,15 +44,17 @@ _Endpoint = tuple[Node, str, str]
 
 class TestCrossNodeDataPath:
     @pytest.fixture
-    def cross_node_spec(self, session_spec: SessionSpec, agent_ids: tuple[str, ...]) -> SessionSpec:
+    def cross_node_spec(
+        self, session_spec: SessionSpec, agent_ids: tuple[str, ...], spread_cpu: str
+    ) -> SessionSpec:
         return replace(
             session_spec,
+            # More than half a node apiece, so the two kernels cannot share one: MULTI_NODE says
+            # how a session is networked, not where it is placed. `spread_cpu` derives the number
+            # from the pair's real CPU counts -- a hardcoded one stopped scheduling here.
+            cpu=spread_cpu,
             cluster_size=2,
             cluster_mode=ClusterModeEnum.MULTI_NODE,
-            # Both nodes, enforced: the kernels have to be on different hosts for this to be
-            # testing anything. It used to ask for ten CPUs apiece instead, so that two would not
-            # fit on one node -- which stopped scheduling at all once the placement became a
-            # requirement rather than a preference.
             agent_list=agent_ids,
         )
 
