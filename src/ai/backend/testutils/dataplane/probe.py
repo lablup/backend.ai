@@ -11,39 +11,62 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Protocol, runtime_checkable
+from uuid import UUID
 
 from ai.backend.testutils.dataplane.nodes import Node
 
 
-async def session_container_ids(node: Node, session: str) -> list[str]:
+@runtime_checkable
+class SessionRef(Protocol):
+    """What a scenario holds for a running session. `SessionHandle` satisfies it."""
+
+    @property
+    def session_id(self) -> UUID: ...
+
+    @property
+    def name(self) -> str: ...
+
+
+def _tokens(session: SessionRef | str) -> tuple[str, ...]:
+    """The strings a runtime record might carry for this session.
+
+    Both, because the two runtimes record different ones: containerd's record carries the session
+    name, and a Docker container's label carries only the id. Passing one of them and searching for
+    it is how a scenario ended up asserting against a node it had found no containers on -- and
+    reporting it as a placement failure, which it was not.
+    """
+    if isinstance(session, str):
+        return (session,)
+    return (str(session.session_id), session.name)
+
+
+async def session_container_ids(node: Node, session: SessionRef | str) -> list[str]:
     """Container ids of this node's kernels for a session, from the runtime's own labels.
 
     Read from the runtime rather than the manager: the question a scenario asks is where the kernels
     actually landed, and taking the manager's word for it would assume the answer.
 
-    Both runtimes, because a node runs one or the other and the scenarios do not care which. This
-    used to ask containerd only, so every scenario silently skipped on a Docker node -- reported as
-    "the session was not spread across both agents", which reads like a scheduling problem and is
-    not one. ``session`` matches either the name or the id: containerd's record carries the name,
-    Docker's label carries the id.
+    Both runtimes, because a node runs one or the other and the scenarios do not care which.
     """
-    ids = await _containerd_session_containers(node, session)
+    tokens = _tokens(session)
+    ids = await _containerd_session_containers(node, tokens)
     if ids:
         return ids
-    return await _docker_session_containers(node, session)
+    return await _docker_session_containers(node, tokens)
 
 
-async def _containerd_session_containers(node: Node, session: str) -> list[str]:
+async def _containerd_session_containers(node: Node, tokens: tuple[str, ...]) -> list[str]:
     listing = await node.run(["ctr", "-n", "backend-ai", "containers", "list", "-q"], check=False)
     ids: list[str] = []
     for cid in listing.lines:
         info = await node.run(["ctr", "-n", "backend-ai", "containers", "info", cid], check=False)
-        if session in info.stdout:
+        if any(token in info.stdout for token in tokens):
             ids.append(cid)
     return ids
 
 
-async def _docker_session_containers(node: Node, session: str) -> list[str]:
+async def _docker_session_containers(node: Node, tokens: tuple[str, ...]) -> list[str]:
     listing = await node.run(
         ["docker", "ps", "-q", "--filter", "label=ai.backend.session-id"], check=False
     )
@@ -52,7 +75,7 @@ async def _docker_session_containers(node: Node, session: str) -> list[str]:
         info = await node.run(
             ["docker", "inspect", "--format", "{{json .Config.Labels}}", cid], check=False
         )
-        if session in info.stdout:
+        if any(token in info.stdout for token in tokens):
             ids.append(cid)
     return ids
 
@@ -96,23 +119,25 @@ async def default_gateway(node: Node, pid: str) -> str:
     raise AssertionError(f"no default gateway in pid {pid}: {out.stdout!r}")
 
 
-async def local_endpoints(node: Node, session_name: str) -> list[tuple[str, str]]:
+async def local_endpoints(node: Node, session: SessionRef | str) -> list[tuple[str, str]]:
     """``[(task pid, LOCAL eth0 address)]`` for the session's kernels on this node."""
-    return await _endpoints_on(node, session_name, "eth0")
+    return await _endpoints_on(node, session, "eth0")
 
 
-async def overlay_endpoints(node: Node, session_name: str) -> list[tuple[str, str]]:
+async def overlay_endpoints(node: Node, session: SessionRef | str) -> list[tuple[str, str]]:
     """``[(task pid, OVERLAY baimulti0 address)]`` for the session's kernels on this node.
 
     Empty when none of the session's kernels landed here -- how a cross-node scenario learns which
     node each kernel is on without trusting the manager's placement.
     """
-    return await _endpoints_on(node, session_name, "baimulti0")
+    return await _endpoints_on(node, session, "baimulti0")
 
 
-async def _endpoints_on(node: Node, session_name: str, ifname: str) -> list[tuple[str, str]]:
+async def _endpoints_on(
+    node: Node, session: SessionRef | str, ifname: str
+) -> list[tuple[str, str]]:
     endpoints: list[tuple[str, str]] = []
-    for container_id in await session_container_ids(node, session_name):
+    for container_id in await session_container_ids(node, session):
         pid = await task_pid(node, container_id)
         endpoints.append((pid, await interface_address(node, pid, ifname)))
     return endpoints
