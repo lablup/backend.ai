@@ -57,6 +57,8 @@ def scan_context() -> Iterator[None]:
     finally:
         all_updates.reset(tokens[0])
         rescan_counts.reset(tokens[1])
+        concurrency_sema.reset(tokens[2])
+        progress_reporter.reset(tokens[3])
 
 
 @pytest.fixture
