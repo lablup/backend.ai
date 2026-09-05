@@ -39,6 +39,7 @@ from ai.backend.testutils.dataplane.collectors.host import (
 )
 from ai.backend.testutils.dataplane.guard import LeakGuard
 from ai.backend.testutils.dataplane.nodes import (
+    SSH_MAX_CONCURRENCY,
     SSH_TRANSPORT_RETRIES,
     CommandFailed,
     CommandResult,
@@ -867,8 +868,25 @@ class TestTellingASshDropFromACommandFailure:
         assert not is_transport_failure(self._result(1))
         assert not is_transport_failure(self._result(0))
 
+    def test_a_255_ssh_explained_is_still_the_transport(self) -> None:
+        # The shared connection refusing another session: sshd's per-connection limit, reached
+        # because a leak-guard snapshot asks for every collector at once.
+        assert is_transport_failure(
+            self._result(255, stderr="mux_client_request_session: session request failed")
+        )
+
     def test_the_retry_count_leaves_room_for_one_drop(self) -> None:
         assert SSH_TRANSPORT_RETRIES >= 2
+
+    def test_a_node_runs_fewer_at_once_than_sshd_allows(self) -> None:
+        # sshd allows ten sessions on a connection by default. Past that it refuses, and a
+        # collector that was never run reads exactly like a node with nothing on it.
+        assert 0 < SSH_MAX_CONCURRENCY < 10
+
+    def test_one_connection_is_shared_per_node(self) -> None:
+        options = SshNode("root@10.0.0.2").wire_argv(["true"])
+        assert "ControlMaster=auto" in options
+        assert any(opt.startswith("ControlPath=") for opt in options)
 
 
 async def _sudo_works() -> bool:
