@@ -55,8 +55,8 @@ class TestCrossSessionOverlaySameNode:
             session_driver.session(spec, "dp-g15-a") as a,
             session_driver.session(spec, "dp-g15-b") as b,
         ):
-            a_eps = await probe.overlay_endpoints(node, a.name)
-            b_eps = await probe.overlay_endpoints(node, b.name)
+            a_eps = await probe.overlay_endpoints(node, a)
+            b_eps = await probe.overlay_endpoints(node, b)
             assert len(a_eps) == 2 and len(b_eps) == 2, (
                 f"expected both sessions' two kernels on {node.name} "
                 f"(A={len(a_eps)}, B={len(b_eps)}); the pin to one agent did not hold"
@@ -102,8 +102,8 @@ class TestCrossSessionOverlayCrossNode:
             session_driver.session(_overlay_session(session_spec, agent_ids[0]), "dp-g16-a") as a,
             session_driver.session(_overlay_session(session_spec, agent_ids[1]), "dp-g16-b") as b,
         ):
-            a_eps = await probe.overlay_endpoints(n0, a.name)
-            b_eps = await probe.overlay_endpoints(n1, b.name)
+            a_eps = await probe.overlay_endpoints(n0, a)
+            b_eps = await probe.overlay_endpoints(n1, b)
             assert a_eps and b_eps, (
                 f"the pinned sessions did not land on their nodes (A on {n0.name}={len(a_eps)}, "
                 f"B on {n1.name}={len(b_eps)}); cross-node isolation cannot be checked"
