@@ -141,21 +141,21 @@ class TestUnreadableDevicesAreNotSilence:
 
 class TestWhetherThisNodeCanEncryptAtAll:
     """The generic checks -- ip, bridge, iptables, u32 -- say nothing about ESP, so the answer is
-    found by TRYING: the overlay's real SA and outbound policy are installed on documentation
-    addresses, read back, and removed.
+    found by TRYING: the overlay's real SA pair and outbound policy are installed, read back, and
+    thrown away with the namespace they were made in.
 
     Reading /proc instead was wrong twice over: `xfrm_stat` is CONFIG_XFRM_STATISTICS, which is
     neither necessary nor sufficient for the CONFIG_XFRM_USER interface `ip xfrm` needs, and a
     name in /proc/crypto is neither necessary (the crypto API loads a module on first use) nor
     sufficient (the listing carries internal `__`-prefixed implementations)."""
 
-    def _probe(self, rec: Any, listing: tuple[str, str]) -> Any:
+    def _probe(self, runner: Any, listing: tuple[str, str]) -> Any:
         state, policy = listing
 
         async def _reader(argv: Sequence[str]) -> str:
-            return policy if list(argv[:3]) == ["ip", "xfrm", "policy"] else state
+            return policy if argv[-1] == "policy" else state
 
-        return vxlan.probe_encryption_support(rec, _reader)
+        return vxlan.probe_encryption_support(runner, _reader)
 
     async def test_a_kernel_that_installs_and_reports_it_back_can(self) -> None:
         calls: list[list[str]] = []
@@ -164,12 +164,21 @@ class TestWhetherThisNodeCanEncryptAtAll:
             calls.append(list(argv))
 
         assert await self._probe(_runner, _installed()) == []
-        assert any(c[:4] == ["ip", "xfrm", "state", "add"] for c in calls)
-        assert any(c[:4] == ["ip", "xfrm", "policy", "update"] for c in calls)
+        assert any(c[:3] == ["ip", "netns", "add"] for c in calls)
+        assert any("state" in c and "add" in c for c in calls)
+        assert any("policy" in c and "update" in c for c in calls)
+
+    async def test_a_node_that_cannot_make_a_namespace_says_so(self) -> None:
+        async def _runner(argv: Sequence[str]) -> None:
+            if argv[:3] == ["ip", "netns", "add"]:
+                raise RuntimeError("Operation not permitted")
+
+        problems = await self._probe(_runner, ("", ""))
+        assert any("network namespace" in p for p in problems)
 
     async def test_a_kernel_that_refuses_the_state_cannot(self) -> None:
         async def _runner(argv: Sequence[str]) -> None:
-            if argv[:4] == ["ip", "xfrm", "state", "add"]:
+            if "state" in argv and "add" in argv:
                 raise RuntimeError("RTNETLINK answers: Operation not supported")
 
         problems = await self._probe(_runner, ("", ""))
@@ -183,45 +192,97 @@ class TestWhetherThisNodeCanEncryptAtAll:
         problems = await self._probe(_runner, _installed(esn=False))
         assert any("ESN" in p for p in problems)
 
-    async def test_a_kernel_that_loses_the_policy_cannot(self) -> None:
+    async def test_only_one_direction_installed_is_not_enough(self) -> None:
+        # A session installs an outbound SA and an inbound one. A kernel that took the first is
+        # not thereby known to have taken the second.
         async def _runner(argv: Sequence[str]) -> None:
             return None
 
-        problems = await self._probe(_runner, _installed(policy=False))
-        assert any("policy" in p for p in problems)
+        problems = await self._probe(_runner, _installed(inbound=False))
+        assert any("192.0.2.2 -> 192.0.2.1" in p for p in problems)
 
-    async def test_the_probe_cleans_up_after_itself(self) -> None:
+    async def test_a_policy_of_some_other_session_does_not_count(self) -> None:
+        # "Some policy of ours exists" passes on any host already running a session, which is
+        # every host this matters on.
+        async def _runner(argv: Sequence[str]) -> None:
+            return None
+
+        problems = await self._probe(_runner, _installed(policy="elsewhere"))
+        assert any("outbound ESP policy" in p for p in problems)
+
+    async def test_a_policy_selecting_the_wrong_sa_does_not_count(self) -> None:
+        async def _runner(argv: Sequence[str]) -> None:
+            return None
+
+        problems = await self._probe(_runner, _installed(policy="wrong-spi"))
+        assert any("selecting the SA it was given" in p for p in problems)
+
+    async def test_the_namespace_goes_afterwards(self) -> None:
         calls: list[list[str]] = []
 
         async def _runner(argv: Sequence[str]) -> None:
             calls.append(list(argv))
 
         await self._probe(_runner, _installed())
-        assert any(c[:4] == ["ip", "xfrm", "state", "del"] for c in calls)
-        assert any(c[:4] == ["ip", "xfrm", "policy", "del"] for c in calls)
+        assert any(c[:3] == ["ip", "netns", "del"] for c in calls)
 
-    async def test_it_cleans_up_after_a_failure_too(self) -> None:
+    async def test_the_namespace_goes_after_a_failure_too(self) -> None:
         calls: list[list[str]] = []
 
         async def _runner(argv: Sequence[str]) -> None:
             calls.append(list(argv))
-            if argv[:4] == ["ip", "xfrm", "policy", "update"]:
+            if "policy" in argv and "update" in argv:
                 raise RuntimeError("no")
 
         await self._probe(_runner, ("", ""))
-        assert any(c[:4] == ["ip", "xfrm", "state", "del"] for c in calls)
+        assert any(c[:3] == ["ip", "netns", "del"] for c in calls)
 
-    async def test_it_only_ever_touches_documentation_addresses(self) -> None:
-        # A leftover after a crash must select nothing real. TEST-NET-1 is never routed and never
-        # a VTEP.
+    async def test_a_namespace_that_will_not_go_does_not_change_the_answer(self) -> None:
+        # It is a leak with this node's name on it, logged -- but the question asked was whether
+        # this node can encrypt, and it answered.
+        async def _runner(argv: Sequence[str]) -> None:
+            if argv[:3] == ["ip", "netns", "del"]:
+                raise RuntimeError("busy")
+
+        assert await self._probe(_runner, _installed()) == []
+
+    async def test_it_touches_nothing_outside_its_namespace(self) -> None:
+        """The bug this shape exists for. Run in the host's namespace, the probe installed real
+        XFRM objects at addresses nothing forbids a cluster from using as VTEPs -- and its cleanup
+        deleted them by name, without checking it had created them, every sixty seconds."""
         calls: list[list[str]] = []
 
         async def _runner(argv: Sequence[str]) -> None:
             calls.append(list(argv))
 
         await self._probe(_runner, _installed())
-        addresses = {c[i + 1] for c in calls for i, t in enumerate(c) if t in ("src", "dst")}
-        assert addresses <= {"192.0.2.1", "192.0.2.2", "192.0.2.1/32", "192.0.2.2/32"}
+        for call in calls:
+            if call[:2] == ["ip", "netns"]:
+                continue
+            assert call[:2] == ["ip", "-n"], f"{call} ran in the host's namespace"
+            assert call[2].startswith("bai-encprobe-")
+
+    async def test_two_probes_do_not_share_a_namespace(self) -> None:
+        names: list[str] = []
+
+        async def _runner(argv: Sequence[str]) -> None:
+            if argv[:3] == ["ip", "netns", "add"]:
+                names.append(argv[3])
+
+        await self._probe(_runner, _installed())
+        await self._probe(_runner, _installed())
+        assert len(set(names)) == 2
+
+    async def test_no_deletes_are_issued_for_objects_it_may_not_have_made(self) -> None:
+        # The namespace goes; the objects in it go with it. Deleting them by name is what reached
+        # into a live session's state.
+        calls: list[list[str]] = []
+
+        async def _runner(argv: Sequence[str]) -> None:
+            calls.append(list(argv))
+
+        await self._probe(_runner, _installed())
+        assert not any("del" in c and ("state" in c or "policy" in c) for c in calls)
 
     def test_the_two_answers_are_separate(self) -> None:
         # A cluster may legitimately run unencrypted on a kernel with no ESP, so "cannot encrypt"
@@ -239,20 +300,39 @@ class TestWhetherThisNodeCanEncryptAtAll:
         assert "this node cannot install the ESP state" in findings.problems
 
 
-def _installed(*, esn: bool = True, policy: bool = True) -> tuple[str, str]:
-    """`(ip xfrm state, ip xfrm policy)` output for a probe the kernel accepted as asked."""
-    spi = vxlan._esp_spi("192.0.2.1", "192.0.2.2")
-    state = (
-        "src 192.0.2.1 dst 192.0.2.2\n"
-        f"\tproto esp spi {spi:#x} reqid {vxlan.XFRM_REQID} mode transport\n"
-        + ("\treplay-window 0 flag esn\n" if esn else "\treplay-window 0\n")
-        + "\taead rfc4106(gcm(aes)) 0xdeadbeef 128\n"
-    )
-    rule = (
-        "src 192.0.2.1/32 dst 192.0.2.2/32 proto udp dport 4789 \n"
-        "\tdir out priority 0 \n"
-        f"\tmark {vxlan.XFRM_MARK:#x}/0xffffffff \n"
-        f"\ttmpl src 192.0.2.1 dst 192.0.2.2 proto esp spi {spi:#x}"
-        f" reqid {vxlan.XFRM_REQID} mode transport\n"
-    )
-    return state, (rule if policy else "")
+def _installed(*, esn: bool = True, inbound: bool = True, policy: str = "probe") -> tuple[str, str]:
+    """`(ip xfrm state, ip xfrm policy)` output for a probe the kernel accepted as asked.
+
+    ``policy``: "probe" for the probe's own, "elsewhere" for another session's, "wrong-spi" for
+    one that selects an SA the probe did not install, "" for none.
+    """
+
+    def _sa(src: str, dst: str, with_esn: bool) -> str:
+        return (
+            f"src {src} dst {dst}\n"
+            f"\tproto esp spi {vxlan._esp_spi(src, dst):#x} reqid {vxlan.XFRM_REQID}"
+            " mode transport\n"
+            + ("\treplay-window 0 flag esn\n" if with_esn else "\treplay-window 0\n")
+            + "\taead rfc4106(gcm(aes)) 0xdeadbeef 128\n"
+        )
+
+    state = _sa("192.0.2.1", "192.0.2.2", esn)
+    if inbound:
+        state += _sa("192.0.2.2", "192.0.2.1", esn)
+
+    def _policy(src: str, dst: str, spi: int) -> str:
+        return (
+            f"src {src}/32 dst {dst}/32 proto udp dport 4789 \n"
+            "\tdir out priority 0 \n"
+            f"\tmark {vxlan.XFRM_MARK:#x}/0xffffffff \n"
+            f"\ttmpl src {src} dst {dst} proto esp spi {spi:#x}"
+            f" reqid {vxlan.XFRM_REQID} mode transport\n"
+        )
+
+    rules = {
+        "probe": _policy("192.0.2.1", "192.0.2.2", vxlan._esp_spi("192.0.2.1", "192.0.2.2")),
+        "elsewhere": _policy("10.0.0.1", "10.0.0.2", vxlan._esp_spi("10.0.0.1", "10.0.0.2")),
+        "wrong-spi": _policy("192.0.2.1", "192.0.2.2", 0x1234),
+        "": "",
+    }
+    return state, rules[policy]

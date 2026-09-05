@@ -17,6 +17,7 @@ import ipaddress
 import logging
 import os
 import re
+import secrets
 import shlex
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Mapping, Sequence
@@ -371,63 +372,108 @@ def xfrm_policy_add_args(
 #: The two ends of the probe SA. TEST-NET-1 (RFC 5737): documentation addresses, never routed and
 #: never a real VTEP, so the SA and policy this installs select nothing that exists and a leftover
 #: after a crash carries no traffic and collides with no pair.
+#: The two ends of the probe SA. TEST-NET-1 (RFC 5737): documentation addresses. They are chosen
+#: for legibility only -- the isolation comes from the namespace below, not from the numbers.
 _PROBE_SELF: Final = "192.0.2.1"
 _PROBE_PEER: Final = "192.0.2.2"
 _PROBE_KEY: Final = "00" * 32
+#: Prefix for the throwaway network namespace each probe runs in. The suffix is random so two
+#: probes -- two agents on one host, or a retry overlapping its predecessor -- cannot collide.
+_PROBE_NETNS_PREFIX: Final = "bai-encprobe-"
 
 
 async def probe_encryption_support(runner: Runner, reader: Reader) -> list[str]:
     """What would stop this node holding up its end of an ESP tunnel, found out by trying.
 
-    Installs the SA and the outbound policy this backend really installs -- same algorithm, same
-    ICV, same replay window, same ESN flag, same reqid and mark -- reads them back, and removes
-    them. Nothing short of that answers the question: /proc/net/xfrm_stat is CONFIG_XFRM_STATISTICS
-    and says nothing about CONFIG_XFRM_USER, which is what `ip xfrm` needs, and a name in
-    /proc/crypto is neither necessary (the crypto API loads a module on first use) nor sufficient
-    (the listing carries internal `__`-prefixed implementations too).
+    Installs the SA pair and the outbound policy this backend really installs -- same algorithm,
+    same ICV, same replay window, same ESN flag, same reqid and mark -- reads them back, and
+    throws the lot away. Nothing short of that answers the question: /proc/net/xfrm_stat is
+    CONFIG_XFRM_STATISTICS and says nothing about CONFIG_XFRM_USER, which is what `ip xfrm` needs,
+    and a name in /proc/crypto is neither necessary (the crypto API loads a module on first use)
+    nor sufficient (the listing carries internal `__`-prefixed implementations too).
 
-    Needs CAP_NET_ADMIN, so on a privnet-backed node it runs THERE and the answer is carried back
-    over the socket -- the agent that asks holds no such capability.
+    In a THROWAWAY NETWORK NAMESPACE, which is the whole safety argument. Run in the host's
+    namespace it installed real XFRM objects at addresses nothing forbids a cluster from using as
+    VTEPs -- and its cleanup deleted them by name, without checking it had created them, every
+    sixty seconds. Two nodes whose VTEPs happened to be these would have had their SAs and their
+    policy removed under them on a timer. Nothing this probe touches is reachable from the host's
+    state, so there is nothing to check ownership of and nothing to lock against.
+
+    Needs CAP_NET_ADMIN and CAP_SYS_ADMIN, so on a privnet-backed node it runs THERE and the answer
+    is carried back over the socket -- the agent that asks holds neither.
     """
+    netns = f"{_PROBE_NETNS_PREFIX}{secrets.token_hex(4)}"
+    try:
+        await runner(["ip", "netns", "add", netns])
+    except (RuntimeError, OSError) as e:
+        return [
+            f"this node cannot create a network namespace to test overlay encryption in ({e}), so"
+            " whether it could carry an encrypted session is unknown."
+        ]
+    try:
+        return await _probe_in_netns(runner, reader, netns)
+    finally:
+        try:
+            await runner(["ip", "netns", "del", netns])
+        except (RuntimeError, OSError) as e:
+            # Not fatal to the answer, but it is a leak with this node's name on it and nothing
+            # else will come back for it.
+            log.warning("could not remove the encryption probe namespace {}: {}", netns, e)
+
+
+async def _probe_in_netns(runner: Runner, reader: Reader, netns: str) -> list[str]:
+    """The probe itself, with its namespace already made and its removal already arranged."""
     problems: list[str] = []
-    adds = [
+    for argv in (
         *xfrm_state_add_args(_PROBE_SELF, _PROBE_PEER, _PROBE_KEY),
         *xfrm_policy_add_args(_PROBE_SELF, _PROBE_PEER),
+    ):
+        try:
+            await runner(_in_netns(netns, argv))
+        except (RuntimeError, OSError) as e:
+            problems.append(
+                f"this node cannot install the overlay's ESP state: `{_probe_verb(argv)}` failed"
+                f" ({e}). An encrypted session placed here would be refused at setup."
+            )
+            return problems
+    # Installed is not the same as installed AS ASKED: the kernel accepts an SA and then reports
+    # what it actually holds, which is where a missing ESN or a truncated ICV shows up.
+    #
+    # BOTH directions. A session installs an outbound SA and an inbound one, and a kernel that
+    # took the first is not thereby known to have taken the second -- checking one of the two is
+    # half a test that reads like a whole one.
+    states = parse_owned_sa_endpoints(
+        await reader(_in_netns(netns, ["ip", "xfrm", "state"])), XFRM_REQID
+    )
+    missing = [
+        f"{src} -> {dst}"
+        for src, dst in ((_PROBE_SELF, _PROBE_PEER), (_PROBE_PEER, _PROBE_SELF))
+        if (src, dst, _esp_spi(src, dst)) not in states
     ]
-    try:
-        for argv in adds:
-            try:
-                await runner(argv)
-            except (RuntimeError, OSError) as e:
-                problems.append(
-                    f"this node cannot install the overlay's ESP state: `{_probe_verb(argv)}`"
-                    f" failed ({e}). An encrypted session placed here would be refused at setup."
-                )
-                return problems
-        # Installed is not the same as installed AS ASKED: the kernel accepts an SA and then
-        # reports what it actually holds, which is where a missing ESN or a truncated ICV shows up.
-        listing = await reader(["ip", "xfrm", "state"])
-        if (_PROBE_SELF, _PROBE_PEER, _esp_spi(_PROBE_SELF, _PROBE_PEER)) not in (
-            parse_owned_sa_endpoints(listing, XFRM_REQID)
-        ):
-            problems.append(
-                "this node installed the overlay's ESP state but the kernel does not report it"
-                f" back as {_ESP_AEAD} with ESN and a full-length ICV, so a session here would run"
-                " on protection it was not promised."
-            )
-        if not parse_owned_policies(await reader(["ip", "xfrm", "policy"]), _XFRM_MARK):
-            problems.append(
-                "this node installed the overlay's outbound ESP policy but the kernel does not"
-                " report it back, so nothing would select the SAs an encrypted session installs."
-            )
-    finally:
-        for argv in (
-            *xfrm_state_del_args(_PROBE_SELF, _PROBE_PEER),
-            *xfrm_policy_del_args(_PROBE_SELF, _PROBE_PEER),
-        ):
-            with contextlib.suppress(RuntimeError, OSError):
-                await runner(argv)
+    if missing:
+        problems.append(
+            "this node installed the overlay's ESP state but the kernel does not report"
+            f" {', '.join(missing)} back as {_ESP_AEAD} with ESN and a full-length ICV, so a"
+            " session here would run on protection it was not promised."
+        )
+    # The probe's OWN policy, at its own selector and naming its own SPI. "Some policy of ours
+    # exists" would pass on a host already running a session, which is every host this matters on.
+    policies = parse_owned_policies(
+        await reader(_in_netns(netns, ["ip", "xfrm", "policy"])), _XFRM_MARK
+    )
+    selected = policies.get((_PROBE_SELF, _PROBE_PEER, VXLAN_DSTPORT))
+    if selected != _esp_spi(_PROBE_SELF, _PROBE_PEER):
+        problems.append(
+            "this node installed the overlay's outbound ESP policy but the kernel does not report"
+            " it back selecting the SA it was given, so nothing would select the SAs an encrypted"
+            " session installs."
+        )
     return problems
+
+
+def _in_netns(netns: str, argv: Sequence[str]) -> list[str]:
+    """``argv`` run inside ``netns``. Only `ip` invocations reach this."""
+    return ["ip", "-n", netns, *argv[1:]]
 
 
 def _probe_verb(argv: Sequence[str]) -> str:
