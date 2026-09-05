@@ -34,6 +34,7 @@ from ai.backend.common.network.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import (
     ForcedBackendUnsupported,
+    NetworkBackendMismatch,
     OverlayTeardownPending,
 )
 from ai.backend.manager.network.ipam import (
@@ -45,6 +46,7 @@ from ai.backend.manager.network.ipam import (
     overlay_encryption_key,
 )
 from ai.backend.manager.network.pairing import (
+    members_can_encrypt,
     require_members_can_serve_driver,
     require_members_overlay_ready,
 )
@@ -145,13 +147,17 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         )
         vni: int | None = None
         try:
-            # Encrypt the overlay only for the encapsulating (VXLAN) backend, and only when the
-            # operator opted in. The key is the CLUSTER's, not this session's: ESP policies select
-            # on the outer packet, where nothing identifies a session, so sessions between the same
-            # pair of nodes share one policy and a per-session key was a promise the data plane
-            # could not keep (see overlay_encryption_key). It still travels in the session meta,
-            # exactly like the VNI, so the agents need no second source.
+            # Encrypt the overlay for the encapsulating (VXLAN) backend unless something opted
+            # OUT -- see `_encryption_enabled`. The key is the CLUSTER's, not this session's: ESP
+            # policies select on the outer packet, where nothing identifies a session, so sessions
+            # between the same pair of nodes share one policy and a per-session key was a promise
+            # the data plane could not keep (see overlay_encryption_key). It still travels in the
+            # session meta, exactly like the VNI, so the agents need no second source.
             encrypt = backend is NetworkBackendKind.VXLAN and self._encryption_enabled(options)
+            if encrypt:
+                encrypt = await self._nodes_can_encrypt(
+                    etcd, member_agents, demanded=options.get("encryption") is True
+                )
             encryption_key = await overlay_encryption_key(etcd) if encrypt else None
             if backend is NetworkBackendKind.VXLAN:
                 vni = await self._vni_allocator.acquire(session_id)
@@ -335,10 +341,51 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         return forced_backend if forced_backend is not None else NetworkBackendKind.VXLAN
 
     def _encryption_enabled(self, options: dict[str, Any]) -> bool:
-        """Whether to encrypt this session's overlay. A per-network request wins (so a caller can ask
-        for encryption explicitly); otherwise the operator's ``overlay-encryption`` plugin default
-        applies. Off unless opted in — encryption trades throughput for confidentiality."""
+        """Whether to encrypt this session's overlay.
+
+        ON unless something says otherwise. A multi-node session's traffic crosses the operator's
+        underlay as plain VXLAN otherwise -- readable, and injectable, by anything on the path
+        between two nodes -- and a default that has to be found in the documentation is a default
+        that is not set. The cost is the ESP overhead in the overlay MTU and the per-packet
+        AES-GCM, which the hardware of any node running these sessions does in silicon.
+
+        A per-network request wins, so a caller can turn it off for one session; failing that the
+        operator's ``overlay-encryption`` plugin setting applies, and only an explicit ``false``
+        turns it off cluster-wide.
+
+        A node that cannot encrypt refuses the session rather than carrying it in clear text (see
+        the agent's readiness probe and `OverlayEncryptionUnavailable`), so turning this on makes
+        the `u32` and `policy` iptables matches a requirement on every node that runs multi-node
+        sessions.
+        """
         requested = options.get("encryption")
         if requested is not None:
             return bool(requested)
-        return bool(self.plugin_config.get("overlay-encryption", False))
+        return bool(self.plugin_config.get("overlay-encryption", True))
+
+    async def _nodes_can_encrypt(
+        self, etcd: AsyncEtcd, member_agents: list[str], *, demanded: bool
+    ) -> bool:
+        """Whether every node this session lands on speaks the overlay encryption profile.
+
+        The two ends of an ESP tunnel must agree on all of it, so one node that cannot do ESN
+        makes the session come up carrying nothing. Before encryption was the default that could
+        not happen -- an operator turned it on once its nodes were ready. Now it is what a rolling
+        upgrade produces on its own, so it is checked.
+
+        A caller that ASKED for encryption gets an error: it stated a requirement this cluster
+        cannot meet. The default falls back to an unencrypted overlay with the reason in the log,
+        because refusing would mean a manager upgrade alone stops every multi-node session on a
+        cluster whose agents have not been upgraded yet.
+        """
+        reason = await members_can_encrypt(etcd, member_agents)
+        if reason is None:
+            return True
+        if demanded:
+            raise NetworkBackendMismatch(
+                f"this session asked for an encrypted overlay, and {reason}"
+            )
+        log.warning(
+            "creating this session's overlay UNENCRYPTED although the default is on: {}", reason
+        )
+        return False
