@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
 from ai.backend.testutils.dataplane import probe
 from ai.backend.testutils.dataplane.agent_control import AgentController
 from ai.backend.testutils.dataplane.nodes import Node
@@ -30,13 +31,22 @@ class TestReachabilitySurvivesRestart:
         node: Node,
         agent_control: AgentController,
     ) -> None:
-        spec = replace(session_spec, agent_list=(primary_agent_id,))
+        # Two kernels: a SINGLE_NODE session gets a LOCAL bridge of its own only when it has more
+        # than one, and the isolation half of this scenario is about two such bridges. With one
+        # kernel apiece both sessions sit on Docker's default bridge and reach each other, which
+        # is not a regression -- it is what a session with no network of its own has always done.
+        spec = replace(
+            session_spec,
+            cluster_size=2,
+            cluster_mode=ClusterModeEnum.SINGLE_NODE,
+            agent_list=(primary_agent_id,),
+        )
         async with (
             session_driver.session(spec, "dp-a10-a") as a,
             session_driver.session(spec, "dp-a10-b") as b,
         ):
-            ((pid_a, _ip_a),) = await probe.local_endpoints(node, a)
-            ((_pid_b, ip_b),) = await probe.local_endpoints(node, b)
+            (pid_a, _ip_a), *_ = await probe.local_endpoints(node, a)
+            (_pid_b, ip_b), *_ = await probe.local_endpoints(node, b)
             gateway = await probe.default_gateway(node, pid_a)
 
             # Baseline before the restart: A reaches its own gateway, and not its neighbour.
@@ -53,7 +63,7 @@ class TestReachabilitySurvivesRestart:
 
             # After recovery: re-resolve A's pid (the task survives, but recovery is what we test),
             # then assert the same two facts still hold.
-            ((pid_a_after, _),) = await probe.local_endpoints(node, a)
+            (pid_a_after, _), *_ = await probe.local_endpoints(node, a)
             gateway_after = await probe.default_gateway(node, pid_a_after)
             assert await probe.reaches(node, pid_a_after, gateway_after), (
                 f"session A cannot reach its gateway {gateway_after} after the agent restarted -- "
