@@ -1696,11 +1696,19 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             )
 
     async def _delete_link_quiet(self, dev: str) -> None:
-        """Delete a link if present; ignore 'does not exist' failures."""
+        """Delete a link if present. Absence is success; nothing else is.
+
+        It used to swallow every RuntimeError, which is not what its name said and not what its
+        callers needed: setup deletes leftovers under the names it is about to build, and a
+        rollback deletes what a failed setup made. A permission error or a netlink failure there
+        reported a clean host while the device was still up -- and the session joins `_sessions`
+        only after the whole setup succeeds, so nothing was left holding a record of it.
+        """
         try:
             await self._runner(link_del_args(dev))
-        except RuntimeError:
-            pass
+        except (RuntimeError, OSError) as e:
+            if not is_absent_error(e):
+                raise
 
     async def _hold_vxlan_down_or_absent(self, dev: str) -> bool:
         """Return whether this VXLAN can no longer carry traffic.
