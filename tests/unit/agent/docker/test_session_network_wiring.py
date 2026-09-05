@@ -146,3 +146,82 @@ class TestGivingTheNetworkBack:
         net._orchestrators["s1"] = cast(Any, _Orchestrator())
 
         await net.detach_container("c1")
+
+
+class TestADetachThatDidNotGoThrough:
+    """The plan and task PID in the attachment record are the only things that name the host
+    veth, the host-local address and the MASQ rule left behind. Dropping the record on a failed
+    detach threw them away, so nothing could free them."""
+
+    @staticmethod
+    def _net() -> SessionNetwork:
+        return SessionNetwork(
+            cast(Any, object()),
+            agent_id="i-docker",
+            host_ip="127.0.0.1",
+            runtime=None,
+            locator=make_docker_locator(),
+            cni_runner=cast(Any, object()),
+            backends={},
+            local_subnets=cast(Any, object()),
+            ipam=cast(Any, object()),
+        )
+
+    async def test_the_attachment_survives_the_failure(self) -> None:
+        class _Orchestrator:
+            async def detach(self, container_id: str, *, plan: Any, task_pid: int) -> None:
+                raise RuntimeError("iproute2 said no")
+
+        net = self._net()
+        net._attachments["c1"] = ("s1", cast(Any, object()), 4242)
+        net._orchestrators["s1"] = cast(Any, _Orchestrator())
+
+        await net.detach_container("c1")
+
+        assert "c1" in net._attachments
+
+    async def test_teardown_tries_it_again(self) -> None:
+        attempts: list[int] = []
+
+        class _Orchestrator:
+            async def detach(self, container_id: str, *, plan: Any, task_pid: int) -> None:
+                attempts.append(task_pid)
+                if len(attempts) == 1:
+                    raise RuntimeError("iproute2 said no")
+
+        net = self._net()
+        net._attachments["c1"] = ("s1", cast(Any, object()), 4242)
+        net._orchestrators["s1"] = cast(Any, _Orchestrator())
+
+        await net.detach_container("c1")
+        await net._retry_pending_detaches("s1")
+
+        assert attempts == [4242, 4242]
+        assert "c1" not in net._attachments
+
+    async def test_another_session_is_left_alone(self) -> None:
+        detached: list[str] = []
+
+        class _Orchestrator:
+            async def detach(self, container_id: str, *, plan: Any, task_pid: int) -> None:
+                detached.append(container_id)
+
+        net = self._net()
+        net._attachments["c1"] = ("s1", cast(Any, object()), 1)
+        net._attachments["c2"] = ("s2", cast(Any, object()), 2)
+        net._orchestrators["s1"] = cast(Any, _Orchestrator())
+        net._orchestrators["s2"] = cast(Any, _Orchestrator())
+
+        await net._retry_pending_detaches("s1")
+
+        assert detached == ["c1"]
+        assert "c2" in net._attachments
+
+    async def test_a_session_whose_orchestrator_is_gone_drops_the_record(self) -> None:
+        # Nothing left to detach from, and no later call that could use it.
+        net = self._net()
+        net._attachments["c1"] = ("s1", cast(Any, object()), 4242)
+
+        await net.detach_container("c1")
+
+        assert "c1" not in net._attachments
