@@ -57,7 +57,7 @@ def fake_ssh_subprocess(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Call
     monkeypatch.setenv("USERPROFILE", str(home_dir))
 
     def install(barrier: threading.Barrier | None = None, download_fails: bool = False) -> None:
-        def fake_run(cmd: Sequence[str], **kwargs: Any) -> subprocess.CompletedProcess:
+        def fake_run(cmd: Sequence[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
             # The key always lands in the destination directory under its
             # container-side basename, even when the download later fails.
             (_download_dest(cmd) / cmd[-1]).write_bytes(KEY_CONTENT)
