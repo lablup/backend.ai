@@ -48,6 +48,21 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     UpdateDeploymentRevisionPresetInput as UpdateInputDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    UpdatePresetModelConfigInput as UpdatePresetModelConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    UpdatePresetModelDefinitionInput as UpdatePresetModelDefinitionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    UpdatePresetModelHealthCheckInput as UpdatePresetModelHealthCheckInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    UpdatePresetModelMetadataInput as UpdatePresetModelMetadataInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    UpdatePresetModelServiceConfigInput as UpdatePresetModelServiceConfigInputDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     CreateDeploymentRevisionPresetPayload as CreatePayloadDTO,
 )
@@ -797,6 +812,189 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Patch for a preset model's health check. Omit a field to keep its "
+        "current stored value.",
+    ),
+    name="UpdatePresetModelHealthCheckInput",
+)
+class UpdatePresetModelHealthCheckInputGQL(
+    PydanticInputMixin[UpdatePresetModelHealthCheckInputDTO]
+):
+    enable: bool | None = gql_field(
+        default=UNSET,
+        description="Whether the route should be health-checked. When false the route "
+        "activates immediately and the remaining fields are ignored. Omit to keep the "
+        "current value.",
+    )
+    interval: float | None = gql_field(
+        default=UNSET,
+        description="Interval in seconds between health checks. Omit to keep the current value.",
+    )
+    path: str | None = gql_field(
+        default=UNSET,
+        description="Path to check for health status. Omit to keep the current value.",
+    )
+    max_retries: int | None = gql_field(
+        default=UNSET,
+        description="Maximum number of retries for health check. Omit to keep the current value.",
+    )
+    max_wait_time: float | None = gql_field(
+        default=UNSET,
+        description="Maximum time in seconds to wait for a health check response. Omit to "
+        "keep the current value.",
+    )
+    expected_status_code: int | None = gql_field(
+        default=UNSET,
+        description="Expected HTTP status code for a healthy response. Omit to keep the "
+        "current value.",
+    )
+    initial_delay: float | None = gql_field(
+        default=UNSET,
+        description="Initial delay in seconds before the first health check. Omit to keep "
+        "the current value.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Patch for a preset model's metadata. Omit a field to keep its current "
+        "stored value.",
+    ),
+    name="UpdatePresetModelMetadataInput",
+)
+class UpdatePresetModelMetadataInputGQL(PydanticInputMixin[UpdatePresetModelMetadataInputDTO]):
+    author: str | None = gql_field(
+        default=UNSET, description="Author of the model. Omit to keep the current value."
+    )
+    title: str | None = gql_field(
+        default=UNSET, description="Title of the model. Omit to keep the current value."
+    )
+    version: str | None = gql_field(
+        default=UNSET, description="Version of the model. Omit to keep the current value."
+    )
+    created: str | None = gql_field(
+        default=UNSET, description="Creation date of the model. Omit to keep the current value."
+    )
+    last_modified: str | None = gql_field(
+        default=UNSET,
+        description="Last modified date of the model. Omit to keep the current value.",
+    )
+    description: str | None = gql_field(
+        default=UNSET, description="Description of the model. Omit to keep the current value."
+    )
+    task: str | None = gql_field(
+        default=UNSET, description="Task type of the model. Omit to keep the current value."
+    )
+    category: str | None = gql_field(
+        default=UNSET, description="Category of the model. Omit to keep the current value."
+    )
+    architecture: str | None = gql_field(
+        default=UNSET, description="Architecture of the model. Omit to keep the current value."
+    )
+    framework: list[str] | None = gql_field(
+        default=UNSET, description="Frameworks used by the model. Omit to keep the current value."
+    )
+    label: list[str] | None = gql_field(
+        default=UNSET, description="Labels for the model. Omit to keep the current value."
+    )
+    license: str | None = gql_field(
+        default=UNSET, description="License of the model. Omit to keep the current value."
+    )
+    min_resource: JSON | None = gql_field(
+        default=UNSET,
+        description="Minimum resource requirements for the model. Omit to keep the current value.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Patch for a preset model's service config. Omit a field to keep its "
+        "current stored value.",
+    ),
+    name="UpdatePresetModelServiceConfigInput",
+)
+class UpdatePresetModelServiceConfigInputGQL(
+    PydanticInputMixin[UpdatePresetModelServiceConfigInputDTO]
+):
+    pre_start_actions: list[PreStartActionInputGQL] | None = gql_field(
+        default=UNSET,
+        description="Pre-start actions to execute before starting the model service. Omit "
+        "to keep the current list; provide the full replacement list to change it.",
+    )
+    command: str | None = gql_field(
+        default=UNSET,
+        description="Single-string command to start the model service. Omit to keep the "
+        "current value.",
+    )
+    start_command: list[str] | None = gql_field(
+        default=UNSET,
+        description="Deprecated. Command to start the model service. Use `command` instead. "
+        "Omit to keep the current value.",
+        deprecation_reason="Use `command` instead.",
+    )
+    shell: str | None = gql_field(
+        default=UNSET,
+        description="Shell used to run the command. If set, the kernel runs "
+        "`[shell, '-c', command]`; null or empty disables shell wrapping. Omit to keep the "
+        "current value.",
+    )
+    port: int | None = gql_field(
+        default=UNSET,
+        description="Port number for the model service. Must be greater than 1. Omit to "
+        "keep the current value.",
+    )
+    health_check: UpdatePresetModelHealthCheckInputGQL | None = gql_field(
+        default=UNSET,
+        description="Health check configuration for the model service. Omit to keep the "
+        "current value.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Patch for a single preset model entry. Omit a field to keep its current "
+        "stored value.",
+    ),
+    name="UpdatePresetModelConfigInput",
+)
+class UpdatePresetModelConfigInputGQL(PydanticInputMixin[UpdatePresetModelConfigInputDTO]):
+    name: str | None = gql_field(
+        default=UNSET, description="Name of the model. Omit to keep the current value."
+    )
+    model_path: str | None = gql_field(
+        default=UNSET, description="Path to the model file. Omit to keep the current value."
+    )
+    service: UpdatePresetModelServiceConfigInputGQL | None = gql_field(
+        default=UNSET,
+        description="Configuration for the model service. Omit to keep the current value.",
+    )
+    metadata: UpdatePresetModelMetadataInputGQL | None = gql_field(
+        default=UNSET, description="Metadata about the model. Omit to keep the current value."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Patch for a preset's model definition. Omit `models` to keep the "
+        "current model entry.",
+    ),
+    name="UpdatePresetModelDefinitionInput",
+)
+class UpdatePresetModelDefinitionInputGQL(PydanticInputMixin[UpdatePresetModelDefinitionInputDTO]):
+    models: list[UpdatePresetModelConfigInputGQL] | None = gql_field(
+        default=UNSET,
+        description="Patch for the model definition's single model entry. Omit to keep the "
+        "current model entry.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Update deployment revision preset input.",
     ),
@@ -841,10 +1039,10 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
         ),
         default=UNSET,
     )
-    model_definition: PresetModelDefinitionInputGQL | None = gql_added_field(
+    model_definition: UpdatePresetModelDefinitionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="Parsed model definition. Set to null to clear.",
+            description="Model definition patch. Set to null to clear the whole model definition.",
         ),
         default=UNSET,
     )

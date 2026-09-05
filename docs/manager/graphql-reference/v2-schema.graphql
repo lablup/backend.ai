@@ -15826,8 +15826,10 @@ input UpdateDeploymentRevisionPresetInput {
   """
   imageId: UUID
 
-  """Added in 26.9.0. Parsed model definition. Set to null to clear."""
-  modelDefinition: PresetModelDefinitionInput
+  """
+  Added in 26.9.0. Model definition patch. Set to null to clear the whole model definition.
+  """
+  modelDefinition: UpdatePresetModelDefinitionInput
 
   """Added in 26.4.4. Container startup command. Set to null to clear."""
   startupCommand: String
@@ -16166,6 +16168,152 @@ input UpdatePermissionInput {
   scopeId: String = null
   entityType: RBACElementType = null
   operation: OperationType = null
+}
+
+"""
+Added in 26.9.0. Patch for a single preset model entry. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelConfigInput {
+  """Name of the model. Omit to keep the current value."""
+  name: String
+
+  """Path to the model file. Omit to keep the current value."""
+  modelPath: String
+
+  """Configuration for the model service. Omit to keep the current value."""
+  service: UpdatePresetModelServiceConfigInput
+
+  """Metadata about the model. Omit to keep the current value."""
+  metadata: UpdatePresetModelMetadataInput
+}
+
+"""
+Added in 26.9.0. Patch for a preset's model definition. Omit `models` to keep the current model entry.
+"""
+input UpdatePresetModelDefinitionInput {
+  """
+  Patch for the model definition's single model entry. Omit to keep the current model entry.
+  """
+  models: [UpdatePresetModelConfigInput!]
+}
+
+"""
+Added in 26.9.0. Patch for a preset model's health check. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelHealthCheckInput {
+  """
+  Whether the route should be health-checked. When false the route activates immediately and the remaining fields are ignored. Omit to keep the current value.
+  """
+  enable: Boolean
+
+  """
+  Interval in seconds between health checks. Omit to keep the current value.
+  """
+  interval: Float
+
+  """Path to check for health status. Omit to keep the current value."""
+  path: String
+
+  """
+  Maximum number of retries for health check. Omit to keep the current value.
+  """
+  maxRetries: Int
+
+  """
+  Maximum time in seconds to wait for a health check response. Omit to keep the current value.
+  """
+  maxWaitTime: Float
+
+  """
+  Expected HTTP status code for a healthy response. Omit to keep the current value.
+  """
+  expectedStatusCode: Int
+
+  """
+  Initial delay in seconds before the first health check. Omit to keep the current value.
+  """
+  initialDelay: Float
+}
+
+"""
+Added in 26.9.0. Patch for a preset model's metadata. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelMetadataInput {
+  """Author of the model. Omit to keep the current value."""
+  author: String
+
+  """Title of the model. Omit to keep the current value."""
+  title: String
+
+  """Version of the model. Omit to keep the current value."""
+  version: String
+
+  """Creation date of the model. Omit to keep the current value."""
+  created: String
+
+  """Last modified date of the model. Omit to keep the current value."""
+  lastModified: String
+
+  """Description of the model. Omit to keep the current value."""
+  description: String
+
+  """Task type of the model. Omit to keep the current value."""
+  task: String
+
+  """Category of the model. Omit to keep the current value."""
+  category: String
+
+  """Architecture of the model. Omit to keep the current value."""
+  architecture: String
+
+  """Frameworks used by the model. Omit to keep the current value."""
+  framework: [String!]
+
+  """Labels for the model. Omit to keep the current value."""
+  label: [String!]
+
+  """License of the model. Omit to keep the current value."""
+  license: String
+
+  """
+  Minimum resource requirements for the model. Omit to keep the current value.
+  """
+  minResource: JSON
+}
+
+"""
+Added in 26.9.0. Patch for a preset model's service config. Omit a field to keep its current stored value.
+"""
+input UpdatePresetModelServiceConfigInput {
+  """
+  Pre-start actions to execute before starting the model service. Omit to keep the current list; provide the full replacement list to change it.
+  """
+  preStartActions: [PreStartActionInput!]
+
+  """
+  Single-string command to start the model service. Omit to keep the current value.
+  """
+  command: String
+
+  """
+  Deprecated. Command to start the model service. Use `command` instead. Omit to keep the current value.
+  """
+  startCommand: [String!] @deprecated(reason: "Use `command` instead.")
+
+  """
+  Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping. Omit to keep the current value.
+  """
+  shell: String
+
+  """
+  Port number for the model service. Must be greater than 1. Omit to keep the current value.
+  """
+  port: Int
+
+  """
+  Health check configuration for the model service. Omit to keep the current value.
+  """
+  healthCheck: UpdatePresetModelHealthCheckInput
 }
 
 """
