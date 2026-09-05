@@ -102,6 +102,11 @@ async def redirect_session_dns(subnet: str, loopback_port: int, session_id: str)
     await install_dns_redirect(gateway, loopback_port, session_id)
 
 
+#: How long one privileged attach command may take. Generous next to what these normally do, and
+#: finite because they run under the privnet's node-wide barrier -- one that never returns stops
+#: every session operation on the node.
+_COMMAND_TIMEOUT_SEC = 30.0
+
 _DEFAULT_IPAM_STATE_DIR = Path("/var/lib/backend.ai/net-ipam")
 _NETNS_PID_RE = re.compile(r"/proc/(\d+)/ns/net")
 
@@ -110,7 +115,20 @@ async def _run(argv: Sequence[str], *, check: bool = True) -> tuple[int, bytes, 
     proc = await asyncio.create_subprocess_exec(
         *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
-    out, err = await proc.communicate()
+    try:
+        async with asyncio.timeout(_COMMAND_TIMEOUT_SEC):
+            out, err = await proc.communicate()
+    except TimeoutError as e:
+        # `nsenter` into a namespace whose task is stuck, `ip` blocked on netlink. Attach runs
+        # under the privnet's node-wide barrier, so one of these that never returns stops every
+        # session operation on the node. Kill it and let the caller's retry deal with it.
+        with contextlib.suppress(ProcessLookupError):
+            proc.kill()
+        with contextlib.suppress(Exception):
+            await proc.wait()
+        raise RuntimeError(
+            f"command timed out after {_COMMAND_TIMEOUT_SEC:.0f}s: {' '.join(argv)}"
+        ) from e
     rc = proc.returncode or 0
     if check and rc != 0:
         raise RuntimeError(

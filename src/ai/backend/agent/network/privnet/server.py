@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import enum
 import logging
 import os
 import pwd
@@ -95,6 +96,10 @@ _FAIL_CLOSE_RETRY_INTERVAL = 30.0
 #: How often to retry a recovery that could not complete. Same reasoning as above:
 #: what is being waited for is a runtime or filesystem coming back, not a race.
 _RECOVERY_RETRY_INTERVAL = 30.0
+#: The longest one request may hold the node-wide barrier. Well above any real operation -- each
+#: privileged command is capped far lower and a request runs a handful of them -- and finite so
+#: that a request which finds a new way to block cannot stop the whole node.
+_REQUEST_TIMEOUT_SEC = 300.0
 #: Verbs that only read. They skip the node-wide mutation barrier, because nothing they do can
 #: race a recovery pass and a readiness probe must not wait on one.
 _READ_ONLY_OPS = frozenset({
@@ -128,6 +133,28 @@ def _self_effective_caps() -> str:
 class PrivNetError(RuntimeError):
     """A request could not be served. The message returned to the agent is generic;
     the privileged detail is logged privnet-side only."""
+
+
+class _Liveness(enum.Enum):
+    """What the runtime says about something a recovery pass is about to delete."""
+
+    GONE = "gone"
+    LIVE = "live"
+    UNKNOWN = "unknown"
+
+    @property
+    def reason(self) -> str:
+        if self is _Liveness.LIVE:
+            return "it is running again; this pass must adopt it rather than reclaim it"
+        return "the runtime could not be asked whether it is still gone"
+
+
+class _ReclaimDeferred(Exception):
+    """The runtime disagrees with the snapshot, so nothing was reclaimed.
+
+    Neither a failure nor a completed reclaim: the caller must keep it on the books, because the
+    only other outcome it knows -- a clean return -- clears the marker that brings the retry back.
+    """
 
 
 class _SessionEntry:
@@ -580,6 +607,12 @@ class PrivNetServer:
                     await self._reclaim_dead_session(
                         session_id, raw_config, journalled_peers.get(session_id)
                     )
+                except _ReclaimDeferred as e:
+                    self._unreclaimed_sessions[session_id] = str(e)
+                    if session_id in set((await self._live_containers()).values()):
+                        # Alive again. It is not a dead session at all, so the next pass must
+                        # ADOPT it rather than keep asking whether it may be deleted.
+                        self._unrecovered_sessions[session_id] = str(e)
                 except Exception as e:
                     log.exception(
                         "failed to reclaim dead session {} on a later attempt", session_id
@@ -833,8 +866,12 @@ class PrivNetServer:
                 continue
             try:
                 await self._restore_live_security(session_id, journalled_peers.get(session_id))
-            except Exception:
+            except Exception as e:
+                # Adoption holds an encrypted tunnel DOWN, and this is what raises it again. Only
+                # logged, the session stayed dark for the life of the process: the node reported
+                # itself recovered, the retry timer never started, and nothing else asks.
                 log.exception("failed to restore security for session {}", session_id)
+                self._unrecovered_sessions[session_id] = f"its protection was not restored ({e})"
 
         # Dead teardown is last: its shared-pair refcount now sees every surviving user.
         # A dead session's devices are named after its VNI, and the manager hands VNIs back out.
@@ -871,6 +908,10 @@ class PrivNetServer:
                 await self._reclaim_dead_session(
                     session_id, raw_config, journalled_peers.get(session_id)
                 )
+            except _ReclaimDeferred as e:
+                # Not a failure and not a success: the runtime says otherwise now, so this stays
+                # on the books for the retry, which reads a fresh snapshot.
+                self._unreclaimed_sessions[session_id] = str(e)
             except Exception as e:
                 log.exception("failed to recover session {}", session_id)
                 self._unreclaimed_sessions[session_id] = str(e)
@@ -1076,15 +1117,15 @@ class PrivNetServer:
         devices, and the node-local block they hold is finite."""
         meta = self._meta_of(session_id, raw_config)
         if meta.vni is None:
-            if not await self._session_still_gone(session_id):
-                return
+            if (liveness := await self._recheck(session_id, session=True)) is not _Liveness.GONE:
+                raise _ReclaimDeferred(liveness.reason)
             await self._reclaim_devices(session_id, meta, peer_vteps)
             await self._journal.forget_session(session_id)
             log.info("reclaimed the network of dead session {}", session_id)
             return
         digest = config_digest(raw_config)
-        if not await self._session_still_gone(session_id):
-            return
+        if (liveness := await self._recheck(session_id, session=True)) is not _Liveness.GONE:
+            raise _ReclaimDeferred(liveness.reason)
         # Before the adopt, not after the teardown. Adoption holds an encrypted tunnel DOWN, so
         # even reaching that far for a session another agent is still running would take its
         # traffic with it -- and this pass runs precisely because this node's own runtime shows no
@@ -1110,36 +1151,26 @@ class PrivNetServer:
         await self._journal.forget_session(session_id)
         log.info("reclaimed the network of dead session {}", session_id)
 
-    async def _still_gone(self, container_id: str) -> bool:
-        """Whether the container is still absent from the runtime, asked again just now.
+    async def _recheck(self, what: str, *, session: bool) -> _Liveness:
+        """Ask the runtime again, right before deleting anything of ``what``.
 
-        The node-wide barrier holds off other privnet requests; it holds off nothing in
-        containerd. A container can be started between the snapshot this pass reads and the
-        moment it acts, and the act is deleting that container's veth and address.
+        Three answers, because two are not enough. The node-wide barrier holds off other privnet
+        requests; it holds off nothing in containerd, so a container can start between the
+        snapshot this pass read and the moment it acts -- and treating "it is back" the same as
+        "it is gone, carry on" left the caller clearing its retry marker over a live session it
+        had not adopted. It stayed journalled, unadopted, its tunnel held down, and nothing came
+        back to it.
         """
         try:
             live = await self._live_containers()
-        except Exception:
-            # Unable to ask is not "it is gone". Leave it for the retry, which is what the
-            # unreclaimed marker exists for.
-            log.warning("could not re-check the runtime before reclaiming {}", container_id)
-            return False
-        if container_id in live:
-            log.info("not reclaiming {}: it is running again", container_id)
-            return False
-        return True
-
-    async def _session_still_gone(self, session_id: str) -> bool:
-        """Whether nothing of this session is running here, asked again just now."""
-        try:
-            live = await self._live_containers()
-        except Exception:
-            log.warning("could not re-check the runtime before reclaiming session {}", session_id)
-            return False
-        if session_id in set(live.values()):
-            log.info("not reclaiming session {}: a container of it is running again", session_id)
-            return False
-        return True
+        except Exception as e:
+            log.warning("could not re-check the runtime before reclaiming {}: {}", what, e)
+            return _Liveness.UNKNOWN
+        present = set(live.values()) if session else set(live)
+        if what in present:
+            log.info("not reclaiming {}: it is running again", what)
+            return _Liveness.LIVE
+        return _Liveness.GONE
 
     async def _reclaim_devices(
         self, session_id: str, meta: SessionNetMeta, peer_vteps: Sequence[str] | None
@@ -1167,7 +1198,11 @@ class PrivNetServer:
         """Give back the host veth, the LOCAL address and the DNAT rules of a container that died
         while we were down. The container's own netns took its end of the veth with it; the host
         side, its address and its rules are ours to release."""
-        if not await self._still_gone(container_id):
+        liveness = await self._recheck(container_id, session=False)
+        if liveness is not _Liveness.GONE:
+            # Back, or unaskable. Either way this is debt, not a completed reclaim: the caller
+            # clears the marker on a clean return, and clearing it here is what stopped the retry.
+            self._unreclaimed_containers[container_id] = liveness.reason
             return
         try:
             await self._forwarder.remove_container(container_id)
@@ -1289,7 +1324,24 @@ class PrivNetServer:
                 return await self._dispatch_locked(req, session_id)
         # Global first, then per-session: the recovery retry takes them in that order too.
         async with self._mutation_lock, self._session_locked(session_id):
-            return await self._dispatch_locked(req, session_id)
+            try:
+                async with asyncio.timeout(_REQUEST_TIMEOUT_SEC):
+                    return await self._dispatch_locked(req, session_id)
+            except TimeoutError:
+                # A backstop, not the primary defence: every command and lock wait beneath this is
+                # already bounded. What it guarantees is that the node-wide barrier is always
+                # given back -- one request that found a new way to block would otherwise stop
+                # every attach, teardown and peer update on this node for as long as it runs.
+                log.error(
+                    "privnet op {} for session {} exceeded {}s; releasing the node-wide lock",
+                    req.op,
+                    session_id,
+                    _REQUEST_TIMEOUT_SEC,
+                )
+                return PrivNetResponse(
+                    ok=False,
+                    error=f"the operation did not finish within {_REQUEST_TIMEOUT_SEC:.0f}s",
+                )
 
     async def _dispatch_locked(self, req: PrivNetRequest, session_id: str) -> PrivNetResponse:
         try:

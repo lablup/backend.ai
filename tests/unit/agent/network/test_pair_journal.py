@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+import ai.backend.agent.network.pair_journal as pj
 from ai.backend.agent.network.pair_journal import PairJournal, pair_key
 
 
@@ -276,3 +277,33 @@ class TestHostileNeighbours:
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
         await _claim(_journal(tmp_path), key, "agent-a", "s1")
         assert stat.S_IMODE((root / key / ".lock").stat().st_mode) & 0o044 == 0o044
+
+
+class TestWaitingForALockThatNeverComes:
+    """The waiter is under the privnet's node-wide barrier. A holder that crashed releases the
+    lock with its fd; one wedged inside a privileged command does not, and waiting for it forever
+    stops every session operation on the node."""
+
+    async def test_it_gives_up_and_says_so(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(pj, "_LOCK_WAIT_TIMEOUT_SEC", 0.15)
+        journal = PairJournal(tmp_path / "pairs")
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        async with journal.holding(key) as held:
+            assert held is not None
+            # A second waiter, while the first still holds it.
+            async with journal.holding(key) as blocked:
+                assert blocked is None
+
+    async def test_giving_up_is_not_permission(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Every caller reads None as "not permission", which is what keeps a timed-out waiter from
+        # deleting an SA somebody else is using.
+        monkeypatch.setattr(pj, "_LOCK_WAIT_TIMEOUT_SEC", 0.15)
+        journal = PairJournal(tmp_path / "pairs")
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        async with journal.holding(key):
+            async with journal.releasing(key, "a1", "s1") as freed:
+                assert freed is None

@@ -63,6 +63,11 @@ _CLAIM_SEP: Final = "~"
 #: loop, rather than one blocking call: a blocking `flock` handed to a thread outlives the task
 #: that is cancelled while waiting for it, and then acquires a lock nobody is left to release.
 _LOCK_POLL_SEC: Final = 0.05
+#: How long to keep trying for a lock another process holds. A holder that crashed releases it
+#: with its fd, so waiting is normally brief; a holder wedged inside a privileged command does not,
+#: and the waiter is under the privnet's node-wide barrier. Giving up is reported as "could not
+#: take the lock", which every caller already treats as "not permission".
+_LOCK_WAIT_TIMEOUT_SEC: Final = 60.0
 
 
 def pair_key(self_vtep: str, peer_vtep: str, dstport: int) -> str:
@@ -392,6 +397,7 @@ class PairJournal:
             os.close(root_fd)
         if dir_fd is None:
             return None
+        deadline = asyncio.get_running_loop().time() + _LOCK_WAIT_TIMEOUT_SEC
         while True:
             lock_fd: int | None = None
             try:
@@ -432,6 +438,14 @@ class PairJournal:
                 if e.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
                     os.close(dir_fd)
                     log.warning("could not lock the ESP pair {}: {}", key, e)
+                    return None
+                if asyncio.get_running_loop().time() >= deadline:
+                    os.close(dir_fd)
+                    log.warning(
+                        "gave up waiting {}s for the node-wide lock on {}; a holder is wedged",
+                        _LOCK_WAIT_TIMEOUT_SEC,
+                        key,
+                    )
                     return None
                 # Somebody else has it. Waiting here is cancellable, which is the point -- and
                 # the directory descriptor has to be closed if the wait IS cancelled, or every

@@ -87,7 +87,9 @@ class PrivNetClient:
         """
         try:
             resp = await self.call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
-        except (PrivNetClientError, OSError) as e:
+        except (PrivNetClientError, ProtocolError, OSError) as e:
+            # ProtocolError too: a truncated line (the daemon died mid-answer) and a corrupt frame
+            # both arrive here, and both mean this node cannot say what it has not recovered.
             return {
                 "privnet:status": f"this node's privnet could not report its recovery state ({e})"
             }
