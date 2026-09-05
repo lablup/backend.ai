@@ -141,7 +141,6 @@ class SessionDBSource:
                 sa.select(UserRow)
                 .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
                 .where(SessionRow.id == session_id)
-                .options(joinedload(UserRow.default_keypair))
             )
             user = await db_sess.scalar(query)
             if user is None:

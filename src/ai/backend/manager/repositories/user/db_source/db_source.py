@@ -12,7 +12,7 @@ from dateutil.tz import tzutc
 from sqlalchemy import Row
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, noload
+from sqlalchemy.orm import load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -580,22 +580,14 @@ class UserDBSource:
 
     async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
         """Private method to get user by email."""
-        res = await session.scalar(
-            sa.select(UserRow)
-            .where(UserRow.email == email)
-            .options(joinedload(UserRow.default_keypair))
-        )
+        res = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
         if res is None:
             raise UserNotFound(f"User with email {email} not found.")
         return res
 
     async def _get_user_by_uuid(self, session: SASession, user_uuid: UUID) -> UserRow:
         """Private method to get user by UUID."""
-        res = await session.scalar(
-            sa.select(UserRow)
-            .where(UserRow.uuid == user_uuid)
-            .options(joinedload(UserRow.default_keypair))
-        )
+        res = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
         if res is None:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return res
@@ -923,7 +915,7 @@ class UserDBSource:
             UserSearchResult with matching users and pagination info.
         """
         async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow).options(joinedload(UserRow.default_keypair))
+            query = sa.select(UserRow)
             result = await execute_batch_querier(db_session, query, querier)
 
             items = [row.UserRow.to_data() for row in result.rows]
@@ -949,7 +941,7 @@ class UserDBSource:
             UserSearchResult with matching users and pagination info.
         """
         async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow).options(joinedload(UserRow.default_keypair))
+            query = sa.select(UserRow)
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
@@ -978,9 +970,7 @@ class UserDBSource:
             UserSearchResult with matching users and pagination info.
         """
         async with self._db.begin_readonly_session() as db_session:
-            query = (
-                sa.select(UserRow).select_from(UserRow).options(joinedload(UserRow.default_keypair))
-            )
+            query = sa.select(UserRow).select_from(UserRow)
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
@@ -1008,7 +998,6 @@ class UserDBSource:
                     UserRoleRow,
                     UserRow.uuid == UserRoleRow.user_id,
                 )
-                .options(joinedload(UserRow.default_keypair))
             )
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 

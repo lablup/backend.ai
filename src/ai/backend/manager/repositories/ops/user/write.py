@@ -78,12 +78,10 @@ class UserWriteOps(RBACWriteOps):
         await self._enroll_in_domain(user_id, full_creation.domain_id)
         await self._enroll_in_projects(user_id, full_creation.domain_id, full_creation.project_ids)
 
-        # The insert leaves the server-default columns unloaded, and default_keypair is the
-        # keypair created just above; reload both so callers can read the row without a
-        # sync-context lazy refresh.
+        # The insert leaves the server-default columns unloaded; reload them so callers
+        # can read the row without a sync-context lazy refresh.
         await self._sess.flush()
         await self._sess.refresh(user_row)
-        await self._sess.refresh(user_row, ["default_keypair"])
         return FullUserCreationResult(user_row=user_row, keypair=keypair)
 
     async def _create_user_scope(self, creation: ScopeCreation[UserRow]) -> UserRow:

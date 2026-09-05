@@ -14,7 +14,6 @@ import msgpack
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DomainID
@@ -169,14 +168,10 @@ class ProjectDBSource:
         project_domain_subq = (
             sa.select(ProjectRow.domain_name).where(ProjectRow.id == project_id).scalar_subquery()
         )
-        query = (
-            sa.select(UserRow)
-            .where(
-                UserRow.uuid.in_(user_ids)
-                & (UserRow.domain_name == project_domain_subq)
-                & ~user_scope_membership_exists(PROJECT_SCOPE_TYPE, project_id, UserRow.uuid)
-            )
-            .options(joinedload(UserRow.default_keypair))
+        query = sa.select(UserRow).where(
+            UserRow.uuid.in_(user_ids)
+            & (UserRow.domain_name == project_domain_subq)
+            & ~user_scope_membership_exists(PROJECT_SCOPE_TYPE, project_id, UserRow.uuid)
         )
         result = await w.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
         return [row.UserRow for row in result.rows]
@@ -592,15 +587,11 @@ class ProjectDBSource:
             existing_ids = {row.UserRow.uuid for row in existing_result.rows}
 
             # Fetch users that are actually members before removing
-            actual_assoc_query = (
-                sa.select(UserRow)
-                .where(
-                    UserRow.uuid.in_(unbinder.user_uuids)
-                    & user_scope_membership_exists(
-                        PROJECT_SCOPE_TYPE, ProjectID(unbinder.project_id), UserRow.uuid
-                    )
+            actual_assoc_query = sa.select(UserRow).where(
+                UserRow.uuid.in_(unbinder.user_uuids)
+                & user_scope_membership_exists(
+                    PROJECT_SCOPE_TYPE, ProjectID(unbinder.project_id), UserRow.uuid
                 )
-                .options(joinedload(UserRow.default_keypair))
             )
             assoc_result = await w.batch_query_in_global(
                 actual_assoc_query, BatchQuerier(pagination=NoPagination())
