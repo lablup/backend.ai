@@ -37,10 +37,12 @@ from ai.backend.testutils.dataplane.collectors.host import (
 )
 from ai.backend.testutils.dataplane.guard import LeakGuard
 from ai.backend.testutils.dataplane.nodes import (
+    SSH_TRANSPORT_RETRIES,
     CommandFailed,
     CommandResult,
     Node,
     SshNode,
+    is_transport_failure,
     parse_node_specs,
 )
 
@@ -837,3 +839,29 @@ class TestNodeSpecs:
     def test_node_protocol_is_satisfied(self) -> None:
         assert isinstance(FakeNode("n1", {}), Node)
         assert isinstance(SshNode("root@10.0.0.2"), Node)
+
+
+class TestTellingASshDropFromACommandFailure:
+    """A dropped connection failed a run that had found nothing wrong. ssh exits 255 for its own
+    errors and passes every other code through, so 255 with no output is the transport."""
+
+    @staticmethod
+    def _result(returncode: int, *, stdout: str = "", stderr: str = "") -> CommandResult:
+        return CommandResult(
+            node="n1", argv=("ssh",), returncode=returncode, stdout=stdout, stderr=stderr
+        )
+
+    def test_a_silent_255_is_the_connection(self) -> None:
+        assert is_transport_failure(self._result(255))
+
+    def test_a_255_that_said_something_is_the_command(self) -> None:
+        # A remote command may exit 255 itself; one that does reports why.
+        assert not is_transport_failure(self._result(255, stderr="ctr: no such namespace"))
+        assert not is_transport_failure(self._result(255, stdout="255"))
+
+    def test_any_other_code_is_the_command(self) -> None:
+        assert not is_transport_failure(self._result(1))
+        assert not is_transport_failure(self._result(0))
+
+    def test_the_retry_count_leaves_room_for_one_drop(self) -> None:
+        assert SSH_TRANSPORT_RETRIES >= 2
