@@ -1136,6 +1136,7 @@ class SessionNetwork:
         # NODE's, keyed on the shared journal's block index, so a kernel of this session belonging
         # to another agent on this host is still running on them. Withdraw without pulling the
         # floor out from under it; the agent whose kernel outlives ours tears the data plane down.
+        await self._retry_pending_detaches(session_id)
         running, _ours = await self._running_containers_of(session_id)
         if running:
             log.info(
@@ -1402,20 +1403,49 @@ class SessionNetwork:
         await self._detach_attachment(container_id)
         await self._release_container(container_id)
 
+    async def _retry_pending_detaches(self, session_id: str) -> None:
+        """Detach again for every container of this session whose detach did not go through.
+
+        `_detach_attachment` keeps the record when the detach fails, and its host veth, address
+        and MASQ rule are still standing. This is the last point at which the plan that names
+        them is available -- the coordinator stops next.
+        """
+        pending = [
+            container_id
+            for container_id, (owner, _plan, _pid) in self._attachments.items()
+            if owner == session_id
+        ]
+        for container_id in pending:
+            await self._detach_attachment(container_id)
+
     async def _detach_attachment(self, container_id: str) -> None:
         """Undo the attach recorded for this container, if there is one. Best-effort: a detach
-        hiccup must not block container removal (or session teardown)."""
-        attachment = self._attachments.pop(container_id, None)
+        hiccup must not block container removal (or session teardown).
+
+        The record is dropped only once the detach it describes has actually happened. Dropping it
+        first threw away the plan and task PID that name the host veth, the address and the MASQ
+        rule a failed detach leaves behind, so nothing could retry it.
+        """
+        attachment = self._attachments.get(container_id)
         if attachment is None:
             return
         session_id, plan, task_pid = attachment
         orchestrator = self._orchestrators.get(session_id)
         if orchestrator is None:
+            # The session is gone and took its orchestrator with it; there is nothing left to
+            # detach from and no later call that could use the record.
+            self._attachments.pop(container_id, None)
             return
         try:
             await orchestrator.detach(container_id, plan=plan, task_pid=task_pid)
         except Exception:
-            log.exception("network detach failed for container {}", container_id)
+            log.exception(
+                "network detach failed for container {}; keeping its attachment so the session's"
+                " teardown can try again",
+                container_id,
+            )
+            return
+        self._attachments.pop(container_id, None)
 
     async def remove_container(self, container_id: str) -> None:
         # Detach the container's network first, using the plan captured at attach: this frees
