@@ -35,6 +35,10 @@ class AgentControlConfig:
     which is what a foreground dev agent needs. `start_cmd` has no fallback — nothing can restart
     a foreground process on the developer's behalf, and pretending otherwise would leave their
     stack down.
+
+    `start_cmd` must launch the agent and return; `start` waits for readiness itself. One that
+    blocks until the agent is up is killed at the node's command limit, taking the agent it just
+    started with it -- and the node then stays down for every scenario after this one.
     """
 
     start_cmd: tuple[str, ...] | None = None
@@ -150,6 +154,7 @@ class AgentController:
                 f"[{self._node.name}] no agent start command configured; set "
                 "BAI_DATAPLANE_AGENT_START_CMD, or the suite cannot bring the agent back"
             )
+        # See `AgentControlConfig`: this launches, `wait_ready` waits.
         await self._node.run(list(self._config.start_cmd))
         await self.wait_ready()
 
