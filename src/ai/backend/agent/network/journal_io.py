@@ -1,4 +1,4 @@
-"""Crash-atomic writes for the node-local network journals (BEP-1062).
+"""Crash-atomic writes for the node-local network journals (BEP-1078).
 
 The IPAM and LOCAL-subnet allocators journal each claim as a small file whose existence *and*
 content are authoritative across a restart. A plain create-then-write (``open("x")`` then

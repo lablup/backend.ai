@@ -1,4 +1,4 @@
-"""Cluster name resolver for the privnet (BEP-1062).
+"""Cluster name resolver for the privnet (BEP-1078).
 
 containerd/runc gives a container no cluster DNS, so peers are resolved today from a static
 ``/etc/hosts`` the agent writes per kernel. This module is the dynamic replacement: the privnet
@@ -6,7 +6,7 @@ answers DNS for a session's cluster hostnames on the gateway address it already 
 **split-horizon** resolver that answers cluster names from a decentralized source (etcd-backed) and
 **forwards everything else** to the node's upstream resolver. A peer whose address changes updates
 one source entry and the next query sees it; the same resolution path serves every backend. See
-``proposals/BEP-1062/cluster-name-resolution.md``.
+BEP-1078 (cluster name resolution).
 
 Only the resolve logic and DNS wire handling live here (built on ``dnspython`` — the protocol is
 not reimplemented). The name source (etcd) and the daemon wiring (which gateway to bind,

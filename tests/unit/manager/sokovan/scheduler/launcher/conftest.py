@@ -105,7 +105,7 @@ def mock_network_plugin_ctx() -> MagicMock:
     mock_network_info.options = {}
     mock_plugin.create_network = AsyncMock(return_value=mock_network_info)
     ctx.plugins = {"overlay": mock_plugin}
-    # The launcher asks etcd which driver the member agents' backends need (BEP-1062). An agent
+    # The launcher asks etcd which driver the member agents' backends need (BEP-1078). An agent
     # that has published no backend leaves the configured default in place, which is what these
     # tests exercise, so the reads answer "nothing published".
     ctx.etcd = MagicMock()

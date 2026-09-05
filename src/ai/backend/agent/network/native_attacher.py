@@ -1,6 +1,6 @@
-"""Native veth/bridge attach runner (BEP-1062) — replaces the CNI ``bridge`` plugin binary.
+"""Native veth/bridge attach runner (BEP-1078) — replaces the CNI ``bridge`` plugin binary.
 
-The BEP-1062 data plane is host-native: the session fabric (vxlan device, bridge, FDB/ARP)
+The BEP-1078 data plane is host-native: the session fabric (vxlan device, bridge, FDB/ARP)
 is built with plain iproute2. The only remaining ``/opt/cni/bin`` dependency was the
 per-container *attach* step, which this module reimplements over ``ip``/``iptables`` so no
 external cni-plugins package is required.
@@ -35,7 +35,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# --- cluster DNS redirect (BEP-1062) -------------------------------------------------------------
+# --- cluster DNS redirect (BEP-1078) -------------------------------------------------------------
 # A container's resolv.conf points at ``gateway:53``; the agent's cluster resolver binds an
 # UNPRIVILEGED ephemeral loopback port (``127.0.0.1:<port>``), and these helpers install the one
 # privileged piece — an iptables DNAT redirecting ``gateway:53`` to that loopback port. So the

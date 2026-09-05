@@ -2,7 +2,7 @@
 
 Allocation state lives in etcd under ``network/ipam/*`` and is claimed with
 ``AsyncEtcd.put_if_absent`` (a compare-and-swap on ``create_revision == 0``),
-replacing Swarm's internal global IPAM. See proposals/BEP-1062/control-plane.md.
+replacing Swarm's internal global IPAM. See BEP-1078 (control plane).
 """
 
 from __future__ import annotations
@@ -265,7 +265,7 @@ class EndpointAllocator:
     Central assignment (vs per-node host-local IPAM) is what guarantees disjoint IPs
     across nodes on a stretched overlay subnet; the written ``endpoints/`` table is also
     the input the agent coordinator uses to program FDB/ARP proactively. See
-    proposals/BEP-1062/control-plane.md.
+    BEP-1078 (control plane).
     """
 
     _etcd: AsyncEtcd
@@ -288,7 +288,7 @@ class EndpointAllocator:
         ``agent_id`` is stored so a peer coordinator can resolve the endpoint's VTEP and
         skip its own local endpoints when programming FDB/ARP. ``cluster_hostname`` is stored
         so the per-session cluster name resolver can answer ``hostname -> ip`` from this same
-        table (BEP-1062, cluster-name-resolution.md).
+        table (BEP-1078, cluster-name-resolution.md).
 
         An address this container already holds is returned as it stands: a retried session
         start must not hand the same container a second address and strand the first.

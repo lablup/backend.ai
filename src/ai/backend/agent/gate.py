@@ -1,6 +1,6 @@
 """The two-phase start gate: hold a container in its own netns until the agent has attached.
 
-BEP-1062 needs a container whose network namespace exists and whose PID is stable *before* the
+BEP-1078 needs a container whose network namespace exists and whose PID is stable *before* the
 user's command runs, so a veth can be moved into it:
 
     handle = await runtime.create_task(cid)   # netns exists, user command NOT exec'd
