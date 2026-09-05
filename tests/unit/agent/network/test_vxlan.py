@@ -4189,3 +4189,83 @@ class TestTwoSetupsRacingForOneVni:
         plugin = _plugin(Recorder(), pair_journal=PairJournal(tmp_path / "pairs"))
         await plugin.setup_session_network(_ENC_META, _SELF)
         await plugin.setup_session_network(_ENC_META, _SELF)
+
+
+#: Verbatim `ip xfrm policy` for one of this backend's own policies, captured from a live host
+#: (iproute2 6.1/6.8, Linux 6.8 and 6.14). Kept as text rather than rebuilt from the arguments,
+#: because every hand-written fixture in this file shared the assumption that broke: that the
+#: template's protocol fields sit on the `tmpl` line. They do not -- they are on a continuation
+#: line under it, and a parser that read only the first found no policy on any real host.
+_REAL_POLICY_LISTING = """\
+src 192.0.2.1/32 dst 192.0.2.2/32 proto udp dport 4789 \n\
+\tdir out priority 0 \n\
+\tmark 0xba100001/0xffffffff \n\
+\ttmpl src 192.0.2.1 dst 192.0.2.2\n\
+\t\tproto esp spi 0x53689c08 reqid 3121610754 mode transport\n\
+"""
+
+#: The matching `ip xfrm state`, from the same capture. Note `replay-window 0 flag esn` with the
+#: real window in the ESN context block below it, and the reqid printed in decimal.
+_REAL_STATE_LISTING = """\
+src 192.0.2.1 dst 192.0.2.2\n\
+\tproto esp spi 0x53689c08 reqid 3121610754 mode transport\n\
+\treplay-window 0 flag esn\n\
+\taead rfc4106(gcm(aes)) 0x0000000000000000000000000000000000000000 128\n\
+\tanti-replay esn context:\n\
+\t seq-hi 0x0, seq 0x0, oseq-hi 0x0, oseq 0x0\n\
+\t replay_window 128, bitmap-length 4\n\
+\t 00000000 00000000 00000000 00000000\n\
+"""
+
+
+class TestWhatTheKernelActuallyPrints:
+    """Parsed from output captured off a live host, not from output written to match the parser.
+
+    Every other fixture here renders the template on the `tmpl` line, because that is how the
+    arguments are written. `ip xfrm policy` prints it on a continuation line underneath -- so the
+    parser found no policy on any real host, the drift pass saw every pair as broken and
+    reprogrammed it every three seconds, and the encryption probe reported that this kernel had
+    lost the policy it had just installed. Unit tests agreed with each other and with nothing else.
+    """
+
+    def test_the_policy_is_recognised(self) -> None:
+        assert parse_owned_policies(_REAL_POLICY_LISTING, f"{XFRM_MARK:#x}") == {
+            ("192.0.2.1", "192.0.2.2", 4789): 0x53689C08
+        }
+
+    def test_the_template_spi_comes_back(self) -> None:
+        # It is what says which key generation the policy selects.
+        policies = parse_owned_policies(_REAL_POLICY_LISTING, f"{XFRM_MARK:#x}")
+        assert policies[("192.0.2.1", "192.0.2.2", 4789)] == _esp_spi("192.0.2.1", "192.0.2.2")
+
+    def test_a_decimal_reqid_is_ours(self) -> None:
+        # The kernel prints reqid in decimal; the arguments write it in hex.
+        assert "3121610754" in _REAL_POLICY_LISTING
+        assert parse_owned_policies(_REAL_POLICY_LISTING, f"{XFRM_MARK:#x}")
+
+    def test_a_template_on_the_continuation_line_can_still_be_rejected(self) -> None:
+        # The two-line form must not become a way to pass without being checked.
+        foreign = _REAL_POLICY_LISTING.replace("reqid 3121610754", "reqid 999")
+        assert parse_owned_policies(foreign, f"{XFRM_MARK:#x}") == {}
+
+    def test_an_optional_template_on_the_continuation_line_is_refused(self) -> None:
+        optional = _REAL_POLICY_LISTING.replace("mode transport", "mode transport level use")
+        assert parse_owned_policies(optional, f"{XFRM_MARK:#x}") == {}
+
+    def test_a_template_naming_other_endpoints_is_refused(self) -> None:
+        elsewhere = _REAL_POLICY_LISTING.replace(
+            "tmpl src 192.0.2.1 dst 192.0.2.2", "tmpl src 10.9.9.9 dst 192.0.2.2"
+        )
+        assert parse_owned_policies(elsewhere, f"{XFRM_MARK:#x}") == {}
+
+    def test_the_state_is_recognised(self) -> None:
+        # This half was already right, and the capture is what proves it: `replay-window 0` with
+        # `flag esn` is what an ESN SA really reports, the window living in the context block.
+        assert parse_owned_sa_endpoints(_REAL_STATE_LISTING, XFRM_REQID) == frozenset({
+            ("192.0.2.1", "192.0.2.2", 0x53689C08)
+        })
+
+    def test_its_identity_is_read_back(self) -> None:
+        assert parse_sa_identities(_REAL_STATE_LISTING) == {
+            ("192.0.2.2", 0x53689C08): ("192.0.2.1", XFRM_REQID)
+        }
