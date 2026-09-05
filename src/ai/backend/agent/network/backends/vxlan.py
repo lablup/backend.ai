@@ -212,6 +212,9 @@ _KEYRING_SIZE: Final = 3
 #: a run of them is a node that cannot say whether anything on it is protected.
 _MAX_UNVERIFIED_PASSES: Final = 3
 _VXLAN_LINE: Final = re.compile(r"^\d+:\s+(?P<name>[^:@\s]+)")
+#: Stands in `unclosed_devices` for "the fail-close preflight has not run". Not a device name --
+#: the point is that this backend does not yet know what the device names ARE.
+_PREFLIGHT_PENDING: Final = "(the fail-close preflight has not run)"
 
 
 async def _list_vxlan_devices() -> frozenset[str]:
@@ -1164,6 +1167,10 @@ async def _run_command(argv: Sequence[str]) -> None:
         )
 
 
+class _PairStillOwned(Exception):
+    """Raised out of the claim context so a failed teardown keeps this pair's claims."""
+
+
 class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     """VXLAN data-plane backend."""
 
@@ -1235,6 +1242,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     _pair_active_generations: dict[tuple[str, str], int]
     #: Consecutive protection passes that could not read the node's state at all.
     _unverified_passes: int
+    #: Whether the fail-close preflight has run to the end since this process started. False is a
+    #: debt the node reports, because an empty `unclosed_devices` otherwise says "everything that
+    #: survived is down" on behalf of a backend that never looked.
+    _preflight_done: bool
     _key_generation: KeyGeneration
     #: Serialize forwarding changes for one session/VTEP. Without this, DEL_PEER can observe no
     #: endpoint yet, remove the pair, and race with ADD_ENDPOINT opening a unicast FDB immediately
@@ -1312,6 +1323,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._security_states = {}
         self._pair_locks = {}
         self._unverified_passes = 0
+        # True until something says otherwise: an agent that never runs a preflight is not
+        # carrying a node's worth of survivors. `owe_fail_close_preflight` is what the privnet
+        # calls at startup to say this node does have one.
+        self._preflight_done = True
         self._pair_slot_generations = {}
         self._pair_active_generations = {}
         self._forwarding_locks = {}
@@ -2008,6 +2023,19 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._programmed_pairs.discard((self_vtep, peer_vtep))
         self._programmed_policies.discard((self_vtep, peer_vtep, meta.vxlan_port))
 
+    def _is_self(self, session_id: str, peer_vtep: str) -> bool:
+        """Whether this "peer" is this very node.
+
+        The manager publishes every member of a session, this node included, so its own VTEP
+        arrives here like any other. Programming it built an ESP pair from an address to itself
+        and appended an FDB entry pointing the tunnel at the local machine -- state the kernel
+        will accept and nothing will ever use, counted as a pair user, and left behind by a
+        teardown that has no peer to remove it for. Traffic between two containers of the session
+        on THIS node crosses the bridge and never reaches the tunnel at all, which is why
+        `_pair_is_protected` already treats this case as protected.
+        """
+        return self._self_vteps.get(session_id) == peer_vtep
+
     def _pair_is_protected(self, meta: SessionNetMeta, session_id: str, peer_vtep: str) -> bool:
         """Whether traffic to ``peer_vtep`` would actually be encrypted."""
         if meta.encryption_key is None:
@@ -2033,6 +2061,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # Preconditions, so they run before any side effect: a session this node cannot carry must
         # leave nothing half-built behind.
         await self._require_mtu_fits(meta)
+        self._require_vni_unused(meta)
         await self._require_closed(vni)
         await self._require_no_conflict(vni, meta.vxlan_port)
         if meta.encryption_key is not None and self_member.vtep_ip is None:
@@ -2228,6 +2257,20 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             self._programmed_pairs.add(sa)
             self._programmed_policies.add(key)
 
+    def owe_fail_close_preflight(self) -> None:
+        """Record that this backend has not yet held the node's surviving tunnels down.
+
+        Called before anything that can block, because the debt must outlive a startup that never
+        reaches the preflight at all -- a runtime connect that hangs, a deadline that fires first.
+        Cleared only by a preflight that ran to the end. Until then `unclosed_devices` is
+        non-empty, so the node reports itself unrecovered and `_require_closed` refuses new
+        sessions, which is the honest state: nothing here has looked at what survived.
+        """
+        self._preflight_done = False
+
+    def _preflight_debt(self) -> frozenset[str]:
+        return frozenset() if self._preflight_done else frozenset({_PREFLIGHT_PENDING})
+
     @override
     async def prepare_recovery(self) -> None:
         """Hold every surviving Backend.AI VXLAN down before journal recovery.
@@ -2257,6 +2300,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 self._unclosed_devices.discard(device)
             else:
                 failed.append(device)
+        self._preflight_done = True
         if failed:
             # Do NOT prune. A claim is what stops another agent removing the SAs of a pair still
             # in use, and a tunnel that would not go down is exactly a pair that may still be
@@ -2303,8 +2347,13 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         return await self._pair_journal.prune(self._journal_owner, live_sessions)
 
     def unclosed_devices(self) -> frozenset[str]:
-        """Surviving tunnels this node has not managed to bring down, for diagnostics."""
-        return frozenset(self._unclosed_devices)
+        """Surviving tunnels this node has not managed to bring down, for diagnostics.
+
+        Includes a standing entry while the preflight has not run at all: an empty set means "this
+        backend looked and everything is down", and a startup that never reached the preflight
+        must not be able to say that.
+        """
+        return frozenset(self._unclosed_devices) | self._preflight_debt()
 
     async def retry_fail_close(self) -> frozenset[str]:
         """Try again to bring down every survivor recovery could not close. Returns what is left.
@@ -2313,12 +2362,40 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         privnet -- it continues in degraded mode on purpose -- so without a retry an orphan whose
         session is not in the journal stays UP for as long as the process runs, carrying whatever
         a previous life was carrying, with nothing coming back to it.
+
+        A preflight that never completed is re-run rather than swept: the set to sweep comes FROM
+        the preflight, so sweeping an empty one reported success on behalf of a backend that had
+        not enumerated anything -- which is exactly the state a startup that timed out on the
+        runtime connect leaves behind.
         """
+        if not self._preflight_done:
+            with contextlib.suppress(Exception):
+                await self.prepare_recovery()
+            if not self._preflight_done:
+                return self.unclosed_devices()
         for dev in sorted(self._unclosed_devices):
             if await self._hold_vxlan_down_or_absent(dev):
                 self._unclosed_devices.discard(dev)
                 log.info("surviving tunnel {} is finally down", dev)
-        return frozenset(self._unclosed_devices)
+        return self.unclosed_devices()
+
+    def _require_vni_unused(self, meta: SessionNetMeta) -> None:
+        """Refuse a VNI another session of THIS process already holds.
+
+        The devices are named after the VNI, and setup deletes what it finds under those names
+        before rebuilding them -- so a second session declaring a VNI that is already up rebuilds
+        the first one's bridge and VXLAN device out from under its containers.
+
+        The privnet's node-wide registry refuses this across agents; this refuses it inside one
+        process, which is the whole of the check where the backend runs in-process and has no
+        registry to consult.
+        """
+        for other_id, other in self._sessions.items():
+            if other_id != meta.session_id and other.vni == meta.vni:
+                raise OverlayEncryptionUnavailable(
+                    f"session {meta.session_id} declares VNI {meta.vni}, which session {other_id}"
+                    " on this node is already running on; its devices are named after it"
+                )
 
     async def _require_closed(self, vni: int) -> None:
         """Refuse to build any overlay while a survivor from a previous life is still up.
@@ -2562,6 +2639,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         meta = self._sessions.get(session_id)
         if meta is None or meta.vni is None or peer.vtep_ip is None:
             return
+        if self._is_self(session_id, peer.vtep_ip):
+            return  # see `_is_self`
         # Encryption first, FDB second. The FDB entry is what makes a frame leave this node for
         # that peer, so opening it before the ESP policy exists is a window in which an "encrypted"
         # session sends clear text. Doing it in this order makes the failure mode "the peer is
@@ -2803,17 +2882,40 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         key: tuple[str, str, int],
         failures: list[str] | None = None,
     ) -> None:
-        """The body of `_unprogram_encryption`, run with the pair's lock held."""
+        """The body of `_unprogram_encryption`, run with the pair's lock held.
+
+        The claims are given up only if the removals below actually land. `releasing` commits when
+        its block returns, so a teardown that could not delete an SA leaves this pair's claims on
+        disk -- which is what the retry needs to find, and what stops a co-located agent reading
+        the pair as unused while its objects are still there.
+        """
         sa = (self_vtep, peer_vtep)
-        async with (
-            self._pair_journal.releasing(sa_key(*sa), self._journal_owner, session_id) as sa_free,
-            self._pair_journal.releasing(
-                pair_key(*key), self._journal_owner, session_id
-            ) as policy_free,
-        ):
-            await self._unprogram_pair_locked(
-                meta, session_id, peer_vtep, self_vtep, key, sa_free, policy_free, failures
-            )
+        pair_failures: list[str] = []
+        try:
+            async with (
+                self._pair_journal.releasing(
+                    sa_key(*sa), self._journal_owner, session_id
+                ) as sa_free,
+                self._pair_journal.releasing(
+                    pair_key(*key), self._journal_owner, session_id
+                ) as policy_free,
+            ):
+                await self._unprogram_pair_locked(
+                    meta, session_id, peer_vtep, self_vtep, key, sa_free, policy_free, pair_failures
+                )
+                if pair_failures:
+                    # Out through the context managers, so neither claim is committed. Caught
+                    # immediately below; the caller sees the failures exactly as before.
+                    raise _PairStillOwned
+        except _PairStillOwned:
+            pass
+        if pair_failures:
+            if failures is None:
+                raise OverlayTeardownIncomplete(
+                    f"session {session_id} could not remove its ESP state for {peer_vtep}: "
+                    + "; ".join(pair_failures)
+                )
+            failures.extend(pair_failures)
 
     def _scope_is_free(
         self,
@@ -2862,9 +2964,13 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         key: tuple[str, str, int],
         sa_free: bool | None,
         policy_free: bool | None,
-        failures: list[str] | None,
+        failures: list[str],
     ) -> None:
-        """The body of `_unprogram_pair`, with the pair's host-wide claim locks held."""
+        """The body of `_unprogram_pair`, with the pair's host-wide claim locks held.
+
+        Everything it could not remove goes into ``failures``, and a non-empty one keeps this
+        pair's claims -- see `_unprogram_pair`.
+        """
         sa = (self_vtep, peer_vtep)
         sa_users = self._pair_users.setdefault(sa, set())
         policy_users = self._policy_users.setdefault(key, set())
@@ -2886,9 +2992,6 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # failure -- but the retry it is asking for reads `_encrypted_peers` to find the pairs to
         # revisit, and that entry is already gone. The retry then finds nothing to do, succeeds,
         # and the manager releases the VNI over an SA and policy that are still on the host.
-        # Collect into the caller's list when it is collecting, and let `_remove` raise when it
-        # is not.
-        pair_failures: list[str] | None = [] if failures is not None else None
         deletes: list[Sequence[str]] = []
         if remove_sa:
             # SAs first, then the policy. Between the two there is a window, and this order makes
@@ -2903,15 +3006,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                         for slot in range(_KEYRING_SIZE)
                         for args in xfrm_state_del_args(self_vtep, peer_vtep, generation=slot)
                     ],
-                    pair_failures,
+                    failures,
                 )
             )
         if remove_policy:
             deletes.extend(xfrm_policy_del_args(self_vtep, peer_vtep, dstport=meta.vxlan_port))
         for args in deletes:
-            await self._remove(args, pair_failures)
-        if failures is not None and pair_failures:
-            failures.extend(pair_failures)
+            await self._remove(args, failures)
+        if failures:
             return  # bookkeeping untouched, so the next teardown visits this pair again
         if remove_sa:
             self._programmed_pairs.discard(sa)
@@ -3042,6 +3144,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         meta = self._sessions.get(session_id)
         if meta is None or meta.vni is None or peer.vtep_ip is None:
             return
+        if self._is_self(session_id, peer.vtep_ip):
+            return  # nothing was ever programmed for it -- see `_is_self`
         async with self._forwarding_lock(session_id, peer.vtep_ip):
             remaining = sorted(
                 f"{ip}/{mac}"

@@ -62,12 +62,16 @@ class TestNodeWideRefcount:
         assert await _release(journal, key, "agent-a", "s1") is False
         assert await journal.users(key) == frozenset({"agent-b/s2"})
 
-    async def test_releasing_twice_is_harmless(self, tmp_path: Path) -> None:
+    async def test_releasing_a_claim_we_no_longer_hold_answers_unknown(
+        self, tmp_path: Path
+    ) -> None:
+        # Not True. "Nobody is left" computed from a set we are not in is a claim somebody else
+        # lost, and the answer authorises deleting the SAs they are still using.
         journal = _journal(tmp_path)
         key = pair_key("10.0.0.1", "10.0.0.2", 4789)
         await _claim(journal, key, "agent-a", "s1")
         assert await _release(journal, key, "agent-a", "s1") is True
-        assert await _release(journal, key, "agent-a", "s1") is True
+        assert await _release(journal, key, "agent-a", "s1") is None
 
     async def test_an_unreachable_journal_reports_unknown_rather_than_free(
         self, tmp_path: Path
@@ -307,3 +311,55 @@ class TestWaitingForALockThatNeverComes:
         async with journal.holding(key):
             async with journal.releasing(key, "a1", "s1") as freed:
                 assert freed is None
+
+
+class TestTheClaimIsGivenUpOnlyOnSuccess:
+    """`releasing` commits when the caller's block returns. Dropping the claim first meant a
+    teardown that failed -- or was cancelled -- had already given up the one thing that stops a
+    co-located agent deleting the SAs it is still using, with nothing left to restore it."""
+
+    async def test_a_failed_teardown_keeps_it(self, tmp_path: Path) -> None:
+        journal = _journal(tmp_path)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(journal, key, "agent-a", "s1")
+
+        with pytest.raises(RuntimeError):
+            async with journal.releasing(key, "agent-a", "s1") as freed:
+                assert freed is True
+                raise RuntimeError("ip xfrm state del failed")
+
+        assert await journal.users(key) == frozenset({"agent-a/s1"})
+
+    async def test_a_cancelled_teardown_keeps_it(self, tmp_path: Path) -> None:
+        journal = _journal(tmp_path)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(journal, key, "agent-a", "s1")
+
+        async def _cancelled() -> None:
+            async with journal.releasing(key, "agent-a", "s1"):
+                await asyncio.Event().wait()
+
+        task = asyncio.create_task(_cancelled())
+        await asyncio.sleep(0.05)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert await journal.users(key) == frozenset({"agent-a/s1"})
+
+    async def test_a_successful_teardown_gives_it_up(self, tmp_path: Path) -> None:
+        journal = _journal(tmp_path)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(journal, key, "agent-a", "s1")
+        async with journal.releasing(key, "agent-a", "s1") as freed:
+            assert freed is True
+        assert await journal.users(key) == frozenset()
+
+    async def test_a_co_located_claim_still_says_not_free(self, tmp_path: Path) -> None:
+        journal = _journal(tmp_path)
+        key = pair_key("10.0.0.1", "10.0.0.2", 4789)
+        await _claim(journal, key, "agent-a", "s1")
+        await _claim(journal, key, "agent-b", "s9")
+        async with journal.releasing(key, "agent-a", "s1") as freed:
+            assert freed is False
+        assert await journal.users(key) == frozenset({"agent-b/s9"})

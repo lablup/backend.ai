@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import inspect
 import logging
 import re
@@ -3821,3 +3822,188 @@ class TestAPreflightCutShort:
         with pytest.raises(OverlayEncryptionUnavailable):
             await plugin.prepare_recovery()
         assert plugin.unclosed_devices() == frozenset({vxlan_dev(4097)})
+
+
+class TestAPreflightThatNeverRan:
+    """The set the fail-close retry sweeps comes FROM the preflight. A startup that never reached
+    the preflight -- a runtime connect that hung, a deadline that fired first -- left that set
+    empty, so the retry swept nothing, reported success, and the node called itself healthy over
+    tunnels it had never looked at."""
+
+    async def test_the_debt_is_reported_before_anything_runs(self) -> None:
+        plugin = _plugin(Recorder(), vxlans={vxlan_dev(4097)})
+        plugin.owe_fail_close_preflight()
+        assert plugin.unclosed_devices(), "an empty set says everything that survived is down"
+
+    async def test_a_new_session_is_refused_while_it_stands(self) -> None:
+        # A host this backend still cannot enumerate: the debt survives `_require_closed`'s own
+        # retry, which is what must refuse the session.
+        async def _cannot_list() -> Collection[str]:
+            raise RuntimeError("ip link is not answering")
+
+        plugin = _plugin(Recorder(), vxlans=set())
+        plugin._vxlan_lister = _cannot_list
+        plugin.owe_fail_close_preflight()
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(_ENC_META, _SELF)
+
+    async def test_a_preflight_that_finds_nothing_lets_the_session_through(self) -> None:
+        # The debt is "we have not looked", not "we are broken": having looked and found nothing
+        # is a complete answer.
+        plugin = _plugin(Recorder(), vxlans=set())
+        plugin.owe_fail_close_preflight()
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        assert plugin.unclosed_devices() == frozenset()
+
+    async def test_the_retry_runs_the_preflight_rather_than_sweeping_nothing(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, vxlans={vxlan_dev(4097)})
+        plugin.owe_fail_close_preflight()
+        assert await plugin.retry_fail_close() == frozenset()
+        assert link_down_args(vxlan_dev(4097)) in rec.calls, "it never looked at the survivor"
+
+    async def test_the_debt_stands_while_the_preflight_keeps_failing(self) -> None:
+        async def _cannot_list() -> Collection[str]:
+            raise RuntimeError("ip link is not answering")
+
+        plugin = _plugin(Recorder(), vxlans=set())
+        plugin._vxlan_lister = _cannot_list
+        plugin.owe_fail_close_preflight()
+        assert await plugin.retry_fail_close()
+        assert await plugin.retry_fail_close(), "it must not clear itself by being asked twice"
+
+    async def test_a_completed_preflight_clears_it(self) -> None:
+        plugin = _plugin(Recorder(), vxlans={vxlan_dev(4097)})
+        plugin.owe_fail_close_preflight()
+        await plugin.prepare_recovery()
+        assert plugin.unclosed_devices() == frozenset()
+
+    async def test_a_plugin_nobody_told_owes_nothing(self) -> None:
+        # An in-process backend built for one session is not carrying a node's worth of survivors.
+        plugin = _plugin(Recorder(), vxlans=set())
+        assert plugin.unclosed_devices() == frozenset()
+
+
+class TestATeardownThatFailedKeepsThePair:
+    """`releasing` commits the claim when its block returns. A teardown that could not delete an
+    SA must leave the claim on disk -- it is what the retry finds, and what stops a co-located
+    agent reading the pair as unused while its objects are still on the host."""
+
+    async def test_the_claim_survives_a_failed_delete(self, tmp_path: Path) -> None:
+        journal = PairJournal(tmp_path / "pairs")
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.fail_on = lambda argv: argv[:4] == ["ip", "xfrm", "state", "del"]
+
+        with pytest.raises(OverlayTeardownIncomplete):
+            await plugin.teardown_session_network("s1")
+
+        assert await journal.users(sa_key("10.0.0.1", "10.0.0.2"))
+
+    async def test_the_claim_goes_once_the_delete_lands(self, tmp_path: Path) -> None:
+        journal = PairJournal(tmp_path / "pairs")
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=journal, journal_owner="agent-a")
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.fail_on = lambda argv: argv[:4] == ["ip", "xfrm", "state", "del"]
+        with contextlib.suppress(OverlayTeardownIncomplete):
+            await plugin.teardown_session_network("s1")
+
+        rec.fail_on = None
+        await plugin.teardown_session_network("s1")
+        assert await journal.users(sa_key("10.0.0.1", "10.0.0.2")) == frozenset()
+
+
+class TestAPeerThatIsThisNode:
+    """The manager publishes every member of a session, this node included, so its own VTEP
+    arrives at `add_peer` like any other. Traffic between two containers of the session on THIS
+    node crosses the bridge and never reaches the tunnel, which is why `_pair_is_protected`
+    already treats it as protected -- but the programming path did not."""
+
+    async def test_no_esp_pair_to_ourselves(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.add_peer("s1", _SELF)
+        assert not any(c[:2] == ["ip", "xfrm"] for c in rec.calls)
+
+    async def test_no_fdb_entry_pointing_at_ourselves(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.add_peer("s1", _SELF)
+        assert not any("fdb" in c for c in rec.calls)
+
+    async def test_it_is_not_counted_as_a_pair_user(self, tmp_path: Path) -> None:
+        # Counted, it is a user a teardown has no peer to remove -- the claim outlives the session.
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _SELF)
+        assert plugin._pair_users == {}
+        assert plugin._encrypted_peers.get("s1", set()) == set()
+
+    async def test_a_real_peer_is_still_programmed(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.add_peer("s1", _PEER)
+        assert any(c[:2] == ["ip", "xfrm"] for c in rec.calls)
+
+    async def test_dropping_ourselves_removes_nothing(self, tmp_path: Path) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, pair_journal=PairJournal(tmp_path / "pairs"))
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.add_peer("s1", _PEER)
+        rec.calls.clear()
+        await plugin.del_peer("s1", _SELF)
+        assert rec.calls == []
+
+
+class TestTwoSessionsOnOneVni:
+    """The devices are named after the VNI and setup deletes what it finds under those names. A
+    second session declaring a VNI that is already up rebuilds the first one's bridge and VXLAN
+    device out from under its containers.
+
+    The privnet's registry refuses this across agents; this is the whole of the check where the
+    backend runs in-process, with no registry to consult."""
+
+    async def test_the_second_is_refused(self) -> None:
+        plugin = _plugin(Recorder())
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        with pytest.raises(OverlayEncryptionUnavailable, match="already running on"):
+            await plugin.setup_session_network(replace(_ENC_META, session_id="s2"), _SELF)
+
+    async def test_the_first_keeps_its_devices(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        with contextlib.suppress(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(replace(_ENC_META, session_id="s2"), _SELF)
+        assert ["ip", "link", "del", vxlan_dev(4097)] not in rec.calls
+
+    async def test_re_declaring_the_same_session_is_not_a_conflict(self) -> None:
+        # Setup is idempotent for its own session: a retry must not be refused by this.
+        plugin = _plugin(Recorder())
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+
+    async def test_another_vni_is_fine(self) -> None:
+        plugin = _plugin(Recorder())
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.setup_session_network(
+            replace(_ENC_META, session_id="s2", vni=4098, subnet="10.128.6.0/24"), _SELF
+        )
+
+    async def test_the_vni_is_free_again_after_teardown(self) -> None:
+        plugin = _plugin(Recorder())
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        await plugin.teardown_session_network("s1")
+        await plugin.setup_session_network(replace(_ENC_META, session_id="s2"), _SELF)

@@ -10,13 +10,13 @@ that host — a diagnostic signal for operators sizing the fabric.
 
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 import json
 import logging
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
+from ai.backend.agent.network import command
 from ai.backend.agent.network.readiness import Readiness, probe_readiness
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.network.keys import (
@@ -55,20 +55,24 @@ def parse_tunnel_offload(ethtool_output: str) -> bool:
 
 
 async def _run_ethtool(iface: str) -> str | None:
-    proc = await asyncio.create_subprocess_exec(
-        "ethtool",
-        "-k",
-        iface,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-    if proc.returncode != 0:
+    """`ethtool -k <iface>`, or None for any reason it did not answer.
+
+    None on a host with no `ethtool` at all, which is an ordinary container image and not an
+    error: the caller reads it as "no tunnel offload", which is the safe reading -- the overlay
+    works without it. Letting the OSError out took the whole capability probe with it, and with it
+    the VXLAN readiness checks that run afterwards.
+    """
+    try:
+        rc, stdout, stderr = await command.run(["ethtool", "-k", iface])
+    except FileNotFoundError:
+        log.debug("no ethtool on this host; assuming no tunnel offload")
+        return None
+    except (OSError, command.CommandTimeout) as e:
+        log.warning("ethtool -k {} did not answer: {}", iface, e)
+        return None
+    if rc != 0:
         log.warning(
-            "ethtool -k {} failed (rc={}): {}",
-            iface,
-            proc.returncode,
-            stderr.decode(errors="replace").strip(),
+            "ethtool -k {} failed (rc={}): {}", iface, rc, stderr.decode(errors="replace").strip()
         )
         return None
     return stdout.decode(errors="replace")
