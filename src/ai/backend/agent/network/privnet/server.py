@@ -112,6 +112,9 @@ _RECOVERY_TIMEOUT_SEC = 240.0
 #: race a recovery pass and a readiness probe must not wait on one.
 _READ_ONLY_OPS = frozenset({
     PrivNetOp.RECOVERY_STATUS,
+    # It writes, but only on documentation addresses nothing else can name, so it cannot race a
+    # recovery pass -- and a readiness probe must not queue behind one.
+    PrivNetOp.ENCRYPTION_PROBE,
     PrivNetOp.LIST_PORTS,
     PrivNetOp.LOCAL_SUBNET,
 })
@@ -678,6 +681,22 @@ class PrivNetServer:
                     self._unreclaimed_sessions[session_id] = str(e)
                 else:
                     self._unreclaimed_sessions.pop(session_id, None)
+
+    async def _probe_encryption(self) -> dict[str, str]:
+        """What would stop this node holding up its end of an ESP tunnel, found out by trying.
+
+        Answered here because it needs CAP_NET_ADMIN: the agent asking holds none, so its own
+        attempt could only read /proc and guess.
+        """
+        backend = self._backends.get(str(NetworkBackendKind.VXLAN))
+        probe = getattr(backend, "probe_encryption_support", None)
+        if probe is None:
+            return {}  # a backend with no encryption to probe
+        try:
+            return {f"privnet:encryption:{n}": why for n, why in enumerate(await probe())}
+        except Exception as e:
+            log.exception("the overlay encryption probe failed")
+            return {"privnet:encryption": f"this node's encryption probe did not complete ({e})"}
 
     def recovery_problems(self) -> dict[str, str]:
         """Everything this privnet knows it has not been able to take charge of, and why.
@@ -1526,6 +1545,8 @@ class PrivNetServer:
                     return PrivNetResponse(ok=True)
                 case PrivNetOp.RECOVERY_STATUS:
                     return PrivNetResponse(ok=True, problems=self.recovery_problems())
+                case PrivNetOp.ENCRYPTION_PROBE:
+                    return PrivNetResponse(ok=True, problems=await self._probe_encryption())
         except (policy.PolicyViolation, netns_mod.NetnsError, PrivNetError) as e:
             return PrivNetResponse(ok=False, error=str(e))
         except Exception:
