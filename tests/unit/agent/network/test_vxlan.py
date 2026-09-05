@@ -3722,3 +3722,83 @@ class TestTheChainsBelongToTheHost:
         await plugin.init()
         for table, builtin, chain in OWNED_CHAINS:
             assert ["iptables", "-t", table, "-I", builtin, "1", "-j", chain] in rec.calls
+
+
+class TestACommandThatNeverReturns:
+    """Every `ip` and `iptables` here runs under a node-wide barrier, so one that hangs -- on an
+    xtables lock somebody else holds, on a netlink socket -- stops every session operation on the
+    node, with nothing in the log to say why."""
+
+    async def test_it_is_killed_and_reported(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        killed = asyncio.Event()
+
+        class _Wedged:
+            returncode = None
+
+            async def communicate(self) -> tuple[bytes, bytes]:
+                await asyncio.Event().wait()
+                raise AssertionError("unreachable")
+
+            def kill(self) -> None:
+                killed.set()
+
+            async def wait(self) -> int:
+                return -9
+
+        async def _spawn(*argv: str, **kwargs: object) -> _Wedged:
+            return _Wedged()
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _spawn)
+        monkeypatch.setattr(vx, "_COMMAND_TIMEOUT_SEC", 0.05)
+        with pytest.raises(RuntimeError, match="timed out"):
+            await vx._run_command(["ip", "link", "show"])
+        assert killed.is_set()
+
+    async def test_the_reader_gives_up_too(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A hung `iptables-save` inside the drift pass holds the barrier just as hard.
+        class _Wedged:
+            returncode = None
+
+            async def communicate(self) -> tuple[bytes, bytes]:
+                await asyncio.Event().wait()
+                raise AssertionError("unreachable")
+
+            def kill(self) -> None:
+                pass
+
+            async def wait(self) -> int:
+                return -9
+
+        async def _spawn(*argv: str, **kwargs: object) -> _Wedged:
+            return _Wedged()
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _spawn)
+        monkeypatch.setattr(vx, "_COMMAND_TIMEOUT_SEC", 0.05)
+        assert await vx._read_command(["iptables-save", "-t", "filter"]) == ""
+
+    async def test_the_key_is_not_in_the_timeout_message(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class _Wedged:
+            returncode = None
+
+            async def communicate(self) -> tuple[bytes, bytes]:
+                await asyncio.Event().wait()
+                raise AssertionError("unreachable")
+
+            def kill(self) -> None:
+                pass
+
+            async def wait(self) -> int:
+                return -9
+
+        async def _spawn(*argv: str, **kwargs: object) -> _Wedged:
+            return _Wedged()
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _spawn)
+        monkeypatch.setattr(vx, "_COMMAND_TIMEOUT_SEC", 0.05)
+        argv = xfrm_state_add_args("10.0.0.1", "10.0.0.2", "ab" * 32)[0]
+        with pytest.raises(RuntimeError) as caught:
+            await vx._run_command(argv)
+        assert "REDACTED" in str(caught.value)
+        assert argv[argv.index("aead") + 2] not in str(caught.value)

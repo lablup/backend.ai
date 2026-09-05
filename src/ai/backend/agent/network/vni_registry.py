@@ -114,12 +114,26 @@ class Binding:
     _digest: str = ""
 
     def mark_built(self) -> bool:
-        """Record that this session's devices now exist, so a later setup adopts them."""
+        """Record that this session's devices now exist, so a later setup adopts them.
+
+        The BUILT claim landing is what this returns. Dropping the reservation afterwards is
+        tidying: a leftover HELD claim beside a BUILT one names the same session and the same
+        configuration, so it conflicts with nobody, `already_held` still reads BUILT, and
+        `releasing` removes both. Reporting the whole thing failed because only the tidying did
+        used to make the caller tear down a data plane the store had already vouched for -- after
+        which the next setup adopted devices that no longer existed.
+        """
         if self._claims is None:
             return False
         if not self._claims.add(self._owner, _claim_id(_BUILT, self._session_id, self._digest)):
             return False
-        return self._claims.remove(self._owner, _claim_id(_HELD, self._session_id, self._digest))
+        if not self._claims.remove(self._owner, _claim_id(_HELD, self._session_id, self._digest)):
+            log.warning(
+                "left a stale reservation beside the built binding for session {}; harmless, and"
+                " the next release or prune clears it",
+                self._session_id,
+            )
+        return True
 
     def abandon(self) -> None:
         """Give the reservation back after a build that did not happen.

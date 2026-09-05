@@ -20,6 +20,14 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+#: Bumped when a verb is added that a caller must be able to tell a daemon apart by. Every
+#: response carries it, so "this privnet does not know that verb" is a fact rather than an
+#: inference from an error string -- and a caller that needs a newer verb refuses instead of
+#: reading a failure as an answer.
+#:
+#: 1: the original verb set. 2: RECOVERY_STATUS.
+PROTOCOL_VERSION: int = 2
+
 
 class PrivNetOp(enum.StrEnum):
     SETUP_SESSION = "setup_session"
@@ -276,6 +284,8 @@ class PrivNetResponse:
     # RECOVERY_STATUS: {what could not be recovered: why}. Empty means this privnet is on top of
     # everything it owns.
     problems: dict[str, str] | None = None
+    #: The protocol the answering daemon speaks. Absent from a daemon that predates it.
+    version: int | None = None
     error: str | None = None
 
     def encode(self) -> bytes:
@@ -290,6 +300,8 @@ class PrivNetResponse:
             payload["subnet"] = self.subnet
         if self.problems is not None:
             payload["problems"] = self.problems
+        if self.version is not None:
+            payload["version"] = self.version
         if self.error is not None:
             payload["error"] = self.error
         return json.dumps(payload, separators=(",", ":")).encode() + b"\n"
@@ -319,6 +331,9 @@ class PrivNetResponse:
             and all(isinstance(k, str) and isinstance(v, str) for k, v in problems.items())
         ):
             raise ProtocolError("problems must be an object of strings")
+        version = data.get("version")
+        if version is not None and not isinstance(version, int):
+            raise ProtocolError("version must be an integer or null")
         error = data.get("error")
         return cls(
             ok=bool(data["ok"]),
@@ -327,5 +342,6 @@ class PrivNetResponse:
             forwards=_decode_forwards(data.get("forwards")),
             subnet=subnet,
             problems=problems,
+            version=version,
             error=error,
         )
