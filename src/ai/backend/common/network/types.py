@@ -2,7 +2,7 @@
 
 These types decouple the cluster-network control plane and data-plane backends
 from any specific container runtime (Docker, containerd, ...). See
-proposals/BEP-1062 and its sub-documents `control-plane.md` and `agent-plugin-v2.md`.
+proposals/BEP-1078 and its sub-documents `control-plane.md` and `agent-plugin-v2.md`.
 """
 
 from __future__ import annotations
@@ -174,7 +174,7 @@ class EndpointAddr:
     ``agent_id`` — no per-node host-local allocation, no BUM flood.
 
     ``cluster_hostname`` (``main1``, ``sub1``, …) makes this table the session-scoped
-    ``hostname -> ip`` source the per-session cluster name resolver reads (BEP-1062,
+    ``hostname -> ip`` source the per-session cluster name resolver reads (BEP-1078,
     cluster-name-resolution.md) — the same per-session ``endpoints/`` prefix, so names never
     share a global namespace and cannot collide across sessions.
     """

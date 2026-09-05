@@ -1,4 +1,4 @@
-"""Docker's half of the two-phase start gate (BEP-1062).
+"""Docker's half of the two-phase start gate (BEP-1078).
 
 The network has to be attached while the container's netns exists and its PID is stable, but before
 the user's command runs -- attaching afterwards races krunner's network-dependent init (REPL bind,

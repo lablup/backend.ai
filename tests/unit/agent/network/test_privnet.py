@@ -1,4 +1,4 @@
-"""Integration tests for the privnet daemon's RPC layer (BEP-1062).
+"""Integration tests for the privnet daemon's RPC layer (BEP-1078).
 
 These exercise the real client<->server round trip over a unix socket in-process (no
 privileges required): peer auth, protocol framing, input policy, and semantic dispatch
@@ -760,7 +760,7 @@ class TestSessionLock:
     or waiter still references it. Popping it mid-hold (the old ``_teardown`` behaviour) would let
     the next arrival mint a fresh lock and enter the critical section alongside the current holder --
     e.g. a SETUP_SESSION racing a TEARDOWN_SESSION of the same session, building and deleting the
-    same-named bridge at once (BEP-1062)."""
+    same-named bridge at once (BEP-1078)."""
 
     def _server(self, tmp_path: Path) -> PrivNetServer:
         return _Harness(state_dir=tmp_path).server

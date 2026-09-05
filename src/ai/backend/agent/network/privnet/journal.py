@@ -1,4 +1,4 @@
-"""What the privileged privnet must remember across its own restart (BEP-1062).
+"""What the privileged privnet must remember across its own restart (BEP-1078).
 
 The agent recovers by reading durable ground truth: containerd's labels say which container belongs
 to which session, and etcd holds each session's meta and each endpoint's overlay IP. The privnet can

@@ -1,4 +1,4 @@
-"""Wire protocol for the privnet daemon (BEP-1062).
+"""Wire protocol for the privnet daemon (BEP-1078).
 
 The unprivileged agent and the privileged (CAP_NET_ADMIN) privnet speak a small,
 **semantic** RPC over a unix socket: newline-delimited JSON, one request and one

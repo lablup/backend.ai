@@ -1,4 +1,4 @@
-"""Unit tests for crash-atomic journal writes (BEP-1062).
+"""Unit tests for crash-atomic journal writes (BEP-1078).
 
 These pin the two properties the LOCAL-network allocators depend on: a claim file is never left
 empty/partial (which replay would read as an owner of ``""``), and exclusivity still raises on an

@@ -2,7 +2,7 @@
 
 A multi-node session's kernels only reach each other if every member agent puts them on the same
 fabric. The two fabrics are not interchangeable: 'overlay' is Docker Swarm, which only the docker
-backend speaks, and 'cni' is the BEP-1062 stack, which the containerd backend and its rootless
+backend speaks, and 'cni' is the BEP-1078 stack, which the containerd backend and its rootless
 subclass speak. Handing a driver to an agent of the other kind does not fail — the agent falls back
 to something node-local and the session comes up with kernels that cannot see each other, with
 nothing in the logs to say why. That is what this refuses.
@@ -21,13 +21,13 @@ from ai.backend.common.network.types import OVERLAY_ENCRYPTION_PROFILE, AgentNet
 from ai.backend.manager.errors.network import NetworkBackendMismatch
 
 # Which agent backend can serve which inter-container network driver.
-# 'enroot' and 'singularity' ride the containerd backend's BEP-1062/CNI stack unchanged (both
-# agents subclass ContainerdAgent and override only the container runtime), so they serve 'cni'
-# exactly like 'containerd' does.
+#
+# 'docker' is the one wired today. The others are agent backends this repository names but does
+# not yet ship a package for; they are listed because what a backend has to provide for 'cni' is
+# a container's netns by PID -- the data plane is a device moved into that netns, and a netns
+# does not care which daemon made it. A backend that arrives without that seam is rejected at
+# `_require_members_cni_capable` on its published caps, not here.
 DRIVER_COMPATIBLE_BACKENDS: dict[str, frozenset[str]] = {
-    # 'docker' serves 'cni' as well: the BEP-1062 data plane is a vxlan device moved into the
-    # container's netns by PID, and a netns does not care which daemon made it. What used to tie
-    # that to containerd was the interface the agent code was written against, not the kernel.
     "cni": frozenset({"containerd", "docker", "enroot", "singularity"}),
     "overlay": frozenset({"docker"}),
 }
@@ -37,7 +37,7 @@ DRIVER_COMPATIBLE_BACKENDS: dict[str, frozenset[str]] = {
 #
 # Docker is the one backend that can serve two, so it is listed explicitly rather than derived:
 # 'overlay' (Swarm) stays its default, because an existing Docker deployment that upgrades into
-# this must not have its fabric changed under it. An operator who wants the BEP-1062 one asks for
+# this must not have its fabric changed under it. An operator who wants the BEP-1078 one asks for
 # it by name — see resolve_driver_for_agents.
 BACKEND_DRIVER: dict[str, str] = {
     **{
