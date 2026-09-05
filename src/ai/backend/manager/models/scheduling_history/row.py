@@ -100,7 +100,7 @@ class KernelSchedulingHistoryRow(Base):
         "id",
         GUID(KernelSchedulingHistoryID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     kernel_id: Mapped[KernelID] = mapped_column(
         "kernel_id", GUID(KernelID), nullable=False, index=True
@@ -170,7 +170,7 @@ class DeploymentHistoryRow(Base):
     __tablename__ = "deployment_history"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     deployment_id: Mapped[DeploymentID] = mapped_column(
         "deployment_id", GUID(DeploymentID), nullable=False, index=True
@@ -240,7 +240,7 @@ class RouteHistoryRow(Base):
     __tablename__ = "route_history"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     route_id: Mapped[ReplicaID] = mapped_column(
         "route_id", GUID(ReplicaID), nullable=False, index=True

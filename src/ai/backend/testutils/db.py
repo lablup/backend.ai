@@ -112,7 +112,7 @@ async def with_tables(
 
     # Create required PostgreSQL extensions and tables
     async with engine.begin() as conn:
-        # Create uuid-ossp extension for uuid_generate_v4()
+        # uuid-ossp for uuid_generate_v4(), then the uuid_generate_v7() function
         await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
         await conn.execute(text(UUID_GENERATE_V7_DDL))
         await conn.run_sync(_create_tables_sync, tables)

@@ -19,7 +19,7 @@ class RetentionPolicyRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(RetentionPolicyID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     category: Mapped[RetentionCategory] = mapped_column(
         "category", StrEnumType(RetentionCategory), nullable=False

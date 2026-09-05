@@ -39,7 +39,7 @@ class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(RuntimeVariantPresetID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     runtime_variant: Mapped[RuntimeVariantID] = mapped_column(
         "runtime_variant", GUID(RuntimeVariantID), nullable=False

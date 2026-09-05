@@ -95,7 +95,7 @@ class DomainFairShareRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "domain_fair_shares"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True
@@ -290,7 +290,7 @@ class ProjectFairShareRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "project_fair_shares"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True
@@ -477,7 +477,7 @@ class UserFairShareRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "user_fair_shares"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True

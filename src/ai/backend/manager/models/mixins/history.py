@@ -24,7 +24,7 @@ from ai.backend.manager.models.base import GUID, PydanticListColumn
 
 class ReconcileHistoryMixin:
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
 
     phase: Mapped[str] = mapped_column("phase", sa.String(length=64), nullable=False)

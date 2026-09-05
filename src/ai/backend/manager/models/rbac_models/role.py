@@ -44,7 +44,7 @@ class RoleRow(LifecycleTimestampsMixin, Base):
     __table_args__ = (sa.Index("ix_id_status", "id", "status"),)
 
     id: Mapped[RoleID] = mapped_column(
-        "id", GUID(RoleID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(RoleID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(64), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)

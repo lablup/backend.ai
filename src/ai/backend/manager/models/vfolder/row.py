@@ -299,7 +299,7 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(VFolderUUID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     # host will be '' if vFolder is unmanaged
     host: Mapped[str] = mapped_column("host", sa.String(length=128), nullable=False, index=True)
@@ -471,7 +471,7 @@ class VFolderInvitationRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "vfolder_invitations"
 
     id: Mapped[VFolderUUID] = mapped_column(
-        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
@@ -501,7 +501,7 @@ class VFolderPermissionRow(Base):
     __tablename__ = "vfolder_permissions"
 
     id: Mapped[VFolderUUID] = mapped_column(
-        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE

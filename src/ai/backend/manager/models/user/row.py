@@ -111,7 +111,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "users"
 
     uuid: Mapped[UserID] = mapped_column(
-        "uuid", GUID(UserID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "uuid", GUID(UserID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     username: Mapped[str] = mapped_column(
         "username", sa.String(length=64), unique=True, nullable=False

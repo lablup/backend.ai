@@ -64,7 +64,7 @@ class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):
         GUID(ResourceSlotTypeUUID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     slot_type: Mapped[str] = mapped_column("slot_type", sa.String(length=16), nullable=False)
@@ -153,7 +153,7 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):
         GUID(AgentResourceID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     agent_id: Mapped[str] = mapped_column("agent_id", sa.String(length=64), primary_key=True)
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
@@ -214,7 +214,7 @@ class ResourceAllocationRow(CreatedAtMixin, Base):
         GUID(ResourceAllocationID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     kernel_id: Mapped[KernelID] = mapped_column("kernel_id", GUID(KernelID), primary_key=True)
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
@@ -293,7 +293,7 @@ class ModelCardResourceRequirementRow(Base):
         GUID(ModelCardResourceRequirementID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     model_card_id: Mapped[ModelCardID] = mapped_column(
         "model_card_id", GUID(ModelCardID), primary_key=True
@@ -351,7 +351,7 @@ class PresetResourceSlotRow(Base):
         GUID(PresetResourceSlotID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     preset_id: Mapped[DeploymentPresetID] = mapped_column(
         "preset_id", GUID(DeploymentPresetID), primary_key=True
@@ -390,7 +390,7 @@ class DeploymentRevisionResourceSlotRow(Base):
         GUID(DeploymentRevisionResourceSlotID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     revision_id: Mapped[DeploymentRevisionID] = mapped_column(
         "revision_id", GUID(DeploymentRevisionID), primary_key=True

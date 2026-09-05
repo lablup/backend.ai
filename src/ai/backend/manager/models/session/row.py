@@ -1262,7 +1262,7 @@ class SessionDependencyRow(Base):
         GUID(SessionDependencyID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     session_id: Mapped[SessionID] = mapped_column(
         "session_id",

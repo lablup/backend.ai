@@ -87,7 +87,7 @@ class DomainRow(LifecycleTimestampsMixin, Base):
         GUID(DomainID),
         nullable=False,
         unique=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, default=True, nullable=False)

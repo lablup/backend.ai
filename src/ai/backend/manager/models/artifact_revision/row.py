@@ -39,7 +39,7 @@ class ArtifactRevisionRow(Base):
         "id",
         GUID(ArtifactRevisionID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     artifact_id: Mapped[ArtifactID] = mapped_column(
         "artifact_id",

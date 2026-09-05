@@ -67,7 +67,7 @@ class AgentRow(Base):
         GUID(AgentUUID),
         unique=True,
         nullable=False,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     id: Mapped[AgentId] = mapped_column("id", sa.String(length=64), primary_key=True)
     status: Mapped[AgentStatus] = mapped_column(

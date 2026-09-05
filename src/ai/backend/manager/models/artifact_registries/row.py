@@ -48,7 +48,7 @@ class ArtifactRegistryRow(Base):
         "id",
         GUID(ArtifactRegistryID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     name: Mapped[str] = mapped_column("name", sa.String, nullable=False, unique=True)
     registry_id: Mapped[uuid.UUID] = mapped_column("registry_id", GUID, nullable=False, unique=True)

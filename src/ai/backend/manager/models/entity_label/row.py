@@ -34,7 +34,7 @@ class EntityLabelRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(EntityLabelID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", sa.String(length=32), nullable=False

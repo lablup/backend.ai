@@ -35,7 +35,7 @@ class SessionGroupRow(CreatedAtMixin, Base):
         "id",
         GUID(SessionGroupID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     domain_id: Mapped[DomainID] = mapped_column(
         "domain_id",

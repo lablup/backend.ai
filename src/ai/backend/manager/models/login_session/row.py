@@ -32,7 +32,7 @@ class LoginSessionRow(CreatedAtMixin, Base):
     __tablename__ = "login_sessions"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     session_token: Mapped[str] = mapped_column(
         "session_token", sa.String(64), unique=True, nullable=False, index=True
@@ -90,7 +90,7 @@ class LoginHistoryRow(Base):
     __tablename__ = "login_history"
 
     id: Mapped[LoginHistoryID] = mapped_column(
-        "id", GUID(LoginHistoryID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(LoginHistoryID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     user_id: Mapped[UserID] = mapped_column(
         "user_id",
