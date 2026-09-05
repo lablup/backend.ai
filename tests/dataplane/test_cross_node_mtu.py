@@ -26,7 +26,7 @@ from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
 from ai.backend.testutils.dataplane import probe
 from ai.backend.testutils.dataplane.guard import LeakGuard
 from ai.backend.testutils.dataplane.nodes import Node
-from ai.backend.testutils.dataplane.session import SessionDriver, SessionSpec
+from ai.backend.testutils.dataplane.session import SessionDriver, SessionHandle, SessionSpec
 
 _OVERLAY_IFNAME = "baimulti0"
 _ICMP_V4_OVERHEAD = 28
@@ -54,14 +54,14 @@ class TestCrossNodeDataPath:
         )
 
     async def _spread_endpoints(
-        self, node_pair: tuple[Node, Node], session_name: str
+        self, node_pair: tuple[Node, Node], session: SessionHandle
     ) -> tuple[_Endpoint, _Endpoint]:
         """Resolve one kernel on each node, or skip if the scheduler packed them onto one.
 
         Same guard as G14: a MULTI_NODE session that landed on a single node exercises no cross-host
         encap->underlay->decap, and asserting on it would pass for the wrong reason.
         """
-        per_node = {n.name: await probe.overlay_endpoints(n, session_name) for n in node_pair}
+        per_node = {n.name: await probe.overlay_endpoints(n, session) for n in node_pair}
         occupied = {name: eps for name, eps in per_node.items() if eps}
         if len(occupied) < 2:
             pytest.skip(
@@ -89,7 +89,7 @@ class TestCrossNodeDataPath:
     ) -> None:
         async with session_driver.session(cross_node_spec, "dp-g17") as handle:
             (node_a, pid_a, ip_a), (node_b, pid_b, ip_b) = await self._spread_endpoints(
-                node_pair, handle.name
+                node_pair, handle
             )
             mtu = await probe.interface_mtu(node_a, pid_a, _OVERLAY_IFNAME)
             payload = mtu - _ICMP_V4_OVERHEAD
@@ -126,7 +126,7 @@ class TestCrossNodeDataPath:
     ) -> None:
         async with session_driver.session(cross_node_spec, "dp-g18") as handle:
             (node_a, pid_a, ip_a), (node_b, pid_b, ip_b) = await self._spread_endpoints(
-                node_pair, handle.name
+                node_pair, handle
             )
             mtu = await probe.interface_mtu(node_a, pid_a, _OVERLAY_IFNAME)
             payload = mtu - _ICMP_V4_OVERHEAD
