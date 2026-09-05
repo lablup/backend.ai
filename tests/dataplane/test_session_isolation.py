@@ -22,7 +22,12 @@ from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
 from ai.backend.testutils.dataplane import probe
 from ai.backend.testutils.dataplane.guard import LeakGuard
 from ai.backend.testutils.dataplane.nodes import Node
-from ai.backend.testutils.dataplane.session import SessionDriver, SessionSpec, unique_name
+from ai.backend.testutils.dataplane.session import (
+    SessionDriver,
+    SessionHandle,
+    SessionSpec,
+    unique_name,
+)
 
 
 @pytest.fixture
@@ -51,8 +56,8 @@ class TestCrossSessionIsolation:
             session_driver.session(pinned_spec, "dp-g10-a") as a,
             session_driver.session(pinned_spec, "dp-g10-b") as b,
         ):
-            pid_a, ip_a, gw_a = await _local_endpoint(node, a.name)
-            pid_b, ip_b, gw_b = await _local_endpoint(node, b.name)
+            pid_a, ip_a, gw_a = await _local_endpoint(node, a)
+            pid_b, ip_b, gw_b = await _local_endpoint(node, b)
             assert ip_a != ip_b, (
                 f"both sessions were handed the same LOCAL address {ip_a}; the per-session block "
                 "allocation collided, and an isolation check between identical addresses is vacuous"
@@ -108,7 +113,7 @@ class TestIntraSessionReachability:
         node: Node,
     ) -> None:
         async with session_driver.session(cluster_spec, "dp-g11") as handle:
-            container_ids = await probe.session_container_ids(node, handle.name)
+            container_ids = await probe.session_container_ids(node, handle)
             assert len(container_ids) == 2, (
                 f"expected two kernels for the cluster session on this node, found "
                 f"{len(container_ids)}; a single-node cluster must not be spread"
@@ -140,7 +145,7 @@ class TestNoCollateralOnTeardown:
         node: Node,
     ) -> None:
         async with session_driver.session(pinned_spec, "dp-g12-keep") as keep:
-            pid, ip, gw = await _local_endpoint(node, keep.name)
+            pid, ip, gw = await _local_endpoint(node, keep)
             assert await probe.reaches(node, pid, gw), (
                 f"the session under test ({ip}) could not reach its gateway {gw} even before a "
                 "neighbour was involved; the collateral check below would be vacuous"
@@ -177,9 +182,9 @@ class TestRepeatedLifecycleLeavesNoResidue:
             await session_driver.destroy(handle.session_id)
 
 
-async def _local_endpoint(node: Node, session_name: str) -> tuple[str, str, str]:
+async def _local_endpoint(node: Node, session: SessionHandle) -> tuple[str, str, str]:
     """``(task pid, LOCAL eth0 address, LOCAL gateway)`` for a single-node session's one kernel."""
-    return await _endpoint_of(node, await _sole_container_id(node, session_name))
+    return await _endpoint_of(node, await _sole_container_id(node, session))
 
 
 async def _endpoint_of(node: Node, container_id: str) -> tuple[str, str, str]:
@@ -192,9 +197,9 @@ async def _endpoint_of(node: Node, container_id: str) -> tuple[str, str, str]:
     )
 
 
-async def _sole_container_id(node: Node, session_name: str) -> str:
-    ids = await probe.session_container_ids(node, session_name)
+async def _sole_container_id(node: Node, session: SessionHandle) -> str:
+    ids = await probe.session_container_ids(node, session)
     assert len(ids) == 1, (
-        f"expected exactly one kernel for {session_name} on this node, found {len(ids)}: {ids}"
+        f"expected exactly one kernel for {session.name} on this node, found {len(ids)}: {ids}"
     )
     return ids[0]

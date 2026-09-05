@@ -35,8 +35,8 @@ class TestReachabilitySurvivesRestart:
             session_driver.session(spec, "dp-a10-a") as a,
             session_driver.session(spec, "dp-a10-b") as b,
         ):
-            ((pid_a, _ip_a),) = await probe.local_endpoints(node, a.name)
-            ((_pid_b, ip_b),) = await probe.local_endpoints(node, b.name)
+            ((pid_a, _ip_a),) = await probe.local_endpoints(node, a)
+            ((_pid_b, ip_b),) = await probe.local_endpoints(node, b)
             gateway = await probe.default_gateway(node, pid_a)
 
             # Baseline before the restart: A reaches its own gateway, and not its neighbour.
@@ -53,7 +53,7 @@ class TestReachabilitySurvivesRestart:
 
             # After recovery: re-resolve A's pid (the task survives, but recovery is what we test),
             # then assert the same two facts still hold.
-            ((pid_a_after, _),) = await probe.local_endpoints(node, a.name)
+            ((pid_a_after, _),) = await probe.local_endpoints(node, a)
             gateway_after = await probe.default_gateway(node, pid_a_after)
             assert await probe.reaches(node, pid_a_after, gateway_after), (
                 f"session A cannot reach its gateway {gateway_after} after the agent restarted -- "

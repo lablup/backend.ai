@@ -43,7 +43,7 @@ class TestCentralIpam:
         node_pair: tuple[Node, Node],
     ) -> None:
         async with session_driver.session(multi_node_spec, "dp-g17") as handle:
-            per_node = {n: await probe.overlay_endpoints(n, handle.name) for n in node_pair}
+            per_node = {n: await probe.overlay_endpoints(n, handle) for n in node_pair}
             all_ips = [ip for eps in per_node.values() for _pid, ip in eps]
             assert len(all_ips) == 2, (
                 f"expected two overlay endpoints for the session, found {len(all_ips)}: {all_ips}"

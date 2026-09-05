@@ -48,7 +48,7 @@ class TestOrphanReap:
     ) -> None:
         spec = replace(session_spec, agent_list=(primary_agent_id,))
         handle = await session_driver.create(spec, "dp-a11")
-        (container_id,) = await probe.session_container_ids(node, handle.name)
+        (container_id,) = await probe.session_container_ids(node, handle)
         try:
             # Down for maintenance; the manager terminates the session while the node is gone
             # (forced -- there is no agent to confirm the teardown); then the node comes back.

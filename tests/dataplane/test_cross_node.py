@@ -44,7 +44,7 @@ class TestCrossNodeOverlay:
         node_pair: tuple[Node, Node],
     ) -> None:
         async with session_driver.session(cross_node_spec, "dp-g14") as handle:
-            per_node = {n.name: await probe.overlay_endpoints(n, handle.name) for n in node_pair}
+            per_node = {n.name: await probe.overlay_endpoints(n, handle) for n in node_pair}
             occupied = {name: eps for name, eps in per_node.items() if eps}
             if len(occupied) < 2:
                 pytest.skip(
