@@ -43,7 +43,7 @@ _DEFAULT_BACKENDS: Mapping[str, type[AbstractVolume]] = {
     DellEMCOneFSVolume.name: DellEMCOneFSVolume,
     WekaVolume.name: WekaVolume,
     GPFSVolume.name: GPFSVolume,  # IBM SpectrumScale or GPFS
-    StorageBackendType.SPECTRUMSCALE: GPFSVolume,  # IBM SpectrumScale or GPFS
+    StorageBackendType("spectrumscale"): GPFSVolume,  # IBM SpectrumScale or GPFS
     CephFSVolume.name: CephFSVolume,
     VASTVolume.name: VASTVolume,
     EXAScalerFSVolume.name: EXAScalerFSVolume,

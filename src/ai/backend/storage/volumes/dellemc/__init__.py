@@ -155,7 +155,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
 
 
 class DellEMCOneFSVolume(BaseVolume):
-    name: ClassVar[StorageBackendType] = StorageBackendType.DELLEMC_ONEFS
+    name: ClassVar[StorageBackendType] = StorageBackendType("dellemc-onefs")
     endpoint: str
     dell_admin: str
     dell_password: str

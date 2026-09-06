@@ -240,7 +240,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
 
 
 class EXAScalerFSVolume(BaseVolume):
-    name: ClassVar[StorageBackendType] = StorageBackendType.EXASCALER
+    name: ClassVar[StorageBackendType] = StorageBackendType("exascaler")
 
     @override
     async def create_quota_model(self) -> AbstractQuotaModel:

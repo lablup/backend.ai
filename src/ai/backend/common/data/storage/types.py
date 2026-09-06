@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import timedelta
-from typing import Final
+from typing import Final, NewType
 
 from pydantic import ConfigDict
 
@@ -28,27 +28,10 @@ class NamedStorageTarget(BackendAISchema):
 ArtifactStorageTarget = NamedStorageTarget | VFolderStorageTarget
 
 
-class StorageBackendType(enum.StrEnum):
-    """The storage backend implementations a volume can be served by.
-
-    The value is what a storage-proxy volume config names under ``backend`` and what the
-    ``storage_backends.type`` column stores.
-    """
-
-    VFS = "vfs"
-    XFS = "xfs"
-    CEPHFS = "cephfs"
-    PURESTORAGE = "purestorage"
-    NETAPP = "netapp"
-    WEKA = "weka"
-    GPFS = "gpfs"
-    SPECTRUMSCALE = "spectrumscale"
-    DELLEMC_ONEFS = "dellemc-onefs"
-    VAST = "vast"
-    EXASCALER = "exascaler"
-    HAMMERSPACE = "hammerspace"
-    HAMMERSPACE_BASE = "hammerspace-base"
-    NOOP = "noop"
+# A storage backend implementation's name, as the storage proxy registers it and as
+# ``storage_backend_types.name`` records it. Not a closed set: a storage backend plugin
+# registers names of its own.
+StorageBackendType = NewType("StorageBackendType", str)
 
 
 class ArtifactStorageType(enum.StrEnum):
