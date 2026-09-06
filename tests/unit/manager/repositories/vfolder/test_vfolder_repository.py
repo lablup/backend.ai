@@ -38,7 +38,6 @@ from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
-    VFolderCreateParams,
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -46,9 +45,11 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import (
+    VFolderAlreadyExists,
     VFolderDeletionNotAllowed,
     VFolderFilterStatusFailed,
     VFolderHasLinkedModelCard,
+    VFolderInvalidParameter,
     VFolderNotFound,
 )
 from ai.backend.manager.errors.user import UserNotFound
@@ -101,6 +102,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermissionRow,
     VFolderRow,
 )
+from ai.backend.manager.models.vfolder.creators import ProjectVFolderCreator
 from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -121,31 +123,26 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 class TestVfolderRepository:
     """Test cases for VfolderRepository"""
 
-    def _make_vfolder_create_params(
+    def _make_project_vfolder_creator(
         self,
         *,
-        folder_id: uuid.UUID,
         domain_name: str,
         group_id: uuid.UUID,
         user_id: uuid.UUID,
         permission: VFolderMountPermission = VFolderMountPermission.READ_ONLY,
         usage_mode: VFolderUsageMode = VFolderUsageMode.MODEL,
-    ) -> VFolderCreateParams:
-        """Create VFolderCreateParams for testing."""
-        return VFolderCreateParams(
-            id=folder_id,
-            name=f"test-model-{folder_id.hex[:8]}",
+        name: str | None = None,
+    ) -> ProjectVFolderCreator:
+        """Build the insert spec of a project-owned vfolder for testing."""
+        return ProjectVFolderCreator(
+            name=name or f"test-model-{uuid.uuid4().hex[:8]}",
             domain_name=domain_name,
             quota_scope_id=f"project:{group_id}",
             usage_mode=usage_mode,
             permission=permission,
             host="local",
-            creator=f"test-{user_id.hex[:8]}@example.com",
             creator_id=user_id,
-            ownership_type=VFolderOwnershipType.GROUP,
-            user=user_id,
-            group=group_id,
-            unmanaged_path=None,
+            project=ProjectID(group_id),
             cloneable=False,
             status=VFolderOperationStatus.READY,
         )
@@ -346,7 +343,8 @@ class TestVfolderRepository:
                 description="Test model-store group",
                 is_active=True,
                 total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
+                # Creating a folder now checks the host where the row is written.
+                allowed_vfolder_hosts={"local": ["create-vfolder"]},
                 resource_policy=test_project_resource_policy_name,
                 type=ProjectType.MODEL_STORE,
             )
@@ -389,9 +387,7 @@ class TestVfolderRepository:
         to READ_ONLY for model-store group type. This test verifies that the repository
         correctly stores the READ_ONLY permission received from the service layer.
         """
-        folder_id = uuid.uuid4()
-        params = self._make_vfolder_create_params(
-            folder_id=folder_id,
+        creator = self._make_project_vfolder_creator(
             domain_name=test_domain.domain_name,
             group_id=test_model_store_group,
             user_id=test_user,
@@ -399,16 +395,136 @@ class TestVfolderRepository:
             usage_mode=VFolderUsageMode.MODEL,
         )
 
-        vfolder_data = await vfolder_repository.create_vfolder_with_permission(
-            params, create_owner_permission=True
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            creator, create_owner_permission=True
         )
 
-        assert vfolder_data.id == folder_id
-        assert vfolder_data.name == params.name
+        vfolder_data = creation.vfolder
+        assert vfolder_data.name == creator.name
         assert vfolder_data.permission == VFolderMountPermission.READ_ONLY
         assert vfolder_data.usage_mode == VFolderUsageMode.MODEL
         assert vfolder_data.ownership_type == VFolderOwnershipType.GROUP
         assert vfolder_data.group == test_model_store_group
+
+    async def test_a_name_already_standing_in_the_project_is_refused(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_model_store_group: uuid.UUID,
+    ) -> None:
+        """The project holds a name once, which the database itself answers."""
+        creator = self._make_project_vfolder_creator(
+            domain_name=test_domain.domain_name,
+            group_id=test_model_store_group,
+            user_id=test_user,
+        )
+        await vfolder_repository.create_vfolder_with_permission(creator)
+
+        with pytest.raises(VFolderAlreadyExists):
+            await vfolder_repository.create_vfolder_with_permission(
+                self._make_project_vfolder_creator(
+                    domain_name=test_domain.domain_name,
+                    group_id=test_model_store_group,
+                    user_id=test_user,
+                    name=creator.name,
+                )
+            )
+
+    async def test_naming_a_personal_project_is_refused(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_resource_policy_name: str,
+    ) -> None:
+        """Nothing is created under another person's name; sharing puts it there."""
+        personal_project = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                ProjectRow(
+                    id=personal_project,
+                    name=f"personal-{personal_project.hex[:8]}",
+                    domain_name=test_domain.domain_name,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={"local": ["create-vfolder"]},
+                    resource_policy=test_project_resource_policy_name,
+                    type=ProjectType.PERSONAL,
+                    creator_id=test_user,
+                )
+            )
+            await session.flush()
+
+        with pytest.raises(VFolderInvalidParameter):
+            await vfolder_repository.create_vfolder_with_permission(
+                self._make_project_vfolder_creator(
+                    domain_name=test_domain.domain_name,
+                    group_id=personal_project,
+                    user_id=test_user,
+                )
+            )
+
+    async def test_the_owners_allowance_refuses_the_folder_over_it(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_resource_policy_name: str,
+        test_model_store_group: uuid.UUID,
+    ) -> None:
+        """The allowance is the project's own policy, read in the insert's transaction."""
+        await _set_project_folder_allowance(db_with_cleanup, test_project_resource_policy_name, 2)
+        for _ in range(2):
+            await vfolder_repository.create_vfolder_with_permission(
+                self._make_project_vfolder_creator(
+                    domain_name=test_domain.domain_name,
+                    group_id=test_model_store_group,
+                    user_id=test_user,
+                )
+            )
+
+        with pytest.raises(VFolderInvalidParameter):
+            await vfolder_repository.create_vfolder_with_permission(
+                self._make_project_vfolder_creator(
+                    domain_name=test_domain.domain_name,
+                    group_id=test_model_store_group,
+                    user_id=test_user,
+                )
+            )
+
+    async def test_no_allowance_lets_the_folder_through(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_resource_policy_name: str,
+        test_model_store_group: uuid.UUID,
+    ) -> None:
+        """Zero states no limit, which is what an unset policy means."""
+        await _set_project_folder_allowance(db_with_cleanup, test_project_resource_policy_name, 0)
+        for _ in range(3):
+            await vfolder_repository.create_vfolder_with_permission(
+                self._make_project_vfolder_creator(
+                    domain_name=test_domain.domain_name,
+                    group_id=test_model_store_group,
+                    user_id=test_user,
+                )
+            )
+
+
+async def _set_project_folder_allowance(
+    db: ExtendedAsyncSAEngine, policy_name: str, allowance: int
+) -> None:
+    async with db.begin_session() as session:
+        await session.execute(
+            sa.update(ProjectResourcePolicyRow)
+            .where(ProjectResourcePolicyRow.name == policy_name)
+            .values(max_vfolder_count=allowance)
+        )
 
 
 class TestVfolderRepositoryAllowedVfolderHosts:
@@ -979,7 +1095,6 @@ class TestVfolderRepositoryPurge:
                 max_size=None,
                 num_files=0,
                 cur_size=0,
-                creator=f"test-{user_id.hex[:8]}@example.com",
                 unmanaged_path=None,
                 ownership_type=VFolderOwnershipType.USER,
                 user=user_id,
@@ -1383,7 +1498,6 @@ class TestVfolderRepositoryDeleteForever:
                     max_size=None,
                     num_files=0,
                     cur_size=0,
-                    creator=f"test-{user_id.hex[:8]}@example.com",
                     unmanaged_path=None,
                     ownership_type=VFolderOwnershipType.USER,
                     user=user_id,

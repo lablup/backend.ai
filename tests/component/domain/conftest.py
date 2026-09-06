@@ -6,6 +6,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
@@ -26,6 +27,7 @@ from ai.backend.manager.api.rest.domain.registry import register_domain_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
@@ -101,11 +103,19 @@ async def project_resource_policy_fixture(
         )
     yield
     async with db_engine.begin() as conn:
-        await conn.execute(
-            ProjectResourcePolicyRow.__table__.delete().where(
-                ProjectResourcePolicyRow.__table__.c.name == "default"
-            )
+        # Personal projects hold this policy too and outlive this fixture, so the row
+        # is left in place while anything still names it.
+        still_referenced = await conn.scalar(
+            sa.select(sa.func.count())
+            .select_from(ProjectRow.__table__)
+            .where(ProjectRow.__table__.c.resource_policy == "default")
         )
+        if not still_referenced:
+            await conn.execute(
+                ProjectResourcePolicyRow.__table__.delete().where(
+                    ProjectResourcePolicyRow.__table__.c.name == "default"
+                )
+            )
 
 
 @pytest.fixture()

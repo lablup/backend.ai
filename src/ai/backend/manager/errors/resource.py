@@ -236,6 +236,16 @@ class ProjectNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class PersonalProjectNotFound(ProjectNotFound):
+    """The user has no personal project, so nothing can be created under their own name.
+
+    Every user is given one at creation, and existing users were backfilled, so this
+    states a broken account rather than a missing option.
+    """
+
+    error_title = "Personal project not found."
+
+
 class TaskTemplateNotFound(ObjectNotFound):
     object_name = "task template"
 

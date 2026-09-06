@@ -47,6 +47,25 @@ class TooManyVFoldersFound(BackendAIError, web.HTTPNotFound):
         super().__init__(extra_data={"matches": serialized_matches})
 
 
+class VFolderOwnerNotFound(BackendAIError, web.HTTPNotFound):
+    """The scope a vfolder was to be created in does not exist.
+
+    A personal folder names its project by its owner, so this states that the owner has
+    no personal project — every user is given one, making it a broken account.
+    """
+
+    error_type = "https://api.backend.ai/probs/vfolder-owner-not-found"
+    error_title = "The vfolder has no owning project."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class VFolderNotFound(ObjectNotFound):
     object_name = "virtual folder"
 

@@ -7,8 +7,6 @@ from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
-    CreateVFolderAction,
-    CreateVFolderActionResult,
     DeleteForeverVFolderAction,
     DeleteForeverVFolderActionResult,
     ForceDeleteVFolderAction,
@@ -34,9 +32,9 @@ from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
     GlobalBatchLoadVFoldersAction,
     GlobalBatchLoadVFoldersActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.create_v2 import (
-    CreateVFolderV2Action,
-    CreateVFolderV2ActionResult,
+from ai.backend.manager.services.vfolder.actions.create import (
+    CreateVFolderAction,
+    CreateVFolderActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
@@ -101,10 +99,6 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
 from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
     CreateUploadSessionV2ActionResult,
-)
-from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
-    CreateVFolderInProjectAction,
-    CreateVFolderInProjectActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
@@ -185,23 +179,15 @@ class VFolderProcessors:
     get_folder_usage: SingleEntityActionProcessor[
         GetVFolderUsageAction, GetVFolderUsageActionResult
     ]
-    create_vfolder_v2: ScopeActionProcessor[CreateVFolderV2Action, CreateVFolderV2ActionResult]
     create_upload_session_v2: SingleEntityActionProcessor[
         CreateUploadSessionV2Action, CreateUploadSessionV2ActionResult
     ]
     delete_v2: SingleEntityActionProcessor[DeleteVFolderV2Action, DeleteVFolderV2ActionResult]
     purge_v2: SingleEntityActionProcessor[PurgeVFolderV2Action, PurgeVFolderV2ActionResult]
     clone_v2: SingleEntityActionProcessor[CloneVFolderV2Action, CloneVFolderV2ActionResult]
-    create_vfolder_in_project: ScopeActionProcessor[
-        CreateVFolderInProjectAction, CreateVFolderInProjectActionResult
-    ]
 
     def __init__(self, group: ProcessorGroup[VFolderData], service: VFolderService) -> None:
         # Scope actions with RBAC validation
-        # NOTE: RBAC validation is temporarily disabled for create_vfolder
-        # because the project member role does not yet grant vfolder:create.
-        # The service layer still enforces the legacy admin-only check for
-        # group-owned folders.
         self.create_vfolder = group.scope(CreateVFolderAction, service.create)
         self.list_vfolder = group.scope(ListVFolderAction, service.list)
         self.search_vfolders_in_project = group.scope(
@@ -275,13 +261,9 @@ class VFolderProcessors:
         # V2 actions
         self.get_v2 = group.single_entity(GetVFolderV2Action, service.get_v2)
         self.get_folder_usage = group.single_entity(GetVFolderUsageAction, service.get_folder_usage)
-        self.create_vfolder_v2 = group.scope(CreateVFolderV2Action, service.create_v2)
         self.create_upload_session_v2 = group.single_entity(
             CreateUploadSessionV2Action, service.create_upload_session_v2
         )
         self.delete_v2 = group.single_entity(DeleteVFolderV2Action, service.delete_v2)
         self.purge_v2 = group.single_entity(PurgeVFolderV2Action, service.purge_v2)
         self.clone_v2 = group.single_entity(CloneVFolderV2Action, service.clone_v2)
-        self.create_vfolder_in_project = group.scope(
-            CreateVFolderInProjectAction, service.create_in_project
-        )

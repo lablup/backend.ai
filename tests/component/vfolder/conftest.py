@@ -51,6 +51,7 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -298,6 +299,15 @@ async def vfolder_factory(
         unique = secrets.token_hex(4)
         vfolder_id = uuid.uuid4()
         user_uuid = admin_user_fixture.user_uuid
+        async with db_engine.begin() as conn:
+            personal_project_id = (
+                await conn.execute(
+                    sa.select(ProjectRow.__table__.c.id).where(
+                        ProjectRow.__table__.c.creator_id == user_uuid,
+                        ProjectRow.__table__.c.type == ProjectType.PERSONAL,
+                    )
+                )
+            ).scalar_one()
         quota_scope_id = QuotaScopeID(
             scope_type=QuotaScopeType.USER,
             scope_id=user_uuid,
@@ -312,6 +322,8 @@ async def vfolder_factory(
             "permission": VFolderMountPermission.READ_WRITE,
             "ownership_type": VFolderOwnershipType.USER,
             "user": str(user_uuid),
+            # A folder lands in a project, which is what holds its name once.
+            "group": str(personal_project_id),
             "creator": "admin-test@test.local",
             "status": VFolderOperationStatus.READY,
             "cloneable": False,

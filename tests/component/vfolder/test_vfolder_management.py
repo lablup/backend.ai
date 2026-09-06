@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder import (
     AcceptInvitationReq,
@@ -30,8 +29,8 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderInvitationState,
     VFolderOperationStatus,
 )
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.vfolder import vfolder_invitations, vfolders
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -393,9 +392,9 @@ class TestVFolderInviteAcceptReject:
         regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
-        """Accepting an invitation fails with a 5xx VirtualEntityNotFound error when the
-        invitee has no virtual entity to hold the vfolder — a server-side data-integrity
-        condition, since every user is provisioned one."""
+        """Accepting an invitation fails when the invitee has no personal project to
+        hold the vfolder — a server-side data-integrity condition, since every user is
+        provisioned one."""
         vf = await vfolder_factory()
         await admin_registry.vfolder.invite(
             vf["name"],
@@ -409,10 +408,10 @@ class TestVFolderInviteAcceptReject:
 
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.delete(VirtualEntityRow).where(
+                sa.delete(ProjectRow).where(
                     sa.and_(
-                        VirtualEntityRow.entity_type == USER_SCOPE_TYPE,
-                        VirtualEntityRow.entity_id == regular_user_fixture.user_uuid,
+                        ProjectRow.creator_id == regular_user_fixture.user_uuid,
+                        ProjectRow.type == ProjectType.PERSONAL,
                     )
                 )
             )
@@ -421,7 +420,7 @@ class TestVFolderInviteAcceptReject:
             await user_registry.vfolder.accept_invitation(
                 AcceptInvitationReq(inv_id=inv_id),
             )
-        assert exc_info.value.status >= 500
+        assert exc_info.value.status == 404
 
     async def test_invitee_rejects_invitation(
         self,

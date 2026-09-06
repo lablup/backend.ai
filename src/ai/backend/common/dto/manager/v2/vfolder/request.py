@@ -4,9 +4,10 @@ Request DTOs for vfolder DTO v2.
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
@@ -87,6 +88,15 @@ class CreateVFolderInput(BaseRequestModel):
             return stripped
         return v
 
+    @model_validator(mode="after")
+    def _reject_dot_prefixed_project_folder(self) -> Self:
+        """A dot-prefixed name is how a folder is mounted automatically, which only
+        makes sense for a folder of one's own. ``.local`` is the exception the mount
+        path gives a per-user subdirectory of."""
+        if self.project_id is not None and self.name.startswith(".") and self.name != ".local":
+            raise ValueError("dot-prefixed vfolders cannot be a project folder.")
+        return self
+
 
 class CreateVFolderInScopeInput(BaseRequestModel):
     """Scope-agnostic body for vfolder creation under a specific scope.
@@ -118,6 +128,15 @@ class CreateVFolderInScopeInput(BaseRequestModel):
                 raise ValueError("name must not be blank or whitespace-only")
             return stripped
         return v
+
+    @model_validator(mode="after")
+    def _reject_dot_prefixed_name(self) -> Self:
+        """The scope this lands in is a project, and a dot-prefixed name is for a folder
+        of one's own. ``.local`` is the exception the mount path gives a per-user
+        subdirectory of."""
+        if self.name.startswith(".") and self.name != ".local":
+            raise ValueError("dot-prefixed vfolders cannot be a project folder.")
+        return self
 
 
 class UpdateVFolderInput(BaseRequestModel):

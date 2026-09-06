@@ -25,7 +25,6 @@ from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAct
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
-    VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
     VFolderPermissionSetAlias,
@@ -116,59 +115,6 @@ class VFolderScopeActionResult(BaseScopeActionResult):
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
         return ()
-
-
-@dataclass
-class CreateVFolderAction(VFolderScopeAction):
-    name: str
-
-    keypair_resource_policy: Mapping[str, Any]
-    domain_name: str
-    group_id_or_name: str | uuid.UUID | None
-    folder_host: str | None
-    unmanaged_path: str | None
-    mount_permission: VFolderPermission
-    usage_mode: VFolderUsageMode
-    cloneable: bool
-
-    scope: ScopeRef
-
-    # User identifier
-    # TODO: Distinguish between creator and owner
-    user_uuid: uuid.UUID
-    user_role: UserRole
-    creator_email: str
-
-    @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return (self.scope,)
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-    @override
-    @classmethod
-    def action_name(cls) -> str:
-        return "create_vfolder"
-
-
-@dataclass
-class CreateVFolderActionResult(VFolderScopeActionResult):
-    id: uuid.UUID
-    name: str
-    quota_scope_id: QuotaScopeID
-    host: str
-    unmanaged_path: str | None
-    mount_permission: VFolderPermission
-    usage_mode: VFolderUsageMode
-    creator_email: str
-    ownership_type: VFolderOwnershipType
-    user_uuid: uuid.UUID | None
-    group_uuid: uuid.UUID | None
-    cloneable: bool
-    status: VFolderOperationStatus
 
 
 @dataclass

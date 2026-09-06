@@ -23,6 +23,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.defs import VFOLDER_DSTPATHS_MAP
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import (
@@ -259,12 +260,11 @@ async def prepare_vfolder_mounts(
                 )
             )
             continue
-        is_cross_project = vfolder["group"] is not None and vfolder["group"] != str(
-            user_scope.group_id
-        )
-        is_model_store_vfolder = (
-            vfolder["group"] is not None and vfolder["group"] in model_store_project_ids
-        )
+        # A personal folder also carries a project — its owner's personal project — so
+        # project ownership is read off the ownership type, never off the column.
+        is_project_vfolder = vfolder["ownership_type"] == VFolderOwnershipType.GROUP
+        is_cross_project = is_project_vfolder and vfolder["group"] != str(user_scope.group_id)
+        is_model_store_vfolder = is_project_vfolder and vfolder["group"] in model_store_project_ids
         if is_cross_project:
             if is_model_store_vfolder and vfolder["usage_mode"] == VFolderUsageMode.MODEL:
                 pass  # Allow cross-project MODEL_STORE model vfolders (read-only)
@@ -283,7 +283,7 @@ async def prepare_vfolder_mounts(
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
         if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
             requested_vfolder_dstpaths[_vfname] = VFOLDER_DSTPATHS_MAP[_vfname]
-        if vfolder["name"] == ".local" and vfolder["group"] is not None:
+        if vfolder["name"] == ".local" and is_project_vfolder:
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(user_scope.user_uuid.hex)
             if is_mount_duplicate(vfid, vfsubpath, matched_vfolder_mounts):

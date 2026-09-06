@@ -319,6 +319,7 @@ class TestListSharedVFoldersAction:
                     "name": "shared-folder",
                     "status": VFolderOperationStatus.READY,
                     "group": uuid.uuid4(),
+                    "ownership_type": VFolderOwnershipType.GROUP,
                     "vfolder_user": None,
                     "user": shared_user_uuid,
                     "email": "shared@test.com",

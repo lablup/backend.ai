@@ -5,9 +5,9 @@ Request DTOs for VFolder API endpoints.
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, Self
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.field import VFolderPermissionField
@@ -82,6 +82,15 @@ class VFolderCreateReq(BaseRequestModel):
         validation_alias=AliasChoices("group", "groupId"),
     )
     cloneable: bool = Field(default=False)
+
+    @model_validator(mode="after")
+    def _reject_dot_prefixed_project_folder(self) -> Self:
+        """A dot-prefixed name is how a folder is mounted automatically, which only
+        makes sense for a folder of one's own. ``.local`` is the exception the mount
+        path gives a per-user subdirectory of."""
+        if self.group_id is not None and self.name.startswith(".") and self.name != ".local":
+            raise ValueError("dot-prefixed vfolders cannot be a group folder.")
+        return self
 
 
 class RenameVFolderReq(BaseRequestModel):

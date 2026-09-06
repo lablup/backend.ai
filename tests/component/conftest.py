@@ -919,6 +919,53 @@ class VirtualEntitySeeder:
             )
         )
 
+    async def insert_personal_project(
+        self, conn: AsyncConnection, user_uuid: UserID, domain_name: str
+    ) -> uuid.UUID:
+        """Give a directly-inserted user the personal project every user is created
+        with. Their own folders are created in it, so the paths that resolve an owner
+        cannot run without it."""
+        project_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(ProjectRow.__table__).values(
+                id=project_id,
+                name=f"personal-{project_id.hex[:8]}",
+                description="Personal Project",
+                is_active=True,
+                domain_name=domain_name,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                integration_id=None,
+                resource_policy="default",
+                type=ProjectType.PERSONAL,
+                creator_id=str(user_uuid),
+            )
+        )
+        virtual_entity_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ScopeType.PROJECT,
+                entity_id=str(project_id),
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
+                permission_cap=None,
+            )
+        )
+        await self.enroll_user_in_project(conn, project_id, user_uuid)
+        return project_id
+
     async def enroll_user_in_project(
         self, conn: AsyncConnection, group_id: uuid.UUID, user_uuid: UserID
     ) -> None:
@@ -1012,6 +1059,9 @@ async def admin_user_fixture(
             )
         )
         await virtual_entity_seeder.insert_user_scope(conn, data.user_uuid)
+        await virtual_entity_seeder.insert_personal_project(
+            conn, data.user_uuid, domain_fixture.domain_name
+        )
         await conn.execute(
             sa.insert(association_groups_users).values(
                 group_id=str(group_fixture),
@@ -1116,6 +1166,9 @@ async def regular_user_fixture(
             )
         )
         await virtual_entity_seeder.insert_user_scope(conn, data.user_uuid)
+        await virtual_entity_seeder.insert_personal_project(
+            conn, data.user_uuid, domain_fixture.domain_name
+        )
         await conn.execute(
             sa.insert(association_groups_users).values(
                 group_id=str(group_fixture),
