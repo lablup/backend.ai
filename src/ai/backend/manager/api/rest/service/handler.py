@@ -589,9 +589,6 @@ class ServiceHandler:
     ) -> ValidateModelServiceActionResult:
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
             )
         )

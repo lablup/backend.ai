@@ -309,13 +309,7 @@ class VFolderHandler:
     ) -> APIResponse:
         params = query.parsed
         user_scope = await self._auth.public_resolve_user_scope.run(
-            PublicResolveUserScopeAction(
-                requester_uuid=ctx.user_uuid,
-                requester_role=ctx.user_role,
-                requester_domain=ctx.user_domain,
-                is_superadmin=ctx.is_superadmin,
-                owner_user_email=params.owner_user_email,
-            )
+            PublicResolveUserScopeAction(owner_user_email=params.owner_user_email)
         )
         owner_user_uuid = user_scope.owner_uuid
         group_id = params.group_id

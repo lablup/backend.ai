@@ -109,6 +109,18 @@ def _user(*, is_authorized: bool = True, is_superadmin: bool = False) -> UserDat
     )
 
 
+def _monitor_user() -> UserData:
+    return UserData(
+        user_id=uuid.uuid4(),
+        is_authorized=True,
+        is_admin=False,
+        is_superadmin=False,
+        role=UserRole.MONITOR,
+        domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
+    )
+
+
 def test_only_get_and_search_actions_can_be_wired_public() -> None:
     PublicActionProcessor[_GetAction, _Result](_GetAction, _run)
     PublicActionProcessor[_SearchAction, _Result](_SearchAction, _run)
@@ -165,3 +177,20 @@ async def test_the_global_path_still_gates_on_superadmin() -> None:
         result = await processor.run(_SearchAction())
 
     assert isinstance(result, _Result)
+
+
+async def test_the_global_path_passes_a_monitor_on_a_read() -> None:
+    processor = GlobalActionProcessor[_SearchAction, _Result](_run)
+
+    with with_user(_monitor_user()):
+        result = await processor.run(_SearchAction())
+
+    assert isinstance(result, _Result)
+
+
+async def test_the_global_path_refuses_a_monitor_anything_but_a_read() -> None:
+    processor = GlobalActionProcessor[_CreateAction, _Result](_run)
+
+    with with_user(_monitor_user()):
+        with pytest.raises(InsufficientPrivilege):
+            await processor.run(_CreateAction())

@@ -8,10 +8,7 @@ from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
 
 @dataclass(frozen=True)
 class PublicGetRoleAction(AuthGlobalAction):
-    user_id: uuid.UUID
     group_id: uuid.UUID | None
-    is_superadmin: bool
-    is_admin: bool
 
     @override
     @classmethod

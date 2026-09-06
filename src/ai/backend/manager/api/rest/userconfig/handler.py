@@ -70,14 +70,9 @@ class UserConfigHandler:
         self._auth = auth
         self._user = user
 
-    async def _owner_access_key(self, ctx: UserContext, owner: str | None) -> AccessKey:
+    async def _owner_access_key(self, owner: str | None) -> AccessKey:
         scope = await self._auth.public_resolve_access_key_scope.run(
-            PublicResolveAccessKeyScopeAction(
-                requester_access_key=ctx.access_key,
-                requester_role=ctx.user_role,
-                requester_domain=ctx.user_domain,
-                owner_access_key=owner,
-            )
+            PublicResolveAccessKeyScopeAction(owner_access_key=owner)
         )
         return AccessKey(scope.owner_access_key)
 
@@ -99,7 +94,7 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        access_key = await self._owner_access_key(ctx, params.owner_access_key)
+        access_key = await self._owner_access_key(params.owner_access_key)
         await self._user.create_dotfile.run(
             CreateKeypairDotfileAction(
                 user_id=await self._owner(access_key),
@@ -115,7 +110,7 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        access_key = await self._owner_access_key(ctx, params.owner_access_key)
+        access_key = await self._owner_access_key(params.owner_access_key)
         keypair = await self._user.get_keypair.run(
             GetKeypairAction(keypair_id=await self._keypair_id(access_key))
         )
@@ -137,7 +132,7 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        access_key = await self._owner_access_key(ctx, params.owner_access_key)
+        access_key = await self._owner_access_key(params.owner_access_key)
         await self._user.update_dotfile.run(
             UpdateKeypairDotfileAction(
                 user_id=await self._owner(access_key),
@@ -153,7 +148,7 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        access_key = await self._owner_access_key(ctx, params.owner_access_key)
+        access_key = await self._owner_access_key(params.owner_access_key)
         await self._user.delete_dotfile.run(
             DeleteKeypairDotfileAction(
                 user_id=await self._owner(access_key),

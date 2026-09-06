@@ -696,6 +696,7 @@ def create_processors(
         ),
         metric=MetricProcessors(
             metric_groups.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)),
+            metric_groups.group(GroupMeta(USER_ENTITY_TYPE)),
             session_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
             services.metric,
         ),

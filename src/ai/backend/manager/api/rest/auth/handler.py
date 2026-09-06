@@ -106,12 +106,7 @@ class AuthHandler:
 
     async def get_role(self, query: QueryParam[GetRoleRequest], ctx: UserContext) -> APIResponse:
         params = query.parsed
-        action = PublicGetRoleAction(
-            user_id=ctx.user_uuid,
-            group_id=params.group,
-            is_superadmin=ctx.is_superadmin,
-            is_admin=ctx.is_admin,
-        )
+        action = PublicGetRoleAction(group_id=params.group)
         result = await self._auth.public_get_role.run(action)
         resp = GetRoleResponse(
             global_role=result.global_role,

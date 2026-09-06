@@ -291,6 +291,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     )
     MetricProcessors(
         registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)),
+        registry.group(GroupMeta(USER_ENTITY_TYPE)),
         registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
         MagicMock(),
     )
