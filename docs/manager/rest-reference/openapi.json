@@ -16373,6 +16373,50 @@
         "format": "uuid",
         "type": "string"
       },
+      "EntityShareRecipientInput": {
+        "description": "Who an offer goes to, named exactly one of three ways.\n\nA project takes it directly, a person takes it into the project that is theirs\nalone, and an address reaches someone who may have no account yet.",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityID"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Project the offer goes to"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityID"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Person the offer goes to; it lands in their own project"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Address the offer goes to",
+            "title": "Email"
+          }
+        },
+        "title": "EntityShareRecipientInput",
+        "type": "object"
+      },
       "PermissionBitDTO": {
         "description": "One bit of the permission mask.\n\nDistinct from :class:`OperationTypeDTO`, which names an action: this names what is\nheld. A cap is a set of these, and an empty set is no cap at all.",
         "enum": [
@@ -16385,8 +16429,8 @@
         "title": "PermissionBitDTO",
         "type": "string"
       },
-      "CreateEntityInvitationInput": {
-        "description": "One offer of one entity to one address.\n\nThe cap is given as the permissions it holds rather than a bitmask; an empty list\nmeans no ceiling, so the invitee's own permissions stand unclipped.",
+      "CreateEntityShareInput": {
+        "description": "One offer of one entity to one recipient.\n\nThe cap is given as the permissions it holds rather than a bitmask; an empty list\nmeans no ceiling, so the recipient's own permissions stand unclipped.",
         "properties": {
           "target_entity_type": {
             "description": "Type of the entity being offered",
@@ -16397,10 +16441,9 @@
             "$ref": "#/components/schemas/EntityID",
             "description": "Id of the entity being offered"
           },
-          "invitee_email": {
-            "description": "Address the offer goes to",
-            "title": "Invitee Email",
-            "type": "string"
+          "recipient": {
+            "$ref": "#/components/schemas/EntityShareRecipientInput",
+            "description": "Who the offer goes to"
           },
           "permissions": {
             "description": "Permissions the offer caps at; empty for no ceiling",
@@ -16414,17 +16457,17 @@
         "required": [
           "target_entity_type",
           "target_entity_id",
-          "invitee_email"
+          "recipient"
         ],
-        "title": "CreateEntityInvitationInput",
+        "title": "CreateEntityShareInput",
         "type": "object"
       },
-      "EntityInvitationFilter": {
+      "EntityShareFilter": {
         "properties": {
           "status": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EntityInvitationStatusFilter"
+                "$ref": "#/components/schemas/EntityShareStatusFilter"
               },
               {
                 "type": "null"
@@ -16443,7 +16486,18 @@
             ],
             "default": null
           },
-          "invitee_email": {
+          "recipient_entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "recipient_email": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/StringFilter"
@@ -16455,13 +16509,13 @@
             "default": null
           }
         },
-        "title": "EntityInvitationFilter",
+        "title": "EntityShareFilter",
         "type": "object"
       },
-      "EntityInvitationOrderBy": {
+      "EntityShareOrderBy": {
         "properties": {
           "field": {
-            "$ref": "#/components/schemas/EntityInvitationOrderField"
+            "$ref": "#/components/schemas/EntityShareOrderField"
           },
           "direction": {
             "$ref": "#/components/schemas/OrderDirection",
@@ -16471,89 +16525,44 @@
         "required": [
           "field"
         ],
-        "title": "EntityInvitationOrderBy",
+        "title": "EntityShareOrderBy",
         "type": "object"
       },
-      "EntityInvitationOrderField": {
+      "EntityShareOrderField": {
         "enum": [
           "created_at",
           "updated_at",
           "status"
         ],
-        "title": "EntityInvitationOrderField",
+        "title": "EntityShareOrderField",
         "type": "string"
       },
-      "EntityInvitationScope": {
-        "description": "Scope for the scoped entity invitation query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty. Naming a user reads the invitations they were sent or sent themselves, which\nthe permission check on that user's scope is what allows.",
-        "properties": {
-          "invitee": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/UUIDScope"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Users the invitations are addressed to",
-            "title": "Invitee"
-          },
-          "inviter": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/UUIDScope"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Users who sent the invitations",
-            "title": "Inviter"
-          },
-          "target": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/EntityInvitationTargetScope"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Entities the invitations offer",
-            "title": "Target"
-          }
-        },
-        "title": "EntityInvitationScope",
-        "type": "object"
+      "EntityShareSideDTO": {
+        "description": "Which side of a share the caller stands on.",
+        "enum": [
+          "recipient",
+          "sharer"
+        ],
+        "title": "EntityShareSideDTO",
+        "type": "string"
       },
-      "EntityInvitationStatusDTO": {
+      "EntityShareStatusDTO": {
         "enum": [
           "pending",
           "accepted",
           "rejected",
-          "canceled"
+          "canceled",
+          "revoked"
         ],
-        "title": "EntityInvitationStatusDTO",
+        "title": "EntityShareStatusDTO",
         "type": "string"
       },
-      "EntityInvitationStatusFilter": {
+      "EntityShareStatusFilter": {
         "properties": {
           "equals": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EntityInvitationStatusDTO"
+                "$ref": "#/components/schemas/EntityShareStatusDTO"
               },
               {
                 "type": "null"
@@ -16565,7 +16574,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/EntityInvitationStatusDTO"
+                  "$ref": "#/components/schemas/EntityShareStatusDTO"
                 },
                 "type": "array"
               },
@@ -16577,11 +16586,195 @@
             "title": "In"
           }
         },
-        "title": "EntityInvitationStatusFilter",
+        "title": "EntityShareStatusFilter",
         "type": "object"
       },
-      "EntityInvitationTargetScope": {
-        "description": "One entity whose invitations are being read.\n\nIts own pair rather than the shared ``EntityTypeScope``: what an invitation offers\nis an open entity type, which that closed element enum cannot name.",
+      "MySearchEntitySharesInput": {
+        "description": "The shares the caller stands on one or both sides of.\n\nWhich side is a value rather than an operation of its own, the same way the scoped\nquery names its sides. Naming both reads them together, which is what a caller\nasking for their own shares usually means.",
+        "properties": {
+          "sides": {
+            "description": "Sides of the share the caller stands on",
+            "items": {
+              "$ref": "#/components/schemas/EntityShareSideDTO"
+            },
+            "title": "Sides",
+            "type": "array"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityShareFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityShareOrderBy"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "title": "MySearchEntitySharesInput",
+        "type": "object"
+      },
+      "EntityShareScope": {
+        "description": "Scope for the scoped entity share query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is\nempty. Naming a user reads the shares addressed to them or sent by them, which the\npermission check on that user's scope is what allows.",
+        "properties": {
+          "recipient": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users the shares are addressed to",
+            "title": "Recipient"
+          },
+          "recipient_project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Projects the shares are addressed to",
+            "title": "Recipient Project"
+          },
+          "sharer": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users who sent the shares",
+            "title": "Sharer"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityShareTargetScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Entities the shares lend",
+            "title": "Target"
+          }
+        },
+        "title": "EntityShareScope",
+        "type": "object"
+      },
+      "EntityShareTargetScope": {
+        "description": "One entity whose shares are being read.\n\nIts own pair rather than the shared ``EntityTypeScope``: what a share lends is an\nopen entity type, which that closed element enum cannot name.",
         "properties": {
           "entity_type": {
             "description": "Type of the entity being offered",
@@ -16597,7 +16790,7 @@
           "entity_type",
           "entity_id"
         ],
-        "title": "EntityInvitationTargetScope",
+        "title": "EntityShareTargetScope",
         "type": "object"
       },
       "UUIDScope": {
@@ -16615,16 +16808,16 @@
         "title": "UUIDScope",
         "type": "object"
       },
-      "ScopedSearchEntityInvitationsInput": {
+      "ScopedSearchEntitySharesInput": {
         "properties": {
           "scope": {
-            "$ref": "#/components/schemas/EntityInvitationScope",
+            "$ref": "#/components/schemas/EntityShareScope",
             "description": "Scope (OR across all items)"
           },
           "filter": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EntityInvitationFilter"
+                "$ref": "#/components/schemas/EntityShareFilter"
               },
               {
                 "type": "null"
@@ -16636,7 +16829,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/EntityInvitationOrderBy"
+                  "$ref": "#/components/schemas/EntityShareOrderBy"
                 },
                 "type": "array"
               },
@@ -16723,7 +16916,7 @@
         "required": [
           "scope"
         ],
-        "title": "ScopedSearchEntityInvitationsInput",
+        "title": "ScopedSearchEntitySharesInput",
         "type": "object"
       },
       "OperationTypeDTO": {
@@ -48026,11 +48219,11 @@
         "description": "Unassign users from a project.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/entity-invitations": {
+    "/v2/entity-shares": {
       "post": {
-        "operationId": "v2/entity-invitations.create",
+        "operationId": "v2/entity-shares.create",
         "tags": [
-          "v2/entity-invitations"
+          "v2/entity-shares"
         ],
         "responses": {
           "200": {
@@ -48046,7 +48239,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateEntityInvitationInput"
+                "$ref": "#/components/schemas/CreateEntityShareInput"
               }
             }
           }
@@ -48055,11 +48248,11 @@
         "description": "Offer one entity to one address.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/entity-invitations/{invitation_id}": {
+    "/v2/entity-shares/{share_id}": {
       "get": {
-        "operationId": "v2/entity-invitations.get",
+        "operationId": "v2/entity-shares.get",
         "tags": [
-          "v2/entity-invitations"
+          "v2/entity-shares"
         ],
         "responses": {
           "200": {
@@ -48073,7 +48266,7 @@
         ],
         "parameters": [
           {
-            "name": "invitation_id",
+            "name": "share_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -48081,12 +48274,12 @@
             }
           }
         ],
-        "description": "Read one invitation from the side that offered it.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Read one share from the side that offered it.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/entity-invitations.cancel",
+        "operationId": "v2/entity-shares.cancel",
         "tags": [
-          "v2/entity-invitations"
+          "v2/entity-shares"
         ],
         "responses": {
           "200": {
@@ -48100,7 +48293,7 @@
         ],
         "parameters": [
           {
-            "name": "invitation_id",
+            "name": "share_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -48111,11 +48304,11 @@
         "description": "Withdraw the offer before it was answered.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/entity-invitations/{invitation_id}/accept": {
+    "/v2/entity-shares/{share_id}/accept": {
       "post": {
-        "operationId": "v2/entity-invitations.accept",
+        "operationId": "v2/entity-shares.accept",
         "tags": [
-          "v2/entity-invitations"
+          "v2/entity-shares"
         ],
         "responses": {
           "200": {
@@ -48129,7 +48322,7 @@
         ],
         "parameters": [
           {
-            "name": "invitation_id",
+            "name": "share_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -48140,11 +48333,11 @@
         "description": "Take what was offered.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/entity-invitations/{invitation_id}/reject": {
+    "/v2/entity-shares/{share_id}/reject": {
       "post": {
-        "operationId": "v2/entity-invitations.reject",
+        "operationId": "v2/entity-shares.reject",
         "tags": [
-          "v2/entity-invitations"
+          "v2/entity-shares"
         ],
         "responses": {
           "200": {
@@ -48158,7 +48351,7 @@
         ],
         "parameters": [
           {
-            "name": "invitation_id",
+            "name": "share_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -48169,11 +48362,69 @@
         "description": "Turn down what was offered.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/entity-invitations/scoped/search": {
+    "/v2/entity-shares/{share_id}/revoke": {
       "post": {
-        "operationId": "v2/entity-invitations.scoped_search",
+        "operationId": "v2/entity-shares.revoke",
         "tags": [
-          "v2/entity-invitations"
+          "v2/entity-shares"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Take back what was lent.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-shares/{share_id}/leave": {
+      "post": {
+        "operationId": "v2/entity-shares.leave",
+        "tags": [
+          "v2/entity-shares"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Give back what was taken.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-shares/my/search": {
+      "post": {
+        "operationId": "v2/entity-shares.my_search",
+        "tags": [
+          "v2/entity-shares"
         ],
         "responses": {
           "200": {
@@ -48189,13 +48440,42 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScopedSearchEntityInvitationsInput"
+                "$ref": "#/components/schemas/MySearchEntitySharesInput"
               }
             }
           }
         },
         "parameters": [],
-        "description": "The invitations the named sides reach.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "The shares the caller stands on a side of.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/entity-shares/scoped/search": {
+      "post": {
+        "operationId": "v2/entity-shares.scoped_search",
+        "tags": [
+          "v2/entity-shares"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchEntitySharesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "The shares the named scopes reach.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/role-presets": {

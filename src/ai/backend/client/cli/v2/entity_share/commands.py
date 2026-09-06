@@ -75,6 +75,7 @@ def create(
     """Offer one entity to one project, one person, or one address."""
     from ai.backend.common.dto.manager.v2.entity_share.request import (
         CreateEntityShareInput,
+        EntityShareRecipientInput,
     )
 
     async def _run() -> None:
@@ -84,9 +85,9 @@ def create(
                 CreateEntityShareInput(
                     target_entity_type=EntityType(entity_type),
                     target_entity_id=entity_id,
-                    recipient_project_id=project_id,
-                    recipient_user_id=user_id,
-                    recipient_email=email,
+                    recipient=EntityShareRecipientInput(
+                        project_id=project_id, user_id=user_id, email=email
+                    ),
                     permissions=[PermissionBitDTO(p) for p in permissions],
                 )
             )

@@ -86,18 +86,19 @@ class EntityShareAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         target = RuntimeEntityID(input.target_entity_type, input.target_entity_id)
+        named = input.recipient
         recipient: EntityIdentifier | None = None
-        if input.recipient_project_id is not None:
-            recipient = ProjectID(input.recipient_project_id)
-        elif input.recipient_user_id is not None:
-            recipient = UserID(input.recipient_user_id)
+        if named.project_id is not None:
+            recipient = ProjectID(named.project_id)
+        elif named.user_id is not None:
+            recipient = UserID(named.user_id)
         result = await self._processors.entity_share.create.run(
             CreateEntityShareAction(
                 creator=EntityShareCreator(
                     sharer_user_id=UserID(me.user_id),
                     target=target,
                     recipient=recipient,
-                    recipient_email=input.recipient_email,
+                    recipient_email=named.email,
                     permission_cap=self._to_permission_cap(input.permissions),
                 )
             )

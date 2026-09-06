@@ -2921,16 +2921,16 @@ type CreateDownloadSessionV2Payload {
   url: String!
 }
 
-"""Added in 26.9.0. Create entity invitation input."""
-input CreateEntityInvitationInput {
+"""Added in 26.9.0. Create entity share input."""
+input CreateEntityShareInput {
   """Type of the entity being offered."""
   targetEntityType: String!
 
   """Id of the entity being offered."""
   targetEntityId: UUID!
 
-  """Address the offer goes to."""
-  inviteeEmail: String!
+  """Who the offer goes to."""
+  recipient: EntityShareRecipientInput!
 
   """Permissions the offer caps at; empty for no ceiling."""
   permissions: [PermissionBit!]! = []
@@ -5348,119 +5348,6 @@ input EntityFilter {
   NOT: [EntityFilter!] = null
 }
 
-"""
-Added in 26.9.0. An offer of one existing entity to one address, settled by the answer.
-"""
-type EntityInvitation implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """Who sent the offer."""
-  inviterUserId: UUID!
-
-  """Address the offer goes to."""
-  inviteeEmail: String!
-
-  """Type of the entity being offered."""
-  targetEntityType: String!
-
-  """Id of the entity being offered."""
-  targetEntityId: UUID!
-
-  """Permissions the offer caps at; empty for no ceiling."""
-  permissions: [PermissionBit!]!
-
-  """Whether the invitation is still open."""
-  status: EntityInvitationStatus!
-
-  """When the offer was made."""
-  createdAt: DateTime!
-
-  """When it was last written."""
-  updatedAt: DateTime!
-}
-
-"""Added in 26.9.0. Paginated list of entity invitations."""
-type EntityInvitationConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection."""
-  edges: [EntityInvitationEdge!]!
-  count: Int!
-}
-
-"""Added in 26.9.0. One entity invitation within a connection."""
-type EntityInvitationEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: EntityInvitation!
-}
-
-"""Added in 26.9.0. Filter for entity invitations."""
-input EntityInvitationFilter {
-  """Status filter."""
-  status: EntityInvitationStatus = null
-
-  """Exact address match."""
-  inviteeEmail: String = null
-}
-
-"""Added in 26.9.0. Order specification."""
-input EntityInvitationOrderBy {
-  """Field to order by."""
-  field: EntityInvitationOrderField!
-
-  """ASC or DESC."""
-  direction: String! = "DESC"
-}
-
-"""Added in 26.9.0. Order fields for entity invitations."""
-enum EntityInvitationOrderField {
-  CREATED_AT
-  UPDATED_AT
-  STATUS
-}
-
-"""Added in 26.9.0. Entity invitation payload."""
-type EntityInvitationPayload {
-  """The invitation the run touched."""
-  invitation: EntityInvitation!
-}
-
-"""
-Added in 26.9.0. Scope for the scoped entity invitation query. All items are OR'd; raises an error if every field is empty.
-"""
-input EntityInvitationScope {
-  """Users the invitations are addressed to."""
-  invitee: [UUIDScope!] = null
-
-  """Users who sent the invitations."""
-  inviter: [UUIDScope!] = null
-
-  """Entities the invitations offer."""
-  target: [EntityInvitationTargetScope!] = null
-}
-
-"""Added in 26.9.0. Whether an invitation is still open."""
-enum EntityInvitationStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-  CANCELED
-}
-
-"""Added in 26.9.0. One entity whose invitations are being read."""
-input EntityInvitationTargetScope {
-  """Type of the entity being offered."""
-  entityType: String!
-
-  """Id of the entity being offered."""
-  entityId: UUID!
-}
-
 """Added in 26.9.0. One `key=value` label and the entity carrying it."""
 type EntityLabel implements Node {
   """The Globally Unique ID of this object"""
@@ -5592,6 +5479,153 @@ type EntityRefEdge {
 
   """The item at the end of the edge"""
   node: EntityRef!
+}
+
+"""
+Added in 26.9.0. One entity handed to one scope: offered, taken, or taken back.
+"""
+type EntityShare implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Who sent the offer."""
+  sharerUserId: UUID!
+
+  """Type of the scope the offer goes to, once it names one."""
+  recipientEntityType: String
+
+  """Id of the scope the offer goes to, once it names one."""
+  recipientEntityId: UUID
+
+  """Address the offer goes to, when it names one."""
+  recipientEmail: String
+
+  """Type of the entity being offered."""
+  targetEntityType: String!
+
+  """Id of the entity being offered."""
+  targetEntityId: UUID!
+
+  """Permissions the offer caps at; empty for no ceiling."""
+  permissions: [PermissionBit!]!
+
+  """Where the share stands."""
+  status: EntityShareStatus!
+
+  """When the offer stops being answerable; empty for never."""
+  expiresAt: DateTime
+
+  """When the offer was made."""
+  createdAt: DateTime!
+
+  """When it was last written."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.9.0. Paginated list of entity shares."""
+type EntityShareConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [EntityShareEdge!]!
+  count: Int!
+}
+
+"""Added in 26.9.0. One entity share within a connection."""
+type EntityShareEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: EntityShare!
+}
+
+"""Added in 26.9.0. Filter for entity shares."""
+input EntityShareFilter {
+  """Status filter."""
+  status: EntityShareStatus = null
+
+  """Exact recipient scope match."""
+  recipientEntityId: UUID = null
+
+  """Exact address match."""
+  recipientEmail: String = null
+}
+
+"""Added in 26.9.0. Order specification."""
+input EntityShareOrderBy {
+  """Field to order by."""
+  field: EntityShareOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "DESC"
+}
+
+"""Added in 26.9.0. Order fields for entity shares."""
+enum EntityShareOrderField {
+  CREATED_AT
+  UPDATED_AT
+  STATUS
+}
+
+"""Added in 26.9.0. Entity share payload."""
+type EntitySharePayload {
+  """The share the run touched."""
+  share: EntityShare!
+}
+
+"""Added in 26.9.0. Who an offer goes to; exactly one of the three."""
+input EntityShareRecipientInput @oneOf {
+  """Project the offer goes to."""
+  projectId: UUID = null
+
+  """Person the offer goes to; it lands in their own project."""
+  userId: UUID = null
+
+  """Address the offer goes to."""
+  email: String = null
+}
+
+"""
+Added in 26.9.0. Scope for the scoped entity share query. All items are OR'd; raises an error if every field is empty.
+"""
+input EntityShareScope {
+  """Users the shares are addressed to."""
+  recipient: [UUIDScope!] = null
+
+  """Projects the shares are addressed to."""
+  recipientProject: [UUIDScope!] = null
+
+  """Users who sent the shares."""
+  sharer: [UUIDScope!] = null
+
+  """Entities the shares lend."""
+  target: [EntityShareTargetScope!] = null
+}
+
+"""Added in 26.9.0. Which side of a share the caller stands on."""
+enum EntityShareSide {
+  RECIPIENT
+  SHARER
+}
+
+"""Added in 26.9.0. Where a share stands."""
+enum EntityShareStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+  REVOKED
+}
+
+"""Added in 26.9.0. One entity whose shares are being read."""
+input EntityShareTargetScope {
+  """Type of the entity being offered."""
+  entityType: String!
+
+  """Id of the entity being offered."""
+  entityId: UUID!
 }
 
 """
@@ -9339,17 +9373,25 @@ type Mutation {
   """Added in 26.8.0. Create a retention policy (superadmin only)."""
   adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload
 
-  """Added in 26.9.0. Offer one entity to one address."""
-  createEntityInvitation(input: CreateEntityInvitationInput!): EntityInvitationPayload
+  """
+  Added in 26.9.0. Offer one entity to one project, one person, or one address.
+  """
+  createEntityShare(input: CreateEntityShareInput!): EntitySharePayload
 
   """Added in 26.9.0. Take what was offered."""
-  acceptEntityInvitation(id: UUID!): EntityInvitationPayload
+  acceptEntityShare(id: UUID!): EntitySharePayload
 
   """Added in 26.9.0. Turn down what was offered."""
-  rejectEntityInvitation(id: UUID!): EntityInvitationPayload
+  rejectEntityShare(id: UUID!): EntitySharePayload
 
   """Added in 26.9.0. Withdraw an offer before it was answered."""
-  cancelEntityInvitation(id: UUID!): EntityInvitationPayload
+  cancelEntityShare(id: UUID!): EntitySharePayload
+
+  """Added in 26.9.0. Take back what was lent."""
+  revokeEntityShare(id: UUID!): EntitySharePayload
+
+  """Added in 26.9.0. Give back what was taken."""
+  leaveEntityShare(id: UUID!): EntitySharePayload
 
   """Added in 26.8.0. Update a retention policy (superadmin only)."""
   adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload
@@ -11893,14 +11935,19 @@ type Query {
   adminRetentionPolicy(id: UUID!): RetentionPolicy
 
   """
-  Added in 26.9.0. Read one invitation by id, from the side that offered it. The invitee reaches theirs through the search addressed to them.
+  Added in 26.9.0. Read one share by id, from the side that offered it. The receiving side reaches theirs through the search addressed to it.
   """
-  entityInvitation(id: UUID!): EntityInvitation
+  entityShare(id: UUID!): EntityShare
 
   """
-  Added in 26.9.0. Page through the invitations the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.9.0. Page through the shares the named scopes reach, combined with OR. Every scope is authorized before the read runs.
   """
-  entityInvitations(scope: EntityInvitationScope!, filter: EntityInvitationFilter = null, orderBy: [EntityInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityInvitationConnection
+  entityShares(scope: EntityShareScope!, filter: EntityShareFilter = null, orderBy: [EntityShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityShareConnection
+
+  """
+  Added in 26.9.0. Page through the shares the caller stands on a side of. Naming no side reads both.
+  """
+  myEntityShares(sides: [EntityShareSide!] = null, filter: EntityShareFilter = null, orderBy: [EntityShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityShareConnection
 
   """Added in 26.4.2. Search runtime variant presets."""
   runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection

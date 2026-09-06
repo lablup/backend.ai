@@ -16,6 +16,9 @@ from ai.backend.common.dto.manager.v2.entity_share.request import (
     EntityShareOrderBy as OrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.entity_share.request import (
+    EntityShareRecipientInput as RecipientInputDTO,
+)
+from ai.backend.common.dto.manager.v2.entity_share.request import (
     EntityShareScope as ScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.entity_share.request import (
@@ -206,20 +209,30 @@ class EntityShareScopeGQL(PydanticInputMixin[ScopeDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Create entity share input; names exactly one recipient.",
+        description="Who an offer goes to; exactly one of the three.",
+    ),
+    name="EntityShareRecipientInput",
+    one_of=True,
+)
+class EntityShareRecipientInputGQL(PydanticInputMixin[RecipientInputDTO]):
+    project_id: UUID | None = gql_field(default=None, description="Project the offer goes to.")
+    user_id: UUID | None = gql_field(
+        default=None, description="Person the offer goes to; it lands in their own project."
+    )
+    email: str | None = gql_field(default=None, description="Address the offer goes to.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Create entity share input.",
     ),
     name="CreateEntityShareInput",
 )
 class CreateEntityShareInputGQL(PydanticInputMixin[CreateInputDTO]):
     target_entity_type: str = gql_field(description="Type of the entity being offered.")
     target_entity_id: UUID = gql_field(description="Id of the entity being offered.")
-    recipient_project_id: UUID | None = gql_field(
-        default=None, description="Project the offer goes to."
-    )
-    recipient_user_id: UUID | None = gql_field(
-        default=None, description="Person the offer goes to; it lands in their own project."
-    )
-    recipient_email: str | None = gql_field(default=None, description="Address the offer goes to.")
+    recipient: EntityShareRecipientInputGQL = gql_field(description="Who the offer goes to.")
     permissions: list[PermissionBitGQL] = gql_field(
         default=(), description="Permissions the offer caps at; empty for no ceiling."
     )
