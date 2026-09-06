@@ -2618,13 +2618,20 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         return frozenset() if self._preflight_done else frozenset({_PREFLIGHT_PENDING})
 
     @override
-    async def prepare_recovery(self) -> None:
+    async def prepare_recovery(self, spare: Collection[int] = ()) -> None:
         """Hold every surviving Backend.AI VXLAN down before journal recovery.
 
-        At this point no session metadata is trusted or even readable yet. Device ownership is the
-        only durable fact available, so the backend prefix is intentionally the boundary: a valid
-        journal later re-adopts and reopens plaintext sessions immediately and encrypted sessions
-        only after their complete protection state is restored.
+        At this point this process's own session metadata is not trusted or even readable yet, so
+        the backend prefix is the boundary: a tunnel whose protection state we cannot vouch for
+        must not be carrying anything. A valid journal later re-adopts and reopens plaintext
+        sessions immediately and encrypted sessions only once their complete protection state is
+        restored.
+
+        ``spare`` is the exception, and the only one: VNIs the node-wide registry attributes to a
+        *different* agent that is still running containers on them. Our restart says nothing about
+        those, and downing them stops a session this process never had anything to do with. The
+        caller establishes that from the registry and the live containers, because neither is this
+        backend's to read; anything it cannot establish is not spared.
         """
         try:
             devices = await self._vxlan_lister()
@@ -2632,7 +2639,17 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             raise OverlayEncryptionUnavailable(
                 f"could not enumerate surviving {VXLAN_DEV_PREFIX} tunnels before recovery: {e}"
             ) from e
-        survivors = sorted(name for name in devices if name.startswith(VXLAN_DEV_PREFIX))
+        spared = {vxlan_dev(vni) for vni in spare}
+        survivors = sorted(
+            name for name in devices if name.startswith(VXLAN_DEV_PREFIX) and name not in spared
+        )
+        if spared:
+            log.info(
+                "leaving {} surviving tunnel(s) up: another agent on this node holds them and is"
+                " still running containers on them ({})",
+                len(spared),
+                ", ".join(sorted(spared)),
+            )
         # Every survivor is recorded as unclosed BEFORE the first one is touched, and cleared only
         # once it is proven down. Recording them afterwards is only correct if this loop runs to
         # completion, and it is under a startup deadline: cancelled partway, the devices it had

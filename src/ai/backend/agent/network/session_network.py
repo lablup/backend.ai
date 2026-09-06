@@ -58,6 +58,7 @@ from ai.backend.agent.network.privnet.resolver import (
 from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
 from ai.backend.agent.network.runtime import ExecResult, OciRuntime
 from ai.backend.agent.network.session_tracker import SessionContainerTracker, TeardownScope
+from ai.backend.agent.network.vni_registry import VniRegistry
 from ai.backend.common.network.keys import endpoint_key, session_meta_key
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
@@ -136,6 +137,8 @@ class SessionNetwork:
     # Tracks container<->session so the last kernel's removal deterministically tears the
     # session network down (otherwise overlay devices + etcd members leak).
     _tracker: SessionContainerTracker
+    #: The node-wide VNI bindings, read to tell another agent's tunnels from ours.
+    _vni_registry: VniRegistry
     # container_id -> (session_id, attach plan, task_pid): the network detach inputs captured
     # at attach time, so the clean/remove phase can release the host veth + IPAM + MASQ even
     # though it is a separate lifecycle call from attach. Without it those host-side resources
@@ -220,6 +223,7 @@ class SessionNetwork:
         self._dns_servers = {}
         self._configured_dns = tuple(configured_dns)
         self._tracker = SessionContainerTracker()
+        self._vni_registry = VniRegistry()
         self._attachments = {}
         if (local_subnets is None) == (privnet_local_subnet is None):
             # Exactly one, always: this process owns the node's pool, or the privnet does. Neither
@@ -473,9 +477,10 @@ class SessionNetwork:
         # gone. The privnet path has always done this first; this one did not, so a rootful agent
         # came back with its tunnels open. What stays open is recorded, so readiness can say so.
         self._recovery_incomplete = {}
+        spare = await self._other_agents_live_vnis()
         for name, backend in self._backends.items():
             try:
-                await backend.prepare_recovery()
+                await backend.prepare_recovery(spare)
             except Exception as e:
                 # Not fatal: the sessions below still need adopting, and a backend that raised has
                 # already attempted every device it owns.
@@ -1409,6 +1414,37 @@ class SessionNetwork:
         """
         await self._detach_attachment(container_id)
         await self._release_container(container_id)
+
+    async def _other_agents_live_vnis(self) -> frozenset[int]:
+        """VNIs a *different* agent on this node holds and is still running containers on.
+
+        A host can run more than one agent, and the fail-close preflight cannot read this
+        process's session metadata -- so without this it brings down every overlay tunnel on the
+        node, including ones it has nothing to do with, and the agent that owns them only notices
+        on its next watchdog tick.
+
+        Both halves are required. The registry alone would let a dead agent's stale binding keep a
+        tunnel up for good; the containers alone do not say which VNI carries them. Anything this
+        cannot establish is left to the preflight, which closes it.
+        """
+        registry = self._vni_registry
+        if registry.unusable_reason() is not None:
+            return frozenset()
+        try:
+            live = await self._live_containers()
+        except Exception:
+            log.exception("could not list this node's containers; sparing no tunnel")
+            return frozenset()
+        if not live:
+            return frozenset()
+        sessions = set(live.values())
+        spare: set[int] = set()
+        for vni in await registry.bound_vnis():
+            for holder in await registry.holders(vni):
+                if holder.agent_id != self._agent_id and holder.session_id in sessions:
+                    spare.add(vni)
+                    break
+        return frozenset(spare)
 
     @staticmethod
     async def _stop_quietly(coordinator: SessionNetworkCoordinator, session_id: str) -> None:

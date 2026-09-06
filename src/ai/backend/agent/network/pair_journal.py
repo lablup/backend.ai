@@ -349,6 +349,23 @@ class PairJournal:
         async with self._hold(key) as held:
             yield None if held is None else ClaimSet(self, held)
 
+    async def keys(self) -> frozenset[str]:
+        """Every key this journal currently holds a claim directory for.
+
+        Read through the verified descriptor, like everything else here; an unreadable root is
+        reported as no keys, which is what the callers of this treat as "cannot establish".
+        """
+        root_fd = self._open_root()
+        if root_fd is None:
+            return frozenset()
+        try:
+            with os.scandir(root_fd) as entries:
+                return frozenset(entry.name for entry in entries if entry.is_dir())
+        except OSError:
+            return frozenset()
+        finally:
+            os.close(root_fd)
+
     async def prune(self, owner: str, live_sessions: Collection[str]) -> int:
         """Drop ``owner``'s claims for sessions it no longer has. Returns how many went.
 
