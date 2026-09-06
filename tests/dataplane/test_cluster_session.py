@@ -30,9 +30,15 @@ CLUSTER_SIZE = 3
 
 
 @pytest.fixture
-def single_node_cluster_spec(session_spec: SessionSpec) -> SessionSpec:
+def single_node_cluster_spec(session_spec: SessionSpec, primary_agent_id: str) -> SessionSpec:
+    """Pinned to the node this scenario reads. Unpinned, the scheduler is free to place it
+    anywhere in the resource group, and the read finds no kernel -- reported as "a single-node
+    cluster session must not be spread", which is not what happened."""
     return replace(
-        session_spec, cluster_size=CLUSTER_SIZE, cluster_mode=ClusterModeEnum.SINGLE_NODE
+        session_spec,
+        cluster_size=CLUSTER_SIZE,
+        cluster_mode=ClusterModeEnum.SINGLE_NODE,
+        agent_list=(primary_agent_id,),
     )
 
 
