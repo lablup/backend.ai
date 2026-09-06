@@ -159,7 +159,7 @@ class HammerspaceQuotaModel(BaseQuotaModel):
 
 
 class HammerspaceVolume(BaseHammerspaceVolume):
-    name: ClassVar[StorageBackendType] = StorageBackendType.HAMMERSPACE
+    name: ClassVar[StorageBackendType] = StorageBackendType("hammerspace")
 
     def __init__(
         self,

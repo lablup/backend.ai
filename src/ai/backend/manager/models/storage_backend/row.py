@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.data.entity.storage_backend import StorageBackendID
+from ai.backend.common.data.entity.storage_backend_type import StorageBackendTypeID
 from ai.backend.common.data.storage.types import (
     DEFAULT_STATUS_STALE_AFTER,
     ServiceStorageStatus,
@@ -22,7 +23,46 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 __all__ = (
     "ServiceStorageBackendRow",
     "StorageBackendRow",
+    "StorageBackendTypeRow",
 )
+
+
+class StorageBackendTypeRow(LifecycleTimestampsMixin, Base):
+    """A storage backend implementation a volume can be served by.
+
+    The capabilities come from the implementation, not from any one appliance, so they
+    live here. Built-in types are seeded; a storage backend plugin adds its own.
+    """
+
+    __tablename__ = "storage_backend_types"
+
+    id: Mapped[StorageBackendTypeID] = mapped_column(
+        "id",
+        GUID(StorageBackendTypeID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v7()"),
+    )
+    name: Mapped[StorageBackendType] = mapped_column(
+        "name", sa.String(length=64), unique=True, nullable=False
+    )
+    supports_vfolder: Mapped[bool] = mapped_column(
+        "supports_vfolder", sa.Boolean, nullable=False, server_default=sa.false()
+    )
+    supports_metric: Mapped[bool] = mapped_column(
+        "supports_metric", sa.Boolean, nullable=False, server_default=sa.false()
+    )
+    supports_quota: Mapped[bool] = mapped_column(
+        "supports_quota", sa.Boolean, nullable=False, server_default=sa.false()
+    )
+    supports_fast_fs_size: Mapped[bool] = mapped_column(
+        "supports_fast_fs_size", sa.Boolean, nullable=False, server_default=sa.false()
+    )
+    supports_fast_scan: Mapped[bool] = mapped_column(
+        "supports_fast_scan", sa.Boolean, nullable=False, server_default=sa.false()
+    )
+    supports_fast_size: Mapped[bool] = mapped_column(
+        "supports_fast_size", sa.Boolean, nullable=False, server_default=sa.false()
+    )
 
 
 class StorageBackendRow(LifecycleTimestampsMixin, Base):
@@ -42,26 +82,11 @@ class StorageBackendRow(LifecycleTimestampsMixin, Base):
         server_default=sa.text("uuid_generate_v7()"),
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=64), unique=True, nullable=False)
-    type: Mapped[StorageBackendType] = mapped_column(
-        "type", StrEnumType(StorageBackendType), nullable=False
-    )
-    supports_vfolder: Mapped[bool] = mapped_column(
-        "supports_vfolder", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    supports_metric: Mapped[bool] = mapped_column(
-        "supports_metric", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    supports_quota: Mapped[bool] = mapped_column(
-        "supports_quota", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    supports_fast_fs_size: Mapped[bool] = mapped_column(
-        "supports_fast_fs_size", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    supports_fast_scan: Mapped[bool] = mapped_column(
-        "supports_fast_scan", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    supports_fast_size: Mapped[bool] = mapped_column(
-        "supports_fast_size", sa.Boolean, nullable=False, server_default=sa.false()
+    type_id: Mapped[StorageBackendTypeID] = mapped_column(
+        "type_id",
+        GUID(StorageBackendTypeID),
+        sa.ForeignKey("storage_backend_types.id", ondelete="RESTRICT"),
+        nullable=False,
     )
     # How long this may go without a fresh check before its status counts as stale.
     status_stale_after: Mapped[timedelta] = mapped_column(

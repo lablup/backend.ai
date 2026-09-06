@@ -138,7 +138,7 @@ class CephFSOpModel(BaseFSOpModel):
 
 
 class CephFSVolume(BaseVolume):
-    name: ClassVar[StorageBackendType] = StorageBackendType.CEPHFS
+    name: ClassVar[StorageBackendType] = StorageBackendType("cephfs")
     loop: asyncio.AbstractEventLoop
     registry: dict[str, int]
     project_id_pool: list[int]

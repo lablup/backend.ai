@@ -133,12 +133,12 @@ class NoopFSOpModel(AbstractFSOpModel):
 
 
 class NoopVolume(AbstractVolume):
-    name: ClassVar[StorageBackendType] = StorageBackendType.NOOP
+    name: ClassVar[StorageBackendType] = StorageBackendType("noop")
 
     @override
     def info(self) -> VolumeInfo:
         return VolumeInfo(
-            backend=StorageBackendType.NOOP,
+            backend=StorageBackendType("noop"),
             path=self.mount_path,
             fsprefix=None,
             options=None,

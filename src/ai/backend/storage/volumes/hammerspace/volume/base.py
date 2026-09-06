@@ -18,7 +18,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class BaseHammerspaceVolume(BaseVolume):
-    name: ClassVar[StorageBackendType] = StorageBackendType.HAMMERSPACE_BASE
+    name: ClassVar[StorageBackendType] = StorageBackendType("hammerspace-base")
 
     @override
     async def get_capabilities(self) -> frozenset[str]:

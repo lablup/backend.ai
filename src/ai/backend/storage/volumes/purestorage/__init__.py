@@ -35,7 +35,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class FlashBladeVolume(BaseVolume):
-    name: ClassVar[StorageBackendType] = StorageBackendType.PURESTORAGE
+    name: ClassVar[StorageBackendType] = StorageBackendType("purestorage")
     _toolkit_version: int | None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
