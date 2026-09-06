@@ -3203,3 +3203,75 @@ class TestAskingWhetherThisNodeCanEncrypt:
         # "I could not find out" is not "it can".
         problems = await PrivNetClient(str(tmp_path / "gone.sock")).encryption_problems()
         assert "privnet:encryption" in problems
+
+
+class TestADetachWhosePlanMustSurvive:
+    """D3. The plan names the host veth, the address and the DNAT rules a detach gives back, and
+    it is the only record of them. Dropped before the detach ran, a failed one left nothing to
+    retry with -- the next call found no plan, deleted the journal entry and reported success
+    over state that was still on the host."""
+
+    @staticmethod
+    def _plan() -> EndpointPlan:
+        return EndpointPlan(
+            attachments=[
+                NetworkAttachSpec(
+                    kind=AttachKind.CNI,
+                    interface_name="eth0",
+                    role=NetworkRole.LOCAL,
+                    is_default_route=True,
+                    cni_config={"type": "bridge", "bridge": "bailo4097"},
+                )
+            ]
+        )
+
+    @classmethod
+    def _attach(cls, h: _Harness) -> None:
+        h.server._sessions["s1"].attached["c1"] = cls._plan()
+        h.server._sessions["s1"].local_ips["c1"] = _LOCAL_IP
+
+    async def _setup(self, h: _Harness) -> None:
+        await h.client().call(
+            PrivNetRequest(op=PrivNetOp.SETUP_SESSION, session_id="s1", network_config=_NC)
+        )
+
+    async def test_a_failed_detach_keeps_the_plan(self) -> None:
+        async with _Harness() as h:
+            await self._setup(h)
+            self._attach(h)
+
+            async def refuse(*args: Any, **kwargs: Any) -> None:
+                raise RuntimeError("iproute2 said no")
+
+            h.server._attacher._runner = refuse
+            with pytest.raises(PrivNetClientError):
+                await h.client().call(
+                    PrivNetRequest(
+                        op=PrivNetOp.DETACH_CONTAINER, session_id="s1", container_id="c1"
+                    )
+                )
+            assert "c1" in h.server._sessions["s1"].attached
+
+    async def test_the_retry_still_has_something_to_detach_with(self) -> None:
+        async with _Harness() as h:
+            await self._setup(h)
+            self._attach(h)
+            attempts: list[str] = []
+
+            async def flaky(op: str, **kwargs: Any) -> None:
+                attempts.append(str(kwargs.get("container_id")))
+                if len(attempts) == 1:
+                    raise RuntimeError("iproute2 said no")
+
+            h.server._attacher._runner = flaky
+            with pytest.raises(PrivNetClientError):
+                await h.client().call(
+                    PrivNetRequest(
+                        op=PrivNetOp.DETACH_CONTAINER, session_id="s1", container_id="c1"
+                    )
+                )
+            await h.client().call(
+                PrivNetRequest(op=PrivNetOp.DETACH_CONTAINER, session_id="s1", container_id="c1")
+            )
+            assert attempts == ["c1", "c1"], "the retry had no plan and deleted nothing"
+            assert "c1" not in h.server._sessions["s1"].attached

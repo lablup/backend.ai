@@ -31,6 +31,7 @@ from ai.backend.agent.errors.network import (
     ContainerSourceUnwired,
     LocalSubnetSourceUnwired,
     OverlayEncryptionUnavailable,
+    OverlayTeardownIncomplete,
     SessionNetworkGone,
     UnusableVtep,
 )
@@ -1409,16 +1410,30 @@ class SessionNetwork:
         `_detach_attachment` keeps the record when the detach fails, and its host veth, address
         and MASQ rule are still standing. This is the last point at which the plan that names
         them is available -- the coordinator stops next.
+
+        Raises:
+            OverlayTeardownIncomplete: one of them still could not be detached. Teardown must not
+                walk past that: the coordinator is about to go, and with it the last thing that
+                knew what those leftovers were. Raising keeps this node's ownership and puts the
+                session back in front of the teardown retry.
         """
         pending = [
             container_id
             for container_id, (owner, _plan, _pid) in self._attachments.items()
             if owner == session_id
         ]
-        for container_id in pending:
-            await self._detach_attachment(container_id)
+        stuck = [
+            container_id
+            for container_id in pending
+            if not await self._detach_attachment(container_id)
+        ]
+        if stuck:
+            raise OverlayTeardownIncomplete(
+                f"session {session_id} still has {len(stuck)} container(s)"
+                f" ({', '.join(sorted(stuck))}) whose network could not be given back"
+            )
 
-    async def _detach_attachment(self, container_id: str) -> None:
+    async def _detach_attachment(self, container_id: str) -> bool:
         """Undo the attach recorded for this container, if there is one. Best-effort: a detach
         hiccup must not block container removal (or session teardown).
 
@@ -1428,14 +1443,14 @@ class SessionNetwork:
         """
         attachment = self._attachments.get(container_id)
         if attachment is None:
-            return
+            return True
         session_id, plan, task_pid = attachment
         orchestrator = self._orchestrators.get(session_id)
         if orchestrator is None:
             # The session is gone and took its orchestrator with it; there is nothing left to
             # detach from and no later call that could use the record.
             self._attachments.pop(container_id, None)
-            return
+            return True
         try:
             await orchestrator.detach(container_id, plan=plan, task_pid=task_pid)
         except Exception:
@@ -1444,8 +1459,9 @@ class SessionNetwork:
                 " teardown can try again",
                 container_id,
             )
-            return
+            return False
         self._attachments.pop(container_id, None)
+        return True
 
     async def remove_container(self, container_id: str) -> None:
         # Detach the container's network first, using the plan captured at attach: this frees
