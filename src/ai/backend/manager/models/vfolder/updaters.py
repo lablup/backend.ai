@@ -105,6 +105,43 @@ class VFolderSoftDeleteUpdater(DataUpdater[VFolderRow, VFolderData]):
 
 
 @dataclass
+class VFolderReadyUpdater(DataUpdater[VFolderRow, VFolderData]):
+    """Marks a vfolder ready once its storage folder is there.
+
+    The row is inserted before the storage call so the name and the allowance are held
+    in the insert's own transaction; this is what makes the folder usable.
+    """
+
+    vfolder_id: VFolderUUID
+
+    @property
+    @override
+    def row_class(self) -> type[VFolderRow]:
+        return VFolderRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return VFolderRow.id
+
+    @override
+    def target_id_value(self) -> VFolderUUID:
+        return self.vfolder_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"status": VFolderOperationStatus.READY}
+
+    @override
+    def to_data(self, row: VFolderRow) -> VFolderData:
+        return row.to_data()
+
+
+@dataclass
 class VFolderTrashUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
     """Moves a vfolder to the trash unless a live session still mounts it.
 

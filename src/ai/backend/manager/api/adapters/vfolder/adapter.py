@@ -7,8 +7,10 @@ from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
@@ -61,7 +63,13 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 )
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
-from ai.backend.common.types import BinarySize, MountPermission, VFolderUsageMode
+from ai.backend.common.types import (
+    BinarySize,
+    MountPermission,
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderUsageMode,
+)
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment.creator import (
@@ -77,14 +85,19 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
+    VFolderMountPermission,
     VFolderOperationStatus,
 )
 from ai.backend.manager.errors.resource import NotAModelVFolder
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
+from ai.backend.manager.models.vfolder.creators import (
+    PersonalVFolderCreator,
+    ProjectVFolderCreator,
+    VFolderBaseCreator,
+)
 from ai.backend.manager.models.vfolder.orders import (
     DEFAULT_BACKWARD_ORDER as VFOLDER_DEFAULT_BACKWARD_ORDER,
 )
@@ -111,7 +124,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
 from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
     GlobalBatchLoadVFoldersAction,
 )
-from ai.backend.manager.services.vfolder.actions.create_v2 import CreateVFolderV2Action
+from ai.backend.manager.services.vfolder.actions.create import CreateVFolderAction
 from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
     CreateDownloadSessionV2Action,
@@ -132,9 +145,6 @@ from ai.backend.manager.services.vfolder.actions.search_user_vfolders import (
 )
 from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
     CreateUploadSessionV2Action,
-)
-from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
-    CreateVFolderInProjectAction,
 )
 from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
     DeleteVFolderV2Action,
@@ -350,18 +360,9 @@ class VFolderAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        action = CreateVFolderV2Action(
-            name=input.name,
-            user_id=me.user_id,
-            domain_name=me.domain_name,
-            project_id=input.project_id,
-            host=input.host,
-            usage_mode=VFolderUsageMode(input.usage_mode.value),
-            permission=VFolderPermission(input.permission.value),
-            cloneable=input.cloneable,
-        )
-        result = await self._processors.vfolder.create_vfolder_v2.run(action)
-        return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
+        if input.project_id is not None:
+            return await self._create(self._project_creator(me, ProjectID(input.project_id), input))
+        return await self._create(self._personal_creator(me, input))
 
     async def create_in_project(
         self,
@@ -370,24 +371,54 @@ class VFolderAdapter(BaseAdapter):
     ) -> CreateVFolderPayload:
         """Create a vfolder owned by the given project.
 
-        Uses ``CreateVFolderInProjectAction`` which is PROJECT-scoped so the
-        caller must hold CREATE permission on the project.
+        PROJECT-scoped, so the caller must hold CREATE permission on the project.
         """
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        action = CreateVFolderInProjectAction(
-            project_id=project_id,
-            user_id=me.user_id,
-            domain_name=me.domain_name,
+        return await self._create(self._project_creator(me, ProjectID(project_id), input))
+
+    async def _create(self, creator: VFolderBaseCreator) -> CreateVFolderPayload:
+        result = await self._processors.vfolder.create_vfolder.run(
+            CreateVFolderAction(creator=creator)
+        )
+        return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
+
+    def _personal_creator(
+        self, me: UserData, input: CreateVFolderInput | CreateVFolderInScopeInput
+    ) -> PersonalVFolderCreator:
+        """The caller's own folder. The personal project is not named here — the spec
+        finds it by the owner, so no request reaches somebody else's."""
+        return PersonalVFolderCreator(
             name=input.name,
-            host=input.host,
+            domain_name=me.domain_name,
+            quota_scope_id=str(QuotaScopeID(QuotaScopeType.USER, me.user_id)),
+            host=input.host or "",
+            creator_id=me.user_id,
+            user=UserID(me.user_id),
             usage_mode=VFolderUsageMode(input.usage_mode.value),
-            permission=VFolderPermission(input.permission.value),
+            permission=VFolderMountPermission(input.permission.value),
             cloneable=input.cloneable,
         )
-        result = await self._processors.vfolder.create_vfolder_in_project.run(action)
-        return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))
+
+    def _project_creator(
+        self,
+        me: UserData,
+        project_id: ProjectID,
+        input: CreateVFolderInput | CreateVFolderInScopeInput,
+    ) -> ProjectVFolderCreator:
+        """A folder the named project owns."""
+        return ProjectVFolderCreator(
+            name=input.name,
+            domain_name=me.domain_name,
+            quota_scope_id=str(QuotaScopeID(QuotaScopeType.PROJECT, project_id)),
+            host=input.host or "",
+            creator_id=me.user_id,
+            project=project_id,
+            usage_mode=VFolderUsageMode(input.usage_mode.value),
+            permission=VFolderMountPermission(input.permission.value),
+            cloneable=input.cloneable,
+        )
 
     async def create_upload_session(
         self, vfolder_id: UUID, input: CreateUploadSessionInput

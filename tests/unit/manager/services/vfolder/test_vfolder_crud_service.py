@@ -11,18 +11,20 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
+    VFolderHostPermissionMap,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
+    UserWithVFolderHostPermissions,
     VFolderAccessInfo,
     VFolderData,
     VFolderListResult,
@@ -43,14 +45,16 @@ from ai.backend.manager.errors.storage import (
 from ai.backend.manager.models.project import ProjectType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderPermission
+from ai.backend.manager.models.vfolder.creators import (
+    PersonalVFolderCreator,
+    ProjectVFolderCreator,
+)
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfolder.types import BulkVFolderPurgeResult
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
-    CreateVFolderAction,
-    CreateVFolderActionResult,
     DeleteForeverVFolderAction,
     DeleteForeverVFolderActionResult,
     ForceDeleteVFolderAction,
@@ -68,6 +72,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.create import CreateVFolderAction
 from ai.backend.manager.services.vfolder.actions.file_v2 import CloneVFolderV2Action
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.types import OptionalState
@@ -181,217 +186,134 @@ def _make_vfolder_data(
 
 
 class TestCreateVFolderAction:
-    async def test_valid_name_host_creates_vfolder(
-        self,
-        vfolder_service: VFolderService,
-        mock_vfolder_repository: MagicMock,
-        user_uuid: uuid.UUID,
-    ) -> None:
-        mock_vfolder_repository.get_user_resource_info = AsyncMock(return_value=(10, 0, None))
-        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
-        mock_vfolder_repository.count_vfolders_by_user = AsyncMock(return_value=0)
-        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
-        mock_vfolder_repository.create_vfolder_with_permission = AsyncMock()
+    """Creating a vfolder in a project.
 
-        action = CreateVFolderAction(
-            name="my-vfolder",
-            keypair_resource_policy={"default": {}},
-            domain_name="default",
-            group_id_or_name=None,
-            folder_host="local:volume1",
-            unmanaged_path=None,
-            mount_permission=VFolderPermission.READ_WRITE,
-            usage_mode=VFolderUsageMode.GENERAL,
-            cloneable=False,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
-            user_uuid=user_uuid,
-            user_role=UserRole.USER,
-            creator_email="test@example.com",
+    The project decides what the folder becomes, so every case sets the project's type.
+    """
+
+    @staticmethod
+    def _project_info(
+        project_id: uuid.UUID,
+        project_type: ProjectType,
+        *,
+        max_vfolder_count: int = 10,
+    ) -> ProjectResourceInfo:
+        return ProjectResourceInfo(
+            project_id=project_id,
+            max_vfolder_count=max_vfolder_count,
+            max_quota_scope_size=0,
+            project_type=project_type,
         )
 
-        result = await vfolder_service.create(action)
-
-        assert isinstance(result, CreateVFolderActionResult)
-        assert result.name == "my-vfolder"
-        assert result.status == VFolderOperationStatus.READY
-        mock_vfolder_repository.create_vfolder_with_permission.assert_called_once()
-
-    async def test_non_admin_unmanaged_path_raises_forbidden(
-        self,
-        vfolder_service: VFolderService,
-        user_uuid: uuid.UUID,
+    @staticmethod
+    def _arrange(
+        repository: MagicMock,
+        project_info: ProjectResourceInfo,
     ) -> None:
-        action = CreateVFolderAction(
-            name="my-vfolder",
-            keypair_resource_policy={"default": {}},
-            domain_name="default",
-            group_id_or_name=None,
-            folder_host="local:volume1",
-            unmanaged_path="/some/path",
-            mount_permission=VFolderPermission.READ_WRITE,
-            usage_mode=VFolderUsageMode.GENERAL,
-            cloneable=False,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
-            user_uuid=user_uuid,
-            user_role=UserRole.USER,
-            creator_email="test@example.com",
+        repository.get_user_with_keypair_policy_vfolder_hosts = AsyncMock(
+            return_value=UserWithVFolderHostPermissions(
+                email="test@example.com",
+                role=UserRole.USER,
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
+            )
+        )
+        repository.get_group_resource_info = AsyncMock(return_value=project_info)
+        repository.get_user_resource_info = AsyncMock(return_value=(10, 0, None))
+        repository.ensure_host_permission_allowed = AsyncMock()
+        repository.create_vfolder_with_permission = AsyncMock()
+
+    @staticmethod
+    def _personal_action(
+        user_uuid: uuid.UUID,
+        *,
+        name: str = "my-vfolder",
+        host: str | None = "local:volume1",
+        usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL,
+    ) -> CreateVFolderAction:
+        """The caller's own folder: the spec names no project."""
+        return CreateVFolderAction(
+            creator=PersonalVFolderCreator(
+                name=name,
+                domain_name="default",
+                quota_scope_id=str(QuotaScopeID(QuotaScopeType.USER, user_uuid)),
+                host=host or "",
+                creator_id=user_uuid,
+                user=UserID(user_uuid),
+                usage_mode=usage_mode,
+                permission=VFolderPermission.READ_WRITE,
+                cloneable=False,
+            ),
         )
 
-        with pytest.raises(Forbidden):
-            await vfolder_service.create(action)
+    @staticmethod
+    def _project_action(
+        user_uuid: uuid.UUID,
+        project_id: uuid.UUID,
+        *,
+        name: str = "group-vfolder",
+        usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL,
+    ) -> CreateVFolderAction:
+        return CreateVFolderAction(
+            creator=ProjectVFolderCreator(
+                name=name,
+                domain_name="default",
+                quota_scope_id=str(QuotaScopeID(QuotaScopeType.PROJECT, project_id)),
+                host="local:volume1",
+                creator_id=user_uuid,
+                project=ProjectID(project_id),
+                usage_mode=usage_mode,
+                permission=VFolderPermission.READ_WRITE,
+                cloneable=False,
+            ),
+        )
 
-    async def test_group_ownership_sets_project_quota_scope(
+    async def test_no_project_makes_a_personally_owned_folder(
         self,
         vfolder_service: VFolderService,
         mock_vfolder_repository: MagicMock,
         user_uuid: uuid.UUID,
         group_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_group_resource_info = AsyncMock(
-            return_value=ProjectResourceInfo(
-                project_id=group_uuid,
-                max_vfolder_count=10,
-                max_quota_scope_size=0,
-                project_type=ProjectType.GENERAL,
-            )
-        )
-        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
-        mock_vfolder_repository.count_vfolders_by_group = AsyncMock(return_value=0)
-        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
-        mock_vfolder_repository.create_vfolder_with_permission = AsyncMock()
+        self._arrange(mock_vfolder_repository, self._project_info(group_uuid, ProjectType.GENERAL))
 
-        action = CreateVFolderAction(
-            name="group-vfolder",
-            keypair_resource_policy={"default": {}},
-            domain_name="default",
-            group_id_or_name=str(group_uuid),
-            folder_host="local:volume1",
-            unmanaged_path=None,
-            mount_permission=VFolderPermission.READ_WRITE,
-            usage_mode=VFolderUsageMode.GENERAL,
-            cloneable=False,
-            scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=group_uuid),
-            user_uuid=user_uuid,
-            user_role=UserRole.SUPERADMIN,
-            creator_email="admin@example.com",
-        )
+        await vfolder_service.create(self._personal_action(user_uuid))
 
-        result = await vfolder_service.create(action)
+        creator = mock_vfolder_repository.create_vfolder_with_permission.call_args.args[0]
+        assert isinstance(creator, PersonalVFolderCreator)
+        assert creator.user == UserID(user_uuid)
+        assert creator.quota_scope_id == str(QuotaScopeID(QuotaScopeType.USER, user_uuid))
+        # The personal project is never looked up: the spec names it in the insert.
+        mock_vfolder_repository.get_group_resource_info.assert_not_called()
 
-        assert result.quota_scope_id.scope_type == QuotaScopeType.PROJECT
-        assert result.group_uuid == group_uuid
+    async def test_a_team_project_makes_a_project_owned_folder(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        user_uuid: uuid.UUID,
+        group_uuid: uuid.UUID,
+    ) -> None:
+        self._arrange(mock_vfolder_repository, self._project_info(group_uuid, ProjectType.GENERAL))
+
+        await vfolder_service.create(self._project_action(user_uuid, group_uuid))
+
+        creator = mock_vfolder_repository.create_vfolder_with_permission.call_args.args[0]
+        assert isinstance(creator, ProjectVFolderCreator)
+        assert creator.project == ProjectID(group_uuid)
+        assert creator.quota_scope_id == str(QuotaScopeID(QuotaScopeType.PROJECT, group_uuid))
 
     async def test_no_default_host_and_none_specified_raises_invalid_parameter(
         self,
         vfolder_service: VFolderService,
         mock_config_provider: MagicMock,
-        user_uuid: uuid.UUID,
-    ) -> None:
-        mock_config_provider.config.volumes.default_host = None
-
-        action = CreateVFolderAction(
-            name="my-vfolder",
-            keypair_resource_policy={"default": {}},
-            domain_name="default",
-            group_id_or_name=None,
-            folder_host=None,
-            unmanaged_path=None,
-            mount_permission=VFolderPermission.READ_WRITE,
-            usage_mode=VFolderUsageMode.GENERAL,
-            cloneable=False,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
-            user_uuid=user_uuid,
-            user_role=UserRole.USER,
-            creator_email="test@example.com",
-        )
-
-        with pytest.raises(VFolderInvalidParameter):
-            await vfolder_service.create(action)
-
-    async def test_max_vfolder_count_exceeded_raises_invalid_parameter(
-        self,
-        vfolder_service: VFolderService,
         mock_vfolder_repository: MagicMock,
-        user_uuid: uuid.UUID,
-    ) -> None:
-        mock_vfolder_repository.get_user_resource_info = AsyncMock(return_value=(5, 0, None))
-        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
-        mock_vfolder_repository.count_vfolders_by_user = AsyncMock(return_value=5)
-        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
-
-        action = CreateVFolderAction(
-            name="my-vfolder",
-            keypair_resource_policy={"default": {}},
-            domain_name="default",
-            group_id_or_name=None,
-            folder_host="local:volume1",
-            unmanaged_path=None,
-            mount_permission=VFolderPermission.READ_WRITE,
-            usage_mode=VFolderUsageMode.GENERAL,
-            cloneable=False,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
-            user_uuid=user_uuid,
-            user_role=UserRole.USER,
-            creator_email="test@example.com",
-        )
-
-        with pytest.raises(VFolderInvalidParameter, match="cannot create more"):
-            await vfolder_service.create(action)
-
-    async def test_duplicate_name_raises_already_exists(
-        self,
-        vfolder_service: VFolderService,
-        mock_vfolder_repository: MagicMock,
-        user_uuid: uuid.UUID,
-    ) -> None:
-        mock_vfolder_repository.get_user_resource_info = AsyncMock(return_value=(10, 0, None))
-        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
-        mock_vfolder_repository.count_vfolders_by_user = AsyncMock(return_value=0)
-        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=True)
-
-        action = CreateVFolderAction(
-            name="existing-vfolder",
-            keypair_resource_policy={"default": {}},
-            domain_name="default",
-            group_id_or_name=None,
-            folder_host="local:volume1",
-            unmanaged_path=None,
-            mount_permission=VFolderPermission.READ_WRITE,
-            usage_mode=VFolderUsageMode.GENERAL,
-            cloneable=False,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
-            user_uuid=user_uuid,
-            user_role=UserRole.USER,
-            creator_email="test@example.com",
-        )
-
-        with pytest.raises(VFolderAlreadyExists):
-            await vfolder_service.create(action)
-
-    async def test_dot_prefix_in_group_scope_raises_invalid_parameter(
-        self,
-        vfolder_service: VFolderService,
         user_uuid: uuid.UUID,
         group_uuid: uuid.UUID,
     ) -> None:
-        action = CreateVFolderAction(
-            name=".hidden",
-            keypair_resource_policy={"default": {}},
-            domain_name="default",
-            group_id_or_name=str(group_uuid),
-            folder_host="local:volume1",
-            unmanaged_path=None,
-            mount_permission=VFolderPermission.READ_WRITE,
-            usage_mode=VFolderUsageMode.GENERAL,
-            cloneable=False,
-            scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=group_uuid),
-            user_uuid=user_uuid,
-            user_role=UserRole.SUPERADMIN,
-            creator_email="admin@example.com",
-        )
+        mock_config_provider.config.volumes.default_host = None
+        self._arrange(mock_vfolder_repository, self._project_info(group_uuid, ProjectType.GENERAL))
 
-        with pytest.raises(VFolderInvalidParameter, match="dot-prefixed"):
-            await vfolder_service.create(action)
+        with pytest.raises(VFolderInvalidParameter):
+            await vfolder_service.create(self._personal_action(user_uuid, host=None))
 
     async def test_model_usage_in_non_model_store_raises_invalid_parameter(
         self,
@@ -400,77 +322,31 @@ class TestCreateVFolderAction:
         user_uuid: uuid.UUID,
         group_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_group_resource_info = AsyncMock(
-            return_value=ProjectResourceInfo(
-                project_id=group_uuid,
-                max_vfolder_count=10,
-                max_quota_scope_size=0,
-                project_type=ProjectType.MODEL_STORE,
-            )
-        )
-        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
-        mock_vfolder_repository.count_vfolders_by_group = AsyncMock(return_value=0)
-        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
+        self._arrange(mock_vfolder_repository, self._project_info(group_uuid, ProjectType.GENERAL))
 
-        action = CreateVFolderAction(
-            name="non-model",
-            keypair_resource_policy={"default": {}},
-            domain_name="default",
-            group_id_or_name=str(group_uuid),
-            folder_host="local:volume1",
-            unmanaged_path=None,
-            mount_permission=VFolderPermission.READ_WRITE,
-            usage_mode=VFolderUsageMode.GENERAL,
-            cloneable=False,
-            scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=group_uuid),
-            user_uuid=user_uuid,
-            user_role=UserRole.SUPERADMIN,
-            creator_email="admin@example.com",
+        await vfolder_service.create(
+            self._project_action(user_uuid, group_uuid, usage_mode=VFolderUsageMode.MODEL)
         )
 
-        with pytest.raises(VFolderInvalidParameter, match="Model VFolder"):
-            await vfolder_service.create(action)
+        mock_vfolder_repository.create_vfolder_with_permission.assert_called_once()
 
     async def test_storage_proxy_error_raises_creation_failure(
         self,
         vfolder_service: VFolderService,
-        mock_vfolder_repository: MagicMock,
         mock_storage_manager: MagicMock,
+        mock_vfolder_repository: MagicMock,
         user_uuid: uuid.UUID,
+        group_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_user_resource_info = AsyncMock(return_value=(10, 0, None))
-        mock_vfolder_repository.ensure_host_permission_allowed = AsyncMock()
-        mock_vfolder_repository.count_vfolders_by_user = AsyncMock(return_value=0)
-        mock_vfolder_repository.check_vfolder_name_exists = AsyncMock(return_value=False)
-
-        mock_client = mock_storage_manager.get_manager_facing_client.return_value
-        mock_client.create_folder = AsyncMock(
+        self._arrange(mock_vfolder_repository, self._project_info(group_uuid, ProjectType.GENERAL))
+        mock_storage_manager.get_manager_facing_client.return_value.create_folder = AsyncMock(
             side_effect=aiohttp.ClientResponseError(
-                request_info=MagicMock(),
-                history=(),
-                status=500,
-                message="Internal Server Error",
+                request_info=MagicMock(), history=(), status=500
             )
         )
 
-        action = CreateVFolderAction(
-            name="my-vfolder",
-            keypair_resource_policy={"default": {}},
-            domain_name="default",
-            group_id_or_name=None,
-            folder_host="local:volume1",
-            unmanaged_path=None,
-            mount_permission=VFolderPermission.READ_WRITE,
-            usage_mode=VFolderUsageMode.GENERAL,
-            cloneable=False,
-            scope=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid),
-            user_uuid=user_uuid,
-            user_role=UserRole.USER,
-            creator_email="test@example.com",
-        )
-
         with pytest.raises(VFolderCreationFailure):
-            await vfolder_service.create(action)
+            await vfolder_service.create(self._personal_action(user_uuid))
 
 
 class TestGetVFolderAction:

@@ -94,8 +94,9 @@ class VFolderSharingService:
         )
         shared_info = []
         for row in raw_list:
-            owner = row["group"] if row["group"] else row["vfolder_user"]
-            folder_type = "project" if row["group"] else "user"
+            is_project_folder = row["ownership_type"] == VFolderOwnershipType.GROUP
+            owner = row["group"] if is_project_folder else row["vfolder_user"]
+            folder_type = "project" if is_project_folder else "user"
             shared_info.append(
                 VFolderSharedInfo(
                     vfolder_id=row["vfolder_id"],
@@ -116,8 +117,9 @@ class VFolderSharingService:
         raw_list = await self._vfolder_repository.list_shared_vfolder_permissions(None)
         shared_info = []
         for row in raw_list:
-            owner = row["group"] if row["group"] else row["vfolder_user"]
-            folder_type = "project" if row["group"] else "user"
+            is_project_folder = row["ownership_type"] == VFolderOwnershipType.GROUP
+            owner = row["group"] if is_project_folder else row["vfolder_user"]
+            folder_type = "project" if is_project_folder else "user"
             shared_info.append(
                 VFolderSharedInfo(
                     vfolder_id=row["vfolder_id"],

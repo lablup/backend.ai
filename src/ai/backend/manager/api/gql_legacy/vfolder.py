@@ -1225,7 +1225,14 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         grps = membership_result.fetchall()
         group_ids = [g.scope_id for g in grps]
         j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
-        query = sa.select(sa.func.count()).select_from(j).where(vfolders.c.group.in_(group_ids))
+        query = (
+            sa.select(sa.func.count())
+            .select_from(j)
+            .where(
+                (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+                & (vfolders.c.group.in_(group_ids))
+            )
+        )
 
         if domain_name is not None:
             query = query.where(groups.c.domain_name == domain_name)
@@ -1263,7 +1270,10 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
                 groups.c.name.label("groups_name"),
             )
             .select_from(j)
-            .where(vfolders.c.group.in_(group_ids))
+            .where(
+                (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+                & (vfolders.c.group.in_(group_ids))
+            )
             .limit(limit)
             .offset(offset)
         )

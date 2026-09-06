@@ -10,7 +10,7 @@ from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
@@ -39,7 +39,7 @@ from ai.backend.manager.data.vfolder.types import (
     UserWithVFolderHostPermissions,
     ValidatedVFolderInfo,
     VFolderAccessInfo,
-    VFolderCreateParams,
+    VFolderCreation,
     VFolderData,
     VFolderInvitationData,
     VFolderListResult,
@@ -54,7 +54,7 @@ from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     RepositoryIntegrityError,
 )
-from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.resource import PersonalProjectNotFound, ProjectNotFound
 from ai.backend.manager.errors.storage import (
     InsufficientStoragePermission,
     VFolderDeletionNotAllowed,
@@ -69,7 +69,7 @@ from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user import (
@@ -107,7 +107,12 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
-from ai.backend.manager.models.vfolder.creators import VFolderCreator, VFolderPermissionCreator
+from ai.backend.manager.models.vfolder.creators import (
+    PersonalVFolderCreator,
+    ProjectVFolderCreator,
+    VFolderBaseCreator,
+    VFolderPermissionCreator,
+)
 from ai.backend.manager.models.vfolder.purgers import (
     VFolderPurger,
     VFolderUserPermissionBatchPurger,
@@ -119,6 +124,7 @@ from ai.backend.manager.models.vfolder.scopes import (
 )
 from ai.backend.manager.models.vfolder.updaters import (
     VFolderAttributeUpdater,
+    VFolderReadyUpdater,
     VFolderSoftDeleteUpdater,
     VFolderTrashUpdater,
 )
@@ -492,46 +498,83 @@ class VfolderRepository:
         return {row.name: cast(uuid.UUID, row.id) for row in rows}
 
     @vfolder_repository_resilience.apply()
-    async def create_vfolder_with_permission(
-        self, params: VFolderCreateParams, create_owner_permission: bool = False
-    ) -> VFolderData:
-        """
-        Create a new VFolder with the given parameters and optionally create owner permission.
-        Returns the created VFolderData.
-        """
-        async with self._v2_ops.write_ops() as w:
-            creator = VFolderCreator(
-                id=params.id,
-                name=params.name,
-                domain_name=params.domain_name,
-                quota_scope_id=params.quota_scope_id,
-                usage_mode=params.usage_mode,
-                permission=params.permission,
-                host=params.host,
-                creator=params.creator,
-                creator_id=params.creator_id,
-                ownership_type=params.ownership_type,
-                user=params.user,
-                group=params.group,
-                unmanaged_path=params.unmanaged_path,
-                cloneable=params.cloneable,
-                status=params.status,
-            )
+    async def get_personal_project_id(self, user_id: uuid.UUID) -> ProjectID:
+        """The project what is given to a person lands in (BEP-1077 5.5).
 
+        Answered by ``groups.creator_id`` on the personal project, which a partial
+        unique index keeps to one per user. Raises ``PersonalProjectNotFound`` when the
+        user has none: every user is given one, so the absence is a broken account and
+        not a case to fall back from.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            project_id = await session.scalar(
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.creator_id == user_id,
+                    ProjectRow.type == ProjectType.PERSONAL,
+                )
+            )
+            if project_id is None:
+                raise PersonalProjectNotFound(f"User '{user_id}' has no personal project.")
+            return ProjectID(project_id)
+
+    @vfolder_repository_resilience.apply()
+    async def create_vfolder_with_permission(
+        self, creator: VFolderBaseCreator, create_owner_permission: bool = False
+    ) -> VFolderCreation:
+        """Write the vfolder row and answer with what making its storage folder needs.
+
+        The host the folder asks for is checked here rather than by the caller, so a
+        request that may not reach that host writes nothing.
+        """
+        await self.ensure_host_permission_allowed_by_user(
+            creator.host,
+            permission=VFolderHostPermission.CREATE,
+            user_uuid=creator.creator_id,
+            group_id=creator.project if isinstance(creator, ProjectVFolderCreator) else None,
+        )
+        limits = await self._storage_limits(creator)
+        async with self._v2_ops.write_ops() as w:
             created = await w.create_entity(creator)
 
-            if create_owner_permission and params.user:
-                vfolder_id = VFolderUUID(params.id)
+            # Only a personally-owned folder records an owner permission here; the
+            # model store folder's owner share is BA-7665.
+            if create_owner_permission and isinstance(creator, PersonalVFolderCreator):
                 await w.create_field(
-                    vfolder_id,
+                    created.id,
                     VFolderPermissionCreator(
-                        user_id=params.user,
+                        user_id=creator.user,
                         permission=VFolderMountPermission.OWNER_PERM,
                     ),
                 )
-                await w.replace_share(UserID(params.user), vfolder_id, Permission.READ)
+                await w.replace_share(UserID(creator.user), created.id, Permission.READ)
 
-            return created
+            return VFolderCreation(
+                vfolder=created,
+                max_quota_scope_size=limits[0],
+                container_uid=limits[1],
+            )
+
+    async def _storage_limits(self, creator: VFolderBaseCreator) -> tuple[int, int | None]:
+        """The quota scope size the folder is made with, and the uid its files take."""
+        if isinstance(creator, ProjectVFolderCreator):
+            project = await self.get_group_resource_info(creator.project, creator.domain_name)
+            if project is None:
+                raise ProjectNotFound(f"Project with {creator.project} not found.")
+            return project.max_quota_scope_size, None
+        user_info = await self.get_user_resource_info(creator.creator_id)
+        if user_info is None:
+            raise UserNotFound(f"User with {creator.creator_id} not found.")
+        _, max_quota_scope_size, container_uid = user_info
+        return max_quota_scope_size, container_uid
+
+    @vfolder_repository_resilience.apply()
+    async def mark_vfolder_ready(self, vfolder_id: VFolderUUID) -> VFolderData:
+        """Make a freshly created vfolder usable, its storage folder now there."""
+        async with self._v2_ops.write_ops() as w:
+            data = await w.update_data(VFolderReadyUpdater(vfolder_id=vfolder_id))
+            if data is None:
+                raise VFolderNotFound(extra_data=str(vfolder_id))
+            return data
 
     @vfolder_repository_resilience.apply()
     async def trash_vfolder(self, updater: VFolderSoftDeleteUpdater) -> VFolderData:
@@ -904,13 +947,15 @@ class VfolderRepository:
         """
         Create a VFolder permission entry.
         """
+        # What is given to a person lands in that person's personal project (BEP-1077).
+        personal_project = await self.get_personal_project_id(user_id)
         async with self._v2_ops.write_ops() as w:
             created = await w.create_field(
                 VFolderUUID(vfolder_id),
                 VFolderPermissionCreator(user_id=user_id, permission=permission),
             )
             await w.replace_share(
-                UserID(user_id), VFolderUUID(vfolder_id), _mount_permission_cap(permission)
+                personal_project, VFolderUUID(vfolder_id), _mount_permission_cap(permission)
             )
             return created
 
@@ -919,11 +964,12 @@ class VfolderRepository:
         """
         Delete a VFolder permission entry.
         """
+        personal_project = await self.get_personal_project_id(user_id)
         async with self._v2_ops.write_ops() as w:
             await w.batch_purge_field_entities(
                 VFolderUUID(vfolder_id), VFolderUserPermissionBatchPurger(user_id=user_id)
             )
-            await w.unshare(UserID(user_id), [VFolderUUID(vfolder_id)])
+            await w.unshare(personal_project, [VFolderUUID(vfolder_id)])
 
     @vfolder_repository_resilience.apply()
     async def get_vfolder_invitations_by_vfolder(
@@ -984,6 +1030,7 @@ class VfolderRepository:
                 .select_from(VFolderRow)
                 .where(
                     (VFolderRow.group == group_id)
+                    & (VFolderRow.ownership_type == VFolderOwnershipType.GROUP)
                     & (VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
                 )
             )
@@ -1660,46 +1707,42 @@ class VfolderRepository:
                 f"Source proxy: {source_proxy}, Target proxy: {target_proxy}."
             )
 
-        # Generate the ID of the destination vfolder.
-        # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
-        #       the actual object (with RETURNING clause).  In that case, we need to temporarily
-        #       mark the object to be "unusable-yet" until the storage proxy creates the destination
-        #       vfolder.  After done, we need to make another transaction to clear the unusable state.
-        target_folder_id = VFolderID(vfolder_info.target_quota_scope_id, uuid.uuid4())
-
-        # Clone the vfolder contents
-        manager_client = storage_manager.get_manager_facing_client(source_proxy)
-        clone_response = await manager_client.clone_folder(
-            source_volume,
-            str(vfolder_info.source_vfolder_id),
-            target_volume,
-            str(target_folder_id),
-        )
-        task_id = clone_response.bgtask_id
-
-        # Insert the new vfolder record. A clone target is always user-owned, and it
-        # goes through the entity creator so the RBAC scope association lands with the row.
+        # The destination row lands first so the database names it, and it stays
+        # unusable until the storage proxy has copied the contents into it. A clone
+        # target is always user-owned, and it goes through the entity creator so the
+        # RBAC scope association lands with the row.
         async with self._v2_ops.write_ops() as w:
-            await w.create_entity(
-                VFolderCreator(
-                    id=target_folder_id.folder_id,
+            target = await w.create_entity(
+                PersonalVFolderCreator(
                     name=vfolder_info.target_vfolder_name,
                     domain_name=vfolder_info.domain_name,
                     quota_scope_id=str(vfolder_info.target_quota_scope_id),
                     host=vfolder_info.target_host,
-                    creator=vfolder_info.email,
                     creator_id=vfolder_info.user_id,
-                    ownership_type=VFolderOwnershipType.USER,
                     usage_mode=vfolder_info.usage_mode,
                     permission=vfolder_info.permission,
-                    user=vfolder_info.user_id,
-                    group=None,
-                    unmanaged_path=None,
+                    user=UserID(vfolder_info.user_id),
                     cloneable=vfolder_info.cloneable,
+                    status=VFolderOperationStatus.CREATING,
                 )
             )
+        target_folder_id = VFolderID(vfolder_info.target_quota_scope_id, target.id)
 
-        return task_id, target_folder_id.folder_id
+        # Clone the vfolder contents
+        manager_client = storage_manager.get_manager_facing_client(source_proxy)
+        try:
+            clone_response = await manager_client.clone_folder(
+                source_volume,
+                str(vfolder_info.source_vfolder_id),
+                target_volume,
+                str(target_folder_id),
+            )
+        except Exception:
+            await self.purge_vfolder(target.id)
+            raise
+        await self.mark_vfolder_ready(target.id)
+
+        return clone_response.bgtask_id, target.id
 
     @vfolder_repository_resilience.apply()
     async def get_logs_vfolder(
@@ -1876,6 +1919,7 @@ class VfolderRepository:
                 vf_table.c.id.label("vfolder_id"),
                 vf_table.c.name,
                 vf_table.c.group,
+                vf_table.c.ownership_type,
                 vf_table.c.status,
                 vf_table.c.user.label("vfolder_user"),
                 users_table.c.email,
@@ -2143,13 +2187,16 @@ class VfolderRepository:
                 "User to migrate vfolder needs an access to the storage host."
             )
 
-        # Step 3: Update vfolder owner
+        # Step 3: Update vfolder owner. The folder moves into the new owner's personal
+        # project, so the project column follows the user column.
+        new_owner_project = await self.get_personal_project_id(user_info.uuid)
+
         async def _update() -> None:
             async with self._db.begin_session() as session:
                 conn = await session.connection()
                 update_query = (
                     sa.update(vfolders)
-                    .values(user=user_info.uuid)
+                    .values(user=user_info.uuid, group=new_owner_project)
                     .where(
                         (vfolders.c.id == vfolder_id)
                         & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
@@ -2172,17 +2219,18 @@ class VfolderRepository:
             # Also clear what the new owner held from when they were an invitee; the
             # ownership below replaces it uncapped.
             async with self._v2_ops.write_ops() as w:
-                await w.unshare(UserID(user_info.uuid), [VFolderUUID(vfolder_id)])
+                await w.unshare(new_owner_project, [VFolderUUID(vfolder_id)])
 
         await execute_with_retry(_delete_related_rows)
 
         # Step 5: Clean up old owner's RBAC records for this vfolder
         if old_owner_uuid is not None and old_owner_uuid != user_info.uuid:
+            old_owner_project = await self.get_personal_project_id(old_owner_uuid)
 
             async def _transfer_rbac() -> None:
                 async with self._v2_ops.write_ops() as w:
                     await w.transfer(
-                        [UserID(old_owner_uuid)], [UserID(user_info.uuid)], VFolderUUID(vfolder_id)
+                        [old_owner_project], [new_owner_project], VFolderUUID(vfolder_id)
                     )
 
             await execute_with_retry(_transfer_rbac)
@@ -2190,7 +2238,7 @@ class VfolderRepository:
 
             async def _own_by_new_owner() -> None:
                 async with self._v2_ops.write_ops() as w:
-                    await w.transfer([], [UserID(user_info.uuid)], VFolderUUID(vfolder_id))
+                    await w.transfer([], [new_owner_project], VFolderUUID(vfolder_id))
 
             await execute_with_retry(_own_by_new_owner)
 

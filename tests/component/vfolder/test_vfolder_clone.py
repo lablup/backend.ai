@@ -24,7 +24,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.types import TaskID
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.dto.manager.v2.vfolder.request import CloneVFolderInput
 from ai.backend.common.dto.manager.vfolder import CloneVFolderReq
@@ -40,6 +40,7 @@ from ai.backend.manager.api.rest.vfolder.handler import VFolderHandler
 from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -157,12 +158,21 @@ def _configure_clone_storage_mock(storage_manager: StorageSessionManager) -> Asy
 async def _fetch_scope_graph(
     db_engine: SAEngine, vfolder_name: str, owner_id: uuid.UUID
 ) -> tuple[int, int]:
-    """Count the vfolder's own virtual entity node and its memberships in the owner's scope."""
+    """Count the vfolder's own virtual entity node and its memberships in the owner's
+    personal project, which is where a personal folder is created."""
     scopes = VirtualEntityRow.__table__
     memberships = EntityMembershipRow.__table__
     async with db_engine.begin() as conn:
         vfolder_id = (
             await conn.execute(sa.select(vfolders.c.id).where(vfolders.c.name == vfolder_name))
+        ).scalar_one()
+        owner_project_id = (
+            await conn.execute(
+                sa.select(ProjectRow.__table__.c.id).where(
+                    ProjectRow.__table__.c.creator_id == owner_id,
+                    ProjectRow.__table__.c.type == ProjectType.PERSONAL,
+                )
+            )
         ).scalar_one()
         own_nodes = (
             await conn.execute(
@@ -186,8 +196,8 @@ async def _fetch_scope_graph(
                 .where(
                     members.c.entity_type == VFOLDER_ENTITY_TYPE,
                     members.c.entity_id == vfolder_id,
-                    scopes.c.entity_type == USER_SCOPE_TYPE,
-                    scopes.c.entity_id == owner_id,
+                    scopes.c.entity_type == PROJECT_SCOPE_TYPE,
+                    scopes.c.entity_id == owner_project_id,
                 )
             )
         ).scalar_one()

@@ -14,9 +14,9 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
 from ai.backend.common.dto.manager.field import (
@@ -102,7 +102,7 @@ from ai.backend.common.dto.manager.vfolder.response import (
     VFolderSharedInfoDTO,
     VolumeInfoDTO,
 )
-from ai.backend.common.types import VFolderID
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import (
     RequestCtx,
@@ -111,7 +111,7 @@ from ai.backend.manager.dto.context import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.errors.common import Forbidden, InternalServerError
 from ai.backend.manager.errors.storage import (
     TooManyVFoldersFound,
     VFolderAlreadyExists,
@@ -126,13 +126,19 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermissionSetAlias,
     VFolderStatusSet,
 )
+from ai.backend.manager.models.vfolder.creators import (
+    PersonalVFolderCreator,
+    ProjectVFolderCreator,
+    UnmanagedPersonalVFolderCreator,
+    UnmanagedProjectVFolderCreator,
+    VFolderBaseCreator,
+)
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     PublicResolveUserScopeAction,
 )
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
-    CreateVFolderAction,
     DeleteForeverVFolderAction,
     ForceDeleteVFolderAction,
     GetVFolderAction,
@@ -143,6 +149,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
     RestoreVFolderFromTrashAction,
     UpdateVFolderAttributeAction,
 )
+from ai.backend.manager.services.vfolder.actions.create import CreateVFolderAction
 from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
     CreateDownloadSessionAction,
@@ -228,39 +235,73 @@ class VFolderHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
-        user_role = req.request["user"]["role"]
-        keypair_resource_policy = req.request["keypair"]["resource_policy"]
 
-        group_id_or_name: str | uuid.UUID | None = None
+        # A project folder is created in the project named; with none named the folder
+        # is the caller's own, and its spec finds the personal project by its owner.
+        # Only an administrator may point a folder at a path the manager does not own.
+        creator: VFolderBaseCreator
+        if params.unmanaged_path and ctx.user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+            raise Forbidden("Insufficient permission")
+        mount_permission = VFolderPermission(params.permission.value)
         if params.group_id is not None:
-            group_id_or_name = params.group_id
-
-        folder_host = params.folder_host
-        unmanaged_path = params.unmanaged_path
-
-        if isinstance(group_id_or_name, uuid.UUID):
-            scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=group_id_or_name)
+            project_id = ProjectID(params.group_id)
+            project_quota_scope = str(QuotaScopeID(QuotaScopeType.PROJECT, project_id))
+            if params.unmanaged_path:
+                creator = UnmanagedProjectVFolderCreator(
+                    name=params.name,
+                    domain_name=ctx.user_domain,
+                    quota_scope_id=project_quota_scope,
+                    host=params.folder_host or "",
+                    creator_id=ctx.user_uuid,
+                    project=project_id,
+                    usage_mode=params.usage_mode,
+                    permission=mount_permission,
+                    cloneable=params.cloneable,
+                    unmanaged_path=params.unmanaged_path,
+                )
+            else:
+                creator = ProjectVFolderCreator(
+                    name=params.name,
+                    domain_name=ctx.user_domain,
+                    quota_scope_id=project_quota_scope,
+                    host=params.folder_host or "",
+                    creator_id=ctx.user_uuid,
+                    project=project_id,
+                    usage_mode=params.usage_mode,
+                    permission=mount_permission,
+                    cloneable=params.cloneable,
+                )
         else:
-            scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ctx.user_uuid)
+            owner = UserID(ctx.user_uuid)
+            personal_quota_scope = str(QuotaScopeID(QuotaScopeType.USER, ctx.user_uuid))
+            if params.unmanaged_path:
+                creator = UnmanagedPersonalVFolderCreator(
+                    name=params.name,
+                    domain_name=ctx.user_domain,
+                    quota_scope_id=personal_quota_scope,
+                    host=params.folder_host or "",
+                    creator_id=ctx.user_uuid,
+                    user=owner,
+                    usage_mode=params.usage_mode,
+                    permission=mount_permission,
+                    cloneable=params.cloneable,
+                    unmanaged_path=params.unmanaged_path,
+                )
+            else:
+                creator = PersonalVFolderCreator(
+                    name=params.name,
+                    domain_name=ctx.user_domain,
+                    quota_scope_id=personal_quota_scope,
+                    host=params.folder_host or "",
+                    creator_id=ctx.user_uuid,
+                    user=owner,
+                    usage_mode=params.usage_mode,
+                    permission=mount_permission,
+                    cloneable=params.cloneable,
+                )
 
         try:
-            result = await self._vfolder.create_vfolder.run(
-                CreateVFolderAction(
-                    name=params.name,
-                    keypair_resource_policy=keypair_resource_policy,
-                    domain_name=ctx.user_domain,
-                    group_id_or_name=group_id_or_name,
-                    folder_host=folder_host,
-                    unmanaged_path=unmanaged_path,
-                    mount_permission=VFolderPermission(params.permission.value),
-                    usage_mode=params.usage_mode,
-                    cloneable=params.cloneable,
-                    user_uuid=ctx.user_uuid,
-                    user_role=user_role,
-                    creator_email=ctx.user_email,
-                    scope=scope,
-                )
-            )
+            result = await self._vfolder.create_vfolder.run(CreateVFolderAction(creator=creator))
         except (VFolderInvalidParameter, VFolderAlreadyExists) as e:
             raise InvalidAPIParameters(str(e)) from e
         # Every other BackendAIError carries its own HTTP status (Forbidden ->
@@ -269,28 +310,25 @@ class VFolderHandler:
         # Collapsing them into InternalServerError hid the actual cause behind
         # a generic 500 "Internal server error." title.
 
+        vfolder = result.vfolder
         item = VFolderItemField(
-            id=result.id.hex,
-            name=result.name,
-            quota_scope_id=str(result.quota_scope_id),
-            host=result.host,
-            usage_mode=result.usage_mode,
-            permission=VFolderPermissionField(result.mount_permission.value),
+            id=vfolder.id.hex,
+            name=vfolder.name,
+            quota_scope_id=str(vfolder.quota_scope_id),
+            host=vfolder.host,
+            usage_mode=vfolder.usage_mode,
+            permission=VFolderPermissionField(
+                (vfolder.permission or VFolderPermission.READ_WRITE).value
+            ),
             max_size=0,
-            creator=result.creator_email,
-            ownership_type=VFolderOwnershipTypeField(result.ownership_type.value),
-            user=(
-                str(result.user_uuid)
-                if result.ownership_type == VFolderOwnershipType.USER
-                else None
-            ),
+            creator=vfolder.creator or ctx.user_email,
+            ownership_type=VFolderOwnershipTypeField(vfolder.ownership_type.value),
+            user=str(vfolder.user) if vfolder.user is not None else None,
             group=(
-                str(result.group_uuid)
-                if result.ownership_type == VFolderOwnershipType.GROUP
-                else None
+                str(vfolder.group) if vfolder.ownership_type == VFolderOwnershipType.GROUP else None
             ),
-            cloneable=result.cloneable,
-            status=VFolderOperationStatusField(result.status.value),
+            cloneable=vfolder.cloneable,
+            status=VFolderOperationStatusField(vfolder.status.value),
             is_owner=True,
             created_at="",
         )

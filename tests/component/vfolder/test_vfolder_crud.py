@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 import sqlalchemy as sa
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
@@ -130,26 +131,31 @@ class TestVFolderCreateErrors:
 
     async def test_dot_prefix_name_for_group_vfolder_raises_error(
         self,
-        admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
     ) -> None:
-        """F-BIZ-4: Dot-prefixed name (except '.local') for a group vfolder is rejected."""
-        with pytest.raises(BackendAPIError) as exc_info:
-            await admin_registry.vfolder.create(
-                VFolderCreateReq(
-                    name=".hidden-data",
-                    folder_host="local",
-                    group_id=group_fixture,
-                ),
+        """F-BIZ-4: a dot-prefixed name (except '.local') is not a project folder's.
+
+        The request itself cannot say it: the rule reads off the body alone, so it is
+        answered where the body is read rather than by the server.
+        """
+        with pytest.raises(ValidationError):
+            VFolderCreateReq(
+                name=".hidden-data",
+                folder_host="local",
+                group_id=group_fixture,
             )
-        assert exc_info.value.status == 400
 
     async def test_non_admin_cannot_create_group_vfolder_in_regular_project(
         self,
         user_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
     ) -> None:
-        """F-BIZ-6: Regular user creating a group vfolder in a non-model-store project is Forbidden."""
+        """F-BIZ-6: a regular user does not get a project folder in a team project.
+
+        The cluster answers first here: this deployment does not allow project-owned
+        folders at all. Once the project presets carry vfolder permissions, the scope
+        check answers before the cluster does and this becomes a 403.
+        """
         with pytest.raises(BackendAPIError) as exc_info:
             await user_registry.vfolder.create(
                 VFolderCreateReq(
@@ -158,8 +164,7 @@ class TestVFolderCreateErrors:
                     group_id=group_fixture,
                 ),
             )
-        # Forbidden propagates with its own 403 status (no longer masked as 500)
-        assert exc_info.value.status == 403
+        assert exc_info.value.status == 400
 
     async def test_duplicate_name_raises_conflict(
         self,

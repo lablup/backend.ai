@@ -110,6 +110,7 @@ class VFolderOperationStatus(enum.StrEnum):
     """
 
     READY = "ready"
+    CREATING = "creating"
     PERFORMING = "performing"
     CLONING = "cloning"
     MOUNTED = "mounted"
@@ -139,6 +140,8 @@ class VFolderOperationStatus(enum.StrEnum):
         match value.upper():
             case "READY":
                 return cls.READY
+            case "CREATING":
+                return cls.CREATING
             case "PERFORMING":
                 return cls.PERFORMING
             case "CLONING":
@@ -258,26 +261,17 @@ class VFolderInvitationData:
 
 
 @dataclass
-class VFolderCreateParams:
-    """
-    Parameters needed to create a new VFolder.
+class VFolderCreation:
+    """A vfolder row that landed, and what making its storage folder needs.
+
+    The quota the folder is made with and the uid its files take belong to the owner's
+    resource policy, which the row does not carry; they are read where the row is
+    written so the storage step needs nothing more.
     """
 
-    id: uuid.UUID
-    name: str
-    domain_name: str
-    quota_scope_id: str
-    usage_mode: VFolderUsageMode
-    permission: VFolderMountPermission
-    host: str
-    creator: str
-    creator_id: uuid.UUID
-    ownership_type: VFolderOwnershipType
-    user: uuid.UUID | None
-    group: uuid.UUID | None
-    unmanaged_path: str | None
-    cloneable: bool
-    status: VFolderOperationStatus
+    vfolder: VFolderData
+    max_quota_scope_size: int
+    container_uid: int | None
 
 
 @dataclass

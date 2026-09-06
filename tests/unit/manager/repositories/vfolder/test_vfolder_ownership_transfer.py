@@ -17,6 +17,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import Permission
@@ -88,14 +89,22 @@ class UserWithKeypair(NamedTuple):
 async def _membership_cap(
     db: ExtendedAsyncSAEngine, vfolder_id: uuid.UUID, user_id: uuid.UUID
 ) -> tuple[bool, Permission | None]:
-    """Whether the vfolder sits in the user's virtual entity, and under what cap.
+    """Whether the vfolder sits in the user's personal project, and under what cap.
 
-    The v2 shape of what the legacy tables split into an AUTO/REF mapping plus
-    permission rows: owning it is a membership with no cap, being shared it is the same
-    membership under one.
+    What a person holds lands in their personal project, so that is the scope the
+    membership hangs on: owning it is a membership with no cap, being shared it is the
+    same membership under one.
     """
     member = aliased(VirtualEntityRow, name="member_virtual_entity")
     async with db.begin_readonly_session() as db_sess:
+        personal_project_id = await db_sess.scalar(
+            sa.select(ProjectRow.id).where(
+                ProjectRow.creator_id == user_id,
+                ProjectRow.type == ProjectType.PERSONAL,
+            )
+        )
+        if personal_project_id is None:
+            return False, None
         row = (
             await db_sess.execute(
                 sa.select(
@@ -107,8 +116,8 @@ async def _membership_cap(
                 )
                 .join(member, member.id == EntityMembershipRow.member_entity_id)
                 .where(
-                    VirtualEntityRow.entity_type == USER_SCOPE_TYPE,
-                    VirtualEntityRow.entity_id == user_id,
+                    VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                    VirtualEntityRow.entity_id == personal_project_id,
                     member.entity_type == VFOLDER_ENTITY_TYPE,
                     member.entity_id == vfolder_id,
                 )
@@ -285,6 +294,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
         test_keypair_resource_policy_name: str,
+        test_project_resource_policy_name: str,
     ) -> UserWithKeypair:
         """Create old owner with keypair. Returns (user_uuid, email)."""
         return await self._create_user_with_keypair(
@@ -292,6 +302,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
             test_domain.domain_name,
             test_user_resource_policy_name,
             test_keypair_resource_policy_name,
+            test_project_resource_policy_name,
         )
 
     @pytest.fixture
@@ -301,6 +312,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
         test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
         test_keypair_resource_policy_name: str,
+        test_project_resource_policy_name: str,
     ) -> UserWithKeypair:
         """Create new owner with keypair. Returns (user_uuid, email)."""
         return await self._create_user_with_keypair(
@@ -308,6 +320,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
             test_domain.domain_name,
             test_user_resource_policy_name,
             test_keypair_resource_policy_name,
+            test_project_resource_policy_name,
         )
 
     async def _create_user_with_keypair(
@@ -316,6 +329,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
         domain_name: str,
         user_policy_name: str,
         kp_policy_name: str,
+        project_policy_name: str,
     ) -> UserWithKeypair:
         """Create a user with RBAC role and keypair. Returns (user_uuid, email)."""
         user_uuid = uuid.uuid4()
@@ -381,6 +395,30 @@ class TestVFolderOwnershipTransferRBACCleanup:
                     id=uuid.uuid4(),
                     entity_type=USER_SCOPE_TYPE,
                     entity_id=UserID(user_uuid),
+                )
+            )
+            # Every user is given a personal project, which is where their own
+            # folders are created.
+            personal_project_id = uuid.uuid4()
+            db_sess.add(
+                ProjectRow(
+                    id=personal_project_id,
+                    name=f"personal-{user_uuid.hex[:8]}",
+                    domain_name=domain_name,
+                    description="Personal Project",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy=project_policy_name,
+                    type=ProjectType.PERSONAL,
+                    creator_id=UserID(user_uuid),
+                )
+            )
+            db_sess.add(
+                VirtualEntityRow(
+                    id=uuid.uuid4(),
+                    entity_type=PROJECT_SCOPE_TYPE,
+                    entity_id=ProjectID(personal_project_id),
                 )
             )
             await db_sess.flush()

@@ -104,6 +104,7 @@ __all__: Sequence[str] = (
     "DEAD_VFOLDER_STATUSES",
     "DEAD_VFOLDER_STATUSES",
     "HARD_DELETED_VFOLDER_STATUSES",
+    "VFOLDER_NAME_IN_PROJECT_INDEX",
     "SOFT_DELETED_VFOLDER_STATUSES",
     "VFolderCloneInfo",
     "VFolderDeletionInfo",
@@ -189,6 +190,7 @@ class VFolderStatusSet(enum.StrEnum):
 vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
     VFolderStatusSet.ALL: {
         VFolderOperationStatus.READY,
+        VFolderOperationStatus.CREATING,
         VFolderOperationStatus.PERFORMING,
         VFolderOperationStatus.CLONING,
         VFolderOperationStatus.MOUNTED,
@@ -222,7 +224,10 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
         VFolderOperationStatus.READY,
     },
     # if DELETABLE access status is requested, DELETE_PENDING, DELETE_COMPLETE operation status is accepted.
+    # CREATING is purgable: the row is there but its storage folder may not be, and
+    # nobody can have used it — a readable or mountable state it never was.
     VFolderStatusSet.PURGABLE: {
+        VFolderOperationStatus.CREATING,
         VFolderOperationStatus.DELETE_PENDING,
         VFolderOperationStatus.DELETE_COMPLETE,
     },
@@ -236,6 +241,7 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
     # is nothing left to reclaim on owner purge.
     VFolderStatusSet.OWNER_PURGABLE: {
         VFolderOperationStatus.READY,
+        VFolderOperationStatus.CREATING,
         VFolderOperationStatus.DELETE_PENDING,
         VFolderOperationStatus.DELETE_ONGOING,
         VFolderOperationStatus.DELETE_ERROR,
@@ -257,6 +263,10 @@ SOFT_DELETED_VFOLDER_STATUSES = (
     VFolderOperationStatus.DELETE_PENDING,
     VFolderOperationStatus.DELETE_ONGOING,
 )
+
+#: The name of the index holding a folder name unique within its project. Named here
+#: so the spec that maps its violation and the migration that creates it agree.
+VFOLDER_NAME_IN_PROJECT_INDEX: Final = "uq_vfolders_project_name"
 
 HARD_DELETED_VFOLDER_STATUSES = (
     VFolderOperationStatus.DELETE_COMPLETE,
@@ -294,6 +304,19 @@ class VFolderCloneInfo(NamedTuple):
 
 class VFolderRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "vfolders"
+    __table_args__ = (
+        # A folder name stands once in the project it was created in. A folder whose
+        # storage payload is gone leaves its name behind for the next one.
+        sa.Index(
+            VFOLDER_NAME_IN_PROJECT_INDEX,
+            "group",
+            "name",
+            unique=True,
+            postgresql_where=sa.text(
+                "status NOT IN ('delete-complete', 'delete-error')",
+            ),
+        ),
+    )
 
     id: Mapped[VFolderUUID] = mapped_column(
         "id",
@@ -698,11 +721,14 @@ async def query_accessible_vfolders(
             model_store_result = await conn.execute(model_store_query)
             model_store_gids = [row.id for row in model_store_result.fetchall()]
             group_ids = list({*group_ids, *model_store_gids})
+        # A personal folder carries its owner's personal project in the same column, so
+        # the scan is bounded by the ownership type rather than by the column alone.
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = (
             sa.select(*vfolders_selectors, vfolders.c.permission, groups.c.name)
             .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
+            .where(vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
         )
         if user_role != UserRole.SUPERADMIN and user_role != "superadmin":
             query = query.where(vfolders.c.group.in_(group_ids))
@@ -722,7 +748,11 @@ async def query_accessible_vfolders(
         query = (
             sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
             .select_from(j)
-            .where((vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid))
+            .where(
+                (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+                & (vfolders.c.group.in_(group_ids))
+                & (vfolder_permissions.c.user == user_uuid)
+            )
         )
         if allowed_status_set is not None:
             query = query.where(vfolders.c.status.in_(vfolder_status_map[allowed_status_set]))
