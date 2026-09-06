@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.storage_backend_type import StorageBackendTyp
 from ai.backend.common.data.storage.types import (
     DEFAULT_STATUS_STALE_AFTER,
     ServiceStorageStatus,
+    StorageBackendCapability,
     StorageBackendType,
 )
 from ai.backend.manager.models.base import (
@@ -45,23 +46,11 @@ class StorageBackendTypeRow(LifecycleTimestampsMixin, Base):
     name: Mapped[StorageBackendType] = mapped_column(
         "name", sa.String(length=64), unique=True, nullable=False
     )
-    supports_vfolder: Mapped[bool] = mapped_column(
-        "supports_vfolder", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    supports_metric: Mapped[bool] = mapped_column(
-        "supports_metric", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    supports_quota: Mapped[bool] = mapped_column(
-        "supports_quota", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    supports_fast_fs_size: Mapped[bool] = mapped_column(
-        "supports_fast_fs_size", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    supports_fast_scan: Mapped[bool] = mapped_column(
-        "supports_fast_scan", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    supports_fast_size: Mapped[bool] = mapped_column(
-        "supports_fast_size", sa.Boolean, nullable=False, server_default=sa.false()
+    capabilities: Mapped[list[StorageBackendCapability]] = mapped_column(
+        "capabilities",
+        sa.ARRAY(StrEnumType(StorageBackendCapability)),
+        nullable=False,
+        server_default=sa.text("'{}'"),
     )
 
 

@@ -51,6 +51,17 @@ class ArtifactStorageImportStep(enum.StrEnum):
 DEFAULT_STATUS_STALE_AFTER: Final[timedelta] = timedelta(hours=1)
 
 
+class StorageBackendCapability(enum.StrEnum):
+    """What a volume implementation can do, as it reports through ``get_capabilities()``."""
+
+    VFOLDER = "vfolder"
+    METRIC = "metric"
+    QUOTA = "quota"
+    FAST_FS_SIZE = "fast-fs-size"
+    FAST_SCAN = "fast-scan"
+    FAST_SIZE = "fast-size"
+
+
 class ServiceStorageStatus(enum.StrEnum):
     """How a service currently sees a storage backend or volume it relates to.
 
