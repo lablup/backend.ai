@@ -846,6 +846,41 @@ class TestPlaintextDrop:
         # and it leaves nothing half-built behind
         assert ["ip", "link", "del", vxlan_dev(4097)] in rec.calls
         assert ["ip", "link", "del", bridge_dev(4097)] in rec.calls
+        # nothing was left up, so nothing is owed
+        assert not ({vxlan_dev(4097), bridge_dev(4097)} & plugin.unclosed_devices())
+
+    async def test_a_device_the_undo_could_not_remove_is_still_named(self) -> None:
+        """What the undo cannot take back off the host has to be owed, not forgotten.
+
+        The session joins `_sessions` only on success, so teardown will never look for these; and
+        the manager, which sees the create fail, is free to hand this VNI to the next session.
+        `retry_fail_close` reads this set on a timer, and readiness reports it.
+        """
+
+        class _NoU32AndNoDelete(Recorder):
+            """The u32 match is missing, and from then on the host refuses to remove a link.
+
+            Only from then on: setup clears leftovers under the names it is about to build, and a
+            host that refused those would fail before there was anything to undo.
+            """
+
+            def __init__(self) -> None:
+                super().__init__()
+                self.unwinding = False
+
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                await super().__call__(argv)
+                if argv[0] == "iptables" and "--u32" in argv:
+                    self.unwinding = True
+                    raise RuntimeError("iptables: No chain/target/match by that name")
+                if self.unwinding and list(argv[:3]) == ["ip", "link", "del"]:
+                    raise RuntimeError("RTNETLINK answers: Operation not permitted")
+
+        plugin = _plugin(_NoU32AndNoDelete())
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(_ENC_META, _SELF)
+        assert {vxlan_dev(4097), bridge_dev(4097)} <= plugin.unclosed_devices()
 
     async def test_teardown_removes_it(self) -> None:
         rec = Recorder()

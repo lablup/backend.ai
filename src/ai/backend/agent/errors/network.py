@@ -361,6 +361,27 @@ class ClusterDNSStartError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class ContainerAttachFailed(BackendAIError, web.HTTPInternalServerError):
+    """A container could not be wired into its session network.
+
+    Named, and a `BackendAIError`, because it is what reaches the manager when a kernel fails to
+    come up: the CNI chain underneath raises `RuntimeError` from an `ip` command, which says
+    nothing about which container or which session. Cancellation is NOT this -- an attach that was
+    interrupted (the kernel-creation timeout, the agent stopping) propagates as itself.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/container-attach-failed"
+    error_title = "Failed to attach the container to its session network."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class NetworkStateStoreConflict(BackendAIError, web.HTTPInternalServerError):
     """A network state store on disk disagrees with its owner's in-memory state.
 

@@ -9,8 +9,10 @@ is the SessionNetworkCoordinator's job and happens once per session before this.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from ai.backend.agent.errors.network import ContainerAttachFailed
 from ai.backend.agent.network.cni import CniAttacher, CniRunner
 from ai.backend.agent.network.cni_runner import netns_path_for_pid
 from ai.backend.common.network.types import EndpointPlan, NetworkRole, SessionNetMeta
@@ -18,21 +20,6 @@ from ai.backend.common.network.types import EndpointPlan, NetworkRole, SessionNe
 if TYPE_CHECKING:
     from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
     from ai.backend.common.types import ClusterInfo, KernelCreationConfig
-
-
-class AttachFailed(Exception):
-    """An attach that did not finish, carrying the plan describing what it may have left behind.
-
-    The attacher undoes its own partial work and says what it could not; this is how the plan
-    reaches a caller that has not been told it yet, so the leftovers have a name to be torn down
-    by rather than waiting for an orphan sweep.
-    """
-
-    plan: EndpointPlan
-
-    def __init__(self, plan: EndpointPlan) -> None:
-        super().__init__("the container's network attach did not complete")
-        self.plan = plan
 
 
 class ContainerNetworkProvisioner:
@@ -55,23 +42,39 @@ class ContainerNetworkProvisioner:
         meta: SessionNetMeta,
         container_id: str,
         task_pid: int,
+        on_planned: Callable[[EndpointPlan], None] | None = None,
     ) -> tuple[EndpointPlan, dict[NetworkRole, str]]:
         """Attach a running container (identified by its task PID) to its session network.
 
         Returns the applied plan (kept by the caller for later detach) and the assigned IP
         per interface role (LOCAL is the host-reachable control address; OVERLAY is for
-        cross-node kernel traffic)."""
+        cross-node kernel traffic).
+
+        ``on_planned`` is handed the plan before a single interface is applied. The plan names
+        the host veth, the address and the rules an attach puts on this host, and until the
+        caller holds it nothing knows the name of what a failure leaves behind -- so it is
+        delivered first rather than carried out on an exception, which is the only way a
+        *cancelled* attach (the kernel-creation timeout, the agent stopping) can leave the
+        caller able to tear its leftovers down. The attacher undoes its own partial work; this
+        covers the DEL that could not run.
+        """
         plan = await self._backend.attach_endpoint(kernel_config, cluster_info, meta=meta)
+        if on_planned is not None:
+            on_planned(plan)
         try:
             assigned = await self._attacher.attach(
                 plan, container_id=container_id, netns=netns_path_for_pid(task_pid)
             )
-        except BaseException as e:
-            # The plan names the host veth, the address and the rules an attach puts on this host,
-            # and until now the caller only learned it when the attach returned. A failed one --
-            # or one whose own undo could not remove everything -- therefore left host state that
-            # nothing knew the name of. Hand it out with the failure so teardown can retry it.
-            raise AttachFailed(plan) from e
+        except Exception as e:
+            # Exception, and not BaseException: this used to catch cancellation too and hand the
+            # caller a plain `Exception`, which threw away what `asyncio.timeout`, an agent
+            # shutdown and a cancelled parent task all mean. Those propagate as themselves; only
+            # a genuine failure is renamed, and it is renamed because an `ip` command's
+            # `RuntimeError` reaching the manager names neither the container nor the session.
+            raise ContainerAttachFailed(
+                f"could not attach container {container_id} to the network of session"
+                f" {meta.session_id}: {e}"
+            ) from e
         return plan, assigned
 
     async def detach(self, plan: EndpointPlan, *, container_id: str, task_pid: int) -> None:
