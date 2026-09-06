@@ -1335,29 +1335,6 @@ def local_ip_capability_args(subnet: str, static_ip: str) -> dict[str, Any]:
 
 #: Substrings that mean "the thing you asked me to remove is not here" rather than "I failed".
 #: iproute2 and iptables both report this as a plain non-zero exit, so the text is the only signal.
-_ABSENT_MARKERS: Final = (
-    "does a matching rule exist",  # iptables -D, rule not present
-    "no chain/target/match by that name",  # iptables -D/-X, chain not present
-    "cannot find device",  # ip link del
-    "no such process",  # ip xfrm state/policy del (ESRCH)
-    "no such file or directory",  # bridge fdb del, ip neigh del
-    "cannot delete",  # iptables -X on a chain that was never created
-)
-
-
-def is_absent_error(exc: BaseException) -> bool:
-    """Whether a removal failed only because its target is already gone.
-
-    Teardown treats exactly this as success. Everything else -- EPERM, a held xtables lock, EBUSY,
-    an nft backend error -- is a real failure that leaves state on the host, and calling it success
-    is what turns a retryable problem into a permanent leak.
-
-    A missing binary is NOT absence. `ip` or `iptables` disappearing from PATH after the devices
-    and rules were made says nothing about whether they are still there; it says this node can no
-    longer clean up, which is a failure to report, not a teardown to record as done.
-    """
-    text = str(exc).lower()
-    return any(marker in text for marker in _ABSENT_MARKERS)
 
 
 async def _read_command(argv: Sequence[str]) -> str:
@@ -1707,7 +1684,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         try:
             await self._runner(link_del_args(dev))
         except (RuntimeError, OSError) as e:
-            if not is_absent_error(e):
+            if not command.is_absent_error(e):
                 raise
 
     async def _hold_vxlan_down_or_absent(self, dev: str) -> bool:
@@ -1765,7 +1742,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         try:
             await self._runner(argv)
         except (RuntimeError, OSError) as e:
-            if is_absent_error(e):
+            if command.is_absent_error(e):
                 return
             if failures is None:
                 raise

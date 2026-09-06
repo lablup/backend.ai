@@ -1,6 +1,7 @@
 """Unit tests for the native veth/bridge attach runner (BEP-1078)."""
 
 import asyncio
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, override
 
@@ -242,17 +243,32 @@ class _RunRecorder:
         *,
         in_netns: set[str] | None = None,
         fail_on: list[str] | None = None,
+        rc_fail_on: Sequence[str] | None = None,
     ) -> None:
         self.calls: list[list[str]] = []
         self._existing = existing or set()  # interface names that "exist" in the HOST netns
         self._in_netns = in_netns or set()  # interface names that exist inside the CONTAINER netns
         self._fail_on = fail_on  # the argv prefix that raises, to drive a mid-attach failure
+        # A command the kernel refuses: it returns non-zero, and -- exactly as `_run` does -- that
+        # only becomes an exception when the caller asked for it to be checked. Unchecked callers
+        # see the failure as success, which is what these tests are for.
+        self._rc_fail_on = list(rc_fail_on) if rc_fail_on is not None else None
+
+    def _refuses(self, argv: list[str]) -> bool:
+        if self._rc_fail_on is None:
+            return False
+        joined = " ".join(argv)
+        return " ".join(self._rc_fail_on) in joined
 
     async def __call__(self, argv: Any, *, check: bool = True) -> tuple[int, bytes, bytes]:
         argv = list(argv)
         self.calls.append(argv)
         if self._fail_on is not None and argv[: len(self._fail_on)] == self._fail_on:
             raise RuntimeError(f"command failed: {' '.join(argv)}")
+        if self._refuses(argv):
+            if check:
+                raise RuntimeError(f"command failed (rc=1): {' '.join(argv)}: refused")
+            return 1, b"", b"refused"
         # emulate `nsenter --net=... -- ip link show <dev>` (the container side of the check)
         if argv[0] == "nsenter" and argv[3:6] == ["ip", "link", "show"]:
             return (0 if argv[6] in self._in_netns else 1), b"", b""
@@ -618,3 +634,73 @@ class TestEnsureBridgeIsRaceTolerant:
         runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
         with pytest.raises(RuntimeError, match="cannot create bridge bailo4103"):
             await runner._ensure_bridge("bailo4103", "1450", None)
+
+
+class TestEveryRequiredCommandIsChecked:
+    """D1. A command that establishes state the session depends on has to be checked.
+
+    The failures these guard against do not look like failures: the kernel starts, the manager
+    marks the session RUNNING, and what is missing shows up as traffic that silently does not
+    arrive -- no default route, no MTU, no gateway on the bridge, no MASQUERADE, no FORWARD
+    accept. Probes and best-effort deletes stay unchecked on purpose; those are the ones whose
+    non-zero exit is the answer, not an error.
+    """
+
+    _REQUIRED_AT_ATTACH = [
+        pytest.param(["ip", "route", "replace", "default"], id="container default route"),
+        pytest.param(["ip", "link", "set", "bailo4097", "mtu"], id="bridge mtu"),
+        pytest.param(["ip", "addr", "replace", "172.30.1.1/24"], id="bridge gateway address"),
+        pytest.param(["iptables", "-t", "nat", "-A", "POSTROUTING"], id="egress masquerade"),
+        pytest.param(["iptables", "-I", "FORWARD"], id="forward accept"),
+    ]
+
+    @pytest.mark.parametrize("refused", _REQUIRED_AT_ATTACH)
+    async def test_attach_fails_when_the_kernel_refuses_it(
+        self, refused: list[str], tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        rec = _RunRecorder(existing=set(), rc_fail_on=refused)
+        monkeypatch.setattr(na, "_run", rec)
+        runner = NativeBridgeAttachRunner(uplink="eth0", ipam_state_dir=tmp_path)
+        with pytest.raises(RuntimeError):
+            await runner("ADD", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
+
+    async def test_a_dns_redirect_that_did_not_land_is_reported(self, monkeypatch: Any) -> None:
+        # Without route_localnet the DNAT to loopback is dropped as a martian, so the session
+        # comes up unable to resolve its own peers.
+        rec = _RunRecorder(rc_fail_on=["sysctl", "-w", "net.ipv4.conf.all.route_localnet=1"])
+        monkeypatch.setattr(na, "_run", rec)
+        with pytest.raises(RuntimeError):
+            await na.install_dns_redirect("172.30.1.1", 45678, "s1")
+
+    async def test_the_address_is_not_released_over_a_veth_that_stayed(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # Releasing an address whose veth is still up hands the next container the same IP.
+        rec = _RunRecorder(existing=set())
+        monkeypatch.setattr(na, "_run", rec)
+        runner = NativeBridgeAttachRunner(uplink="eth0", ipam_state_dir=tmp_path)
+        await runner("ADD", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
+
+        refusing = _RunRecorder(existing=set(), rc_fail_on=["ip", "link", "del"])
+        monkeypatch.setattr(na, "_run", refusing)
+        with pytest.raises(RuntimeError):
+            await runner("DEL", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
+
+    async def test_a_veth_that_was_already_gone_is_still_a_clean_delete(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # Absence is what DEL is trying to achieve; only absence counts as success.
+        rec = _RunRecorder(existing=set())
+        monkeypatch.setattr(na, "_run", rec)
+        runner = NativeBridgeAttachRunner(uplink="eth0", ipam_state_dir=tmp_path)
+        await runner("ADD", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
+
+        class _Absent(_RunRecorder):
+            @override
+            async def __call__(self, argv: Any, *, check: bool = True) -> tuple[int, bytes, bytes]:
+                if list(argv)[:3] == ["ip", "link", "del"] and check:
+                    raise RuntimeError('Cannot find device "vethcid-h"')
+                return await super().__call__(argv, check=check)
+
+        monkeypatch.setattr(na, "_run", _Absent(existing=set()))
+        await runner("DEL", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
