@@ -437,7 +437,7 @@ class XCPFSOpModel(BaseFSOpModel):
 
 
 class NetAppVolume(BaseVolume):
-    name: ClassVar[StorageBackendType] = StorageBackendType.NETAPP
+    name: ClassVar[StorageBackendType] = StorageBackendType("netapp")
     ontap_endpoint: str
     netapp_user: str
     netapp_password: str

@@ -213,7 +213,7 @@ class VASTQuotaModel(BaseQuotaModel):
 class VASTVolume(BaseVolume):
     api_client: VASTAPIClient
 
-    name: ClassVar[StorageBackendType] = StorageBackendType.VAST
+    name: ClassVar[StorageBackendType] = StorageBackendType("vast")
 
     def __init__(
         self,

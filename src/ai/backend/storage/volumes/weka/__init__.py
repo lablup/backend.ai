@@ -120,7 +120,7 @@ class WekaQuotaModel(BaseQuotaModel):
 class WekaVolume(BaseVolume):
     api_client: WekaAPIClient
 
-    name: ClassVar[StorageBackendType] = StorageBackendType.WEKA
+    name: ClassVar[StorageBackendType] = StorageBackendType("weka")
 
     _fs_uid: str
 
