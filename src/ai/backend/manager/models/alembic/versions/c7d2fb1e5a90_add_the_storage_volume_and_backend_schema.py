@@ -127,7 +127,6 @@ def upgrade() -> None:
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v7()"), nullable=False),
         sa.Column("name", sa.String(length=64), nullable=False),
         sa.Column("storage_backend_id", GUID(), nullable=False),
-        sa.Column("is_default", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column(
             "status_stale_after",
             sa.Interval(),
@@ -146,13 +145,6 @@ def upgrade() -> None:
             name=op.f("fk_storage_volumes_storage_backend_id_storage_backends"),
             ondelete="RESTRICT",
         ),
-    )
-    op.create_index(
-        "uq_storage_volumes_is_default",
-        "storage_volumes",
-        ["is_default"],
-        unique=True,
-        postgresql_where=sa.text("is_default"),
     )
 
     op.create_table(
@@ -187,6 +179,7 @@ def upgrade() -> None:
         sa.Column("resource_group_id", GUID(), nullable=False),
         sa.Column("storage_volume_id", GUID(), nullable=False),
         sa.Column("enabled", sa.Boolean(), server_default=sa.true(), nullable=False),
+        sa.Column("is_default", sa.Boolean(), server_default=sa.false(), nullable=False),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint(
             "resource_group_id",
@@ -205,6 +198,14 @@ def upgrade() -> None:
             name="fk_rg_storage_volumes_storage_volume_id",
             ondelete="CASCADE",
         ),
+    )
+
+    op.create_index(
+        "uq_rg_storage_volumes_is_default",
+        "resource_group_storage_volumes",
+        ["resource_group_id"],
+        unique=True,
+        postgresql_where=sa.text("is_default"),
     )
 
     op.add_column("vfolders", sa.Column("storage_volume_id", GUID(), nullable=True))
