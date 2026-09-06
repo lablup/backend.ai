@@ -9,7 +9,7 @@ create/destroy remain contract guards until P2 fills them in.
 import asyncio
 import ipaddress
 import json
-from typing import Any, cast
+from typing import Any, cast, override
 
 import pytest
 
@@ -947,12 +947,14 @@ class TestACreateThatNeverFinished:
         plugin = _plugin_with(etcd)
         started = asyncio.Event()
 
-        async def never_returns(session_id: str) -> int:
-            started.set()
-            await asyncio.sleep(60)
-            raise AssertionError("unreachable")
+        class NeverReturns(VNIAllocator):
+            @override
+            async def acquire(self, session_id: str) -> int:
+                started.set()
+                await asyncio.sleep(60)
+                raise AssertionError("unreachable")
 
-        plugin._vni_allocator.acquire = never_returns  # type: ignore[method-assign]
+        plugin._vni_allocator = NeverReturns(cast(AsyncEtcd, etcd))
         task = asyncio.create_task(
             plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
         )
@@ -980,3 +982,141 @@ class TestACreateThatNeverFinished:
         info = await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
         assert info.options["vni"] == stranded
         assert len([k for k in etcd.store if k.startswith("network/ipam/vni/")]) == 1
+
+
+class _GatedEtcd(FakeEtcd):
+    """A store that holds every prefix read at a barrier, so two callers see one snapshot.
+
+    That is the shape of the race: two managers both find no meta, and both go on to allocate.
+    """
+
+    def __init__(self, gate: asyncio.Event) -> None:
+        super().__init__()
+        self._gate = gate
+
+    @override
+    async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
+        found = await super().get_prefix(prefix, **kwargs)
+        await self._gate.wait()
+        return found
+
+
+class TestTwoManagersCreatingOneSession:
+    """C1. A session start can reach two managers at once -- an HA pair, or a retry landing
+    elsewhere while the first is still running. Each allocation the losers walk away from is
+    claimed by nobody's meta, and nothing ever frees it."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    async def _race(self) -> tuple[FakeEtcd, list[Any]]:
+        gate = asyncio.Event()
+        etcd = _GatedEtcd(gate)
+        managers = [_plugin_with(etcd) for _ in range(2)]
+        tasks = [
+            asyncio.create_task(m.create_network(identifier="s1", options=dict(self._OPTIONS)))
+            for m in managers
+        ]
+        await asyncio.sleep(0)
+        gate.set()
+        return etcd, list(await asyncio.gather(*tasks))
+
+    async def test_both_get_the_same_allocation(self) -> None:
+        _etcd, results = await self._race()
+        first, second = results
+        assert second.options["subnet"] == first.options["subnet"]
+        assert second.options["vni"] == first.options["vni"]
+        assert second.options["endpoint_ips"] == first.options["endpoint_ips"]
+
+    async def test_the_pool_holds_exactly_one_of_each(self) -> None:
+        etcd, _results = await self._race()
+        blocks = [k for k in etcd.store if k.startswith("network/ipam/allocated/")]
+        vnis = [k for k in etcd.store if k.startswith("network/ipam/vni/")]
+        addresses = [k for k in etcd.store if k.startswith("network/session/s1/ipam/")]
+        assert len(blocks) == 1, f"a block was claimed and abandoned: {sorted(blocks)}"
+        assert len(vnis) == 1, f"a VNI was claimed and abandoned: {sorted(vnis)}"
+        assert len(addresses) == 1, f"an address was claimed and abandoned: {sorted(addresses)}"
+
+    async def test_what_the_meta_records_is_what_is_claimed(self) -> None:
+        etcd, results = await self._race()
+        meta = json.loads(etcd.store["network/session/s1/meta"])
+        assert await _plugin_with(etcd)._subnet_allocator.holder(meta["subnet"]) == "s1"
+        assert await _plugin_with(etcd)._vni_allocator.holder(int(meta["vni"])) == "s1"
+        assert {r.options["subnet"] for r in results} == {meta["subnet"]}
+
+
+class TestAnAddressWithNoEndpointRecord:
+    """C3. The address claim and the endpoint record are two writes. Everything downstream reads
+    the record -- peers program FDB and ARP from it, the resolver answers from it -- so a
+    container holding an address no record mentions is one its own session cannot reach, on a
+    session that reports itself healthy."""
+
+    async def test_a_retry_writes_the_record_the_first_attempt_owed(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        # Exactly what a manager killed between the two writes leaves behind.
+        etcd.store["network/session/s1/ipam/10.128.0.1"] = json.dumps({"container_id": "k1"})
+
+        ip, _mac = await plugin._endpoint_allocator.assign(
+            "s1", "k1", "10.128.0.0/24", agent_id="a1", cluster_hostname="main1"
+        )
+
+        assert ip == "10.128.0.1"
+        record = json.loads(etcd.store["network/session/s1/endpoints/k1"])
+        assert record["ip"] == "10.128.0.1"
+        assert record["agent_id"] == "a1"
+
+    async def test_it_does_not_take_a_second_address(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        etcd.store["network/session/s1/ipam/10.128.0.1"] = json.dumps({"container_id": "k1"})
+
+        await plugin._endpoint_allocator.assign(
+            "s1", "k1", "10.128.0.0/24", agent_id="a1", cluster_hostname=None
+        )
+
+        addresses = [k for k in etcd.store if k.startswith("network/session/s1/ipam/")]
+        assert addresses == ["network/session/s1/ipam/10.128.0.1"]
+
+
+class TestAMetaThatOutlivedItsAllocation:
+    """C4. A rollback that frees the subnet and VNI but cannot delete the session's keys leaves a
+    record naming resources the pool is free to hand to the next session."""
+
+    async def test_a_record_whose_allocation_is_gone_is_not_reused(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        first = await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+        # Free the allocation behind the record's back, as a half-failed rollback does, and let
+        # another session take it.
+        await plugin._subnet_allocator.release(first.options["subnet"], "s1")
+        await plugin._vni_allocator.release(int(first.options["vni"]), "s1")
+        stolen = await plugin._subnet_allocator.acquire("s2")
+        assert stolen == first.options["subnet"]
+
+        again = await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+
+        assert again.options["subnet"] != stolen, (
+            "s1 was handed the subnet s2 now holds, from a record that outlived its allocation"
+        )
+
+    async def test_a_rollback_that_cannot_clear_the_record_keeps_the_allocation(self) -> None:
+        class NoDeletes(FakeEtcd):
+            @override
+            async def delete_prefix(self, prefix: str, **kwargs: Any) -> None:
+                raise RuntimeError("etcd is unreachable")
+
+        etcd = NoDeletes()
+        plugin = _plugin_with(etcd)
+        subnet = await plugin._subnet_allocator.acquire("s1")
+        vni = await plugin._vni_allocator.acquire("s1")
+        etcd.store["network/session/s1/meta"] = json.dumps({"subnet": subnet, "vni": vni})
+
+        await plugin._rollback_create("s1", subnet, vni)
+
+        # Nothing was released, so nothing else can be given what the surviving record names.
+        assert await plugin._subnet_allocator.holder(subnet) == "s1"
+        assert await plugin._vni_allocator.holder(vni) == "s1"
+        assert await plugin._subnet_allocator.acquire("s2") != subnet

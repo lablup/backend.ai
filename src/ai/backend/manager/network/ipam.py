@@ -65,6 +65,14 @@ def _flat(listing: Mapping[str, Any]) -> dict[str, str]:
     return {key: value for key, value in listing.items() if isinstance(value, str)}
 
 
+def _own_vni(allocated: Mapping[str, str], payload: str) -> int | None:
+    """The VNI this session already holds, out of a listing of every claim."""
+    for key, raw in allocated.items():
+        if raw == payload and key.isdigit():
+            return int(key)
+    return None
+
+
 def _claim(session_id: str, subnet: str) -> str:
     """The value stored on every unit block of ``subnet``.
 
@@ -169,7 +177,14 @@ class SubnetAllocator:
                 continue
             if await self._try_claim_units(candidate, _claim(session_id, str(candidate))):
                 return str(candidate)
-            owned.update(units)
+            # Lost the compare-and-swap. The winner can be this very session -- a second manager
+            # creating it at the same time -- and moving to the next block would then leave one
+            # of the two claimed by nobody's meta, for the cluster's lifetime. Ask again who
+            # holds what before deciding this candidate is somebody else's.
+            taken = _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
+            if held := self._already_held(taken, session_id):
+                return held
+            owned = {unquote(key) for key in taken} | set(units)
         raise NetworkPoolExhausted()
 
     def _already_held(self, allocated: Mapping[str, str], session_id: str) -> str | None:
@@ -220,6 +235,10 @@ class SubnetAllocator:
                 " is accounted at that granularity. Lower ipam-block-size to request a smaller block."
             )
         if not await self._try_claim_units(requested, _claim(session_id, str(requested))):
+            # As in auto mode: the winner may be this same session, and that is not a conflict.
+            taken = _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
+            if (held := self._already_held(taken, session_id)) == str(requested):
+                return held
             raise RequestedSubnetUnavailable(
                 f"'{requested}' overlaps a subnet already allocated to another session."
             )
@@ -241,6 +260,20 @@ class SubnetAllocator:
                 await self._etcd.delete(_allocated_key(taken))
             return False
         return True
+
+    async def holder(self, subnet: str) -> str | None:
+        """The session every unit block of ``subnet`` is claimed by, or None if they disagree or
+        any of them is free. Used to tell a live allocation from a record that outlived one."""
+        owners: set[str] = set()
+        for unit in _unit_blocks(ipaddress.ip_network(subnet), self._block_prefixlen):
+            raw = await self._etcd.get(_allocated_key(unit))
+            if not isinstance(raw, str):
+                return None
+            try:
+                owners.add(str(json.loads(raw)["session_id"]))
+            except (ValueError, KeyError):
+                return None
+        return owners.pop() if len(owners) == 1 else None
 
     async def release(self, subnet: str, session_id: str) -> bool:
         """Give the subnet back, but only the unit blocks this session still owns.
@@ -297,31 +330,49 @@ class EndpointAllocator:
             NetworkPoolExhausted: the session subnet has no free host address.
         """
         claim = json.dumps({"container_id": container_id})
+
+        async def settle(ip: str) -> tuple[str, str]:
+            """Make the endpoint record say what the address claim already says.
+
+            The address and the record are two writes, and everything downstream reads the
+            record: peers program FDB and ARP from it, and the cluster resolver answers from it.
+            A container holding an address that no record mentions is a kernel the rest of the
+            session cannot reach, on a session that reports itself healthy -- so the record is
+            written here whether this call made the claim or found it.
+            """
+            mac = mac_for_ip(ip)
+            await self._etcd.put(
+                endpoint_key(session_id, container_id),
+                json.dumps(
+                    EndpointAddr(
+                        container_id=container_id,
+                        ip=ip,
+                        mac=mac,
+                        agent_id=agent_id,
+                        cluster_hostname=cluster_hostname,
+                    ).to_etcd_payload()
+                ),
+            )
+            return ip, mac
+
         held = _flat(await self._etcd.get_prefix(session_ipam_prefix(session_id)))
         for ip, raw in held.items():
             if raw == claim:
-                return ip, mac_for_ip(ip)
+                return await settle(ip)
         taken = set(held)
         for host in ipaddress.ip_network(subnet).hosts():
             ip = str(host)
             if ip in taken:
                 continue
-            claimed = await self._etcd.put_if_absent(session_ipam_key(session_id, ip), claim)
-            if not claimed:
-                continue
-            mac = mac_for_ip(ip)
-            endpoint = EndpointAddr(
-                container_id=container_id,
-                ip=ip,
-                mac=mac,
-                agent_id=agent_id,
-                cluster_hostname=cluster_hostname,
-            )
-            await self._etcd.put(
-                endpoint_key(session_id, container_id),
-                json.dumps(endpoint.to_etcd_payload()),
-            )
-            return ip, mac
+            if await self._etcd.put_if_absent(session_ipam_key(session_id, ip), claim):
+                return await settle(ip)
+            # Lost the CAS. It can be this very container, claimed by a concurrent create of the
+            # same session; taking a second address would strand the first.
+            held = _flat(await self._etcd.get_prefix(session_ipam_prefix(session_id)))
+            for other, raw in held.items():
+                if raw == claim:
+                    return await settle(other)
+            taken = set(held) | {ip}
         raise NetworkPoolExhausted()
 
     async def release(self, session_id: str, container_id: str, ip: str) -> None:
@@ -389,9 +440,8 @@ class VNIAllocator:
         low, high = self._vni_range
         payload = json.dumps({"session_id": session_id})
         allocated = _flat(await self._etcd.get_prefix(_VNI_PREFIX))
-        for key, raw in allocated.items():
-            if raw == payload and key.isdigit():
-                return int(key)
+        if (mine := _own_vni(allocated, payload)) is not None:
+            return mine
         # The listing only rules VNIs out -- it is a snapshot, so a VNI it shows as free still
         # has to be won by CAS. It saves a round trip per VNI already taken, which is what the
         # plain low-to-high scan costs once the pool has any depth of live sessions.
@@ -401,7 +451,23 @@ class VNIAllocator:
                 continue
             if await self._etcd.put_if_absent(f"{_VNI_PREFIX}/{vni}", payload):
                 return vni
+            # Same reasoning as the subnet allocator: a lost CAS whose winner is this session is
+            # this session's VNI, not a reason to take a second one.
+            allocated = _flat(await self._etcd.get_prefix(_VNI_PREFIX))
+            if (mine := _own_vni(allocated, payload)) is not None:
+                return mine
+            taken = {int(key) for key in allocated if key.isdigit()}
         raise VNIPoolExhausted()
+
+    async def holder(self, vni: int) -> str | None:
+        """The session ``vni`` is claimed by, or None if it is free."""
+        raw = await self._etcd.get(f"{_VNI_PREFIX}/{vni}")
+        if not isinstance(raw, str):
+            return None
+        try:
+            return str(json.loads(raw)["session_id"])
+        except (ValueError, KeyError):
+            return None
 
     async def release(self, vni: int, session_id: str) -> bool:
         """Give the VNI back, but only while it is still this session's.
