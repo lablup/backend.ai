@@ -348,13 +348,15 @@ class TestWhatTheOtherAgentOnThisHostIsUsing:
     them."""
 
     @staticmethod
-    async def _spared(net: Any, registry: VniRegistry, live: dict[str, str]) -> frozenset[int]:
+    async def _spared(
+        net: Any, registry: VniRegistry, live: set[tuple[str, str]]
+    ) -> frozenset[int]:
         net._vni_registry = registry
 
-        async def containers() -> dict[str, str]:
+        async def running() -> set[tuple[str, str]]:
             return live
 
-        net._live_containers = containers
+        net._live_session_owners = running
         spared: frozenset[int] = await net._other_agents_live_vnis()
         return spared
 
@@ -363,7 +365,7 @@ class TestWhatTheOtherAgentOnThisHostIsUsing:
         async with registry.binding(5000, "i-other", "their-session", "d1") as bound:
             bound.mark_built()
         net = _network()
-        spared = await self._spared(net, registry, {"c9": "their-session"})
+        spared = await self._spared(net, registry, {("their-session", "i-other")})
         assert spared == frozenset({5000})
 
     async def test_our_own_vni_is_not_spared(self, tmp_path: Path) -> None:
@@ -372,7 +374,7 @@ class TestWhatTheOtherAgentOnThisHostIsUsing:
         net = _network()
         async with registry.binding(5000, net._agent_id, "our-session", "d1") as bound:
             bound.mark_built()
-        spared = await self._spared(net, registry, {"c1": "our-session"})
+        spared = await self._spared(net, registry, {("our-session", net._agent_id)})
         assert spared == frozenset()
 
     async def test_a_binding_with_nothing_running_is_not_spared(self, tmp_path: Path) -> None:
@@ -381,11 +383,33 @@ class TestWhatTheOtherAgentOnThisHostIsUsing:
         async with registry.binding(5000, "i-other", "gone", "d1") as bound:
             bound.mark_built()
         net = _network()
-        spared = await self._spared(net, registry, {"c1": "some-other-session"})
+        spared = await self._spared(net, registry, {("some-other-session", "i-other")})
+        assert spared == frozenset()
+
+    async def test_a_binding_that_only_reserved_the_vni_is_not_spared(self, tmp_path: Path) -> None:
+        # HELD, never built: it describes no device, so there is nothing to spare and the
+        # fail-close is what should decide.
+        registry = VniRegistry(tmp_path)
+        async with registry.binding(5000, "i-other", "their-session", "d1"):
+            pass
+        net = _network()
+        spared = await self._spared(net, registry, {("their-session", "i-other")})
+        assert spared == frozenset()
+
+    async def test_a_container_of_another_agent_does_not_vouch_for_a_third(
+        self, tmp_path: Path
+    ) -> None:
+        # The binding is i-other's and the running container is i-third's. Neither says i-other's
+        # tunnel is live, and excepting it from the fail-close on that basis is the bypass.
+        registry = VniRegistry(tmp_path)
+        async with registry.binding(5000, "i-other", "their-session", "d1") as bound:
+            bound.mark_built()
+        net = _network()
+        spared = await self._spared(net, registry, {("their-session", "i-third")})
         assert spared == frozenset()
 
     async def test_an_unreadable_registry_spares_nothing(self, tmp_path: Path) -> None:
         registry = VniRegistry(tmp_path / "does" / "not" / "exist")
         net = _network()
-        spared = await self._spared(net, registry, {"c1": "whatever"})
+        spared = await self._spared(net, registry, {("whatever", "i-other")})
         assert spared == frozenset()
