@@ -55,7 +55,7 @@ from ai.backend.agent.network.privnet.resolver import (
     ClusterResolver,
     make_upstream_forwarder,
 )
-from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
+from ai.backend.agent.network.provisioner import AttachFailed, ContainerNetworkProvisioner
 from ai.backend.agent.network.runtime import ExecResult, OciRuntime
 from ai.backend.agent.network.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.network.vni_registry import VniRegistry
@@ -1318,13 +1318,21 @@ class SessionNetwork:
         # The periodic reconcile would get there on its own, but not before the gate is released;
         # this is the one moment where waiting is cheaper than retrying.
         await self._converge_peers(session_id)
-        result = await self._orchestrator_of(session_id).attach(
-            container_id,
-            meta=meta,
-            kernel_config=kernel_config,
-            cluster_info=cluster_info,
-            task_pid=task_pid,
-        )
+        try:
+            result = await self._orchestrator_of(session_id).attach(
+                container_id,
+                meta=meta,
+                kernel_config=kernel_config,
+                cluster_info=cluster_info,
+                task_pid=task_pid,
+            )
+        except AttachFailed as e:
+            # Record what the failed attach may have left on this host. The attacher undoes its
+            # own partial work, but a DEL that could not run leaves a veth and an address with
+            # nothing naming them -- and the caller was only ever told the plan on success, so
+            # until now nothing could tear them down. Kept for `_retry_pending_detaches`.
+            self._attachments[container_id] = (session_id, e.plan, task_pid)
+            raise
         # Tracked here for the same reason `launch_container` tracks what it started: the tracker
         # is what decides when the session's last kernel on this node is gone, and a container it
         # never heard of can never be that one. Untracked, this session's teardown simply never
