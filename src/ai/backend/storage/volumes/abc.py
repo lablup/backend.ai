@@ -11,7 +11,10 @@ from typing import (
     final,
 )
 
-from ai.backend.common.data.storage.types import StorageBackendType
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -29,17 +32,6 @@ from ai.backend.storage.types import (
     VolumeInfo,
 )
 from ai.backend.storage.watcher import WatcherClient
-
-# Available capabilities of a volume implementation
-CAP_VFOLDER: Final = "vfolder"  # ability to create vfolder
-CAP_METRIC: Final = "metric"  # ability to report disk related metrics
-CAP_QUOTA: Final = "quota"  # ability to manage quota limits
-# ability to scan filesystem size fast (e.g. by API)
-CAP_FAST_FS_SIZE: Final = "fast-fs-size"
-# ability to scan number of files in vFolder fast (e.g. by API)
-CAP_FAST_SCAN: Final = "fast-scan"
-# ability to scan vFolder size fast (e.g. by API)
-CAP_FAST_SIZE: Final = "fast-size"
 
 _CURRENT_DIR: Final = PurePosixPath(".")
 
@@ -264,7 +256,7 @@ class AbstractVolume(metaclass=ABCMeta):
     # ------ volume operations -------
 
     @abstractmethod
-    async def get_capabilities(self) -> frozenset[str]:
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
         raise NotImplementedError
 
     @abstractmethod

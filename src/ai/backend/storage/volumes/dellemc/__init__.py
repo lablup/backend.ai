@@ -7,7 +7,10 @@ from typing import Any, ClassVar, cast, override
 
 import aiofiles.os
 
-from ai.backend.common.data.storage.types import StorageBackendType
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaScopeID
@@ -15,10 +18,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import QuotaDirectoryNotEmptyError
 from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ai.backend.storage.volumes.abc import (
-    CAP_FAST_FS_SIZE,
-    CAP_METRIC,
-    CAP_QUOTA,
-    CAP_VFOLDER,
     AbstractQuotaModel,
 )
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
@@ -206,8 +205,13 @@ class DellEMCOneFSVolume(BaseVolume):
         )
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([
+            StorageBackendCapability.FAST_FS_SIZE,
+            StorageBackendCapability.VFOLDER,
+            StorageBackendCapability.QUOTA,
+            StorageBackendCapability.METRIC,
+        ])
 
     @override
     async def get_hwinfo(self) -> HardwareMetadata:
