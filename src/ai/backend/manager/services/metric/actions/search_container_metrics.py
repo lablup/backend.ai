@@ -10,8 +10,11 @@ from ai.backend.manager.services.metric.actions.base import QueryMetricAction
 
 
 @dataclass(frozen=True)
-class PublicSearchContainerMetricsAction(QueryMetricAction):
-    """Read one container metric over a time range; every authenticated user may."""
+class GlobalSearchContainerMetricsAction(QueryMetricAction):
+    """Read one container metric over a time range, narrowed by whatever labels are given.
+
+    Names no user, so it reads across all of them and stays behind the global gate.
+    """
 
     metric_name: str
     labels: ContainerMetricOptionalLabel
@@ -20,9 +23,9 @@ class PublicSearchContainerMetricsAction(QueryMetricAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "public_search_container_metrics"
+        return "global_search_container_metrics"
 
 
 @dataclass(frozen=True)
-class PublicSearchContainerMetricsActionResult:
+class GlobalSearchContainerMetricsActionResult:
     result: list[ContainerMetricResult]

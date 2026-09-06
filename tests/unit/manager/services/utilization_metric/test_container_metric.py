@@ -9,6 +9,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
@@ -39,7 +40,10 @@ from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.clients.prometheus.types import ValueType
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.services.metric.actions.search_container_metrics import (
-    PublicSearchContainerMetricsAction,
+    GlobalSearchContainerMetricsAction,
+)
+from ai.backend.manager.services.metric.actions.search_user_container_metrics import (
+    SearchUserContainerMetricsAction,
 )
 
 
@@ -586,8 +590,24 @@ class TestMetricTypeDetection:
 class TestContainerMetricDataTypes:
     """Test data types used in container metric service."""
 
+    async def test_user_container_metric_action_fields(self) -> None:
+        user_id = UserID(UUID("11223344-5566-7788-99aa-bbccddeeff00"))
+        action = SearchUserContainerMetricsAction(
+            user_id=user_id,
+            metric_name="container_cpu_percent",
+            value_type=ValueType.CURRENT,
+            time_range=QueryTimeRange(
+                start="2024-01-01T00:00:00", end="2024-01-01T01:00:00", step="60s"
+            ),
+        )
+
+        assert action.entity_id() == user_id
+        assert action.metric_name == "container_cpu_percent"
+        assert action.labels().value_type == ValueType.CURRENT
+        assert action.labels().user_id == user_id
+
     async def test_container_metric_action_fields(self) -> None:
-        action = PublicSearchContainerMetricsAction(
+        action = GlobalSearchContainerMetricsAction(
             metric_name="container_cpu_percent",
             labels=ContainerMetricOptionalLabel(
                 value_type=ValueType.CURRENT,

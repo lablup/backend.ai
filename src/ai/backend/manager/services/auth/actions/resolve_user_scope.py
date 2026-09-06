@@ -9,10 +9,6 @@ from ai.backend.manager.services.auth.actions.base import AuthGlobalAction
 
 @dataclass(frozen=True)
 class PublicResolveUserScopeAction(AuthGlobalAction):
-    requester_uuid: uuid.UUID
-    requester_role: UserRole
-    requester_domain: str
-    is_superadmin: bool
     owner_user_email: str | None  # None = self
 
     @override

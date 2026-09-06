@@ -9,8 +9,12 @@ from ai.backend.manager.services.metric.actions.search_container_metric_metadata
     PublicSearchContainerMetricMetadataActionResult,
 )
 from ai.backend.manager.services.metric.actions.search_container_metrics import (
-    PublicSearchContainerMetricsAction,
-    PublicSearchContainerMetricsActionResult,
+    GlobalSearchContainerMetricsAction,
+    GlobalSearchContainerMetricsActionResult,
+)
+from ai.backend.manager.services.metric.actions.search_user_container_metrics import (
+    SearchUserContainerMetricsAction,
+    SearchUserContainerMetricsActionResult,
 )
 
 
@@ -30,16 +34,27 @@ class MetricService:
         metric_names = await self._metric_repository.query_container_metric_metadata()
         return PublicSearchContainerMetricMetadataActionResult(metric_names=metric_names)
 
-    async def search_container_metrics(
+    async def search_user_container_metrics(
         self,
-        action: PublicSearchContainerMetricsAction,
-    ) -> PublicSearchContainerMetricsActionResult:
+        action: SearchUserContainerMetricsAction,
+    ) -> SearchUserContainerMetricsActionResult:
+        result = await self._metric_repository.query_container_metric(
+            action.metric_name,
+            action.labels(),
+            action.time_range,
+        )
+        return SearchUserContainerMetricsActionResult(result=result)
+
+    async def global_search_container_metrics(
+        self,
+        action: GlobalSearchContainerMetricsAction,
+    ) -> GlobalSearchContainerMetricsActionResult:
         result = await self._metric_repository.query_container_metric(
             action.metric_name,
             action.labels,
             action.time_range,
         )
-        return PublicSearchContainerMetricsActionResult(result=result)
+        return GlobalSearchContainerMetricsActionResult(result=result)
 
     async def batch_get_kernel_live_stats(
         self,

@@ -17,9 +17,15 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionTokenData,
 )
 from ai.backend.common.contexts.client_ip import current_client_ip
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
+from ai.backend.common.exception import (
+    InvalidAPIParameters,
+    UnreachableError,
+    UserResourcePolicyNotFound,
+)
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -171,17 +177,30 @@ class AuthService:
         self._client_ip_masking_repository = client_ip_masking_repository
         self._key_provider_pool = key_provider_pool
 
+    def _acting_user(self) -> UserData:
+        """The user the request runs as, per BEP-1058."""
+        user = current_user()
+        if user is None:
+            raise UnreachableError("Acting user is not set in the request context")
+        return user
+
+    async def _acting_access_key(self) -> AccessKey:
+        """The acting user's default keypair, the one they authorize with."""
+        keypair = await self._auth_repository.default_keypair(self._acting_user().user_id)
+        return AccessKey(keypair.access_key)
+
     async def get_role(self, action: PublicGetRoleAction) -> PublicGetRoleActionResult:
+        acting = self._acting_user()
         group_role = None
         if action.group_id is not None:
-            if action.is_superadmin:
+            if acting.is_superadmin:
                 # Superadmins have global access across all domains and groups.
                 group_role = "user"
             else:
                 try:
                     # TODO: per-group role is not yet implemented.
                     await self._auth_repository.get_group_membership(
-                        action.group_id, action.user_id
+                        action.group_id, acting.user_id
                     )
                     group_role = "user"
                 except GroupMembershipNotFoundError as e:
@@ -191,8 +210,8 @@ class AuthService:
                     ) from e
 
         return PublicGetRoleActionResult(
-            global_role="superadmin" if action.is_superadmin else "user",
-            domain_role="admin" if action.is_admin else "user",
+            global_role="superadmin" if acting.is_superadmin else "user",
+            domain_role="admin" if acting.is_admin else "user",
             group_role=group_role,
         )
 
@@ -762,11 +781,9 @@ class AuthService:
     async def resolve_access_key_scope(
         self, action: PublicResolveAccessKeyScopeAction
     ) -> PublicResolveAccessKeyScopeResult:
-        requester_ak = AccessKey(action.requester_access_key)
-        if (
-            action.owner_access_key is None
-            or action.owner_access_key == action.requester_access_key
-        ):
+        acting = self._acting_user()
+        requester_ak = await self._acting_access_key()
+        if action.owner_access_key is None or action.owner_access_key == requester_ak:
             return PublicResolveAccessKeyScopeResult(
                 requester_access_key=requester_ak,
                 owner_access_key=requester_ak,
@@ -783,8 +800,8 @@ class AuthService:
             raise InvalidAPIParameters(str(e)) from e
         try:
             check_if_requester_is_eligible_to_act_as_target_user(
-                action.requester_role,
-                action.requester_domain,
+                acting.role,
+                acting.domain_name,
                 owner_role,
                 owner_domain,
             )
@@ -798,12 +815,13 @@ class AuthService:
     async def resolve_user_scope(
         self, action: PublicResolveUserScopeAction
     ) -> PublicResolveUserScopeResult:
+        acting = self._acting_user()
         if action.owner_user_email is None:
             return PublicResolveUserScopeResult(
-                owner_uuid=action.requester_uuid,
-                owner_role=action.requester_role,
+                owner_uuid=acting.user_id,
+                owner_role=acting.role,
             )
-        if not action.is_superadmin:
+        if not acting.is_superadmin:
             raise InvalidAPIParameters("Only superadmins may have user scopes.")
         try:
             (
@@ -817,8 +835,8 @@ class AuthService:
             raise InvalidAPIParameters(str(e)) from e
         try:
             check_if_requester_is_eligible_to_act_as_target_user(
-                action.requester_role,
-                action.requester_domain,
+                acting.role,
+                acting.domain_name,
                 owner_role,
                 owner_domain,
             )

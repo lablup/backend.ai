@@ -3319,11 +3319,6 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         *,
         props: UserUtilizationMetricQueryInput,
     ) -> UserUtilizationMetric:
-        graph_ctx = cast(GraphQueryContext, info.context)
-        user = graph_ctx.user
-        if user["role"] not in (UserRole.SUPERADMIN, UserRole.MONITOR):
-            if user["uuid"] != user_id:
-                raise RuntimeError("Permission denied.")
         return await UserUtilizationMetric.get_object(
             info,
             user_id,

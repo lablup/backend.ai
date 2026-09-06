@@ -1,11 +1,12 @@
 ---
 name: manager-services-metric
 type: design-rationale
-description: 컨테이너 사용량 조회 도메인의 액션 모양 선택, public 게이트 근거, 실시간 통계가 세션에 답하는 이유, 프로세서 필드 이름
+description: which shape each container-utilization read takes, why the gates differ per operation, why live stats answer for the session, and the processor field names
 scope: src/ai/backend/manager/services/metric
 keywords:
   - MetricProcessors
-  - PublicSearchContainerMetricsAction
+  - SearchUserContainerMetricsAction
+  - GlobalSearchContainerMetricsAction
   - PublicSearchContainerMetricMetadataAction
   - BatchGetKernelLiveStatsAction
   - LookupBulkKernelOwnerAction
@@ -21,41 +22,55 @@ generated:
 status: draft
 ---
 
-# 컨테이너 사용량 조회 (`services/metric`)
+# Container utilization (`services/metric`)
 
-이 도메인은 테이블이 아니라 Prometheus가 답하는 시계열을 읽는다. 저장소 계층은
-`repositories/metric` 이고, 그 아래는 DB가 아니라 메트릭 스토어다.
+This domain reads the time series Prometheus answers, not a table. The storage layer is
+`repositories/metric`, and under it sits the metric store rather than the DB.
 
-## 모양은 지목하는 대상이 정한다
+## What an operation names decides its shape
 
-- 지표 시계열과 이름 목록은 아무 행도 지목하지 않는다. 라벨로 스토어를 좁힐 뿐이므로
-  global 모양이다.
-- 실시간 통계는 호출부가 커널을 지목해 넘긴다. 커널은 행이지 엔티티가 아니므로 bulk field
-  모양이며, 그 커널들을 품은 세션을 먼저 읽어 그 세션들에 대해 검사한다.
-- 세 연산 다 `operation_type()` 은 `SEARCH` 다. 라벨을 얼마나 좁히든 필터링된 질의다.
+- The metric names name no row, so that read is global-shaped.
+- The time series splits in two by whose containers it reads. A caller's own metrics
+  name that user and are single-entity shaped; reading another user, or every one of
+  them, names nobody and stays global. The call site picks between them by comparing the
+  target user with the caller.
+- Live stats are read per kernel the caller names. A kernel is a row rather than an
+  entity, so that read is bulk-field shaped: the sessions owning those kernels are read
+  first and each answers for it.
+- All four declare `operation_type() == SEARCH`. However far the labels narrow it, it is
+  a filtered query.
 
-## 앞의 두 연산은 SUPERADMIN이 아니라 public이다
+## The gate differs per operation
 
-- 사용량 패널은 일반 사용자가 자기 자원을 보는 화면이므로 superadmin 게이트를 두면
-  기능이 사라진다.
-- 레거시 배선에는 게이트가 아예 없었다. public 으로 옮기면서 인증 확인이 처음 붙는다.
-- 어느 사용자·프로젝트의 컨테이너까지 보이는지는 게이트가 아니라 호출부가 채우는
-  라벨이 정한다.
+- The utilization panel is where an ordinary user looks at their own resources, so a
+  superadmin gate would take the feature away. A caller's own metrics pass on READ
+  permission over that user instead.
+- The metric names check authentication only. The legacy wiring had no gate at all; the
+  authentication check arrived with the move to public.
+- Another user's metrics moved from a role comparison written by hand in the legacy
+  resolver to the global gate. A super admin passes, and so does the MONITOR role on a
+  read.
 
-## 엔티티는 읽는 대상에 따라 둘로 갈린다
+## The entity answering splits three ways
 
-| 연산 | 답하는 엔티티 | 이유 |
+| Operation | Entity answering | Why |
 |---|---|---|
-| 지표 시계열 · 이름 목록 | prometheus query preset | 코드에 박힌 질의다. 저장된 preset 행과 다른 점은 행이 아니라 붙박이라는 것뿐이다 |
-| 커널 실시간 통계 | session | 커널은 세션의 행이므로 `LookupBulkKernelOwnerAction` 으로 세션을 읽어 그 세션이 답한다 |
+| A user's own time series | user | It reads the containers of the user the labels name |
+| Time series across users, and the metric names | prometheus query preset | A query fixed in code. It differs from a stored preset row only in being built in rather than a row |
+| Kernel live stats | session | A kernel is a row of its session, so `LookupBulkKernelOwnerAction` reads that session and the session answers |
 
-- 앞의 둘은 `Concern.METRIC` 아래 preset 도메인과 같은 그룹을 쓰고 public 게이트다.
-- 실시간 통계는 `ProcessorGroup.bulk_field` 로 배선한다. 같은 모양을 쓰는 것이
-  `BatchGetKernelResourceAllocationAction` 이다.
-- 프로세서 필드는 `public_search`(지표) / `metadata_public_search`(이름 목록) /
-  `batch_get_kernel_live_stats`(실시간 통계) 셋이다.
+- A user's own metrics are wired through `ProcessorGroup.single_entity` on the user group
+  under `Concern.METRIC`.
+- The cross-user series and the metric names share the preset domain's group, behind the
+  global gate and the public gate respectively.
+- Live stats are wired through `ProcessorGroup.bulk_field`. The same shape is used by
+  `BatchGetKernelResourceAllocationAction`.
+- The processor fields are `search_user_container_metrics` (own metrics), `global_search`
+  (cross-user), `metadata_public_search` (metric names) and `batch_get_kernel_live_stats`
+  (live stats).
 
-## 서비스는 남는다
+## The service stays
 
-- 세 메서드 모두 외부 시스템(Prometheus)을 부르므로 ops 제네릭 서비스로 내려갈 수
-  없다. 리포지토리 spec 을 그대로 넘기는 통과 연산이 아니다.
+- All four methods call an external system (Prometheus), so none of them can move down to
+  the generic ops services. They are not pass-through operations forwarding a repository
+  spec.

@@ -22,22 +22,35 @@ result = await metric_service.search_container_metric_metadata(action)
 # Returns: ["container_cpu_percent", "container_memory_used_bytes", ...]
 ```
 
-### 2. Read one metric over a time range
+### 2. Read one metric of a user's containers over a time range
 ```python
-action = PublicSearchContainerMetricsAction(
+action = SearchUserContainerMetricsAction(
+    user_id=user_id,
+    metric_name="container_cpu_percent",
+    value_type=ValueType.CURRENT,
+    time_range=QueryTimeRange(
+        start="2024-01-01T00:00:00", end="2024-01-01T01:00:00", step="60s"
+    ),
+)
+result = await metric_service.search_user_container_metrics(action)
+```
+
+### 3. Read one metric across users over a time range
+```python
+action = GlobalSearchContainerMetricsAction(
     metric_name="container_cpu_percent",
     labels=ContainerMetricOptionalLabel(kernel_id=kernel_id, value_type=ValueType.CURRENT),
     time_range=QueryTimeRange(
         start="2024-01-01T00:00:00", end="2024-01-01T01:00:00", step="60s"
     ),
 )
-result = await metric_service.search_container_metrics(action)
+result = await metric_service.global_search_container_metrics(action)
 ```
 
-The same action aggregates by any other label: pass `agent_id`, `session_id`,
-`user_id` or `project_id` instead of `kernel_id`.
+This action aggregates by any label: pass `agent_id`, `session_id`, `user_id` or
+`project_id` instead of `kernel_id`.
 
-### 3. Read the latest stats of several kernels
+### 4. Read the latest stats of several kernels
 ```python
 action = BatchGetKernelLiveStatsAction(kernel_ids=[kernel_id, other_kernel_id])
 result = await metric_service.batch_get_kernel_live_stats(action)
@@ -48,7 +61,8 @@ result = await metric_service.batch_get_kernel_live_stats(action)
 | Action | Input |
 |---|---|
 | `PublicSearchContainerMetricMetadataAction` | none |
-| `PublicSearchContainerMetricsAction` | `metric_name`, `labels`, `time_range` |
+| `SearchUserContainerMetricsAction` | `user_id`, `metric_name`, `value_type`, `time_range` |
+| `GlobalSearchContainerMetricsAction` | `metric_name`, `labels`, `time_range` |
 | `BatchGetKernelLiveStatsAction` | `kernel_ids` |
 
 `ContainerMetricOptionalLabel` carries `value_type` plus the optional `agent_id`,

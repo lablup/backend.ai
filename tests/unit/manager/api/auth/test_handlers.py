@@ -492,37 +492,6 @@ class TestGetRole:
         action = mock_processors.auth.public_get_role.run.call_args[0][0]
         assert action.group_id == group_uuid
 
-    async def test_uses_admin_flags_from_context(
-        self,
-        handler: AuthHandler,
-        mock_processors: MagicMock,
-    ) -> None:
-        """Verify is_admin and is_superadmin are passed from UserContext."""
-        admin_ctx = UserContext(
-            user_uuid=uuid.uuid4(),
-            user_email="admin@example.com",
-            user_domain="default",
-            user_role=UserRole.SUPERADMIN,
-            access_key="AKADMIN",
-            is_admin=True,
-            is_superadmin=True,
-        )
-        query: QueryParam[GetRoleRequest] = QueryParam(GetRoleRequest)
-        query.from_query({})
-        mock_processors.auth.public_get_role.run = AsyncMock(
-            return_value=PublicGetRoleActionResult(
-                global_role="superadmin",
-                domain_role="admin",
-                group_role=None,
-            )
-        )
-
-        await handler.get_role(query, admin_ctx)
-
-        action = mock_processors.auth.public_get_role.run.call_args[0][0]
-        assert action.is_admin is True
-        assert action.is_superadmin is True
-
 
 class TestUpdatePassword:
     """Tests for update_password handler."""

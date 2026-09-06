@@ -598,9 +598,6 @@ class SessionHandler:
 
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -707,9 +704,6 @@ class SessionHandler:
         domain_name = params.domain or request["user"]["domain_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -772,9 +766,6 @@ class SessionHandler:
         domain_name = params.domain or request["user"]["domain_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -809,15 +800,10 @@ class SessionHandler:
     async def match_sessions(
         self,
         query: QueryParam[MatchSessionsRequest],
-        ctx: RequestCtx,
     ) -> APIResponse:
-        request = ctx.request
         params = query.parsed
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -841,15 +827,10 @@ class SessionHandler:
     async def sync_agent_registry(
         self,
         body: BodyParam[SyncAgentRegistryRequest],
-        ctx: RequestCtx,
     ) -> APIResponse:
-        request = ctx.request
         params = body.parsed
         await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -886,9 +867,6 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -941,9 +919,6 @@ class SessionHandler:
         user_role = cast(UserRole, request["user"]["role"])
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -980,9 +955,6 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1013,9 +985,6 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1043,9 +1012,6 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1110,9 +1076,6 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1137,9 +1100,6 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1168,9 +1128,6 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1200,9 +1157,6 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1232,9 +1186,6 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1265,9 +1216,6 @@ class SessionHandler:
         new_name = params.session_name
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1296,9 +1244,6 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1330,9 +1275,6 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1369,9 +1311,6 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1404,9 +1343,6 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1439,9 +1375,6 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -1467,9 +1400,6 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
@@ -1500,9 +1430,6 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -1557,9 +1484,6 @@ class SessionHandler:
         root_session_name = request.match_info["session_name"]
         scope = await self._auth.public_resolve_access_key_scope.run(
             PublicResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
