@@ -22,23 +22,22 @@ branch_labels = None
 depends_on = None
 
 
-# name, supports_vfolder, supports_metric, supports_quota,
-# supports_fast_fs_size, supports_fast_scan, supports_fast_size
-_BUILTIN_BACKEND_TYPES: list[tuple[str, bool, bool, bool, bool, bool, bool]] = [
-    ("vfs", True, False, False, False, False, False),
-    ("xfs", True, False, True, False, False, False),
-    ("cephfs", True, False, True, False, False, True),
-    ("purestorage", True, True, False, True, True, False),
-    ("netapp", True, True, True, True, False, True),
-    ("weka", True, True, True, True, False, False),
-    ("gpfs", True, True, True, True, False, False),
-    ("spectrumscale", True, True, True, True, False, False),
-    ("dellemc-onefs", True, True, True, True, False, False),
-    ("vast", True, True, True, True, False, True),
-    ("exascaler", True, False, True, False, False, False),
-    ("hammerspace", True, False, True, False, False, False),
-    ("hammerspace-base", True, False, False, False, False, False),
-    ("noop", False, False, False, False, False, False),
+# Capability names a volume implementation reports.
+_BUILTIN_BACKEND_TYPES: list[tuple[str, list[str]]] = [
+    ("vfs", ["vfolder"]),
+    ("xfs", ["vfolder", "quota"]),
+    ("cephfs", ["vfolder", "quota", "fast-size"]),
+    ("purestorage", ["vfolder", "metric", "fast-fs-size", "fast-scan"]),
+    ("netapp", ["vfolder", "metric", "quota", "fast-fs-size", "fast-size"]),
+    ("weka", ["vfolder", "metric", "quota", "fast-fs-size"]),
+    ("gpfs", ["vfolder", "metric", "quota", "fast-fs-size"]),
+    ("spectrumscale", ["vfolder", "metric", "quota", "fast-fs-size"]),
+    ("dellemc-onefs", ["vfolder", "metric", "quota", "fast-fs-size"]),
+    ("vast", ["vfolder", "metric", "quota", "fast-fs-size", "fast-size"]),
+    ("exascaler", ["vfolder", "quota"]),
+    ("hammerspace", ["vfolder", "quota"]),
+    ("hammerspace-base", ["vfolder"]),
+    ("noop", []),
 ]
 
 
@@ -64,12 +63,12 @@ def upgrade() -> None:
         "storage_backend_types",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v7()"), nullable=False),
         sa.Column("name", sa.String(length=64), nullable=False),
-        sa.Column("supports_vfolder", sa.Boolean(), server_default=sa.false(), nullable=False),
-        sa.Column("supports_metric", sa.Boolean(), server_default=sa.false(), nullable=False),
-        sa.Column("supports_quota", sa.Boolean(), server_default=sa.false(), nullable=False),
-        sa.Column("supports_fast_fs_size", sa.Boolean(), server_default=sa.false(), nullable=False),
-        sa.Column("supports_fast_scan", sa.Boolean(), server_default=sa.false(), nullable=False),
-        sa.Column("supports_fast_size", sa.Boolean(), server_default=sa.false(), nullable=False),
+        sa.Column(
+            "capabilities",
+            sa.ARRAY(sa.String(length=64)),
+            server_default=sa.text("'{}'"),
+            nullable=False,
+        ),
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_storage_backend_types")),
         sa.UniqueConstraint("name", name=op.f("uq_storage_backend_types_name")),
@@ -221,34 +220,13 @@ def upgrade() -> None:
     storage_backend_types = sa.table(
         "storage_backend_types",
         sa.column("name", sa.String),
-        sa.column("supports_vfolder", sa.Boolean),
-        sa.column("supports_metric", sa.Boolean),
-        sa.column("supports_quota", sa.Boolean),
-        sa.column("supports_fast_fs_size", sa.Boolean),
-        sa.column("supports_fast_scan", sa.Boolean),
-        sa.column("supports_fast_size", sa.Boolean),
+        sa.column("capabilities", sa.ARRAY(sa.String)),
     )
     op.bulk_insert(
         storage_backend_types,
         [
-            {
-                "name": name,
-                "supports_vfolder": vfolder,
-                "supports_metric": metric,
-                "supports_quota": quota,
-                "supports_fast_fs_size": fast_fs_size,
-                "supports_fast_scan": fast_scan,
-                "supports_fast_size": fast_size,
-            }
-            for (
-                name,
-                vfolder,
-                metric,
-                quota,
-                fast_fs_size,
-                fast_scan,
-                fast_size,
-            ) in _BUILTIN_BACKEND_TYPES
+            {"name": name, "capabilities": capabilities}
+            for name, capabilities in _BUILTIN_BACKEND_TYPES
         ],
     )
 

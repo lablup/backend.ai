@@ -13,7 +13,10 @@ from typing import (
 
 from yarl import URL
 
-from ai.backend.common.data.storage.types import StorageBackendType
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.volume.broadcast import DoVolumeMountEvent
@@ -21,8 +24,6 @@ from ai.backend.common.types import QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.types import CapacityUsage, QuotaUsage
 from ai.backend.storage.volumes.abc import (
-    CAP_QUOTA,
-    CAP_VFOLDER,
     AbstractQuotaModel,
 )
 from ai.backend.storage.volumes.hammerspace.client import HammerspaceAPIClient
@@ -241,8 +242,8 @@ class HammerspaceVolume(BaseHammerspaceVolume):
         )
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([StorageBackendCapability.VFOLDER, StorageBackendCapability.QUOTA])
 
     async def _get_site_id(self) -> uuid.UUID | None:
         sites = await self._client.get_sites()

@@ -8,7 +8,10 @@ from typing import Any, ClassVar, Final, Literal, cast, override
 import aiofiles
 import aiofiles.os
 
-from ai.backend.common.data.storage.types import StorageBackendType
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
@@ -21,13 +24,6 @@ from ai.backend.storage.errors import (
     StorageProxyError,
 )
 from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaUsage
-from ai.backend.storage.volumes.abc import (
-    CAP_FAST_FS_SIZE,
-    CAP_FAST_SIZE,
-    CAP_METRIC,
-    CAP_QUOTA,
-    CAP_VFOLDER,
-)
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient
 
@@ -263,8 +259,14 @@ class VASTVolume(BaseVolume):
         return VASTQuotaModel(self.mount_path, self.api_client)
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER, CAP_METRIC, CAP_QUOTA, CAP_FAST_FS_SIZE, CAP_FAST_SIZE])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([
+            StorageBackendCapability.VFOLDER,
+            StorageBackendCapability.METRIC,
+            StorageBackendCapability.QUOTA,
+            StorageBackendCapability.FAST_FS_SIZE,
+            StorageBackendCapability.FAST_SIZE,
+        ])
 
     @override
     async def get_hwinfo(self) -> HardwareMetadata:

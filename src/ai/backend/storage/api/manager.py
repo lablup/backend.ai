@@ -33,6 +33,7 @@ from ai.backend.common.api_handlers import (
     api_handler,
 )
 from ai.backend.common.clients.valkey_client.valkey_tus import TusSessionId
+from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
@@ -260,7 +261,7 @@ def handle_external_errors() -> Iterator[None]:
 
 
 async def get_volumes(request: web.Request) -> web.Response:
-    async def _get_caps(ctx: RootContext, volume_name: str) -> list[str]:
+    async def _get_caps(ctx: RootContext, volume_name: str) -> list[StorageBackendCapability]:
         async with ctx.get_volume(volume_name) as volume:
             return [*await volume.get_capabilities()]
 

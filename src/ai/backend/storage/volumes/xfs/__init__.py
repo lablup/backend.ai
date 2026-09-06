@@ -9,7 +9,7 @@ from typing import Any, ClassVar, override
 import aiofiles
 import aiofiles.os
 
-from ai.backend.common.data.storage.types import StorageBackendType
+from ai.backend.common.data.storage.types import StorageBackendCapability, StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.exception import InvalidConfigError
@@ -27,7 +27,7 @@ from ai.backend.storage.types import (
     QuotaConfig,
     QuotaUsage,
 )
-from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ai.backend.storage.volumes.abc import AbstractQuotaModel
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient
 
@@ -346,5 +346,5 @@ class XfsVolume(BaseVolume):
         )
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([StorageBackendCapability.VFOLDER, StorageBackendCapability.QUOTA])

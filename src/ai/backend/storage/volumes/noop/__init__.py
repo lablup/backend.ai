@@ -3,7 +3,10 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, ClassVar, override
 
-from ai.backend.common.data.storage.types import StorageBackendType
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -155,7 +158,7 @@ class NoopVolume(AbstractVolume):
     # ------ volume operations -------
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
         return frozenset()
 
     @override

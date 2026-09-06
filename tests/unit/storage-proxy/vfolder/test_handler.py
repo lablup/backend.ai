@@ -10,6 +10,7 @@ import pytest
 from aiohttp import web
 from aiohttp.web import StreamResponse
 
+from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType, VFolderID, VolumeID
 from ai.backend.storage.api.vfolder.handler import VFolderHandler, VFolderServiceProtocol
 from ai.backend.storage.volumes.types import (
@@ -33,7 +34,7 @@ class MockVFolderService(VFolderServiceProtocol):
             backend="vfs",
             path=Path("/mnt/test_volume"),
             fsprefix=PurePath("vfs-test"),
-            capabilities=["read", "write"],
+            capabilities=[StorageBackendCapability.VFOLDER, StorageBackendCapability.QUOTA],
         )
 
     @override
@@ -48,7 +49,7 @@ class MockVFolderService(VFolderServiceProtocol):
                 backend=info.get("backend", "vfs"),
                 path=Path(info.get("path", "/mnt/test_volume")),
                 fsprefix=PurePath(info.get("fsprefix", "vfs-test")),
-                capabilities=["read", "write"],
+                capabilities=[StorageBackendCapability.VFOLDER, StorageBackendCapability.QUOTA],
             )
             for volume_id, info in volumes.items()
         ]

@@ -6,7 +6,10 @@ import logging
 import re
 from typing import Any, ClassVar, override
 
-from ai.backend.common.data.storage.types import StorageBackendType
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import (
@@ -16,10 +19,6 @@ from ai.backend.storage.errors import (
 )
 from ai.backend.storage.types import CapacityUsage, FSPerfMetric
 from ai.backend.storage.volumes.abc import (
-    CAP_FAST_FS_SIZE,
-    CAP_FAST_SCAN,
-    CAP_METRIC,
-    CAP_VFOLDER,
     AbstractFSOpModel,
 )
 from ai.backend.storage.volumes.vfs import BaseVolume
@@ -109,13 +108,13 @@ class FlashBladeVolume(BaseVolume):
         await self.purity_client.aclose()
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
         return frozenset(
             [
-                CAP_FAST_FS_SIZE,
-                CAP_VFOLDER,
-                CAP_METRIC,
-                CAP_FAST_SCAN,
+                StorageBackendCapability.FAST_FS_SIZE,
+                StorageBackendCapability.VFOLDER,
+                StorageBackendCapability.METRIC,
+                StorageBackendCapability.FAST_SCAN,
             ],
         )
 

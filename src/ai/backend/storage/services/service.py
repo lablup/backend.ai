@@ -8,6 +8,7 @@ from typing import Any
 
 from aiohttp import web
 
+from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
@@ -55,7 +56,7 @@ class VolumeService:
         self._deletion_tasks = weakref.WeakValueDictionary[VFolderID, asyncio.Task[Any]]()
         self._background_tasks = set()
 
-    async def _get_capabilities(self, volume_id: VolumeID) -> list[str]:
+    async def _get_capabilities(self, volume_id: VolumeID) -> list[StorageBackendCapability]:
         async with self._volume_pool.get_volume(volume_id) as volume:
             return [*await volume.get_capabilities()]
 

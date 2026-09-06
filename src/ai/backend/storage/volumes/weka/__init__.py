@@ -9,7 +9,10 @@ from typing import Any, ClassVar, override
 
 import aiofiles.os
 
-from ai.backend.common.data.storage.types import StorageBackendType
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.json import dump_json_str
@@ -18,10 +21,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import VolumeNotInitializedError
 from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaUsage
 from ai.backend.storage.volumes.abc import (
-    CAP_FAST_FS_SIZE,
-    CAP_METRIC,
-    CAP_QUOTA,
-    CAP_VFOLDER,
     AbstractQuotaModel,
 )
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
@@ -170,8 +169,13 @@ class WekaVolume(BaseVolume):
         return WekaQuotaModel(self.mount_path, self._fs_uid, self.api_client)
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC, CAP_FAST_FS_SIZE])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([
+            StorageBackendCapability.VFOLDER,
+            StorageBackendCapability.QUOTA,
+            StorageBackendCapability.METRIC,
+            StorageBackendCapability.FAST_FS_SIZE,
+        ])
 
     @override
     async def get_hwinfo(self) -> HardwareMetadata:
