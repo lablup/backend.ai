@@ -4339,3 +4339,34 @@ class TestASetupThatWasCancelled:
         with pytest.raises(RuntimeError):
             await plugin.setup_session_network(_META, _SELF)
         assert self._deleted(rec) >= {bridge_dev(4097), vxlan_dev(4097)}
+
+
+class TestATunnelAnotherAgentIsUsing:
+    """D4. A host can run more than one agent. The preflight cannot read this process's session
+    metadata, so without an exception it brings down every overlay tunnel on the node -- and the
+    agent that owns the others only notices on its next watchdog tick."""
+
+    async def test_a_spared_vni_is_left_alone(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, vxlans=(vxlan_dev(4097), vxlan_dev(5000)))
+        await plugin.prepare_recovery(spare=(5000,))
+        touched = {call[3] for call in rec.calls if call[:3] == ["ip", "link", "set"]}
+        assert vxlan_dev(4097) in touched
+        assert vxlan_dev(5000) not in touched
+
+    async def test_everything_else_still_goes_down(self) -> None:
+        # Sparing is the exception, not a new default: a tunnel nobody could attribute to another
+        # agent is one whose protection state this process cannot vouch for.
+        rec = Recorder()
+        plugin = _plugin(rec, vxlans=(vxlan_dev(4097), vxlan_dev(5000)))
+        await plugin.prepare_recovery()
+        touched = {call[3] for call in rec.calls if call[:3] == ["ip", "link", "set"]}
+        assert {vxlan_dev(4097), vxlan_dev(5000)} <= touched
+
+    async def test_a_spared_tunnel_is_not_recorded_as_unclosed(self) -> None:
+        # It is not ours to close, so it is not a debt of ours either -- recording it would hold
+        # this node out of service over another agent's healthy session.
+        rec = Recorder()
+        plugin = _plugin(rec, vxlans=(vxlan_dev(5000),))
+        await plugin.prepare_recovery(spare=(5000,))
+        assert plugin.unclosed_devices() == frozenset()
