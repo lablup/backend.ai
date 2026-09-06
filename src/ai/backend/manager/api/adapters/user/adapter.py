@@ -443,7 +443,7 @@ class UserAdapter(BaseAdapter):
             full_name=input.full_name,
             description=input.description,
             status=UserStatus(input.status),
-            role=str(UserRoleModel(input.role)),
+            role=UserRoleModel(input.role),
             allowed_client_ip=input.allowed_client_ip,
             totp_activated=input.totp_activated,
             resource_policy=input.resource_policy,

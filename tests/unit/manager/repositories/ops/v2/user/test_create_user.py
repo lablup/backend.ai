@@ -1,4 +1,4 @@
-"""Integration tests for the personal project ``create_full_user`` provisions."""
+"""Integration tests for what ``create_user`` provisions."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -49,9 +49,8 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.user.provider import UserOpsProvider
-from ai.backend.manager.repositories.ops.user.write import FullUserCreation
-from ai.backend.manager.repositories.user.creators import UserScopeCreation
+from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import HasTable, with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -165,21 +164,21 @@ async def _create_user(
         domain_id=domain_id,
     )
     async with provider.write_ops() as w:
-        result = await w.create_full_user(
-            FullUserCreation(
-                creation=UserScopeCreation(spec=creator),
-                domain_id=domain_id,
-                project_ids=project_ids or [],
-                keypair_resource_policy="default",
+        result = await w.create_user(
+            FullUserCreator(
+                user=creator,
                 keypair_secrets=KeyPairSecrets(
                     access_key=AccessKey(f"AK{unique}"),
                     secret_key=SecretValue(f"SK{unique}"),
                     ssh_public_key="ssh-rsa test",
                     ssh_private_key="test-private-key",
                 ),
+                keypair_resource_policy="default",
             )
         )
-    return UserID(result.user_row.uuid)
+        user_id = UserID(result.user.id)
+        await w.enroll_in_projects(user_id, domain_id, project_ids or [])
+    return user_id
 
 
 async def _personal_projects(
@@ -329,25 +328,213 @@ class TestPersonalProjectProvisioning:
 
         assert await _project_member_ids(db, owned_project) == [str(owner)]
 
-    async def test_the_user_is_associated_with_the_project_scope(
+
+async def _owns(
+    db: ExtendedAsyncSAEngine,
+    owner: tuple[str, uuid.UUID],
+    member: tuple[str, uuid.UUID],
+) -> bool:
+    """Whether the owner's virtual entity lists the member, uncapped."""
+    async with db.begin_readonly_session() as session:
+        return bool(
+            await session.scalar(
+                sa.select(
+                    sa.exists().where(
+                        EntityMembershipRow.virtual_entity_id == _node_of(*owner),
+                        EntityMembershipRow.member_entity_id == _node_of(*member),
+                        EntityMembershipRow.capped.is_(False),
+                    )
+                )
+            )
+        )
+
+
+async def _governs(
+    db: ExtendedAsyncSAEngine,
+    scope: tuple[str, uuid.UUID],
+    entity: tuple[str, uuid.UUID],
+) -> bool:
+    """Whether the scope rules the entity's virtual entity."""
+    async with db.begin_readonly_session() as session:
+        return bool(
+            await session.scalar(
+                sa.select(
+                    sa.exists().where(
+                        ScopeBindingRow.virtual_entity_id == _node_of(*entity),
+                        ScopeBindingRow.scope_entity_id == _node_of(*scope),
+                    )
+                )
+            )
+        )
+
+
+@pytest.fixture
+async def user_role_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
+    """An active user-scope preset every created user's scope instantiates."""
+    preset_id = uuid.uuid4()
+    async with db.begin_session() as session:
+        session.add(
+            RolePresetRow(
+                id=preset_id,
+                name="preset-user",
+                scope_type=ScopeType.USER,
+                auto_assign=True,
+                deleted=False,
+            )
+        )
+        await session.flush()
+        session.add(
+            RolePermissionPresetRow(
+                role_preset_id=preset_id,
+                entity_type=EntityType.VFOLDER,
+                operation=OperationType.READ,
+            )
+        )
+        await session.commit()
+    return preset_id
+
+
+class TestUserGraphProvisioning:
+    """Creating a user puts it in the graph under its domain, with its own role."""
+
+    async def test_the_domain_owns_and_governs_the_user(
         self,
         db: ExtendedAsyncSAEngine,
         provider: UserOpsProvider,
         domain: DomainFixtureData,
     ) -> None:
-        """The roster write reaches the legacy scope association too."""
+        """``created_in`` puts the user on the domain's list and under its roles."""
         user_id = await _create_user(provider, domain.domain_id, "alice")
-        project_id = (await _personal_projects(db, domain.domain_name))[0].id
+
+        domain_node = (DOMAIN_ENTITY_TYPE, domain.domain_id)
+        user_node = (USER_ENTITY_TYPE, user_id)
+        assert await _owns(db, domain_node, user_node)
+        assert await _governs(db, domain_node, user_node)
+
+    async def test_no_legacy_scope_association_is_written(
+        self,
+        db: ExtendedAsyncSAEngine,
+        provider: UserOpsProvider,
+        domain: DomainFixtureData,
+    ) -> None:
+        """Placement is the graph's answer alone; the legacy association table is
+        left untouched."""
+        user_id = await _create_user(provider, domain.domain_id, "alice")
 
         async with db.begin_readonly_session() as session:
-            associated = await session.scalar(
+            associations = await session.scalar(
                 sa.select(sa.func.count())
                 .select_from(AssociationScopesEntitiesRow)
                 .where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(project_id),
                     AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     AssociationScopesEntitiesRow.entity_id == str(user_id),
                 )
             )
-        assert associated == 1
+        assert associations == 0
+
+    async def test_the_user_holds_the_roles_its_scope_presets_call_for(
+        self,
+        db: ExtendedAsyncSAEngine,
+        provider: UserOpsProvider,
+        domain: DomainFixtureData,
+        user_role_preset: uuid.UUID,
+    ) -> None:
+        """A user scope's roles come from its presets, and the user holds the
+        auto_assign ones."""
+        user_id = await _create_user(provider, domain.domain_id, "alice")
+
+        async with db.begin_readonly_session() as session:
+            role = (
+                await session.scalars(
+                    sa.select(RoleRow)
+                    .join(UserRoleRow, UserRoleRow.role_id == RoleRow.id)
+                    .where(UserRoleRow.user_id == user_id)
+                )
+            ).one()
+            entity_types = set(
+                (
+                    await session.scalars(
+                        sa.select(PermissionRow.entity_type).where(
+                            PermissionRow.role_id == role.id,
+                            PermissionRow.scope_type == ScopeType.USER,
+                            PermissionRow.scope_id == str(user_id),
+                        )
+                    )
+                ).all()
+            )
+        assert role.name == f"preset-user-{str(user_id)[:8]}"
+        assert {str(EntityType.VFOLDER)} == {str(entity_type) for entity_type in entity_types}
+
+
+async def _create_project(db: ExtendedAsyncSAEngine, domain_name: DomainName) -> ProjectID:
+    """A general project in the domain, the kind a user is enrolled in and out of."""
+    project_id = ProjectID(uuid.uuid4())
+    async with db.begin_session() as session:
+        session.add(
+            ProjectRow(
+                id=project_id,
+                name=f"project-{uuid.uuid4().hex[:8]}",
+                description="Test project",
+                is_active=True,
+                domain_name=domain_name,
+                resource_policy="default",
+                type=ProjectType.GENERAL,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                integration_id=None,
+            )
+        )
+        await session.commit()
+    return project_id
+
+
+class TestProjectMembershipSync:
+    """Setting the user's projects joins and leaves only what changed."""
+
+    async def test_the_user_joins_the_named_projects(
+        self,
+        db: ExtendedAsyncSAEngine,
+        provider: UserOpsProvider,
+        domain: DomainFixtureData,
+    ) -> None:
+        user_id = await _create_user(provider, domain.domain_id, "alice")
+        project_id = await _create_project(db, domain.domain_name)
+
+        async with provider.write_ops() as w:
+            left = await w.replace_user_projects(user_id, domain.domain_name, [project_id])
+
+        assert left == []
+        assert await _project_member_ids(db, project_id) == [str(user_id)]
+
+    async def test_a_project_dropped_from_the_set_is_left(
+        self,
+        db: ExtendedAsyncSAEngine,
+        provider: UserOpsProvider,
+        domain: DomainFixtureData,
+    ) -> None:
+        user_id = await _create_user(provider, domain.domain_id, "alice")
+        project_id = await _create_project(db, domain.domain_name)
+        async with provider.write_ops() as w:
+            await w.replace_user_projects(user_id, domain.domain_name, [project_id])
+
+        async with provider.write_ops() as w:
+            left = await w.replace_user_projects(user_id, domain.domain_name, [])
+
+        assert left == [project_id]
+        assert await _project_member_ids(db, project_id) == []
+
+    async def test_the_personal_project_stands_outside_the_sync(
+        self,
+        db: ExtendedAsyncSAEngine,
+        provider: UserOpsProvider,
+        domain: DomainFixtureData,
+    ) -> None:
+        """An empty set leaves every project but the user's own personal one."""
+        user_id = await _create_user(provider, domain.domain_id, "alice")
+        personal_id = ProjectID((await _personal_projects(db, domain.domain_name))[0].id)
+
+        async with provider.write_ops() as w:
+            left = await w.replace_user_projects(user_id, domain.domain_name, [])
+
+        assert left == []
+        assert await _project_member_ids(db, personal_id) == [str(user_id)]

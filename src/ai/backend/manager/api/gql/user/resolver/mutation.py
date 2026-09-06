@@ -130,7 +130,7 @@ async def _build_bulk_create_user_action(
             full_name=dto.full_name,
             description=dto.description,
             status=UserStatus(dto.status),
-            role=str(dto.role),
+            role=UserRole(dto.role),
             allowed_client_ip=dto.allowed_client_ip,
             totp_activated=dto.totp_activated,
             resource_policy=dto.resource_policy,

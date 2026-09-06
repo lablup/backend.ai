@@ -19,7 +19,8 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import AuthenticationError, InvalidRequestError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
@@ -44,7 +45,7 @@ from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -53,9 +54,6 @@ from ai.backend.manager.models.project import (
     ProjectRow,
     ProjectType,
     association_groups_users,
-)
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -172,11 +170,6 @@ async def signup_default_project(
         )
     yield data
     async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.delete(AssociationScopesEntitiesRow).where(
-                AssociationScopesEntitiesRow.scope_id == str(data.project_id),
-            ),
-        )
         for email in data.cleanup_emails:
             await conn.execute(
                 keypairs.delete().where(
@@ -1122,10 +1115,8 @@ class TestSignup:
         db_engine: SAEngine,
         signup_default_project: _SignupDefaultProjectData,
     ) -> None:
-        """When a project named ``default`` exists in the signup domain, the
-        signup flow must bind the new user to that project via
-        ``association_scopes_entities`` (scope_type=PROJECT, entity_type=USER).
-        """
+        """When a project named ``default`` exists in the signup domain, the signup
+        flow must put the new user on that project's roster."""
         unique = secrets.token_hex(4)
         email = f"signup-bind-{unique}@test.local"
         signup_default_project.cleanup_emails.append(email)
@@ -1146,15 +1137,21 @@ class TestSignup:
                 sa.select(users.c.uuid).where(users.c.email == email),
             )
             assert user_uuid is not None
-            ase_count = await conn.scalar(
-                sa.select(sa.func.count()).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(signup_default_project.project_id),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+            member = sa.orm.aliased(VirtualEntityRow, name="member_node")
+            scope = sa.orm.aliased(VirtualEntityRow, name="scope_node")
+            membership_count = await conn.scalar(
+                sa.select(sa.func.count())
+                .select_from(EntityMembershipRow)
+                .join(scope, scope.id == EntityMembershipRow.virtual_entity_id)
+                .join(member, member.id == EntityMembershipRow.member_entity_id)
+                .where(
+                    scope.entity_type == PROJECT_ENTITY_TYPE,
+                    scope.entity_id == signup_default_project.project_id,
+                    member.entity_type == USER_ENTITY_TYPE,
+                    member.entity_id == user_uuid,
                 ),
             )
-            assert ase_count == 1
+            assert membership_count == 1
 
 
 class TestCrossDomainAccess:

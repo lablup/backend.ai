@@ -42,7 +42,7 @@ class UserCreator(RoleManagedEntityCreator[UserRow, UserData]):
     is_active: bool | None = None
     status: UserStatus | None = None
     status_info: str | None = None
-    role: str | None = None
+    role: UserRole | None = None
     allowed_client_ip: list[str] | None = None
     totp_activated: bool | None = None
     resource_policy: str | None = None
@@ -95,13 +95,13 @@ class UserCreator(RoleManagedEntityCreator[UserRow, UserData]):
 
     @override
     def build_row(self) -> UserRow:
+        """The row to insert. A column the spec leaves unsaid is handed ``None``, which
+        the row answers with its own default."""
         return UserRow(
             username=self.username,
             email=self.email,
             password=self.password,
-            need_password_change=self.need_password_change
-            if self.need_password_change is not None
-            else False,
+            need_password_change=self.need_password_change,
             full_name=self.full_name,
             description=self.description,
             status=self._status(),
@@ -111,27 +111,27 @@ class UserCreator(RoleManagedEntityCreator[UserRow, UserData]):
             domain_name=sa.select(DomainRow.name)
             .where(DomainRow.id == self.domain_id)
             .scalar_subquery(),
-            role=UserRole(self.role) if self.role is not None else UserRole.USER,
+            role=self.role,
+            # No default of its own: the column is a foreign key and cannot be empty.
             resource_policy=self.resource_policy if self.resource_policy is not None else "default",
             allowed_client_ip=self.allowed_client_ip,
-            totp_activated=self.totp_activated if self.totp_activated is not None else False,
-            sudo_session_enabled=self.sudo_session_enabled
-            if self.sudo_session_enabled is not None
-            else False,
+            totp_activated=self.totp_activated,
+            sudo_session_enabled=self.sudo_session_enabled,
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,
             integration_id=self.integration_name,  # DB column is integration_id
         )
 
+    def _status(self) -> UserStatus | None:
+        """The explicit status, else the one ``is_active`` implies. ``None`` leaves the
+        column to its default, which is unverified."""
+        if self.status is not None:
+            return self.status
+        if self.is_active is None:
+            return None
+        return UserStatus.ACTIVE if self.is_active else UserStatus.INACTIVE
+
     @override
     def to_data(self, row: UserRow) -> UserData:
         return row.to_data()
-
-    def _status(self) -> UserStatus:
-        """The explicit status, else the one ``is_active`` implies, else unverified."""
-        if self.status is not None:
-            return self.status
-        if self.is_active is not None:
-            return UserStatus.ACTIVE if self.is_active else UserStatus.INACTIVE
-        return UserStatus.BEFORE_VERIFICATION
