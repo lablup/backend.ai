@@ -8,7 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.types import EntityID, EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.entity_share.types import (
     EntityShareData,
@@ -28,24 +27,37 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
     moment pending, so it is a share carrying an offer rather than an offer that became
     something else.
 
-    The recipient is a virtual entity, the coordinates the graph edge uses, so a project
-    receives as well as a person. An address with no account yet stays an email until it
-    is answered, and answering fills the virtual entity in — which is why both are
-    nullable and two checks hold them: one of the two is always there, and an accepted
-    row always names the node, which answering records.
+    Both ends name a graph node by the pair that identifies it, which the graph holds
+    unique, so each is a foreign key rather than a loose pair. Nothing that has no node
+    can be lent or receive: the graph write would have nowhere to attach.
 
-    The target is a polymorphic pair with no foreign key. A pending row is not a graph
-    edge, so it does not name the target's node either.
+    A recipient that is an address has no node yet, so its pair stays empty until the
+    offer is answered. ``MATCH FULL`` holds it to both or neither, and two checks hold
+    the rest: one of the two ways of addressing is always there, and an accepted row
+    always names the scope.
     """
 
     __tablename__ = "entity_shares"
     __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["target_entity_type", "target_entity_id"],
+            ["virtual_entities.entity_type", "virtual_entities.entity_id"],
+            name="target",
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["recipient_entity_type", "recipient_entity_id"],
+            ["virtual_entities.entity_type", "virtual_entities.entity_id"],
+            name="recipient",
+            ondelete="CASCADE",
+            match="FULL",
+        ),
         sa.CheckConstraint(
-            "recipient_virtual_entity_id IS NOT NULL OR recipient_email IS NOT NULL",
+            "recipient_entity_type IS NOT NULL OR recipient_email IS NOT NULL",
             name="addressed",
         ),
         sa.CheckConstraint(
-            "status <> 'accepted' OR recipient_virtual_entity_id IS NOT NULL",
+            "status <> 'accepted' OR recipient_entity_type IS NOT NULL",
             name="accepted_resolved",
         ),
         sa.Index(
@@ -58,14 +70,14 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
         ),
         sa.Index(
             "uq_entity_shares_pending_recipient",
-            "recipient_virtual_entity_id",
+            "recipient_entity_type",
+            "recipient_entity_id",
             "target_entity_type",
             "target_entity_id",
             unique=True,
-            postgresql_where=sa.text(
-                "status = 'pending' AND recipient_virtual_entity_id IS NOT NULL"
-            ),
+            postgresql_where=sa.text("status = 'pending' AND recipient_entity_type IS NOT NULL"),
         ),
+        sa.Index("ix_entity_shares_recipient", "recipient_entity_type", "recipient_entity_id"),
         sa.Index("ix_entity_shares_target", "target_entity_type", "target_entity_id"),
         sa.Index("ix_entity_shares_recipient_email", "recipient_email"),
     )
@@ -82,11 +94,11 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
         sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
-    recipient_virtual_entity_id: Mapped[VirtualEntityID | None] = mapped_column(
-        "recipient_virtual_entity_id",
-        GUID(VirtualEntityID),
-        sa.ForeignKey("virtual_entities.id", ondelete="CASCADE"),
-        nullable=True,
+    recipient_entity_type: Mapped[EntityType | None] = mapped_column(
+        "recipient_entity_type", sa.String(length=32), nullable=True
+    )
+    recipient_entity_id: Mapped[EntityID | None] = mapped_column(
+        "recipient_entity_id", GUID(), nullable=True
     )
     recipient_email: Mapped[str | None] = mapped_column(
         "recipient_email", sa.String(length=64), nullable=True
@@ -109,11 +121,18 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
         server_default=EntityShareStatus.PENDING.value,
     )
 
+    def _recipient(self) -> RuntimeEntityID | None:
+        node_type = self.recipient_entity_type
+        node_id = self.recipient_entity_id
+        if node_type is None or node_id is None:
+            return None
+        return RuntimeEntityID(node_type, node_id)
+
     def to_data(self) -> EntityShareData:
         return EntityShareData(
             id=self.id,
             sharer_user_id=self.sharer_user_id,
-            recipient_virtual_entity_id=self.recipient_virtual_entity_id,
+            recipient=self._recipient(),
             recipient_email=self.recipient_email,
             target=RuntimeEntityID(self.target_entity_type, self.target_entity_id),
             permission_cap=self.permission_cap,

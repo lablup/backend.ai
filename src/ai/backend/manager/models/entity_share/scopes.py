@@ -15,7 +15,6 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 __all__ = (
     "EntityShareRecipientProjectScope",
@@ -49,14 +48,9 @@ class EntityShareRecipientScope(OperationScope):
                     .where(UserRow.uuid == recipient_user_id)
                     .scalar_subquery()
                 ),
-                EntityShareRow.recipient_virtual_entity_id
-                == (
-                    sa.select(VirtualEntityRow.id)
-                    .where(
-                        VirtualEntityRow.entity_type == USER_ENTITY_TYPE,
-                        VirtualEntityRow.entity_id == recipient_user_id,
-                    )
-                    .scalar_subquery()
+                sa.and_(
+                    EntityShareRow.recipient_entity_type == USER_ENTITY_TYPE,
+                    EntityShareRow.recipient_entity_id == recipient_user_id,
                 ),
             )
 
@@ -80,13 +74,9 @@ class EntityShareRecipientProjectScope(OperationScope):
         project_id = self.project_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EntityShareRow.recipient_virtual_entity_id == (
-                sa.select(VirtualEntityRow.id)
-                .where(
-                    VirtualEntityRow.entity_type == PROJECT_ENTITY_TYPE,
-                    VirtualEntityRow.entity_id == project_id,
-                )
-                .scalar_subquery()
+            return sa.and_(
+                EntityShareRow.recipient_entity_type == PROJECT_ENTITY_TYPE,
+                EntityShareRow.recipient_entity_id == project_id,
             )
 
         return inner

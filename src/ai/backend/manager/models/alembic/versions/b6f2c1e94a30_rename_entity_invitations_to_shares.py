@@ -37,16 +37,24 @@ _PENDING_EMAIL_INDEX: Final = "uq_entity_shares_pending_email"
 _PENDING_RECIPIENT_INDEX: Final = "uq_entity_shares_pending_recipient"
 _TARGET_INDEX: Final = "ix_entity_shares_target"
 _EMAIL_INDEX: Final = "ix_entity_shares_recipient_email"
+_RECIPIENT_INDEX: Final = "ix_entity_shares_recipient"
 
 _ADDRESSED: Final = "addressed"
 
 _BACKFILL_RECIPIENT: Final = sa.text("""
     UPDATE entity_shares s
-    SET recipient_virtual_entity_id = ve.id
+    SET recipient_entity_type = 'project', recipient_entity_id = g.id
     FROM users u
     JOIN groups g ON g.type = 'personal' AND g.creator_id = u.uuid
-    JOIN virtual_entities ve ON ve.entity_type = 'project' AND ve.entity_id = g.id
     WHERE s.recipient_email = u.email AND s.status = 'accepted'
+""")
+
+_DROP_TARGETS_WITHOUT_A_NODE: Final = sa.text("""
+    DELETE FROM entity_shares s
+    WHERE NOT EXISTS (
+        SELECT 1 FROM virtual_entities ve
+        WHERE ve.entity_type = s.target_entity_type AND ve.entity_id = s.target_entity_id
+    )
 """)
 
 
@@ -60,24 +68,37 @@ def upgrade() -> None:
         "entity_shares", "invitee_email", new_column_name="recipient_email", nullable=True
     )
     op.add_column(
-        "entity_shares",
-        sa.Column(
-            "recipient_virtual_entity_id",
-            GUID,
-            sa.ForeignKey("virtual_entities.id", ondelete="CASCADE"),
-            nullable=True,
-        ),
+        "entity_shares", sa.Column("recipient_entity_type", sa.String(length=32), nullable=True)
     )
+    op.add_column("entity_shares", sa.Column("recipient_entity_id", GUID, nullable=True))
     op.add_column(
         "entity_shares",
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.execute(_BACKFILL_RECIPIENT)
+    op.execute(_DROP_TARGETS_WITHOUT_A_NODE)
+    op.create_foreign_key(
+        "target",
+        "entity_shares",
+        "virtual_entities",
+        ["target_entity_type", "target_entity_id"],
+        ["entity_type", "entity_id"],
+        ondelete="CASCADE",
+    )
+    op.create_foreign_key(
+        "recipient",
+        "entity_shares",
+        "virtual_entities",
+        ["recipient_entity_type", "recipient_entity_id"],
+        ["entity_type", "entity_id"],
+        ondelete="CASCADE",
+        match="FULL",
+    )
 
     op.create_check_constraint(
         _ADDRESSED,
         "entity_shares",
-        "recipient_virtual_entity_id IS NOT NULL OR recipient_email IS NOT NULL",
+        "recipient_entity_type IS NOT NULL OR recipient_email IS NOT NULL",
     )
     op.create_index(
         _PENDING_EMAIL_INDEX,
@@ -99,13 +120,17 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute(sa.text("DELETE FROM entity_shares WHERE recipient_email IS NULL"))
+    op.drop_constraint(op.f("fk_entity_shares_recipient"), "entity_shares", type_="foreignkey")
+    op.drop_constraint(op.f("fk_entity_shares_target"), "entity_shares", type_="foreignkey")
+    op.drop_index(_RECIPIENT_INDEX, table_name="entity_shares")
     op.drop_index(_EMAIL_INDEX, table_name="entity_shares")
     op.drop_index(_TARGET_INDEX, table_name="entity_shares")
     op.drop_index(_PENDING_RECIPIENT_INDEX, table_name="entity_shares")
     op.drop_index(_PENDING_EMAIL_INDEX, table_name="entity_shares")
     op.drop_constraint(op.f(f"ck_entity_shares_{_ADDRESSED}"), "entity_shares", type_="check")
     op.drop_column("entity_shares", "expires_at")
-    op.drop_column("entity_shares", "recipient_virtual_entity_id")
+    op.drop_column("entity_shares", "recipient_entity_id")
+    op.drop_column("entity_shares", "recipient_entity_type")
     op.alter_column(
         "entity_shares", "recipient_email", new_column_name="invitee_email", nullable=False
     )

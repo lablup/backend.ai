@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.entity_share import ENTITY_SHARE_ENTITY_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
     EntityType,
@@ -19,6 +20,7 @@ from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.scopes import (
+    EntityShareRecipientProjectScope,
     EntityShareRecipientScope,
     EntityShareSharerScope,
     EntityShareTargetScope,
@@ -27,6 +29,7 @@ from ai.backend.manager.models.entity_share.searchers import EntityShareSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
 __all__ = (
+    "EntityShareRecipientProjectScopeItem",
     "EntityShareRecipientScopeItem",
     "EntityShareSharerScopeItem",
     "EntityShareScopeItem",
@@ -55,7 +58,7 @@ class EntityShareScopeItem(ABC):
 
 @dataclass(frozen=True)
 class EntityShareRecipientScopeItem(EntityShareScopeItem):
-    """The invitations addressed to one person's email."""
+    """The shares addressed to one person, by node or by address."""
 
     user_id: UserID
 
@@ -70,7 +73,7 @@ class EntityShareRecipientScopeItem(EntityShareScopeItem):
 
 @dataclass(frozen=True)
 class EntityShareSharerScopeItem(EntityShareScopeItem):
-    """The invitations one person sent."""
+    """The shares one person sent."""
 
     user_id: UserID
 
@@ -84,8 +87,23 @@ class EntityShareSharerScopeItem(EntityShareScopeItem):
 
 
 @dataclass(frozen=True)
+class EntityShareRecipientProjectScopeItem(EntityShareScopeItem):
+    """The shares addressed to one project."""
+
+    project_id: ProjectID
+
+    @override
+    def scope_ref(self) -> ScopeRef:
+        return ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id)
+
+    @override
+    def operation_scope(self) -> OperationScope:
+        return EntityShareRecipientProjectScope(project_id=self.project_id)
+
+
+@dataclass(frozen=True)
 class EntityShareTargetScopeItem(EntityShareScopeItem):
-    """The invitations offering one entity."""
+    """The shares lending one entity."""
 
     target: EntityIdentifier
 

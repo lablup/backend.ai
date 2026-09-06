@@ -28,7 +28,6 @@ from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 __all__ = (
     "EntityShareAcceptUpdater",
@@ -77,13 +76,9 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
         scope = self.answering_scope
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            named = EntityShareRow.recipient_virtual_entity_id == (
-                sa.select(VirtualEntityRow.id)
-                .where(
-                    VirtualEntityRow.entity_type == scope.entity_type(),
-                    VirtualEntityRow.entity_id == scope,
-                )
-                .scalar_subquery()
+            named = sa.and_(
+                EntityShareRow.recipient_entity_type == scope.entity_type(),
+                EntityShareRow.recipient_entity_id == scope,
             )
             if scope.entity_type() != USER_ENTITY_TYPE:
                 return named
@@ -133,14 +128,8 @@ class EntityShareAcceptUpdater(_RecipientInvitationUpdater):
         scope = self.answering_scope
         return {
             "status": EntityShareStatus.ACCEPTED,
-            "recipient_virtual_entity_id": (
-                sa.select(VirtualEntityRow.id)
-                .where(
-                    VirtualEntityRow.entity_type == scope.entity_type(),
-                    VirtualEntityRow.entity_id == scope,
-                )
-                .scalar_subquery()
-            ),
+            "recipient_entity_type": scope.entity_type(),
+            "recipient_entity_id": scope,
         }
 
 

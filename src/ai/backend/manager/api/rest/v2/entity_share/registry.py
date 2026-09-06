@@ -26,6 +26,7 @@ def register_v2_entity_share_routes(
     registry.add("DELETE", "/{share_id}", handler.cancel, middlewares=[auth_required])
     registry.add("POST", "/{share_id}/revoke", handler.revoke, middlewares=[auth_required])
     registry.add("POST", "/{share_id}/leave", handler.leave, middlewares=[auth_required])
+    registry.add("POST", "/my/search", handler.my_search, middlewares=[auth_required])
     registry.add("POST", "/scoped/search", handler.scoped_search, middlewares=[auth_required])
 
     return registry

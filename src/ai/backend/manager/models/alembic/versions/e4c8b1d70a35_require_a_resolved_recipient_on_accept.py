@@ -1,8 +1,8 @@
 """require a resolved recipient on an accepted share
 
-An offer that reached an address carries no node until it is answered. Answering
-records the node the answering scope holds, so from that point an accepted row always
-names one and the graph edge beside it has somewhere to hang.
+An offer that reached an address names no scope until it is answered. Answering records
+the scope that answered, so from that point an accepted row always names one and the
+graph edge beside it has somewhere to hang.
 
 Revision ID: e4c8b1d70a35
 Revises: b6f2c1e94a30
@@ -27,13 +27,12 @@ _ACCEPTED_RESOLVED: Final = "accepted_resolved"
 
 def upgrade() -> None:
     op.execute(
-        "DELETE FROM entity_shares "
-        "WHERE status = 'accepted' AND recipient_virtual_entity_id IS NULL"
+        "DELETE FROM entity_shares WHERE status = 'accepted' AND recipient_entity_type IS NULL"
     )
     op.create_check_constraint(
         _ACCEPTED_RESOLVED,
         "entity_shares",
-        "status <> 'accepted' OR recipient_virtual_entity_id IS NOT NULL",
+        "status <> 'accepted' OR recipient_entity_type IS NOT NULL",
     )
 
 

@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.entity_share.request import (
     EntityShareFilter,
     EntityShareOrderBy,
     EntityShareScope,
+    MySearchEntitySharesInput,
     ScopedSearchEntitySharesInput,
 )
 from ai.backend.common.dto.manager.v2.entity_share.response import (
@@ -23,6 +24,7 @@ from ai.backend.common.dto.manager.v2.entity_share.response import (
 )
 from ai.backend.common.dto.manager.v2.entity_share.types import (
     EntityShareOrderField,
+    EntityShareSideDTO,
     EntityShareStatusDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
@@ -51,6 +53,7 @@ from ai.backend.manager.services.entity_share.actions.create import (
 )
 from ai.backend.manager.services.entity_share.actions.get import GetEntityShareAction
 from ai.backend.manager.services.entity_share.actions.search import (
+    EntityShareRecipientProjectScopeItem,
     EntityShareRecipientScopeItem,
     EntityShareScopeItem,
     EntityShareSharerScopeItem,
@@ -99,13 +102,13 @@ class EntityShareAdapter(BaseAdapter):
                 )
             )
         )
-        return EntitySharePayload(invitation=self._to_node(result.data))
+        return EntitySharePayload(share=self._to_node(result.data))
 
     async def get(self, share_id: EntityShareID) -> EntitySharePayload:
         result = await self._processors.entity_share.get.run(
             GetEntityShareAction(share_id=share_id)
         )
-        return EntitySharePayload(invitation=self._to_node(result.data))
+        return EntitySharePayload(share=self._to_node(result.data))
 
     async def accept(self, share_id: EntityShareID) -> EntitySharePayload:
         me = current_user()
@@ -114,7 +117,7 @@ class EntityShareAdapter(BaseAdapter):
         result = await self._processors.entity_share.accept.run(
             AcceptEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
         )
-        return EntitySharePayload(invitation=self._to_node(result.data))
+        return EntitySharePayload(share=self._to_node(result.data))
 
     async def reject(self, share_id: EntityShareID) -> EntitySharePayload:
         me = current_user()
@@ -123,19 +126,19 @@ class EntityShareAdapter(BaseAdapter):
         result = await self._processors.entity_share.reject.run(
             RejectEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
         )
-        return EntitySharePayload(invitation=self._to_node(result.data))
+        return EntitySharePayload(share=self._to_node(result.data))
 
     async def cancel(self, share_id: EntityShareID) -> EntitySharePayload:
         result = await self._processors.entity_share.cancel.run(
             CancelEntityShareAction(share_id=share_id)
         )
-        return EntitySharePayload(invitation=self._to_node(result.data))
+        return EntitySharePayload(share=self._to_node(result.data))
 
     async def revoke(self, share_id: EntityShareID) -> EntitySharePayload:
         result = await self._processors.entity_share.revoke.run(
             RevokeEntityShareAction(share_id=share_id)
         )
-        return EntitySharePayload(invitation=self._to_node(result.data))
+        return EntitySharePayload(share=self._to_node(result.data))
 
     async def leave(self, share_id: EntityShareID) -> EntitySharePayload:
         me = current_user()
@@ -144,28 +147,80 @@ class EntityShareAdapter(BaseAdapter):
         result = await self._processors.entity_share.leave.run(
             LeaveEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
         )
-        return EntitySharePayload(invitation=self._to_node(result.data))
+        return EntitySharePayload(share=self._to_node(result.data))
 
-    async def scoped_search(
-        self, input: ScopedSearchEntitySharesInput
-    ) -> SearchEntitySharesPayload:
-        """Page through the invitations the named scopes reach, combined with OR.
+    async def my_search(self, input: MySearchEntitySharesInput) -> SearchEntitySharesPayload:
+        """Page through the shares the caller stands on a side of.
 
-        Every scope is authorized before the read runs, so naming another person's
-        invitations is refused unless the caller may reach that person's scope.
+        The same read the scoped query runs, with the caller filling the scope instead
+        of naming it.
         """
-        items = self._to_scope_items(input.scope)
-        searcher = self._build_searcher(
-            EntityShareSearcher,
-            conditions=self._convert_filter(input.filter) if input.filter else [],
-            orders=self._convert_orders(input.order) if input.order else [],
-            pagination_spec=_entity_share_pagination_spec(),
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        items: list[EntityShareScopeItem] = []
+        for side in input.sides:
+            match side:
+                case EntityShareSideDTO.RECIPIENT:
+                    items.append(EntityShareRecipientScopeItem(user_id=UserID(me.user_id)))
+                case EntityShareSideDTO.SHARER:
+                    items.append(EntityShareSharerScopeItem(user_id=UserID(me.user_id)))
+        return await self._search(
+            items,
+            filter=input.filter,
+            order=input.order,
             first=input.first,
             after=input.after,
             last=input.last,
             before=input.before,
             limit=input.limit,
             offset=input.offset,
+        )
+
+    async def scoped_search(
+        self, input: ScopedSearchEntitySharesInput
+    ) -> SearchEntitySharesPayload:
+        """Page through the shares the named scopes reach, combined with OR.
+
+        Every scope is authorized before the read runs, so naming another person's
+        shares is refused unless the caller may reach that person's scope.
+        """
+        return await self._search(
+            self._to_scope_items(input.scope),
+            filter=input.filter,
+            order=input.order,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+
+    async def _search(
+        self,
+        items: list[EntityShareScopeItem],
+        *,
+        filter: EntityShareFilter | None,
+        order: list[EntityShareOrderBy] | None,
+        first: int | None,
+        after: str | None,
+        last: int | None,
+        before: str | None,
+        limit: int | None,
+        offset: int | None,
+    ) -> SearchEntitySharesPayload:
+        searcher = self._build_searcher(
+            EntityShareSearcher,
+            conditions=self._convert_filter(filter) if filter else [],
+            orders=self._convert_orders(order) if order else [],
+            pagination_spec=_entity_share_pagination_spec(),
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
         )
         result = await self._processors.entity_share.search.run(
             SearchEntitySharesAction(items=items, searcher=searcher)
@@ -179,10 +234,12 @@ class EntityShareAdapter(BaseAdapter):
 
     def _to_scope_items(self, scope: EntityShareScope) -> list[EntityShareScopeItem]:
         items: list[EntityShareScopeItem] = []
-        for invitee in scope.invitee or ():
-            items.append(EntityShareRecipientScopeItem(user_id=UserID(invitee.value)))
-        for inviter in scope.inviter or ():
-            items.append(EntityShareSharerScopeItem(user_id=UserID(inviter.value)))
+        for recipient in scope.recipient or ():
+            items.append(EntityShareRecipientScopeItem(user_id=UserID(recipient.value)))
+        for project in scope.recipient_project or ():
+            items.append(EntityShareRecipientProjectScopeItem(project_id=ProjectID(project.value)))
+        for sharer in scope.sharer or ():
+            items.append(EntityShareSharerScopeItem(user_id=UserID(sharer.value)))
         for target in scope.target or ():
             items.append(
                 EntityShareTargetScopeItem(

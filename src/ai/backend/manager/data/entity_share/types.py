@@ -9,7 +9,6 @@ from typing import override
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.types import EntityData, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission
 
 __all__ = (
@@ -40,7 +39,7 @@ class EntityShareStatus(enum.StrEnum):
 class EntityShareData(EntityData):
     id: EntityShareID
     sharer_user_id: UserID
-    recipient_virtual_entity_id: VirtualEntityID | None
+    recipient: RuntimeEntityID | None
     recipient_email: str | None
     target: RuntimeEntityID
     permission_cap: Permission | None

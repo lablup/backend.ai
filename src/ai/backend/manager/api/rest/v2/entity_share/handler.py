@@ -9,6 +9,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.dto.manager.v2.entity_share.request import (
     CreateEntityShareInput,
+    MySearchEntitySharesInput,
     ScopedSearchEntitySharesInput,
 )
 from ai.backend.manager.api.rest.v2.path_params import ShareIdPathParam
@@ -55,6 +56,11 @@ class V2EntityShareHandler:
         """Withdraw the offer before it was answered."""
         result = await self._adapter.cancel(EntityShareID(path.parsed.share_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_search(self, body: BodyParam[MySearchEntitySharesInput]) -> APIResponse:
+        """The shares the caller stands on a side of."""
+        result = await self._adapter.my_search(body.parsed)
+        return APIResponse.build(status_code=200, response_model=result)
 
     async def scoped_search(self, body: BodyParam[ScopedSearchEntitySharesInput]) -> APIResponse:
         """The invitations the named sides reach."""
