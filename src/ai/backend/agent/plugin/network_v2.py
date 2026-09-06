@@ -8,7 +8,7 @@ interpret it. The Docker provisioner is the one that does today. See BEP-1078 (a
 """
 
 from abc import ABCMeta, abstractmethod
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from typing import Any
 
 from ai.backend.agent.kernel import AbstractKernel
@@ -110,11 +110,14 @@ class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, meta
         """
         return
 
-    async def prepare_recovery(self) -> None:
+    async def prepare_recovery(self, spare: Collection[int] = ()) -> None:
         """Fail-close surviving host state before a privileged executor reads its journal.
 
         The default is a no-op for backends without persistent cross-node paths. Overlay backends
         use this before recovery knows which sessions it can safely adopt.
+
+        ``spare`` names the tunnel identifiers another agent on this node is known to be running
+        on. Whatever a backend cannot establish belongs to somebody else is closed.
         """
         return
 

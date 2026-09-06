@@ -12,12 +12,15 @@ defaults, so a signature change breaks them rather than passing over a stub.
 
 from __future__ import annotations
 
+from collections.abc import Collection
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
 
 from ai.backend.agent.errors.network import OverlayEncryptionUnavailable
 from ai.backend.agent.network.session_network import SessionNetwork
+from ai.backend.agent.network.vni_registry import VniRegistry
 from ai.backend.common.network.types import NetworkBackendKind, SessionNetMeta
 
 
@@ -30,10 +33,12 @@ class _Backend:
         self.preflight_error = preflight_error
         self.still_up = still_up
         self.preflight_calls = 0
+        self.spared: frozenset[int] = frozenset()
         self.retry_calls = 0
 
-    async def prepare_recovery(self) -> None:
+    async def prepare_recovery(self, spare: Collection[int] = ()) -> None:
         self.preflight_calls += 1
+        self.spared = frozenset(spare)
         if self.preflight_error is not None:
             raise self.preflight_error
 
@@ -334,3 +339,53 @@ class TestWithdrawingBeforeTheMemberKeyGoes:
         assert stopped == [], (
             "the member key was removed anyway; the manager now believes this node let the VNI go"
         )
+
+
+class TestWhatTheOtherAgentOnThisHostIsUsing:
+    """D4, caller side. Sparing needs both halves: the registry says which agent holds a VNI, the
+    live containers say the holder is still using it. The registry alone would let a dead agent's
+    stale binding keep a tunnel up for good; the containers alone do not say which VNI carries
+    them."""
+
+    @staticmethod
+    async def _spared(net: Any, registry: VniRegistry, live: dict[str, str]) -> frozenset[int]:
+        net._vni_registry = registry
+
+        async def containers() -> dict[str, str]:
+            return live
+
+        net._live_containers = containers
+        spared: frozenset[int] = await net._other_agents_live_vnis()
+        return spared
+
+    async def test_another_agents_live_vni_is_spared(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path)
+        async with registry.binding(5000, "i-other", "their-session", "d1") as bound:
+            bound.mark_built()
+        net = _network()
+        spared = await self._spared(net, registry, {"c9": "their-session"})
+        assert spared == frozenset({5000})
+
+    async def test_our_own_vni_is_not_spared(self, tmp_path: Path) -> None:
+        # The preflight exists for exactly these: our restart says nothing about their state.
+        registry = VniRegistry(tmp_path)
+        net = _network()
+        async with registry.binding(5000, net._agent_id, "our-session", "d1") as bound:
+            bound.mark_built()
+        spared = await self._spared(net, registry, {"c1": "our-session"})
+        assert spared == frozenset()
+
+    async def test_a_binding_with_nothing_running_is_not_spared(self, tmp_path: Path) -> None:
+        # A dead agent's leftover binding would otherwise keep a tunnel up for good.
+        registry = VniRegistry(tmp_path)
+        async with registry.binding(5000, "i-other", "gone", "d1") as bound:
+            bound.mark_built()
+        net = _network()
+        spared = await self._spared(net, registry, {"c1": "some-other-session"})
+        assert spared == frozenset()
+
+    async def test_an_unreadable_registry_spares_nothing(self, tmp_path: Path) -> None:
+        registry = VniRegistry(tmp_path / "does" / "not" / "exist")
+        net = _network()
+        spared = await self._spared(net, registry, {"c1": "whatever"})
+        assert spared == frozenset()

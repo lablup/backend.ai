@@ -173,6 +173,14 @@ class VniRegistry:
     def unusable_reason(self) -> str | None:
         return self._journal.unusable_reason()
 
+    async def bound_vnis(self) -> frozenset[int]:
+        """Every VNI this node currently records a binding for, whoever holds it."""
+        found: set[int] = set()
+        for key in await self._journal.keys():
+            if key.startswith("vni") and key[3:].isdigit():
+                found.add(int(key[3:]))
+        return frozenset(found)
+
     async def holders(self, vni: int) -> frozenset[VniHolder]:
         """Everyone on this node currently bound to the VNI, for diagnostics and refusal text."""
         return frozenset(
