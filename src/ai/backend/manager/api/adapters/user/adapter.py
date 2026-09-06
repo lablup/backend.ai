@@ -116,10 +116,6 @@ from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.orders import UserOrders
 from ai.backend.manager.models.user.row import UserRole as UserRoleModel
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.user.scopes import (
-    DomainUserOperationScope,
-    ProjectUserOperationScope,
-)
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
@@ -154,13 +150,12 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
 )
 from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
+from ai.backend.manager.services.user.actions.scoped_search import (
+    DomainUserScopeItem,
+    ProjectUserScopeItem,
+    ScopedSearchUsersAction,
+)
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
-from ai.backend.manager.services.user.actions.search_users_by_domain import (
-    SearchUsersByDomainAction,
-)
-from ai.backend.manager.services.user.actions.search_users_by_project import (
-    SearchUsersByProjectAction,
-)
 from ai.backend.manager.services.user.actions.search_users_by_role import (
     SearchUsersByRoleAction,
 )
@@ -271,7 +266,7 @@ class UserAdapter(BaseAdapter):
 
     async def gql_search_by_domain(
         self,
-        scope: DomainUserOperationScope,
+        domain_name: str,
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users within a domain, cursor-based pagination."""
@@ -289,10 +284,9 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.user.search_users_by_domain.run(
-            SearchUsersByDomainAction(
-                domain_id=await self.resolve_domain_id(scope.domain_name),
-                domain_name=scope.domain_name,
+        result = await self._processors.user.scoped_search.run(
+            ScopedSearchUsersAction(
+                items=[DomainUserScopeItem(domain_id=await self.resolve_domain_id(domain_name))],
                 searcher=searcher,
             )
         )
@@ -305,7 +299,7 @@ class UserAdapter(BaseAdapter):
 
     async def gql_search_by_project(
         self,
-        scope: ProjectUserOperationScope,
+        project_id: ProjectID,
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users within a project, cursor-based pagination."""
@@ -323,8 +317,11 @@ class UserAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.user.search_users_by_project.run(
-            SearchUsersByProjectAction(project_id=ProjectID(scope.project_id), searcher=searcher)
+        result = await self._processors.user.scoped_search.run(
+            ScopedSearchUsersAction(
+                items=[ProjectUserScopeItem(project_id=project_id)],
+                searcher=searcher,
+            )
         )
         return AdminSearchUsersPayload(
             items=await self._user_nodes(result.items),
@@ -360,10 +357,9 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users within a domain."""
         searcher = self._build_search_searcher(input)
-        result = await self._processors.user.search_users_by_domain.run(
-            SearchUsersByDomainAction(
-                domain_id=await self.resolve_domain_id(domain_name),
-                domain_name=domain_name,
+        result = await self._processors.user.scoped_search.run(
+            ScopedSearchUsersAction(
+                items=[DomainUserScopeItem(domain_id=await self.resolve_domain_id(domain_name))],
                 searcher=searcher,
             )
         )
@@ -383,8 +379,11 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users within a project."""
         searcher = self._build_search_searcher(input)
-        result = await self._processors.user.search_users_by_project.run(
-            SearchUsersByProjectAction(project_id=ProjectID(project_id), searcher=searcher)
+        result = await self._processors.user.scoped_search.run(
+            ScopedSearchUsersAction(
+                items=[ProjectUserScopeItem(project_id=ProjectID(project_id))],
+                searcher=searcher,
+            )
         )
         return SearchUsersPayload(
             items=await self._user_nodes(result.items),

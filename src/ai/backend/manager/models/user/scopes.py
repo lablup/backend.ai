@@ -5,11 +5,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
@@ -35,28 +36,28 @@ class DomainUserOperationScope(OperationScope):
     Used for domain_users query (domain admin+).
     """
 
-    domain_name: str
+    domain_id: DomainID
     """Required. The domain to search within."""
 
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for UserRow."""
-        domain_name = self.domain_name
+        domain_id = self.domain_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRow.domain_name == domain_name
+            return UserRow.domain_id == domain_id
 
         return inner
 
     @property
     @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
+    def existence_checks(self) -> Sequence[ExistenceCheck[DomainID]]:
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
-                column=DomainRow.name,
-                value=self.domain_name,
-                error=DomainNotFound(self.domain_name),
+                column=DomainRow.id,
+                value=self.domain_id,
+                error=DomainNotFound(str(self.domain_id)),
             ),
         ]
 
@@ -69,7 +70,7 @@ class ProjectUserOperationScope(OperationScope):
     Membership is read from the project's virtual entity.
     """
 
-    project_id: UUID
+    project_id: ProjectID
     """Required. The project (group) to search within."""
 
     @override
@@ -85,7 +86,7 @@ class ProjectUserOperationScope(OperationScope):
 
     @property
     @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+    def existence_checks(self) -> Sequence[ExistenceCheck[ProjectID]]:
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
@@ -103,7 +104,7 @@ class RoleUserOperationScope(OperationScope):
     Requires JOIN with user_roles table.
     """
 
-    role_id: UUID
+    role_id: RoleID
     """Required. The role to search within."""
 
     @override
@@ -118,7 +119,7 @@ class RoleUserOperationScope(OperationScope):
 
     @property
     @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+    def existence_checks(self) -> Sequence[ExistenceCheck[RoleID]]:
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(

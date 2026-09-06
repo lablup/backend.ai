@@ -302,11 +302,9 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             UserV2Edge,
             UserV2GQL,
         )
-        from ai.backend.manager.models.user.scopes import DomainUserOperationScope
 
-        scope = DomainUserOperationScope(domain_name=self.basic_info.name)
         payload = await info.context.adapters.user.gql_search_by_domain(
-            scope=scope,
+            domain_name=self.basic_info.name,
             input=AdminSearchUsersInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,

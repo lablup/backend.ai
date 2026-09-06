@@ -10,6 +10,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ProjectFairShareScopeDTO,
     ProjectUsageScopeDTO,
@@ -251,11 +252,9 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             UserV2Edge,
             UserV2GQL,
         )
-        from ai.backend.manager.models.user.scopes import ProjectUserOperationScope
 
-        repo_scope = ProjectUserOperationScope(project_id=UUID(str(self.id)))
         payload = await info.context.adapters.user.gql_search_by_project(
-            scope=repo_scope,
+            project_id=ProjectID(UUID(str(self.id))),
             input=AdminSearchUsersInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,

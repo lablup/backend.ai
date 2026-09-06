@@ -9,6 +9,7 @@ from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.user.request import AdminSearchUsersInput
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -27,10 +28,6 @@ from ai.backend.manager.api.gql.user.types import (
     UserV2GQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.models.user.scopes import (
-    DomainUserOperationScope,
-    ProjectUserOperationScope,
-)
 
 
 @gql_root_field(
@@ -111,7 +108,7 @@ async def domain_users_v2(
     offset: int | None = None,
 ) -> UserV2Connection | None:
     payload = await info.context.adapters.user.gql_search_by_domain(
-        scope=DomainUserOperationScope(domain_name=scope.domain_name),
+        domain_name=scope.domain_name,
         input=AdminSearchUsersInput(
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
@@ -156,7 +153,7 @@ async def project_users_v2(
     offset: int | None = None,
 ) -> UserV2Connection | None:
     payload = await info.context.adapters.user.gql_search_by_project(
-        scope=ProjectUserOperationScope(project_id=scope.project_id),
+        project_id=ProjectID(scope.project_id),
         input=AdminSearchUsersInput(
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,

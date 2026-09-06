@@ -62,10 +62,6 @@ from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.orders import ProjectOrders
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.project.scopes import (
-    DomainProjectOperationScope,
-    UserProjectOperationScope,
-)
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.project.updaters import (
     ProjectRestoreUpdater,
@@ -82,11 +78,14 @@ from ai.backend.manager.services.project.actions.create_project import CreatePro
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
 from ai.backend.manager.services.project.actions.purge_project import PurgeProjectAction
 from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
+from ai.backend.manager.services.project.actions.scoped_search import (
+    DomainProjectScopeItem,
+    ScopedSearchProjectsAction,
+    UserProjectScopeItem,
+)
 from ai.backend.manager.services.project.actions.search_projects import (
     GetProjectAction,
     GlobalSearchProjectsAction,
-    SearchProjectsByDomainAction,
-    SearchProjectsByUserAction,
 )
 from ai.backend.manager.services.project.actions.unassign_users import (
     UnassignUsersFromProjectAction,
@@ -285,7 +284,6 @@ class ProjectAdapter(BaseAdapter):
     ) -> AdminSearchGroupsPayload:
         """Search projects within a domain."""
         domain_id = await self._resolve_domain_id(domain_name)
-        scope = DomainProjectOperationScope(domain_id=domain_id)
         conditions = self._convert_group_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         searcher = self._build_searcher(
@@ -301,8 +299,10 @@ class ProjectAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.project.search_projects_by_domain.run(
-            SearchProjectsByDomainAction(domain_id=scope.domain_id, searcher=searcher)
+        result = await self._processors.project.scoped_search.run(
+            ScopedSearchProjectsAction(
+                items=[DomainProjectScopeItem(domain_id=domain_id)], searcher=searcher
+            )
         )
 
         return AdminSearchGroupsPayload(
@@ -314,7 +314,7 @@ class ProjectAdapter(BaseAdapter):
 
     async def search_by_user(
         self,
-        scope: UserProjectOperationScope,
+        user_id: UserID,
         input: AdminSearchProjectsInput,
     ) -> AdminSearchGroupsPayload:
         """Search projects a user is a member of."""
@@ -333,8 +333,10 @@ class ProjectAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.project.search_projects_by_user.run(
-            SearchProjectsByUserAction(user_id=UserID(scope.user_uuid), searcher=searcher)
+        result = await self._processors.project.scoped_search.run(
+            ScopedSearchProjectsAction(
+                items=[UserProjectScopeItem(user_id=user_id)], searcher=searcher
+            )
         )
 
         return AdminSearchGroupsPayload(
