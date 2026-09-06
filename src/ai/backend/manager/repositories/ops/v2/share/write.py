@@ -15,9 +15,9 @@ from collections.abc import Collection, Mapping, Sequence
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.data.entity_invitation.types import EntityInvitationData
+from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.errors.permission import InvalidFieldPermission
-from ai.backend.manager.models.entity_invitation.updaters import EntityInvitationAcceptUpdater
+from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
 from ai.backend.manager.repositories.ops.v2.cap import V2CapOps
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
@@ -114,9 +114,7 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
         await self._removed_from(from_scopes, entity)
         await self._created_in(to_scopes, entity)
 
-    async def accept_invitation(
-        self, updater: EntityInvitationAcceptUpdater
-    ) -> EntityInvitationData | None:
+    async def accept_invitation(self, updater: EntityShareAcceptUpdater) -> EntityShareData | None:
         """Settle the invitation as accepted and share its entity to the invitee.
 
         ``None`` when nothing was settled — the invitation is gone, already answered,
@@ -140,7 +138,7 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
             return None
         data = updater.to_data(row)
         await self.widen_share(
-            updater.invitee_user_id,
+            updater.recipient_user_id,
             data.target,
             data.permission_cap if data.permission_cap is not None else Permission.full(),
         )

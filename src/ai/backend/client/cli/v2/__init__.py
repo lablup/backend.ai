@@ -275,10 +275,10 @@ def audit_log() -> None:
 
 @v2.group(
     cls=LazyGroup,
-    import_name="ai.backend.client.cli.v2.entity_invitation:entity_invitation",
-    name="entity-invitation",
+    import_name="ai.backend.client.cli.v2.entity_share:entity_share",
+    name="entity-share",
 )
-def entity_invitation() -> None:
+def entity_share() -> None:
     """Entity invitation commands."""
 
 

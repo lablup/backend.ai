@@ -54,10 +54,10 @@ def build_v2_routes(
     )
     from .domain.handler import V2DomainHandler
     from .domain.registry import register_v2_domain_routes
-    from .entity_invitation.handler import V2EntityInvitationHandler
-    from .entity_invitation.registry import register_v2_entity_invitation_routes
     from .entity_label.handler import V2EntityLabelHandler
     from .entity_label.registry import register_v2_entity_label_routes
+    from .entity_share.handler import V2EntityShareHandler
+    from .entity_share.registry import register_v2_entity_share_routes
     from .entity_type.handler import V2EntityTypeHandler
     from .entity_type.registry import register_v2_entity_type_routes
     from .fair_share.handler import V2FairShareHandler
@@ -173,7 +173,7 @@ def build_v2_routes(
     notification_handler = V2NotificationHandler(adapter=adapters.notification)
     object_storage_handler = V2ObjectStorageHandler(adapter=adapters.object_storage)
     project_handler = V2ProjectHandler(adapter=adapters.project)
-    entity_invitation_handler = V2EntityInvitationHandler(adapter=adapters.entity_invitation)
+    entity_share_handler = V2EntityShareHandler(adapter=adapters.entity_share)
     role_preset_handler = V2RolePresetHandler(adapter=adapters.role_preset)
     prometheus_query_preset_handler = V2PrometheusQueryPresetHandler(
         adapter=adapters.prometheus_query_preset
@@ -262,9 +262,7 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_notification_routes(notification_handler, route_deps))
     v2_reg.add_subregistry(register_v2_object_storage_routes(object_storage_handler, route_deps))
     v2_reg.add_subregistry(register_v2_project_routes(project_handler, route_deps))
-    v2_reg.add_subregistry(
-        register_v2_entity_invitation_routes(entity_invitation_handler, route_deps)
-    )
+    v2_reg.add_subregistry(register_v2_entity_share_routes(entity_share_handler, route_deps))
     v2_reg.add_subregistry(register_v2_role_preset_routes(role_preset_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_prometheus_query_preset_routes(prometheus_query_preset_handler, route_deps)
