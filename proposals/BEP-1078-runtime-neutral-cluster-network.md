@@ -3,7 +3,7 @@ Author: Daemyung Jang (daemyung@lablup.com)
 Status: Draft
 Created: 2026-09-06
 Created-Version: 26.9.0
-Target-Version:
+Target-Version: 26.9.0
 Implemented-Version:
 ---
 
@@ -36,6 +36,9 @@ to hand over a container's network namespace.
 | Agent plugin | agent | node data plane: devices, FDB/ARP, firewall, XFRM |
 | Backend | agent | how the L2 domain is realized (`vxlan`, `bridge`) |
 | Runtime seam | agent | netns of a container, by PID |
+
+Docker is the runtime wired today. The seam names no runtime type, so a provisioner for another
+one implements the same contract, but this proposal does not claim more than one exists.
 
 An agent joins a session by publishing a member record; it removes that record only once its
 teardown has completed, which is what the manager reads before it reuses an allocation.
@@ -75,8 +78,10 @@ The plugin exposes the node's half of a session:
 | `add_peer` / `del_peer` | program one remote endpoint; both idempotent |
 | `teardown_session_network` | leave nothing of this session on the node |
 
-A node's own privileged operations run in a separate `privnet` daemon, so the agent itself needs
-no `CAP_NET_ADMIN`.
+A node's privileged operations can be delegated to a separate `privnet` daemon, so the agent
+itself needs no `CAP_NET_ADMIN`. That is opt-in: `network-privnet-socket` selects it, and with it
+unset the agent does this work in-process and must hold the capabilities. Two agents sharing a
+host share one privnet when it is used.
 
 ### 2.4 Cluster name resolution
 
