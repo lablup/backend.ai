@@ -55,7 +55,7 @@ from ai.backend.agent.network.privnet.resolver import (
     ClusterResolver,
     make_upstream_forwarder,
 )
-from ai.backend.agent.network.provisioner import AttachFailed, ContainerNetworkProvisioner
+from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
 from ai.backend.agent.network.runtime import ExecResult, OciRuntime
 from ai.backend.agent.network.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.network.vni_registry import VniRegistry
@@ -159,8 +159,12 @@ class SessionNetwork:
     # setup_session_network deletes the vxlan/bridge the first just created.
     _session_locks: dict[str, asyncio.Lock]
     # How many tasks hold or wait on each session's lock, so it is dropped only when the last one
-    # leaves (see _session_locked for why its identity must outlive a single critical section).
+    # leaves (see _keyed_lock for why its identity must outlive a single critical section).
     _session_lock_users: dict[str, int]
+    # The same, for the session's cluster resolver. A separate lock because `ensure_session` calls
+    # `ensure_cluster_dns` while holding the one above, and an asyncio.Lock is not reentrant.
+    _dns_locks: dict[str, asyncio.Lock]
+    _dns_lock_users: dict[str, int]
     # A last-kernel cleanup must not forget a session merely because fail-close hit a transient
     # host error. The coordinator remains registered until one of these retries finishes teardown.
     _teardown_retry_tasks: dict[str, asyncio.Task[None]]
@@ -243,6 +247,8 @@ class SessionNetwork:
         self._ipam = ipam
         self._session_locks = {}
         self._session_lock_users = {}
+        self._dns_locks = {}
+        self._dns_lock_users = {}
         self._teardown_retry_tasks = {}
         self._tearing_down = set()
 
@@ -758,7 +764,25 @@ class SessionNetwork:
 
     @contextlib.asynccontextmanager
     async def _session_locked(self, session_id: str) -> AsyncIterator[None]:
-        """Hold this session's setup/teardown lock.
+        """Hold this session's setup/teardown lock."""
+        async with self._keyed_lock(self._session_locks, self._session_lock_users, session_id):
+            yield
+
+    @contextlib.asynccontextmanager
+    async def _dns_locked(self, session_id: str) -> AsyncIterator[None]:
+        """Hold this session's cluster-resolver lock.
+
+        Its own lock, and not the setup/teardown one: `ensure_session` brings the resolver up
+        while holding that lock, and an asyncio.Lock is not reentrant.
+        """
+        async with self._keyed_lock(self._dns_locks, self._dns_lock_users, session_id):
+            yield
+
+    @contextlib.asynccontextmanager
+    async def _keyed_lock(
+        self, locks: dict[str, asyncio.Lock], users: dict[str, int], key: str
+    ) -> AsyncIterator[None]:
+        """Hold the lock ``locks[key]``, minting and dropping it around the last user.
 
         The lock is refcounted rather than simply popped on teardown, because its *identity* has to
         stay stable for as long as anyone holds or waits on it. `Lock.release()` only schedules the
@@ -769,21 +793,21 @@ class SessionNetwork:
         first await, and dropping the entry only when the last user leaves, keeps one lock per
         in-flight session and still lets the dict shrink to empty.
         """
-        lock = self._session_locks.get(session_id)
+        lock = locks.get(key)
         if lock is None:
             lock = asyncio.Lock()
-            self._session_locks[session_id] = lock
-        self._session_lock_users[session_id] = self._session_lock_users.get(session_id, 0) + 1
+            locks[key] = lock
+        users[key] = users.get(key, 0) + 1
         try:
             async with lock:
                 yield
         finally:
-            remaining = self._session_lock_users[session_id] - 1
+            remaining = users[key] - 1
             if remaining:
-                self._session_lock_users[session_id] = remaining
+                users[key] = remaining
             else:
-                del self._session_lock_users[session_id]
-                self._session_locks.pop(session_id, None)
+                del users[key]
+                locks.pop(key, None)
 
     def _refuse_while_unrecovered(self, meta: SessionNetMeta) -> None:
         """Refuse a new overlay session while this node has not finished recovering.
@@ -1066,9 +1090,22 @@ class SessionNetwork:
         **Fail-loud**: phase 5 removed the ``/etc/hosts`` peer map, so a resolver that does not come
         up leaves cluster names unresolvable and the session would hang at rendezvous with no visible
         cause — a bind failure, a missing post-attach gateway, or a failed redirect all raise. A
-        genuinely absent session (no coordinator) is still a silent no-op."""
-        if session_id in self._dns_servers:
-            return
+        genuinely absent session (no coordinator) is still a silent no-op.
+
+        **Once per session, and every caller waits for all of it.** The kernels of one session
+        attach concurrently on a node, and the server joins ``_dns_servers`` before its redirect is
+        installed: a second kernel that only read the dict would pass this gate with the gateway's
+        ``:53`` still going nowhere, and — if the first attempt then failed — go on to run its
+        command against a session that has no resolver at all. So the check is made under the
+        lock and nowhere else: inside it, an entry in ``_dns_servers`` is a resolver that is up
+        AND redirected -- a start that fails takes its entry back out before it releases."""
+        async with self._dns_locked(session_id):
+            if session_id in self._dns_servers:
+                return  # up and redirected, by this session's first kernel on this node
+            await self._start_cluster_dns(session_id)
+
+    async def _start_cluster_dns(self, session_id: str) -> None:
+        """Bind the resolver and redirect the gateway's :53 to it. Holds `_dns_locked`."""
         coordinator = self._coordinators.get(session_id)
         backend = self._session_backends.get(session_id)
         if coordinator is None or backend is None:
@@ -1090,11 +1127,6 @@ class SessionNetwork:
             raise ClusterDNSStartError(
                 f"could not bind the cluster resolver for session {session_id}: {e}"
             ) from e
-        # Another kernel of this session may have started the server across the awaits above; if so,
-        # keep the first and drop this one so its socket does not leak.
-        if session_id in self._dns_servers:
-            await server.stop()
-            return
         self._dns_servers[session_id] = server
         # Redirect :53 -> the loopback port only AFTER the resolver is live, so it never points at a
         # dead socket. A failure here means cluster names are unresolvable — unwind and fail loudly.
@@ -1247,9 +1279,9 @@ class SessionNetwork:
             meta=meta,
             kernel_config=kernel_config,
             cluster_info=cluster_info,
+            on_planned=self._record_attachment(session_id, container_id),
         )
         self._tracker.track(session_id, container_id)
-        self._attachments[container_id] = (session_id, result.plan, result.handle.pid)
         # The attach just allocated the session's LOCAL block, so its gateway now exists — bring the
         # resolver up (idempotent: only the first attach on this node actually starts it).
         await self.ensure_cluster_dns(session_id)
@@ -1281,9 +1313,12 @@ class SessionNetwork:
     ) -> LaunchResult:
         """Start the container + attach CNI — maps to AbstractAgent.start_container."""
         result = await self._orchestrator_of(session_id).start_and_attach(
-            container_id, meta=meta, kernel_config=kernel_config, cluster_info=cluster_info
+            container_id,
+            meta=meta,
+            kernel_config=kernel_config,
+            cluster_info=cluster_info,
+            on_planned=self._record_attachment(session_id, container_id),
         )
-        self._attachments[container_id] = (session_id, result.plan, result.handle.pid)
         # The attach just allocated the session's LOCAL block, so its gateway now exists — bring the
         # resolver up (idempotent: only the first attach on this node actually starts it).
         await self.ensure_cluster_dns(session_id)
@@ -1318,32 +1353,42 @@ class SessionNetwork:
         # The periodic reconcile would get there on its own, but not before the gate is released;
         # this is the one moment where waiting is cheaper than retrying.
         await self._converge_peers(session_id)
-        try:
-            result = await self._orchestrator_of(session_id).attach(
-                container_id,
-                meta=meta,
-                kernel_config=kernel_config,
-                cluster_info=cluster_info,
-                task_pid=task_pid,
-            )
-        except AttachFailed as e:
-            # Record what the failed attach may have left on this host. The attacher undoes its
-            # own partial work, but a DEL that could not run leaves a veth and an address with
-            # nothing naming them -- and the caller was only ever told the plan on success, so
-            # until now nothing could tear them down. Kept for `_retry_pending_detaches`.
-            self._attachments[container_id] = (session_id, e.plan, task_pid)
-            raise
+        result = await self._orchestrator_of(session_id).attach(
+            container_id,
+            meta=meta,
+            kernel_config=kernel_config,
+            cluster_info=cluster_info,
+            task_pid=task_pid,
+            on_planned=self._record_attachment(session_id, container_id),
+        )
         # Tracked here for the same reason `launch_container` tracks what it started: the tracker
         # is what decides when the session's last kernel on this node is gone, and a container it
         # never heard of can never be that one. Untracked, this session's teardown simply never
         # ran -- measured on three nodes: after the session reached TERMINATED every node still
         # held its vxlan device, its bridge, its ESP state and its plaintext-drop rule.
         self._tracker.attach(session_id, kernel_id, container_id)
-        self._attachments[container_id] = (session_id, result.plan, task_pid)
         # The attach just allocated the session's LOCAL block, so its gateway now exists — bring the
         # resolver up (idempotent: only the first attach on this node actually starts it).
         await self.ensure_cluster_dns(session_id)
         return result
+
+    def _record_attachment(
+        self, session_id: str, container_id: str
+    ) -> Callable[[EndpointPlan, int], None]:
+        """Capture a container's detach inputs the moment its plan exists, before it is applied.
+
+        The plan names the host veth, the address and the rules the attach puts on this host, so
+        an attach that fails -- or is CANCELLED, which is how the kernel-creation timeout and the
+        agent stopping arrive -- leaves state nothing else can name. The attacher undoes its own
+        partial work; this is what `_retry_pending_detaches` reads for the DEL that could not run.
+        Recording early costs a record for a container that never attached, whose detach is a
+        no-op; recording late cost the leftovers of every attach that did not return.
+        """
+
+        def record(plan: EndpointPlan, task_pid: int) -> None:
+            self._attachments[container_id] = (session_id, plan, task_pid)
+
+        return record
 
     async def _converge_peers(self, session_id: str) -> None:
         """Program every peer this node knows of, before a container starts talking to them.

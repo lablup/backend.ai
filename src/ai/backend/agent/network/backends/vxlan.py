@@ -2478,8 +2478,19 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         with contextlib.suppress(Exception):
             await self._del_forward_accept(vni, rollback)
         for dev in (bridge_dev(vni), vxlan_dev(vni)):
-            with contextlib.suppress(Exception):
+            try:
                 await self._delete_link_quiet(dev)
+            except Exception:
+                # Suppressed, because the failure the caller is undoing is the one worth raising
+                # -- but recorded, which it was not. `_delete_link_quiet` reports anything but
+                # absence precisely so a device that is still up is not mistaken for a clean
+                # host, and this session joins `_sessions` only on success, so nothing else will
+                # ever come back for it. `retry_fail_close` reads this set, and readiness reports
+                # it: a device left here carries a VNI the manager is free to allocate again.
+                self._unclosed_devices.add(dev)
+                log.exception(
+                    "could not remove {} while undoing a partial vxlan setup for vni {}", dev, vni
+                )
         if rollback:
             log.warning(
                 "undid a partial vxlan setup for vni {}: {}", vni, ", ".join(sorted(rollback))
@@ -2715,7 +2726,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         return await probe_encryption_support(self._runner, self._reader)
 
     def unclosed_devices(self) -> frozenset[str]:
-        """Surviving tunnels this node has not managed to bring down, for diagnostics.
+        """Devices this node has not managed to bring down, for diagnostics.
+
+        Tunnels a previous life left behind, and anything a failed setup could not take back off
+        this host.
 
         Includes a standing entry while the preflight has not run at all: an empty set means "this
         backend looked and everything is down", and a startup that never reached the preflight

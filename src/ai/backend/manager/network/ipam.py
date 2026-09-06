@@ -8,7 +8,6 @@ replacing Swarm's internal global IPAM. See BEP-1078 (control plane).
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import ipaddress
 import json
 import logging
@@ -344,10 +343,28 @@ class SubnetAllocator:
         committed and whose answer never came back -- the awaiting task cancelled, the connection
         dropped -- is held by this session and named in no list. Only units carrying this exact
         claim are touched, so a unit that went to somebody else is left alone.
+
+        A unit that would not go back is said out loud rather than suppressed: the caller goes on
+        to the next candidate block, `release` only ever runs against the subnet a session's meta
+        records, and nothing else names this one -- so it is a hole in the pool for the cluster's
+        lifetime, and the pool's size is an operator's number.
         """
+        stuck: list[str] = []
         for unit in units:
-            with contextlib.suppress(Exception):
+            try:
                 await self._etcd.delete_if_value(_allocated_key(unit), payload)
+            except Exception:
+                # Kept going, not raised: this runs while a claim is being abandoned, and the
+                # remaining units are worth more than reporting the first failure.
+                stuck.append(unit)
+        if stuck:
+            log.error(
+                "could not give back {} unit block(s) of a partial claim: {}. They stay claimed"
+                " by {} and no later release names them.",
+                len(stuck),
+                ", ".join(stuck),
+                payload,
+            )
 
     async def holder(self, subnet: str) -> str | None:
         """The session every unit block of ``subnet`` is claimed by, or None if they disagree or

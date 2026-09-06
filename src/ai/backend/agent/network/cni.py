@@ -87,8 +87,8 @@ class CniAttacher:
 
         Atomic: if any ADD fails, the ADDs already applied are rolled back (DEL, reverse order)
         before re-raising, so a partial attach never leaves a dangling veth / IPAM lease / MASQ
-        rule that no later detach would reclaim (the caller only records the plan once attach
-        returns successfully)."""
+        rule that no later detach would reclaim. What this cannot undo -- a DEL that would not
+        run -- is the caller's, which is why it is handed the plan before this is called."""
         assigned: dict[NetworkRole, str] = {}
         applied: list[CniInvocation] = []
         try:
@@ -112,8 +112,8 @@ class CniAttacher:
         except BaseException:
             # BaseException, and shielded: a cancelled attach -- the kernel-creation timeout, the
             # agent shutting down -- is the ordinary way this is interrupted, and it left every
-            # interface the plan had already applied on the host with nothing naming them. The
-            # caller records the plan only once attach returns, so nothing else knows they exist.
+            # interface the plan had already applied on the host behind. What this undo cannot
+            # remove is named by the plan its caller already holds.
             await asyncio.shield(
                 asyncio.ensure_future(self._undo(applied, container_id=container_id, netns=netns))
             )

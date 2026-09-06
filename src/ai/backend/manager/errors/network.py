@@ -143,3 +143,25 @@ class NetworkBackendMismatch(BackendAIError, web.HTTPConflict):
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.CONFLICT,
         )
+
+
+class SessionRecordContested(BackendAIError, web.HTTPConflict):
+    """Another manager took this session's network record while a create was running.
+
+    Two managers can build one session at once -- an HA pair, a retry landing elsewhere. They
+    converge on one subnet and one VNI, so only the call holding the record may write or undo;
+    the other finding out here is what stops it overwriting, resurrecting or releasing what the
+    holder is already handing to its agents. Retryable: the session is somebody's, and the next
+    attempt reads what they published.
+    """
+
+    error_type = "https://api.backend.ai/probs/manager/session-network-record-contested"
+    error_title = "The session's network record belongs to another manager."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )

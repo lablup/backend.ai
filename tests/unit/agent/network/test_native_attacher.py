@@ -731,3 +731,60 @@ class TestEveryRequiredCommandIsChecked:
 
         monkeypatch.setattr(na, "_run", _Absent(existing=set()))
         await runner("DEL", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
+
+
+class TestAnAttachThatCouldNotBeUndone:
+    """D2b. The undo gives the address back only once the veth carrying it is gone -- the rule the
+    DEL path already follows. The half-attached veth already has the address configured, so a
+    lease returned over a link that would not go down puts the next container on a live IP."""
+
+    _SUBNET = "172.30.1.0/24"
+    _GATEWAY = "172.30.1.1"
+    _FIRST = "172.30.1.2"
+
+    class _Refusing(_RunRecorder):
+        """Refuses the container's default route, so the attach unwinds -- and, when asked, the
+        removal of the host veth the unwind reaches for next."""
+
+        def __init__(self, *, veth_delete_fails: bool) -> None:
+            super().__init__(existing=set())
+            self._veth_delete_fails = veth_delete_fails
+
+        @override
+        async def __call__(self, argv: Any, *, check: bool = True) -> tuple[int, bytes, bytes]:
+            argv = list(argv)
+            if "ip route replace default" in " ".join(argv):
+                self.calls.append(argv)
+                raise RuntimeError("command failed (rc=2): no route to host")
+            if argv[:3] == ["ip", "link", "del"] and self._veth_delete_fails:
+                self.calls.append(argv)
+                raise RuntimeError(
+                    "command failed (rc=2): RTNETLINK answers: Operation not permitted"
+                )
+            return await super().__call__(argv, check=check)
+
+    async def _attach_that_failed(
+        self, tmp_path: Path, monkeypatch: Any, *, veth_delete_fails: bool
+    ) -> NativeBridgeAttachRunner:
+        run = self._Refusing(veth_delete_fails=veth_delete_fails)
+        monkeypatch.setattr(na, "_run", run)
+        runner = NativeBridgeAttachRunner(uplink="eth0", ipam_state_dir=tmp_path)
+        with pytest.raises(RuntimeError):
+            await runner("ADD", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
+        assert any(c[:3] == ["ip", "link", "del"] for c in run.calls), "the undo never ran"
+        return runner
+
+    async def test_the_address_stays_claimed_when_the_veth_would_not_go(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        runner = await self._attach_that_failed(tmp_path, monkeypatch, veth_delete_fails=True)
+        nxt = await runner._ipam.allocate(self._SUBNET, "next", "eth0", reserve=[self._GATEWAY])
+        assert nxt != self._FIRST, "handed the next container an address a live veth still holds"
+
+    async def test_the_address_goes_back_once_the_veth_is_gone(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # The other half of the rule: a lease kept forever is a pool that shrinks every failure.
+        runner = await self._attach_that_failed(tmp_path, monkeypatch, veth_delete_fails=False)
+        nxt = await runner._ipam.allocate(self._SUBNET, "next", "eth0", reserve=[self._GATEWAY])
+        assert nxt == self._FIRST

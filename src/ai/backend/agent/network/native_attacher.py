@@ -14,7 +14,6 @@ bridge), ``isDefaultGateway`` (default route in the container) and ``ipMasq`` (e
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import hashlib
 import ipaddress
 import logging
@@ -483,20 +482,39 @@ class NativeBridgeAttachRunner:
         ipam: Mapping[str, Any],
         subnet: str | None,
     ) -> None:
-        """Give back the veth and the address of an attach that did not finish."""
+        """Give back the veth and the address of an attach that did not finish.
+
+        The address only once the veth is gone, exactly as `_del` does it: the half-attached veth
+        already carries it, so releasing it over a link that would not go down hands the next
+        container an address a live interface is using. A lease kept costs one address until the
+        failed attach's plan is detached again (`_retry_pending_detaches`, which reaches this host
+        veth by name); a lease released early costs two containers one IP.
+        """
+        removed = True
         try:
             await _run(["ip", "link", "del", host_veth])
         except RuntimeError as e:
             if not command.is_absent_error(e):
+                removed = False
                 log.warning(
-                    "could not remove {} while undoing a failed attach of {}: {}",
+                    "could not remove {} while undoing a failed attach of {}: {}; keeping its"
+                    " address claimed so nothing else is given it",
                     host_veth,
                     container_id,
                     e,
                 )
-        if ipam.get("type") != "static" and subnet:
-            with contextlib.suppress(Exception):
+        if removed and ipam.get("type") != "static" and subnet:
+            try:
                 await self._ipam.release(subnet, container_id, ifname)
+            except Exception:
+                # Swallowed, not raised: this runs from the caller's `except` and an exception
+                # here would replace the failure it is undoing. Said out loud, because a lease
+                # nothing reports is one the pool never gets back.
+                log.exception(
+                    "could not release the address of {} on {} while undoing a failed attach",
+                    container_id,
+                    subnet,
+                )
 
     async def _is_wired(self, host_veth: str, netns: str, ifname: str) -> bool:
         """Is this container already attached — really attached, both ends?

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import signal as signal_module
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -98,14 +98,24 @@ class ContainerdKernelOrchestrator:
         meta: SessionNetMeta,
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
+        on_planned: Callable[[EndpointPlan, int], None] | None = None,
     ) -> LaunchResult:
         """Create the (already-created container's) task, attach CNI to its netns, then start it.
 
         The attach happens while the task is in the 'created' state — its netns exists but the
         user command has not exec'd — so the container process begins with its network already
         in place. Attaching after start would race krunner's network-dependent init (REPL bind,
-        SSH, peer lookup)."""
+        SSH, peer lookup).
+
+        ``on_planned`` receives ``(plan, task_pid)`` -- the detach inputs -- as soon as the plan
+        exists and before anything is applied. The PID is the orchestrator's to hand over: it
+        comes from the task this method creates, so a caller could not have it any earlier."""
         handle = await self._require_runtime().create_task(container_id)
+
+        def planned(plan: EndpointPlan) -> None:
+            if on_planned is not None:
+                on_planned(plan, handle.pid)
+
         # attach is atomic (it rolls back its own partial ADDs on failure), so a failure here
         # leaves the network clean and the created task is reclaimed by the normal clean path.
         plan, endpoint_ips = await self._network.attach(
@@ -114,6 +124,7 @@ class ContainerdKernelOrchestrator:
             meta=meta,
             container_id=container_id,
             task_pid=handle.pid,
+            on_planned=planned,
         )
         try:
             await self._require_runtime().start_task(container_id)
@@ -136,11 +147,16 @@ class ContainerdKernelOrchestrator:
         meta: SessionNetMeta,
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
+        on_planned: Callable[[EndpointPlan, int], None] | None = None,
     ) -> LaunchResult:
         """Convenience: create then start+attach in one call (single-step callers)."""
         await self.create(container_id, image_ref=image_ref, command=command, oci_spec=oci_spec)
         return await self.start_and_attach(
-            container_id, meta=meta, kernel_config=kernel_config, cluster_info=cluster_info
+            container_id,
+            meta=meta,
+            kernel_config=kernel_config,
+            cluster_info=cluster_info,
+            on_planned=on_planned,
         )
 
     async def attach(
@@ -151,6 +167,7 @@ class ContainerdKernelOrchestrator:
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
         task_pid: int,
+        on_planned: Callable[[EndpointPlan, int], None] | None = None,
     ) -> AttachResult:
         """Attach an already-running container's netns, given its PID.
 
@@ -164,12 +181,18 @@ class ContainerdKernelOrchestrator:
         atomic in itself (it undoes its own partial ADDs), but a gate never released leaves a
         container parked forever.
         """
+
+        def planned(plan: EndpointPlan) -> None:
+            if on_planned is not None:
+                on_planned(plan, task_pid)
+
         plan, endpoint_ips = await self._network.attach(
             kernel_config,
             cluster_info,
             meta=meta,
             container_id=container_id,
             task_pid=task_pid,
+            on_planned=planned,
         )
         return AttachResult(plan=plan, endpoint_ips=endpoint_ips)
 
