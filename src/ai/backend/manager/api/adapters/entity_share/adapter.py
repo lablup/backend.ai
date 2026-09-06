@@ -4,7 +4,8 @@ from collections.abc import Sequence
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.entity_share import EntityShareID
-from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -80,12 +81,18 @@ class EntityShareAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         target = RuntimeEntityID(input.target_entity_type, input.target_entity_id)
+        recipient: EntityIdentifier | None = None
+        if input.recipient_project_id is not None:
+            recipient = ProjectID(input.recipient_project_id)
+        elif input.recipient_user_id is not None:
+            recipient = UserID(input.recipient_user_id)
         result = await self._processors.entity_share.create.run(
             CreateEntityShareAction(
                 creator=EntityShareCreator(
                     sharer_user_id=UserID(me.user_id),
-                    recipient_email=input.recipient_email,
                     target=target,
+                    recipient=recipient,
+                    recipient_email=input.recipient_email,
                     permission_cap=self._to_permission_cap(input.permissions),
                 )
             )

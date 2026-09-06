@@ -25,19 +25,38 @@ __all__ = (
 
 
 class CreateEntityShareInput(BaseRequestModel):
-    """One offer of one entity to one address.
+    """One offer of one entity to one recipient.
 
-    The cap is given as the permissions it holds rather than a bitmask; an empty list
-    means no ceiling, so the invitee's own permissions stand unclipped.
+    The recipient is named exactly one of three ways: a project, a person, or an
+    address belonging to someone who may have no account. The cap is given as the
+    permissions it holds rather than a bitmask; an empty list means no ceiling, so the
+    recipient's own permissions stand unclipped.
     """
 
     target_entity_type: EntityType = Field(description="Type of the entity being offered")
     target_entity_id: EntityID = Field(description="Id of the entity being offered")
-    recipient_email: str = Field(description="Address the offer goes to")
+    recipient_project_id: EntityID | None = Field(
+        default=None, description="Project the offer goes to"
+    )
+    recipient_user_id: EntityID | None = Field(
+        default=None, description="Person the offer goes to; it lands in their own project"
+    )
+    recipient_email: str | None = Field(default=None, description="Address the offer goes to")
     permissions: list[PermissionBitDTO] = Field(
         default_factory=list,
         description="Permissions the offer caps at; empty for no ceiling",
     )
+
+    @model_validator(mode="after")
+    def _exactly_one_recipient(self) -> CreateEntityShareInput:
+        named = [
+            self.recipient_project_id is not None,
+            self.recipient_user_id is not None,
+            self.recipient_email is not None,
+        ]
+        if sum(named) != 1:
+            raise ValueError("An offer names exactly one recipient")
+        return self
 
 
 class EntityShareOrderBy(BaseRequestModel):

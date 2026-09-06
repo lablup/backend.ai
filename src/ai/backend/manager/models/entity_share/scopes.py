@@ -8,14 +8,17 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 __all__ = (
+    "EntityShareRecipientProjectScope",
     "EntityShareRecipientScope",
     "EntityShareSharerScope",
     "EntityShareTargetScope",
@@ -24,11 +27,12 @@ __all__ = (
 
 @dataclass(frozen=True)
 class EntityShareRecipientScope(OperationScope):
-    """The invitations addressed to one user.
+    """The offers addressed to one person, whichever way they were named.
 
-    The row carries an email rather than a user id, so the requester's own email is
-    read back from ``users`` in the condition itself. ``users.email`` is unique, so the
-    subquery answers with exactly one value.
+    A person is named two ways: by who they are, and by an address that reached them
+    before they had an account. Both are read back inside the statement — the node they
+    hold from ``virtual_entities``, their address from ``users``, where the column is
+    unique and answers with one value.
     """
 
     recipient_user_id: UserID
@@ -38,8 +42,22 @@ class EntityShareRecipientScope(OperationScope):
         recipient_user_id = self.recipient_user_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EntityShareRow.recipient_email == (
-                sa.select(UserRow.email).where(UserRow.uuid == recipient_user_id).scalar_subquery()
+            return sa.or_(
+                EntityShareRow.recipient_email
+                == (
+                    sa.select(UserRow.email)
+                    .where(UserRow.uuid == recipient_user_id)
+                    .scalar_subquery()
+                ),
+                EntityShareRow.recipient_virtual_entity_id
+                == (
+                    sa.select(VirtualEntityRow.id)
+                    .where(
+                        VirtualEntityRow.entity_type == USER_ENTITY_TYPE,
+                        VirtualEntityRow.entity_id == recipient_user_id,
+                    )
+                    .scalar_subquery()
+                ),
             )
 
         return inner
@@ -48,6 +66,35 @@ class EntityShareRecipientScope(OperationScope):
     @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         # The requester is authenticated before reaching here.
+        return ()
+
+
+@dataclass(frozen=True)
+class EntityShareRecipientProjectScope(OperationScope):
+    """The offers addressed to one project."""
+
+    project_id: ProjectID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        project_id = self.project_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EntityShareRow.recipient_virtual_entity_id == (
+                sa.select(VirtualEntityRow.id)
+                .where(
+                    VirtualEntityRow.entity_type == PROJECT_ENTITY_TYPE,
+                    VirtualEntityRow.entity_id == project_id,
+                )
+                .scalar_subquery()
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        # The project's readability is settled by the permission check before this runs.
         return ()
 
 

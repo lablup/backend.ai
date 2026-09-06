@@ -8,6 +8,7 @@ from collections.abc import Collection
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_share.row import EntityShareRow
@@ -41,6 +42,13 @@ class EntityShareConditions:
     def by_recipient_email(email: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EntityShareRow.recipient_email == email
+
+        return inner
+
+    @staticmethod
+    def by_recipient(recipient_node: VirtualEntityID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EntityShareRow.recipient_virtual_entity_id == recipient_node
 
         return inner
 
