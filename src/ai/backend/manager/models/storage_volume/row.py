@@ -71,6 +71,17 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
         nullable=False,
         server_default=sa.text(f"'{int(DEFAULT_STATUS_STALE_AFTER.total_seconds())} seconds'"),
     )
+    # Which usage figures this volume reports to a user. A percentage tells how full the
+    # volume is without disclosing its size, which is why it alone is exposed by default.
+    expose_percentage: Mapped[bool] = mapped_column(
+        "expose_percentage", sa.Boolean, nullable=False, server_default=sa.true()
+    )
+    expose_used_bytes: Mapped[bool] = mapped_column(
+        "expose_used_bytes", sa.Boolean, nullable=False, server_default=sa.false()
+    )
+    expose_capacity_bytes: Mapped[bool] = mapped_column(
+        "expose_capacity_bytes", sa.Boolean, nullable=False, server_default=sa.false()
+    )
 
 
 class ServiceStorageVolumeRow(LifecycleTimestampsMixin, Base):
