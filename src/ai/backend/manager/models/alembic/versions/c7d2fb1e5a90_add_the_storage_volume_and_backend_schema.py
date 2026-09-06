@@ -61,16 +61,25 @@ def _timestamp_columns() -> list[sa.Column[Any]]:
 
 def upgrade() -> None:
     op.create_table(
-        "storage_backends",
+        "storage_backend_types",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v7()"), nullable=False),
         sa.Column("name", sa.String(length=64), nullable=False),
-        sa.Column("type", sa.String(length=64), nullable=False),
         sa.Column("supports_vfolder", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("supports_metric", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("supports_quota", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("supports_fast_fs_size", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("supports_fast_scan", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("supports_fast_size", sa.Boolean(), server_default=sa.false(), nullable=False),
+        *_timestamp_columns(),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_storage_backend_types")),
+        sa.UniqueConstraint("name", name=op.f("uq_storage_backend_types_name")),
+    )
+
+    op.create_table(
+        "storage_backends",
+        sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v7()"), nullable=False),
+        sa.Column("name", sa.String(length=64), nullable=False),
+        sa.Column("type_id", GUID(), nullable=False),
         sa.Column(
             "status_stale_after",
             sa.Interval(),
@@ -80,6 +89,12 @@ def upgrade() -> None:
         *_timestamp_columns(),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_storage_backends")),
         sa.UniqueConstraint("name", name=op.f("uq_storage_backends_name")),
+        sa.ForeignKeyConstraint(
+            ["type_id"],
+            ["storage_backend_types.id"],
+            name="fk_storage_backends_type_id",
+            ondelete="RESTRICT",
+        ),
     )
 
     op.create_table(
@@ -200,10 +215,9 @@ def upgrade() -> None:
         ondelete="SET NULL",
     )
 
-    storage_backends = sa.table(
-        "storage_backends",
+    storage_backend_types = sa.table(
+        "storage_backend_types",
         sa.column("name", sa.String),
-        sa.column("type", sa.String),
         sa.column("supports_vfolder", sa.Boolean),
         sa.column("supports_metric", sa.Boolean),
         sa.column("supports_quota", sa.Boolean),
@@ -212,11 +226,10 @@ def upgrade() -> None:
         sa.column("supports_fast_size", sa.Boolean),
     )
     op.bulk_insert(
-        storage_backends,
+        storage_backend_types,
         [
             {
                 "name": name,
-                "type": name,
                 "supports_vfolder": vfolder,
                 "supports_metric": metric,
                 "supports_quota": quota,
@@ -247,3 +260,4 @@ def downgrade() -> None:
     op.drop_table("storage_volumes")
     op.drop_table("service_storage_backends")
     op.drop_table("storage_backends")
+    op.drop_table("storage_backend_types")

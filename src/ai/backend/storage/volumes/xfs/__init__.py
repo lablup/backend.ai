@@ -294,7 +294,7 @@ class XfsVolume(BaseVolume):
     `xfs_quota` command and write to `/etc/projects` and `/etc/projid`.
     """
 
-    name: ClassVar[StorageBackendType] = StorageBackendType.XFS
+    name: ClassVar[StorageBackendType] = StorageBackendType("xfs")
 
     project_registry: XfsProjectRegistry
 
