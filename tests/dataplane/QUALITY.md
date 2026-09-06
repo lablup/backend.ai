@@ -68,7 +68,9 @@ Second round, against the same bar:
 R1 met (`# noqa` and `# type: ignore` both absent from the feature). R2 met: the BEP now says
 privnet delegation is opt-in and that Docker is the runtime wired today.
 
-R3, on the three-node rig, at `b86473af9`: G20-G24 encrypted 6/6, G15/G16 overlay isolation 2/2,
+R3, on the three-node rig, at `992faf053`: G20-G24 encrypted 6/6, G15/G16 2/2, G10-G13 session
+isolation 4/4, G17 IPAM, G14 cross-node, G17/G18 MTU 2/2, A11 orphan reap, plus 101 harness and
+driver tests. Earlier, at `b86473af9`: G20-G24 encrypted 6/6, G15/G16 overlay isolation 2/2,
 G17 IPAM, G14 cross-node, G17/G18 MTU 2/2, plus 101 harness and driver tests. The privnet
 orphan-recovery fix was watched live -- the node came back 45s after the cause went, where the
 same condition had previously left it out of service indefinitely.
@@ -81,6 +83,10 @@ Two things this run did NOT establish, and neither should be read as met:
   the path Backend.AI already had. G12 fails there roughly two runs in three; that is worth its
   own investigation and it is not about the code reviewed here. Cross-session isolation on our
   own data plane is G15/G16, which pass.
+- **G9 (a 3-kernel single-node cluster session) fails on this rig.** `tenacity.TryAgain` out of
+  the container-startup wait -- no network command failed. It fails identically at `de4f1167b`,
+  before any of this, so it is not the quality work; it is the single-node startup flake this
+  branch inherited, at the heaviest single-node shape.
 - **A1/A2/A3/A9/A10 (agent restart) still have not run.** They were failing on a misconfigured RPC
   port, and with that corrected the node does not come back from the harness stop/start cycle.
   Rig plumbing, but unproven either way, so D2 and D4 rest on unit evidence across a restart.
