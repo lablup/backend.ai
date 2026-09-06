@@ -20,6 +20,21 @@ if TYPE_CHECKING:
     from ai.backend.common.types import ClusterInfo, KernelCreationConfig
 
 
+class AttachFailed(Exception):
+    """An attach that did not finish, carrying the plan describing what it may have left behind.
+
+    The attacher undoes its own partial work and says what it could not; this is how the plan
+    reaches a caller that has not been told it yet, so the leftovers have a name to be torn down
+    by rather than waiting for an orphan sweep.
+    """
+
+    plan: EndpointPlan
+
+    def __init__(self, plan: EndpointPlan) -> None:
+        super().__init__("the container's network attach did not complete")
+        self.plan = plan
+
+
 class ContainerNetworkProvisioner:
     _backend: AbstractNetworkAgentPluginV2[Any]
     _attacher: CniAttacher
@@ -47,9 +62,16 @@ class ContainerNetworkProvisioner:
         per interface role (LOCAL is the host-reachable control address; OVERLAY is for
         cross-node kernel traffic)."""
         plan = await self._backend.attach_endpoint(kernel_config, cluster_info, meta=meta)
-        assigned = await self._attacher.attach(
-            plan, container_id=container_id, netns=netns_path_for_pid(task_pid)
-        )
+        try:
+            assigned = await self._attacher.attach(
+                plan, container_id=container_id, netns=netns_path_for_pid(task_pid)
+            )
+        except BaseException as e:
+            # The plan names the host veth, the address and the rules an attach puts on this host,
+            # and until now the caller only learned it when the attach returned. A failed one --
+            # or one whose own undo could not remove everything -- therefore left host state that
+            # nothing knew the name of. Hand it out with the failure so teardown can retry it.
+            raise AttachFailed(plan) from e
         return plan, assigned
 
     async def detach(self, plan: EndpointPlan, *, container_id: str, task_pid: int) -> None:

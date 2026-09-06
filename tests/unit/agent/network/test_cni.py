@@ -1,8 +1,14 @@
-from typing import Any
+import asyncio
+from typing import Any, cast, override
 
 import pytest
 
-from ai.backend.agent.network.cni import CniAttacher, CniInvocation, plan_to_invocations
+from ai.backend.agent.network.cni import (
+    CniAttacher,
+    CniInvocation,
+    CniRunner,
+    plan_to_invocations,
+)
 from ai.backend.common.network.types import (
     AttachKind,
     EndpointPlan,
@@ -144,3 +150,63 @@ class TestCniAttacher:
             ("DEL", "baimulti0"),  # ...and is cleaned up: it may have wired part of the container
             ("DEL", "eth0"),  # rollback of the one that succeeded
         ]
+
+
+class TestAnAttachThatDidNotFinish:
+    """D2, the container side. An attach applies interfaces one at a time, and until it returns
+    nobody else knows they exist -- the caller records the plan only on success. So whatever it
+    left had to be undone here, on every way out."""
+
+    @staticmethod
+    def _plan_of_two() -> EndpointPlan:
+        return _plan()
+
+    async def test_a_cancelled_attach_removes_what_it_applied(self) -> None:
+        started = asyncio.Event()
+
+        class StallsOnTheSecond(RecordingRunner):
+            @override
+            async def __call__(
+                self, command: str, *, ifname: str, netns: str, container_id: str, config: Any
+            ) -> None:
+                await super().__call__(
+                    command, ifname=ifname, netns=netns, container_id=container_id, config=config
+                )
+                if ifname == "baimulti0" and command == "ADD":
+                    started.set()
+                    await asyncio.sleep(60)
+
+        runner = StallsOnTheSecond()
+        attacher = CniAttacher(cast(CniRunner, runner))
+        task = asyncio.create_task(
+            attacher.attach(self._plan_of_two(), container_id="c1", netns="/proc/1/ns/net")
+        )
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert ("DEL", "eth0") in runner.calls, "the interface it had already applied stayed"
+
+    async def test_one_del_that_fails_does_not_stop_the_others(self) -> None:
+        # Stopping at the first would leave the earlier interfaces behind, which are the ones
+        # this is here for.
+        class RefusesTheOverlayDel(RecordingRunner):
+            @override
+            async def __call__(
+                self, command: str, *, ifname: str, netns: str, container_id: str, config: Any
+            ) -> None:
+                await super().__call__(
+                    command, ifname=ifname, netns=netns, container_id=container_id, config=config
+                )
+                if command == "ADD" and ifname == "baimulti0":
+                    raise RuntimeError("the overlay bridge is missing")
+                if command == "DEL" and ifname == "baimulti0":
+                    raise RuntimeError("iproute2 said no")
+
+        runner = RefusesTheOverlayDel()
+        attacher = CniAttacher(cast(CniRunner, runner))
+        with pytest.raises(RuntimeError):
+            await attacher.attach(_plan(), container_id="c1", netns="/proc/1/ns/net")
+
+        assert ("DEL", "eth0") in runner.calls
