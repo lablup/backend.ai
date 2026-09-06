@@ -63,6 +63,7 @@ from ai.backend.agent.network.backends.vxlan import (
     plaintext_drop_check_args,
     plaintext_drop_del_args,
     rule_is_present,
+    set_master_args,
     vxlan_dev,
     vxlan_link_add_args,
     xfrm_add_args,
@@ -4269,3 +4270,72 @@ class TestWhatTheKernelActuallyPrints:
         assert parse_sa_identities(_REAL_STATE_LISTING) == {
             ("192.0.2.2", 0x53689C08): ("192.0.2.1", XFRM_REQID)
         }
+
+
+class _HangsOnMaster(Recorder):
+    """Stops inside setup, at the point where the devices exist but nothing else does."""
+
+    def __init__(self, started: asyncio.Event) -> None:
+        super().__init__()
+        self._started = started
+
+    @override
+    async def __call__(self, argv: Sequence[str]) -> None:
+        if list(argv) == set_master_args(4097):
+            self._started.set()
+            await asyncio.sleep(60)
+        await super().__call__(argv)
+
+
+class TestASetupThatWasCancelled:
+    """D2. Setup is all-or-nothing on the host.
+
+    `except Exception` let a cancellation -- the kernel-creation timeout, the agent shutting
+    down -- walk away from whatever had already landed. Teardown skips a session it has no meta
+    for, so a device left behind outlives every record of it, and the next session the manager
+    gives that VNI to inherits a stranger's tunnel.
+    """
+
+    @staticmethod
+    def _deleted(rec: Recorder) -> set[str]:
+        return {call[3] for call in rec.calls if call[:3] == ["ip", "link", "del"]}
+
+    @staticmethod
+    async def _cancel_mid_setup(rec: Recorder, started: asyncio.Event) -> VxlanNetworkPlugin:
+        plugin = _plugin(rec)
+        task = asyncio.create_task(plugin.setup_session_network(_META, _SELF))
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        return plugin
+
+    async def test_a_cancelled_setup_takes_its_devices_back(self) -> None:
+        started = asyncio.Event()
+        rec = _HangsOnMaster(started)
+        await self._cancel_mid_setup(rec, started)
+        assert self._deleted(rec) >= {bridge_dev(4097), vxlan_dev(4097)}
+
+    async def test_a_cancelled_setup_registers_no_session(self) -> None:
+        # A registered session with no devices has teardown report success over nothing.
+        started = asyncio.Event()
+        plugin = await self._cancel_mid_setup(_HangsOnMaster(started), started)
+        assert "s1" not in plugin._sessions
+
+    async def test_a_failure_after_the_devices_still_takes_them_back(self) -> None:
+        # The forward-accept rules sit between device creation and the encryption rules; a
+        # failure there used to fall outside every rollback scope. `_AbsentRuleRecorder` makes
+        # the `-C` probe report the rule missing, so the install this refuses actually runs.
+        class _RefusesTheInsert(_AbsentRuleRecorder):
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                if list(argv)[:2] == ["iptables", "-I"]:
+                    self.calls.append(list(argv))
+                    raise RuntimeError("iptables: Permission denied (you must be root)")
+                await super().__call__(argv)
+
+        rec = _RefusesTheInsert()
+        plugin = _plugin(rec)
+        with pytest.raises(RuntimeError):
+            await plugin.setup_session_network(_META, _SELF)
+        assert self._deleted(rec) >= {bridge_dev(4097), vxlan_dev(4097)}
