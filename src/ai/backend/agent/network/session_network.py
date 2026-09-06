@@ -62,6 +62,8 @@ from ai.backend.agent.network.vni_registry import VniRegistry
 from ai.backend.common.network.keys import endpoint_key, session_meta_key
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
+    SESSION_META_READY,
+    SESSION_META_STATE,
     EndpointPlan,
     Member,
     NetworkBackendKind,
@@ -318,7 +320,23 @@ class SessionNetwork:
         Empty is the healthy answer. While it is not, this node holds devices whose protection it
         cannot vouch for, and it should not be handed a new overlay session.
         """
-        return {**self._recovery_incomplete, **self._unrecovered_sessions()}
+        return {
+            **self._recovery_incomplete,
+            **self._unrecovered_sessions(),
+            **self._backend_cleanup_debt(),
+        }
+
+    def _backend_cleanup_debt(self) -> dict[str, str]:
+        """What the backends could not take back off this host after a setup failed.
+
+        The in-process half; in privnet mode the privnet reports its own backends' debt.
+        """
+        debt: dict[str, str] = {}
+        for backend in self._backends.values():
+            owed = getattr(backend, "cleanup_debt", None)
+            if owed is not None:
+                debt.update(owed())
+        return debt
 
     async def retry_recovery_fail_close(self) -> dict[str, str]:
         """Try again to close only what recovery could not. Returns what is still open.
@@ -570,7 +588,13 @@ class SessionNetwork:
         raw = await self._etcd.get(session_meta_key(session_id))
         if not raw:
             return None
-        return session_net_meta_from_network_config(session_id, json.loads(raw))
+        record = json.loads(raw)
+        # A record the manager is still building, or is undoing, names a subnet and a VNI that
+        # are committed to nobody -- and carries none of the rest of the meta. It is no more this
+        # node's to act on than an absent one. Our own single-node metas carry no state at all.
+        if record.get(SESSION_META_STATE, SESSION_META_READY) != SESSION_META_READY:
+            return None
+        return session_net_meta_from_network_config(session_id, record)
 
     async def _persist_session_meta(self, meta: SessionNetMeta) -> None:
         """Write a single-node session's meta to etcd so a restart's recover() can resume it.
@@ -772,8 +796,8 @@ class SessionNetwork:
     async def _dns_locked(self, session_id: str) -> AsyncIterator[None]:
         """Hold this session's cluster-resolver lock.
 
-        Its own lock, and not the setup/teardown one: `ensure_session` brings the resolver up
-        while holding that lock, and an asyncio.Lock is not reentrant.
+        Its own, not the setup/teardown one: `ensure_session` holds that while starting the
+        resolver, and an asyncio.Lock is not reentrant.
         """
         async with self._keyed_lock(self._dns_locks, self._dns_lock_users, session_id):
             yield
@@ -1092,13 +1116,9 @@ class SessionNetwork:
         cause — a bind failure, a missing post-attach gateway, or a failed redirect all raise. A
         genuinely absent session (no coordinator) is still a silent no-op.
 
-        **Once per session, and every caller waits for all of it.** The kernels of one session
-        attach concurrently on a node, and the server joins ``_dns_servers`` before its redirect is
-        installed: a second kernel that only read the dict would pass this gate with the gateway's
-        ``:53`` still going nowhere, and — if the first attempt then failed — go on to run its
-        command against a session that has no resolver at all. So the check is made under the
-        lock and nowhere else: inside it, an entry in ``_dns_servers`` is a resolver that is up
-        AND redirected -- a start that fails takes its entry back out before it releases."""
+        **Once per session, and every caller waits for all of it.** The check is made under the
+        lock and nowhere else, so an entry in ``_dns_servers`` means up AND redirected: a start
+        that fails or is cancelled takes its entry back out before it releases."""
         async with self._dns_locked(session_id):
             if session_id in self._dns_servers:
                 return  # up and redirected, by this session's first kernel on this node
@@ -1132,12 +1152,18 @@ class SessionNetwork:
         # dead socket. A failure here means cluster names are unresolvable — unwind and fail loudly.
         try:
             await backend.setup_dns_redirect(session_id, server.port)
-        except Exception as e:
+        except BaseException as e:
+            # BaseException: a cancelled start -- the kernel-creation timeout, the agent stopping
+            # -- otherwise left the entry standing for a redirect that never landed, and the next
+            # kernel read it as a resolver that was up. Cancellation propagates as itself; only a
+            # real failure is renamed.
             self._dns_servers.pop(session_id, None)
-            await server.stop()
-            raise ClusterDNSStartError(
-                f"could not redirect :53 to the cluster resolver for session {session_id}: {e}"
-            ) from e
+            await server.stop()  # closes a transport and never suspends, so cancellation is safe
+            if isinstance(e, Exception):
+                raise ClusterDNSStartError(
+                    f"could not redirect :53 to the cluster resolver for session {session_id}: {e}"
+                ) from e
+            raise
         log.info(
             "cluster DNS for session {} listening on 127.0.0.1:{} (:53 redirected by the privnet)",
             session_id,
@@ -1145,10 +1171,15 @@ class SessionNetwork:
         )
 
     async def _stop_cluster_dns(self, session_id: str) -> None:
-        server = self._dns_servers.pop(session_id, None)
-        if server is not None:
-            with contextlib.suppress(Exception):
-                await server.stop()
+        """Take the session's resolver down, under the lock that brings it up.
+
+        Otherwise a teardown crossing a start leaves a live resolver for a session that is gone.
+        """
+        async with self._dns_locked(session_id):
+            server = self._dns_servers.pop(session_id, None)
+            if server is not None:
+                with contextlib.suppress(Exception):
+                    await server.stop()
 
     async def teardown_session(self, session_id: str) -> None:
         # Under the same per-session lock as setup, so a teardown racing the last kernel's setup
@@ -1377,12 +1408,8 @@ class SessionNetwork:
     ) -> Callable[[EndpointPlan, int], None]:
         """Capture a container's detach inputs the moment its plan exists, before it is applied.
 
-        The plan names the host veth, the address and the rules the attach puts on this host, so
-        an attach that fails -- or is CANCELLED, which is how the kernel-creation timeout and the
-        agent stopping arrive -- leaves state nothing else can name. The attacher undoes its own
-        partial work; this is what `_retry_pending_detaches` reads for the DEL that could not run.
-        Recording early costs a record for a container that never attached, whose detach is a
-        no-op; recording late cost the leftovers of every attach that did not return.
+        What `_retry_pending_detaches` reads for the DEL that could not run. Recording early
+        costs a record whose detach is a no-op; recording late cost every cancelled attach.
         """
 
         def record(plan: EndpointPlan, task_pid: int) -> None:

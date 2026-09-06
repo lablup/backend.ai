@@ -727,6 +727,11 @@ class PrivNetServer:
                     f"the {name} backend could not bring down a tunnel that survived a previous"
                     " life on this node"
                 )
+            # Devices are not all a failed setup can leave: firewall rules it could not remove
+            # stay behind the VNI, and the next session given that VNI runs into them.
+            debt = getattr(backend, "cleanup_debt", None)
+            if debt is not None:
+                problems.update({f"privnet:{what}": why for what, why in debt().items()})
         return problems
 
     def _recovery_pending(self) -> bool:
