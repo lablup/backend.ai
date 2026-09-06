@@ -33,6 +33,8 @@ from ai.backend.manager.network.ipam import (
     EndpointAllocator,
     SubnetAllocator,
     VNIAllocator,
+    _allocated_key,
+    _claim,
     _prefix_for_hosts,
 )
 
@@ -1237,3 +1239,69 @@ class TestACreateThatFailedBesideOneThatDidNot:
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
         assert not [key for key in info.options if key.startswith("_")]
+
+
+class TestABlockClaimedOnlyInPart:
+    """C1, wide blocks. A subnet wider than one unit is claimed a unit at a time, so an acquire
+    that died between them leaves a block that is half this session's and half free. Answering
+    "this session already holds it" on the strength of one unit hands back a /23 whose second
+    half nothing holds -- and the pool gives that half to the next session, overlapping the
+    address space of one that believes it has the lot."""
+
+    @staticmethod
+    def _half_claimed(etcd: FakeEtcd, session_id: str, block: str, unit: str) -> None:
+        etcd.store[_allocated_key(unit)] = _claim(session_id, block)
+
+    async def test_a_partial_claim_is_finished_not_adopted(self) -> None:
+        etcd = FakeEtcd()
+        allocator = _subnet_allocator(etcd)
+        self._half_claimed(etcd, "s1", "10.128.0.0/23", "10.128.0.0/24")
+
+        got = await allocator.acquire("s1", host_count=400)
+
+        assert got == "10.128.0.0/23"
+        assert _allocated_key("10.128.1.0/24") in etcd.store, "the second half was never claimed"
+
+    async def test_the_finished_block_is_not_offered_to_anyone_else(self) -> None:
+        etcd = FakeEtcd()
+        allocator = _subnet_allocator(etcd)
+        self._half_claimed(etcd, "s1", "10.128.0.0/23", "10.128.0.0/24")
+        await allocator.acquire("s1", host_count=400)
+
+        assert await allocator.acquire("s2") not in ("10.128.0.0/24", "10.128.1.0/24")
+
+    async def test_a_partial_claim_another_session_broke_into_is_given_back(self) -> None:
+        # It can never be this session's now, and holding the rest of it helps nobody.
+        etcd = FakeEtcd()
+        allocator = _subnet_allocator(etcd)
+        self._half_claimed(etcd, "s1", "10.128.0.0/23", "10.128.0.0/24")
+        etcd.store[_allocated_key("10.128.1.0/24")] = _claim("s2", "10.128.1.0/24")
+
+        got = await allocator.acquire("s1", host_count=400)
+
+        assert got != "10.128.0.0/23"
+        assert _allocated_key("10.128.0.0/24") not in etcd.store, "the dead half was kept"
+        assert await allocator.holder("10.128.1.0/24") == "s2"
+
+    async def test_an_acquire_that_is_cancelled_keeps_no_units(self) -> None:
+        # Without this the units it had already won stay claimed with nobody behind them.
+        started = asyncio.Event()
+
+        class StallsBetweenUnits(FakeEtcd):
+            @override
+            async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
+                claimed = await super().put_if_absent(key, val, **kwargs)
+                if claimed and not started.is_set():
+                    started.set()
+                    await asyncio.sleep(60)
+                return claimed
+
+        etcd = StallsBetweenUnits()
+        allocator = _subnet_allocator(etcd)
+        task = asyncio.create_task(allocator.acquire("s1", host_count=400))
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert not [k for k in etcd.store if k.startswith("network/ipam/allocated/")]
