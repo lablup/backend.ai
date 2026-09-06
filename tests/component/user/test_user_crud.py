@@ -11,7 +11,11 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.data.permission.types import RelationType
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
+from ai.backend.common.data.permission.id import EntityMembershipID
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
@@ -22,12 +26,9 @@ from ai.backend.common.dto.manager.user import (
     UserStatus,
 )
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import users
@@ -37,6 +38,28 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import UserFactory
+
+
+def _node_id(entity_type: str, entity_id: uuid.UUID) -> sa.ScalarSelect[VirtualEntityID]:
+    """The virtual entity node of an entity, as a scalar subquery."""
+    return (
+        sa.select(VirtualEntityRow.id)
+        .where(
+            VirtualEntityRow.entity_type == entity_type,
+            VirtualEntityRow.entity_id == entity_id,
+        )
+        .scalar_subquery()
+    )
+
+
+def _membership_query(
+    scope_type: str, scope_id: uuid.UUID, member_type: str, member_id: uuid.UUID
+) -> sa.Select[tuple[EntityMembershipID]]:
+    """The edge listing the member in the scope's virtual entity."""
+    return sa.select(EntityMembershipRow.id).where(
+        EntityMembershipRow.virtual_entity_id == _node_id(scope_type, scope_id),
+        EntityMembershipRow.member_entity_id == _node_id(member_type, member_id),
+    )
 
 
 class TestUserCreateCrud:
@@ -94,22 +117,18 @@ class TestUserCreateCrud:
         group_fixture: uuid.UUID,
         db_engine: SAEngine,
     ) -> None:
-        """S-3: User created with group_ids → verify association_scopes_entities mapping in DB."""
+        """S-3: User created with group_ids → the group's virtual entity lists the user."""
         result = await user_factory(group_ids=[str(group_fixture)])
 
         async with db_engine.begin() as conn:
-            row = await conn.execute(
-                sa.select(AssociationScopesEntitiesRow).where(
-                    sa.and_(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(group_fixture),
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                        AssociationScopesEntitiesRow.entity_id == str(result.user.id),
+            membership = (
+                await conn.execute(
+                    _membership_query(
+                        PROJECT_ENTITY_TYPE, group_fixture, USER_ENTITY_TYPE, result.user.id
                     )
                 )
-            )
-            assoc = row.fetchone()
-        assert assoc is not None, "User should be associated with the given group"
+            ).fetchone()
+        assert membership is not None, "User should be on the given group's roster"
 
     async def test_s7_create_makes_a_personal_project_with_the_user_alone(
         self,
@@ -130,19 +149,22 @@ class TestUserCreateCrud:
                 )
             )
             assert project_id is not None, "A personal project should be created"
+            member = sa.orm.aliased(VirtualEntityRow, name="member_node")
             member_ids = (
                 await conn.scalars(
-                    sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(project_id),
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    sa.select(member.entity_id)
+                    .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == member.id)
+                    .where(
+                        EntityMembershipRow.virtual_entity_id
+                        == _node_id(PROJECT_ENTITY_TYPE, project_id),
+                        member.entity_type == USER_ENTITY_TYPE,
                     )
                 )
             ).all()
             creator_id = await conn.scalar(
                 sa.select(ProjectRow.creator_id).where(ProjectRow.id == project_id)
             )
-        assert list(member_ids) == [str(result.user.id)]
+        assert list(member_ids) == [result.user.id]
         assert creator_id == result.user.id
 
     async def test_s8_purging_the_user_leaves_its_personal_project_dangling(
@@ -453,13 +475,19 @@ class TestUserCreateAutoAssignRoles:
                 auto_assign=True,
             )
         )
+        role_node_id = uuid.uuid4()
         await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(project_id),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_id),
-                relation_type=RelationType.AUTO,
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=role_node_id,
+                entity_type=ROLE_ENTITY_TYPE,
+                entity_id=role_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_entity_id=_node_id(PROJECT_ENTITY_TYPE, project_id),
+                member_entity_id=role_node_id,
+                capped=False,
             )
         )
         return role_id
@@ -470,11 +498,9 @@ class TestUserCreateAutoAssignRoles:
             UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
         )
         await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                sa.and_(
-                    AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.ROLE,
-                    AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id),
-                )
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ROLE_ENTITY_TYPE,
+                VirtualEntityRow.__table__.c.entity_id == role_id,
             )
         )
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
@@ -577,11 +603,8 @@ class TestUserCreateAutoAssignRoles:
         async with db_engine.begin() as conn:
             membership = (
                 await conn.execute(
-                    sa.select(AssociationScopesEntitiesRow).where(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(group_fixture),
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                        AssociationScopesEntitiesRow.entity_id == str(result.user.id),
+                    _membership_query(
+                        PROJECT_ENTITY_TYPE, group_fixture, USER_ENTITY_TYPE, result.user.id
                     )
                 )
             ).fetchone()
@@ -610,11 +633,8 @@ class TestUserCreateAutoAssignRoles:
         async with db_engine.begin() as conn:
             membership = (
                 await conn.execute(
-                    sa.select(AssociationScopesEntitiesRow).where(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(model_store_project),
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                        AssociationScopesEntitiesRow.entity_id == str(result.user.id),
+                    _membership_query(
+                        PROJECT_ENTITY_TYPE, model_store_project, USER_ENTITY_TYPE, result.user.id
                     )
                 )
             ).fetchone()

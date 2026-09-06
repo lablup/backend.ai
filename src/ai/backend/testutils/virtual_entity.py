@@ -49,7 +49,7 @@ class VirtualEntitySeeder:
         return await self.get_or_create_node(sess, scope_type, scope_id)
 
     async def seed_user_scope(self, sess: AsyncSession, user_id: uuid.UUID) -> None:
-        """Give a directly-inserted user the chain rows ``create_full_user`` would
+        """Give a directly-inserted user the chain rows ``create_user`` would
         have made: their own virtual entity plus the self membership/binding."""
         scope_id = await self.get_or_create_scope(sess, ScopeType.USER, user_id)
         sess.add(

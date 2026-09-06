@@ -62,10 +62,9 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.ops.user.provider import UserOpsProvider
-from ai.backend.manager.repositories.ops.user.write import FullUserCreation
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.user.creators import UserScopeCreation
+from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 auth_db_source_resilience = Resilience(
@@ -166,18 +165,17 @@ class AuthDBSource:
         """Provision a signup user in one transaction: the row, its default keypair,
         and its domain/project (model-store included) scope enrollments."""
         async with self._user_ops_provider.write_ops() as w:
-            result = await w.create_full_user(
-                FullUserCreation(
-                    creation=UserScopeCreation(spec=user_spec),
-                    domain_id=user_spec.domain_id,
-                    project_ids=project_ids,
+            result = await w.create_user(
+                FullUserCreator(
+                    user=user_spec,
+                    keypair_secrets=await generate_keypair_data(self._key_provider_pool),
                     keypair_resource_policy=keypair_resource_policy,
                     keypair_rate_limit=keypair_rate_limit,
-                    keypair_secrets=await generate_keypair_data(self._key_provider_pool),
                 )
             )
+            await w.enroll_in_projects(UserID(result.user.id), user_spec.domain_id, project_ids)
             return UserCreationData(
-                user=self._user_row_to_data(result.user_row),
+                user=result.user,
                 keypair=result.keypair,
             )
 

@@ -17,9 +17,8 @@ from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.keypair import KeyPairID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import EntityRef, ScopeRef
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -59,10 +58,6 @@ from ai.backend.manager.models.keypair.row import (
     keypairs,
 )
 from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
-from ai.backend.manager.models.project import (
-    ProjectRow,
-    ProjectType,
-)
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
@@ -75,7 +70,6 @@ from ai.backend.manager.models.session import (
     by_status,
     by_user_id,
 )
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.user.creators import UserCreator
@@ -105,20 +99,14 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
-from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.ops.rbac.provider import (
-    EntityMembersAddition,
-    ScopeUserMember,
-)
-from ai.backend.manager.repositories.ops.user.provider import UserOpsProvider
-from ai.backend.manager.repositories.ops.user.write import FullUserCreation, UserWriteOps
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.user.creators import (
-    UserCreateSpec,
-    UserScopeCreation,
+from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
+from ai.backend.manager.repositories.ops.v2.user.write import (
+    FullUserCreator,
+    V2UserWriteOps,
 )
+from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 from ai.backend.manager.secret.pool import KeyProviderPool
 
@@ -187,35 +175,32 @@ class UserDBSource:
 
     async def _create_user_with_keypair_and_groups(
         self,
-        w: UserWriteOps,
+        w: V2UserWriteOps,
         creator: UserCreator,
         group_ids: list[str] | None,
         keypair_resource_policy: str,
     ) -> UserCreateResultData:
         """Provision a user (row, default keypair, domain/project/model-store scope
         enrollments) within the caller's write ops transaction."""
-        duplicate_query = sa.select(UserRow.uuid).where(
-            sa.or_(UserRow.email == creator.email, UserRow.username == creator.username)
-        )
-        duplicates = await w.batch_query_in_global(
-            duplicate_query, BatchQuerier(pagination=NoPagination())
-        )
-        if duplicates.rows:
+        if await w.user_exists(creator.email, creator.username):
             raise UserConflict(
                 f"User with email {creator.email} or username {creator.username} already exists."
             )
 
-        result = await w.create_full_user(
-            FullUserCreation(
-                creation=UserScopeCreation(spec=creator),
-                domain_id=creator.domain_id,
-                project_ids=[ProjectID(UUID(gid)) for gid in group_ids or []],
-                keypair_resource_policy=keypair_resource_policy,
+        result = await w.create_user(
+            FullUserCreator(
+                user=creator,
                 keypair_secrets=await generate_keypair_data(self._key_provider_pool),
+                keypair_resource_policy=keypair_resource_policy,
             )
         )
+        await w.enroll_in_projects(
+            UserID(result.user.id),
+            creator.domain_id,
+            [ProjectID(UUID(gid)) for gid in group_ids or []],
+        )
         return UserCreateResultData(
-            user=result.user_row.to_data(),
+            user=result.user,
             keypair=result.keypair,
         )
 
@@ -705,66 +690,20 @@ class UserDBSource:
         domain_name: str,
         group_ids: list[str],
     ) -> None:
-        """Sync the user's project memberships to match ``group_ids`` (the domain's
-        model-store projects always included) through the RBAC member ops, in its
-        own transaction. Personal projects stand outside the sync — none is joined
-        and the user's own is never left.
-
-        Diff-based: only projects entering or leaving the target set are touched,
-        preserving existing rows for unchanged memberships. Joining a project
-        grants its ``auto_assign`` roles; member ops leave role mappings untouched
-        on removal, so the roles of the projects left behind are revoked afterwards,
-        in a v2 transaction of their own.
-        """
-        member_ref = EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=UserID(user_uuid))
-        left_project_ids: list[ProjectID] = []
+        """Sync the user's project memberships to match ``group_ids``, in its own
+        transaction, then revoke the roles of the projects left behind — the roster
+        write leaves role mappings untouched on the way out."""
+        user_id = UserID(user_uuid)
         async with self._user_ops_provider.write_ops() as w:
-            target_result = await w.batch_query_in_global(
-                sa.select(ProjectRow.id).where(
-                    ProjectRow.domain_name == domain_name,
-                    ProjectRow.type != ProjectType.PERSONAL,
-                    sa.or_(
-                        ProjectRow.id.in_([UUID(gid) for gid in group_ids]),
-                        ProjectRow.type == ProjectType.MODEL_STORE,
-                    ),
-                ),
-                BatchQuerier(pagination=NoPagination()),
+            left_project_ids = await w.replace_user_projects(
+                user_id, domain_name, [ProjectID(UUID(gid)) for gid in group_ids]
             )
-            target_project_ids = {row.id for row in target_result.rows}
-
-            current_result = await w.batch_query_in_global(
-                user_scope_membership_query(PROJECT_SCOPE_TYPE, user_uuid).where(
-                    VirtualEntityRow.entity_id.not_in(
-                        sa.select(ProjectRow.id).where(ProjectRow.type == ProjectType.PERSONAL)
-                    ),
-                ),
-                BatchQuerier(pagination=NoPagination()),
-            )
-            current_project_ids = {row.scope_id for row in current_result.rows}
-
-            for project_id in current_project_ids - target_project_ids:
-                await w.remove_bulk_members(
-                    ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(project_id)),
-                    [member_ref],
-                )
-                left_project_ids.append(ProjectID(project_id))
-            for project_id in target_project_ids - current_project_ids:
-                project_scope = ScopeRef(
-                    scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(project_id)
-                )
-                await w.ensure_scope(project_scope)
-                await w.add_bulk_members(
-                    EntityMembersAddition(
-                        scope=project_scope,
-                        members=[ScopeUserMember(user_id=UserID(user_uuid))],
-                    )
-                )
 
         if left_project_ids:
             async with self._v2_ops.write_ops() as v2:
                 for project_id in left_project_ids:
                     await v2.batch_purge_field_entities(
-                        UserID(user_uuid), UserProjectRolePurger(project_id=project_id)
+                        user_id, UserProjectRolePurger(project_id=project_id)
                     )
 
     async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:

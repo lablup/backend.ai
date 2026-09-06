@@ -151,7 +151,7 @@ async def create_user_if_not_exists(
         description=user_data["description"],
         status=user_data["status"],
         status_info=user_data["status_info"],
-        role=user_data["role"],
+        role=UserRole(user_data["role"]) if user_data["role"] is not None else None,
         resource_policy=user_data["resource_policy"],
     )
     creation = await auth_repository.create_user_with_keypair(

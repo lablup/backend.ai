@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Final
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
@@ -122,7 +123,7 @@ class UserHandler:
             status=ManagerUserStatus(body.parsed.status.value)
             if body.parsed.status is not None
             else None,
-            role=body.parsed.role.value if body.parsed.role is not None else None,
+            role=UserRole(body.parsed.role.value) if body.parsed.role is not None else None,
             allowed_client_ip=body.parsed.allowed_client_ip,
             totp_activated=body.parsed.totp_activated,
             resource_policy=body.parsed.resource_policy,

@@ -132,7 +132,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
         "description", sa.String(length=500), nullable=True
     )
     status: Mapped[UserStatus] = mapped_column(
-        "status", EnumValueType(UserStatus), default=UserStatus.ACTIVE, nullable=False
+        "status", EnumValueType(UserStatus), default=UserStatus.BEFORE_VERIFICATION, nullable=False
     )
     status_info: Mapped[str | None] = mapped_column(
         "status_info", sa.Unicode(), nullable=True, default=sa.null()

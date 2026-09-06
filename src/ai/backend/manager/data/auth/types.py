@@ -12,6 +12,7 @@ from ai.backend.manager.data.resource.types import (
     KeyPairResourcePolicyData,
     UserResourcePolicyData,
 )
+from ai.backend.manager.data.user.types import UserData as ManagerUserData
 from ai.backend.manager.data.user.types import UserStatus
 
 
@@ -61,9 +62,14 @@ class GroupMembershipData:
 
 @dataclass(frozen=True)
 class UserCreationData:
-    """A fully provisioned user and its default keypair."""
+    """A fully provisioned user and its default keypair.
 
-    user: UserData
+    The user is the manager-wide type: what creation answers with is what the row
+    holds, and the credentials this module's own :class:`UserData` carries beside it
+    are not part of that answer.
+    """
+
+    user: ManagerUserData
     keypair: KeyPairData
 
 

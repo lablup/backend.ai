@@ -893,7 +893,7 @@ class VirtualEntitySeeder:
     """
 
     async def insert_user_scope(self, conn: AsyncConnection, user_uuid: UserID) -> None:
-        """Give a directly-inserted user the RBAC rows ``create_full_user`` would
+        """Give a directly-inserted user the RBAC rows ``create_user`` would
         have made. Without them the member-binding paths cannot resolve the user's
         virtual entity."""
         virtual_entity_id = uuid.uuid4()
