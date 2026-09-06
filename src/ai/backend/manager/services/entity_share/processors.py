@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.ops.result import (
-    CreatedEntityOpsResult,
     EntityOpsResult,
     ScopedBatchOpsResult,
 )
@@ -21,6 +20,7 @@ from ai.backend.manager.services.entity_share.actions.answer import (
 )
 from ai.backend.manager.services.entity_share.actions.create import (
     CreateEntityShareAction,
+    CreateEntityShareActionResult,
 )
 from ai.backend.manager.services.entity_share.actions.get import GetEntityShareAction
 from ai.backend.manager.services.entity_share.actions.search import (
@@ -36,7 +36,7 @@ class EntityShareProcessors:
     One search for every side: which side a read comes in through is a value, and the
     scope it is answered for travels with the rows it selects."""
 
-    create: ScopeActionProcessor[CreateEntityShareAction, CreatedEntityOpsResult[EntityShareData]]
+    create: ScopeActionProcessor[CreateEntityShareAction, CreateEntityShareActionResult]
     get: SingleEntityActionProcessor[GetEntityShareAction, EntityOpsResult[EntityShareData]]
     search: ScopeActionProcessor[SearchEntitySharesAction, ScopedBatchOpsResult[EntityShareData]]
     accept: ScopeActionProcessor[AcceptEntityShareAction, EntityShareAnswerResult]
@@ -50,7 +50,7 @@ class EntityShareProcessors:
         group: ProcessorGroup[EntityShareData],
         service: EntityShareService,
     ) -> None:
-        self.create = group.entity_create_ops(CreateEntityShareAction)
+        self.create = group.scope(CreateEntityShareAction, service.create)
         self.get = group.single_get_ops(GetEntityShareAction)
         self.search = group.scope_search_ops(SearchEntitySharesAction)
         self.accept = group.scope(AcceptEntityShareAction, service.accept)

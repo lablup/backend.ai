@@ -31,7 +31,6 @@ from ai.backend.manager.data.entity_share.types import (
 )
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.entity_share import (
-    DuplicateEntityShareError,
     EntityShareNotFound,
 )
 from ai.backend.manager.models.base import ensure_all_tables_registered
@@ -412,22 +411,32 @@ class TestCancel:
 
 
 class TestCreate:
-    async def test_a_second_open_offer_conflicts(
+    async def test_offering_again_restates_the_one_standing(
         self,
-        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
     ) -> None:
-        await ops.create_entity(_creator())
-        with pytest.raises(DuplicateEntityShareError):
-            await ops.create_entity(_creator())
+        first = await repository.create(_creator(cap=Permission.READ))
+        again = await repository.create(_creator(cap=Permission.UPDATE))
+        assert again.id == first.id
+        assert again.permission_cap == Permission.UPDATE
+
+    async def test_offering_again_to_a_taken_share_states_what_it_lends(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: EntityShareRepository,
+    ) -> None:
+        offered = await repository.create(_creator(cap=Permission.READ | Permission.UPDATE))
+        await repository.accept(offered.id, _INVITEE_ID)
+        await repository.create(_creator(cap=Permission.READ))
+        assert await _cap(database, _INVITEE_PROJECT_ID) == (True, Permission.READ)
 
     async def test_a_new_offer_after_a_rejection_is_allowed(
         self,
-        ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        first = await ops.create_entity(_creator())
+        first = await repository.create(_creator())
         await repository.reject(first.id, _INVITEE_ID)
-        second = await ops.create_entity(_creator())
+        second = await repository.create(_creator())
         assert second.id != first.id
 
     async def test_the_invitation_joins_the_entity_it_offers(

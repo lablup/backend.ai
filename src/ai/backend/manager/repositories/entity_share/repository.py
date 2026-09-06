@@ -4,6 +4,7 @@ from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.errors.entity_share import EntityShareNotFound
+from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.updaters import (
     EntityShareAcceptUpdater,
     EntityShareCancelUpdater,
@@ -29,6 +30,20 @@ class EntityShareRepository:
 
     def __init__(self, ops_provider: ShareOpsProvider) -> None:
         self._ops = ops_provider
+
+    async def create(self, creator: EntityShareCreator) -> EntityShareData:
+        """Write the offer, or restate what already stands for the same pair.
+
+        One live row stands per recipient and entity, so offering again to somewhere
+        that already holds the entity sets what it lends rather than adding a second
+        row. Looking and writing share one transaction, so two offers racing cannot
+        both decide nothing stands.
+        """
+        async with self._ops.write_ops() as w:
+            restated = await w.restate_share(creator)
+            if restated is not None:
+                return restated
+            return await w.create_entity(creator)
 
     async def accept(
         self, share_id: EntityShareID, answering_scope: EntityIdentifier

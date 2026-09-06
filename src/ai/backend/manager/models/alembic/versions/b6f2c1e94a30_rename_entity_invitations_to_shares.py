@@ -33,8 +33,8 @@ _OLD_PENDING_INDEX: Final = "uq_entity_invitations_pending"
 _OLD_TARGET_INDEX: Final = "ix_entity_invitations_target"
 _OLD_EMAIL_INDEX: Final = "ix_entity_invitations_invitee_email"
 
-_PENDING_EMAIL_INDEX: Final = "uq_entity_shares_pending_email"
-_PENDING_RECIPIENT_INDEX: Final = "uq_entity_shares_pending_recipient"
+_LIVE_EMAIL_INDEX: Final = "uq_entity_shares_live_email"
+_LIVE_RECIPIENT_INDEX: Final = "uq_entity_shares_live_recipient"
 _TARGET_INDEX: Final = "ix_entity_shares_target"
 _EMAIL_INDEX: Final = "ix_entity_shares_recipient_email"
 _RECIPIENT_INDEX: Final = "ix_entity_shares_recipient"
@@ -64,6 +64,19 @@ def upgrade() -> None:
     op.drop_index(_OLD_PENDING_INDEX, table_name="entity_invitations")
     op.rename_table("entity_invitations", "entity_shares")
     op.alter_column("entity_shares", "inviter_user_id", new_column_name="sharer_user_id")
+    op.drop_constraint(
+        op.f("fk_entity_invitations_inviter_user_id_users"), "entity_shares", type_="foreignkey"
+    )
+    op.alter_column("entity_shares", "sharer_user_id", nullable=True)
+    op.create_foreign_key(
+        "sharer_user_id",
+        "entity_shares",
+        "users",
+        ["sharer_user_id"],
+        ["uuid"],
+        onupdate="CASCADE",
+        ondelete="SET NULL",
+    )
     op.alter_column(
         "entity_shares", "invitee_email", new_column_name="recipient_email", nullable=True
     )
@@ -101,14 +114,14 @@ def upgrade() -> None:
         "recipient_entity_type IS NOT NULL OR recipient_email IS NOT NULL",
     )
     op.create_index(
-        _PENDING_EMAIL_INDEX,
+        _LIVE_EMAIL_INDEX,
         "entity_shares",
         ["recipient_email", "target_entity_type", "target_entity_id"],
         unique=True,
         postgresql_where=sa.text("status = 'pending' AND recipient_email IS NOT NULL"),
     )
     op.create_index(
-        _PENDING_RECIPIENT_INDEX,
+        _LIVE_RECIPIENT_INDEX,
         "entity_shares",
         ["recipient_virtual_entity_id", "target_entity_type", "target_entity_id"],
         unique=True,
@@ -125,8 +138,8 @@ def downgrade() -> None:
     op.drop_index(_RECIPIENT_INDEX, table_name="entity_shares")
     op.drop_index(_EMAIL_INDEX, table_name="entity_shares")
     op.drop_index(_TARGET_INDEX, table_name="entity_shares")
-    op.drop_index(_PENDING_RECIPIENT_INDEX, table_name="entity_shares")
-    op.drop_index(_PENDING_EMAIL_INDEX, table_name="entity_shares")
+    op.drop_index(_LIVE_RECIPIENT_INDEX, table_name="entity_shares")
+    op.drop_index(_LIVE_EMAIL_INDEX, table_name="entity_shares")
     op.drop_constraint(op.f(f"ck_entity_shares_{_ADDRESSED}"), "entity_shares", type_="check")
     op.drop_column("entity_shares", "expires_at")
     op.drop_column("entity_shares", "recipient_entity_id")
@@ -134,7 +147,19 @@ def downgrade() -> None:
     op.alter_column(
         "entity_shares", "recipient_email", new_column_name="invitee_email", nullable=False
     )
+    op.drop_constraint(op.f("fk_entity_shares_sharer_user_id"), "entity_shares", type_="foreignkey")
+    op.execute(sa.text("DELETE FROM entity_shares WHERE sharer_user_id IS NULL"))
+    op.alter_column("entity_shares", "sharer_user_id", nullable=False)
     op.alter_column("entity_shares", "sharer_user_id", new_column_name="inviter_user_id")
+    op.create_foreign_key(
+        "inviter_user_id",
+        "entity_shares",
+        "users",
+        ["inviter_user_id"],
+        ["uuid"],
+        onupdate="CASCADE",
+        ondelete="CASCADE",
+    )
     op.rename_table("entity_shares", "entity_invitations")
     op.create_index(
         _OLD_PENDING_INDEX,

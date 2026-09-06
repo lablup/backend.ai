@@ -98,7 +98,9 @@ class EntityShareOrderFieldGQL(StrEnum):
 )
 class EntityShareGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
-    sharer_user_id: UUID = gql_field(description="Who sent the offer.")
+    sharer_user_id: UUID | None = gql_field(
+        default=None, description="Who sent the offer, while that account is still there."
+    )
     recipient_entity_type: str | None = gql_field(
         default=None, description="Type of the scope the offer goes to, once it names one."
     )

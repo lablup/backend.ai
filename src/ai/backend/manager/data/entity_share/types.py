@@ -26,6 +26,17 @@ class EntityShareStatus(enum.StrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
+    def live_states(cls) -> frozenset[EntityShareStatus]:
+        """Offered and taken: the two a share stands in.
+
+        One row per recipient and entity stands in these, so offering again to
+        somewhere that already holds the entity restates what it lends. The rest have
+        ended and pile up beside it.
+        """
+        return frozenset((cls.PENDING, cls.ACCEPTED))
+
+    @classmethod
+    @lru_cache(maxsize=1)
     def unsettled_states(cls) -> frozenset[EntityShareStatus]:
         """Every state other than ACCEPTED: waiting, turned down, withdrawn, taken back.
 
@@ -38,7 +49,7 @@ class EntityShareStatus(enum.StrEnum):
 @dataclass(frozen=True)
 class EntityShareData(EntityData):
     id: EntityShareID
-    sharer_user_id: UserID
+    sharer_user_id: UserID | None
     recipient: RuntimeEntityID | None
     recipient_email: str | None
     target: RuntimeEntityID

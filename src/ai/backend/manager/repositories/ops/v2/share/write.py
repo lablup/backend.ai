@@ -12,13 +12,16 @@ from __future__ import annotations
 import re
 from collections.abc import Collection, Mapping, Sequence
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.data.entity_share.types import EntityShareData
+from ai.backend.manager.data.entity_share.types import EntityShareData, EntityShareStatus
 from ai.backend.manager.errors.permission import InvalidFieldPermission
 from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
@@ -148,6 +151,54 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
             data.permission_cap if data.permission_cap is not None else Permission.full(),
         )
         return data
+
+    async def restate_share(self, creator: EntityShareCreator) -> EntityShareData | None:
+        """Set what a share already standing for this pair lends, and answer with it.
+
+        ``None`` when nothing stands, which is the caller's sign to write a new offer.
+
+        Offering again to somewhere that already holds the entity states what holds now
+        rather than adding a second row: one live row stands per pair. A taken share has
+        its edge restated with it, so narrowing takes effect at once — what was lent is
+        the lending side's to set, the way withdrawing it already is.
+        """
+        table = EntityShareRow.__table__
+        stmt = (
+            sa.update(table)
+            .values({"permission_cap": creator.permission_cap})
+            .where(
+                EntityShareRow.target_entity_type == creator.target.entity_type(),
+                EntityShareRow.target_entity_id == creator.target,
+                EntityShareRow.status.in_(EntityShareStatus.live_states()),
+                self._addressed_the_same_way(creator),
+            )
+        )
+        row = (
+            await self._sess.execute(
+                sa.select(EntityShareRow).from_statement(stmt.returning(*table.columns))
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        data: EntityShareData = row.to_data()
+        if data.status is EntityShareStatus.ACCEPTED and data.recipient is not None:
+            await self.replace_share(
+                await self._landing_scope(data.recipient),
+                data.target,
+                data.permission_cap if data.permission_cap is not None else Permission.full(),
+            )
+        return data
+
+    def _addressed_the_same_way(
+        self, creator: EntityShareCreator
+    ) -> sa.sql.expression.ColumnElement[bool]:
+        """The rows the offer would collide with, matched the way it names its recipient."""
+        if creator.recipient is not None:
+            return sa.and_(
+                EntityShareRow.recipient_entity_type == creator.recipient.entity_type(),
+                EntityShareRow.recipient_entity_id == creator.recipient,
+            )
+        return EntityShareRow.recipient_email == creator.recipient_email
 
     async def revoke_share(
         self, updater: GuardedDataUpdater[EntityShareRow, EntityShareData]

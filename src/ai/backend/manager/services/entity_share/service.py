@@ -11,21 +11,29 @@ from ai.backend.manager.services.entity_share.actions.answer import (
     RevokeEntityShareAction,
     RevokeEntityShareActionResult,
 )
+from ai.backend.manager.services.entity_share.actions.create import (
+    CreateEntityShareAction,
+    CreateEntityShareActionResult,
+)
 
 __all__ = ("EntityShareService",)
 
 
 class EntityShareService:
-    """The three answers an invitation can receive.
+    """Making an offer and the answers it can receive.
 
-    Creating and reading one is a single spec and runs against ops without passing
-    through here.
+    Reading one is a single spec and runs against ops without passing through here.
     """
 
     _repository: EntityShareRepository
 
     def __init__(self, repository: EntityShareRepository) -> None:
         self._repository = repository
+
+    async def create(self, action: CreateEntityShareAction) -> CreateEntityShareActionResult:
+        """Write the offer, or restate what already stands for the same pair."""
+        data = await self._repository.create(action.creator)
+        return CreateEntityShareActionResult(data=data)
 
     async def accept(self, action: AcceptEntityShareAction) -> EntityShareAnswerResult:
         data = await self._repository.accept(action.share_id, action.answering_scope)

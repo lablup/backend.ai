@@ -5488,8 +5488,8 @@ type EntityShare implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Who sent the offer."""
-  sharerUserId: UUID!
+  """Who sent the offer, while that account is still there."""
+  sharerUserId: UUID
 
   """Type of the scope the offer goes to, once it names one."""
   recipientEntityType: String

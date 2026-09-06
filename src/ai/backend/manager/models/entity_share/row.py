@@ -35,6 +35,9 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
     offer is answered. ``MATCH FULL`` holds it to both or neither, and two checks hold
     the rest: one of the two ways of addressing is always there, and an accepted row
     always names the scope.
+
+    One live row stands per recipient and entity, live meaning offered or taken. Ended
+    rows pile up beside it, so the same entity can go out again after it came back.
     """
 
     __tablename__ = "entity_shares"
@@ -61,21 +64,25 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
             name="accepted_resolved",
         ),
         sa.Index(
-            "uq_entity_shares_pending_email",
+            "uq_entity_shares_live_email",
             "recipient_email",
             "target_entity_type",
             "target_entity_id",
             unique=True,
-            postgresql_where=sa.text("status = 'pending' AND recipient_email IS NOT NULL"),
+            postgresql_where=sa.text(
+                "status IN ('pending', 'accepted') AND recipient_email IS NOT NULL"
+            ),
         ),
         sa.Index(
-            "uq_entity_shares_pending_recipient",
+            "uq_entity_shares_live_recipient",
             "recipient_entity_type",
             "recipient_entity_id",
             "target_entity_type",
             "target_entity_id",
             unique=True,
-            postgresql_where=sa.text("status = 'pending' AND recipient_entity_type IS NOT NULL"),
+            postgresql_where=sa.text(
+                "status IN ('pending', 'accepted') AND recipient_entity_type IS NOT NULL"
+            ),
         ),
         sa.Index("ix_entity_shares_recipient", "recipient_entity_type", "recipient_entity_id"),
         sa.Index("ix_entity_shares_target", "target_entity_type", "target_entity_id"),
@@ -88,11 +95,13 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
         primary_key=True,
         server_default=sa.text("uuid_generate_v7()"),
     )
-    sharer_user_id: Mapped[UserID] = mapped_column(
+    #: Provenance, not authority: nothing is answered for by who sent the offer, so
+    #: the account going away empties this and leaves the share standing.
+    sharer_user_id: Mapped[UserID | None] = mapped_column(
         "sharer_user_id",
         GUID(UserID),
-        sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
+        sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="SET NULL"),
+        nullable=True,
     )
     recipient_entity_type: Mapped[EntityType | None] = mapped_column(
         "recipient_entity_type", sa.String(length=32), nullable=True

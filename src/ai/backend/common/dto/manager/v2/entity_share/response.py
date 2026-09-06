@@ -22,7 +22,9 @@ __all__ = (
 
 class EntityShareNode(BaseResponseModel):
     id: EntityShareID = Field(description="Share id")
-    sharer_user_id: UserID = Field(description="Who sent the offer")
+    sharer_user_id: UserID | None = Field(
+        default=None, description="Who sent the offer, while that account is still there"
+    )
     recipient_entity_type: EntityType | None = Field(
         default=None, description="Type of the scope the offer goes to, once it names one"
     )

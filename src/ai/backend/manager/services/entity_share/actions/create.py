@@ -1,4 +1,4 @@
-"""Offer one existing entity to one email address."""
+"""Offer one existing entity to one scope, or to an address with no account yet."""
 
 from __future__ import annotations
 
@@ -8,25 +8,30 @@ from typing import override
 
 from ai.backend.common.data.entity.entity_share import ENTITY_SHARE_ENTITY_TYPE
 from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
     EntityType,
     ScopeRef,
     ScopeType,
 )
-from ai.backend.manager.actions.v2.ops.base import CreateEntityOpsAction
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
-from ai.backend.manager.models.entity_share.row import EntityShareRow
 
-__all__ = ("CreateEntityShareAction",)
+__all__ = (
+    "CreateEntityShareAction",
+    "CreateEntityShareActionResult",
+)
 
 
 @dataclass
-class CreateEntityShareAction(CreateEntityOpsAction[EntityShareRow, EntityShareData]):
+class CreateEntityShareAction(BaseScopeAction):
     """Offer an entity, answered for by that entity.
 
-    The scope is what is being offered rather than who it goes to: the invitee is an
-    email that may belong to nobody yet, while the entity is what the caller has to be
-    allowed to hand out.
+    The scope checked is what is being offered rather than who it goes to: the
+    recipient may be a scope the caller cannot reach, or an address belonging to
+    nobody yet, while the entity is what the caller has to be allowed to hand out.
     """
 
     creator: EntityShareCreator
@@ -38,6 +43,11 @@ class CreateEntityShareAction(CreateEntityOpsAction[EntityShareRow, EntityShareD
 
     @override
     @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+    @override
+    @classmethod
     def action_name(cls) -> str:
         return "create_entity_share"
 
@@ -46,6 +56,13 @@ class CreateEntityShareAction(CreateEntityOpsAction[EntityShareRow, EntityShareD
         target = self.creator.target
         return (ScopeRef(scope_type=ScopeType(target.entity_type()), scope_id=target),)
 
+
+@dataclass
+class CreateEntityShareActionResult(BaseScopeActionResult):
+    """The offer that was written, or the one that already stood."""
+
+    data: EntityShareData
+
     @override
-    def to_creator(self) -> EntityShareCreator:
-        return self.creator
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (self.data.id,)
