@@ -397,7 +397,7 @@ class BaseFSOpModel(AbstractFSOpModel):
 
 
 class BaseVolume(AbstractVolume):
-    name: ClassVar[StorageBackendType] = StorageBackendType.VFS
+    name: ClassVar[StorageBackendType] = StorageBackendType("vfs")
 
     @override
     def info(self) -> VolumeInfo:

@@ -139,7 +139,7 @@ class GPFSOpModel(BaseFSOpModel):
 
 
 class GPFSVolume(BaseVolume):
-    name: ClassVar[StorageBackendType] = StorageBackendType.GPFS
+    name: ClassVar[StorageBackendType] = StorageBackendType("gpfs")
     api_client: GPFSAPIClient
 
     fs: str
