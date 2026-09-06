@@ -33,6 +33,7 @@ from ai.backend.agent.network.privnet.client import (
     PrivNetClient,
     PrivNetClientError,
     PrivNetProvisioner,
+    PrivNetUnreachable,
 )
 from ai.backend.agent.network.privnet.journal import PrivNetJournal
 from ai.backend.agent.network.privnet.netns import PinnedNetns
@@ -44,6 +45,7 @@ from ai.backend.agent.network.privnet.policy import (
 from ai.backend.agent.network.privnet.protocol import PrivNetOp, PrivNetRequest, PrivNetResponse
 from ai.backend.agent.network.privnet.server import PrivNetServer
 from ai.backend.agent.network.vni_registry import Binding, VniRegistry, config_digest
+from ai.backend.common.exception import BackendAIError, ErrorDomain
 from ai.backend.common.network.types import (
     AttachKind,
     EndpointPlan,
@@ -3275,3 +3277,32 @@ class TestADetachWhosePlanMustSurvive:
             )
             assert attempts == ["c1", "c1"], "the retry had no plan and deleted nothing"
             assert "c1" not in h.server._sessions["s1"].attached
+
+
+class TestWhatReachesTheManagerWhenThePrivnetIsDown:
+    """E5. A node whose helper is down can serve no session, and what arrives at the manager is
+    what an operator is told. A built-in `ConnectionRefusedError` carries errno 111 and nothing
+    else -- not which node, not which socket, not that the whole data plane there is down."""
+
+    async def test_it_is_a_backend_ai_error(self, tmp_path: Path) -> None:
+        client = PrivNetClient(str(tmp_path / "nothing-here.sock"))
+        with pytest.raises(BackendAIError) as caught:
+            await client.call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
+        assert isinstance(caught.value, PrivNetUnreachable)
+
+    async def test_it_says_which_socket_and_what_it_means(self, tmp_path: Path) -> None:
+        socket_path = str(tmp_path / "nothing-here.sock")
+        client = PrivNetClient(socket_path)
+        with pytest.raises(PrivNetUnreachable) as caught:
+            await client.call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
+        message = str(caught.value)
+        assert socket_path in message
+        assert "until it is back" in message
+
+    async def test_it_carries_an_error_code(self, tmp_path: Path) -> None:
+        # The manager renders this; an exception with no code renders as an internal error with
+        # nothing an operator can act on.
+        client = PrivNetClient(str(tmp_path / "nothing-here.sock"))
+        with pytest.raises(PrivNetUnreachable) as caught:
+            await client.call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
+        assert caught.value.error_code().domain is ErrorDomain.AGENT

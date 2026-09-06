@@ -201,7 +201,7 @@ task가 생존한다. "Docker와 같아야 한다"가 성립하지 않고, Docke
 | E2 | privnet 소켓 끊긴 상태에서 attach 요청 | 명확한 에러, 반쯤 만든 veth 없음 | I | | ⬜ |
 | E3 | privnet 모드에서 agent 재시작 | 저널은 privnet 소유 → 에이전트가 reclaim 시도하지 않음 | I | `_reclaim_orphans`의 `None` 분기 | ⬜ |
 | E4 | privnet 다운 중 커널 생성 | 생성이 **실패로 매니저에 전파**됨. 세션이 CREATING에 매달리지 않음 | I | 결함 **BUG1** — 재현함. 에이전트는 즉시 실패했으나 커널은 10분 뒤에도 PREPARED | 🔴재현됨 ⬜ |
-| E5 | privnet 도달 불가 시 에러 타입 | `BackendAIError` 계열. 로그에서 원인 식별 가능 | I | 결함 **BUG2** — 현재 `ConnectionRefusedError`(내장 예외), `exception.message`가 `111`뿐 | 🔴재현됨 ⬜ |
+| E5 | privnet 도달 불가 시 에러 타입 | `BackendAIError` 계열. 로그에서 원인 식별 가능 | I | `PrivilegedNetworkHelperUnreachable` — 소켓 경로와 의미를 담고 `error_code()`를 가짐. `TestWhatReachesTheManagerWhenThePrivnetIsDown` | ✅ |
 
 ## F. etcd
 

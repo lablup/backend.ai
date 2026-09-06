@@ -20,6 +20,10 @@ import logging
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast, override
 
+from ai.backend.agent.errors.network import (
+    PrivilegedNetworkHelperFailed,
+    PrivilegedNetworkHelperUnreachable,
+)
 from ai.backend.agent.network.caps import probe_caps
 from ai.backend.agent.network.port_forward import PortForward
 from ai.backend.agent.network.privnet.protocol import (
@@ -45,8 +49,10 @@ if TYPE_CHECKING:
     from ai.backend.common.types import ClusterInfo, KernelCreationConfig
 
 
-class PrivNetClientError(RuntimeError):
-    """The privnet refused or failed a request. Carries the privnet's generic reason."""
+#: The privnet refused or failed a request. Named here for the callers that have always used
+#: these names; the classes themselves are `BackendAIError`s, so what reaches the manager says
+#: which node and which socket rather than an errno.
+PrivNetClientError = PrivilegedNetworkHelperFailed
 
 
 #: The protocol version that introduced RECOVERY_STATUS. A daemon below it cannot answer, and
@@ -60,13 +66,7 @@ _ENCRYPTION_PROBE_VERSION = 3
 _CALL_TIMEOUT_SEC = 120.0
 
 
-class PrivNetUnreachable(PrivNetClientError):
-    """The privileged helper could not be reached at all, rather than refusing one request.
-
-    A subclass, so every caller that already degrades on a failed request keeps doing so -- the
-    distinction is for the ones that want to say WHY, and for readiness, which reports a node
-    whose helper is down instead of letting each session discover it at create time.
-    """
+PrivNetUnreachable = PrivilegedNetworkHelperUnreachable
 
 
 class PrivNetClient:
