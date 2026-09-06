@@ -7,11 +7,13 @@ replacing Swarm's internal global IPAM. See BEP-1078 (control plane).
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import ipaddress
 import json
 import logging
 import secrets
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote
 
@@ -160,6 +162,10 @@ class SubnetAllocator:
         taken = _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
         if held := self._already_held(taken, session_id):
             return held
+        # A block this session holds only part of: an acquire that died between its units. Finish
+        # it, or give the part back so the pool is not carrying a claim nobody can use.
+        if (finished := await self._finish_partial_claim(taken, session_id)) is not None:
+            return finished
         if subnet is not None:
             return await self._acquire_requested(subnet, pool, session_id)
         prefixlen = _prefix_for_hosts(
@@ -188,16 +194,77 @@ class SubnetAllocator:
         raise NetworkPoolExhausted()
 
     def _already_held(self, allocated: Mapping[str, str], session_id: str) -> str | None:
-        """The block this session already owns, if a previous ``acquire`` got that far.
+        """The block this session already owns *whole*, if a previous ``acquire`` got that far.
 
         The caller retries a failed session start with the same id, and a create that was
         cancelled or died between the claim and the session's meta record leaves the block
         claimed with nobody to release it. Handing back the same block makes the retry converge
         instead of claiming a second one and orphaning the first.
+
+        Whole, because a block wider than one unit is claimed a unit at a time. Answering on the
+        strength of one of them would hand back a ``/23`` whose second half nothing holds -- and
+        the pool would give that half to the next session, overlapping the address space of one
+        that believes it has the lot. A partial claim is reported through `_partly_held` instead,
+        for the caller to finish or give up.
         """
-        for raw in allocated.values():
-            if held := _claimed_subnet(raw, session_id):
+        for held in self._claims_of(allocated, session_id):
+            units = self._units_of(held)
+            if len(self._ours_among(allocated, units, session_id)) == len(units):
                 return held
+        return None
+
+    def _claims_of(self, allocated: Mapping[str, str], session_id: str) -> list[str]:
+        """Every distinct block this session has a unit claimed for, widest first."""
+        blocks = {held for raw in allocated.values() if (held := _claimed_subnet(raw, session_id))}
+        return sorted(blocks, key=lambda block: ipaddress.ip_network(block).prefixlen)
+
+    def _units_of(self, subnet: str) -> list[str]:
+        return _unit_blocks(ipaddress.ip_network(subnet), self._block_prefixlen)
+
+    @staticmethod
+    def _ours_among(
+        allocated: Mapping[str, str], units: Sequence[str], session_id: str
+    ) -> list[str]:
+        """Which of ``units`` this session holds. Presence is not enough -- a unit another
+        session took is exactly what makes a block not ours."""
+        return [
+            unit
+            for unit in units
+            if _claimed_subnet(allocated.get(quote(unit, safe=""), ""), session_id) is not None
+        ]
+
+    async def _finish_partial_claim(
+        self, allocated: Mapping[str, str], session_id: str
+    ) -> str | None:
+        """Complete a block this session holds only part of, or give the part back.
+
+        A wide block is claimed a unit at a time, so an acquire that died partway leaves one.
+        Finishing it is what the retry wants; if somebody else has taken a unit in the meantime
+        the block can never be this session's, and holding the rest of it helps nobody.
+        """
+        for block in self._claims_of(allocated, session_id):
+            units = self._units_of(block)
+            ours = self._ours_among(allocated, units, session_id)
+            if len(ours) == len(units):
+                continue  # whole; `_already_held` deals with it
+            payload = _claim(session_id, block)
+            missing = [unit for unit in units if unit not in ours]
+            won = list(ours)
+            for unit in missing:
+                if await self._etcd.put_if_absent(_allocated_key(unit), payload):
+                    won.append(unit)
+                    continue
+                # Somebody else holds a piece of it. This block is not this session's to have.
+                log.warning(
+                    "giving back session {}'s partial claim on {}: another session holds {}",
+                    session_id,
+                    block,
+                    unit,
+                )
+                await self._give_back(won, payload)
+                return None
+            log.info("completed session {}'s partial claim on {}", session_id, block)
+            return block
         return None
 
     async def _acquire_requested(
@@ -250,16 +317,37 @@ class SubnetAllocator:
         payload: str,
     ) -> bool:
         """CAS-claim every unit block of ``candidate``; return False (and give back any partial
-        claim) if any unit is already owned, so the block is never split between two sessions."""
-        claimed: list[str] = []
-        for unit in _unit_blocks(candidate, self._block_prefixlen):
-            if await self._etcd.put_if_absent(_allocated_key(unit), payload):
-                claimed.append(unit)
-                continue
-            for taken in claimed:
-                await self._etcd.delete(_allocated_key(taken))
-            return False
+        claim) if any unit is already owned, so the block is never split between two sessions.
+
+        The partial claim is given back on *any* way out, not only on a unit that was taken: a
+        cancelled or failed acquire that walked away from the units it had already won would leave
+        a block that is half this session's and half free -- and the free half is what the next
+        session is handed, overlapping the address space of a session that thinks it owns the
+        whole block.
+        """
+        units = _unit_blocks(candidate, self._block_prefixlen)
+        try:
+            for unit in units:
+                if await self._etcd.put_if_absent(_allocated_key(unit), payload):
+                    continue
+                await self._give_back(units, payload)
+                return False
+        except BaseException:
+            await asyncio.shield(asyncio.ensure_future(self._give_back(units, payload)))
+            raise
         return True
+
+    async def _give_back(self, units: Sequence[str], payload: str) -> None:
+        """Release every unit of a block this claim owns.
+
+        Every unit, rather than the ones the loop recorded: a claim whose compare-and-swap
+        committed and whose answer never came back -- the awaiting task cancelled, the connection
+        dropped -- is held by this session and named in no list. Only units carrying this exact
+        claim are touched, so a unit that went to somebody else is left alone.
+        """
+        for unit in units:
+            with contextlib.suppress(Exception):
+                await self._etcd.delete_if_value(_allocated_key(unit), payload)
 
     async def holder(self, subnet: str) -> str | None:
         """The session every unit block of ``subnet`` is claimed by, or None if they disagree or
