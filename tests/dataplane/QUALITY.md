@@ -37,4 +37,23 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 
 ## Status
 
-Filled in by the verification pass; `SCENARIOS.md` carries the per-scenario record.
+Verified at `25bcca215`. Every C and D item below has the named test, and each one was seen to
+fail against the code as it stood before the fix.
+
+| # | Was | Now |
+|---|-----|-----|
+| C1 | two concurrent creates of one session claimed two subnets; the one no meta named leaked | one subnet, one VNI, one address; both callers get the same |
+| C2 | met | met |
+| C3 | a create killed between the two writes left an address with no endpoint record | the record is written whether the call made the claim or found it |
+| C4 | a half-failed rollback left a meta naming resources the pool had freed | the allocation is kept when the record cannot be cleared, and a record whose allocation moved on is not reused |
+| C5 | met | met |
+| C6 | met, unguarded | guarded by `TestAllocationRoundTrips` |
+| D1 | default route, bridge MTU, gateway address, MASQUERADE, FORWARD accept and `route_localnet` all ran unchecked | checked; probes and best-effort deletes stay unchecked |
+| D2 | `except Exception` let a cancelled setup leave a VXLAN device behind, and the forward-accept rules sat outside every rollback scope | one scope over the whole of setup, `BaseException`, undone under a shield |
+| D3 | the privnet dropped the plan before the detach it describes; a failed one left nothing to retry with, and teardown walked past it | the plan goes once the detach has happened, and a stuck one raises `OverlayTeardownIncomplete` |
+| D4 | the preflight downed every tunnel on the node, another agent's included | a VNI the registry attributes to another agent that is still running containers on it is left alone |
+| D5 | met | met |
+
+R1 met (`# noqa` and `# type: ignore` both absent from the feature). R2 met: the BEP now says
+privnet delegation is opt-in and that Docker is the runtime wired today. R3 is the standing gap
+-- see `SCENARIOS.md` for which scenarios have run against real nodes and which have not.
