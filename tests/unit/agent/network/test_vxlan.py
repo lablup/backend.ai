@@ -43,7 +43,6 @@ from ai.backend.agent.network.backends.vxlan import (
     forward_accept_add_args,
     forward_accept_check_args,
     forward_accept_del_args,
-    is_absent_error,
     jump_is_first,
     link_down_args,
     link_up_args,
@@ -77,6 +76,7 @@ from ai.backend.agent.network.backends.vxlan_security import (
     VxlanSecurityState,
     VxlanSecurityStateMachine,
 )
+from ai.backend.agent.network.command import is_absent_error
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.pair_journal import PairJournal, pair_key, sa_key
 from ai.backend.common.network.types import (
