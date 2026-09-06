@@ -55,5 +55,21 @@ fail against the code as it stood before the fix.
 | D5 | met | met |
 
 R1 met (`# noqa` and `# type: ignore` both absent from the feature). R2 met: the BEP now says
-privnet delegation is opt-in and that Docker is the runtime wired today. R3 is the standing gap
--- see `SCENARIOS.md` for which scenarios have run against real nodes and which have not.
+privnet delegation is opt-in and that Docker is the runtime wired today.
+
+R3, on the three-node rig, at `b86473af9`: G20-G24 encrypted 6/6, G15/G16 overlay isolation 2/2,
+G17 IPAM, G14 cross-node, G17/G18 MTU 2/2, plus 101 harness and driver tests. The privnet
+orphan-recovery fix was watched live -- the node came back 45s after the cause went, where the
+same condition had previously left it out of service indefinitely.
+
+Two things this run did NOT establish, and neither should be read as met:
+
+- **G10/G11/G12 do not exercise this branch's LOCAL data plane.** A SINGLE_NODE session with more
+  than one kernel gets `bai-singlenode-<session>`, a Docker network (`launcher.py`), and no
+  `bailo*` device exists while they run -- measured, not inferred. They are regression cover for
+  the path Backend.AI already had. G12 fails there roughly two runs in three; that is worth its
+  own investigation and it is not about the code reviewed here. Cross-session isolation on our
+  own data plane is G15/G16, which pass.
+- **A1/A2/A3/A9/A10 (agent restart) still have not run.** They were failing on a misconfigured RPC
+  port, and with that corrected the node does not come back from the harness stop/start cycle.
+  Rig plumbing, but unproven either way, so D2 and D4 rest on unit evidence across a restart.
