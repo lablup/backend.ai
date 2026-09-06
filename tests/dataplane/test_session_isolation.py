@@ -37,11 +37,14 @@ def pinned_spec(session_spec: SessionSpec, primary_agent_id: str) -> SessionSpec
     Pinned because with a second agent registered in the group the scheduler is otherwise free to
     place it elsewhere, and a read of the inspected node would find no kernel.
 
-    Two kernels because that is what gives a session a LOCAL bridge of its own: the manager builds
-    a per-session network for a SINGLE_NODE session only when it has more than one kernel
-    (`launcher.py`). A one-kernel session gets Docker's default bridge, which every other such
-    session is on too -- so a cross-session isolation scenario built on those was asserting a
-    separation nothing had claimed to provide.
+    Two kernels because a SINGLE_NODE session gets a network of its own only when it has more than
+    one (`launcher.py`); with one kernel every such session sits on Docker's default bridge, and a
+    cross-session isolation scenario built on those asserted a separation nothing provides.
+
+    On a Docker agent that network is Docker's -- `bai-singlenode-<session>`, made by
+    `create_local_network` -- not this branch's LOCAL bridge. Measured: no `bailo*` device exists
+    while these run. So they are regression cover for the path Backend.AI already had. Cross-session
+    isolation on the data plane this branch builds is G15/G16, which are MULTI_NODE and do reach it.
     """
     return replace(
         session_spec,
