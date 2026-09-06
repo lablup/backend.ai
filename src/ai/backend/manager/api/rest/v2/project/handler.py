@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     CreateProjectInput,
     DeleteProjectInput,
     PurgeProjectInput,
+    RestoreProjectInput,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
 )
@@ -70,6 +71,14 @@ class V2ProjectHandler:
     ) -> APIResponse:
         """Soft-delete a project (superadmin only)."""
         result = await self._adapter.admin_delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_restore(
+        self,
+        body: BodyParam[RestoreProjectInput],
+    ) -> APIResponse:
+        """Restore a soft-deleted project (superadmin only)."""
+        result = await self._adapter.admin_restore(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(

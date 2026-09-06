@@ -11,9 +11,7 @@ class ResourceGroupRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = ResourceGroupRepository(
-            args.db,
-        )
+        repository = ResourceGroupRepository(args.db, args.v2_ops_provider)
 
         return cls(
             repository=repository,

@@ -5,7 +5,11 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
-from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, EntityOpsResult
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+)
 from ai.backend.manager.actions.v2.single_entity.processor import (
     PublicSingleEntityActionProcessor,
     SingleEntityActionProcessor,
@@ -13,7 +17,6 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
-    CreateRuntimeVariantPresetActionResult,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.get import (
     GetRuntimeVariantPresetAction,
@@ -34,13 +37,13 @@ from ai.backend.manager.services.runtime_variant_preset.service import (
 
 
 class RuntimeVariantPresetProcessors:
-    """Reads and the removal run against ops; the two writes keep their service."""
+    """Everything but the update runs against ops; the update reads before it writes."""
 
     public_get: PublicSingleEntityActionProcessor[
         GetRuntimeVariantPresetAction, EntityOpsResult[RuntimeVariantPresetData]
     ]
     global_create: GlobalActionProcessor[
-        CreateRuntimeVariantPresetAction, CreateRuntimeVariantPresetActionResult
+        CreateRuntimeVariantPresetAction, CreatedEntityOpsResult[RuntimeVariantPresetData]
     ]
     update: SingleEntityActionProcessor[
         UpdateRuntimeVariantPresetAction, UpdateRuntimeVariantPresetActionResult
@@ -58,7 +61,7 @@ class RuntimeVariantPresetProcessors:
         service: RuntimeVariantPresetService,
     ) -> None:
         self.public_get = group.public_get_ops(GetRuntimeVariantPresetAction)
-        self.global_create = group.global_scope(CreateRuntimeVariantPresetAction, service.create)
+        self.global_create = group.global_create_ops(CreateRuntimeVariantPresetAction)
         self.update = group.single_entity(UpdateRuntimeVariantPresetAction, service.update)
         self.purge = group.entity_purge_ops(PurgeRuntimeVariantPresetAction)
         self.public_search = group.public_search_ops(SearchRuntimeVariantPresetsAction)

@@ -37,6 +37,7 @@ from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
+    RouteSubStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
@@ -507,6 +508,75 @@ class TestCheckRunningRoutes:
         # Assert
         assert len(result.successes) == 1
         assert len(result.errors) == 1
+
+    @pytest.mark.parametrize(
+        "sub_status",
+        [RouteSubStatus.WARMING_UP, RouteSubStatus.STARTING],
+    )
+    async def test_provisioning_route_with_terminated_session_in_errors(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        running_route: RouteData,
+        session_status_terminated: MagicMock,
+        sub_status: RouteSubStatus,
+    ) -> None:
+        """RR-005: PROVISIONING route whose session died is in errors.
+
+        Given: PROVISIONING route with a session that is already terminal
+        When: Check running routes
+        Then: Route in errors list, without waiting for the initial delay
+        """
+        # Arrange
+        route = dataclasses.replace(
+            running_route,
+            status=RouteStatus.PROVISIONING,
+            sub_status=sub_status,
+            health_status=RouteHealthStatus.NOT_CHECKED,
+        )
+        mock_deployment_repo.fetch_session_statuses_by_route_ids.return_value = {
+            route.route_id: session_status_terminated
+        }
+
+        entity_ids = [route.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            # Act
+            result = await route_executor.check_running_routes([route])
+
+        # Assert
+        assert len(result.successes) == 0
+        assert len(result.errors) == 1
+
+    async def test_route_without_session_in_successes(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        running_route: RouteData,
+    ) -> None:
+        """RR-006: PROVISIONING route not yet bound to a session passes.
+
+        Given: PROVISIONING+PENDING route with no session_id
+        When: Check running routes
+        Then: Route in successes list
+        """
+        # Arrange
+        route = dataclasses.replace(
+            running_route,
+            status=RouteStatus.PROVISIONING,
+            sub_status=RouteSubStatus.PENDING,
+            health_status=RouteHealthStatus.NOT_CHECKED,
+            session_id=None,
+        )
+        mock_deployment_repo.fetch_session_statuses_by_route_ids.return_value = {}
+
+        entity_ids = [route.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            # Act
+            result = await route_executor.check_running_routes([route])
+
+        # Assert
+        assert len(result.successes) == 1
+        assert len(result.errors) == 0
 
 
 # =============================================================================

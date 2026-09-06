@@ -13,7 +13,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.types import ResourceSlot, SessionTypes
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
@@ -83,8 +83,6 @@ async def session_seed(
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -107,8 +105,6 @@ async def session_seed(
                 scaling_group=resource_group_fixture,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,

@@ -53,7 +53,6 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search images with filters, orders, and pagination."""
-        log.info("SEARCH (ak:{})", ctx.access_key)
         querier = self._adapter.build_querier(body.parsed)
         action_result = await self._image.search_images.run(SearchImagesAction(querier=querier))
         resp = SearchImagesResponse(
@@ -72,7 +71,6 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Get a single image by ID."""
-        log.info("GET (ak:{}, image_id:{})", ctx.access_key, path.parsed.image_id)
         action_result = await self._image.get_image_by_id.run(
             GetImageByIdAction(image_id=ImageID(path.parsed.image_id), image_status=None)
         )
@@ -89,7 +87,6 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Rescan an image from the registry."""
-        log.info("RESCAN (ak:{})", ctx.access_key)
         action_result = await self._image.scan_image.run(
             ScanImageAction(canonical=body.parsed.canonical, architecture=body.parsed.architecture)
         )
@@ -105,7 +102,6 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Create an image alias."""
-        log.info("ALIAS (ak:{})", ctx.access_key)
         action_result = await self._image.alias_image_by_id.run(
             AliasImageByIdAction(
                 image_id=ImageID(body.parsed.image_id),
@@ -125,7 +121,6 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Remove an image alias."""
-        log.info("DEALIAS (ak:{})", ctx.access_key)
         action_result = await self._image.dealias_image.run(
             DealiasImageAction(alias=body.parsed.alias)
         )
@@ -142,7 +137,6 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Forget (soft-delete) an image."""
-        log.info("FORGET (ak:{})", ctx.access_key)
         action_result = await self._image.forget_image_by_id.run(
             ForgetImageByIdAction(image_id=ImageID(body.parsed.image_id))
         )
@@ -157,7 +151,6 @@ class ImageHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Purge (hard-delete) an image."""
-        log.info("PURGE (ak:{})", ctx.access_key)
         action_result = await self._image.purge_image_by_id.run(
             PurgeImageByIdAction(image_id=ImageID(body.parsed.image_id))
         )

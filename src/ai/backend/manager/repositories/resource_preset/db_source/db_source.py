@@ -47,7 +47,7 @@ from ai.backend.manager.models.resource_slot import (
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
@@ -191,6 +191,17 @@ class ResourcePresetDBSource:
                 presets.append(row.to_dataclass())
 
         return presets
+
+    async def known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
+        """
+        The system-wide registry of enabled resource slot types.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = sa.select(ResourceSlotTypeRow.slot_name, ResourceSlotTypeRow.slot_type).where(
+                ResourceSlotTypeRow.enabled.is_(True)
+            )
+            rows = (await session.execute(stmt)).all()
+        return {SlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows}
 
     async def search_presets(
         self,
@@ -645,7 +656,9 @@ class ResourcePresetDBSource:
         for preset_data in preset_data_list:
             allocatable = False
             preset_slots = resource_slot_to_quantities(
-                preset_data.resource_slots.normalize_slots(ignore_unknown=True)
+                preset_data.resource_slots.normalize_slots_by_known_slots(
+                    known_slot_types, ignore_unknown=True
+                )
             )
             for agent_slot in agent_slots:
                 if quantities_ge(agent_slot, preset_slots) and quantities_ge(

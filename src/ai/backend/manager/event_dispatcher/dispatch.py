@@ -192,7 +192,11 @@ class Dispatchers:
         self._db = args.db
         self._propagator_handler = PropagatorEventHandler(args.event_hub)
         self._agent_event_handler = AgentEventHandler(
-            args.agent_registry, args.db, args.event_dispatcher_plugin_ctx, args.processors_factory
+            args.agent_registry,
+            args.db,
+            args.event_dispatcher_plugin_ctx,
+            args.repositories.agent.repository,
+            args.event_producer,
         )
         self._image_event_handler = ImageEventHandler(
             args.agent_registry,

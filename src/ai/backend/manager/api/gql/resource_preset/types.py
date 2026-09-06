@@ -207,11 +207,11 @@ class UpdateResourcePresetInputGQL(PydanticInputMixin[UpdateResourcePresetInputD
         default=None, description="Updated resource slot allocations."
     )
     shared_memory: BinarySizeInputGQL | None = gql_field(
-        default=None,
+        default=strawberry.UNSET,
         description="Updated shared memory. Use null to clear.",
     )
     resource_group_name: str | None = gql_field(
-        default=None,
+        default=strawberry.UNSET,
         description="Updated resource group name. Use null to make global.",
     )
 

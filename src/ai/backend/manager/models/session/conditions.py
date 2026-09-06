@@ -8,6 +8,11 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
+from ai.backend.manager.models.entity_label.conditions import (
+    make_entity_label_nested_conditions,
+)
+
 if TYPE_CHECKING:
     from ai.backend.common.data.filter_specs import (
         StringMatchSpec,
@@ -30,6 +35,9 @@ from .row import SessionRow
 
 class SessionConditions:
     """Query conditions for sessions."""
+
+    labels = make_entity_label_nested_conditions(SessionRow, SessionRow.id, SESSION_ENTITY_TYPE)
+    """The `labels` nested filter: some / every / none over the labels on a session."""
 
     @staticmethod
     def by_ids(session_ids: Collection[SessionId]) -> QueryCondition:

@@ -16,12 +16,13 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
+from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -30,6 +31,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -55,15 +57,24 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.auth.repository import AuthRepository
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 @dataclass
@@ -131,16 +142,25 @@ class TestAuthRepository:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
+                EntityLabelRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
     async def auth_repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AuthRepository:
-        return AuthRepository(db=db_with_cleanup)
+        return AuthRepository(
+            db=db_with_cleanup,
+            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            key_provider_pool=KeyProviderPool(
+                providers=[], write_provider_type=KeyProviderType.PLAIN
+            ),
+        )
 
     @pytest.fixture
     async def default_domain(
@@ -186,9 +206,9 @@ class TestAuthRepository:
         self,
         default_domain: DomainTestData,
         user_resource_policy: ResourcePolicyTestData,
-    ) -> UserCreatorSpec:
-        """Build the creator spec a signup submits: the domain named, its id unset."""
-        return UserCreatorSpec(
+    ) -> UserCreator:
+        """Build the creator spec a signup submits."""
+        return UserCreator(
             email=f"signup-{uuid.uuid4()}@example.com",
             username=f"signup-{uuid.uuid4().hex[:8]}",
             password=PasswordInfo(
@@ -198,7 +218,7 @@ class TestAuthRepository:
                 salt_size=32,
             ),
             need_password_change=False,
-            domain_name=default_domain.name,
+            domain_id=default_domain.id,
             status=UserStatus.INACTIVE,
             role=UserRole.USER,
             resource_policy=user_resource_policy.name,
@@ -262,7 +282,7 @@ class TestAuthRepository:
             # Create test keypair with SSH keys
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="test_secret_key",
+                secret_key=SecretValue("test_secret_key"),
                 user=user_uuid,
                 is_active=True,
                 is_default=True,
@@ -357,7 +377,7 @@ class TestAuthRepository:
                 )
             )
             await db_sess.flush()
-            await VirtualScopeSeeder().enroll_user_in_project(
+            await VirtualEntitySeeder().enroll_user_in_project(
                 db_sess, group_id, sample_user_data.uuid
             )
             await db_sess.refresh(group)
@@ -583,30 +603,13 @@ class TestAuthRepository:
         time_diff = abs((now_utc - result).total_seconds())
         assert time_diff < 1.0
 
-    async def test_get_user_id_by_access_key_success(
-        self,
-        auth_repository: AuthRepository,
-        sample_user_data: UserTestData,
-    ) -> None:
-        result = await auth_repository.get_user_id_by_access_key(
-            AccessKey(sample_user_data.access_key)
-        )
-
-        assert result == sample_user_data.uuid
-
-    async def test_get_user_id_by_access_key_not_found(
-        self, auth_repository: AuthRepository
-    ) -> None:
-        with pytest.raises(AccessKeyNotFound):
-            await auth_repository.get_user_id_by_access_key(AccessKey("AKIANONEXISTENT"))
-
-    async def test_create_user_with_keypair_writes_the_domain_id_from_the_name(
+    async def test_create_user_with_keypair_writes_the_domain_name_from_the_id(
         self,
         auth_repository: AuthRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         default_domain: DomainTestData,
         keypair_resource_policy: ResourcePolicyTestData,
-        signup_user_spec: UserCreatorSpec,
+        signup_user_spec: UserCreator,
     ) -> None:
         result = await auth_repository.create_user_with_keypair(
             signup_user_spec,

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.v2.validators import ActionValidators
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 # fmt: off
 if TYPE_CHECKING:
@@ -70,6 +71,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.auth.processors import AuthProcessors
     from ai.backend.manager.services.auth.service import AuthService
+    from ai.backend.manager.services.client_ip_masking.processors import (
+        ClientIPMaskingProcessors,
+    )
     from ai.backend.manager.services.container_registry.processors import (
         ContainerRegistryProcessors,
     )
@@ -92,6 +96,15 @@ if TYPE_CHECKING:
         DomainProcessors,
     )
     from ai.backend.manager.services.domain.service import DomainService
+    from ai.backend.manager.services.entity_invitation.processors import (
+        EntityInvitationProcessors,
+    )
+    from ai.backend.manager.services.entity_invitation.service import (
+        EntityInvitationService,
+    )
+    from ai.backend.manager.services.entity_label.processors import (
+        EntityLabelProcessors,
+    )
     from ai.backend.manager.services.etcd_config.processors import (
         EtcdConfigProcessors,
     )
@@ -230,6 +243,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.scheduling_history.service import (
         SchedulingHistoryService,
     )
+    from ai.backend.manager.services.secret.processors import SecretProcessors
+    from ai.backend.manager.services.secret.service import SecretService
     from ai.backend.manager.services.service_catalog.processors import (
         ServiceCatalogProcessors,
     )
@@ -324,6 +339,7 @@ class ServiceArgs:
     appproxy_client_pool: AppProxyClientPool
     prometheus_client: PrometheusClient
     ssh_key_validator: SSHKeyValidator
+    key_provider_pool: KeyProviderPool
     registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
@@ -347,10 +363,12 @@ class Services:
     vfolder_sharing: VFolderSharingService
     session: SessionService
     manager_admin: ManagerAdminService
+    secret: SecretService
     prometheus_query_preset: PrometheusQueryPresetService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
     role_preset: RolePresetService
+    entity_invitation: EntityInvitationService
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentPresetService
     model_card: ModelCardService
@@ -407,6 +425,7 @@ class Processors:
     container_registry: ContainerRegistryProcessors
     keypair_resource_policy: KeypairResourcePolicyProcessors
     manager_admin: ManagerAdminProcessors
+    secret: SecretProcessors
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     prometheus_query_preset: PrometheusQueryPresetProcessors
@@ -415,7 +434,9 @@ class Processors:
     resource_slot: ResourceSlotProcessors
     retention_policy: RetentionPolicyProcessors
     role_preset: RolePresetProcessors
+    entity_invitation: EntityInvitationProcessors
     runtime_variant: RuntimeVariantProcessors
+    client_ip_masking: ClientIPMaskingProcessors
     runtime_variant_preset: RuntimeVariantPresetProcessors
     deployment_revision_preset: DeploymentPresetProcessors
     model_card: ModelCardProcessors
@@ -434,6 +455,7 @@ class Processors:
     deployment: DeploymentProcessors
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
+    entity_label: EntityLabelProcessors
     idle_checker_assignment: IdleCheckerAssignmentProcessors
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors

@@ -591,6 +591,11 @@ class Permission(enum.IntFlag):
         """The full permission cap — every operation allowed."""
         return cls.READ | cls.UPDATE | cls.CREATE | cls.SOFT_DELETE | cls.HARD_DELETE
 
+    @classmethod
+    def field_bearing(cls) -> Permission:
+        """The operations that state a field scope — read and update."""
+        return cls.READ | cls.UPDATE
+
     def covers(self, required: Permission) -> bool:
         """Whether this mask holds *every* bit of ``required``.
 
@@ -598,6 +603,23 @@ class Permission(enum.IntFlag):
         ``CREATE | UPDATE``), so holding any one of its bits is not enough.
         """
         return (required & ~self) == Permission.NONE
+
+    def to_operation(self) -> OperationType:
+        """The :class:`OperationType` of a single-bit mask — the inverse of
+        :meth:`from_operation` for the bits that have one."""
+        match self:
+            case Permission.READ:
+                return OperationType.READ
+            case Permission.UPDATE:
+                return OperationType.UPDATE
+            case Permission.CREATE:
+                return OperationType.CREATE
+            case Permission.SOFT_DELETE:
+                return OperationType.SOFT_DELETE
+            case Permission.HARD_DELETE:
+                return OperationType.HARD_DELETE
+            case _:
+                raise ValueError(f"{self!r} is not a single operation bit")
 
     @classmethod
     def from_operation(cls, operation: OperationType) -> Permission:

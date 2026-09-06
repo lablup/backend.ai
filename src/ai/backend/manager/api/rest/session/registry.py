@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import auth_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import SessionHandler
@@ -55,7 +55,7 @@ def register_session_routes(handler: SessionHandler, route_deps: RouteDeps) -> R
         "POST",
         "/_/sync-agent-registry",
         handler.sync_agent_registry,
-        middlewares=[route_deps.all_status_mw, auth_required],
+        middlewares=[route_deps.all_status_mw, superadmin_required],
     )
     reg.add(
         "POST",

@@ -5,10 +5,14 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.common.data.permission.types import (
     OperationType,
+    Permission,
     RBACElementType,
-    ScopeType,
+)
+from ai.backend.common.data.permission.types import (
+    ScopeType as LegacyScopeType,
 )
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.permission import PermissionData
@@ -19,7 +23,7 @@ from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
-from ai.backend.manager.data.permission.types import EntityType
+from ai.backend.manager.data.permission.types import EntityType as LegacyEntityType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
@@ -67,10 +71,10 @@ class TestPermissionCreate:
         creator = Creator(
             spec=PermissionCreatorSpec(
                 role_id=target_role.role.id,
-                scope_type=RBACElementType.DOMAIN,
+                scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
                 scope_id=domain_fixture.domain_name,
-                entity_type=RBACElementType.SESSION,
-                operation=OperationType.READ,
+                entity_type=EntityType(RBACElementType.SESSION),
+                permission=Permission.READ,
             )
         )
         result = await permission_controller_processors.create_permission.wait_for_complete(
@@ -79,9 +83,9 @@ class TestPermissionCreate:
 
         assert isinstance(result.data, PermissionData)
         assert result.data.role_id == target_role.role.id
-        assert result.data.scope_type == ScopeType.DOMAIN
-        assert result.data.entity_type == EntityType.SESSION
-        assert result.data.operation == OperationType.READ
+        assert result.data.scope_type == LegacyScopeType.DOMAIN.value
+        assert result.data.entity_type == LegacyEntityType.SESSION.value
+        assert result.data.permission == Permission.READ
 
         # Cleanup
         await permission_controller_processors.delete_permission.wait_for_complete(
@@ -125,16 +129,16 @@ class TestPermissionCreate:
                     creator=Creator(
                         spec=PermissionCreatorSpec(
                             role_id=target_role.role.id,
-                            scope_type=scope_type,
+                            scope_type=ScopeType(EntityType(scope_type)),
                             scope_id=scope_id,
-                            entity_type=entity_type,
-                            operation=operation,
+                            entity_type=EntityType(entity_type),
+                            permission=Permission.from_operation(operation),
                         )
                     )
                 )
             )
-            assert result.data.entity_type == entity_type.to_entity_type()
-            assert result.data.operation == operation
+            assert result.data.entity_type == entity_type.value
+            assert result.data.permission == Permission.from_operation(operation)
             assert result.data.role_id == target_role.role.id
             created_ids.append(result.data.id)
 
@@ -155,10 +159,10 @@ class TestPermissionCreate:
         """F-BIZ-4: Create duplicate permission → unique constraint error."""
         spec = PermissionCreatorSpec(
             role_id=target_role.role.id,
-            scope_type=RBACElementType.DOMAIN,
+            scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
             scope_id=domain_fixture.domain_name,
-            entity_type=RBACElementType.VFOLDER,
-            operation=OperationType.READ,
+            entity_type=EntityType(RBACElementType.VFOLDER),
+            permission=Permission.READ,
         )
 
         result = await permission_controller_processors.create_permission.wait_for_complete(
@@ -194,10 +198,10 @@ class TestPermissionDelete:
                 creator=Creator(
                     spec=PermissionCreatorSpec(
                         role_id=target_role.role.id,
-                        scope_type=RBACElementType.DOMAIN,
+                        scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
                         scope_id=domain_fixture.domain_name,
-                        entity_type=RBACElementType.SESSION,
-                        operation=OperationType.HARD_DELETE,
+                        entity_type=EntityType(RBACElementType.SESSION),
+                        permission=Permission.HARD_DELETE,
                     )
                 )
             )
@@ -223,10 +227,10 @@ class TestPermissionDelete:
                 creator=Creator(
                     spec=PermissionCreatorSpec(
                         role_id=target_role.role.id,
-                        scope_type=RBACElementType.DOMAIN,
+                        scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
                         scope_id=domain_fixture.domain_name,
-                        entity_type=RBACElementType.IMAGE,
-                        operation=OperationType.SOFT_DELETE,
+                        entity_type=EntityType(RBACElementType.IMAGE),
+                        permission=Permission.SOFT_DELETE,
                     )
                 )
             )
@@ -270,7 +274,7 @@ class TestCheckPermissionOfEntity:
             SingleEntityPermissionCheckInput(
                 user_id=uuid.uuid4(),  # random user with no roles
                 target_object_id=ObjectId(
-                    entity_type=EntityType.SESSION, entity_id=str(uuid.uuid4())
+                    entity_type=LegacyEntityType.SESSION, entity_id=str(uuid.uuid4())
                 ),
                 operation=OperationType.READ,
             )
@@ -299,10 +303,10 @@ class TestCheckPermissionInScope:
                 creator=Creator(
                     spec=PermissionCreatorSpec(
                         role_id=role_id,
-                        scope_type=RBACElementType.DOMAIN,
+                        scope_type=ScopeType(EntityType(RBACElementType.DOMAIN)),
                         scope_id=domain_fixture.domain_name,
-                        entity_type=RBACElementType.SESSION,
-                        operation=OperationType.READ,
+                        entity_type=EntityType(RBACElementType.SESSION),
+                        permission=Permission.READ,
                     )
                 )
             )
@@ -316,11 +320,11 @@ class TestCheckPermissionInScope:
             has_perm = await permission_repo.check_permission_in_scope(
                 ScopePermissionCheckInput(
                     user_id=user_id,
-                    target_entity_type=EntityType.SESSION,
+                    target_entity_type=LegacyEntityType.SESSION,
                     target_scope_id=ScopeId(
-                        scope_type=ScopeType.DOMAIN, scope_id=domain_fixture.domain_name
+                        scope_type=LegacyScopeType.DOMAIN, scope_id=domain_fixture.domain_name
                     ),
-                    operation=OperationType.READ,
+                    permission=Permission.READ,
                 )
             )
             assert has_perm is True
@@ -343,11 +347,11 @@ class TestCheckPermissionInScope:
         has_perm = await permission_repo.check_permission_in_scope(
             ScopePermissionCheckInput(
                 user_id=uuid.uuid4(),  # random user with no roles
-                target_entity_type=EntityType.SESSION,
+                target_entity_type=LegacyEntityType.SESSION,
                 target_scope_id=ScopeId(
-                    scope_type=ScopeType.DOMAIN, scope_id=domain_fixture.domain_name
+                    scope_type=LegacyScopeType.DOMAIN, scope_id=domain_fixture.domain_name
                 ),
-                operation=OperationType.READ,
+                permission=Permission.READ,
             )
         )
         assert has_perm is False

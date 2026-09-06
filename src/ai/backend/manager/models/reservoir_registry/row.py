@@ -33,7 +33,7 @@ class ReservoirRegistryRow(Base):
     __tablename__ = "reservoir_registries"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     endpoint: Mapped[str] = mapped_column("endpoint", sa.String, nullable=False)
     access_key: Mapped[str] = mapped_column("access_key", sa.String, nullable=False)

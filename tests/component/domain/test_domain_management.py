@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.domain import (
 )
 from ai.backend.common.dto.manager.domain.types import DomainOrder, DomainOrderField, OrderDirection
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.user.types import UserStatus
@@ -174,8 +173,6 @@ class TestDomainPurgeValidation:
                     user_uuid=user_uuid,
                     scaling_group_name=sgroup_name,
                     resource_group_id=sgroup_id,
-                    occupying_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     priority=10,
                     cluster_size=1,
                     use_host_network=False,
@@ -195,8 +192,6 @@ class TestDomainPurgeValidation:
                     local_rank=0,
                     cluster_hostname="localhost",
                     status=KernelStatus.RUNNING,
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     occupied_shares={},
                     repl_in_port=0,
                     repl_out_port=0,
@@ -279,8 +274,6 @@ class TestDomainPurgeValidation:
                     user_uuid=user_uuid,
                     scaling_group_name=sgroup_name,
                     resource_group_id=sgroup_id,
-                    occupying_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     priority=10,
                     cluster_size=1,
                     use_host_network=False,
@@ -300,8 +293,6 @@ class TestDomainPurgeValidation:
                     local_rank=0,
                     cluster_hostname="localhost",
                     status=KernelStatus.RUNNING,
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     occupied_shares={},
                     repl_in_port=0,
                     repl_out_port=0,

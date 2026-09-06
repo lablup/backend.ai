@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
@@ -49,6 +50,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
     CreateUserInput,
     DeleteUserInput,
     PurgeUserInput,
+    RestoreUserInput,
     SearchUsersRequest,
     UpdateUserInput,
     UserFilter,
@@ -67,6 +69,7 @@ from ai.backend.common.dto.manager.v2.user.response import (
     DeleteUserPayload,
     EntityTimestamps,
     PurgeUserPayload,
+    RestoreUserPayload,
     SearchUsersPayload,
     UpdateMyAllowedClientIPPayload,
     UpdateUserPayload,
@@ -93,40 +96,32 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus as UserStatusDTO,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.types import AccessKey
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.conditions import KeypairConditions
 from ai.backend.manager.models.keypair.orders import KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.conditions import UserConditions
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.orders import UserOrders
 from ai.backend.manager.models.user.row import UserRole as UserRoleModel
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.user.searchers import UserSearcher
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair.types import (
-    UserKeypairOperationScope,
-)
-from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
-from ai.backend.manager.repositories.user.types import (
+from ai.backend.manager.models.user.scopes import (
     DomainUserOperationScope,
     ProjectUserOperationScope,
 )
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.models.user.searchers import UserSearcher
+from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
@@ -136,19 +131,20 @@ from ai.backend.manager.services.user.actions.delete_user import DeleteUserActio
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairAction,
-    AdminDeleteKeypairAction,
     AdminDeleteSSHKeypairAction,
-    AdminGetKeypairAction,
     AdminGetSSHKeypairAction,
     AdminRegisterSSHKeypairAction,
     AdminSearchKeypairsAction,
-    AdminUpdateKeypairAction,
     GetDefaultKeypairsAction,
+    GetKeypairAction,
     IssueMyKeypairAction,
-    RevokeMyKeypairAction,
+    PurgeKeypairAction,
     SearchMyKeypairsAction,
     SwitchDefaultAccessKeyAction,
-    UpdateMyKeypairAction,
+    UpdateKeypairAction,
+)
+from ai.backend.manager.services.user.actions.lookup_keypair import (
+    LookupKeypairByAccessKeyAction,
 )
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupKeypairOwnerByAccessKeyAction,
@@ -157,6 +153,7 @@ from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     PurgeUserAction,
 )
+from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
     SearchUsersByDomainAction,
@@ -179,6 +176,8 @@ if TYPE_CHECKING:
 
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 _USER_PAGINATION_SPEC = PaginationSpec(
     forward_order=UserOrders.created_at(ascending=False),
@@ -200,11 +199,18 @@ _KEYPAIR_PAGINATION_SPEC = PaginationSpec(
 class UserAdapter(BaseAdapter):
     """Adapter for user domain operations."""
 
-    def __init__(self, processors: Processors, auth_config: AuthConfig) -> None:
+    def __init__(
+        self,
+        processors: Processors,
+        auth_config: AuthConfig,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
         super().__init__(processors)
         self._auth_config = auth_config
+        self._key_provider_pool = key_provider_pool
 
-    async def _resolve_domain_id(self, domain_name: str) -> DomainID:
+    async def resolve_domain_id(self, domain_name: str) -> DomainID:
+        """The domain's id, for callers that only hold its name."""
         result = await self._processors.domain.lookup.run(
             LookupDomainAction(name=DomainName(domain_name))
         )
@@ -285,7 +291,7 @@ class UserAdapter(BaseAdapter):
         )
         result = await self._processors.user.search_users_by_domain.run(
             SearchUsersByDomainAction(
-                domain_id=await self._resolve_domain_id(scope.domain_name),
+                domain_id=await self.resolve_domain_id(scope.domain_name),
                 domain_name=scope.domain_name,
                 searcher=searcher,
             )
@@ -356,7 +362,7 @@ class UserAdapter(BaseAdapter):
         searcher = self._build_search_searcher(input)
         result = await self._processors.user.search_users_by_domain.run(
             SearchUsersByDomainAction(
-                domain_id=await self._resolve_domain_id(domain_name),
+                domain_id=await self.resolve_domain_id(domain_name),
                 domain_name=domain_name,
                 searcher=searcher,
             )
@@ -428,12 +434,12 @@ class UserAdapter(BaseAdapter):
             rounds=self._auth_config.password_hash_rounds,
             salt_size=self._auth_config.password_hash_salt_size,
         )
-        spec = UserCreatorSpec(
+        creator = UserCreator(
+            domain_id=await self.resolve_domain_id(input.domain_name),
             email=input.email,
             username=input.username,
             password=password_info,
             need_password_change=input.need_password_change,
-            domain_name=input.domain_name,
             full_name=input.full_name,
             description=input.description,
             status=UserStatus(input.status),
@@ -448,22 +454,18 @@ class UserAdapter(BaseAdapter):
             integration_name=input.integration_name,
         )
         group_ids = [str(gid) for gid in input.group_ids] if input.group_ids else None
-        domain_id = await self._resolve_domain_id(spec.domain_name)
         result = await self._processors.user.create_user.run(
-            CreateUserAction(
-                domain_id=domain_id,
-                creator=Creator(spec=spec),
-                group_ids=group_ids,
-            )
+            CreateUserAction(creator=creator, group_ids=group_ids)
         )
         return CreateUserPayload(
             user=await self._user_node(result.data.user),
-            keypair=self._keypair_data_to_created_payload(result.data.keypair),
+            keypair=await self._keypair_data_to_created_payload(result.data.keypair),
         )
 
     async def update_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
         """Update a user by UUID."""
-        updater_spec = UserUpdaterSpec(
+        updater = UserUpdater(
+            user_id=UserID(user_id),
             username=(
                 OptionalState.update(input.username)
                 if input.username is not None
@@ -556,10 +558,7 @@ class UserAdapter(BaseAdapter):
                 else OptionalState.update([str(gid) for gid in input.group_ids])
             ),
         )
-        updater: Updater[UserRow] = Updater(spec=updater_spec, pk_value=user_id)
-        result = await self._processors.user.update_user.run(
-            UpdateUserAction(user_id=UserID(user_id), updater=updater)
-        )
+        result = await self._processors.user.update_user.run(UpdateUserAction(updater=updater))
         if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
             await self.switch_default_access_key(UserID(user_id), AccessKey(input.main_access_key))
         return UpdateUserPayload(user=await self._user_node(result.data))
@@ -568,6 +567,13 @@ class UserAdapter(BaseAdapter):
         """Soft-delete a user by UUID."""
         await self._processors.user.delete_user.run(DeleteUserAction(user_id=UserID(input.user_id)))
         return DeleteUserPayload(success=True)
+
+    async def restore_user_by_id(self, input: RestoreUserInput) -> RestoreUserPayload:
+        """Restore a soft-deleted user by UUID."""
+        await self._processors.user.restore_user.run(
+            RestoreUserAction(user_id=UserID(input.user_id))
+        )
+        return RestoreUserPayload(success=True)
 
     async def purge_user_by_id(
         self, input: PurgeUserInput, admin_user_id: UUID
@@ -604,10 +610,8 @@ class UserAdapter(BaseAdapter):
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
-                username=(
-                    spec := cast(UserCreatorSpec, action.items[error.index].creator.spec)
-                ).username,
-                email=spec.email,
+                username=(creator := action.items[error.index].creator).username,
+                email=creator.email,
                 message=str(error.exception),
             )
             for error in result.data.failures
@@ -626,17 +630,15 @@ class UserAdapter(BaseAdapter):
         created = [
             CreateUserPayload(
                 user=node,
-                keypair=self._keypair_data_to_created_payload(item.keypair),
+                keypair=await self._keypair_data_to_created_payload(item.keypair),
             )
             for item, node in zip(result.data.successes, created_nodes, strict=True)
         ]
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
-                username=(
-                    spec := cast(UserCreatorSpec, action.items[error.index].creator.spec)
-                ).username,
-                email=spec.email,
+                username=(creator := action.items[error.index].creator).username,
+                email=creator.email,
                 message=str(error.exception),
             )
             for error in result.data.failures
@@ -684,6 +686,7 @@ class UserAdapter(BaseAdapter):
             for error in result.data.failures
         ]
         return BulkPurgeUsersPayload(
+            successes=list(result.data.purged_user_ids),
             purged_count=result.data.purged_count(),
             failed=failed,
         )
@@ -702,27 +705,20 @@ class UserAdapter(BaseAdapter):
         )
         return IssueMyKeypairPayload(
             keypair=self._keypair_data_to_node(result.generated_data.keypair),
-            secret_key=str(result.generated_data.keypair.secret_key),
+            secret_key=await self._secret_key_of(result.generated_data.keypair),
         )
 
-    async def revoke_my_keypair(self, user_id: UUID, access_key: str) -> RevokeMyKeypairPayload:
+    async def revoke_my_keypair(self, access_key: str) -> RevokeMyKeypairPayload:
         """Revoke a keypair owned by the current user."""
-        result = await self._processors.user.revoke_my_keypair.run(
-            RevokeMyKeypairAction(user_id=UserID(user_id), access_key=access_key)
-        )
-        return RevokeMyKeypairPayload(success=result.success)
+        await self._purge_keypair(access_key)
+        return RevokeMyKeypairPayload(success=True)
 
-    async def update_my_keypair(
-        self, user_id: UUID, access_key: str, is_active: bool
-    ) -> UpdateMyKeypairPayload:
+    async def update_my_keypair(self, access_key: str, is_active: bool) -> UpdateMyKeypairPayload:
         """Update a keypair owned by the current user."""
-        result = await self._processors.user.update_my_keypair.run(
-            UpdateMyKeypairAction(
-                user_id=UserID(user_id),
-                updater=Updater(
-                    spec=KeyPairUpdaterSpec(is_active=OptionalState.update(is_active)),
-                    pk_value=access_key,
-                ),
+        result = await self._processors.user.update_keypair.run(
+            UpdateKeypairAction(
+                keypair_id=await self._resolve_keypair(access_key),
+                is_active=OptionalState.update(is_active),
             )
         )
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
@@ -792,12 +788,17 @@ class UserAdapter(BaseAdapter):
             user_id=data.user_id,
         )
 
-    @staticmethod
-    def _keypair_data_to_created_payload(data: KeyPairData) -> CreateKeypairPayload:
+    async def _secret_key_of(self, data: KeyPairData) -> SecretKey:
+        """The keypair's secret key as plaintext, whatever form it is stored in."""
+        return SecretKey(
+            await self._key_provider_pool.decrypt(data.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
+        )
+
+    async def _keypair_data_to_created_payload(self, data: KeyPairData) -> CreateKeypairPayload:
         """Convert KeyPairData to a CreateKeypairPayload, including the one-time secret key."""
         return CreateKeypairPayload(
             keypair=UserAdapter._keypair_data_to_node(data),
-            secret_key=data.secret_key,
+            secret_key=await self._secret_key_of(data),
         )
 
     # ------------------------------------------------------------------ admin keypair operations
@@ -817,7 +818,7 @@ class UserAdapter(BaseAdapter):
         )
         return AdminCreateKeypairPayload(
             keypair=self._keypair_data_to_node(result.generated_data.keypair),
-            secret_key=str(result.generated_data.keypair.secret_key),
+            secret_key=await self._secret_key_of(result.generated_data.keypair),
         )
 
     async def _resolve_keypair_owner(self, access_key: str) -> UserID:
@@ -826,55 +827,43 @@ class UserAdapter(BaseAdapter):
         )
         return UserID(result.entity_id())
 
+    async def _resolve_keypair(self, access_key: str) -> KeyPairID:
+        """The id of the keypair an access key names, which every operation on that row
+        is built from."""
+        result = await self._processors.user.lookup_keypair.run(
+            LookupKeypairByAccessKeyAction(access_key=AccessKey(access_key))
+        )
+        return KeyPairID(result.field_id)
+
+    async def _purge_keypair(self, access_key: str) -> str:
+        result = await self._processors.user.purge_keypair.run(
+            PurgeKeypairAction(keypair_id=await self._resolve_keypair(access_key))
+        )
+        return str(result.keypair.access_key)
+
     async def admin_update_keypair(
         self, input: AdminUpdateKeypairInput
     ) -> AdminUpdateKeypairPayload:
         """Admin updates any keypair."""
-        updater_spec = KeyPairUpdaterSpec(
-            is_active=(
-                OptionalState.update(input.is_active)
-                if input.is_active is not None
-                else OptionalState.nop()
-            ),
-            is_admin=(
-                OptionalState.update(input.is_admin)
-                if input.is_admin is not None
-                else OptionalState.nop()
-            ),
-            resource_policy=(
-                OptionalState.update(input.resource_policy)
-                if input.resource_policy is not None
-                else OptionalState.nop()
-            ),
-            rate_limit=(
-                OptionalState.update(input.rate_limit)
-                if input.rate_limit is not None
-                else OptionalState.nop()
-            ),
-        )
-        updater: Updater[KeyPairRow] = Updater(spec=updater_spec, pk_value=input.access_key)
-        result = await self._processors.user.admin_update_keypair.run(
-            AdminUpdateKeypairAction(
-                user_id=await self._resolve_keypair_owner(input.access_key), updater=updater
+        result = await self._processors.user.update_keypair.run(
+            UpdateKeypairAction(
+                keypair_id=await self._resolve_keypair(input.access_key),
+                is_active=OptionalState.from_nullable(input.is_active),
+                is_admin=OptionalState.from_nullable(input.is_admin),
+                resource_policy=OptionalState.from_nullable(input.resource_policy),
+                rate_limit=OptionalState.from_nullable(input.rate_limit),
             )
         )
         return AdminUpdateKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
     async def admin_delete_keypair(self, access_key: str) -> AdminDeleteKeypairPayload:
         """Admin deletes any keypair."""
-        result = await self._processors.user.admin_delete_keypair.run(
-            AdminDeleteKeypairAction(
-                user_id=await self._resolve_keypair_owner(access_key), access_key=access_key
-            )
-        )
-        return AdminDeleteKeypairPayload(access_key=result.access_key)
+        return AdminDeleteKeypairPayload(access_key=await self._purge_keypair(access_key))
 
     async def admin_get_keypair(self, access_key: str) -> KeypairNode:
         """Admin retrieves a single keypair by access key."""
-        result = await self._processors.user.admin_get_keypair.run(
-            AdminGetKeypairAction(
-                user_id=await self._resolve_keypair_owner(access_key), access_key=access_key
-            )
+        result = await self._processors.user.get_keypair.run(
+            GetKeypairAction(keypair_id=await self._resolve_keypair(access_key))
         )
         return self._keypair_data_to_node(result.keypair)
 

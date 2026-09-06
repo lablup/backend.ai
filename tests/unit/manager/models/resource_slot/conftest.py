@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from decimal import Decimal
 
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -207,8 +206,6 @@ async def agent_id(
                 resource_group_id=resource_group_id,
                 region="local",
                 addr="tcp://127.0.0.1:6001",
-                available_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("4294967296")}),
-                occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
                 first_contact=None,
                 lost_at=None,
                 version="test",
@@ -241,8 +238,6 @@ async def kernel_id(
                 resource_group_id=resource_group_id,
                 scaling_group_name=resource_group,
                 user_uuid=user_uuid,
-                occupying_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
-                requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
             )
         )
         await db_sess.flush()
@@ -253,8 +248,6 @@ async def kernel_id(
                 domain_name=domain_fixture.domain_name,
                 group_id=project_id,
                 user_uuid=user_uuid,
-                occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
-                requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,

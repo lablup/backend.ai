@@ -64,7 +64,7 @@ class KernelUsageRecordRow(Base):
     __tablename__ = "kernel_usage_records"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
 
     # Foreign keys (no FK constraints - referenced entities can be deleted)
@@ -133,7 +133,7 @@ class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "domain_usage_buckets"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
@@ -205,7 +205,7 @@ class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "project_usage_buckets"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     project_id: Mapped[ProjectID] = mapped_column(
         "project_id", GUID(ProjectID), nullable=False, index=True
@@ -284,7 +284,7 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "user_usage_buckets"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
 
     # User identification (user_uuid + project_id + domain_name combination)

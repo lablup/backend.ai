@@ -13,7 +13,7 @@ from ai.backend.common.data.entity.manager_admin import MANAGER_ADMIN_ENTITY_TYP
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.types import HostPortPair, ResourceSlot
+from ai.backend.common.types import HostPortPair
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     FieldGroupMeta,
@@ -123,8 +123,6 @@ async def agent_fixture(
                 region="local",
                 scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
-                available_slots=ResourceSlot(),
-                occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",
                 version="test",
                 architecture="x86_64",

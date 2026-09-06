@@ -22,12 +22,9 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.errors.service import (
     EndpointAutoScalingRuleNotFound,
 )
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.models.endpoint.updaters import AutoScalingRuleUpdater
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
-from ai.backend.manager.repositories.model_serving.updaters import (
-    EndpointAutoScalingRuleUpdaterSpec,
-)
 from ai.backend.manager.services.model_serving.actions.update_auto_scaling_rule import (
     UpdateEndpointAutoScalingRuleAction,
     UpdateEndpointAutoScalingRuleActionResult,
@@ -130,11 +127,9 @@ class TestModifyAutoScalingRule:
                 UpdateEndpointAutoScalingRuleAction(
                     deployment_id=DeploymentID(uuid.uuid4()),
                     id=RuleId(uuid.UUID("88888888-8888-8888-8888-888888888888")),
-                    updater=Updater(
-                        spec=EndpointAutoScalingRuleUpdaterSpec(
-                            threshold=OptionalState.update(Decimal("85.0")),
-                        ),
-                        pk_value=uuid.UUID("88888888-8888-8888-8888-888888888888"),
+                    updater=AutoScalingRuleUpdater(
+                        rule_id=RuleId(uuid.UUID("88888888-8888-8888-8888-888888888888")),
+                        threshold=OptionalState.update(Decimal("85.0")),
                     ),
                 ),
                 UpdateEndpointAutoScalingRuleActionResult(
@@ -147,12 +142,10 @@ class TestModifyAutoScalingRule:
                 UpdateEndpointAutoScalingRuleAction(
                     deployment_id=DeploymentID(uuid.uuid4()),
                     id=RuleId(uuid.UUID("99999999-9999-9999-9999-999999999999")),
-                    updater=Updater(
-                        spec=EndpointAutoScalingRuleUpdaterSpec(
-                            min_replicas=TriState.update(5),
-                            max_replicas=TriState.update(25),
-                        ),
-                        pk_value=uuid.UUID("99999999-9999-9999-9999-999999999999"),
+                    updater=AutoScalingRuleUpdater(
+                        rule_id=RuleId(uuid.UUID("99999999-9999-9999-9999-999999999999")),
+                        min_replicas=TriState.update(5),
+                        max_replicas=TriState.update(25),
                     ),
                 ),
                 UpdateEndpointAutoScalingRuleActionResult(
@@ -165,9 +158,8 @@ class TestModifyAutoScalingRule:
                 UpdateEndpointAutoScalingRuleAction(
                     deployment_id=DeploymentID(uuid.uuid4()),
                     id=RuleId(uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
-                    updater=Updater(
-                        spec=EndpointAutoScalingRuleUpdaterSpec(),
-                        pk_value=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                    updater=AutoScalingRuleUpdater(
+                        rule_id=RuleId(uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
                     ),
                 ),
                 UpdateEndpointAutoScalingRuleActionResult(
@@ -180,11 +172,9 @@ class TestModifyAutoScalingRule:
                 UpdateEndpointAutoScalingRuleAction(
                     deployment_id=DeploymentID(uuid.uuid4()),
                     id=RuleId(uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")),
-                    updater=Updater(
-                        spec=EndpointAutoScalingRuleUpdaterSpec(
-                            threshold=OptionalState.update(Decimal("90.0")),
-                        ),
-                        pk_value=uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                    updater=AutoScalingRuleUpdater(
+                        rule_id=RuleId(uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")),
+                        threshold=OptionalState.update(Decimal("90.0")),
                     ),
                 ),
                 EndpointAutoScalingRuleNotFound,

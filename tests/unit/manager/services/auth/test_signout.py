@@ -3,6 +3,8 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user import UserRole, UserStatus
@@ -10,6 +12,7 @@ from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.signout import SignoutAction
 from ai.backend.manager.services.auth.service import AuthService
 
@@ -26,6 +29,7 @@ def auth_service(
     mock_config_provider: AsyncMock,
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
+    mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
@@ -36,6 +40,8 @@ def auth_service(
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
         ssh_key_validator=AsyncMock(),
+        client_ip_masking_repository=mock_client_ip_masking_repository,
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
 
 
@@ -45,7 +51,7 @@ async def test_signout_successful_with_valid_credentials(
 ) -> None:
     """Test successful signout with valid credentials"""
     action = SignoutAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         password="correct_password",
@@ -73,7 +79,7 @@ async def test_signout_fails_when_not_account_owner(
 ) -> None:
     """Test signout fails when requester is not the account owner"""
     action = SignoutAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         password="password",
@@ -90,7 +96,7 @@ async def test_signout_fails_with_invalid_credentials(
 ) -> None:
     """Test signout fails with invalid credentials"""
     action = SignoutAction(
-        user_id=UUID("12345678-1234-5678-1234-567812345678"),
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
         password="wrong_password",

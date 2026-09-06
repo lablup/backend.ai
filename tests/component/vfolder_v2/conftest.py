@@ -30,6 +30,7 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler
 from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_routes
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -40,11 +41,13 @@ from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
@@ -93,8 +96,12 @@ def vfolder_processors(
     RBAC checks use check_permission_with_scope_chain() against the real DB.
     Without explicit RBAC permission grants, all access is denied (403).
     """
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = VFolderService(
         config_provider=MagicMock(),
         etcd=MagicMock(),

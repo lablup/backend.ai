@@ -11,11 +11,13 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.permission.types import ScopeType as LegacyScopeType
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.types import BackendAISchema
 
-from .types import EntityType, OperationType, RoleSource, RoleStatus
+from .types import EntityType as LegacyEntityType
+from .types import OperationType, RoleSource, RoleStatus
 
 __all__ = (
     "AssignRoleResponse",
@@ -131,7 +133,7 @@ class ObjectPermissionDTO(BackendAISchema):
 
     id: UUID = Field(description="Object permission ID")
     role_id: UUID = Field(description="Role ID")
-    entity_type: EntityType = Field(description="Entity type")
+    entity_type: LegacyEntityType = Field(description="Entity type")
     entity_id: str = Field(description="Entity ID")
     operation: OperationType = Field(description="Operation type")
 
@@ -163,13 +165,13 @@ class DeleteObjectPermissionResponse(BaseResponseModel):
 class GetScopeTypesResponse(BaseResponseModel):
     """Response for getting available scope types."""
 
-    items: list[ScopeType] = Field(description="List of available scope types")
+    items: list[LegacyScopeType] = Field(description="List of available scope types")
 
 
 class ScopeDTO(BackendAISchema):
     """DTO for scope data."""
 
-    scope_type: ScopeType = Field(description="Scope type")
+    scope_type: LegacyScopeType = Field(description="Scope type")
     scope_id: str = Field(description="Scope ID (domain name, project UUID, or user UUID)")
     name: str = Field(description="Scope display name")
 
@@ -184,13 +186,13 @@ class SearchScopesResponse(BaseResponseModel):
 class GetEntityTypesResponse(BaseResponseModel):
     """Response for getting available entity types."""
 
-    items: list[EntityType] = Field(description="List of available entity types")
+    items: list[LegacyEntityType] = Field(description="List of available entity types")
 
 
 class EntityDTO(BackendAISchema):
     """DTO for entity data."""
 
-    entity_type: EntityType = Field(description="Entity type")
+    entity_type: LegacyEntityType = Field(description="Entity type")
     entity_id: str = Field(description="Entity ID")
 
 

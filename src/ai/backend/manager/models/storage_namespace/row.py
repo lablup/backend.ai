@@ -40,7 +40,7 @@ class StorageNamespaceRow(Base):
         "id",
         GUID(StorageNamespaceID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     storage_id: Mapped[ObjectStorageID] = mapped_column(
         "storage_id",

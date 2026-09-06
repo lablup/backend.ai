@@ -39,7 +39,7 @@ class SessionTemplateRow(Base):
         "id",
         GUID(SessionTemplateID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     created_at: Mapped[datetime] = mapped_column(
         "created_at",

@@ -5,7 +5,8 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     PublicActionProcessor,
 )
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
-from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
+from ai.backend.manager.actions.v2.ops.result import LookupOpsResult, ScopedBatchOpsResult
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.services.resource_group.actions.associate_with_domain import (
@@ -44,14 +45,6 @@ from ai.backend.manager.services.resource_group.actions.get_allowed_projects_for
     GetAllowedProjectsForResourceGroupAction,
     GetAllowedProjectsForResourceGroupActionResult,
 )
-from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_domain import (
-    GetAllowedResourceGroupsForDomainAction,
-    GetAllowedResourceGroupsForDomainActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_project import (
-    GetAllowedResourceGroupsForProjectAction,
-    GetAllowedResourceGroupsForProjectActionResult,
-)
 from ai.backend.manager.services.resource_group.actions.get_resource_info import (
     GetResourceInfoAction,
     GetResourceInfoActionResult,
@@ -59,10 +52,6 @@ from ai.backend.manager.services.resource_group.actions.get_resource_info import
 from ai.backend.manager.services.resource_group.actions.get_wsproxy_version import (
     GetWsproxyVersionAction,
     GetWsproxyVersionActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.list_allowed import (
-    ListAllowedResourceGroupsAction,
-    ListAllowedResourceGroupsActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.list_resource_groups import (
     SearchResourceGroupsAction,
@@ -84,6 +73,9 @@ from ai.backend.manager.services.resource_group.actions.replace_default_session_
 from ai.backend.manager.services.resource_group.actions.resolve_resource_group_ids_by_names import (
     ResolveResourceGroupIDsByNamesAction,
     ResolveResourceGroupIDsByNamesActionResult,
+)
+from ai.backend.manager.services.resource_group.actions.scoped_search import (
+    ScopedSearchResourceGroupsAction,
 )
 from ai.backend.manager.services.resource_group.actions.update import (
     UpdateResourceGroupAction,
@@ -126,8 +118,8 @@ class ResourceGroupProcessors:
     search_resource_groups: GlobalActionProcessor[
         SearchResourceGroupsAction, SearchResourceGroupsActionResult
     ]
-    list_allowed_sgroups: PublicActionProcessor[
-        ListAllowedResourceGroupsAction, ListAllowedResourceGroupsActionResult
+    scoped_search_resource_groups: ScopeActionProcessor[
+        ScopedSearchResourceGroupsAction, ScopedBatchOpsResult[ResourceGroupData]
     ]
     get_wsproxy_version: PublicActionProcessor[
         GetWsproxyVersionAction, GetWsproxyVersionActionResult
@@ -182,14 +174,6 @@ class ResourceGroupProcessors:
         UpdateAllowedProjectsForResourceGroupAction,
         UpdateAllowedProjectsForResourceGroupActionResult,
     ]
-    get_allowed_rgs_for_domain: SingleEntityActionProcessor[
-        GetAllowedResourceGroupsForDomainAction,
-        GetAllowedResourceGroupsForDomainActionResult,
-    ]
-    get_allowed_rgs_for_project: SingleEntityActionProcessor[
-        GetAllowedResourceGroupsForProjectAction,
-        GetAllowedResourceGroupsForProjectActionResult,
-    ]
     get_allowed_domains_for_rg: SingleEntityActionProcessor[
         GetAllowedDomainsForResourceGroupAction,
         GetAllowedDomainsForResourceGroupActionResult,
@@ -219,8 +203,8 @@ class ResourceGroupProcessors:
         self.search_resource_groups = group.global_scope(
             SearchResourceGroupsAction, service.search_resource_groups
         )
-        self.list_allowed_sgroups = group.public(
-            ListAllowedResourceGroupsAction, service.list_allowed_sgroups
+        self.scoped_search_resource_groups = group.scope_search_ops(
+            ScopedSearchResourceGroupsAction
         )
         self.get_wsproxy_version = group.public(
             GetWsproxyVersionAction, service.get_wsproxy_version
@@ -274,13 +258,6 @@ class ResourceGroupProcessors:
         self.update_allowed_projects_for_rg = group.single_entity(
             UpdateAllowedProjectsForResourceGroupAction,
             service.update_allowed_projects_for_resource_group,
-        )
-        self.get_allowed_rgs_for_domain = group.single_entity(
-            GetAllowedResourceGroupsForDomainAction, service.get_allowed_resource_groups_for_domain
-        )
-        self.get_allowed_rgs_for_project = group.single_entity(
-            GetAllowedResourceGroupsForProjectAction,
-            service.get_allowed_resource_groups_for_project,
         )
         self.get_allowed_domains_for_rg = group.single_entity(
             GetAllowedDomainsForResourceGroupAction, service.get_allowed_domains_for_resource_group

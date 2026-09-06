@@ -31,10 +31,11 @@ The User Service is a core component of Backend.AI that handles comprehensive us
 #### Basic User Creation
 ```python
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
-from ai.backend.manager.services.user.type import UserCreator
+from ai.backend.manager.models.user.creators import UserCreator
 
 action = CreateUserAction(
-    input=UserCreator(
+    domain_id=domain_id,
+    creator=UserCreator(
         email="user@example.com",
         password="SecurePassword123!",
         username="newuser",
@@ -52,7 +53,8 @@ result = await user_processor.create_user.wait_for_complete(action)
 #### Admin User with Special Permissions
 ```python
 action = CreateUserAction(
-    input=UserCreator(
+    domain_id=domain_id,
+    creator=UserCreator(
         email="admin@example.com",
         password="AdminPass123!",
         username="admin",
@@ -69,7 +71,8 @@ action = CreateUserAction(
 #### User with Container Configuration
 ```python
 action = CreateUserAction(
-    input=UserCreator(
+    domain_id=domain_id,
+    creator=UserCreator(
         email="container@example.com",
         password="ContainerPass123!",
         username="containeruser",
@@ -87,12 +90,13 @@ action = CreateUserAction(
 
 #### Basic Information Updates
 ```python
-from ai.backend.manager.services.user.actions.update_user import UpdateUserAction, UserModifier
+from ai.backend.manager.models.user.updaters import UserUpdater
+from ai.backend.manager.services.user.actions.update_user import UpdateUserAction
 from ai.backend.manager.types import OptionalState
 
 action = UpdateUserAction(
-    email="user@example.com",
-    modifier=UserModifier(
+    updater=UserUpdater(
+        user_id=user_id,
         full_name=OptionalState.update("Updated Name"),
         description=OptionalState.update("Senior Developer"),
     ),
@@ -102,8 +106,8 @@ action = UpdateUserAction(
 #### Role and Permission Changes
 ```python
 action = UpdateUserAction(
-    email="user@example.com",
-    modifier=UserModifier(
+    updater=UserUpdater(
+        user_id=user_id,
         role=OptionalState.update(UserRole.ADMIN),
         sudo_session_enabled=OptionalState.update(True),
     ),
@@ -113,8 +117,8 @@ action = UpdateUserAction(
 #### Security Settings
 ```python
 action = UpdateUserAction(
-    email="user@example.com",
-    modifier=UserModifier(
+    updater=UserUpdater(
+        user_id=user_id,
         totp_activated=OptionalState.update(True),
         need_password_change=OptionalState.update(True),
         status=OptionalState.update(UserStatus.ACTIVE),

@@ -9,7 +9,6 @@ from ai.backend.manager.actions.action.rbac import (
     RBACActionName,
     RBACRequiredPermission,
 )
-from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import (
     UserRoleRevocationData,
 )
@@ -98,30 +97,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_entities im
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
     SearchPermissionsActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
-    AcceptRoleInvitationAction as AcceptRoleInvitationServiceAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
-    AdminSearchRoleInvitationsAction,
-    AdminSearchRoleInvitationsActionResult,
-    CreateRoleInvitationActionResult,
-    RoleInvitationActionResult,
-    SearchMyRoleInvitationsAction,
-    SearchMyRoleInvitationsActionResult,
-    SearchMySentRoleInvitationsAction,
-    SearchMySentRoleInvitationsActionResult,
-    SearchRoleInvitationsByRoleAction,
-    SearchRoleInvitationsByRoleActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
-    CancelRoleInvitationAction as CancelRoleInvitationServiceAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
-    CreateRoleInvitationAction as CreateRoleInvitationServiceAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_role_invitations import (
-    RejectRoleInvitationAction as RejectRoleInvitationServiceAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
@@ -443,91 +418,3 @@ class PermissionControllerService:
         """
         permissions = await self._repository.resolve_effective_permissions(action.keys)
         return ResolveEffectivePermissionsActionResult(permissions=permissions)
-
-    async def create_role_invitation(
-        self, action: CreateRoleInvitationServiceAction
-    ) -> CreateRoleInvitationActionResult:
-        """Create role invitations by resolving invitee emails."""
-        result = await self._repository.create_invitation_by_email(
-            invitee_emails=action.invitee_emails,
-            inviter_user_id=action.inviter_user_id,
-            role_id=action.role_id,
-        )
-        return CreateRoleInvitationActionResult(created=result.created)
-
-    async def accept_invitation(
-        self, action: AcceptRoleInvitationServiceAction
-    ) -> RoleInvitationActionResult:
-        """Accept a PENDING invitation and assign the role atomically."""
-        data = await self._repository.accept_invitation(action.invitation_id)
-        return RoleInvitationActionResult(data=data)
-
-    async def reject_invitation(
-        self, action: RejectRoleInvitationServiceAction
-    ) -> RoleInvitationActionResult:
-        """Reject a PENDING invitation."""
-        data = await self._repository.reject_invitation(action.invitation_id)
-        return RoleInvitationActionResult(data=data)
-
-    async def cancel_invitation(
-        self, action: CancelRoleInvitationServiceAction
-    ) -> RoleInvitationActionResult:
-        """Cancel a PENDING invitation."""
-        data = await self._repository.cancel_invitation(action.invitation_id)
-        return RoleInvitationActionResult(data=data)
-
-    async def search_my_role_invitations(
-        self, action: SearchMyRoleInvitationsAction
-    ) -> SearchMyRoleInvitationsActionResult:
-        """Search invitations addressed to a specific user."""
-        result = await self._repository.search_invitations_by_invitee(action.querier, action.scope)
-        return SearchMyRoleInvitationsActionResult(
-            result=SearchResult(
-                items=result.items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-        )
-
-    async def search_my_sent_role_invitations(
-        self, action: SearchMySentRoleInvitationsAction
-    ) -> SearchMySentRoleInvitationsActionResult:
-        """Search invitations sent by a specific user."""
-        result = await self._repository.search_invitations_by_inviter(action.querier, action.scope)
-        return SearchMySentRoleInvitationsActionResult(
-            result=SearchResult(
-                items=result.items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-        )
-
-    async def search_role_invitations_by_role(
-        self, action: SearchRoleInvitationsByRoleAction
-    ) -> SearchRoleInvitationsByRoleActionResult:
-        """Search invitations for a specific role (admin/project-admin view)."""
-        result = await self._repository.search_invitations_by_role(action.querier, action.scope)
-        return SearchRoleInvitationsByRoleActionResult(
-            result=SearchResult(
-                items=result.items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-        )
-
-    async def admin_search_role_invitations(
-        self, action: AdminSearchRoleInvitationsAction
-    ) -> AdminSearchRoleInvitationsActionResult:
-        """Search all invitations across the system (superadmin only)."""
-        result = await self._repository.admin_search_invitations(action.querier)
-        return AdminSearchRoleInvitationsActionResult(
-            result=SearchResult(
-                items=result.items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-        )

@@ -1,4 +1,4 @@
-"""RBAC-scoped DB ops: scope-associated entity creation and virtual-scope ownership
+"""RBAC-scoped DB ops: scope-associated entity creation and virtual-entity ownership
 on top of the base write ops."""
 
 from __future__ import annotations
@@ -21,21 +21,19 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_SCOPE_TYPE
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeID, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE, UserID
-from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
+from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import (
     Permission,
     RBACElementType,
 )
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import RBACTypeConversionError, UnreachableError
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -50,14 +48,13 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as LegacyScopeType,
 )
-from ai.backend.manager.errors.permission import VirtualScopeNotFound
+from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data
-from ai.backend.manager.models.project import ProjectRow, ProjectType
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -68,10 +65,13 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.user import UserRow, UserStatus
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import (
     BulkCreator,
     CreatorSpec,
@@ -107,11 +107,9 @@ from ai.backend.manager.repositories.base.rbac.entity_upserter import (
     RBACEntityUpserterResult,
 )
 from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_conflict_do_nothing
-from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
-    EntityMembershipCreatorSpec,
     PermissionCreatorSpec,
     RoleCreatorSpec,
     ScopeBindingCreatorSpec,
@@ -159,31 +157,10 @@ class ScopeCreationResult[TRow: Base]:
     auto_grant_role_ids: list[UUID]
 
 
-@dataclass
-class FullUserCreation:
-    """Everything needed to provision a user in full: the user-scope creation, the
-    scopes to enroll in, and the default keypair's policy. ``keypair_secrets`` overrides
-    the generated key material (e.g. pre-issued keys)."""
-
-    creation: ScopeCreation[UserRow]
-    domain_id: DomainID
-    project_ids: Collection[ProjectID]
-    keypair_resource_policy: str
-    keypair_rate_limit: int | None = None
-    keypair_secrets: KeyPairSecrets | None = None
-
-
-@dataclass
-class FullUserCreationResult:
-    """A fully provisioned user: the row and its default keypair, marked as the main one."""
-
-    user_row: UserRow
-    keypair_row: KeyPairRow
-
-
 class ScopeMember(ABC):
     """A member to attach to a scope; ``assign_role_on`` names the user to grant its
-    auto_assign roles, or ``None`` to skip."""
+    auto_assign roles, or ``None`` to skip, and ``permission_cap`` gives the cap every
+    row of this member kind carries in that scope kind."""
 
     @abstractmethod
     def entity_ref(self) -> EntityRef:
@@ -191,6 +168,10 @@ class ScopeMember(ABC):
 
     @abstractmethod
     def assign_role_on(self) -> UserID | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def permission_cap(self, scope: ScopeRef) -> Permission | None:
         raise NotImplementedError
 
 
@@ -209,6 +190,13 @@ class ScopeUserMember(ScopeMember):
     def assign_role_on(self) -> UserID:
         return self.user_id
 
+    @override
+    def permission_cap(self, scope: ScopeRef) -> Permission | None:
+        """A project roster caps its users to read; a domain roster carries no cap."""
+        if scope.scope_type == PROJECT_SCOPE_TYPE:
+            return Permission.READ
+        return None
+
 
 @dataclass
 class ScopeEntityMember(ScopeMember):
@@ -222,6 +210,10 @@ class ScopeEntityMember(ScopeMember):
 
     @override
     def assign_role_on(self) -> UserID | None:
+        return None
+
+    @override
+    def permission_cap(self, scope: ScopeRef) -> Permission | None:
         return None
 
 
@@ -248,7 +240,7 @@ class EntityMembersResultWithFailures:
 
 @dataclass
 class ScopeDeletion[TRow: Base]:
-    """A real scope-entity row to delete together with its RBAC entries and virtual scope."""
+    """A real scope-entity row to delete together with its RBAC entries and virtual entity."""
 
     purger: RBACEntityPurger[TRow]
     scope: ScopeRef
@@ -257,7 +249,7 @@ class ScopeDeletion[TRow: Base]:
 @dataclass
 class ScopeBatchDeletion[TRow: Base]:
     """A batch purger selecting real scope-entity rows to delete together with their RBAC
-    entries, and the virtual scopes to drop for the deleted rows."""
+    entries, and the virtual entities to drop for the deleted rows."""
 
     purger: RBACEntityBatchPurger[TRow]
     scopes: Sequence[ScopeRef]
@@ -278,7 +270,7 @@ class ScopeSource(Protocol):
 
 
 class RBACWriteOps(WriteOps):
-    """Base write ops plus RBAC scope-associated creation and virtual-scope writes."""
+    """Base write ops plus RBAC scope-associated creation and virtual-entity writes."""
 
     _scope_rows: ClassVar[Mapping[ScopeType, type[ScopeSource]]] = {
         CONTAINER_REGISTRY_SCOPE_TYPE: ContainerRegistryRow,
@@ -378,83 +370,81 @@ class RBACWriteOps(WriteOps):
             self._sess, [spec.build_row(dependency) for spec in specs]
         )
 
-    # -- Virtual-scope helpers ----------------------------------------------------
+    # -- Virtual-entity helpers ----------------------------------------------------
 
-    async def _find_virtual_scope_id(self, scope: ScopeRef) -> VirtualScopeID | None:
-        """Return the virtual scope id backing ``scope``, or ``None`` if it has none."""
-        stmt = sa.select(VirtualScopeRow.id).where(
-            VirtualScopeRow.scope_type == scope.scope_type,
-            VirtualScopeRow.scope_id == scope.scope_id,
+    async def _find_virtual_entity_id(self, scope: ScopeRef) -> VirtualEntityID | None:
+        """Return the virtual entity id backing ``scope``, or ``None`` if it has none."""
+        stmt = sa.select(VirtualEntityRow.id).where(
+            VirtualEntityRow.entity_type == scope.scope_type,
+            VirtualEntityRow.entity_id == scope.scope_id,
         )
         return (await self._sess.execute(stmt)).scalar_one_or_none()
 
-    async def _resolve_virtual_scope_id(self, scope: ScopeRef) -> VirtualScopeID:
-        """Return the virtual scope id backing ``scope``.
+    async def _resolve_virtual_entity_id(self, scope: ScopeRef) -> VirtualEntityID:
+        """Return the virtual entity id backing ``scope``.
 
-        Every owner scope is created with its virtual scope, so a missing one is an
-        invariant violation: raises :class:`VirtualScopeNotFound` (500).
+        Every owner scope is created with its virtual entity, so a missing one is an
+        invariant violation: raises :class:`VirtualEntityNotFound` (500).
         """
-        virtual_scope_id = await self._find_virtual_scope_id(scope)
-        if virtual_scope_id is None:
-            raise VirtualScopeNotFound(
-                f"No virtual scope for scope {scope.scope_type}:{scope.scope_id}"
+        virtual_entity_id = await self._find_virtual_entity_id(scope)
+        if virtual_entity_id is None:
+            raise VirtualEntityNotFound(
+                f"No virtual entity for scope {scope.scope_type}:{scope.scope_id}"
             )
-        return virtual_scope_id
+        return virtual_entity_id
 
-    async def _find_virtual_scope_ids(
+    async def _find_virtual_entity_ids(
         self, scopes: Sequence[ScopeRef]
-    ) -> dict[ScopeRef, VirtualScopeID]:
-        """Return the virtual scope ids backing ``scopes`` in one query; scopes
+    ) -> dict[ScopeRef, VirtualEntityID]:
+        """Return the virtual entity ids backing ``scopes`` in one query; scopes
         without one are absent from the result."""
         if not scopes:
             return {}
         stmt = sa.select(
-            VirtualScopeRow.scope_type,
-            VirtualScopeRow.scope_id,
-            VirtualScopeRow.id,
+            VirtualEntityRow.entity_type,
+            VirtualEntityRow.entity_id,
+            VirtualEntityRow.id,
         ).where(
-            sa.tuple_(VirtualScopeRow.scope_type, VirtualScopeRow.scope_id).in_([
+            sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
                 (s.scope_type, s.scope_id) for s in scopes
             ])
         )
         return {
-            ScopeRef(
-                scope_type=ScopeType(EntityType(row.scope_type)), scope_id=row.scope_id
-            ): row.id
+            ScopeRef(scope_type=ScopeType(row.entity_type), scope_id=row.entity_id): row.id
             for row in (await self._sess.execute(stmt)).all()
         }
 
-    async def _resolve_virtual_scope_ids(
+    async def _resolve_virtual_entity_ids(
         self, scopes: Sequence[ScopeRef]
-    ) -> dict[ScopeRef, VirtualScopeID]:
-        """Return the virtual scope id backing each of ``scopes`` in one query.
+    ) -> dict[ScopeRef, VirtualEntityID]:
+        """Return the virtual entity id backing each of ``scopes`` in one query.
 
-        As with :meth:`_resolve_virtual_scope_id`, a scope without a virtual scope is
-        an invariant violation: raises :class:`VirtualScopeNotFound` naming them all.
+        As with :meth:`_resolve_virtual_entity_id`, a scope without a virtual entity is
+        an invariant violation: raises :class:`VirtualEntityNotFound` naming them all.
         """
-        resolved = await self._find_virtual_scope_ids(scopes)
+        resolved = await self._find_virtual_entity_ids(scopes)
         missing = [s for s in scopes if s not in resolved]
         if missing:
-            raise VirtualScopeNotFound(
-                "No virtual scope for scopes: "
+            raise VirtualEntityNotFound(
+                "No virtual entity for scopes: "
                 + ", ".join(f"{s.scope_type}:{s.scope_id}" for s in missing)
             )
         return resolved
 
-    async def _insert_virtual_scopes(self, scopes: Sequence[ScopeRef]) -> None:
-        """Create each scope's virtual scope node with its self entity-membership and self
+    async def _insert_virtual_entities(self, scopes: Sequence[ScopeRef]) -> None:
+        """Create each scope's virtual entity node with its self entity-membership and self
         scope_binding (permission_cap NULL). Idempotent: an existing scope is a no-op."""
         if not scopes:
             return
-        values = [{"scope_type": s.scope_type, "scope_id": s.scope_id} for s in scopes]
+        values = [{"entity_type": s.scope_type, "entity_id": s.scope_id} for s in scopes]
         insert_stmt = (
-            pg_insert(VirtualScopeRow)
+            pg_insert(VirtualEntityRow)
             .values(values)
-            .on_conflict_do_nothing(index_elements=["scope_type", "scope_id"])
+            .on_conflict_do_nothing(index_elements=["entity_type", "entity_id"])
             .returning(
-                VirtualScopeRow.id,
-                VirtualScopeRow.scope_type,
-                VirtualScopeRow.scope_id,
+                VirtualEntityRow.id,
+                VirtualEntityRow.entity_type,
+                VirtualEntityRow.entity_id,
             )
         )
         inserted = (await self._sess.execute(insert_stmt)).all()
@@ -464,10 +454,9 @@ class RBACWriteOps(WriteOps):
             pg_insert(EntityMembershipRow)
             .values([
                 {
-                    "virtual_scope_id": row.id,
-                    "entity_type": row.scope_type,
-                    "entity_id": row.scope_id,
-                    "permission_cap": None,
+                    "virtual_entity_id": row.id,
+                    "member_entity_id": row.id,
+                    "capped": False,
                 }
                 for row in inserted
             ])
@@ -478,9 +467,8 @@ class RBACWriteOps(WriteOps):
             pg_insert(ScopeBindingRow)
             .values([
                 {
-                    "virtual_scope_id": row.id,
-                    "scope_type": row.scope_type,
-                    "scope_id": row.scope_id,
+                    "virtual_entity_id": row.id,
+                    "scope_entity_id": row.id,
                     "permission_cap": None,
                 }
                 for row in inserted
@@ -489,29 +477,16 @@ class RBACWriteOps(WriteOps):
         )
         await self._sess.execute(binding_stmt)
 
-    async def _delete_virtual_scopes(self, scopes: Sequence[ScopeRef]) -> None:
-        """Delete the virtual scope nodes for ``scopes`` (FK CASCADE removes the edges
-        inside them), plus the edges the scopes left in other virtual scopes — bindings
-        where a deleted scope is the reaching side and memberships where it is enrolled
-        as an entity — which no FK covers."""
+    async def _delete_virtual_entities(self, scopes: Sequence[ScopeRef]) -> None:
+        """Delete the virtual entity nodes for ``scopes``; every edge naming a node at
+        either end goes with it by FK."""
         if not scopes:
             return
-        scope_keys = [(s.scope_type, s.scope_id) for s in scopes]
         await self._sess.execute(
-            sa.delete(VirtualScopeRow).where(
-                sa.tuple_(VirtualScopeRow.scope_type, VirtualScopeRow.scope_id).in_(scope_keys)
-            )
-        )
-        await self._sess.execute(
-            sa.delete(ScopeBindingRow).where(
-                sa.tuple_(ScopeBindingRow.scope_type, ScopeBindingRow.scope_id).in_(scope_keys)
-            )
-        )
-        await self._sess.execute(
-            sa.delete(EntityMembershipRow).where(
-                sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_(
-                    scope_keys
-                )
+            sa.delete(VirtualEntityRow).where(
+                sa.tuple_(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).in_([
+                    (s.scope_type, s.scope_id) for s in scopes
+                ])
             )
         )
 
@@ -648,14 +623,14 @@ class RBACWriteOps(WriteOps):
                 errors.append(BulkPurgerError(purger=purger, exception=e, index=index))
         return BulkPurgerResultWithFailures(successes=successes, errors=errors)
 
-    # -- Scope lifecycle: real scope entity + its virtual scope node --------------
+    # -- Scope lifecycle: real scope entity + its virtual entity node --------------
 
     async def create_scope[TRow: Base](
         self,
         creation: ScopeCreation[TRow],
     ) -> ScopeCreationResult[TRow]:
         """Create a scope in full: the real row with its parent scope association, its
-        virtual scope node, its SYSTEM roles, and the roles from matching presets.
+        virtual entity node, its SYSTEM roles, and the roles from matching presets.
 
         The row is inserted first, so ``creation`` sees the id the database assigned.
         The roles are only created here; granting the returned ``auto_grant_role_ids``
@@ -663,7 +638,7 @@ class RBACWriteOps(WriteOps):
         """
         result = await self.create_scoped(creation.creator())
         scope = creation.scope_of(result.row)
-        await self._insert_virtual_scopes([scope])
+        await self._insert_virtual_entities([scope])
         created_roles = await self._provision_scope_roles({
             scope: creation.system_roles_of(result.row)
         })
@@ -680,14 +655,14 @@ class RBACWriteOps(WriteOps):
 
         The real scope rows are created atomically via a single bulk insert: either all
         rows and their scope associations are materialized, or the whole batch fails and
-        nothing is created. The virtual scope inserts are idempotent (get-or-create).
+        nothing is created. The virtual entity inserts are idempotent (get-or-create).
         """
         result = await self.bulk_create_scoped([creation.creator() for creation in creations])
         scope_roles = {
             creation.scope_of(row): creation.system_roles_of(row)
             for creation, row in zip(creations, result.rows, strict=True)
         }
-        await self._insert_virtual_scopes(list(scope_roles.keys()))
+        await self._insert_virtual_entities(list(scope_roles.keys()))
         await self._provision_scope_roles(scope_roles)
         return result
 
@@ -853,14 +828,15 @@ class RBACWriteOps(WriteOps):
         permissions = [
             PermissionCreatorSpec(
                 role_id=row.id,
-                scope_type=self._scope_element_type(spec.scope),
+                scope_type=ScopeType(EntityType(self._scope_element_type(spec.scope))),
                 scope_id=str(spec.scope.scope_id),
-                entity_type=entity_type,
-                operation=operation,
+                entity_type=EntityType(entity_type),
+                permission=Permission.from_operation(operation),
             )
             for spec, row in zip(specs, roles.rows, strict=True)
             for entity_type, operations in spec.entity_operations.items()
             for operation in operations
+            if Permission.from_operation(operation) != Permission.NONE
         ]
         if permissions:
             await self.bulk_create(BulkCreator(specs=permissions))
@@ -871,15 +847,15 @@ class RBACWriteOps(WriteOps):
         deletion: ScopeDeletion[TRow],
     ) -> RBACEntityPurgerResult[TRow] | None:
         """Delete a scope in full: the real row with its RBAC entries (permissions and
-        scope associations in both directions) and its virtual scope node.
+        scope associations in both directions) and its virtual entity node.
 
-        Deleting the virtual scope cascades to its scope bindings and entity
+        Deleting the virtual entity cascades to its scope bindings and entity
         memberships (FK ``ON DELETE CASCADE``); the scope's own bindings and
-        memberships in other virtual scopes are deleted explicitly. Returns ``None``
+        memberships in other virtual entities are deleted explicitly. Returns ``None``
         if the row is already gone.
         """
         result = await self.purge_scoped(deletion.purger)
-        await self._delete_virtual_scopes([deletion.scope])
+        await self._delete_virtual_entities([deletion.scope])
         return result
 
     async def batch_delete_scopes[TRow: Base](
@@ -890,15 +866,15 @@ class RBACWriteOps(WriteOps):
         :meth:`delete_scope` does for one.
 
         The real scope rows are purged in batches with their RBAC entries, then the
-        virtual scope nodes for ``deletion.scopes`` are dropped (FK ``ON DELETE CASCADE``
+        virtual entity nodes for ``deletion.scopes`` are dropped (FK ``ON DELETE CASCADE``
         removes their edges) along with the scopes' bindings and memberships in other
-        virtual scopes.
+        virtual entities.
         """
         result = await execute_rbac_entity_batch_purger(self._sess, deletion.purger)
-        await self._delete_virtual_scopes(deletion.scopes)
+        await self._delete_virtual_entities(deletion.scopes)
         return result
 
-    # -- Virtual scope: member edges (entity_memberships + scope_bindings) --------
+    # -- Virtual entity: member edges (entity_memberships + scope_bindings) --------
 
     async def _grant_auto_assign_roles(
         self,
@@ -977,138 +953,62 @@ class RBACWriteOps(WriteOps):
         if specs:
             await self.bulk_create(BulkCreator(specs=specs))
 
-    async def create_full_user(
-        self,
-        full_creation: FullUserCreation,
-    ) -> FullUserCreationResult:
-        """Provision a user end to end in one transaction.
-
-        Creates the user scope (row, virtual scope, own-scope roles) and grants those
-        roles, creates the default keypair under the user scope and marks it as the
-        user's main one, then enrolls the user in its domain's and projects'
-        virtual scopes — the domain's model-store projects always included, and
-        ``project_ids`` narrowed to projects that exist in the domain.
-        """
-        creation_result = await self.create_scope(full_creation.creation)
-        user_row = creation_result.row
-        user_id = UserID(user_row.uuid)
-        await self.assign_roles_to_user(user_id, creation_result.auto_grant_role_ids)
-
-        kp_result = await self.create_scoped(
-            RBACEntityCreator(
-                spec=KeyPairCreatorSpec(
-                    secrets=full_creation.keypair_secrets or generate_keypair_data(),
-                    user_id=user_row.uuid,
-                    is_active=user_row.status == UserStatus.ACTIVE,
-                    is_admin=user_row.role in (UserRole.SUPERADMIN, UserRole.ADMIN),
-                    is_default=True,
-                    resource_policy=full_creation.keypair_resource_policy,
-                    rate_limit=full_creation.keypair_rate_limit,
-                ),
-                element_type=RBACElementType.KEYPAIR,
-                scope_ref=RBACElementRef(RBACElementType.USER, str(user_row.uuid)),
-            )
-        )
-        keypair_row = kp_result.row
-
-        member = ScopeUserMember(user_id=user_id)
-        domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=full_creation.domain_id)
-        await self.ensure_scope(domain_scope)
-        await self.add_bulk_inheriting_members(
-            EntityMembersAddition(scope=domain_scope, members=[member])
-        )
-        for project_id in await self._domain_member_project_ids(
-            full_creation.domain_id, full_creation.project_ids
-        ):
-            project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
-            await self.ensure_scope(project_scope)
-            await self.add_bulk_members(
-                EntityMembersAddition(scope=project_scope, members=[member])
-            )
-
-        # The insert leaves the server-default columns unloaded, and default_keypair is the
-        # keypair created just above; reload both so callers can read the row without a
-        # sync-context lazy refresh.
-        await self._sess.flush()
-        await self._sess.refresh(user_row)
-        await self._sess.refresh(user_row, ["default_keypair"])
-        return FullUserCreationResult(user_row=user_row, keypair_row=keypair_row)
-
-    async def _domain_member_project_ids(
-        self,
-        domain_id: DomainID,
-        project_ids: Collection[ProjectID],
-    ) -> list[ProjectID]:
-        """``project_ids`` narrowed to the domain's real projects, plus the domain's
-        model-store projects that every user joins."""
-        stmt = (
-            sa.select(ProjectRow.id)
-            .join(DomainRow, DomainRow.name == ProjectRow.domain_name)
-            .where(
-                DomainRow.id == domain_id,
-                sa.or_(ProjectRow.id.in_(project_ids), ProjectRow.type == ProjectType.MODEL_STORE),
-            )
-        )
-        return [ProjectID(row) for row in (await self._sess.scalars(stmt)).all()]
-
     async def add_bulk_members(
         self,
         addition: EntityMembersAddition,
-        permission_cap: Permission | None = None,
     ) -> None:
-        """Attach each member under the scope: membership in the scope's virtual scope
-        and the legacy scope association. The scope reaches the member entities
-        themselves, not the entities they own — use
+        """Attach each member under the scope: membership in the scope's virtual entity,
+        carrying the member kind's constant cap, and the legacy scope association. The
+        scope reaches the member entities themselves, not the entities they own — use
         :meth:`add_bulk_inheriting_members` when the member must inherit the scope's
         permissions over what it owns. Grants the scope's auto_assign roles to members
         whose ``assign_role_on`` returns a user id.
 
-        Raises :class:`VirtualScopeNotFound` if the scope has no virtual scope.
-        Idempotent: existing rows keep their ``permission_cap``.
+        Raises :class:`VirtualEntityNotFound` if the scope has no virtual entity.
+        Idempotent: existing rows keep their cap.
         """
         members = list(addition.members)
         if not members:
             return
         scope = addition.scope
-        virtual_scope_id = await self._resolve_virtual_scope_id(scope)
-        entity_refs = [member.entity_ref() for member in members]
-        await self._enroll_members_in_scope_vs(virtual_scope_id, entity_refs, permission_cap)
-        await self._associate_entities_with_scope(scope, entity_refs)
+        virtual_entity_id = await self._resolve_virtual_entity_id(scope)
+        await self._enroll_members_in_scope_ve(virtual_entity_id, scope, members)
+        await self._associate_entities_with_scope(
+            scope, [member.entity_ref() for member in members]
+        )
         await self._grant_member_auto_assign_roles(scope, members)
 
     async def add_bulk_inheriting_members(
         self,
         addition: EntityMembersAddition,
-        permission_cap: Permission | None = None,
     ) -> None:
         """Attach each member so that it inherits the scope's permissions: everything
         :meth:`add_bulk_members` writes, plus the binding that carries those permissions
         onto every entity the member owns.
 
         Only for relations where that inheritance is intended — a domain over its
-        projects and users, a project over the container registries it contains. A
-        member that merely participates in the scope, such as a user in a project, is an
-        ordinary member: binding its virtual scope would expose everything it owns
-        elsewhere. Inheritance stays unidirectional; the reverse would widen every
-        member-scoped role at once.
+        projects, a project over the container registries it contains. Joining a scope's
+        roster is not such a relation: a user is an ordinary member of both its domain
+        and its projects, and no row ever binds a user's virtual entity into a scope.
+        Inheritance stays unidirectional; the reverse would widen every member-scoped
+        role at once.
 
-        Raises :class:`VirtualScopeNotFound` for any missing virtual scope. Idempotent:
-        existing rows keep their ``permission_cap``.
+        Raises :class:`VirtualEntityNotFound` for any missing virtual entity. Idempotent:
+        existing rows keep their cap.
         """
         members = list(addition.members)
         if not members:
             return
-        await self.add_bulk_members(addition, permission_cap)
+        await self.add_bulk_members(addition)
         member_scopes = [self._member_scope_ref(member.entity_ref()) for member in members]
-        await self._bind_scope_to_member_vs(addition.scope, member_scopes, permission_cap)
+        await self._bind_scope_to_member_vs(addition.scope, member_scopes)
 
     async def add_bulk_members_partial(
         self,
         addition: EntityMembersAddition,
-        permission_cap: Permission | None = None,
     ) -> EntityMembersResultWithFailures:
         """Add members as :meth:`add_bulk_members` does, isolating each member in its
-        own savepoint: a failed member — including one without a virtual scope — lands
+        own savepoint: a failed member — including one without a virtual entity — lands
         in ``errors`` while the rest are added. Roles are granted only to the
         successful members.
         """
@@ -1118,34 +1018,58 @@ class RBACWriteOps(WriteOps):
         if not members:
             return EntityMembersResultWithFailures(successes=successes, errors=errors)
         scope = addition.scope
-        virtual_scope_id = await self._resolve_virtual_scope_id(scope)
+        virtual_entity_id = await self._resolve_virtual_entity_id(scope)
         for index, member in enumerate(members):
             # The handler stays outside the savepoint — see bulk_create_scoped_partial.
             try:
                 async with self.savepoint():
-                    ref = member.entity_ref()
-                    await self._enroll_members_in_scope_vs(virtual_scope_id, [ref], permission_cap)
-                    await self._associate_entities_with_scope(scope, [ref])
+                    await self._enroll_members_in_scope_ve(virtual_entity_id, scope, [member])
+                    await self._associate_entities_with_scope(scope, [member.entity_ref()])
                 successes.append(member)
             except Exception as e:
                 errors.append(EntityMemberCreationError(member=member, exception=e, index=index))
         await self._grant_member_auto_assign_roles(scope, successes)
         return EntityMembersResultWithFailures(successes=successes, errors=errors)
 
-    async def _enroll_members_in_scope_vs(
+    async def _enroll_members_in_scope_ve(
         self,
-        virtual_scope_id: VirtualScopeID,
-        refs: Sequence[EntityRef],
-        permission_cap: Permission | None,
+        virtual_entity_id: VirtualEntityID,
+        scope: ScopeRef,
+        members: Sequence[ScopeMember],
     ) -> None:
-        """Enroll each entity in the scope's virtual scope."""
-        await self._bulk_create_dependent_ignore_conflicts(
-            [
-                EntityMembershipCreatorSpec(entity_ref=ref, permission_cap=permission_cap)
-                for ref in refs
-            ],
-            virtual_scope_id,
-        )
+        """Enroll each member in the scope's virtual entity with its kind's cap; raises
+        :class:`VirtualEntityNotFound` for members without a virtual entity."""
+        member_scopes = [self._member_scope_ref(member.entity_ref()) for member in members]
+        member_virtual_entity_ids = await self._resolve_virtual_entity_ids(member_scopes)
+        caps = {
+            member_virtual_entity_ids[member_scope]: member.permission_cap(scope)
+            for member, member_scope in zip(members, member_scopes, strict=True)
+        }
+        # Only an edge written here gets its cap rows: an existing edge keeps its cap.
+        inserted = (
+            await self._sess.execute(
+                pg_insert(EntityMembershipRow)
+                .values([
+                    {
+                        "virtual_entity_id": virtual_entity_id,
+                        "member_entity_id": member_node_id,
+                        "capped": cap is not None,
+                    }
+                    for member_node_id, cap in caps.items()
+                ])
+                .on_conflict_do_nothing(index_elements=["virtual_entity_id", "member_entity_id"])
+                .returning(EntityMembershipRow.id, EntityMembershipRow.member_entity_id)
+            )
+        ).all()
+        cap_values = [
+            {"membership_id": row.id, "permission": bit, "all_fields": True}
+            for row in inserted
+            if (cap := caps[row.member_entity_id]) is not None
+            for bit in Permission
+            if bit and cap & bit
+        ]
+        if cap_values:
+            await self._sess.execute(pg_insert(EntityMembershipCapRow).values(cap_values))
 
     async def _associate_entities_with_scope(
         self,
@@ -1161,19 +1085,18 @@ class RBACWriteOps(WriteOps):
         self,
         scope: ScopeRef,
         member_scopes: Sequence[ScopeRef],
-        permission_cap: Permission | None,
     ) -> None:
-        """Bind the scope into each member's own virtual scope; raises
-        :class:`VirtualScopeNotFound` for members without one."""
-        member_virtual_scope_ids = await self._resolve_virtual_scope_ids(member_scopes)
+        """Bind the scope into each member's own virtual entity, uncapped; raises
+        :class:`VirtualEntityNotFound` for a scope or member without one."""
+        virtual_entity_ids = await self._resolve_virtual_entity_ids([*member_scopes, scope])
         await self._bulk_create_dependent_ignore_conflicts(
             [
                 ScopeBindingCreatorSpec(
-                    anchor_scope=member_scope, bound_scope=scope, permission_cap=permission_cap
+                    anchor_scope=member_scope, bound_scope=scope, permission_cap=None
                 )
                 for member_scope in member_scopes
             ],
-            member_virtual_scope_ids,
+            virtual_entity_ids,
         )
 
     @staticmethod
@@ -1218,22 +1141,23 @@ class RBACWriteOps(WriteOps):
     ) -> None:
         """Detach each member from the scope, undoing both :meth:`add_bulk_members` and
         :meth:`add_bulk_inheriting_members`: the membership, the association, and the scope's
-        binding in the member's own virtual scope — a no-op for members added without
+        binding in the member's own virtual entity — a no-op for members added without
         that binding, since the delete matches the scope exactly. Role mappings are left
-        untouched. Missing virtual scopes (legacy data) never raise — whatever exists is
+        untouched. Missing virtual entities (legacy data) never raise — whatever exists is
         deleted.
         """
         entity_refs = list(entities)
         if not entity_refs:
             return
-        virtual_scope_id = await self._find_virtual_scope_id(scope)
-        if virtual_scope_id is not None:
+        virtual_entity_id = await self._find_virtual_entity_id(scope)
+        member_virtual_entity_ids = await self._find_virtual_entity_ids([
+            self._member_scope_ref(ref) for ref in entity_refs
+        ])
+        if virtual_entity_id is not None and member_virtual_entity_ids:
             await self._sess.execute(
                 sa.delete(EntityMembershipRow).where(
-                    EntityMembershipRow.virtual_scope_id == virtual_scope_id,
-                    sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
-                        (ref.entity_type, ref.entity_id) for ref in entity_refs
-                    ]),
+                    EntityMembershipRow.virtual_entity_id == virtual_entity_id,
+                    EntityMembershipRow.member_entity_id.in_(member_virtual_entity_ids.values()),
                 )
             )
         await self._sess.execute(
@@ -1248,23 +1172,19 @@ class RBACWriteOps(WriteOps):
                 ]),
             )
         )
-        member_virtual_scope_ids = await self._find_virtual_scope_ids([
-            self._member_scope_ref(ref) for ref in entity_refs
-        ])
-        if member_virtual_scope_ids:
+        if virtual_entity_id is not None and member_virtual_entity_ids:
             await self._sess.execute(
                 sa.delete(ScopeBindingRow).where(
-                    ScopeBindingRow.virtual_scope_id.in_(member_virtual_scope_ids.values()),
-                    ScopeBindingRow.scope_type == scope.scope_type,
-                    ScopeBindingRow.scope_id == scope.scope_id,
+                    ScopeBindingRow.virtual_entity_id.in_(member_virtual_entity_ids.values()),
+                    ScopeBindingRow.scope_entity_id == virtual_entity_id,
                 )
             )
 
-    # -- Virtual scope: ensure compatibility for externally-created rows ----------
+    # -- Virtual entity: ensure compatibility for externally-created rows ----------
 
     async def ensure_scope(self, scope: ScopeRef) -> None:
-        """Ensure the virtual scope node for an already-created ``scope``. Idempotent."""
-        await self._insert_virtual_scopes([scope])
+        """Ensure the virtual entity node for an already-created ``scope``. Idempotent."""
+        await self._insert_virtual_entities([scope])
 
 
 class RBACOpsProvider(DBOpsProvider):

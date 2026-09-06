@@ -117,8 +117,6 @@ def _create_session(
         resource=ResourceSpec(
             cluster_mode=cluster_mode.value,
             cluster_size=kernel_count,
-            occupying_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             resource_group_name=resource_group,
             target_sgroup_names=None,
             agent_ids=None,
@@ -201,8 +199,6 @@ def _create_session(
                 agent=agent_id,
                 agent_addr=f"tcp://agent-{i}:5001",
                 container_id=f"container-{kernel_id}",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 occupied_shares={},
                 attached_devices={},
                 resource_opts={},
@@ -302,8 +298,6 @@ def _create_kernel(
             agent=aid,
             agent_addr=agent_addr or f"tcp://{aid}:5001",
             container_id=f"container-{kid}",
-            occupied_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             occupied_shares={},
             attached_devices={},
             resource_opts={},
@@ -586,8 +580,6 @@ def kernel_without_agent() -> KernelInfo:
             agent=None,  # No agent assigned
             agent_addr=None,
             container_id=None,
-            occupied_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             occupied_shares={},
             attached_devices={},
             resource_opts={},
@@ -742,7 +734,7 @@ def terminating_session_data_factory() -> Callable[..., list[TerminatingSessionD
                         container_id=k.resource.container_id,
                         agent_id=AgentId(k.resource.agent) if k.resource.agent else None,
                         agent_addr=k.resource.agent_addr,
-                        occupied_slots=k.resource.occupied_slots or ResourceSlot(),
+                        occupied_slots=ResourceSlot(),
                     )
                     for k in s.kernel_infos
                 ],

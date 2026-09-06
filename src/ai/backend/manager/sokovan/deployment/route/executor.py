@@ -339,13 +339,13 @@ class RouteExecutor:
         )
 
     async def check_running_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Check health status of running routes.
+        """Check that each route's bound session is still alive.
 
         Args:
-            routes: Routes to check (should be HEALTHY or UNHEALTHY status)
+            routes: PROVISIONING or RUNNING routes to check
 
         Returns:
-            Result containing routes with updated health status
+            Result whose errors are the routes whose session is gone or terminal
         """
         # Phase 1: Load status
         with RouteRecorderContext.shared_phase("load_status"):
@@ -1182,12 +1182,18 @@ class RouteExecutor:
         route: RouteData,
         session_statuses: Mapping[ReplicaID, SessionStatus | None],
     ) -> None:
-        """Verify that route's session is in a valid state."""
+        """Verify that route's session is in a valid state.
+
+        A route with no bound session yet passes; the status map cannot tell that
+        case apart from a missing session row.
+        """
         pool = RouteRecorderContext.current_pool()
         recorder = pool.recorder(route.route_id)
 
         with recorder.phase("verify_session"):
             with recorder.step("check_session_exists"):
+                if route.session_id is None:
+                    return
                 session_status = session_statuses.get(route.route_id)
                 if session_status is None:
                     raise RouteSessionNotFound("No session associated with route")

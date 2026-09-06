@@ -1,7 +1,7 @@
 ---
 name: role-preset-service-shapes
 type: decision-table
-description: role preset processor fields and their entity/operation/scope, why a preset is global state that owns field rows, why creation is one action, why delete and purge both exist, why the two template-settling writes have a service
+description: role preset knowledge: why a preset is global state that owns field rows, why creation is one action, why delete and purge both exist, why the two template-settling writes have a service
 scope: src/ai/backend/manager/services/role_preset
 keywords: [CreateRolePresetAction, BulkDeleteRolePresetsAction, BulkRestoreRolePresetsAction, RolePresetCreator, RolePermissionPresetCreator, RolePresetService, role_name_template, field_atomic_create_ops, partial_bulk_delete_ops, deleted]
 sources:
@@ -25,23 +25,12 @@ the preset that owns them.
 
 ## The processor fields
 
-| Field | Action | Entity type | Shape | Operation |
-|---|---|---|---|---|
-| `create` | `CreateRolePresetAction` | ROLE_PRESET | global + fields | CREATE |
-| `get` | `GetRolePresetAction` | ROLE_PRESET | single entity | GET |
-| `search` | `SearchRolePresetsAction` | ROLE_PRESET | global | SEARCH |
-| `update` | `UpdateRolePresetAction` | ROLE_PRESET | single entity | UPDATE |
-| `bulk_delete` | `BulkDeleteRolePresetsAction` | ROLE_PRESET | partial bulk | DELETE |
-| `bulk_restore` | `BulkRestoreRolePresetsAction` | ROLE_PRESET | partial bulk | RESTORE |
-| `purge` | `PurgeRolePresetAction` | ROLE_PRESET | single entity | PURGE |
-| `bulk_purge` | `BulkPurgeRolePresetsAction` | ROLE_PRESET | partial bulk | PURGE |
-| `search_permission_presets` | `SearchRolePermissionPresetsAction` | ROLE_PRESET | global | SEARCH |
-| `bulk_add_permissions` | `BulkAddRolePermissionPresetsAction` | ROLE_PRESET | single entity, atomic | UPDATE |
-| `bulk_remove_permissions` | `BulkRemoveRolePermissionPresetsAction` | ROLE_PRESET | bulk field, partial | UPDATE |
+`backend.ai mgr ops list --concern rbac` prints the wired list. Its output
+answers the entity type, shape, operation, gate and backing.
 
-One `ProcessorGroup` is wired. The preset is the entity and its permission entries
-are field rows of it, so the last three come from the field sub-group that group hands
-out. The entity recorded is always the preset.
+One `ProcessorGroup` is wired. The preset is the entity and its permission entries are
+field rows of it, so the operations over those entries come from the field sub-group
+that group hands out. The entity recorded is always the preset.
 
 ## A preset is global state that owns field rows
 

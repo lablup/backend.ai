@@ -38,7 +38,6 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from sqlalchemy.orm import load_only
 
-from ai.backend.common.contexts.client_ip import with_client_ip
 from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
@@ -59,13 +58,14 @@ from ai.backend.manager.errors.auth import (
     UserNotFound,
 )
 from ai.backend.manager.errors.common import GenericForbidden, RejectedByHook
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT, KeyPairRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user import UserRow, UserStatus
 from ai.backend.manager.models.utils import execute_with_retry
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -77,6 +77,7 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 TRUSTED_PROXY_NETWORKS_KEY: Final = "_trusted_proxy_networks"
 FORWARDED_URL_HEADER: Final = "X-Forwarded-URL"
+FORWARDED_PREFIX_HEADER: Final = "X-Forwarded-Prefix"
 
 _whois_timezone_info: Final = {
     "A": 1 * 3600,
@@ -445,6 +446,23 @@ def _resolve_forwarded_url(request: web.Request) -> str | None:
     return upstream_url
 
 
+def _resolve_forwarded_prefix(request: web.Request) -> str | None:
+    """Return the ``X-Forwarded-Prefix`` value only when its origin may be trusted.
+
+    Unlike ``X-Forwarded-URL``, there is no untrusted-origin fallback for this header.
+    """
+    raw_prefix = request.headers.get(FORWARDED_PREFIX_HEADER)
+    if raw_prefix is None:
+        return None
+    if not is_from_trusted_proxy(request):
+        log.debug(
+            "ignored the X-Forwarded-Prefix header sent from an untrusted peer (peer:{})",
+            _peer_address(request),
+        )
+        return None
+    return raw_prefix.rstrip("/")
+
+
 def check_date(request: web.Request) -> bool:
     raw_date = request.headers.get("Date")
     if not raw_date:
@@ -487,10 +505,15 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         body_hash = hashlib.new(hash_type, body).hexdigest()
         path = request.raw_path
         host = request.host
-        if upstream_url := _resolve_forwarded_url(request):
-            parsed_url = urlparse(upstream_url)
-            path = parsed_url.path
-            host = parsed_url.netloc
+        upstream_url = _resolve_forwarded_url(request)
+        if upstream_url:
+            host = urlparse(upstream_url).netloc
+
+        prefix = _resolve_forwarded_prefix(request)
+        if prefix is not None:
+            path = prefix + request.raw_path
+        elif upstream_url:
+            path = urlparse(upstream_url).path
 
         sign_bytes = "{0}\n{1}\n{2}\nhost:{3}\ncontent-type:{4}\nx-{name}-version:{5}\n{6}".format(
             request.method,
@@ -594,6 +617,15 @@ def _set_unauthenticated_state(request: web.Request) -> None:
     request["user"] = None
 
 
+#: Statuses whose owner may not authenticate: the account is gone or a purge is
+#: working through it. This is what keeps a soft-deleted user's keypairs from
+#: reaching the API — the delete no longer deactivates them.
+_AUTH_DENIED_USER_STATUSES: Final = frozenset({
+    UserStatus.DELETED,
+    *UserStatus.purge_in_progress(),
+})
+
+
 @dataclass(frozen=True)
 class _AuthContext:
     """What an authenticated request carries about its caller."""
@@ -604,6 +636,7 @@ class _AuthContext:
 
 async def _query_auth_context_by_access_key(
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     access_key: str,
 ) -> _AuthContext | None:
     """Resolve an access key into the context an authenticated request carries.
@@ -633,6 +666,7 @@ async def _query_auth_context_by_access_key(
                     UserRow.uuid,
                     UserRow.email,
                     UserRow.role,
+                    UserRow.status,
                     UserRow.domain_name,
                     UserRow.domain_id,
                     UserRow.sudo_session_enabled,
@@ -648,6 +682,8 @@ async def _query_auth_context_by_access_key(
             return None
 
         keypair_row, user_row, keypair_policy_row, user_policy_row = row
+        if user_row.status in _AUTH_DENIED_USER_STATUSES:
+            raise AuthorizationFailed(f"User account is {user_row.status}")
         return _AuthContext(
             user=AuthenticatedUser(
                 uuid=UserID(user_row.uuid),
@@ -661,7 +697,11 @@ async def _query_auth_context_by_access_key(
             ),
             keypair=AuthenticatedKeypair(
                 access_key=AccessKey(keypair_row.access_key),
-                secret_key=SecretKey(keypair_row.secret_key),
+                secret_key=SecretKey(
+                    await key_provider_pool.decrypt(
+                        keypair_row.secret_key, KEYPAIR_SECRET_KEY_CONTEXT
+                    )
+                ),
                 is_admin=bool(keypair_row.is_admin),
                 rate_limit=keypair_row.rate_limit,
                 resource_policy=keypair_policy_row.to_dataclass(),
@@ -671,6 +711,7 @@ async def _query_auth_context_by_access_key(
 
 async def _authenticate_via_jwt(
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     jwt_validator: JWTValidator,
     valkey_stat: ValkeyStatClient,
     jwt_token: str,
@@ -684,7 +725,7 @@ async def _authenticate_via_jwt(
         if not access_key:
             raise AuthorizationFailed("Access key not found in JWT token")
 
-        context = await _query_auth_context_by_access_key(db, access_key)
+        context = await _query_auth_context_by_access_key(db, key_provider_pool, access_key)
 
         if context is None:
             raise AuthorizationFailed("Access key not found in database")
@@ -703,6 +744,7 @@ async def _authenticate_via_jwt(
 async def _authenticate_via_hmac(
     request: web.Request,
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     valkey_stat: ValkeyStatClient,
 ) -> _AuthContext | None:
     if not check_date(request):
@@ -714,7 +756,7 @@ async def _authenticate_via_hmac(
 
     sign_method, access_key, signature = params
 
-    context = await _query_auth_context_by_access_key(db, access_key)
+    context = await _query_auth_context_by_access_key(db, key_provider_pool, access_key)
 
     if context is None:
         raise AuthorizationFailed("Access key not found in HMAC")
@@ -730,6 +772,7 @@ async def _authenticate_via_hmac(
 async def _authenticate_via_hook(
     request: web.Request,
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     valkey_stat: ValkeyStatClient,
     hook_plugin_ctx: HookPluginContext,
 ) -> _AuthContext | None:
@@ -749,7 +792,7 @@ async def _authenticate_via_hook(
     if access_key is None:
         return None
 
-    context = await _query_auth_context_by_access_key(db, access_key)
+    context = await _query_auth_context_by_access_key(db, key_provider_pool, access_key)
 
     if context is None:
         raise AuthorizationFailed("Access key not found in hook")
@@ -771,6 +814,8 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserDat
     row = await execute_with_retry(_query)
     if row is None:
         raise UserNotFound("Impersonation target user not found")
+    if row.status in _AUTH_DENIED_USER_STATUSES:
+        raise AuthorizationFailed(f"Impersonation target user account is {row.status}")
     return UserData(
         user_id=row.uuid,
         is_authorized=True,
@@ -803,7 +848,6 @@ async def _resolve_effective_user(
 
 
 def _setup_user_context(
-    request: web.Request,
     effective_user: UserData | None,
     trigger_user: UserData | None,
 ) -> ExitStack:
@@ -815,10 +859,6 @@ def _setup_user_context(
         stack.enter_context(with_log_context_fields({"user_id": str(effective_user.user_id)}))
     if trigger_user is not None:
         stack.enter_context(with_triggered_user(trigger_user))
-
-    client_ip = extract_client_ip(request)
-    if client_ip:
-        stack.enter_context(with_client_ip(client_ip))
 
     return stack
 
@@ -924,6 +964,7 @@ def superadmin_required_for_method(
 def build_auth_middleware(
     *,
     db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
     jwt_validator: JWTValidator,
     valkey_stat: ValkeyStatClient,
     hook_plugin_ctx: HookPluginContext,
@@ -946,11 +987,15 @@ def build_auth_middleware(
         jwt_token = request.headers.get("X-BackendAI-Token")
         auth_header = request.headers.get("Authorization")
         if jwt_token:
-            context = await _authenticate_via_jwt(db, jwt_validator, valkey_stat, jwt_token)
+            context = await _authenticate_via_jwt(
+                db, key_provider_pool, jwt_validator, valkey_stat, jwt_token
+            )
         elif auth_header:
-            context = await _authenticate_via_hmac(request, db, valkey_stat)
+            context = await _authenticate_via_hmac(request, db, key_provider_pool, valkey_stat)
         else:
-            context = await _authenticate_via_hook(request, db, valkey_stat, hook_plugin_ctx)
+            context = await _authenticate_via_hook(
+                request, db, key_provider_pool, valkey_stat, hook_plugin_ctx
+            )
 
         authenticated_user: UserData | None = None
         if context is not None:
@@ -980,7 +1025,7 @@ def build_auth_middleware(
             if authenticated_user is not None
             else None
         )
-        with _setup_user_context(request, effective_user, authenticated_user):
+        with _setup_user_context(effective_user, authenticated_user):
             return await handler(request)
 
     return _middleware

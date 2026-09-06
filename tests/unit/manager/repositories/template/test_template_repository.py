@@ -34,6 +34,7 @@ from ai.backend.manager.models.session_template import SessionTemplateRow, Templ
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.template.repository import TemplateRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -212,7 +213,7 @@ class TestTemplateRepository:
         async with db_with_cleanup.begin_session() as session:
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="testsecretkey1234567890",
+                secret_key=SecretValue("testsecretkey1234567890"),
                 is_active=True,
                 is_admin=False,
                 user=test_user,

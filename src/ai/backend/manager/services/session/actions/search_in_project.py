@@ -8,8 +8,8 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
+from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
 from ai.backend.manager.services.session.base import (
     SessionScopeAction,
     SessionScopeActionResult,

@@ -33,7 +33,7 @@ class RolePermissionPresetRow(CreatedAtMixin, Base):
         "id",
         GUID(RolePermissionPresetID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     role_preset_id: Mapped[RolePresetID] = mapped_column(
         "role_preset_id",

@@ -1,4 +1,7 @@
-"""Upserter for repository upsert (INSERT ON CONFLICT UPDATE) operations."""
+"""Upserter for repository upsert (INSERT ON CONFLICT UPDATE) operations.
+
+Deprecated: declare new upsert specs in ``models/specs/upserter.py``.
+"""
 
 from __future__ import annotations
 
@@ -22,6 +25,9 @@ TRow = TypeVar("TRow", bound=Base)
 
 class UpserterSpec[TRow: Base](ABC):
     """Abstract base class for upsert operations.
+
+    Deprecated: use ``GlobalEntityUpserter`` / ``EntityUpserter`` / ``FieldUpserter``
+    in ``models/specs/upserter.py``.
 
     Implementations specify what to upsert by providing:
     - row_class property for target table and result reconstruction
@@ -65,6 +71,8 @@ class UpserterSpec[TRow: Base](ABC):
 
 class DataUpserter[TRow: Base, TData](UpserterSpec[TRow], ABC):
     """An upserter spec that names its conflict target and how the row becomes data.
+
+    Deprecated with :class:`UpserterSpec`; the v2 roots already carry both.
 
     ``UpserterSpec`` says only what to insert and what to set on conflict, leaving
     ``index_elements`` as a separate argument and the conversion to the caller. Carrying

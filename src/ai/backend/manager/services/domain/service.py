@@ -9,10 +9,6 @@ from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.models.domain.row import verify_dotfile_name
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater
 from ai.backend.manager.repositories.domain.repository import DomainRepository
-from ai.backend.manager.services.domain.actions.create_domain import (
-    CreateDomainAction,
-    CreateDomainActionResult,
-)
 from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
     CreateDomainDotfileAction,
     CreateDomainDotfileActionResult,
@@ -40,8 +36,6 @@ from ai.backend.manager.services.domain.actions.update_domain_node import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_MAXIMUM_DOMAIN_NAME_LENGTH = 64
-
 
 class DomainService:
     _repository: DomainRepository
@@ -49,15 +43,9 @@ class DomainService:
     def __init__(self, repository: DomainRepository) -> None:
         self._repository = repository
 
-    async def create_domain(self, action: CreateDomainAction) -> CreateDomainActionResult:
-        self._validate_name(action.creator.name)
-        domain_data = await self._repository.create_domain(action.creator)
-        return CreateDomainActionResult(domain_data=domain_data)
-
     async def create_domain_node(
         self, action: CreateDomainNodeAction
     ) -> CreateDomainNodeActionResult:
-        self._validate_name(action.creator.name)
         domain_data = await self._repository.create_domain_node(
             action.creator, action.resource_group_ids
         )
@@ -109,13 +97,6 @@ class DomainService:
         entries = current.removed(action.path)
         await self._write_dotfiles(domain_id, entries)
         return DeleteDomainDotfileActionResult(entries=entries.entries)
-
-    def _validate_name(self, name: str) -> None:
-        candidate = name.strip()
-        if candidate == "" or len(candidate) > _MAXIMUM_DOMAIN_NAME_LENGTH:
-            raise InvalidAPIParameters(
-                f"Domain name cannot be empty or exceed {_MAXIMUM_DOMAIN_NAME_LENGTH} characters."
-            )
 
     async def _read_dotfiles(self, name: str) -> tuple[DomainID, DotfileEntries]:
         """The domain's id alongside its entries, so the write keys on the id it read."""

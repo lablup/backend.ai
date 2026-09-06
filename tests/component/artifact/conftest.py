@@ -37,6 +37,12 @@ from ai.backend.manager.repositories.artifact.repository import ArtifactReposito
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
+    ArtifactRegistryOpsProvider,
+)
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
@@ -70,12 +76,18 @@ def artifact_processors(
     config_provider: ManagerConfigProvider,
     processor_registry: ProcessorRegistry[Any],
 ) -> ArtifactProcessors:
-    artifact_repository = ArtifactRepository(database_engine)
-    artifact_registry_repository = ArtifactRegistryRepository(database_engine)
+    artifact_repository = ArtifactRepository(database_engine, V2DBOpsProvider(database_engine))
+    artifact_registry_repository = ArtifactRegistryRepository(
+        database_engine, V2DBOpsProvider(database_engine)
+    )
     object_storage_repository = ObjectStorageRepository(database_engine)
     vfs_storage_repository = VFSStorageRepository(database_engine)
-    huggingface_repository = HuggingFaceRepository(database_engine)
-    reservoir_repository = ReservoirRegistryRepository(database_engine)
+    huggingface_repository = HuggingFaceRepository(
+        database_engine, ArtifactRegistryOpsProvider(database_engine)
+    )
+    reservoir_repository = ReservoirRegistryRepository(
+        database_engine, ArtifactRegistryOpsProvider(database_engine)
+    )
     service = ArtifactService(
         artifact_repository=artifact_repository,
         artifact_registry_repository=artifact_registry_repository,
@@ -111,16 +123,23 @@ def artifact_revision_processors(
     background_task_manager: BackgroundTaskManager,
     processor_registry: ProcessorRegistry[Any],
 ) -> ArtifactRevisionProcessors:
-    artifact_repository = ArtifactRepository(database_engine)
-    artifact_registry_repository = ArtifactRegistryRepository(database_engine)
+    artifact_repository = ArtifactRepository(database_engine, V2DBOpsProvider(database_engine))
+    artifact_registry_repository = ArtifactRegistryRepository(
+        database_engine, V2DBOpsProvider(database_engine)
+    )
     object_storage_repository = ObjectStorageRepository(database_engine)
     vfs_storage_repository = VFSStorageRepository(database_engine)
     storage_namespace_repository = StorageNamespaceRepository(database_engine)
-    huggingface_repository = HuggingFaceRepository(database_engine)
-    reservoir_repository = ReservoirRegistryRepository(database_engine)
-    vfolder_repository = VfolderRepository(database_engine)
+    huggingface_repository = HuggingFaceRepository(
+        database_engine, ArtifactRegistryOpsProvider(database_engine)
+    )
+    reservoir_repository = ReservoirRegistryRepository(
+        database_engine, ArtifactRegistryOpsProvider(database_engine)
+    )
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
     service = ArtifactRevisionService(
         artifact_repository=artifact_repository,
+        revision_ops=OpsRepository(V2DBOpsProvider(database_engine)),
         artifact_registry_repository=artifact_registry_repository,
         object_storage_repository=object_storage_repository,
         vfs_storage_repository=vfs_storage_repository,

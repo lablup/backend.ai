@@ -14,10 +14,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, EntityType
-from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
 from ai.backend.manager.actions.v2.ops.result import (
-    BulkOpsResult,
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
@@ -25,7 +23,6 @@ from ai.backend.manager.actions.v2.ops.result import (
     ScopedBatchOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
-from ai.backend.manager.errors.repository import EntityNotFoundError
 
 _ENTITY_TYPE = EntityType("preset")
 
@@ -98,29 +95,6 @@ def test_lookup_result_reports_the_id_its_key_resolved_to() -> None:
     result: BaseLookupActionResult = LookupOpsResult(resolved_entity_id=entity_id)
 
     assert result.entity_id() == entity_id
-
-
-def test_bulk_result_answers_for_every_entity_named() -> None:
-    ok, broken = _PresetID(uuid.uuid4()), _PresetID(uuid.uuid4())
-
-    result = BulkOpsResult(
-        successes={ok: _PresetData(id=ok, name="a")},
-        errors={broken: EntityNotFoundError("gone")},
-    )
-
-    by_id = {r.entity_id: r for r in result.entity_results()}
-    assert by_id[ok].status is OperationStatus.SUCCESS
-    assert by_id[broken].status is OperationStatus.ERROR
-    assert by_id[broken].error_code == EntityNotFoundError("gone").error_code()
-
-
-def test_bulk_result_needs_nothing_from_its_data_type() -> None:
-    # The ids are the ones the caller passed in, so `EntityData` is not required.
-    entity_id = _PresetID(uuid.uuid4())
-
-    result = BulkOpsResult(successes={entity_id: _PlainData(name="a")}, errors={})
-
-    assert [r.entity_id for r in result.entity_results()] == [entity_id]
 
 
 def test_entity_result_carries_only_its_data() -> None:

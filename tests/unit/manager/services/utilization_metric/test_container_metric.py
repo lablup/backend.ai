@@ -38,8 +38,8 @@ from ai.backend.manager.clients.prometheus.metric_types import (
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.clients.prometheus.types import ValueType
 from ai.backend.manager.repositories.metric.repository import MetricRepository
-from ai.backend.manager.services.metric.actions.container import (
-    ContainerMetricAction,
+from ai.backend.manager.services.metric.actions.search_container_metrics import (
+    PublicSearchContainerMetricsAction,
 )
 
 
@@ -587,7 +587,7 @@ class TestContainerMetricDataTypes:
     """Test data types used in container metric service."""
 
     async def test_container_metric_action_fields(self) -> None:
-        action = ContainerMetricAction(
+        action = PublicSearchContainerMetricsAction(
             metric_name="container_cpu_percent",
             labels=ContainerMetricOptionalLabel(
                 value_type=ValueType.CURRENT,

@@ -3,24 +3,28 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
-from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.runtime_variant_preset.actions.base import (
-    RuntimeVariantPresetGlobalAction,
+from ai.backend.common.data.entity.runtime_variant_preset import (
+    RUNTIME_VARIANT_PRESET_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
+from ai.backend.manager.models.runtime_variant_preset.creators import RuntimeVariantPresetCreator
+from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 
 
 @dataclass
-class CreateRuntimeVariantPresetAction(RuntimeVariantPresetGlobalAction):
-    """Add a preset, taking the next rank within its variant.
+class CreateRuntimeVariantPresetAction(
+    CreateGlobalOpsAction[RuntimeVariantPresetRow, RuntimeVariantPresetData]
+):
+    """Add a preset, taking the next rank within its variant."""
 
-    Service-kept: the rank is drawn from the presets already stored for the variant,
-    which is a read the write spec cannot express.
-    """
+    creator: RuntimeVariantPresetCreator
 
-    creator: Creator[RuntimeVariantPresetRow]
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return RUNTIME_VARIANT_PRESET_ENTITY_TYPE
 
     @override
     @classmethod
@@ -28,11 +32,5 @@ class CreateRuntimeVariantPresetAction(RuntimeVariantPresetGlobalAction):
         return "create_runtime_variant_preset"
 
     @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreateRuntimeVariantPresetActionResult:
-    preset: RuntimeVariantPresetData
+    def to_creator(self) -> RuntimeVariantPresetCreator:
+        return self.creator

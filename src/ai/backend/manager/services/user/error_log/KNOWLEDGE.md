@@ -1,7 +1,7 @@
 ---
 name: error-log-service-shapes
 type: decision-table
-description: error log processor fields and their entity/operation/scope, why recording is user-scoped rather than global, why clearing is a soft delete addressed by id
+description: error log knowledge: why recording is user-scoped rather than global, why clearing is a soft delete addressed by id
 scope: src/ai/backend/manager/services/user/error_log
 keywords: [CreateErrorLogAction, DeleteErrorLogAction, SearchErrorLogsAction, AdminSearchErrorLogsAction, ErrorLogSoftDeleteUpdater, UserErrorLogOperationScope, entity_create_ops, scope_search_ops, single_delete_ops, is_cleared]
 sources:
@@ -25,12 +25,8 @@ the action layer.
 
 ## The processor fields
 
-| Field | Action | Shape | Operation | Authorized against |
-|---|---|---|---|---|
-| `create` | `CreateErrorLogAction` | entity + scope-shaped | CREATE | the owning user's scope |
-| `scoped_search` | `SearchErrorLogsAction` | operation-scope | SEARCH | the owning user's scope |
-| `search` | `AdminSearchErrorLogsAction` | global | SEARCH | SUPERADMIN gate |
-| `delete` | `DeleteErrorLogAction` | single entity | DELETE | the log row itself |
+`backend.ai mgr ops list --field error_log` prints the wired list. Its output answers
+the entity type, shape, operation, gate and backing.
 
 ## Recording is user-scoped, not global
 
@@ -65,5 +61,5 @@ the action layer.
   rests on the RBAC validators.
 - No `migrate_error_log_data_to_rbac` exists, so until the permission rows land
   a non-super-admin caller is refused.
-- The component suite cannot see either state: it replaces the virtual-scope
+- The component suite cannot see either state: it replaces the virtual-entity
   validators with mocks, so its fixtures admit every caller.

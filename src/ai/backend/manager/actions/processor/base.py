@@ -66,7 +66,6 @@ class ActionRunner[TAction: BaseAction, TActionResult: BaseActionResult]:
         try:
             result = await self._func(action)
         except BackendAIError as e:
-            log.exception("Action processing error: {}", e)
             status = OperationStatus.ERROR
             description = str(e)
             error_code = e.error_code()

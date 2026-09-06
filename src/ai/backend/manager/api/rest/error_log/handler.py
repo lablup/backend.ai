@@ -54,7 +54,6 @@ class ErrorLogHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info("CREATE (ak:{})", ctx.access_key)
 
         severity = ErrorLogSeverity(params.severity.lower())
         creator = ErrorLogCreator(
@@ -78,7 +77,6 @@ class ErrorLogHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        log.info("LIST (ak:{})", ctx.access_key)
 
         searcher = ErrorLogSearcher(
             pagination=OffsetPagination(
@@ -132,7 +130,6 @@ class ErrorLogHandler:
     ) -> APIResponse:
         path_params = path.parsed
         log_id = uuid.UUID(path_params.log_id)
-        log.info("CLEAR")
 
         action = DeleteErrorLogAction(log_id=ErrorLogID(log_id))
         await self._error_log.delete.run(action)

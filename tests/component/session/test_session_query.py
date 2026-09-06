@@ -38,7 +38,7 @@ from ai.backend.common.dto.manager.session.response import (
     GetStatusHistoryResponse,
     MatchSessionsResponse,
 )
-from ai.backend.common.types import ResourceSlot, SessionTypes
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     GroupMeta,
@@ -156,8 +156,6 @@ async def system_session_seed(
                 region="local",
                 scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
-                available_slots=ResourceSlot(),
-                occupied_slots=ResourceSlot(),
                 addr="tcp://127.0.0.1:6001",
                 public_host="127.0.0.1",
                 version="1.0.0",
@@ -183,8 +181,6 @@ async def system_session_seed(
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -208,8 +204,6 @@ async def system_session_seed(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -282,8 +276,6 @@ async def system_session_no_agent_seed(
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -307,8 +299,6 @@ async def system_session_no_agent_seed(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -379,8 +369,6 @@ async def second_session_seed(
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -404,8 +392,6 @@ async def second_session_seed(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,

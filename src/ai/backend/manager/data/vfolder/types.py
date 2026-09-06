@@ -7,8 +7,9 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
@@ -119,6 +120,15 @@ class VFolderOperationStatus(enum.StrEnum):
     DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
     DELETE_ERROR = "delete-error"
 
+    @classmethod
+    def purge_in_progress(cls) -> frozenset[VFolderOperationStatus]:
+        """Statuses a purge is working through. Writes are refused while in one.
+
+        ``DELETE_ONGOING`` and ``DELETE_ERROR`` name the two points the other entities
+        call ``purging`` and ``purge-error``.
+        """
+        return frozenset({cls.DELETE_ONGOING, cls.DELETE_ERROR})
+
     @override
     @classmethod
     def _missing_(cls, value: Any) -> VFolderOperationStatus | None:
@@ -220,12 +230,12 @@ class VFolderUsageData:
 
 
 @dataclass
-class VFolderPermissionData:
+class VFolderPermissionData(FieldData):
     """
     VFolder permission data representing user-specific permissions on a VFolder.
     """
 
-    id: uuid.UUID
+    id: VFolderPermissionID
     vfolder: uuid.UUID
     user: uuid.UUID
     permission: VFolderMountPermission

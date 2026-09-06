@@ -15,11 +15,11 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
-from ai.backend.manager.models.specs.searcher import SearcherResult
-from ai.backend.manager.repositories.app_config_fragment.types import (
+from ai.backend.manager.models.app_config_fragment.scopes import (
     PublicAppConfigFragmentOperationScope,
     VisibleAppConfigFragmentOperationScope,
 )
+from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.app_config.actions.search import (
     AnonymousSearchAppConfigsAction,

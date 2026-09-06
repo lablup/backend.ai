@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from typing import Self
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
@@ -28,4 +29,18 @@ class BaseBulkAction(ABC):
 
         Each names its own type, so one run may reach several kinds at once.
         """
+        raise NotImplementedError
+
+
+class BasePartialBulkAction(BaseBulkAction, ABC):
+    """A bulk action whose entities do not share one fate.
+
+    Re-states itself over a subset, which is what lets the run go ahead without the
+    entities the caller was denied. An atomic shape stays on :class:`BaseBulkAction`:
+    narrowing one would turn all-or-nothing into something else.
+    """
+
+    @abstractmethod
+    def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
+        """Return the same action over ``entity_ids``, a subset of what it named."""
         raise NotImplementedError

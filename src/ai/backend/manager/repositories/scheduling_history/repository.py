@@ -24,15 +24,15 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryListResult,
 )
-from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.base import BatchQuerier
-
-from .db_source import SchedulingHistoryDBSource
-from .types import (
+from ai.backend.manager.models.scheduling_history.scopes import (
     DeploymentHistoryOperationScope,
     RouteHistoryOperationScope,
     SessionSchedulingHistoryOperationScope,
 )
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.repositories.base import BatchQuerier
+
+from .db_source import SchedulingHistoryDBSource
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

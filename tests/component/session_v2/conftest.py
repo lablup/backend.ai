@@ -34,7 +34,6 @@ from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import (
     EntityType,
-    OperationType,
     Permission,
     RelationType,
     RoleStatus,
@@ -42,7 +41,7 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import ResourceSlot, SessionTypes
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
@@ -55,6 +54,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.agent.row import AgentRow
@@ -71,13 +71,16 @@ from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -124,7 +127,7 @@ def rbac_permission_repo(
 def session_repository(
     database_engine: ExtendedAsyncSAEngine,
 ) -> SessionRepository:
-    return SessionRepository(database_engine)
+    return SessionRepository(database_engine, DBOpsProvider(database_engine))
 
 
 @pytest.fixture()
@@ -282,20 +285,21 @@ async def user_system_role(
         )
         # Grant owner permissions for all owner-accessible entity types in user scope
         for entity_type in EntityType.owner_accessible_entity_types_in_user():
-            for operation in OperationType.owner_operations():
+            for bit in Permission:
+                if not bit:
+                    continue
                 await conn.execute(
                     sa.insert(PermissionRow.__table__).values(
                         role_id=role_id,
                         scope_type=ScopeType.USER,
                         scope_id=str(user_uuid),
                         entity_type=entity_type,
-                        operation=operation,
-                        permission=Permission.from_operation(operation),
+                        permission=bit,
                     )
                 )
         # USER entity type permissions (excluding CREATE)
-        for operation in OperationType.owner_operations():
-            if operation == OperationType.CREATE:
+        for bit in Permission:
+            if not bit or bit == Permission.CREATE:
                 continue
             await conn.execute(
                 sa.insert(PermissionRow.__table__).values(
@@ -303,8 +307,7 @@ async def user_system_role(
                     scope_type=ScopeType.USER,
                     scope_id=str(user_uuid),
                     entity_type=EntityType.USER,
-                    operation=operation,
-                    permission=Permission.from_operation(operation),
+                    permission=bit,
                 )
             )
 
@@ -378,8 +381,6 @@ async def _seed_session(
                 status=status,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -403,8 +404,6 @@ async def _seed_session(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -609,8 +608,6 @@ async def agent_factory(
                     scaling_group=resource_group_name,
                     resource_group_id=resource_group_id,
                     schedulable=True,
-                    available_slots=ResourceSlot(available_slots),
-                    occupied_slots=ResourceSlot(),
                     addr=f"10.0.0.{len(created_ids) + 1}:6001",
                     version="26.0.0",
                     architecture="x86_64",
@@ -677,6 +674,7 @@ async def compute_session_processors(
     )
     scheduler_repository = SchedulerRepository(
         database_engine,
+        ReconcileOpsProvider(database_engine),
         valkey_clients.stat,
         valkey_clients.schedule,
         config_provider,
@@ -703,11 +701,15 @@ async def compute_session_processors(
         event_hub=AsyncMock(),
         error_monitor=error_monitor,
         idle_checker_host=AsyncMock(),
-        session_repository=SessionRepository(database_engine),
+        session_repository=SessionRepository(database_engine, DBOpsProvider(database_engine)),
         scheduler_repository=scheduler_repository,
         scheduling_controller=scheduling_controller,
         appproxy_client_pool=AsyncMock(),
-        user_repository=UserRepository(database_engine, V2DBOpsProvider(database_engine)),
+        user_repository=UserRepository(
+            database_engine,
+            V2DBOpsProvider(database_engine),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        ),
     )
     service = SessionService(args)
     return SessionProcessors(

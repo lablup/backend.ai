@@ -19,7 +19,7 @@ class GlobalEntityUpserter[TRow: Base, TData](ABC):
     """Upsert spec of a global entity: an entity that belongs under no other scope.
 
     The node stays provisioned idempotently, as the entity upsert does; what is absent
-    is ``member_of``.
+    is ``created_in``.
     """
 
     @abstractmethod
@@ -57,8 +57,8 @@ class GlobalEntityUpserter[TRow: Base, TData](ABC):
 
 class EntityUpserter[TRow: Base, TData](ABC):
     """Upsert spec of an entity: the row that comes back — inserted or updated —
-    stays provisioned in the RBAC graph idempotently (node get-or-create, memberships
-    registered under the create rule)."""
+    stays provisioned in the RBAC graph idempotently (node get-or-create, owned and
+    governed under the create rule)."""
 
     @abstractmethod
     def entity_id(self, row: TRow) -> EntityIdentifier:
@@ -68,8 +68,9 @@ class EntityUpserter[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def member_of(self, row: TRow) -> Collection[EntityIdentifier]:
-        """The existing entities this one belongs to; registered idempotently."""
+    def created_in(self, row: TRow) -> Collection[EntityIdentifier]:
+        """The scopes this entity is created in; each owns and governs it, registered
+        idempotently."""
         raise NotImplementedError
 
     @abstractmethod

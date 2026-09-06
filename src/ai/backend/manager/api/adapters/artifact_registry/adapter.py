@@ -11,8 +11,8 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.models.artifact_registries.conditions import ArtifactRegistryConditions
+from ai.backend.manager.models.artifact_registries.searchers import ArtifactRegistrySearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
     GetArtifactRegistryMetaAction,
 )
@@ -70,12 +70,13 @@ class ArtifactRegistryAdapter(BaseAdapter):
         """
         if not ids:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[ArtifactRegistryConditions.by_ids(ids)],
-        )
         action_result = await self._processors.artifact_registry.search_artifact_registries.run(
-            SearchArtifactRegistriesAction(querier=querier)
+            SearchArtifactRegistriesAction(
+                searcher=ArtifactRegistrySearcher(
+                    pagination=OffsetPagination(limit=len(ids)),
+                    conditions=[ArtifactRegistryConditions.by_ids(ids)],
+                )
+            )
         )
         registry_map = {item.id: self._data_to_dto(item) for item in action_result.registries}
         return [registry_map.get(ArtifactRegistryID(registry_id)) for registry_id in ids]

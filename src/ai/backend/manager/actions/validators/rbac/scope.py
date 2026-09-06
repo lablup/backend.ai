@@ -45,7 +45,7 @@ class ScopeActionRBACValidator(ScopeActionValidator):
                     entity_id=target.element_id,
                     subject_entity_type=action.entity_type().to_element(),
                 ),
-                operation=action.operation_type().to_permission_operation(),
+                permission=action.operation_type().to_permission(),
             )
         )
         if not allowed:

@@ -12,5 +12,5 @@ class ModelCardRepositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         return cls(
-            repository=ModelCardRepository(args.db),
+            repository=ModelCardRepository(args.v2_ops_provider),
         )

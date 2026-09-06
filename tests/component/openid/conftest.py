@@ -31,7 +31,7 @@ from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
     ResourceSlot,
@@ -44,6 +44,7 @@ from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.config.unified import DatabaseConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.domain.row import DomainRow
@@ -61,13 +62,16 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import UserRole, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.plugin.openid.hook import OIDCHookPlugin
 from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
 from ai.backend.manager.plugin.openid.webapp import OIDCWebAppPlugin
+from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.db.engine import connect_database
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     postgres_container,
     redis_container,
@@ -461,27 +465,25 @@ async def seed_data(
         )
         sess.add(project)
         await sess.flush()
-        virtual_scope_id = uuid.uuid4()
+        virtual_entity_id = uuid.uuid4()
         await conn.execute(
-            sa.insert(VirtualScopeRow.__table__).values(
-                id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=project.id,
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ScopeType.PROJECT,
+                entity_id=project.id,
             )
         )
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=project.id,
-                permission_cap=None,
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=project.id,
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -495,9 +497,9 @@ async def seed_data(
         await conn.execute(keypairs.delete())
         await conn.execute(users.delete())
         await conn.execute(
-            VirtualScopeRow.__table__.delete().where(
-                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
-                VirtualScopeRow.__table__.c.scope_id == project.id,
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_id == project.id,
             )
         )
         await conn.execute(groups.delete())
@@ -551,16 +553,32 @@ def mock_config_provider(redis_container: Any) -> MagicMock:  # noqa: F811
 
 
 @pytest.fixture
+def auth_repository(seed_data: ExtendedAsyncSAEngine) -> AuthRepository:
+    """The only repository the OpenID plugin reaches the database through."""
+    return AuthRepository(
+        seed_data,
+        V2DBOpsProvider(seed_data),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
+
+
+@pytest.fixture
 def mock_root_app(
-    seed_data: ExtendedAsyncSAEngine, mock_config_provider: MagicMock
+    seed_data: ExtendedAsyncSAEngine,
+    mock_config_provider: MagicMock,
+    auth_repository: AuthRepository,
 ) -> dict[str, Any]:
     """
     Dict simulating root_app that plugin handlers access via
-    request.app["_root_app"]["_db"] / ["_config_provider"].
+    request.app["_root_app"]["_auth_repository"] / ["_config_provider"].
     """
     return {
         "_db": seed_data,  # seed_data yields database_engine
         "_config_provider": mock_config_provider,
+        "_key_provider_pool": KeyProviderPool(
+            providers=[], write_provider_type=KeyProviderType.PLAIN
+        ),
+        "_auth_repository": auth_repository,
     }
 
 
@@ -652,9 +670,11 @@ def make_stoken(plugin_config: dict[str, Any]) -> Callable[..., str]:
 
 
 @pytest.fixture
-def make_hook_request(seed_data: ExtendedAsyncSAEngine) -> Callable[..., MagicMock]:
+def make_hook_request(
+    seed_data: ExtendedAsyncSAEngine, auth_repository: AuthRepository
+) -> Callable[..., MagicMock]:
     """Callable(cookies) -> mock Request with _root_app wired to seed_data."""
-    root_app: dict[str, Any] = {"_db": seed_data}
+    root_app: dict[str, Any] = {"_db": seed_data, "_auth_repository": auth_repository}
 
     def _make(cookies: dict[str, str]) -> MagicMock:
         request = MagicMock()

@@ -169,7 +169,7 @@ class EndpointRow(Base):
     )
 
     id: Mapped[DeploymentID] = mapped_column(
-        "id", GUID(DeploymentID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(DeploymentID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=512), nullable=False)
     created_user: Mapped[UUID] = mapped_column("created_user", GUID, nullable=False)
@@ -831,6 +831,19 @@ class EndpointRow(Base):
             policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
         )
 
+    def to_bare_deployment_info(self) -> DeploymentInfo:
+        """DeploymentInfo carrying this row's own columns only.
+
+        The revision and policy fields come back ``None``: a write path holds the
+        row it just wrote, with no relationship loaded to read them from.
+        """
+        return self._build_deployment_info(
+            current_revision_id=None,
+            deploying_revision_id=None,
+            current_revision=None,
+            deploying_revision=None,
+        )
+
     def _build_deployment_info(
         self,
         current_revision_id: DeploymentRevisionID | None,
@@ -890,7 +903,7 @@ class EndpointTokenRow(Base):
         "id",
         GUID(DeploymentTokenID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     token: Mapped[str] = mapped_column("token", sa.String(), nullable=False)
     endpoint: Mapped[DeploymentID | None] = mapped_column(
@@ -1013,7 +1026,7 @@ class EndpointAutoScalingRuleRow(Base):
     __tablename__ = "endpoint_auto_scaling_rules"
 
     id: Mapped[UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     metric_source: Mapped[AutoScalingMetricSource] = mapped_column(
         "metric_source", StrEnumType(AutoScalingMetricSource, use_name=False), nullable=False

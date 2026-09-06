@@ -79,7 +79,6 @@ class AutoScalingRuleHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Create a new auto-scaling rule."""
-        log.info("AUTO_SCALING_RULE.CREATE (ak:{})", ctx.access_key)
 
         creator = ModelDeploymentAutoScalingRuleCreator(
             model_deployment_id=body.parsed.model_deployment_id,
@@ -111,7 +110,6 @@ class AutoScalingRuleHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Get a specific auto-scaling rule."""
-        log.info("AUTO_SCALING_RULE.GET (ak:{})", ctx.access_key)
 
         action_result = await self._deployment.get_auto_scaling_rule.run(
             GetAutoScalingRuleAction(
@@ -131,7 +129,6 @@ class AutoScalingRuleHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search auto-scaling rules with filters, orders, and pagination."""
-        log.info("AUTO_SCALING_RULE.SEARCH (ak:{})", ctx.access_key)
 
         querier = self._adapter.build_querier(body.parsed)
 
@@ -156,7 +153,6 @@ class AutoScalingRuleHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Update an existing auto-scaling rule."""
-        log.info("AUTO_SCALING_RULE.UPDATE (ak:{})", ctx.access_key)
 
         rule_id = path.parsed.rule_id
         modifier = self._adapter.build_modifier(body.parsed)
@@ -180,7 +176,6 @@ class AutoScalingRuleHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Delete an auto-scaling rule."""
-        log.info("AUTO_SCALING_RULE.DELETE (ak:{})", ctx.access_key)
 
         action_result = await self._deployment.delete_auto_scaling_rule.run(
             DeleteAutoScalingRuleAction(

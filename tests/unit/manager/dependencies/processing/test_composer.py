@@ -36,6 +36,7 @@ def _make_processing_input() -> ProcessingInput:
         route_coordinator=MagicMock(),
         reconciler_coordinator=MagicMock(),
         scheduler_repository=MagicMock(),
+        key_provider_pool=MagicMock(),
         event_hub=MagicMock(),
         agent_registry=MagicMock(),
         db=MagicMock(),

@@ -43,7 +43,6 @@ class SchedulingHistoryHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search session scheduling history."""
-        log.info("SEARCH_SESSION_HISTORY (ak:{})", ctx.access_key)
 
         querier = self._adapter.build_session_history_querier(body.parsed)
 
@@ -69,7 +68,6 @@ class SchedulingHistoryHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search deployment history."""
-        log.info("SEARCH_DEPLOYMENT_HISTORY (ak:{})", ctx.access_key)
 
         querier = self._adapter.build_deployment_history_querier(body.parsed)
 
@@ -95,7 +93,6 @@ class SchedulingHistoryHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search route history."""
-        log.info("SEARCH_ROUTE_HISTORY (ak:{})", ctx.access_key)
 
         querier = self._adapter.build_route_history_querier(body.parsed)
 

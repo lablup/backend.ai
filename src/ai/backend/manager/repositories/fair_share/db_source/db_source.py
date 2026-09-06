@@ -45,7 +45,12 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.fair_share.scopes import (
+    DomainFairShareOperationScope,
+    ProjectFairShareOperationScope,
+    UserFairShareOperationScope,
+)
+from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow, ProjectType
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.resource_usage_history import (
@@ -68,11 +73,8 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
-    DomainFairShareOperationScope,
     ProjectFairShareEntitySearchResult,
-    ProjectFairShareOperationScope,
     UserFairShareEntitySearchResult,
-    UserFairShareOperationScope,
 )
 
 if TYPE_CHECKING:
@@ -449,7 +451,8 @@ class FairShareDBSource:
 
         This method returns all projects with complete fair share data
         (either from records or defaults). Projects do not need to be
-        registered in the resource group to appear in results.
+        registered in the resource group to appear in results. Personal
+        projects are left out.
 
         Args:
             scope: Required scope with resource_group.
@@ -475,6 +478,9 @@ class FairShareDBSource:
                         ProjectFairShareRow.resource_group_id == scope.resource_group_id,
                     ),
                 )
+                # A personal project holds one person's own work and is not a fair-share
+                # subject.
+                .where(ProjectRow.type != ProjectType.PERSONAL)
             )
 
             result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])

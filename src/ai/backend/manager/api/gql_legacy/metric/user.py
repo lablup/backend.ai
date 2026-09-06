@@ -10,8 +10,8 @@ import graphene
 
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.manager.clients.prometheus.metric_types import ContainerMetricOptionalLabel
-from ai.backend.manager.services.metric.actions.container import (
-    ContainerMetricAction,
+from ai.backend.manager.services.metric.actions.search_container_metrics import (
+    PublicSearchContainerMetricsAction,
 )
 from ai.backend.manager.services.metric.types import (
     MetricQueryParameter,
@@ -70,8 +70,8 @@ class UserUtilizationMetric(graphene.ObjectType):  # type: ignore[misc]
         param: MetricQueryParameter,
     ) -> Self:
         graph_ctx: GraphQueryContext = info.context
-        action_result = await graph_ctx.processors.metric.query_container.wait_for_complete(
-            ContainerMetricAction(
+        action_result = await graph_ctx.processors.metric.public_search.run(
+            PublicSearchContainerMetricsAction(
                 metric_name=param.metric_name,
                 labels=ContainerMetricOptionalLabel(user_id=user_id, value_type=param.value_type),
                 time_range=QueryTimeRange(start=param.start, end=param.end, step=param.step),

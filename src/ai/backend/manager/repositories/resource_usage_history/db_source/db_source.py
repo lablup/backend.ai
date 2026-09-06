@@ -30,6 +30,11 @@ from ai.backend.manager.models.resource_usage_history import (
     UsageBucketEntryRow,
     UserUsageBucketRow,
 )
+from ai.backend.manager.models.resource_usage_history.scopes import (
+    DomainUsageBucketOperationScope,
+    ProjectUsageBucketOperationScope,
+    UserUsageBucketOperationScope,
+)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
@@ -41,12 +46,9 @@ from ai.backend.manager.repositories.base import (
     execute_upserter,
 )
 from ai.backend.manager.repositories.resource_usage_history.types import (
-    DomainUsageBucketOperationScope,
     DomainUsageBucketSearchResult,
     KernelUsageRecordSearchResult,
-    ProjectUsageBucketOperationScope,
     ProjectUsageBucketSearchResult,
-    UserUsageBucketOperationScope,
     UserUsageBucketSearchResult,
 )
 

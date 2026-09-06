@@ -17,7 +17,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID, Resour
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import ResourceSlot, SessionTypes
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
@@ -32,6 +32,7 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.stream.repository import StreamRepository
 from ai.backend.manager.services.session.actions.lookup import LookupSessionAction
@@ -96,7 +97,7 @@ async def session_processors(
     ``SessionRepository``); that is all the stream handler uses to normalize a
     UUID-shaped path reference to its canonical session name.
     """
-    repo = SessionRepository(database_engine)
+    repo = SessionRepository(database_engine, DBOpsProvider(database_engine))
     service = SessionService(
         SessionServiceArgs(
             agent_registry=AsyncMock(),
@@ -186,8 +187,6 @@ async def session_seed(
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -211,8 +210,6 @@ async def session_seed(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,

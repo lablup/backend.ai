@@ -12,13 +12,11 @@ from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.resource_policy.scopes import UserKeypairResourcePolicyOperationScope
 from ai.backend.manager.models.resource_policy.searchers import (
     KeyPairResourcePolicySearcher,
 )
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.keypair_resource_policy.types import (
-    UserKeypairResourcePolicyOperationScope,
-)
 
 
 @dataclass

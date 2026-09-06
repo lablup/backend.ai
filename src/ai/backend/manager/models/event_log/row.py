@@ -21,7 +21,7 @@ class EventLogRow(Base):
     __tablename__ = "event_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
 
     event_name: Mapped[str] = mapped_column("event_name", sa.String, nullable=False)

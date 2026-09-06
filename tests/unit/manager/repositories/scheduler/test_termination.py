@@ -61,6 +61,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.scheduler.options import SessionConditions
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -274,7 +275,7 @@ class TestKernelTermination:
         async with db_with_cleanup.begin_session() as db_sess:
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key=secret_key,
+                secret_key=SecretValue(secret_key),
                 user=test_user_uuid,
                 is_active=True,
                 is_admin=False,
@@ -329,8 +330,6 @@ class TestKernelTermination:
                 region="local",
                 scaling_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
-                available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",
                 version="1.0.0",
                 architecture="x86_64",
@@ -349,6 +348,7 @@ class TestKernelTermination:
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
     ) -> AsyncGenerator[SessionId, None]:
         """Create test session in TERMINATING status and return session ID"""
         session_id = SessionId(uuid.uuid4())
@@ -361,12 +361,12 @@ class TestKernelTermination:
                 domain_id=test_domain_id,
                 domain_name=test_domain.domain_name,
                 group_id=test_group_id,
+                user_uuid=test_user_uuid,
                 resource_group_id=test_scaling_group_id,
                 scaling_group_name=test_scaling_group_name,
                 status=SessionStatus.TERMINATING,
                 status_info="test-termination",
                 cluster_mode=ClusterMode.SINGLE_NODE,
-                requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 created_at=datetime.now(tzutc()),
                 images=["python:3.8"],
                 vfolder_mounts=[],
@@ -411,8 +411,6 @@ class TestKernelTermination:
                 container_id=f"container-{uuid.uuid4().hex[:8]}",
                 status=KernelStatus.TERMINATING,
                 status_changed=datetime.now(tzutc()),
-                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
-                requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
@@ -464,8 +462,6 @@ class TestKernelTermination:
                 container_id=f"container-{uuid.uuid4().hex[:8]}",
                 status=KernelStatus.CANCELLED,
                 status_changed=datetime.now(tzutc()),
-                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
-                requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
@@ -517,8 +513,6 @@ class TestKernelTermination:
                 container_id=f"container-{uuid.uuid4().hex[:8]}",
                 status=KernelStatus.TERMINATED,
                 status_changed=datetime.now(tzutc()),
-                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
-                requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
@@ -637,8 +631,6 @@ class TestKernelTermination:
                 container_id=f"container-{uuid.uuid4().hex[:8]}",
                 status=KernelStatus.RUNNING,
                 status_changed=datetime.now(tzutc()),
-                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
-                requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                 domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,

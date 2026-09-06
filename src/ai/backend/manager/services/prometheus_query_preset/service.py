@@ -1,5 +1,4 @@
 import logging
-from typing import cast
 
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -17,9 +16,6 @@ from ai.backend.manager.data.prometheus_query_preset import (
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
-    PrometheusQueryPresetUpdaterSpec,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions import (
     CreatePresetAction,
@@ -64,11 +60,10 @@ class PrometheusQueryPresetService:
         )
 
     async def update_preset(self, action: UpdatePresetAction) -> UpdatePresetActionResult:
-        spec = cast(PrometheusQueryPresetUpdaterSpec, action.updater.spec)
-        template = spec.query_template.optional_value()
+        template = action.updater.query_template.optional_value()
         if template is not None:
             self._template_renderer.validate(template)
-        preset_data = await self._repository.update(action.updater)
+        preset_data = await self._ops_repository.update(action.updater)
         return UpdatePresetActionResult(preset=preset_data)
 
     def _validate_labels(

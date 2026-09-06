@@ -3,16 +3,21 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import cast
+from typing import Any
 from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import (
+    CONTAINER_REGISTRY_ENTITY_TYPE,
+    ContainerRegistryID,
+)
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -26,6 +31,9 @@ from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyRow,
 )
@@ -34,6 +42,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -61,23 +70,20 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.container_registry.creators import (
-    ContainerRegistryCreatorSpec,
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
 )
-from ai.backend.manager.repositories.container_registry.purgers import ContainerRegistryPurgerSpec
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.container_registry.updaters import (
-    ContainerRegistryUpdaterSpec,
-)
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -159,10 +165,13 @@ class TestContainerRegistryRepository:
                 PermissionRow,
                 RolePresetRow,
                 RolePermissionPresetRow,
-                # The registry's owner virtual scope and the allowed-project edges
-                VirtualScopeRow,
+                # The registry's owner virtual entity and the allowed-project edges
+                VirtualEntityRow,
                 ScopeBindingRow,
+                EntityLabelRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -170,7 +179,9 @@ class TestContainerRegistryRepository:
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
         """Create ContainerRegistryRepository instance with real database"""
-        return ContainerRegistryRepository(db=db_with_cleanup)
+        return ContainerRegistryRepository(
+            db=db_with_cleanup, ops_provider=RelationOpsProvider(db_with_cleanup)
+        )
 
     @pytest.fixture
     async def sample_domain(
@@ -218,6 +229,7 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
+                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
                 group_ids.append(group.id)
 
             await session.commit()
@@ -403,40 +415,37 @@ class TestContainerRegistryRepository:
         assert len(result) == 2
 
     @pytest.fixture
-    async def creator(self) -> Creator[ContainerRegistryRow]:
+    async def creator(self) -> ContainerRegistryCreator:
         """Fixture that provides a minimal creator spec for creating registries."""
-        return Creator(
-            spec=ContainerRegistryCreatorSpec(
-                url="https://minimal.example.com",
-                type=ContainerRegistryType.HARBOR2,
-                registry_name="minimal-registry",
-                project="minimal-project",
-            )
+        return ContainerRegistryCreator(
+            url="https://minimal.example.com",
+            type=ContainerRegistryType.HARBOR2,
+            registry_name="minimal-registry",
+            project="minimal-project",
         )
 
     async def test_create_registry_minimal(
         self,
         repository: ContainerRegistryRepository,
-        creator: Creator[ContainerRegistryRow],
+        creator: ContainerRegistryCreator,
     ) -> None:
         """Test creating registry with minimal required fields"""
         # When
         result = await repository.create_registry(creator)
 
         # Then - Verify result
-        spec: ContainerRegistryCreatorSpec = cast(ContainerRegistryCreatorSpec, creator.spec)
         assert result is not None
-        assert result.registry_name == spec.registry_name
-        assert result.url == spec.url
-        assert result.type == spec.type
-        assert result.project == spec.project
+        assert result.registry_name == creator.registry_name
+        assert result.url == creator.url
+        assert result.type == creator.type
+        assert result.project == creator.project
         assert result.id is not None
 
     @pytest.fixture
     async def creator_spec_with_allowed_groups(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> tuple[ContainerRegistryCreatorSpec, list[str]]:
+    ) -> tuple[ContainerRegistryCreator, list[str]]:
         """Fixture that provides a creator spec with allowed_groups for creating registries."""
         registry_name = "registry-with-groups-" + str(uuid.uuid4())[:8]
         project = "project-with-groups-" + str(uuid.uuid4())[:8]
@@ -476,33 +485,34 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
+                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
                 group_ids.append(str(group.id))
             await session.commit()
 
-        spec = ContainerRegistryCreatorSpec(
+        creator = ContainerRegistryCreator(
             url=f"https://{registry_name}",
             type=ContainerRegistryType.HARBOR2,
             registry_name=registry_name,
             project=project,
             allowed_groups=AllowedGroupsModel(add=group_ids, remove=[]),
         )
-        return spec, group_ids
+        return creator, group_ids
 
     async def test_create_registry_with_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        creator_spec_with_allowed_groups: tuple[ContainerRegistryCreatorSpec, list[str]],
+        creator_spec_with_allowed_groups: tuple[ContainerRegistryCreator, list[str]],
     ) -> None:
         """Test creating registry with allowed_groups"""
         # Given - Registry and groups
-        spec, group_ids = creator_spec_with_allowed_groups
+        creator, group_ids = creator_spec_with_allowed_groups
         # When
-        result = await repository.create_registry(Creator(spec=spec))
+        result = await repository.create_registry(creator)
 
         # Then - Verify registry created
         assert result is not None
-        assert result.registry_name == spec.registry_name
+        assert result.registry_name == creator.registry_name
 
         # Then - Verify allowed_groups associations created
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -768,20 +778,18 @@ class TestContainerRegistryRepository:
         changed_extra = {"modified_key": "modified_value"}
 
         result = await repository.modify_registry(
-            Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.nop(),
-                    type=OptionalState.nop(),
-                    registry_name=OptionalState.nop(),
-                    project=TriState.nop(),
-                    username=TriState.update(changed_username),
-                    password=TriState.update(changed_password),
-                    ssl_verify=TriState.nop(),
-                    is_global=TriState.nop(),
-                    extra=TriState.update(changed_extra),
-                    allowed_groups=TriState.nop(),
-                ),
-                pk_value=registry_for_modification.id,
+            ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_for_modification.id),
+                url=OptionalState.nop(),
+                type=OptionalState.nop(),
+                registry_name=OptionalState.nop(),
+                project=TriState.nop(),
+                username=TriState.update(changed_username),
+                password=TriState.update(changed_password),
+                ssl_verify=TriState.nop(),
+                is_global=TriState.nop(),
+                extra=TriState.update(changed_extra),
+                allowed_groups=TriState.nop(),
             )
         )
 
@@ -805,20 +813,18 @@ class TestContainerRegistryRepository:
         # Then
         with pytest.raises(ContainerRegistryNotFound):
             await repository.modify_registry(
-                Updater(
-                    spec=ContainerRegistryUpdaterSpec(
-                        url=OptionalState.nop(),
-                        type=OptionalState.nop(),
-                        registry_name=OptionalState.nop(),
-                        project=TriState.nop(),
-                        username=TriState.update("new-user"),
-                        password=TriState.nop(),
-                        ssl_verify=TriState.nop(),
-                        is_global=TriState.nop(),
-                        extra=TriState.nop(),
-                        allowed_groups=TriState.nop(),
-                    ),
-                    pk_value=non_existent_id,
+                ContainerRegistryUpdater(
+                    registry_id=ContainerRegistryID(non_existent_id),
+                    url=OptionalState.nop(),
+                    type=OptionalState.nop(),
+                    registry_name=OptionalState.nop(),
+                    project=TriState.nop(),
+                    username=TriState.update("new-user"),
+                    password=TriState.nop(),
+                    ssl_verify=TriState.nop(),
+                    is_global=TriState.nop(),
+                    extra=TriState.nop(),
+                    allowed_groups=TriState.nop(),
                 )
             )
 
@@ -846,6 +852,10 @@ class TestContainerRegistryRepository:
                 project=project,
             )
             session.add(registry)
+            await session.flush()
+            session.add(
+                VirtualEntityRow(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry.id)
+            )
             await session.commit()
             await session.refresh(registry)
             return self._RegistryWithAvailableGroups(
@@ -862,25 +872,23 @@ class TestContainerRegistryRepository:
         """Test adding allowed_groups to an existing registry"""
         # When
         result = await repository.modify_registry(
-            Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.nop(),
-                    type=OptionalState.nop(),
-                    registry_name=OptionalState.nop(),
-                    project=TriState.nop(),
-                    username=TriState.nop(),
-                    password=TriState.nop(),
-                    ssl_verify=TriState.update(True),
-                    is_global=TriState.nop(),
-                    extra=TriState.nop(),
-                    allowed_groups=TriState.update(
-                        AllowedGroupsModel(
-                            add=[str(g) for g in registry_and_groups_for_adding.group_ids],
-                            remove=[],
-                        )
-                    ),
+            ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_and_groups_for_adding.registry.id),
+                url=OptionalState.nop(),
+                type=OptionalState.nop(),
+                registry_name=OptionalState.nop(),
+                project=TriState.nop(),
+                username=TriState.nop(),
+                password=TriState.nop(),
+                ssl_verify=TriState.update(True),
+                is_global=TriState.nop(),
+                extra=TriState.nop(),
+                allowed_groups=TriState.update(
+                    AllowedGroupsModel(
+                        add=[str(g) for g in registry_and_groups_for_adding.group_ids],
+                        remove=[],
+                    )
                 ),
-                pk_value=registry_and_groups_for_adding.registry.id,
             )
         )
 
@@ -927,6 +935,10 @@ class TestContainerRegistryRepository:
                 project=project,
             )
             session.add(registry)
+            await session.flush()
+            session.add(
+                VirtualEntityRow(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry.id)
+            )
 
             # Create resource policies
             user_policy = UserResourcePolicyRow(
@@ -956,6 +968,7 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
+                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
                 group_ids.append(group.id)
 
                 # Associate with registry
@@ -980,24 +993,22 @@ class TestContainerRegistryRepository:
 
         # When - Request to remove one group
         result = await repository.modify_registry(
-            Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.nop(),
-                    type=OptionalState.nop(),
-                    registry_name=OptionalState.nop(),
-                    project=TriState.nop(),
-                    username=TriState.nop(),
-                    password=TriState.nop(),
-                    ssl_verify=TriState.update(True),
-                    is_global=TriState.nop(),
-                    extra=TriState.nop(),
-                    allowed_groups=TriState.update(
-                        AllowedGroupsModel(
-                            add=[], remove=[str(registry_with_associated_groups.group_ids[0])]
-                        )
-                    ),
+            ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_with_associated_groups.registry.id),
+                url=OptionalState.nop(),
+                type=OptionalState.nop(),
+                registry_name=OptionalState.nop(),
+                project=TriState.nop(),
+                username=TriState.nop(),
+                password=TriState.nop(),
+                ssl_verify=TriState.update(True),
+                is_global=TriState.nop(),
+                extra=TriState.nop(),
+                allowed_groups=TriState.update(
+                    AllowedGroupsModel(
+                        add=[], remove=[str(registry_with_associated_groups.group_ids[0])]
+                    )
                 ),
-                pk_value=registry_with_associated_groups.registry.id,
             )
         )
 
@@ -1054,6 +1065,10 @@ class TestContainerRegistryRepository:
                 project=project,
             )
             session.add(registry)
+            await session.flush()
+            session.add(
+                VirtualEntityRow(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry.id)
+            )
 
             # Create resource policies
             user_policy = UserResourcePolicyRow(
@@ -1083,6 +1098,7 @@ class TestContainerRegistryRepository:
                 )
                 session.add(group)
                 await session.flush()
+                session.add(VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=group.id))
                 group_ids.append(group.id)
 
             # Associate first 2 groups with the registry
@@ -1113,25 +1129,23 @@ class TestContainerRegistryRepository:
 
         # When - Remove group 0, add group 2, 3
         result = await repository.modify_registry(
-            Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    url=OptionalState.nop(),
-                    type=OptionalState.nop(),
-                    registry_name=OptionalState.nop(),
-                    project=TriState.nop(),
-                    username=TriState.nop(),
-                    password=TriState.nop(),
-                    ssl_verify=TriState.update(True),
-                    is_global=TriState.nop(),
-                    extra=TriState.nop(),
-                    allowed_groups=TriState.update(
-                        AllowedGroupsModel(
-                            add=[str(group_ids[2]), str(group_ids[3])],
-                            remove=[str(group_ids[0])],
-                        )
-                    ),
+            ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_with_partial_groups.registry.id),
+                url=OptionalState.nop(),
+                type=OptionalState.nop(),
+                registry_name=OptionalState.nop(),
+                project=TriState.nop(),
+                username=TriState.nop(),
+                password=TriState.nop(),
+                ssl_verify=TriState.update(True),
+                is_global=TriState.nop(),
+                extra=TriState.nop(),
+                allowed_groups=TriState.update(
+                    AllowedGroupsModel(
+                        add=[str(group_ids[2]), str(group_ids[3])],
+                        remove=[str(group_ids[0])],
+                    )
                 ),
-                pk_value=registry_with_partial_groups.registry.id,
             )
         )
 
@@ -1165,22 +1179,20 @@ class TestContainerRegistryRepository:
     ) -> None:
         """Test removing non-existent allowed_groups raises error"""
         # Given - An updater attempting to remove a non-existent group
-        updater = Updater(
-            spec=ContainerRegistryUpdaterSpec(
-                url=OptionalState.nop(),
-                type=OptionalState.nop(),
-                registry_name=OptionalState.nop(),
-                project=TriState.nop(),
-                username=TriState.update("user"),
-                password=TriState.nop(),
-                ssl_verify=TriState.nop(),
-                is_global=TriState.nop(),
-                extra=TriState.nop(),
-                allowed_groups=TriState.update(
-                    AllowedGroupsModel(add=[], remove=["00000000-0000-0000-0000-000000000000"])
-                ),
+        updater = ContainerRegistryUpdater(
+            registry_id=ContainerRegistryID(sample_registry.id),
+            url=OptionalState.nop(),
+            type=OptionalState.nop(),
+            registry_name=OptionalState.nop(),
+            project=TriState.nop(),
+            username=TriState.update("user"),
+            password=TriState.nop(),
+            ssl_verify=TriState.nop(),
+            is_global=TriState.nop(),
+            extra=TriState.nop(),
+            allowed_groups=TriState.update(
+                AllowedGroupsModel(add=[], remove=["00000000-0000-0000-0000-000000000000"])
             ),
-            pk_value=sample_registry.id,
         )
 
         # Then - Should raise error for non-existent group
@@ -1188,12 +1200,13 @@ class TestContainerRegistryRepository:
             await repository.modify_registry(updater)
 
     @pytest.fixture
-    async def updater_spec_with_two_duplicate_two_new_allowed_groups(
+    async def updater_with_two_duplicate_two_new_allowed_groups(
         self, registry_with_partial_groups: _RegistryWithPartialGroups
-    ) -> ContainerRegistryUpdaterSpec:
-        """UpdaterSpec that attempts to add duplicate allowed_groups."""
+    ) -> ContainerRegistryUpdater:
+        """Updater that attempts to add duplicate allowed_groups."""
         group_ids = registry_with_partial_groups.all_group_ids
-        return ContainerRegistryUpdaterSpec(
+        return ContainerRegistryUpdater(
+            registry_id=ContainerRegistryID(registry_with_partial_groups.registry.id),
             url=OptionalState.nop(),
             type=OptionalState.nop(),
             registry_name=OptionalState.nop(),
@@ -1220,58 +1233,136 @@ class TestContainerRegistryRepository:
         self,
         repository: ContainerRegistryRepository,
         registry_with_partial_groups: _RegistryWithPartialGroups,
-        updater_spec_with_two_duplicate_two_new_allowed_groups: ContainerRegistryUpdaterSpec,
+        updater_with_two_duplicate_two_new_allowed_groups: ContainerRegistryUpdater,
     ) -> None:
         """Test adding duplicate allowed_groups raises ContainerRegistryGroupsAlreadyAssociated error"""
         # When - Try to add 2 duplicate, 2 new groups
         # Then - Should raise error for duplicate groups
         with pytest.raises(ContainerRegistryGroupsAlreadyAssociated):
-            await repository.modify_registry(
-                Updater(
-                    spec=updater_spec_with_two_duplicate_two_new_allowed_groups,
-                    pk_value=registry_with_partial_groups.registry.id,
-                )
-            )
+            await repository.modify_registry(updater_with_two_duplicate_two_new_allowed_groups)
 
-    async def test_modify_registry_set_is_global_clears_allowed_groups(
+    async def test_modify_registry_set_is_global_keeps_allowed_groups(
         self,
         repository: ContainerRegistryRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         registry_with_associated_groups: _RegistryWithGroups,
     ) -> None:
-        """Test that setting is_global=True clears all group associations."""
-        # Given - Registry already has 3 groups associated
+        """is_global is a legacy read flag; the project relations are not touched."""
         registry_id = registry_with_associated_groups.registry.id
 
-        # When - Set is_global to True
         result = await repository.modify_registry(
-            Updater(
-                spec=ContainerRegistryUpdaterSpec(
-                    is_global=TriState.update(True),
-                ),
-                pk_value=registry_id,
+            ContainerRegistryUpdater(
+                registry_id=ContainerRegistryID(registry_id),
+                is_global=TriState.update(True),
             )
         )
 
-        # Then - Registry is updated
         assert result is not None
         assert result.is_global is True
-
-        # Then - All group associations are cleared
         async with db_with_cleanup.begin_readonly_session() as session:
-            associations = (
-                (
-                    await session.execute(
-                        sa.select(AssociationContainerRegistriesGroupsRow).where(
-                            AssociationContainerRegistriesGroupsRow.registry_id == registry_id
-                        )
+            linked = (
+                await session.scalars(
+                    sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
+                        AssociationContainerRegistriesGroupsRow.registry_id == registry_id
                     )
                 )
-                .scalars()
-                .all()
+            ).all()
+            assert set(linked) == set(registry_with_associated_groups.group_ids)
+
+    async def test_allowed_project_reads_the_registry_and_is_read_by_it(
+        self,
+        repository: ContainerRegistryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_and_groups_for_adding: _RegistryWithAvailableGroups,
+    ) -> None:
+        """The relation: the project governs the registry under READ, and the registry
+        holds the project under a READ share."""
+        registry_id = ContainerRegistryID(registry_and_groups_for_adding.registry.id)
+        project_id = registry_and_groups_for_adding.group_ids[0]
+        await repository.modify_registry(
+            ContainerRegistryUpdater(
+                registry_id=registry_id,
+                allowed_groups=TriState.update(
+                    AllowedGroupsModel(add=[str(project_id)], remove=[])
+                ),
+            )
+        )
+
+        assert await self._govern_cap(db_with_cleanup, project_id, registry_id) == Permission.READ
+        assert await self._share_cap(db_with_cleanup, registry_id, project_id) == Permission.READ
+
+        await repository.modify_registry(
+            ContainerRegistryUpdater(
+                registry_id=registry_id,
+                allowed_groups=TriState.update(
+                    AllowedGroupsModel(add=[], remove=[str(project_id)])
+                ),
+            )
+        )
+
+        assert await self._govern_cap(db_with_cleanup, project_id, registry_id) is None
+        assert await self._share_cap(db_with_cleanup, registry_id, project_id) is None
+
+    def _node(self, entity: EntityIdentifier) -> sa.ScalarSelect[Any]:
+        return (
+            sa.select(VirtualEntityRow.id)
+            .where(
+                VirtualEntityRow.entity_type == entity.entity_type(),
+                VirtualEntityRow.entity_id == entity,
+            )
+            .scalar_subquery()
+        )
+
+    async def _govern_cap(
+        self, db: ExtendedAsyncSAEngine, scope: EntityIdentifier, entity: EntityIdentifier
+    ) -> Permission | None:
+        """The cap the scope governs the entity under; ``None`` when it does not."""
+        async with db.begin_readonly_session() as session:
+            return await session.scalar(
+                sa.select(ScopeBindingRow.permission_cap).where(
+                    ScopeBindingRow.virtual_entity_id == self._node(entity),
+                    ScopeBindingRow.scope_entity_id == self._node(scope),
+                )
             )
 
-            assert len(associations) == 0
+    async def _share_cap(
+        self, db: ExtendedAsyncSAEngine, scope: EntityIdentifier, member: EntityIdentifier
+    ) -> Permission | None:
+        """The bits the scope holds the member under; ``None`` when it does not."""
+        async with db.begin_readonly_session() as session:
+            membership_id = await session.scalar(
+                sa.select(EntityMembershipRow.id).where(
+                    EntityMembershipRow.virtual_entity_id == self._node(scope),
+                    EntityMembershipRow.member_entity_id == self._node(member),
+                )
+            )
+            if membership_id is None:
+                return None
+            cap = Permission.NONE
+            for bit in await session.scalars(
+                sa.select(EntityMembershipCapRow.permission).where(
+                    EntityMembershipCapRow.membership_id == membership_id
+                )
+            ):
+                cap |= bit
+            return cap
+
+    async def test_delete_registry_takes_its_project_relations_with_it(
+        self,
+        repository: ContainerRegistryRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_with_associated_groups: _RegistryWithGroups,
+    ) -> None:
+        registry_id = ContainerRegistryID(registry_with_associated_groups.registry.id)
+        await repository.delete_registry(ContainerRegistryPurger(registry_id=registry_id))
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            left = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(AssociationContainerRegistriesGroupsRow)
+                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
+            )
+            assert left == 0
 
     async def test_delete_registry_success(
         self,
@@ -1284,7 +1375,7 @@ class TestContainerRegistryRepository:
         registry_name = test_registry.registry_name
 
         # When: Delete the registry
-        purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=registry_id))
+        purger = ContainerRegistryPurger(registry_id=registry_id)
         result = await repository.delete_registry(purger)
 
         # Then: Returns deleted registry data
@@ -1293,7 +1384,7 @@ class TestContainerRegistryRepository:
 
         # And: Registry no longer exists
         with pytest.raises(ContainerRegistryNotFound):
-            purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=registry_id))
+            purger = ContainerRegistryPurger(registry_id=registry_id)
             await repository.delete_registry(purger)
 
     async def test_delete_registry_not_found(
@@ -1306,7 +1397,7 @@ class TestContainerRegistryRepository:
 
         # When/Then: Raises ContainerRegistryNotFound
         with pytest.raises(ContainerRegistryNotFound):
-            purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=non_existent_id))
+            purger = ContainerRegistryPurger(registry_id=non_existent_id)
             await repository.delete_registry(purger)
 
     async def test_delete_registry_returns_data_before_deletion(
@@ -1319,9 +1410,7 @@ class TestContainerRegistryRepository:
         registry = test_registry_with_custom_props
 
         # When: Delete the registry
-        purger = Purger(
-            spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(registry.id))
-        )
+        purger = ContainerRegistryPurger(registry_id=ContainerRegistryID(registry.id))
         result = await repository.delete_registry(purger)
 
         # Then: Returns all registry data with correct properties
@@ -1379,7 +1468,9 @@ class TestSearchContainerRegistries:
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ContainerRegistryRepository:
-        return ContainerRegistryRepository(db=db_with_cleanup)
+        return ContainerRegistryRepository(
+            db=db_with_cleanup, ops_provider=RelationOpsProvider(db_with_cleanup)
+        )
 
     @pytest.fixture
     async def sample_registries(

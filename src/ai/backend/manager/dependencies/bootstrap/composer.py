@@ -11,9 +11,11 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.config import ConfigProviderDependency, ConfigProviderInput
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .config import BootstrapConfigDependency, BootstrapConfigInput
 from .etcd import EtcdDependency
+from .secret import KeyProviderPoolDependency
 
 
 @dataclass
@@ -31,20 +33,23 @@ class BootstrapInput:
 class BootstrapResources:
     """Container for bootstrap stage resources.
 
-    Holds etcd and config provider initialized from bootstrap configuration.
+    Holds etcd, the config provider, and the key provider pool initialized from
+    bootstrap configuration.
     """
 
     etcd: AsyncEtcd
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
 
 
 class BootstrapComposer(DependencyComposer[BootstrapInput, BootstrapResources]):
     """Composes bootstrap dependencies.
 
-    Composes the three-stage bootstrap initialization:
+    Composes the four-stage bootstrap initialization:
     1. Bootstrap config: Load bootstrap configuration from file
     2. Etcd: Initialize etcd with bootstrap config
     3. Config provider: Create config provider with etcd
+    4. Key provider pool: Build the secret column key providers from the config
     """
 
     @property
@@ -66,7 +71,8 @@ class BootstrapComposer(DependencyComposer[BootstrapInput, BootstrapResources]):
             setup_input: Bootstrap input containing config path and log level
 
         Yields:
-            BootstrapResources containing etcd and config provider
+            BootstrapResources containing etcd, the config provider, and the key
+            provider pool
         """
         # Stage 1: Load bootstrap config
         bootstrap_config_dep = BootstrapConfigDependency()
@@ -98,8 +104,15 @@ class BootstrapComposer(DependencyComposer[BootstrapInput, BootstrapResources]):
             config_provider_input,
         )
 
+        # Stage 4: Build the key provider pool for secret columns
+        key_provider_pool = await stack.enter_dependency(
+            KeyProviderPoolDependency(),
+            config_provider.config,
+        )
+
         # Yield bootstrap resources
         yield BootstrapResources(
             etcd=etcd,
             config_provider=config_provider,
+            key_provider_pool=key_provider_pool,
         )

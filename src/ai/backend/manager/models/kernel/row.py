@@ -30,7 +30,6 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -66,7 +65,6 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     KernelIDColumnType,
-    ResourceSlotColumn,
     SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
@@ -146,7 +144,7 @@ class KernelRow(CreatedAtMixin, Base):
     # The Backend.AI-side UUID for each kernel
     # (mapped to a container in the docker backend and a pod in the k8s backend)
     id: Mapped[KernelId] = mapped_column(
-        "id", KernelIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", KernelIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     # session_id == id when the kernel is the main container in a multi-container session or a
     # single-container session.
@@ -248,16 +246,6 @@ class KernelRow(CreatedAtMixin, Base):
     # Resource occupation
     container_id: Mapped[str | None] = mapped_column(
         "container_id", sa.String(length=64), nullable=True
-    )
-    # DEPRECATED (Phase 3, BA-4308): No longer the source of truth.
-    # Kernel resource allocations are now tracked by the normalized
-    # resource_allocations table.  Retained for historical audit.
-    occupied_slots: Mapped[ResourceSlot] = mapped_column(
-        "occupied_slots", ResourceSlotColumn(), nullable=False
-    )
-    # DEPRECATED (Phase 3, BA-4308): See resource_allocations table.
-    requested_slots: Mapped[ResourceSlot] = mapped_column(
-        "requested_slots", ResourceSlotColumn(), nullable=False
     )
     occupied_shares: Mapped[dict[str, Any]] = mapped_column(
         "occupied_shares", pgsql.JSONB(), nullable=False, default={}
@@ -561,8 +549,6 @@ class KernelRow(CreatedAtMixin, Base):
                 agent=self.agent,
                 agent_addr=self.agent_addr,
                 container_id=self.container_id,
-                occupied_slots=self.occupied_slots,
-                requested_slots=self.requested_slots,
                 occupied_shares=self.occupied_shares,
                 attached_devices=self.attached_devices or {},
                 resource_opts=self.resource_opts or {},

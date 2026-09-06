@@ -5,7 +5,7 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.reservoir_registry.searchers import ReservoirRegistrySearcher
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
 
 
@@ -13,7 +13,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import ArtifactR
 class SearchReservoirRegistriesAction(ArtifactRegistryAction):
     """Action to search Reservoir registries."""
 
-    querier: BatchQuerier
+    searcher: ReservoirRegistrySearcher
 
     @override
     @classmethod

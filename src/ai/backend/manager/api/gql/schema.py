@@ -2,9 +2,11 @@ import re
 from typing import override
 
 import strawberry
+from graphql import GraphQLError
 from graphql.pyutils.undefined import Undefined as GraphQLUndefined
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
+from strawberry.types import ExecutionContext
 
 from ai.backend.common.api_handlers import Sentinel as BackendSentinel
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -69,6 +71,11 @@ from .artifact import (
 from .artifact_registry import default_artifact_registry
 from .audit_log import admin_audit_logs_v2, scoped_audit_logs_v2
 from .background_task import background_task_events
+from .client_ip_masking import (
+    admin_client_ip_masking_policies,
+    admin_purge_client_ip_masking_policy,
+    admin_upsert_client_ip_masking_policy,
+)
 from .container_registry import (
     admin_container_registries_v2,
     admin_create_container_registry_v2,
@@ -123,9 +130,24 @@ from .domain_v2 import (
     admin_delete_domain_v2,
     admin_domains_v2,
     admin_purge_domain_v2,
+    admin_restore_domain_v2,
     admin_update_domain_v2,
     domain_v2,
     rg_domains_v2,
+)
+from .entity.resolver import entity_types
+from .entity_invitation import (
+    accept_entity_invitation,
+    cancel_entity_invitation,
+    create_entity_invitation,
+    entity_invitation,
+    entity_invitations,
+    reject_entity_invitation,
+)
+from .entity_label.resolver import (
+    entity_labels,
+    purge_entity_label,
+    upsert_entity_label,
 )
 from .fair_share import (
     admin_bulk_upsert_domain_fair_share_weight,
@@ -287,6 +309,7 @@ from .project_v2 import (
     admin_delete_project_v2,
     admin_projects_v2,
     admin_purge_project_v2,
+    admin_restore_project_v2,
     admin_update_project_v2,
     domain_projects_v2,
     project_domain_v2,
@@ -307,13 +330,11 @@ from .prometheus_query_preset import (
     prometheus_query_presets,
 )
 from .rbac import (
-    accept_role_invitation,
     admin_assign_role,
     admin_bulk_add_role_permissions,
     admin_bulk_assign_role,
     admin_bulk_remove_role_permissions,
     admin_bulk_revoke_role,
-    admin_cancel_role_invitation,
     admin_create_permission,
     admin_create_role,
     admin_delete_permission,
@@ -325,20 +346,14 @@ from .rbac import (
     admin_revoke_role,
     admin_role,
     admin_role_assignments,
-    admin_role_invitations,
     admin_roles,
     admin_update_permission,
     admin_update_role,
-    create_role_invitation,
-    my_role_invitations,
     my_roles,
-    my_sent_role_invitations,
     project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
-    reject_role_invitation,
-    role_scoped_role_invitations,
 )
 from .reservoir_registry import (
     create_reservoir_registry,
@@ -472,6 +487,7 @@ from .scheduling_history import (
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
+from .secret import admin_reencrypt_secrets, admin_secret_status
 from .service_catalog import admin_service_catalogs
 from .session.resolver import (
     admin_sessions_v2,
@@ -498,6 +514,7 @@ from .user import (
     admin_delete_user_v2,
     admin_delete_users_v2,
     admin_purge_user_v2,
+    admin_restore_user_v2,
     admin_update_user_v2,
     # Queries
     admin_user_v2,
@@ -612,6 +629,10 @@ class Query:
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
     scoped_audit_logs_v2 = scoped_audit_logs_v2
+    # Entity APIs
+    entity_types = entity_types
+    # Entity Label APIs
+    entity_labels = entity_labels
     admin_container_registries_v2 = admin_container_registries_v2
     admin_login_sessions_v2 = admin_login_sessions_v2
     admin_login_history_v2 = admin_login_history_v2
@@ -646,18 +667,14 @@ class Query:
     admin_keypair_v2 = admin_keypair_v2
     admin_keypairs_v2 = admin_keypairs_v2
     admin_ssh_keypair_v2 = admin_ssh_keypair_v2
+    admin_secret_status = admin_secret_status
     # Login session/history self-service queries
     my_login_sessions_v2 = my_login_sessions_v2
     my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
-    my_role_invitations = my_role_invitations
-    my_sent_role_invitations = my_sent_role_invitations
-    # RBAC Admin Invitation APIs
-    admin_role_invitations = admin_role_invitations
     # RBAC Scoped APIs
     project_roles = project_roles
-    role_scoped_role_invitations = role_scoped_role_invitations
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
     rbac_entity_operation_combinations = rbac_entity_operation_combinations
     rbac_permission_matrix = rbac_permission_matrix
@@ -741,9 +758,13 @@ class Query:
     # Runtime Variant APIs
     runtime_variants = runtime_variants
     runtime_variant = runtime_variant
+    # Client IP Masking APIs
+    admin_client_ip_masking_policies = admin_client_ip_masking_policies
     # Retention Policy APIs
     admin_retention_policies = admin_retention_policies
     admin_retention_policy = admin_retention_policy
+    entity_invitation = entity_invitation
+    entity_invitations = entity_invitations
     # Runtime Variant Preset APIs
     runtime_variant_presets = runtime_variant_presets
     runtime_variant_preset = runtime_variant_preset
@@ -892,12 +913,14 @@ class Mutation:
     admin_create_domain_v2 = admin_create_domain_v2
     admin_update_domain_v2 = admin_update_domain_v2
     admin_delete_domain_v2 = admin_delete_domain_v2
+    admin_restore_domain_v2 = admin_restore_domain_v2
     admin_purge_domain_v2 = admin_purge_domain_v2
     # Project V2 APIs
     admin_create_project_v2 = admin_create_project_v2
     admin_update_project_v2 = admin_update_project_v2
     admin_delete_project_v2 = admin_delete_project_v2
     admin_purge_project_v2 = admin_purge_project_v2
+    admin_restore_project_v2 = admin_restore_project_v2
     unassign_users_from_project_v2 = unassign_users_from_project_v2
     # User V2 APIs
     admin_create_user_v2 = admin_create_user_v2
@@ -907,6 +930,7 @@ class Mutation:
     admin_update_user_v2 = admin_update_user_v2
     update_user_v2 = update_user_v2
     admin_delete_user_v2 = admin_delete_user_v2
+    admin_restore_user_v2 = admin_restore_user_v2
     admin_delete_users_v2 = admin_delete_users_v2
     admin_purge_user_v2 = admin_purge_user_v2
     admin_bulk_purge_users_v2 = admin_bulk_purge_users_v2
@@ -921,6 +945,7 @@ class Mutation:
     admin_delete_keypair_v2 = admin_delete_keypair_v2
     admin_register_ssh_keypair_v2 = admin_register_ssh_keypair_v2
     admin_delete_ssh_keypair_v2 = admin_delete_ssh_keypair_v2
+    admin_reencrypt_secrets = admin_reencrypt_secrets
     # Login session mutations
     admin_revoke_login_session = admin_revoke_login_session
     my_revoke_login_session = my_revoke_login_session
@@ -957,11 +982,6 @@ class Mutation:
     admin_bulk_add_role_permissions = admin_bulk_add_role_permissions
     admin_bulk_remove_role_permissions = admin_bulk_remove_role_permissions
     admin_replace_role_permissions = admin_replace_role_permissions
-    # RBAC Invitation Mutations
-    create_role_invitation = create_role_invitation
-    accept_role_invitation = accept_role_invitation
-    reject_role_invitation = reject_role_invitation
-    admin_cancel_role_invitation = admin_cancel_role_invitation
     # Resource Policy V2 APIs
     admin_create_keypair_resource_policy_v2 = admin_create_keypair_resource_policy_v2
     admin_update_keypair_resource_policy_v2 = admin_update_keypair_resource_policy_v2
@@ -988,8 +1008,15 @@ class Mutation:
     admin_update_runtime_variant = admin_update_runtime_variant
     admin_delete_runtime_variant = admin_delete_runtime_variant
     admin_delete_runtime_variants = admin_delete_runtime_variants
+    # Client IP Masking mutations
+    admin_upsert_client_ip_masking_policy = admin_upsert_client_ip_masking_policy
+    admin_purge_client_ip_masking_policy = admin_purge_client_ip_masking_policy
     # Retention Policy mutations
     admin_create_retention_policy = admin_create_retention_policy
+    create_entity_invitation = create_entity_invitation
+    accept_entity_invitation = accept_entity_invitation
+    reject_entity_invitation = reject_entity_invitation
+    cancel_entity_invitation = cancel_entity_invitation
     admin_update_retention_policy = admin_update_retention_policy
     admin_delete_retention_policy = admin_delete_retention_policy
     admin_purge_retention_policy = admin_purge_retention_policy
@@ -1029,6 +1056,9 @@ class Mutation:
     terminate_sessions_v2 = terminate_sessions_v2
     exclude_session_idle_checks = exclude_session_idle_checks
     include_session_idle_checks = include_session_idle_checks
+    # Entity Label mutations
+    upsert_entity_label = upsert_entity_label
+    purge_entity_label = purge_entity_label
 
 
 @strawberry.type
@@ -1042,6 +1072,16 @@ class Subscription:
 
 
 class CustomizedSchema(Schema):
+    @override
+    def process_errors(
+        self,
+        errors: list[GraphQLError],
+        execution_context: ExecutionContext | None = None,
+    ) -> None:
+        # Suppresses strawberry's default StrawberryLogger.error call; GQLExceptionHandlerExtension
+        # already logs every resolver error at the right level.
+        pass
+
     @override
     def as_str(self) -> str:
         # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL

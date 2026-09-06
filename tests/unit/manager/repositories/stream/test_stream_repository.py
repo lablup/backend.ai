@@ -40,6 +40,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.stream.repository import StreamRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -90,8 +91,6 @@ def _make_session_row(
         starts_at=None,
         startup_command=None,
         callback_url=None,
-        occupying_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-        requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
         vfolder_mounts=[],
         environ=None,
         bootstrap_script=None,
@@ -150,8 +149,6 @@ def _make_kernel_row(
         created_at=created_at,
         terminated_at=None,
         starts_at=None,
-        occupied_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
-        requested_slots=ResourceSlot({"cpu": "1", "mem": "1073741824"}),
         occupied_shares={},
         environ=None,
         vfolder_mounts=[],
@@ -343,7 +340,7 @@ class TestStreamRepository:
                 KeyPairRow(
                     user=user_uuid,
                     access_key=active_access_key,
-                    secret_key="active-secret",
+                    secret_key=SecretValue("active-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy=keypair_resource_policy.name,
@@ -354,7 +351,7 @@ class TestStreamRepository:
                 KeyPairRow(
                     user=user_uuid,
                     access_key=inactive_access_key,
-                    secret_key="inactive-secret",
+                    secret_key=SecretValue("inactive-secret"),
                     is_active=False,
                     is_admin=False,
                     resource_policy=keypair_resource_policy.name,
@@ -365,7 +362,7 @@ class TestStreamRepository:
                 KeyPairRow(
                     user=other_user_uuid,
                     access_key=other_user_access_key,
-                    secret_key="other-secret",
+                    secret_key=SecretValue("other-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy=keypair_resource_policy.name,

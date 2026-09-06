@@ -13,6 +13,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -51,7 +52,12 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     id: NodeID[str] = gql_field(description="Unique identifier of the audit log entry (UUID).")
 
     action_id: UUID = gql_field(description="UUID of the action that generated this log.")
-    entity_type: str = gql_field(description="Type of entity this log relates to.")
+    entity_type: str | None = gql_field(
+        description=(
+            "Type of entity this log relates to. Null for an operation that names "
+            "scopes and no entity kind, such as linking two entities."
+        )
+    )
     operation: str = gql_field(description="Operation performed (create, update, delete, etc.).")
     entity_id: str | None = gql_field(description="ID of the affected entity, if applicable.")
     created_at: datetime = gql_field(description="Timestamp when the audit log was created.")
@@ -74,6 +80,16 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
         description="Duration of the operation as a string representation."
     )
     status: AuditLogStatusGQL = gql_field(description="Status of the operation.")
+    client_ip: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "IP address of the request that produced this record, masked per the client "
+                "IP masking policy. Null when the policy records none, or when the address "
+                "was unavailable or unusable."
+            ),
+        )
+    )
 
     @gql_field(
         description="The user who triggered this audit log entry, resolved from triggered_by UUID."

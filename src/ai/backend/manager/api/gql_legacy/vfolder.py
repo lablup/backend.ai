@@ -66,8 +66,7 @@ from ai.backend.manager.models.vfolder import (
     vfolder_permissions,
     vfolders,
 )
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
 # Re-export for backward compatibility
 __all__ = (
@@ -1218,9 +1217,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
     ) -> int:
         from ai.backend.manager.models.project import groups
 
-        membership_query = user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
-            EntityMembershipRow.entity_id == user_id
-        )
+        membership_query = user_scope_membership_query(PROJECT_SCOPE_TYPE, user_id)
 
         async with graph_ctx.db.begin_readonly() as conn:
             membership_result = await conn.execute(membership_query)
@@ -1254,9 +1251,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
     ) -> list[VirtualFolder]:
         from ai.backend.manager.models.project import groups
 
-        membership_query = user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
-            EntityMembershipRow.entity_id == user_id
-        )
+        membership_query = user_scope_membership_query(PROJECT_SCOPE_TYPE, user_id)
         async with graph_ctx.db.begin_readonly() as conn:
             membership_result = await conn.execute(membership_query)
         grps = membership_result.fetchall()

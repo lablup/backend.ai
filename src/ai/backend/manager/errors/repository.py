@@ -247,3 +247,22 @@ class ExclusionViolationError(RepositoryIntegrityError):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.CONFLICT,
         )
+
+
+class EntityWriteRefusedError(RepositoryError, web.HTTPConflict):
+    """Raised when a guarded write names an existing row whose guard declined it.
+
+    Kept apart from :class:`EntityNotFoundError` so a caller can tell a row that is
+    gone from a row that is there and refusing.
+    """
+
+    error_type = "https://api.backend.ai/probs/entity-write-refused"
+    error_title = "Entity refused the write."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )

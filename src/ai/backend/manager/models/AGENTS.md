@@ -11,8 +11,8 @@ The single-file shorthand (`models/{domain}.py`) is legacy — do not add new on
 
 Domains migrated to the v2 specs add them next to `row.py` — `creators.py` / `purgers.py` /
 `upserters.py` / `updaters.py` for writes, `queriers.py` / `searchers.py` / `lookups.py` for
-reads. The spec bases live in `models/specs/` — read `models/specs/AGENTS.md` before touching
-them.
+reads, `scopes.py` for the `OperationScope` subclasses that filter the row. The spec bases
+live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
 
 ## Row class rules
 
@@ -20,6 +20,13 @@ them.
 - Every Row class requires a `__tablename__`.
 - Do NOT add new `relationship()` definitions — fetch related rows in `repositories/db_source/` queries. Existing relationships are being phased out; remove them (with their `back_populates` pair) once nothing references them.
 - Inter-entity relationships: keep related Row imports inside a `TYPE_CHECKING` block only.
+
+## Virtual entity references
+
+- Only graph edge rows (`entity_memberships`, `scope_bindings`) reference `virtual_entities.id`
+  by foreign key. A row attached to an entity (`entity_labels`, `entity_invitations`) carries the
+  `(entity_type, entity_id)` pair.
+- A node id never goes on a `data/` type. A Row's `to_data()` names the entity as an `EntityIdentifier`.
 
 ## No logic in Row classes
 
@@ -34,10 +41,63 @@ them.
   by the spec's type (rationale: `KNOWLEDGE.md`).
 - Do NOT open a db session to manipulate Rows directly — the implementation belongs in a repository.
 
+## Id column defaults
+
+- Give every id column a `server_default`. Do not mint the value in Python.
+- The generator is `uuid_generate_v7()`. No table departs from this today.
+- Use `uuid_generate_v4()` only for **an id that is relied on to be unguessable**, such as
+  an unsigned share link. The deciding number is the count of random bits: 62 for v7,
+  122 for v4.
+- Do not make a secret out of an id. Put it in its own column, the way
+  `login_sessions.session_token`, `endpoint_tokens.token` and `keypairs.secret_key` do.
+- Never read an id as a time. Ordering and creation time belong to the `created_at` columns.
+- v7 tells the holder of an id when it was made. When a new id goes to an unauthenticated
+  party, confirm that its creation time may be known.
+- Changing a default changes two places: the Row declaration and an
+  `ALTER COLUMN ... SET DEFAULT` in the migration. Editing only the Python declaration
+  leaves a freshly created database and a migrated one with different schemas.
+- A foreign key column naming an owner or a parent gets no default. An INSERT that omits
+  the value must be rejected.
+- The function DDL lives in `models/uuid7.py`. Execute that string rather than copying it.
+- `IDColumn()`, `SessionIDColumn()` and `KernelIDColumn()` in `models/base.py` stay on v4:
+  old migrations reproduce past schemas through them. Do not use them for a new table.
+
+## Constraint names
+
+- Leave a constraint unnamed and let the naming convention in `models/base.py` name it.
+- Past 63 characters — PostgreSQL's identifier limit — SQLAlchemy truncates the generated
+  name with a 4-character md5 suffix, leaving an unreadable one
+  (`fk_..._registry_id__4a21`). A foreign key joining two long table names lands there.
+  Name those explicitly with `sa.ForeignKey(..., name=...)`, within 63 characters.
+  Precedent: `association_container_registries_groups`.
+- A constraint named explicitly carries that same string into the migration. A Row
+  declaration and a migration that disagree leave a freshly created database and a
+  migrated one with different constraint names.
+
+## Creator columns
+
+- Ownership is answered by the `scope -> virtual_entity -> entity` path alone
+  (BEP-1077 §5.1). Do NOT put an `owner_*` column on a row — it leaves two answers to
+  the same question.
+- To record which user a row came into being for, use **`creator_id`**. Do not coin
+  another spelling; `vfolders.creator_id` already carries this meaning.
+- It is provenance, not ownership. Do NOT use it in an access decision.
+- Always nullable, and the foreign key is `ON DELETE SET NULL`. When the user goes the
+  column empties and the row stays.
+- Do NOT add a `CHECK` requiring it, not even for one row kind. A row whose creator is
+  gone is a valid state, not a broken one — what the row holds outlives the account, and
+  a sweep collects it later. A `CHECK` turns that state into a refused user deletion.
+- `RESTRICT` is wrong for the same reason: a row the user merely created must not block
+  their purge.
+- Where a user may have at most one, lock it with a partial unique index.
+  Precedent: `groups.creator_id`.
+
 ## Custom column types
 
 - Where possible, reuse the existing `TypeDecorator` wrappers in `models/base.py`.
 - Add new `TypeDecorator`s only to `models/base.py` — not in individual row files.
+- A `SecretColumn` takes a `SecretValue`. Encrypt through the key provider pool before
+  binding it — the column performs no cryptography and refuses a bare string.
 
 ## `__init__.py` rules
 

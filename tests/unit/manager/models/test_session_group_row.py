@@ -12,7 +12,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
@@ -259,8 +259,6 @@ def _make_session(
         resource_group_id=scope.resource_group_id,
         scaling_group_name=scope.resource_group_name,
         status=SessionStatus.PENDING,
-        occupying_slots=ResourceSlot(),
-        requested_slots=ResourceSlot(),
         vfolder_mounts=[],
         session_group_id=session_group_id,
     )

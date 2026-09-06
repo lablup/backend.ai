@@ -65,6 +65,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 )
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.deployment_revision_preset.conditions import (
     DeploymentRevisionPresetConditions,
 )
@@ -90,10 +91,6 @@ from ai.backend.manager.models.resource_slot.orders import (
 )
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
-)
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.services.deployment_revision_preset.actions.create import (
     CreateDeploymentPresetAction,

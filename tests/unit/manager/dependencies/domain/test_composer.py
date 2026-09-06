@@ -47,6 +47,7 @@ class TestDomainComposer:
 
         domain_input = DomainInput(
             config_provider=MagicMock(),
+            key_provider_pool=MagicMock(),
             db=MagicMock(),
             etcd=MagicMock(),
             storage_manager=MagicMock(),

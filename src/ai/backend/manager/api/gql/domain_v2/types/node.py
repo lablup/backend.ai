@@ -164,7 +164,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             DomainUsageBucketEdge,
             DomainUsageBucketGQL,
         )
-        from ai.backend.manager.repositories.resource_usage_history.types import (
+        from ai.backend.manager.models.resource_usage_history.scopes import (
             DomainUsageBucketOperationScope,
         )
 
@@ -302,7 +302,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             UserV2Edge,
             UserV2GQL,
         )
-        from ai.backend.manager.repositories.user.types import DomainUserOperationScope
+        from ai.backend.manager.models.user.scopes import DomainUserOperationScope
 
         scope = DomainUserOperationScope(domain_name=self.basic_info.name)
         payload = await info.context.adapters.user.gql_search_by_domain(

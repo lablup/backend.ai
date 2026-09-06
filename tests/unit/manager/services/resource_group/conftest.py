@@ -34,6 +34,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -66,11 +67,19 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -128,7 +137,7 @@ async def database_fixture(
     Overrides the guard fixture in tests/unit/manager/services/conftest.py.
 
     The purge and RBAC scope paths issue whole-entity SELECTs (batch purgers,
-    virtual-scope writes), so the real rows are created instead of minimal stub
+    virtual-entity writes), so the real rows are created instead of minimal stub
     tables, mirroring the repository-level test fixture.
     """
     async with database_engine.begin() as conn:
@@ -146,9 +155,12 @@ async def database_fixture(
             PermissionRow,
             RolePresetRow,
             RolePermissionPresetRow,
-            VirtualScopeRow,
+            VirtualEntityRow,
             EntityMembershipRow,
+            EntityMembershipCapRow,
+            EntityMembershipFieldRow,
             ScopeBindingRow,
+            EntityLabelRow,
             ResourceGroupForDomainRow,
             ResourceGroupForProjectRow,
             UserResourcePolicyRow,
@@ -186,12 +198,14 @@ async def database_fixture(
 @pytest.fixture
 def resource_group_repository(database_engine: ExtendedAsyncSAEngine) -> ResourceGroupRepository:
     """Direct repository instance for association existence checks."""
-    return ResourceGroupRepository(database_engine)
+    return ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
 
 
 @pytest.fixture
 def resource_group_service(database_engine: ExtendedAsyncSAEngine) -> ResourceGroupService:
-    return ResourceGroupService(ResourceGroupRepository(database_engine))
+    return ResourceGroupService(
+        ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +289,7 @@ async def admin_user_fixture(
         await conn.execute(
             sa.insert(KeyPairRow.__table__).values(
                 access_key=access_key,
-                secret_key=secret_key,
+                secret_key=SecretValue(secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
@@ -324,7 +338,7 @@ async def regular_user_fixture(
         await conn.execute(
             sa.insert(KeyPairRow.__table__).values(
                 access_key=access_key,
-                secret_key=secret_key,
+                secret_key=SecretValue(secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,

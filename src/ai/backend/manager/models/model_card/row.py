@@ -23,7 +23,7 @@ class ModelCardRow(LifecycleTimestampsMixin, Base):
     )
 
     id: Mapped[ModelCardID] = mapped_column(
-        "id", GUID(ModelCardID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ModelCardID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=512), nullable=False)
     vfolder: Mapped[VFolderUUID] = mapped_column(

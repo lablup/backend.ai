@@ -71,7 +71,7 @@ class BulkActionRBACValidator(BulkActionValidator):
         permission_map = await self._repository.check_bulk_permission_with_scope_chain(
             BulkPermissionCheckInput(
                 keys=keys,
-                operation=action.operation_type().to_permission_operation(),
+                permission=action.operation_type().to_permission(),
             )
         )
 

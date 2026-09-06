@@ -8,7 +8,7 @@ from pathlib import Path
 
 import tomlkit
 
-exempted_files = ["README.md", "template.md"]
+exempted_files = ["README.md", "template.md", "KNOWLEDGE.md"]
 
 
 def read_news_types() -> set[str]:

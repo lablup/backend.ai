@@ -7,12 +7,9 @@ from ai.backend.manager.data.resource_usage_history.types import (
     UserUsageBucketData,
 )
 from ai.backend.manager.repositories.resource_usage_history.types import (
-    DomainUsageBucketOperationScope,
     DomainUsageBucketSearchResult,
     KernelUsageRecordSearchResult,
-    ProjectUsageBucketOperationScope,
     ProjectUsageBucketSearchResult,
-    UserUsageBucketOperationScope,
     UserUsageBucketSearchResult,
 )
 
@@ -54,10 +51,6 @@ __all__ = (
     "DomainUsageBucketSearchResult",
     "ProjectUsageBucketSearchResult",
     "UserUsageBucketSearchResult",
-    # Search scope types
-    "DomainUsageBucketOperationScope",
-    "ProjectUsageBucketOperationScope",
-    "UserUsageBucketOperationScope",
     # Creator specs
     "KernelUsageRecordCreatorSpec",
     "DomainUsageBucketCreatorSpec",

@@ -17,6 +17,7 @@ class AgentRepositories:
             args.valkey_live_client,
             args.valkey_stat_client,
             args.config_provider,
+            args.v2_ops_provider,
         )
 
         return cls(

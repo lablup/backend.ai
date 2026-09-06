@@ -28,7 +28,7 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):
     )
 
     id: Mapped[RolePresetID] = mapped_column(
-        "id", GUID(RolePresetID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(RolePresetID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(64), nullable=False)
     role_name_template: Mapped[str | None] = mapped_column(

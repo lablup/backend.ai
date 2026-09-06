@@ -11,6 +11,11 @@
   revision identifier. Do NOT hardcode a version; the `NEXT_RELEASE_VERSION` placeholder is frozen to the actual version. For backports the placeholder freezes per branch, so both `d` and `d'` keep the same placeholder.
 - **Do NOT edit the revision of a released migration** — do not modify the `revision`/`down_revision` of an
   already-released migration. Editing `down_revision` is allowed only when inserting a backport into the main chain before merge.
+- **Wrap a convention-generated constraint name in `op.f()`** — `op.create_foreign_key(op.f("fk_..."), ...)`.
+  A bare string has the convention applied to it again and is exempt from truncation, so it
+  either disagrees with the name `mgr schema oneshot` produces or trips the 63-character limit
+  with `IdentifierError`. Autogenerate already renders these wrapped. A constraint the Row
+  declaration names explicitly is not wrapped (rule: `models/AGENTS.md`).
 
 ## Diverged heads
 

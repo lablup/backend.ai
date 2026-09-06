@@ -9,6 +9,7 @@ from .resolver import (
     admin_delete_domain_v2,
     admin_domains_v2,
     admin_purge_domain_v2,
+    admin_restore_domain_v2,
     admin_update_domain_v2,
     domain_v2,
     rg_domains_v2,
@@ -34,6 +35,7 @@ __all__ = [
     "admin_create_domain_v2",
     "admin_update_domain_v2",
     "admin_delete_domain_v2",
+    "admin_restore_domain_v2",
     "admin_purge_domain_v2",
     # Filter and OrderBy
     "DomainV2Filter",

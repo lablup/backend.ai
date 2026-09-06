@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.common import (
     MountItemInput,
     ResourceSlotEntryInput,
 )
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
@@ -98,6 +99,9 @@ class SessionFilter(BaseRequestModel):
     project_id: UUIDFilter | None = None
     user_uuid: UUIDFilter | None = None
     created_at: DateTimeFilter | None = None
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None, description="Filter by the labels on the entity"
+    )
     AND: list[SessionFilter] | None = None
     OR: list[SessionFilter] | None = None
     NOT: list[SessionFilter] | None = None

@@ -98,6 +98,7 @@ class TestProjectV2GQL:
         for project_type, expected_enum in [
             (ProjectType.GENERAL, ProjectTypeEnum.GENERAL),
             (ProjectType.MODEL_STORE, ProjectTypeEnum.MODEL_STORE),
+            (ProjectType.PERSONAL, ProjectTypeEnum.PERSONAL),
         ]:
             dto = _make_project_node(project_type=project_type)
             project_gql = ProjectV2GQL.from_pydantic(dto)

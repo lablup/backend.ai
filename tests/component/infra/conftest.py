@@ -11,14 +11,13 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.entity.agent import AGENT_ENTITY_TYPE
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
@@ -35,6 +34,7 @@ from ai.backend.manager.api.rest.resource_group.registry import register_resourc
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
@@ -43,18 +43,24 @@ from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
+from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.etcd_config.repository import EtcdConfigRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 from ai.backend.manager.services.project.processors import ProjectProcessors
@@ -65,7 +71,6 @@ from ai.backend.manager.services.resource_preset.processors import ResourcePrese
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 def _create_mock_validators() -> MagicMock:
@@ -82,7 +87,7 @@ def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> ContainerRegistryProcessors:
-    repo = ContainerRegistryRepository(database_engine)
+    repo = ContainerRegistryRepository(database_engine, RelationOpsProvider(database_engine))
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
         processor_registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), service
@@ -128,8 +133,6 @@ def agent_processors(
     database_engine: ExtendedAsyncSAEngine,
     async_etcd: AsyncEtcd,
     config_provider: ManagerConfigProvider,
-    hook_plugin_ctx: HookPluginContext,
-    event_producer: EventProducer,
     valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
 ) -> AgentProcessors:
@@ -139,9 +142,11 @@ def agent_processors(
         valkey_clients.live,
         valkey_clients.stat,
         config_provider,
+        V2DBOpsProvider(database_engine),
     )
     scheduler_repo = SchedulerRepository(
         database_engine,
+        ReconcileOpsProvider(database_engine),
         valkey_clients.stat,
         valkey_clients.schedule,
         config_provider,
@@ -154,18 +159,11 @@ def agent_processors(
         agent_repository=agent_repo,
         scheduler_repository=scheduler_repo,
         scheduling_controller=AsyncMock(),
-        hook_plugin_ctx=hook_plugin_ctx,
-        event_producer=event_producer,
-        agent_cache=AsyncMock(),
     )
     return AgentProcessors(
         processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
         service,
         [],
-        ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
     )
 
 
@@ -196,7 +194,11 @@ def user_processors(
     storage_manager: AsyncMock,
     processor_registry: ProcessorRegistry[Any],
 ) -> UserProcessors:
-    user_repo = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repo = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo, AsyncMock())
     return UserProcessors(
         processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
@@ -209,7 +211,7 @@ def resource_group_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourceGroupProcessors:
-    repo = ResourceGroupRepository(database_engine)
+    repo = ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
     service = ResourceGroupService(repo, appproxy_client_pool=AsyncMock())
     return ResourceGroupProcessors(
         processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service
@@ -217,9 +219,22 @@ def resource_group_processors(
 
 
 @pytest.fixture()
+def domain_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
+) -> DomainProcessors:
+    """The handler resolves the caller's domain name to its id, so this runs against the DB."""
+    service = DomainService(
+        repository=DomainRepository(database_engine, V2DBOpsProvider(database_engine))
+    )
+    return DomainProcessors(processor_registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), service, [])
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     container_registry_processors: ContainerRegistryProcessors,
+    domain_processors: DomainProcessors,
     etcd_config_processors: EtcdConfigProcessors,
     resource_preset_processors: ResourcePresetProcessors,
     agent_processors: AgentProcessors,
@@ -250,7 +265,12 @@ def server_module_registries(
             route_deps,
         ),
         register_resource_group_routes(
-            ResourceGroupHandler(resource_group=resource_group_processors), route_deps
+            ResourceGroupHandler(
+                resource_group=resource_group_processors,
+                domain=domain_processors,
+                project=project_processors,
+            ),
+            route_deps,
         ),
     ]
 

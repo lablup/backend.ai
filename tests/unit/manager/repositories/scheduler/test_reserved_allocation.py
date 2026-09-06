@@ -25,6 +25,7 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -76,7 +77,7 @@ class TestAllocateSessionsReservation:
             kernel_assignments=[(kernel_ids[0], test_agent_id)],
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.allocate_sessions(batch)
         assert result == [session_id]
 
@@ -141,7 +142,7 @@ class TestAllocateSessionsReservation:
             ],
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.allocate_sessions(batch)
         assert result == [session_id]
 
@@ -192,7 +193,7 @@ class TestAllocateSessionsReservation:
             kernel_assignments=[(kernel_ids[0], test_agent_id)],
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         first = await db_source.allocate_sessions(batch)
         second = await db_source.allocate_sessions(batch)
         assert first == [session_id]
@@ -240,7 +241,7 @@ class TestAllocateSessionsReservation:
             kernel_assignments=[(kernel_ids[0], test_agent_id)],
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.allocate_sessions(batch)
         assert result == []
 
@@ -310,7 +311,7 @@ class TestAllocateSessionsReservation:
         # Combine both session allocations into one batch.
         batch_a.extend(batch_b)
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.allocate_sessions(batch_a)
         assert result == []
 
@@ -360,7 +361,7 @@ class TestReservedOnlyRelease:
             session_id=session_id,
             kernel_assignments=[(kernel_ids[0], agent_id)],
         )
-        result = await ScheduleDBSource(db).allocate_sessions(batch)
+        result = await ScheduleDBSource(db, ReconcileOpsProvider(db)).allocate_sessions(batch)
         assert result == [session_id]
         return session_id, kernel_ids[0]
 
@@ -384,7 +385,7 @@ class TestReservedOnlyRelease:
             cpu_capacity=Decimal("10"),
             mem_capacity=Decimal("10240"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         _, kernel_id = await self._allocate_one(
             db_with_cleanup,
             domain_id=test_domain_id,
@@ -446,7 +447,7 @@ class TestReservedOnlyRelease:
             cpu_capacity=Decimal("10"),
             mem_capacity=Decimal("10240"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         _, kernel_id = await self._allocate_one(
             db_with_cleanup,
             domain_id=test_domain_id,
@@ -491,7 +492,7 @@ class TestReservedOnlyRelease:
             cpu_capacity=Decimal("10"),
             mem_capacity=Decimal("10240"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         _, kernel_id = await self._allocate_one(
             db_with_cleanup,
             domain_id=test_domain_id,

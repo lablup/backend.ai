@@ -22,7 +22,7 @@ class LoginClientTypeRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(LoginClientTypeID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=64), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)

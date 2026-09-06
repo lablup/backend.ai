@@ -51,6 +51,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.db_source import ProjectDBSource
 from ai.backend.testutils.db import TableOrORM, with_tables
 
@@ -239,7 +240,7 @@ class TestGroupNestedSearchIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ProjectDBSource:
-        return ProjectDBSource(db=db_with_cleanup)
+        return ProjectDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def two_domains_with_projects(
@@ -578,7 +579,7 @@ class TestGroupUserNestedSearchIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ProjectDBSource:
-        return ProjectDBSource(db=db_with_cleanup)
+        return ProjectDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def projects_with_users(

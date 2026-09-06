@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, load_only
 from sqlalchemy.sql.elements import ColumnElement
 
-from ai.backend.common.types import SlotName
+from ai.backend.common.types import KernelId, ResourceSlot, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.manager.data.kernel.types import KernelStatus
 
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow
 from .project import ProjectRow
+from .resource_slot.aggregates import batch_load_kernel_allocations
 from .session import SessionRow
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine
@@ -445,6 +446,7 @@ def parse_total_resource_group(
 
 def parse_resource_usage(
     kernel: KernelRow,
+    allocated_slots: ResourceSlot,
     last_stat: Mapping[str, Any] | None,
 ) -> ResourceUsage:
     if not last_stat:
@@ -469,16 +471,16 @@ def parse_resource_usage(
             smp += int(nmget(dev_info, "data.smp", 0))
             gpu_mem_allocated += int(nmget(dev_info, "data.mem", 0))
     gpu_allocated = Decimal(0)
-    for key, value in kernel.occupied_slots.items():
+    for key, value in allocated_slots.items():
         if SlotName(key).is_accelerator():
             gpu_allocated += value
 
     return ResourceUsage(
         agent_ids={kernel.agent} if kernel.agent else set(),
         nfs={*nfs},
-        cpu_allocated=float(kernel.occupied_slots.get("cpu", 0)),
+        cpu_allocated=float(allocated_slots.get("cpu", 0)),
         cpu_used=float(nmget(last_stat, "cpu_used.current", 0)),
-        mem_allocated=int(kernel.occupied_slots.get("mem", 0)),
+        mem_allocated=int(allocated_slots.get("mem", 0)),
         mem_used=int(nmget(last_stat, "mem.capacity", 0)),
         shared_memory=int(nmget(kernel.resource_opts or {}, "shmem", 0)),
         disk_allocated=0,
@@ -494,6 +496,7 @@ def parse_resource_usage(
 
 async def parse_resource_usage_groups(
     kernels: list[KernelRow],
+    allocated_slots: Mapping[UUID, ResourceSlot],
     valkey_stat_client: ValkeyStatClient,
     local_tz: tzinfo,
 ) -> list[BaseResourceUsageGroup]:
@@ -540,7 +543,9 @@ async def parse_resource_usage_groups(
             cluster_mode=kern.cluster_mode,
             status_info=kern.status_info,
             group_unit=ResourceGroupUnit.KERNEL,
-            total_usage=parse_resource_usage(kern, stat_map.get(kern.id)),
+            total_usage=parse_resource_usage(
+                kern, allocated_slots.get(kern.id, ResourceSlot()), stat_map.get(kern.id)
+            ),
         )
         for kern in kernels
     ]
@@ -579,7 +584,6 @@ KERNEL_RESOURCE_SELECT_COLS = (
     KernelRow.session_id,
     KernelRow.id,
     KernelRow.container_id,
-    KernelRow.occupied_slots,
     KernelRow.attached_devices,
     KernelRow.vfolder_mounts,
     KernelRow.mounts,
@@ -622,7 +626,8 @@ async def fetch_resource_usage(
     end_date: datetime,
     session_ids: Sequence[UUID] | None = None,
     project_ids: Sequence[UUID] | None = None,
-) -> list[KernelRow]:
+) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
+    """Fetch the kernels overlapping the period with the slots they were allocated."""
     project_cond = None
     if project_ids:
         project_cond = ProjectRow.id.in_(project_ids)
@@ -646,4 +651,11 @@ async def fetch_resource_usage(
     )
     async with db_engine.begin_readonly_session() as db_sess:
         result = await db_sess.execute(query)
-        return list(result.scalars().all())
+        kernels: list[KernelRow] = list(result.scalars().all())
+        aggregates = await batch_load_kernel_allocations(
+            db_sess, [KernelId(kernel.id) for kernel in kernels]
+        )
+    allocated_slots: dict[UUID, ResourceSlot] = {
+        kernel_id: aggregate.allocated for kernel_id, aggregate in aggregates.items()
+    }
+    return kernels, allocated_slots

@@ -28,6 +28,7 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
@@ -49,12 +50,18 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import get_allowed_vfolder_hosts_by_user
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
-from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 HOST_A = "host-a"
 HOST_B = "host-b"
@@ -106,9 +113,12 @@ class TestGetAllowedVFolderHostsByUserMembership:
                 ProjectRow,
                 AgentRow,
                 AssociationScopesEntitiesRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
+                EntityLabelRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -264,7 +274,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                     entity_id=str(regular_user),
                 )
             )
-            await VirtualScopeSeeder().enroll_user_in_project(sess, group_a, regular_user)
+            await VirtualEntitySeeder().enroll_user_in_project(sess, group_a, regular_user)
             await sess.flush()
         yield
 
@@ -285,7 +295,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                     entity_id=str(regular_user),
                 )
             )
-            await VirtualScopeSeeder().enroll_user_in_project(sess, group_b, regular_user)
+            await VirtualEntitySeeder().enroll_user_in_project(sess, group_b, regular_user)
             await sess.flush()
         yield
 

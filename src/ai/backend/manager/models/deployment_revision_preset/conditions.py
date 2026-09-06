@@ -7,6 +7,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
@@ -15,6 +16,10 @@ from ai.backend.common.data.filter_specs import (
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.resource_slot.row import (
+    ModelCardResourceRequirementRow,
+    PresetResourceSlotRow,
+)
 
 __all__ = ("DeploymentRevisionPresetConditions",)
 
@@ -158,5 +163,41 @@ class DeploymentRevisionPresetConditions:
                 .scalar_subquery()
             )
             return DeploymentRevisionPresetRow.created_at > subquery
+
+        return inner
+
+    @staticmethod
+    def satisfying_model_card(model_card_id: ModelCardID) -> QueryCondition:
+        """Presets meeting every minimum slot quantity the card requires.
+
+        Relational division: a preset qualifies iff no required slot lacks a
+        preset_resource_slots row whose quantity meets the minimum. Both EXISTS
+        clauses correlate against the outer preset (and the outer requirement),
+        without which SQLAlchemy aliases the inner FROM and the predicates
+        degenerate into Cartesian matches that accept every preset.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            drp = DeploymentRevisionPresetRow.__table__
+            mcr = ModelCardResourceRequirementRow.__table__
+            prs = PresetResourceSlotRow.__table__
+            return ~sa.exists(
+                sa.select(sa.literal(1))
+                .select_from(mcr)
+                .correlate(drp)
+                .where(
+                    mcr.c.model_card_id == model_card_id,
+                    ~sa.exists(
+                        sa.select(sa.literal(1))
+                        .select_from(prs)
+                        .correlate(drp, mcr)
+                        .where(
+                            prs.c.preset_id == drp.c.id,
+                            prs.c.slot_name == mcr.c.slot_name,
+                            prs.c.quantity >= mcr.c.min_quantity,
+                        )
+                    ),
+                )
+            )
 
         return inner

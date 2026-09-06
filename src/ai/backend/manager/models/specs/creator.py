@@ -12,7 +12,6 @@ from dataclasses import dataclass
 
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
-    EntityType,
     FieldData,
     FieldIdentifier,
 )
@@ -24,10 +23,10 @@ from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 class GlobalEntityCreator[TRow: Base, TData](ABC):
     """Insert spec of a global entity: an entity that belongs under no other scope.
 
-    Creating a row provisions its virtual scope node exactly as :class:`EntityCreator`
+    Creating a row provisions its virtual entity node exactly as :class:`EntityCreator`
     does — rows are created under a global entity too (an image under its container
     registry), so it has to be namable in the graph. What it does not have is
-    ``member_of``: it joins nothing, and the missing hook is what says so.
+    ``created_in``: it is created in no scope, and the missing hook is what says so.
     """
 
     @abstractmethod
@@ -52,8 +51,8 @@ class GlobalEntityCreator[TRow: Base, TData](ABC):
 
 class EntityCreator[TRow: Base, TData](ABC):
     """Insert spec of an entity: creating a row always provisions it in the RBAC graph
-    (its virtual scope node, self membership and self binding) and joins the entities
-    ``member_of`` declares.
+    (its virtual entity node, which owns and governs itself) and puts it under the
+    scopes ``created_in`` declares: each owns it and governs it.
 
     The spec knows nothing about roles; entities that allow role presets use
     :class:`RoleManagedEntityCreator`.
@@ -67,10 +66,40 @@ class EntityCreator[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def member_of(self, row: TRow) -> Collection[EntityIdentifier]:
-        """The existing entities the new one joins as a member (a project joins its
-        domain; a keypair joins its user). Empty for a top-level entity. Carries no
-        permission cap: capped sharing is the object-sharing mechanism, not creation."""
+    def created_in(self, row: TRow) -> Collection[EntityIdentifier]:
+        """The scopes the new entity is created in (a session's project and user). Each
+        owns it and governs it. Empty for a top-level entity."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_row(self) -> TRow:
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        raise NotImplementedError
+
+
+class RoleManagedGlobalEntityCreator[TRow: Base, TData](RoleTemplateSource[TRow], ABC):
+    """Insert spec of a role-managed entity created in no scope (domain, resource
+    group): what :class:`GlobalEntityCreator` writes, plus the preset roles the
+    role-template declares.
+
+    Deliberately NOT a :class:`GlobalEntityCreator` subtype — the entity hooks are
+    duplicated instead — so a role-managed spec cannot flow through the plain
+    ``create_global_entity`` path and silently skip its preset roles; only the
+    role-managed ops methods accept this type.
+    """
+
+    @abstractmethod
+    def entity_id(self, row: TRow) -> EntityIdentifier:
+        """The entity's id, read off the settled row; not necessarily the primary key.
+
+        Answers the type too, so nothing declares it separately."""
         raise NotImplementedError
 
     @abstractmethod
@@ -87,13 +116,11 @@ class EntityCreator[TRow: Base, TData](ABC):
 
 
 class RoleManagedEntityCreator[TRow: Base, TData](RoleTemplateSource[TRow], ABC):
-    """Insert spec of a role-managed entity (domain/project/user): the entity
-    creation plus the role-preset declaration.
+    """Insert spec of a role-managed entity created in a scope (project, user): what
+    :class:`EntityCreator` writes, plus the preset roles the role-template declares.
 
-    Deliberately NOT an :class:`EntityCreator` subtype — the entity hooks are
-    duplicated instead — so a role-managed spec cannot flow through the plain
-    ``create_entity`` path and silently skip its preset roles; only the
-    role-managed ops methods accept this type.
+    Deliberately NOT an :class:`EntityCreator` subtype, for the same reason
+    :class:`RoleManagedGlobalEntityCreator` is not a global one.
     """
 
     @abstractmethod
@@ -104,9 +131,9 @@ class RoleManagedEntityCreator[TRow: Base, TData](RoleTemplateSource[TRow], ABC)
         raise NotImplementedError
 
     @abstractmethod
-    def member_of(self, row: TRow) -> Collection[EntityIdentifier]:
-        """The existing entities the new one joins as a member; empty for a top-level
-        entity. Carries no permission cap."""
+    def created_in(self, row: TRow) -> Collection[EntityIdentifier]:
+        """The scopes the new entity is created in (a project's domain); each owns it
+        and governs it, as for :class:`EntityCreator`."""
         raise NotImplementedError
 
     @abstractmethod
@@ -173,15 +200,29 @@ class FieldCreator[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
 class DanglingFieldCreator[TRow: Base, TData: FieldData](FieldRowCreator[TRow, TData], ABC):
     """Insert spec of a field row written without an owner to build under.
 
-    The row names an entity type and no id: the operation being recorded named a kind but
-    no row, or named nothing at all. The type is on the creator, since there is no owner
-    to read it from. Reachable only by a read that names no owner either.
+    No owner names it, so what the row says about the entity it concerns is the spec's
+    own value like every other column — the kind it is about where there is one, nothing
+    where there is not. An operation that names scopes and no entity type is the latter.
+
+    Reachable only by a read that names no owner either.
     """
 
     @abstractmethod
-    def build_row(self, entity_type: EntityType) -> TRow:
-        """Build the row under a kind alone, since no owner names it."""
+    def build_row(self) -> TRow:
+        """Build the row, which no owner names."""
         raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class NestedFieldToCreate[TOwnerID: FieldIdentifier, TRow: Base, TData: FieldData]:
+    """One nested row to insert, under the field row named beside it.
+
+    What :class:`FieldToCreate` is to a field row, this is to a nested one: a batch
+    may reach several owners at once without the two falling out of step.
+    """
+
+    owner_id: TOwnerID
+    creator: NestedFieldCreator[TOwnerID, TRow, TData]
 
 
 class NestedFieldCreator[TOwnerID: FieldIdentifier, TRow: Base, TData: FieldData](ABC):

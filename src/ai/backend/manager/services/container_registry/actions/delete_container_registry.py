@@ -3,14 +3,13 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
 from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
 
 
 @dataclass
 class DeleteContainerRegistryAction(ContainerRegistryAction):
-    purger: Purger[ContainerRegistryRow]
+    purger: ContainerRegistryPurger
 
     @override
     @classmethod

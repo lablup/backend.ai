@@ -34,7 +34,7 @@ class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(PrometheusQueryPresetID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=256), nullable=False)
     metric_name: Mapped[str] = mapped_column("metric_name", sa.String(length=256), nullable=False)

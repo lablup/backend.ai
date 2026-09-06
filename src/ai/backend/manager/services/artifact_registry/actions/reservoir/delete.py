@@ -10,8 +10,6 @@ from ai.backend.manager.services.artifact_registry.actions.base import (
 
 @dataclass
 class DeleteReservoirRegistryAction(ArtifactRegistrySingleEntityAction):
-    reservoir_id: uuid.UUID
-
     @override
     @classmethod
     def action_name(cls) -> str:

@@ -1,19 +1,14 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.services.auth.actions.base import (
-    KeypairSingleEntityAction,
-    KeypairSingleEntityActionResult,
-)
+from ai.backend.manager.services.auth.actions.base import UserEntityAction
 
 
-@dataclass
-class GetSSHKeypairAction(KeypairSingleEntityAction):
-    user_id: uuid.UUID
+@dataclass(frozen=True)
+class GetSSHKeypairAction(UserEntityAction):
+    """Read the SSH public key the named user's keypair carries."""
+
     access_key: str
 
     @override
@@ -22,19 +17,12 @@ class GetSSHKeypairAction(KeypairSingleEntityAction):
         return ActionOperationType.GET
 
     @override
-    def target_entity_id(self) -> str:
-        return self.access_key
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.KEYPAIR, self.access_key)
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_ssh_keypair"
 
 
-@dataclass
-class GetSSHKeypairActionResult(KeypairSingleEntityActionResult):
+@dataclass(frozen=True)
+class GetSSHKeypairActionResult:
     public_key: str
     access_key: str
-
-    @override
-    def target_entity_id(self) -> str:
-        return self.access_key

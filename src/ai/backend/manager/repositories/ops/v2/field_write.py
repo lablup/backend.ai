@@ -7,12 +7,23 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.creator import FieldCreator, FieldToCreate, NestedFieldCreator
-from ai.backend.manager.models.specs.purger import FieldPurger
+from ai.backend.manager.models.specs.creator import (
+    FieldCreator,
+    FieldToCreate,
+    NestedFieldCreator,
+    NestedFieldToCreate,
+)
+from ai.backend.manager.models.specs.purger import (
+    FieldBatchPurger,
+    FieldPurger,
+    GuardedFieldPurger,
+)
 from ai.backend.manager.models.specs.upserter import FieldUpserter
 from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
@@ -70,6 +81,23 @@ class V2FieldWriteOps(V2WriteOpsBase):
             )
         return [c.creator.to_data(row) for c, row in zip(creations, rows, strict=True)]
 
+    async def atomic_create_nested_fields[
+        TOwnerID: FieldIdentifier,
+        TRow: Base,
+        TData: FieldData,
+    ](self, creations: Sequence[NestedFieldToCreate[TOwnerID, TRow, TData]]) -> list[TData]:
+        """Insert nested rows atomically, each under the field row named beside it.
+
+        The owners are already written, so this is the path for a batch whose rows
+        differ per owner; :meth:`atomic_create_fields_with_nested` is for the batch
+        that shares one set of nested specs.
+        """
+        if not creations:
+            return []
+        rows = [c.creator.build_row(c.owner_id) for c in creations]
+        await self._insert_rows(rows, creations[0].creator.integrity_error_checks())
+        return [c.creator.to_data(row) for c, row in zip(creations, rows, strict=True)]
+
     async def atomic_create_field_entities[
         TOwnerID: EntityIdentifier,
         TRow: Base,
@@ -85,6 +113,18 @@ class V2FieldWriteOps(V2WriteOpsBase):
         await self._insert_rows(rows, creators[0].integrity_error_checks())
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
+    async def batch_purge_field_entities[TOwnerID: EntityIdentifier, TRow: Base, TData](
+        self, owner_id: TOwnerID, purger: FieldBatchPurger[TOwnerID, TRow, TData]
+    ) -> list[TData]:
+        """Delete the owner's field rows the spec selects, in chunks, returning what
+        was removed. Bounded by the owner, as every field write is."""
+        return await self._batch_purge_returning(
+            None,
+            lambda: purger.build_subquery(owner_id),
+            purger.conflict_checks(),
+            purger.to_data,
+        )
+
     async def purge_field_entity[TRow: Base, TData: FieldData](
         self, purger: FieldPurger[TRow, TData]
     ) -> TData | None:
@@ -94,6 +134,32 @@ class V2FieldWriteOps(V2WriteOpsBase):
         row = await self._delete_row_returning(
             purger.row_class(), purger.target_id_column(), purger.target_id_value()
         )
+        if row is None:
+            return None
+        return purger.to_data(row)
+
+    async def purge_guarded_field_entity[TRow: Base, TData: FieldData](
+        self, purger: GuardedFieldPurger[TRow, TData]
+    ) -> TData | None:
+        """Delete the field row the id names when its guard holds, returning what was
+        removed; ``None`` when nothing was — the row is gone or the guard refused.
+
+        The guard rides on the statement, so no separate read and no row lock stand
+        between the check and the delete. Callers that must tell the two misses apart
+        read the row themselves.
+        """
+        await self._validate_conflict_checks(purger.conflict_checks())
+        row_class = purger.row_class()
+        table = row_class.__table__
+        stmt = sa.delete(table).where(purger.target_id_column() == purger.target_id_value())
+        for condition in purger.guard_conditions():
+            stmt = stmt.where(condition())
+        returning_stmt = stmt.returning(*table.columns)
+        try:
+            result = await self._sess.execute(sa.select(row_class).from_statement(returning_stmt))
+        except sa.exc.IntegrityError as e:
+            raise self._parse_integrity_error(e) from e
+        row = result.scalar_one_or_none()
         if row is None:
             return None
         return purger.to_data(row)

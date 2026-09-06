@@ -18,12 +18,12 @@ from ai.backend.manager.actions.v2.ops.base import (
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.project.queriers import ProjectQuerier
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.project.searchers import ProjectSearcher
-from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.project.types import (
+from ai.backend.manager.models.project.scopes import (
     DomainProjectOperationScope,
     UserProjectOperationScope,
 )
+from ai.backend.manager.models.project.searchers import ProjectSearcher
+from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass(frozen=True)

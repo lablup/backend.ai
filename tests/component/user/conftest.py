@@ -40,6 +40,7 @@ from ai.backend.manager.api.rest.v2.user.handler import V2UserHandler
 from ai.backend.manager.api.rest.v2.user.registry import register_v2_user_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.project import association_groups_users
 from ai.backend.manager.models.user import users
@@ -48,6 +49,7 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
@@ -78,7 +80,11 @@ def user_processors(
     valkey_clients: Any,
     processor_registry: ProcessorRegistry[Any],
 ) -> UserProcessors:
-    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     service = UserService(
         storage_manager=storage_manager,
         valkey_stat_client=valkey_clients.stat,
@@ -132,7 +138,15 @@ def server_module_registries(
     # v2 user routes (/v2/users) — exercises the api/adapters/user adapter shared with GQL.
     processors = MagicMock(spec=Processors)
     processors.user = user_processors
-    v2_handler = V2UserHandler(adapter=UserAdapter(processors, auth_config=MagicMock()))
+    v2_handler = V2UserHandler(
+        adapter=UserAdapter(
+            processors,
+            auth_config=MagicMock(),
+            key_provider_pool=KeyProviderPool(
+                providers=[], write_provider_type=KeyProviderType.PLAIN
+            ),
+        )
+    )
     v2_registry = RouteRegistry.create("v2", route_deps.cors_options)
     v2_registry.add_subregistry(register_v2_user_routes(v2_handler, route_deps))
 

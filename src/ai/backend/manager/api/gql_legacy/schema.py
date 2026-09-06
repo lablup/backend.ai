@@ -109,6 +109,7 @@ if TYPE_CHECKING:
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.permission.permission_defs import (
     AgentPermission,
     ComputeSessionPermission,
@@ -138,6 +139,8 @@ from ai.backend.manager.models.resource_group.row import (
     query_allowed_sgroups,
 )
 from ai.backend.manager.models.vfolder import ensure_quota_scope_accessible_by_user
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .acl import PredefinedAtomicPermission
 from .agent import (
@@ -316,6 +319,7 @@ class GraphQueryContext:
     schema: graphene.Schema
     dataloader_manager: DataLoaderManager[Any, Any, Any]
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     etcd: AsyncEtcd
     user: Mapping[str, Any]  # TODO: express using typed dict
     access_key: str
@@ -337,6 +341,7 @@ class GraphQueryContext:
     scheduler_repository: SchedulerRepository
     user_repository: UserRepository
     agent_repository: AgentRepository
+    network_repository: OpsRepository[NetworkData]
 
 
 class Mutation(graphene.ObjectType):  # type: ignore[misc]

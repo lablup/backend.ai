@@ -178,6 +178,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             DomainComposer(),
             DomainInput(
                 config_provider=bootstrap.config_provider,
+                key_provider_pool=bootstrap.key_provider_pool,
                 db=infrastructure.db,
                 etcd=bootstrap.etcd,
                 storage_manager=components.storage_manager,
@@ -310,6 +311,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 repositories=domain.repositories,
                 storage_manager=components.storage_manager,
                 config_provider=bootstrap.config_provider,
+                key_provider_pool=bootstrap.key_provider_pool,
                 event_producer=messaging.event_producer,
                 # Processors creation
                 etcd=bootstrap.etcd,

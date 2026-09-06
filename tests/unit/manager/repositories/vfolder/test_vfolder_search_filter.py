@@ -33,9 +33,11 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
+from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import UserVFolderOperationScope
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -70,7 +72,9 @@ class TestVfolderSearchFilter:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
-        return VfolderRepository(db=db_with_cleanup)
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
+        )
 
     @pytest.fixture
     async def cloneable_data(
@@ -177,7 +181,7 @@ class TestVfolderSearchFilter:
                 KeyPairRow(
                     user=user_a_id,
                     access_key="TESTKEYCLONE000A",
-                    secret_key="test-secret-ca",
+                    secret_key=SecretValue("test-secret-ca"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -188,7 +192,7 @@ class TestVfolderSearchFilter:
                 KeyPairRow(
                     user=user_b_id,
                     access_key="TESTKEYCLONE000B",
-                    secret_key="test-secret-cb",
+                    secret_key=SecretValue("test-secret-cb"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",

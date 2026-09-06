@@ -40,6 +40,12 @@ def register_v2_image_routes(
     )
     registry.add(
         "POST",
+        "/restore",
+        handler.admin_restore,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
         "/purge",
         handler.admin_purge,
         middlewares=[superadmin_required],

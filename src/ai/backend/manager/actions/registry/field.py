@@ -21,11 +21,14 @@ from ai.backend.manager.actions.v2.bulk.processor import (
     AtomicEntityResultJudge,
     BulkActionProcessor,
 )
-from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
+from ai.backend.manager.actions.v2.bulk.validator import (
+    AtomicBulkActionValidator,
+    PartialBulkActionValidator,
+)
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
 from ai.backend.manager.actions.v2.field.bulk_processor import (
-    BulkFieldActionProcessor,
     OwnerBulkLookupProcessor,
+    PartialBulkFieldActionProcessor,
 )
 from ai.backend.manager.actions.v2.field.ops import (
     DeleteFieldOpsAction,
@@ -33,6 +36,7 @@ from ai.backend.manager.actions.v2.field.ops import (
     PartialBulkPurgeFieldOpsAction,
     PurgeFieldOpsAction,
     RestoreFieldOpsAction,
+    RuntimePurgeFieldOpsAction,
     UpdateFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.field.processor import (
@@ -74,10 +78,10 @@ from ai.backend.manager.services.ops.service import (
     DeleteService,
     FieldAtomicCreateService,
     FieldCreateService,
+    FieldGetService,
     FieldPartialBulkPurgeService,
     FieldPurgeService,
     FieldUpsertService,
-    GetService,
     GlobalSearchService,
     RestoreService,
     SearchFieldsService,
@@ -143,18 +147,18 @@ class FieldGroup[TFieldData: FieldData]:
         Scope-shaped, like every other search that names where it looks: the owner is
         the scope, so ops applies that condition and nothing is looked up.
         """
-        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return ScopeActionProcessor(
             SearchFieldsService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.scope, *monitors),
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def bulk_scoped_search_ops[TAction: BulkScopedSearchOpsAction[Any, Any]](
+    def atomic_bulk_scoped_search_ops[TAction: BulkScopedSearchOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[AtomicBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
     ) -> BulkActionProcessor[TAction, ScopedFieldsOpsResult[TFieldData]]:
         """A page of the field rows owned by the entities the caller named.
@@ -162,32 +166,32 @@ class FieldGroup[TFieldData: FieldData]:
         Bulk-shaped, unlike :meth:`search_ops`: the owners are named rather than being a
         scope, so each is answered for and the record is per owner.
         """
-        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return BulkActionProcessor(
             SearchFieldsService(self._deps.repository).execute,
             AtomicEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            validators=(*self._deps.validators.atomic_bulk, *validators),
         )
 
-    def bulk_get_ops[TAction: BulkGetOwnedFieldOpsAction[Any, Any, Any]](
+    def atomic_bulk_get_ops[TAction: BulkGetOwnedFieldOpsAction[Any, Any, Any]](
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[AtomicBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
     ) -> BulkActionProcessor[TAction, OwnedFieldsOpsResult[Any, TFieldData]]:
         """The one row each entity the caller named designates.
 
-        Bulk-shaped like :meth:`bulk_scoped_search_ops`, and answers one row per owner
+        Bulk-shaped like :meth:`atomic_bulk_scoped_search_ops`, and answers one row per owner
         rather than a page. Nothing is looked up: the owners are already named.
         """
-        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return BulkActionProcessor(
             BulkOwnedFieldGetService(self._deps.repository).execute,
             AtomicEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            validators=(*self._deps.validators.atomic_bulk, *validators),
         )
 
     def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
@@ -200,7 +204,7 @@ class FieldGroup[TFieldData: FieldData]:
         """A read across every row of this field type, behind the SUPERADMIN gate.
 
         For one owner's rows use :meth:`search_ops`; this one names no owner."""
-        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return GlobalActionProcessor(
             GlobalSearchService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
@@ -214,7 +218,9 @@ class FieldGroup[TFieldData: FieldData]:
         validators: Sequence[SingleEntityActionValidator] = (),
         monitors: Sequence[SingleEntityActionMonitor] = (),
     ) -> SingleEntityActionProcessor[TAction, CreatedFieldOpsResult[TFieldData]]:
-        self._record(action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
         return SingleEntityActionProcessor(
             FieldCreateService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.single_entity, *monitors),
@@ -228,7 +234,9 @@ class FieldGroup[TFieldData: FieldData]:
         validators: Sequence[SingleEntityActionValidator] = (),
         monitors: Sequence[SingleEntityActionMonitor] = (),
     ) -> SingleEntityActionProcessor[TAction, FieldsOpsResult[TFieldData]]:
-        self._record(action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
         return SingleEntityActionProcessor(
             FieldAtomicCreateService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.single_entity, *monitors),
@@ -242,7 +250,9 @@ class FieldGroup[TFieldData: FieldData]:
         validators: Sequence[SingleEntityActionValidator] = (),
         monitors: Sequence[SingleEntityActionMonitor] = (),
     ) -> SingleEntityActionProcessor[TAction, EntityOpsResult[TFieldData]]:
-        self._record(action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
         return SingleEntityActionProcessor(
             FieldUpsertService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.single_entity, *monitors),
@@ -281,9 +291,11 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         validators: Sequence[SingleEntityActionValidator] = (),
         monitors: Sequence[SingleEntityActionMonitor] = (),
     ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
-        self._record(action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
         return SingleFieldActionProcessor(
-            GetService(self._deps.repository).execute,
+            FieldGetService(self._deps.repository).execute,
             self._owner_lookup,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),
@@ -296,7 +308,9 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         validators: Sequence[SingleEntityActionValidator] = (),
         monitors: Sequence[SingleEntityActionMonitor] = (),
     ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
-        self._record(action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
         return SingleFieldActionProcessor(
             UpdateService(self._deps.repository).execute,
             self._owner_lookup,
@@ -311,7 +325,9 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         validators: Sequence[SingleEntityActionValidator] = (),
         monitors: Sequence[SingleEntityActionMonitor] = (),
     ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
-        self._record(action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
         return SingleFieldActionProcessor(
             DeleteService(self._deps.repository).execute,
             self._owner_lookup,
@@ -326,7 +342,9 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         validators: Sequence[SingleEntityActionValidator] = (),
         monitors: Sequence[SingleEntityActionMonitor] = (),
     ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
-        self._record(action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
         return SingleFieldActionProcessor(
             RestoreService(self._deps.repository).execute,
             self._owner_lookup,
@@ -343,7 +361,7 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         monitors: Sequence[SingleEntityActionMonitor] = (),
     ) -> SingleFieldActionProcessor[TAction, TResult]:
         self._record(
-            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.SERVICE
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.CUSTOM
         )
         return SingleFieldActionProcessor(
             func,
@@ -359,7 +377,31 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         validators: Sequence[SingleEntityActionValidator] = (),
         monitors: Sequence[SingleEntityActionMonitor] = (),
     ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
-        self._record(action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.OPS)
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
+        return SingleFieldActionProcessor(
+            FieldPurgeService(self._deps.repository).execute,
+            self._owner_lookup,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def runtime_purge_ops[TAction: RuntimePurgeFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleFieldActionProcessor[TAction, EntityOpsResult[TFieldData]]:
+        """A hard delete of a field row whose owning entity is polymorphic.
+
+        Separate from :meth:`purge_ops` because the action is the other root: the owner
+        it names is read by the runtime lookup, executed by its own ops method.
+        """
+        self._record(
+            action_cls, ActionKind.SINGLE_ENTITY, ActionGate.PERMISSION, ActionBacking.GENERIC
+        )
         return SingleFieldActionProcessor(
             FieldPurgeService(self._deps.repository).execute,
             self._owner_lookup,
@@ -371,13 +413,18 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[BulkActionValidator] = (),
+        validators: Sequence[PartialBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkFieldActionProcessor[TAction, TFieldData]:
-        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.OPS)
-        return BulkFieldActionProcessor(
+    ) -> PartialBulkFieldActionProcessor[TAction, TFieldData]:
+        """Remove the rows the caller named, one permission check per owning entity.
+
+        An owner the caller may not write takes its rows out of the run and puts them
+        back into the answer as denied items.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return PartialBulkFieldActionProcessor(
             FieldPartialBulkPurgeService(self._deps.repository).execute,
             self._bulk_owner_lookup,
             monitors=(*self._deps.monitors.bulk, *monitors),
-            validators=(*self._deps.validators.bulk, *validators),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )

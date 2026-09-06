@@ -15,87 +15,45 @@ The Metric Service provides container utilization metrics collection and managem
 
 ## Operation Scenarios
 
-### 1. Query Available Metrics
+### 1. List the metric names the store holds
 ```python
-# Get all available metric names
-action = ContainerMetricMetadataAction()
-result = await metric_service.query_metadata(action)
+action = PublicSearchContainerMetricMetadataAction()
+result = await metric_service.search_container_metric_metadata(action)
 # Returns: ["container_cpu_percent", "container_memory_used_bytes", ...]
 ```
 
-### 2. Query CPU Usage for a Specific Kernel
+### 2. Read one metric over a time range
 ```python
-action = ContainerMetricAction(
+action = PublicSearchContainerMetricsAction(
     metric_name="container_cpu_percent",
-    start="2024-01-01T00:00:00",
-    end="2024-01-01T01:00:00",
-    step=60,  # 1-minute intervals
-    labels=ContainerMetricOptionalLabel(
-        kernel_id="kernel-123",
-        value_type="usage"
-    )
+    labels=ContainerMetricOptionalLabel(kernel_id=kernel_id, value_type=ValueType.CURRENT),
+    time_range=QueryTimeRange(
+        start="2024-01-01T00:00:00", end="2024-01-01T01:00:00", step="60s"
+    ),
 )
-result = await metric_service.query_metric(action)
+result = await metric_service.search_container_metrics(action)
 ```
 
-### 3. Monitor Network Traffic Rate
+The same action aggregates by any other label: pass `agent_id`, `session_id`,
+`user_id` or `project_id` instead of `kernel_id`.
+
+### 3. Read the latest stats of several kernels
 ```python
-# Network metrics are automatically detected as RATE type
-action = ContainerMetricAction(
-    metric_name="net_rx",
-    start="2024-01-01T00:00:00",
-    end="2024-01-01T00:05:00",
-    step=30,
-    labels=ContainerMetricOptionalLabel(agent_id="agent-1")
-)
-result = await metric_service.query_metric(action)
+action = BatchGetKernelLiveStatsAction(kernel_ids=[kernel_id, other_kernel_id])
+result = await metric_service.batch_get_kernel_live_stats(action)
 ```
 
-### 4. Project-Level Resource Aggregation
-```python
-# Aggregate CPU usage for all containers in a project
-action = ContainerMetricAction(
-    metric_name="container_cpu_percent",
-    start="2024-01-01T00:00:00",
-    end="2024-01-01T23:59:59",
-    step=3600,  # Hourly aggregation
-    labels=ContainerMetricOptionalLabel(project_id="research-team")
-)
-result = await metric_service.query_metric(action)
-```
+## Action Inputs
 
-## API Usage Examples
+| Action | Input |
+|---|---|
+| `PublicSearchContainerMetricMetadataAction` | none |
+| `PublicSearchContainerMetricsAction` | `metric_name`, `labels`, `time_range` |
+| `BatchGetKernelLiveStatsAction` | `kernel_ids` |
 
-### ContainerMetricMetadataAction
-Used to retrieve available metric names:
-```python
-from ai.backend.manager.services.metric.actions.container import ContainerMetricMetadataAction
-
-action = ContainerMetricMetadataAction()
-# No parameters required
-```
-
-### ContainerMetricAction
-Used to query metric data:
-```python
-from ai.backend.manager.services.metric.actions.container import ContainerMetricAction
-from ai.backend.manager.services.metric.types import ContainerMetricOptionalLabel
-
-action = ContainerMetricAction(
-    metric_name="container_memory_used_bytes",  # Required
-    start="2024-01-01T00:00:00",                # Required: ISO format
-    end="2024-01-01T01:00:00",                  # Required: ISO format
-    step=60,                                     # Required: seconds
-    labels=ContainerMetricOptionalLabel(
-        value_type="usage",      # Optional: "usage" or "capacity"
-        agent_id="agent-1",      # Optional
-        kernel_id="kernel-123",  # Optional
-        session_id="session-456", # Optional
-        user_id="user@example.com", # Optional
-        project_id="project-789"    # Optional
-    )
-)
-```
+`ContainerMetricOptionalLabel` carries `value_type` plus the optional `agent_id`,
+`kernel_id`, `session_id`, `user_id` and `project_id` filters;
+`QueryTimeRange` carries `start`, `end` and `step`.
 
 ## Integration Points
 

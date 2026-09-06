@@ -4,19 +4,16 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.user.types import BulkUserUpdateResultData, UserData
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.updaters import UserUpdateSpec
+from ai.backend.manager.models.user.updaters import UserUpdater
 
 __all__ = (
     "UpdateUserAction",
     "UpdateUserActionResult",
-    "UserUpdateSpec",
     "BulkUpdateUserAction",
     "BulkUpdateUserActionResult",
 )
@@ -26,12 +23,11 @@ __all__ = (
 class UpdateUserAction(BaseSingleEntityAction):
     """Edit one user."""
 
-    user_id: UserID
-    updater: Updater[UserRow]
+    updater: UserUpdater
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.user_id
+        return self.updater.user_id
 
     @override
     @classmethod
@@ -53,7 +49,7 @@ class UpdateUserActionResult:
 class BulkUpdateUserAction(BaseGlobalAction):
     """Edit several users at once, across domains."""
 
-    items: list[UserUpdateSpec]
+    items: list[UserUpdater]
 
     @override
     @classmethod

@@ -10,9 +10,9 @@ from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.scopes import ProjectModelCardOperationScope
 from ai.backend.manager.models.model_card.searchers import ModelCardSearcher
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.model_card.types import ProjectModelCardOperationScope
 
 
 @dataclass(frozen=True)

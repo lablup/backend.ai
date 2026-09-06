@@ -25,6 +25,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -47,9 +48,16 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
@@ -101,9 +109,12 @@ class TestRoleAssignment:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
                 ScopeBindingRow,
+                EntityLabelRow,
             ],
         ):
             yield database_connection
@@ -178,9 +189,9 @@ class TestRoleAssignment:
                 )
             )
             session.add(
-                VirtualScopeRow(
-                    scope_type=ScopeType.PROJECT.value,
-                    scope_id=project_id,
+                VirtualEntityRow(
+                    entity_type=ScopeType.PROJECT.value,
+                    entity_id=project_id,
                 )
             )
             await session.commit()
@@ -215,7 +226,7 @@ class TestRoleAssignment:
                     domain_id=domain_id,
                 )
             )
-            session.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
+            session.add(VirtualEntityRow(entity_type=ScopeType.USER.value, entity_id=user_uuid))
             await session.commit()
         return user_uuid
 
@@ -285,7 +296,7 @@ class TestRoleAssignment:
 
     @pytest.fixture
     def group_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ProjectDBSource:
-        return ProjectDBSource(db=db_with_cleanup)
+        return ProjectDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
 
     # --- revoke_role remaining count ---
 
@@ -376,43 +387,43 @@ class TestRoleAssignment:
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
-        """Joining a project leaves the user's own virtual scope unbound: the user is a
+        """Joining a project leaves the user's own virtual entity unbound: the user is a
         ordinary member of the project, not an inheriting one, so project permissions never
         reach the entities the user owns."""
         await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
 
         async with db_with_cleanup.begin_readonly_session() as session:
             user_vs_id = await session.scalar(
-                sa.select(VirtualScopeRow.id).where(
-                    VirtualScopeRow.scope_type == ScopeType.USER.value,
-                    VirtualScopeRow.scope_id == user_1,
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == ScopeType.USER.value,
+                    VirtualEntityRow.entity_id == user_1,
                 )
             )
             project_vs_id = await session.scalar(
-                sa.select(VirtualScopeRow.id).where(
-                    VirtualScopeRow.scope_type == ScopeType.PROJECT.value,
-                    VirtualScopeRow.scope_id == test_project,
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                    VirtualEntityRow.entity_id == test_project,
                 )
             )
             bindings_into_user_scope = (
                 await session.scalars(
-                    sa.select(ScopeBindingRow.scope_id).where(
-                        ScopeBindingRow.virtual_scope_id == user_vs_id,
-                        ScopeBindingRow.scope_id == test_project,
+                    sa.select(ScopeBindingRow.scope_entity_id).where(
+                        ScopeBindingRow.virtual_entity_id == user_vs_id,
+                        ScopeBindingRow.scope_entity_id == project_vs_id,
                     )
                 )
             ).all()
             memberships_in_project_scope = (
                 await session.scalars(
-                    sa.select(EntityMembershipRow.entity_id).where(
-                        EntityMembershipRow.virtual_scope_id == project_vs_id,
-                        EntityMembershipRow.entity_id == user_1,
+                    sa.select(EntityMembershipRow.member_entity_id).where(
+                        EntityMembershipRow.virtual_entity_id == project_vs_id,
+                        EntityMembershipRow.member_entity_id == user_vs_id,
                     )
                 )
             ).all()
 
         assert list(bindings_into_user_scope) == []
-        assert list(memberships_in_project_scope) == [user_1]
+        assert list(memberships_in_project_scope) == [user_vs_id]
 
     async def test_bind_user_to_project_skips_if_already_bound(
         self,

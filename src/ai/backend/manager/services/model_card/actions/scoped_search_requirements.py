@@ -10,14 +10,12 @@ from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.model_card.types import ModelCardResourceRequirementData
+from ai.backend.manager.models.model_card.scopes import ModelCardResourceRequirementOperationScope
 from ai.backend.manager.models.model_card.searchers import (
     ModelCardResourceRequirementSearcher,
 )
 from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.model_card.types import (
-    ModelCardResourceRequirementOperationScope,
-)
 
 
 @dataclass

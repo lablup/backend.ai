@@ -5,8 +5,7 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 
 from .base import ResourceGroupAction
 
@@ -15,7 +14,7 @@ from .base import ResourceGroupAction
 class UpdateResourceGroupAction(ResourceGroupAction):
     """Action to modify a resource group."""
 
-    updater: Updater[ResourceGroupRow]
+    updater: ResourceGroupUpdater
 
     @override
     @classmethod

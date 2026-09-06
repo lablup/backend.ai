@@ -95,8 +95,7 @@ from ai.backend.manager.models.utils import (
     execute_with_txn_retry,
     sql_json_merge,
 )
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.queries import (
+from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,
 )
@@ -300,7 +299,7 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(VFolderUUID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     # host will be '' if vFolder is unmanaged
     host: Mapped[str] = mapped_column("host", sa.String(length=128), nullable=False, index=True)
@@ -472,7 +471,7 @@ class VFolderInvitationRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "vfolder_invitations"
 
     id: Mapped[VFolderUUID] = mapped_column(
-        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
@@ -502,7 +501,7 @@ class VFolderPermissionRow(Base):
     __tablename__ = "vfolder_permissions"
 
     id: Mapped[VFolderUUID] = mapped_column(
-        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(VFolderUUID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
@@ -683,9 +682,7 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.id for g in grps]
         else:
-            query = user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
-                EntityMembershipRow.entity_id == user_uuid
-            )
+            query = user_scope_membership_query(PROJECT_SCOPE_TYPE, user_uuid)
             result = await conn.execute(query)
             grps = result.fetchall()
             group_ids = [g.scope_id for g in grps]

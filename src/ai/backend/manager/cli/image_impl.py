@@ -21,6 +21,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
 from ai.backend.manager.repositories.db.engine import connect_database
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .context import CLIContext, redis_ctx
 
@@ -211,7 +212,9 @@ async def rescan_images(
         connect_database(bootstrap_config.db) as db,
     ):
         try:
-            result = await ImageDBSource(db).rescan_images(registry_or_image, project)
+            result = await ImageDBSource(db, V2DBOpsProvider(db)).rescan_images(
+                registry_or_image, project
+            )
             for error in result.errors:
                 log.error(f"Failed to scan registries: {error}")
         except Exception as e:

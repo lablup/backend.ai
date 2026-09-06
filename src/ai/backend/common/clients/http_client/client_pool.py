@@ -51,6 +51,15 @@ def tcp_client_session_factory(
     )
 
 
+def _has_inflight_requests(session: aiohttp.ClientSession) -> bool:
+    """A connection stays acquired until its response body is fully read."""
+    connector = session.connector
+    if connector is None:
+        return False
+    # Private aiohttp attribute, verified on 3.13; absent means fall back to time-based eviction.
+    return bool(getattr(connector, "_acquired", None))
+
+
 @dataclass(slots=True)
 class _Client:
     session: aiohttp.ClientSession
@@ -72,13 +81,17 @@ class ClientKey:
 class ClientPool:
     _clients: MutableMapping[ClientKey, _Client]
     _cleanup_task: asyncio.Task[None]
+    _keep_inflight_sessions: bool
 
     def __init__(
         self,
         factory: ClientSessionFactory,
         cleanup_interval_seconds: float = 600,
+        *,
+        keep_inflight_sessions: bool = False,
     ) -> None:
         frame = inspect.stack()[1]
+        self._keep_inflight_sessions = keep_inflight_sessions
         self._creator_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
         self._cleanup_task = asyncio.create_task(
             self._cleanup_loop(cleanup_interval_seconds),
@@ -113,12 +126,16 @@ class ClientPool:
             await asyncio.sleep(cleanup_interval_seconds)
             now = time.perf_counter()
             for key, client in list(self._clients.items()):
-                if now - client.last_used > cleanup_interval_seconds:
-                    del self._clients[key]
-                    try:
-                        await client.session.close()
-                    except Exception as e:
-                        log.exception("Error closing client session: {}", e)
+                if now - client.last_used <= cleanup_interval_seconds:
+                    continue
+                if self._keep_inflight_sessions and _has_inflight_requests(client.session):
+                    client.last_used = now
+                    continue
+                del self._clients[key]
+                try:
+                    await client.session.close()
+                except Exception as e:
+                    log.exception("Error closing client session: {}", e)
 
     def load_client_session(self, key: ClientKey) -> aiohttp.ClientSession:
         session = self._clients.get(key, None)

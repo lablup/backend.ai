@@ -6,12 +6,15 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
-from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
+from ai.backend.manager.actions.v2.field.base import (
+    BaseRuntimeSingleFieldAction,
+    BaseSingleFieldAction,
+)
+from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAction
 from ai.backend.manager.actions.v2.ops.base import (
+    FieldGetOpsAction,
     FieldPartialBulkPurgeOpsAction,
     FieldPurgeOpsAction,
-    GetOpsAction,
     UpdateOpsAction,
 )
 from ai.backend.manager.models.base import Base
@@ -31,7 +34,7 @@ class GetFieldOpsAction[
     TOwnerID: EntityIdentifier,
     TRow: Base,
     TData: FieldData,
-](BaseSingleFieldAction[TFieldID, TOwnerID], GetOpsAction[TRow, TData], ABC):
+](BaseSingleFieldAction[TFieldID, TOwnerID], FieldGetOpsAction[TRow, TData], ABC):
     """A read of one field row, authorized against the entity owning it."""
 
     @override
@@ -96,13 +99,24 @@ class PurgeFieldOpsAction[
         return ActionOperationType.UPDATE
 
 
+class RuntimePurgeFieldOpsAction[TFieldID: FieldIdentifier, TRow: Base, TData: FieldData](
+    BaseRuntimeSingleFieldAction[TFieldID], FieldPurgeOpsAction[TRow, TData], ABC
+):
+    """A hard delete of a field row whose owning entity is polymorphic."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
 class PartialBulkPurgeFieldOpsAction[
     TFieldID: FieldIdentifier,
     TOwnerID: EntityIdentifier,
     TRow: Base,
     TData: FieldData,
 ](
-    BaseBulkFieldAction[TFieldID, TOwnerID],
+    BasePartialBulkFieldAction[TFieldID, TOwnerID],
     FieldPartialBulkPurgeOpsAction[TFieldID, TRow, TData],
     ABC,
 ):

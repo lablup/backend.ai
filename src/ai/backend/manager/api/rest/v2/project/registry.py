@@ -24,6 +24,7 @@ def register_v2_project_routes(
     reg.add("POST", "", handler.admin_create, middlewares=[superadmin_required])
     reg.add("PATCH", "/{project_id}", handler.admin_update, middlewares=[superadmin_required])
     reg.add("POST", "/delete", handler.admin_delete, middlewares=[superadmin_required])
+    reg.add("POST", "/restore", handler.admin_restore, middlewares=[superadmin_required])
     reg.add("POST", "/purge", handler.admin_purge, middlewares=[superadmin_required])
     reg.add(
         "POST",

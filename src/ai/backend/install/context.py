@@ -1476,15 +1476,17 @@ class Context(metaclass=ABCMeta):
         # TODO: add an option to generate keypairs
         base_path = self.install_info.base_path
         service = self.install_info.service_config
+        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
+            current_shell = os.environ.get("SHELL", "sh")
+            user_data = json.loads(Path(user_path).read_bytes())
+        username_by_uuid = {user["uuid"]: user["username"] for user in user_data["users"]}
         with self.resource_path(
             "ai.backend.install.fixtures", "example-keypairs.json"
         ) as keypair_path:
             keypair_data = json.loads(Path(keypair_path).read_bytes())
         for keypair in keypair_data["keypairs"]:
-            email = keypair["user_id"]
-            if match := re.search(r"^(\w+)@", email):
-                username = match.group(1)
-            else:
+            username = username_by_uuid.get(keypair["user"])
+            if username is None:
                 continue
             with (base_path / f"env-local-{username}-api.sh").open("w") as fp:
                 print("# Directly access to the manager using API keypair (admin)", file=fp)
@@ -1496,9 +1498,6 @@ class Context(metaclass=ABCMeta):
                 print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
                 print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
                 print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
-        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
-            current_shell = os.environ.get("SHELL", "sh")
-            user_data = json.loads(Path(user_path).read_bytes())
         for user in user_data["users"]:
             username = user["username"]
             with (base_path / f"env-local-{username}-session.sh").open("w") as fp:

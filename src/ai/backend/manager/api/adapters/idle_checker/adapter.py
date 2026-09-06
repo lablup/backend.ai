@@ -49,18 +49,12 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerConditions
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Creator,
-    Purger,
-    Updater,
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger, Updater
 from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerCreatorSpec
 from ai.backend.manager.repositories.idle_checker.purgers import IdleCheckerPurgerSpec
 from ai.backend.manager.repositories.idle_checker.updaters import IdleCheckerUpdaterSpec

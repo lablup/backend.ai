@@ -29,7 +29,7 @@ class ErrorLogRow(CreatedAtMixin, Base):
     __table_args__ = (sa.Index("ix_error_logs_created_at", "created_at"),)
 
     id: Mapped[ErrorLogID] = mapped_column(
-        "id", GUID(ErrorLogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ErrorLogID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     # Columns keep the historical nullable=True of the imperative table definition;
     # the annotations stay non-Optional because every writer supplies them.

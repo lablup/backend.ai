@@ -5,17 +5,19 @@ import pytest
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
-    ResolveAccessKeyScopeAction,
+    PublicResolveAccessKeyScopeAction,
 )
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
-    ResolveUserScopeAction,
+    PublicResolveUserScopeAction,
 )
 from ai.backend.manager.services.auth.service import AuthService
 
@@ -32,6 +34,7 @@ def auth_service(
     mock_config_provider: AsyncMock,
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
+    mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
@@ -42,6 +45,8 @@ def auth_service(
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
         ssh_key_validator=AsyncMock(),
+        client_ip_masking_repository=mock_client_ip_masking_repository,
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
 
 
@@ -56,7 +61,7 @@ class TestResolveAccessKeyScope:
         self,
         auth_service: AuthService,
     ) -> None:
-        action = ResolveAccessKeyScopeAction(
+        action = PublicResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,
             requester_role=UserRole.USER,
             requester_domain="default",
@@ -70,7 +75,7 @@ class TestResolveAccessKeyScope:
         self,
         auth_service: AuthService,
     ) -> None:
-        action = ResolveAccessKeyScopeAction(
+        action = PublicResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,
             requester_role=UserRole.ADMIN,
             requester_domain="default",
@@ -88,7 +93,7 @@ class TestResolveAccessKeyScope:
             "default",
             UserRole.ADMIN,
         )
-        action = ResolveAccessKeyScopeAction(
+        action = PublicResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,
             requester_role=UserRole.USER,
             requester_domain="default",
@@ -105,7 +110,7 @@ class TestResolveAccessKeyScope:
         mock_auth_repository.get_delegation_target_by_access_key.side_effect = ValueError(
             "Unknown owner access key"
         )
-        action = ResolveAccessKeyScopeAction(
+        action = PublicResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,
             requester_role=UserRole.SUPERADMIN,
             requester_domain="default",
@@ -123,7 +128,7 @@ class TestResolveAccessKeyScope:
             "other-domain",
             UserRole.USER,
         )
-        action = ResolveAccessKeyScopeAction(
+        action = PublicResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,
             requester_role=UserRole.ADMIN,
             requester_domain="default",
@@ -138,7 +143,7 @@ class TestResolveUserScope:
         self,
         auth_service: AuthService,
     ) -> None:
-        action = ResolveUserScopeAction(
+        action = PublicResolveUserScopeAction(
             requester_uuid=REQUESTER_UUID,
             requester_role=UserRole.USER,
             requester_domain="default",
@@ -153,7 +158,7 @@ class TestResolveUserScope:
         self,
         auth_service: AuthService,
     ) -> None:
-        action = ResolveUserScopeAction(
+        action = PublicResolveUserScopeAction(
             requester_uuid=REQUESTER_UUID,
             requester_role=UserRole.ADMIN,
             requester_domain="default",
@@ -173,7 +178,7 @@ class TestResolveUserScope:
             UserRole.USER,
             "default",
         )
-        action = ResolveUserScopeAction(
+        action = PublicResolveUserScopeAction(
             requester_uuid=REQUESTER_UUID,
             requester_role=UserRole.SUPERADMIN,
             requester_domain="default",
@@ -192,7 +197,7 @@ class TestResolveUserScope:
         mock_auth_repository.get_delegation_target_by_email.side_effect = ValueError(
             "Unknown user email"
         )
-        action = ResolveUserScopeAction(
+        action = PublicResolveUserScopeAction(
             requester_uuid=REQUESTER_UUID,
             requester_role=UserRole.SUPERADMIN,
             requester_domain="default",

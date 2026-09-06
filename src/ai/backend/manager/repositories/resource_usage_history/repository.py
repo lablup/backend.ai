@@ -25,14 +25,16 @@ from ai.backend.manager.data.resource_usage_history.types import (
     ProjectUsageBucketData,
     UserUsageBucketData,
 )
+from ai.backend.manager.models.resource_usage_history.scopes import (
+    DomainUsageBucketOperationScope,
+    ProjectUsageBucketOperationScope,
+    UserUsageBucketOperationScope,
+)
 from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator, Upserter
 from ai.backend.manager.repositories.resource_usage_history.types import (
-    DomainUsageBucketOperationScope,
     DomainUsageBucketSearchResult,
     KernelUsageRecordSearchResult,
-    ProjectUsageBucketOperationScope,
     ProjectUsageBucketSearchResult,
-    UserUsageBucketOperationScope,
     UserUsageBucketSearchResult,
 )
 

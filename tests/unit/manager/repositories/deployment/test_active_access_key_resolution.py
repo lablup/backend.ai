@@ -24,6 +24,8 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.db_source.db_source import DeploymentDBSource
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -73,6 +75,7 @@ class TestResolveUserAndActiveAccessKey:
     def db_source(self, db: ExtendedAsyncSAEngine) -> DeploymentDBSource:
         return DeploymentDBSource(
             db=db,
+            reconcile_ops_provider=ReconcileOpsProvider(db),
             storage_manager=MagicMock(spec=StorageSessionManager),
         )
 
@@ -128,7 +131,7 @@ class TestResolveUserAndActiveAccessKey:
                 sess.add(
                     KeyPairRow(
                         access_key=kp.access_key,
-                        secret_key="secret",
+                        secret_key=SecretValue("secret"),
                         user=spec.user_uuid,
                         is_active=kp.is_active,
                         resource_policy=kp_policy,

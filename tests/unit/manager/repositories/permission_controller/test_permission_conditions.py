@@ -5,7 +5,11 @@ Tests verify that condition factories produce correct SQLAlchemy expressions.
 
 from __future__ import annotations
 
-from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    Permission,
+    ScopeType,
+)
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
     PermissionConditions,
@@ -43,15 +47,15 @@ class TestPermissionConditions:
         assert "permissions.entity_type IN" in compiled
         assert "session" in compiled.lower()
 
-    def test_by_operations_produces_in_clause(self) -> None:
-        """by_operations should generate operation IN (...) clause."""
-        condition = PermissionConditions.by_operations([OperationType.READ, OperationType.CREATE])
+    def test_by_permissions_produces_in_clause(self) -> None:
+        """by_permissions should generate permission IN (...) clause."""
+        condition = PermissionConditions.by_permissions([Permission.READ, Permission.CREATE])
         clause = condition()
 
         compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
-        assert "permissions.operation IN" in compiled
-        assert "read" in compiled.lower()
-        assert "create" in compiled.lower()
+        assert "permissions.permission IN" in compiled
+        assert str(int(Permission.READ)) in compiled
+        assert str(int(Permission.CREATE)) in compiled
 
 
 class TestExistsPermissionCombined:
@@ -87,7 +91,7 @@ class TestExistsPermissionCombined:
         """exists_permission_combined should combine multiple operation filters."""
         permission_conditions = [
             PermissionConditions.by_scope_types([ScopeType.DOMAIN, ScopeType.PROJECT]),
-            PermissionConditions.by_operations([OperationType.READ, OperationType.UPDATE]),
+            PermissionConditions.by_permissions([Permission.READ, Permission.UPDATE]),
         ]
 
         condition = AssignedUserConditions.exists_permission_combined(permission_conditions)
@@ -97,11 +101,11 @@ class TestExistsPermissionCombined:
 
         # Verify both scope_types and operations are in the WHERE clause
         assert "permissions.scope_type IN" in compiled
-        assert "permissions.operation IN" in compiled
+        assert "permissions.permission IN" in compiled
         assert "domain" in compiled.lower()
         assert "project" in compiled.lower()
-        assert "read" in compiled.lower()
-        assert "update" in compiled.lower()
+        assert str(int(Permission.READ)) in compiled
+        assert str(int(Permission.UPDATE)) in compiled
 
     def test_exists_permission_combined_empty_conditions(self) -> None:
         """exists_permission_combined with empty list should produce basic EXISTS with join only."""

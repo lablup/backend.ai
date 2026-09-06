@@ -32,6 +32,7 @@ from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.object_storage import ObjectStorageOperationNotSupported
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
@@ -48,6 +49,11 @@ class TestObjectStorageService:
     @pytest.fixture
     def mock_artifact_repository(self) -> MagicMock:
         return MagicMock(spec=ArtifactRepository)
+
+    @pytest.fixture
+    def mock_revision_ops(self) -> MagicMock:
+        """Create mocked OpsRepository for artifact revisions"""
+        return MagicMock(spec=OpsRepository)
 
     @pytest.fixture
     def mock_object_storage_repository(self) -> MagicMock:
@@ -69,6 +75,7 @@ class TestObjectStorageService:
     def object_storage_service(
         self,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_storage_manager: MagicMock,
@@ -76,6 +83,7 @@ class TestObjectStorageService:
     ) -> ObjectStorageService:
         return ObjectStorageService(
             artifact_repository=mock_artifact_repository,
+            revision_ops=mock_revision_ops,
             object_storage_repository=mock_object_storage_repository,
             storage_namespace_repository=mock_storage_namespace_repository,
             storage_manager=mock_storage_manager,
@@ -148,6 +156,7 @@ class TestObjectStorageService:
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_storage_manager: MagicMock,
         mock_config_provider: MagicMock,
         sample_object_storage_data: ObjectStorageData,
@@ -167,9 +176,7 @@ class TestObjectStorageService:
         mock_storage_namespace_repository.get_by_storage_and_namespace = AsyncMock(
             return_value=sample_namespace_data
         )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_revision_data
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=sample_revision_data)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact_data)
 
         mock_client = MagicMock()
@@ -193,6 +200,7 @@ class TestObjectStorageService:
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_config_provider: MagicMock,
         sample_object_storage_data: ObjectStorageData,
         sample_artifact_data: ArtifactData,
@@ -224,9 +232,7 @@ class TestObjectStorageService:
         mock_storage_namespace_repository.get_by_storage_and_namespace = AsyncMock(
             return_value=sample_namespace_data
         )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=not_available_revision
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=not_available_revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact_data)
 
         action = GetDownloadPresignedURLAction(
@@ -279,6 +285,7 @@ class TestObjectStorageService:
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_storage_manager: MagicMock,
         mock_config_provider: MagicMock,
         sample_object_storage_data: ObjectStorageData,
@@ -298,9 +305,7 @@ class TestObjectStorageService:
         mock_storage_namespace_repository.get_by_storage_and_namespace = AsyncMock(
             return_value=sample_namespace_data
         )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_revision_data
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=sample_revision_data)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact_data)
 
         mock_client = MagicMock()
@@ -341,6 +346,7 @@ class TestObjectStorageService:
         mock_object_storage_repository: MagicMock,
         mock_storage_namespace_repository: MagicMock,
         mock_artifact_repository: MagicMock,
+        mock_revision_ops: MagicMock,
         mock_config_provider: MagicMock,
         sample_object_storage_data: ObjectStorageData,
         sample_revision_data: ArtifactRevisionData,
@@ -374,9 +380,7 @@ class TestObjectStorageService:
         mock_storage_namespace_repository.get_by_storage_and_namespace = AsyncMock(
             return_value=sample_namespace_data
         )
-        mock_artifact_repository.get_artifact_revision_by_id = AsyncMock(
-            return_value=sample_revision_data
-        )
+        mock_revision_ops.get_field = AsyncMock(return_value=sample_revision_data)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=readonly_artifact)
 
         action = GetUploadPresignedURLAction(

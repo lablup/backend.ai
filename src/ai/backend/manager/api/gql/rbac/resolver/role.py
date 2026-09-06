@@ -45,7 +45,7 @@ from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentEdge, RoleE
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
-from ai.backend.manager.repositories.permission_controller.types import ScopedRoleOperationScope
+from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 
 # ==================== Query Resolvers ====================
 

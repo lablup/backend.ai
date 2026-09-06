@@ -27,31 +27,23 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
     RBACScopeBindingPair,
 )
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupCreatorSpec,
     ResourceGroupForDomainCreatorSpec,
     ResourceGroupForKeypairsCreatorSpec,
 )
 from ai.backend.manager.repositories.resource_group.purgers import (
-    ResourceGroupNamePurgerSpec,
     create_resource_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.repositories.resource_group.scope_binders import (
     ResourceGroupDomainEntityUnbinder,
-)
-from ai.backend.manager.repositories.resource_group.updaters import (
-    ResourceGroupDriverConfigUpdaterSpec,
-    ResourceGroupMetadataUpdaterSpec,
-    ResourceGroupStatusUpdaterSpec,
-    ResourceGroupUpdaterSpec,
 )
 from ai.backend.manager.services.resource_group.actions.associate_with_domain import (
     AssociateResourceGroupWithDomainsAction,
@@ -93,15 +85,13 @@ async def _create_sgroup(
     if name is None:
         name = f"test-crud-{uuid.uuid4().hex[:8]}"
     action = CreateResourceGroupAction(
-        creator=Creator(
-            spec=ResourceGroupCreatorSpec(
-                name=name,
-                driver=driver,
-                scheduler=scheduler,
-                is_public=is_public,
-                is_active=is_active,
-                description=description or f"Test scaling group {name}",
-            )
+        creator=ResourceGroupCreator(
+            name=name,
+            driver=driver,
+            scheduler=scheduler,
+            is_public=is_public,
+            is_active=is_active,
+            description=description or f"Test scaling group {name}",
         )
     )
     result = await resource_group_service.create_resource_group(action)
@@ -110,13 +100,10 @@ async def _create_sgroup(
 
 async def _purge_sgroup(
     resource_group_service: ResourceGroupService,
-    name: str,
+    resource_group_id: ResourceGroupID,
 ) -> None:
     """Purge a scaling group."""
-    action = PurgeResourceGroupAction(
-        resource_group_id=ResourceGroupID(uuid.uuid4()),
-        purger=Purger(spec=ResourceGroupNamePurgerSpec(name=name)),
-    )
+    action = PurgeResourceGroupAction(resource_group_id=resource_group_id)
     await resource_group_service.purge_resource_group(action)
 
 
@@ -148,7 +135,7 @@ class TestScalingGroupCRUD:
             assert sg.status.is_active is True
             assert sg.status.is_public is True
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
     async def test_s_create_3_private_scaling_group(
         self,
@@ -165,7 +152,7 @@ class TestScalingGroupCRUD:
         try:
             assert sg.status.is_public is False
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
     # ------------------------------------------------------------------
     # MODIFY
@@ -178,23 +165,19 @@ class TestScalingGroupCRUD:
     ) -> None:
         """S-MOD-1: Modify description → updated value returned."""
         name = f"crud-mod-{uuid.uuid4().hex[:8]}"
-        await _create_sgroup(resource_group_service, name)
+        sg = await _create_sgroup(resource_group_service, name)
         try:
             action = UpdateResourceGroupAction(
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                updater=Updater(
-                    spec=ResourceGroupUpdaterSpec(
-                        metadata=ResourceGroupMetadataUpdaterSpec(
-                            description=TriState.update("Updated description"),
-                        )
-                    ),
-                    pk_value=name,
+                resource_group_id=sg.id,
+                updater=ResourceGroupUpdater(
+                    resource_group_id=sg.id,
+                    description=TriState.update("Updated description"),
                 ),
             )
             result = await resource_group_service.update_resource_group(action)
             assert result.resource_group.metadata.description == "Updated description"
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
     async def test_s_mod_2_toggle_public_to_private(
         self,
@@ -207,20 +190,16 @@ class TestScalingGroupCRUD:
         assert sg.status.is_public is True
         try:
             action = UpdateResourceGroupAction(
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                updater=Updater(
-                    spec=ResourceGroupUpdaterSpec(
-                        status=ResourceGroupStatusUpdaterSpec(
-                            is_public=OptionalState.update(False),
-                        )
-                    ),
-                    pk_value=name,
+                resource_group_id=sg.id,
+                updater=ResourceGroupUpdater(
+                    resource_group_id=sg.id,
+                    is_public=OptionalState.update(False),
                 ),
             )
             result = await resource_group_service.update_resource_group(action)
             assert result.resource_group.status.is_public is False
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
     async def test_s_mod_3_deactivate_scaling_group(
         self,
@@ -229,23 +208,19 @@ class TestScalingGroupCRUD:
     ) -> None:
         """S-MOD-3: Deactivate scaling group (is_active=False)."""
         name = f"crud-mod3-{uuid.uuid4().hex[:8]}"
-        await _create_sgroup(resource_group_service, name, is_active=True)
+        sg = await _create_sgroup(resource_group_service, name, is_active=True)
         try:
             action = UpdateResourceGroupAction(
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                updater=Updater(
-                    spec=ResourceGroupUpdaterSpec(
-                        status=ResourceGroupStatusUpdaterSpec(
-                            is_active=OptionalState.update(False),
-                        )
-                    ),
-                    pk_value=name,
+                resource_group_id=sg.id,
+                updater=ResourceGroupUpdater(
+                    resource_group_id=sg.id,
+                    is_active=OptionalState.update(False),
                 ),
             )
             result = await resource_group_service.update_resource_group(action)
             assert result.resource_group.status.is_active is False
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
     async def test_s_mod_4_change_driver(
         self,
@@ -254,24 +229,20 @@ class TestScalingGroupCRUD:
     ) -> None:
         """S-MOD-4: Update driver config."""
         name = f"crud-mod4-{uuid.uuid4().hex[:8]}"
-        await _create_sgroup(resource_group_service, name, driver="static")
+        sg = await _create_sgroup(resource_group_service, name, driver="static")
         try:
             action = UpdateResourceGroupAction(
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                updater=Updater(
-                    spec=ResourceGroupUpdaterSpec(
-                        driver=ResourceGroupDriverConfigUpdaterSpec(
-                            driver=OptionalState.update("static"),
-                            driver_opts=OptionalState.update({"key": "value"}),
-                        )
-                    ),
-                    pk_value=name,
+                resource_group_id=sg.id,
+                updater=ResourceGroupUpdater(
+                    resource_group_id=sg.id,
+                    driver=OptionalState.update("static"),
+                    driver_opts=OptionalState.update({"key": "value"}),
                 ),
             )
             result = await resource_group_service.update_resource_group(action)
             assert result.resource_group.driver.name == "static"
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
     # ------------------------------------------------------------------
     # PURGE
@@ -285,12 +256,9 @@ class TestScalingGroupCRUD:
     ) -> None:
         """S-PURGE-1: Purge a scaling group; it is no longer findable."""
         name = f"crud-purge-{uuid.uuid4().hex[:8]}"
-        await _create_sgroup(resource_group_service, name)
+        sg = await _create_sgroup(resource_group_service, name)
 
-        action = PurgeResourceGroupAction(
-            resource_group_id=ResourceGroupID(uuid.uuid4()),
-            purger=Purger(spec=ResourceGroupNamePurgerSpec(name=name)),
-        )
+        action = PurgeResourceGroupAction(resource_group_id=sg.id)
         result = await resource_group_service.purge_resource_group(action)
         assert result.data.name == name
 
@@ -343,7 +311,7 @@ class TestScalingGroupDomainAssociation:
             )
             assert exists is True
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
     # ------------------------------------------------------------------
     # S-3: Disassociate domain
@@ -407,7 +375,7 @@ class TestScalingGroupDomainAssociation:
             )
             assert exists is False
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
     # ------------------------------------------------------------------
     # S-5: Check association existence
@@ -459,7 +427,7 @@ class TestScalingGroupDomainAssociation:
                 )
             ) is True
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
 
 class TestScalingGroupKeypairAssociation:
@@ -503,7 +471,7 @@ class TestScalingGroupKeypairAssociation:
             )
             assert exists is True
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
     # ------------------------------------------------------------------
     # S-3: Disassociate keypair
@@ -564,7 +532,7 @@ class TestScalingGroupKeypairAssociation:
             )
             assert exists is False
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
     # ------------------------------------------------------------------
     # S-2: Associate multiple keypairs
@@ -615,7 +583,7 @@ class TestScalingGroupKeypairAssociation:
                 )
             ) is True
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)
 
     # ------------------------------------------------------------------
     # S-5: Check association existence
@@ -662,4 +630,4 @@ class TestScalingGroupKeypairAssociation:
                 )
             ) is True
         finally:
-            await _purge_sgroup(resource_group_service, name)
+            await _purge_sgroup(resource_group_service, sg.id)

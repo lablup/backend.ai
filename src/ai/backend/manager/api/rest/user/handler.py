@@ -38,8 +38,7 @@ from ai.backend.manager.data.user.types import UserStatus as ManagerUserStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.user_request import GetUserPathParam, UpdateUserPathParam
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
@@ -100,7 +99,6 @@ class UserHandler:
         body: BodyParam[CreateUserRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("CREATE_USER (ak:{})", ctx.access_key)
         password_info = PasswordInfo(
             password=body.parsed.password,
             algorithm=self._config_provider.config.auth.password_hash_algorithm,
@@ -108,37 +106,34 @@ class UserHandler:
             salt_size=self._config_provider.config.auth.password_hash_salt_size,
         )
 
-        creator = Creator(
-            spec=UserCreatorSpec(
-                email=body.parsed.email,
-                username=body.parsed.username,
-                password=password_info,
-                need_password_change=body.parsed.need_password_change,
-                domain_name=body.parsed.domain_name,
-                full_name=body.parsed.full_name,
-                description=body.parsed.description,
-                status=ManagerUserStatus(body.parsed.status.value)
-                if body.parsed.status is not None
-                else None,
-                role=body.parsed.role.value if body.parsed.role is not None else None,
-                allowed_client_ip=body.parsed.allowed_client_ip,
-                totp_activated=body.parsed.totp_activated,
-                resource_policy=body.parsed.resource_policy,
-                sudo_session_enabled=body.parsed.sudo_session_enabled,
-                container_uid=body.parsed.container_uid,
-                container_main_gid=body.parsed.container_main_gid,
-                container_gids=body.parsed.container_gids,
-            )
-        )
-
         domain_id = (
             await self._domain.lookup.run(
                 LookupDomainAction(name=DomainName(body.parsed.domain_name))
             )
         ).entity_id()
+        creator = UserCreator(
+            domain_id=domain_id,
+            email=body.parsed.email,
+            username=body.parsed.username,
+            password=password_info,
+            need_password_change=body.parsed.need_password_change,
+            full_name=body.parsed.full_name,
+            description=body.parsed.description,
+            status=ManagerUserStatus(body.parsed.status.value)
+            if body.parsed.status is not None
+            else None,
+            role=body.parsed.role.value if body.parsed.role is not None else None,
+            allowed_client_ip=body.parsed.allowed_client_ip,
+            totp_activated=body.parsed.totp_activated,
+            resource_policy=body.parsed.resource_policy,
+            sudo_session_enabled=body.parsed.sudo_session_enabled,
+            container_uid=body.parsed.container_uid,
+            container_main_gid=body.parsed.container_main_gid,
+            container_gids=body.parsed.container_gids,
+        )
+
         action_result = await self._user.create_user.run(
             CreateUserAction(
-                domain_id=domain_id,
                 creator=creator,
                 group_ids=body.parsed.group_ids,
             )
@@ -156,7 +151,6 @@ class UserHandler:
         path: PathParam[GetUserPathParam],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("GET_USER (ak:{}, u:{})", ctx.access_key, path.parsed.user_id)
         action_result = await self._user.get_user.run(
             GetUserAction(user_id=UserID(path.parsed.user_id))
         )
@@ -173,7 +167,6 @@ class UserHandler:
         body: BodyParam[SearchUsersRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("SEARCH_USERS (ak:{})", ctx.access_key)
         searcher = self._adapter.build_searcher(body.parsed)
 
         action_result = await self._user.global_search.run(
@@ -200,14 +193,6 @@ class UserHandler:
         body: BodyParam[UpdateUserRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("UPDATE_USER (ak:{}, u:{})", ctx.access_key, path.parsed.user_id)
-
-        # First get the user to obtain email (required by UpdateUserAction)
-        get_result = await self._user.get_user.run(
-            GetUserAction(user_id=UserID(path.parsed.user_id))
-        )
-        email = get_result.user.email
-
         # Build password info if password is being updated
         password_info: PasswordInfo | None = None
         if body.parsed.password is not None:
@@ -218,11 +203,11 @@ class UserHandler:
                 salt_size=self._config_provider.config.auth.password_hash_salt_size,
             )
 
-        updater = self._adapter.build_updater(body.parsed, email, password_info)
-
-        action_result = await self._user.update_user.run(
-            UpdateUserAction(user_id=UserID(path.parsed.user_id), updater=updater)
+        updater = self._adapter.build_updater(
+            body.parsed, UserID(path.parsed.user_id), password_info
         )
+
+        action_result = await self._user.update_user.run(UpdateUserAction(updater=updater))
 
         if body.parsed.main_access_key is not None:
             await self._user.switch_default_access_key.run(
@@ -244,8 +229,6 @@ class UserHandler:
         body: BodyParam[DeleteUserRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("DELETE_USER (ak:{}, u:{})", ctx.access_key, body.parsed.user_id)
-
         await self._user.delete_user.run(DeleteUserAction(user_id=UserID(body.parsed.user_id)))
 
         resp = DeleteUserResponse(success=True)
@@ -260,8 +243,6 @@ class UserHandler:
         body: BodyParam[PurgeUserRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("PURGE_USER (ak:{}, u:{})", ctx.access_key, body.parsed.user_id)
-
         purge_shared = OptionalState[bool].nop()
         delegate_endpoint = OptionalState[bool].nop()
         if body.parsed.purge_shared_vfolders:

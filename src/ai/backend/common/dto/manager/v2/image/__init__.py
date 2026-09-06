@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageOrderByInputDTO,
     PurgeImageInput,
     RescanImagesInput,
+    RestoreImageInput,
     SearchImagesInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
@@ -27,6 +28,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImagePermissionInfoDTO,
     PurgeImagePayload,
     RescanImagesPayload,
+    RestoreImagePayload,
     SearchImagesPayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
@@ -54,6 +56,7 @@ __all__ = (
     "AliasImageInput",
     "DealiasImageInput",
     "ForgetImageInput",
+    "RestoreImageInput",
     "ImageFilter",
     "ImageFilterInputDTO",
     "ImageOrder",
@@ -66,6 +69,7 @@ __all__ = (
     "AdminSearchImagesPayload",
     "AliasImagePayload",
     "ForgetImagePayload",
+    "RestoreImagePayload",
     "GetImagePayload",
     "ImageAliasNode",
     "ImageNode",

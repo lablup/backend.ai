@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
@@ -45,39 +45,27 @@ from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_que
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
     BulkCreatorResultWithFailures,
-    Creator,
     execute_bulk_creator,
 )
 from ai.backend.manager.repositories.base.purger import (
     BatchPurger,
-    Purger,
     execute_batch_purger,
 )
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.base.rbac.scope_binder import RBACScopeBinder
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import RBACScopeEntityUnbinder
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
     RBACOpsProvider,
     RBACWriteOps,
-    ScopeDeletion,
     ScopeEntityMember,
 )
 from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupCreatorSpec,
     ResourceGroupForDomainCreatorSpec,
     ResourceGroupForProjectCreatorSpec,
-    ResourceGroupScopeCreation,
 )
 from ai.backend.manager.repositories.resource_group.purgers import (
     DomainsForResourceGroupPurgerSpec,
     ProjectsForResourceGroupPurgerSpec,
-    ResourceGroupEndpointsPurgerSpec,
-    ResourceGroupKernelsPurgerSpec,
-    ResourceGroupPurgerSpec,
-    ResourceGroupRoutingsPurgerSpec,
-    ResourceGroupSessionsPurgerSpec,
     ResourceGroupsForDomainPurgerSpec,
     ResourceGroupsForProjectPurgerSpec,
 )
@@ -153,32 +141,6 @@ class ResourceGroupDBSource:
         )
         return {row.name: row.id for row in result.rows}
 
-    async def _get_resource_group_id(
-        self, w: RBACWriteOps, resource_group_name: str
-    ) -> ResourceGroupID:
-        result = await w.batch_query_in_global(
-            sa.select(ResourceGroupRow.id).where(ResourceGroupRow.name == resource_group_name),
-            BatchQuerier(pagination=NoPagination()),
-        )
-        if not result.rows:
-            raise ResourceGroupNotFound(resource_group_name)
-        return ResourceGroupID(result.rows[0].id)
-
-    async def create_resource_group(
-        self,
-        creator: Creator[ResourceGroupRow],
-    ) -> ResourceGroupData:
-        """Creates a new resource group as a resource-group scope: the row is created
-        together with its virtual scope, so RBAC resolution reaches the resource group
-        and its entities through the virtual-scope chain.
-
-        Raises ScalingGroupConflict if a resource group with the same name already exists.
-        """
-        spec = cast(ResourceGroupCreatorSpec, creator.spec)
-        async with self._rbac_ops_provider.write_ops() as w:
-            result = await w.create_scope(ResourceGroupScopeCreation(spec=spec))
-            return result.row.to_dataclass()
-
     async def search_resource_groups(
         self,
         querier: BatchQuerier,
@@ -246,72 +208,6 @@ class ResourceGroupDBSource:
                 raise ResourceGroupNotFound(name)
             return row.to_dataclass()
 
-    async def purge_resource_group(
-        self,
-        purger: Purger[ResourceGroupRow],
-    ) -> ResourceGroupData:
-        """Purges a resource group and all related sessions, routes, endpoints, and
-        kernels, together with its RBAC entries and virtual scope.
-
-        Raises ScalingGroupNotFound if resource group doesn't exist.
-        """
-        resource_group_name = cast(str, purger.spec.pk_value())
-        async with self._rbac_ops_provider.write_ops() as w:
-            resource_group_id = await self._get_resource_group_id(w, resource_group_name)
-
-            await w.batch_purge(
-                BatchPurger(
-                    spec=ResourceGroupRoutingsPurgerSpec(resource_group_id=resource_group_id)
-                )
-            )
-            await w.batch_purge(
-                BatchPurger(
-                    spec=ResourceGroupEndpointsPurgerSpec(resource_group_id=resource_group_id)
-                )
-            )
-            await w.batch_purge(
-                BatchPurger(
-                    spec=ResourceGroupKernelsPurgerSpec(resource_group_id=resource_group_id)
-                )
-            )
-            await w.batch_purge(
-                BatchPurger(
-                    spec=ResourceGroupSessionsPurgerSpec(resource_group_id=resource_group_id)
-                )
-            )
-
-            result = await w.delete_scope(
-                ScopeDeletion(
-                    purger=RBACEntityPurger(
-                        spec=ResourceGroupPurgerSpec(
-                            name=resource_group_name,
-                            resource_group_id=resource_group_id,
-                        )
-                    ),
-                    scope=self._resource_group_scope(resource_group_id),
-                )
-            )
-            if result is None:
-                raise ResourceGroupNotFound(
-                    f"Resource group not found (name:{resource_group_name})"
-                )
-
-            return result.row.to_dataclass()
-
-    async def update_resource_group(
-        self,
-        updater: Updater[ResourceGroupRow],
-    ) -> ResourceGroupData:
-        """Updates an existing resource group.
-
-        Raises ScalingGroupNotFound if the resource group does not exist.
-        """
-        async with self._db.begin_session() as session:
-            result = await execute_updater(session, updater)
-            if result is None:
-                raise ResourceGroupNotFound(f"Resource group not found (name:{updater.pk_value})")
-            return result.row.to_dataclass()
-
     async def replace_default_deployment_options(
         self,
         name: ResourceGroupName,
@@ -375,7 +271,7 @@ class ResourceGroupDBSource:
         binder: RBACScopeBinder[ResourceGroupForDomainRow],
     ) -> None:
         """Associates a resource group with multiple domains, binding each domain scope
-        to the resource group's virtual scope."""
+        to the resource group's virtual entity."""
         await self._associate_resource_groups(binder)
 
     async def disassociate_resource_group_with_domains(
@@ -383,13 +279,13 @@ class ResourceGroupDBSource:
         unbinder: RBACScopeEntityUnbinder[ResourceGroupForDomainRow],
     ) -> None:
         """Disassociates resource groups from a domain, unbinding the domain scope from
-        each resource group's virtual scope."""
+        each resource group's virtual entity."""
         await self._disassociate_resource_groups(unbinder)
 
     async def _associate_resource_groups[TRow: Base](self, binder: RBACScopeBinder[TRow]) -> None:
         """Create the N:N mapping rows and enroll each pair's resource group into the
         pair's scope (association row + membership), binding the scope to the resource
-        group's virtual scope so it reaches the resource group's entities."""
+        group's virtual entity so it reaches the resource group's entities."""
         if not binder.pairs:
             return
         async with self._rbac_ops_provider.write_ops() as w:
@@ -403,7 +299,7 @@ class ResourceGroupDBSource:
         self, unbinder: RBACScopeEntityUnbinder[TRow]
     ) -> None:
         """Delete the N:N mapping rows and withdraw each resource group from the
-        unbinder's scope (association row + membership + virtual-scope binding)."""
+        unbinder's scope (association row + membership + virtual-entity binding)."""
         async with self._rbac_ops_provider.write_ops() as w:
             accessor_scope = self._scope_ref_of(unbinder.scope_ref)
             entity_ids = unbinder.entity_ids
@@ -428,8 +324,8 @@ class ResourceGroupDBSource:
     ) -> None:
         """Enroll resource groups under ``accessor_scope`` as inheriting members:
         membership, the legacy scope association, and the scope's binding into each
-        resource group's virtual scope. The virtual scopes are ensured first, since
-        rows created before the virtual-scope rollout may not have one."""
+        resource group's virtual entity. The virtual entities are ensured first, since
+        rows created before the virtual-entity rollout may not have one."""
         if not resource_group_ids:
             return
         await w.ensure_scope(accessor_scope)
@@ -453,7 +349,7 @@ class ResourceGroupDBSource:
     ) -> None:
         """Withdraw resource groups from ``accessor_scope`` via ``remove_bulk_members``:
         membership, the legacy scope association, and the scope's binding in each
-        resource group's virtual scope (missing virtual scopes never raise)."""
+        resource group's virtual entity (missing virtual entities never raise)."""
         if not resource_group_ids:
             return
         await w.remove_bulk_members(
@@ -520,7 +416,7 @@ class ResourceGroupDBSource:
         binder: RBACScopeBinder[ResourceGroupForProjectRow],
     ) -> None:
         """Associates a resource group with multiple user groups (projects), binding each
-        project scope to the resource group's virtual scope."""
+        project scope to the resource group's virtual entity."""
         await self._associate_resource_groups(binder)
 
     async def disassociate_resource_group_with_user_groups(
@@ -528,7 +424,7 @@ class ResourceGroupDBSource:
         unbinder: RBACScopeEntityUnbinder[ResourceGroupForProjectRow],
     ) -> None:
         """Disassociates resource groups from a project, unbinding the project scope from
-        each resource group's virtual scope."""
+        each resource group's virtual entity."""
         await self._disassociate_resource_groups(unbinder)
 
     async def check_resource_group_user_group_association_exists(
@@ -666,7 +562,7 @@ class ResourceGroupDBSource:
         """Atomically add/remove allowed resource groups for a domain.
 
         Alongside the N:N mapping rows, maintains the domain scope's RBAC association
-        with each resource group (association row + membership + virtual-scope binding).
+        with each resource group (association row + membership + virtual-entity binding).
 
         Returns the current list of allowed resource group names after the update.
         """
@@ -719,7 +615,7 @@ class ResourceGroupDBSource:
         """Atomically add/remove allowed resource groups for a project.
 
         Alongside the N:N mapping rows, maintains the project scope's RBAC association
-        with each resource group (association row + membership + virtual-scope binding).
+        with each resource group (association row + membership + virtual-entity binding).
 
         Returns the current list of allowed resource group names after the update.
         """
@@ -888,39 +784,6 @@ class ResourceGroupDBSource:
     # =========================================================================
     # Get allowed (read-only queries)
     # =========================================================================
-
-    async def get_allowed_resource_groups_for_domain(
-        self,
-        domain_name: str,
-    ) -> list[str]:
-        """Get allowed resource group names for a domain."""
-        async with self._db.begin_readonly_session_read_committed() as session:
-            result = await session.execute(
-                sa.select(ResourceGroupRow.name)
-                .join(
-                    ResourceGroupForDomainRow,
-                    ResourceGroupForDomainRow.resource_group_id == ResourceGroupRow.id,
-                )
-                .join(DomainRow, DomainRow.id == ResourceGroupForDomainRow.domain_id)
-                .where(DomainRow.name == domain_name)
-            )
-            return [row[0] for row in result]
-
-    async def get_allowed_resource_groups_for_project(
-        self,
-        project_id: uuid.UUID,
-    ) -> list[str]:
-        """Get allowed resource group names for a project."""
-        async with self._db.begin_readonly_session_read_committed() as session:
-            result = await session.execute(
-                sa.select(ResourceGroupRow.name)
-                .join(
-                    ResourceGroupForProjectRow,
-                    ResourceGroupForProjectRow.resource_group_id == ResourceGroupRow.id,
-                )
-                .where(ResourceGroupForProjectRow.group == project_id)
-            )
-            return [row[0] for row in result]
 
     async def get_allowed_domains_for_resource_group(
         self,

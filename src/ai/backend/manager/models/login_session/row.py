@@ -17,6 +17,7 @@ from ai.backend.manager.data.auth.login_session_types import (
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    IPAddressColumn,
     StrEnumType,
 )
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
@@ -31,7 +32,7 @@ class LoginSessionRow(CreatedAtMixin, Base):
     __tablename__ = "login_sessions"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     session_token: Mapped[str] = mapped_column(
         "session_token", sa.String(64), unique=True, nullable=False, index=True
@@ -89,7 +90,7 @@ class LoginHistoryRow(Base):
     __tablename__ = "login_history"
 
     id: Mapped[LoginHistoryID] = mapped_column(
-        "id", GUID(LoginHistoryID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(LoginHistoryID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     user_id: Mapped[UserID] = mapped_column(
         "user_id",
@@ -106,6 +107,9 @@ class LoginHistoryRow(Base):
         index=True,
     )
     fail_reason: Mapped[str | None] = mapped_column("fail_reason", sa.Text, nullable=True)
+    # The address of the request that produced this record, not of the session it closes:
+    # an eviction or an admin revocation carries the address of whoever triggered it.
+    client_ip: Mapped[str | None] = mapped_column("client_ip", IPAddressColumn, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -127,5 +131,6 @@ class LoginHistoryRow(Base):
             domain_name=self.domain_name,
             result=self.result,
             fail_reason=self.fail_reason,
+            client_ip=self.client_ip,
             created_at=self.created_at,
         )

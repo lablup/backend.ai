@@ -55,7 +55,7 @@ class RoutingRow(Base):
     )
 
     id: Mapped[ReplicaID] = mapped_column(
-        "id", GUID(ReplicaID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ReplicaID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     endpoint: Mapped[DeploymentID] = mapped_column(
         "endpoint",

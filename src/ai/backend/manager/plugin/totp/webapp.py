@@ -32,7 +32,6 @@ async def initialize_otp_activation(request: web.Request) -> web.Response:
     db = root_app["_db"]
     ctx = cast(PrivateContext, request.app["context"])
     email = request["user"]["email"]
-    log.info("TOTP.INITIALIZE_OTP_ACTIVATION()")
     async with db.begin_readonly() as conn:
         query = (
             sa.select(users.c.totp_activated, users.c.totp_key)
@@ -76,7 +75,6 @@ async def finalize_otp_activation(request: web.Request, params: Any) -> web.Resp
     root_app = request.app["_root_app"]
     db = root_app["_db"]
     email = request["user"]["email"]
-    log.info("TOTP.FINALIZE_OTP_ACTIVATION(otp: {})", params["otp"])
 
     async with db.begin_readonly() as conn:
         query = (
@@ -117,7 +115,6 @@ async def deactivate_totp(request: web.Request) -> web.Response:
             raise GenericForbidden
         email = request.query["email"]
 
-    log.info("TOTP.DEACTIVATE_TOTP(email: {})", email)
     async with db.begin_readonly() as conn:
         query = (
             sa.select(users.c.totp_activated, users.c.totp_key)
@@ -154,7 +151,6 @@ async def initialize_anonymous_otp_activation(request: web.Request, params: Any)
     root_app = request.app["_root_app"]
     db = root_app["_db"]
     ctx = cast(PrivateContext, request.app["context"])
-    log.info("TOTP.INITIALIZE_OTP_ACTIVATION()")
     raw_token = params["registration_token"]
     try:
         token = ctx.token_parser.deserialize(raw_token)
@@ -194,7 +190,6 @@ async def finalize_anonymous_otp_activation(request: web.Request, params: Any) -
     root_app = request.app["_root_app"]
     db = root_app["_db"]
     ctx = cast(PrivateContext, request.app["context"])
-    log.info("TOTP.FINALIZE_OTP_ACTIVATION(otp: {})", params["otp"])
     raw_token = params["registration_token"]
     try:
         token = ctx.token_parser.deserialize(raw_token)

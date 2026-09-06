@@ -22,7 +22,7 @@ class AuditLogData(FieldData):
     action_id: ActionID
     action_kind: ActionKind | None
     action_name: str
-    entity_type: str
+    entity_type: str | None
     operation: str
     created_at: datetime
     description: str
@@ -34,6 +34,7 @@ class AuditLogData(FieldData):
     triggered_by: str | None
     acted_as: uuid.UUID | None
     duration: timedelta | None
+    client_ip: str | None
 
 
 @dataclass

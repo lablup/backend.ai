@@ -49,6 +49,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -83,18 +84,25 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
 from ai.backend.manager.repositories.resource_preset.types import (
     CheckPresetsResult,
 )
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
-from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 def _qty(slots: list[SlotQuantity], name: str) -> Decimal:
@@ -153,9 +161,12 @@ class TestCheckPresetsOccupiedSlots:
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
                 AssociationScopesEntitiesRow,  # RBAC project membership
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
+                EntityLabelRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -328,7 +339,7 @@ class TestCheckPresetsOccupiedSlots:
                     entity_id=str(test_user_uuid),
                 )
             )
-            await VirtualScopeSeeder().enroll_user_in_project(db_sess, group_id, test_user_uuid)
+            await VirtualEntitySeeder().enroll_user_in_project(db_sess, group_id, test_user_uuid)
             await db_sess.flush()
 
         try:
@@ -406,7 +417,7 @@ class TestCheckPresetsOccupiedSlots:
             # Get user email for user_id field
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="test-secret",
+                secret_key=SecretValue("test-secret"),
                 user=test_user_uuid,  # user is UUID (required NOT NULL)
                 is_active=True,
                 resource_policy=test_resource_policy_name,
@@ -453,8 +464,6 @@ class TestCheckPresetsOccupiedSlots:
                 scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 schedulable=schedulable,
-                available_slots=_available,
-                occupied_slots=_occupied,
                 addr=addr,
                 version="v25.03.0",
                 architecture="x86_64",
@@ -674,14 +683,6 @@ class TestCheckPresetsOccupiedSlots:
                 cluster_role="main",
                 cluster_idx=1,
                 cluster_hostname="main",
-                occupied_slots=ResourceSlot({
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                }),
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                }),
                 vfolder_mounts=[],
                 repl_in_port=0,
                 repl_out_port=0,
@@ -689,11 +690,12 @@ class TestCheckPresetsOccupiedSlots:
                 stdout_port=0,
             )
 
+            kernel_slots = ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")})
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
             # Seed normalized resource_allocations for this kernel
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 db_sess.add(
                     ResourceAllocationRow(
                         kernel_id=kernel.id,
@@ -703,7 +705,7 @@ class TestCheckPresetsOccupiedSlots:
                     )
                 )
             # Update AgentResourceRow.used to match kernel occupied slots
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 await db_sess.execute(
                     sa.update(AgentResourceRow)
                     .where(
@@ -813,14 +815,6 @@ class TestCheckPresetsOccupiedSlots:
                 cluster_role="main",
                 cluster_idx=1,
                 cluster_hostname="main",
-                occupied_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
-                }),
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
-                }),
                 vfolder_mounts=[],
                 repl_in_port=0,
                 repl_out_port=0,
@@ -828,10 +822,11 @@ class TestCheckPresetsOccupiedSlots:
                 stdout_port=0,
             )
 
+            kernel_slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")})
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 db_sess.add(
                     ResourceAllocationRow(
                         kernel_id=kernel.id,
@@ -840,7 +835,7 @@ class TestCheckPresetsOccupiedSlots:
                         used=Decimal(str(value)),
                     )
                 )
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 await db_sess.execute(
                     sa.update(AgentResourceRow)
                     .where(
@@ -949,14 +944,6 @@ class TestCheckPresetsOccupiedSlots:
                 cluster_role="main",
                 cluster_idx=1,
                 cluster_hostname="main",
-                occupied_slots=ResourceSlot({  # Not yet occupied
-                    "cpu": Decimal("0"),
-                    "mem": Decimal("0"),
-                }),
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                }),
                 vfolder_mounts=[],
                 repl_in_port=0,
                 repl_out_port=0,
@@ -964,11 +951,12 @@ class TestCheckPresetsOccupiedSlots:
                 stdout_port=0,
             )
 
+            kernel_requested = ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")})
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
             # PENDING kernel: allocation exists with requested but no used
-            for slot_name, value in kernel.requested_slots.items():
+            for slot_name, value in kernel_requested.items():
                 db_sess.add(
                     ResourceAllocationRow(
                         kernel_id=kernel.id,
@@ -1045,23 +1033,15 @@ class TestCheckPresetsOccupiedSlots:
                 scaling_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
                 schedulable=True,
-                available_slots=ResourceSlot({
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("32768"),
-                }),
-                occupied_slots=ResourceSlot({
-                    # WRONG: cached value says 10 CPU occupied
-                    "cpu": Decimal("10"),
-                    "mem": Decimal("20480"),
-                }),
                 addr="10.0.0.2:2001",
                 version="v25.03.0",
                 architecture="x86_64",
             )
+            agent_capacity = ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")})
             db_sess.add(agent)
             await db_sess.flush()
             # Seed normalized agent_resources (ACTUAL occupied = 3 CPU, 6144 mem)
-            for slot_name, capacity in agent.available_slots.items():
+            for slot_name, capacity in agent_capacity.items():
                 db_sess.add(
                     AgentResourceRow(
                         agent_id=agent_id,
@@ -1115,15 +1095,6 @@ class TestCheckPresetsOccupiedSlots:
                 cluster_role="main",
                 cluster_idx=1,
                 cluster_hostname="main",
-                occupied_slots=ResourceSlot({
-                    # ACTUAL: only 3 CPU occupied
-                    "cpu": Decimal("3"),
-                    "mem": Decimal("6144"),
-                }),
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("3"),
-                    "mem": Decimal("6144"),
-                }),
                 vfolder_mounts=[],
                 repl_in_port=0,
                 repl_out_port=0,
@@ -1131,10 +1102,11 @@ class TestCheckPresetsOccupiedSlots:
                 stdout_port=0,
             )
 
+            kernel_slots = ResourceSlot({"cpu": Decimal("3"), "mem": Decimal("6144")})
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 db_sess.add(
                     ResourceAllocationRow(
                         kernel_id=kernel.id,
@@ -1144,7 +1116,7 @@ class TestCheckPresetsOccupiedSlots:
                     )
                 )
             # Update AgentResourceRow.used to match ACTUAL kernel occupied (3 CPU, 6144 mem)
-            for slot_name, value in kernel.occupied_slots.items():
+            for slot_name, value in kernel_slots.items():
                 await db_sess.execute(
                     sa.update(AgentResourceRow)
                     .where(
@@ -1276,9 +1248,11 @@ class TestCheckPresetsZeroValues:
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
                 AssociationScopesEntitiesRow,  # RBAC project membership
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -1484,7 +1458,7 @@ class TestCheckPresetsZeroValues:
                     entity_id=str(test_user_uuid),
                 )
             )
-            await VirtualScopeSeeder().enroll_user_in_project(db_sess, group_id, test_user_uuid)
+            await VirtualEntitySeeder().enroll_user_in_project(db_sess, group_id, test_user_uuid)
             await db_sess.flush()
 
         try:
@@ -1506,7 +1480,7 @@ class TestCheckPresetsZeroValues:
             # Get user email for user_id field
             keypair = KeyPairRow(
                 access_key=access_key,
-                secret_key="test-secret",
+                secret_key=SecretValue("test-secret"),
                 user=test_user_uuid,
                 is_active=True,
                 resource_policy=test_resource_policy_name,
@@ -1602,8 +1576,6 @@ class TestCheckPresetsZeroValues:
                 scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
                 schedulable=True,
-                available_slots=_available,
-                occupied_slots=_occupied,
                 addr=addr,
                 version="v25.03.0",
                 architecture="x86_64",

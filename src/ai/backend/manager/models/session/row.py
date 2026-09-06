@@ -38,6 +38,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_dependency import SessionDependencyID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
@@ -46,7 +47,6 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -85,7 +85,6 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
     PydanticColumn,
-    ResourceSlotColumn,
     SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
@@ -108,7 +107,6 @@ from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -363,7 +361,7 @@ def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
 class SessionRow(CreatedAtMixin, Base):
     __tablename__ = "sessions"
     id: Mapped[SessionId] = mapped_column(
-        "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     creation_id: Mapped[str | None] = mapped_column(
         "creation_id", sa.String(length=32), unique=False, index=False
@@ -480,9 +478,7 @@ class SessionRow(CreatedAtMixin, Base):
         "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
     group: Mapped[ProjectRow] = relationship("ProjectRow")
-    user_uuid: Mapped[UserID] = mapped_column(
-        "user_uuid", GUID(UserID), server_default=sa.text("uuid_generate_v4()"), nullable=False
-    )
+    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False)
     user: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
@@ -497,17 +493,6 @@ class SessionRow(CreatedAtMixin, Base):
     image_ids: Mapped[list[UUID] | None] = mapped_column("image_ids", sa.ARRAY(GUID), nullable=True)
     tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
 
-    # Resource occupation
-    # DEPRECATED (Phase 3, BA-4308): No longer written to.
-    # Resource allocations are now tracked by the normalized
-    # resource_allocations / agent_resources tables.
-    # Retained for historical audit; will be dropped in a future major version.
-    occupying_slots: Mapped[ResourceSlot] = mapped_column(
-        "occupying_slots", ResourceSlotColumn(), nullable=False
-    )
-    requested_slots: Mapped[ResourceSlot] = mapped_column(
-        "requested_slots", ResourceSlotColumn(), nullable=False
-    )
     vfolder_mounts: Mapped[list[VFolderMount] | None] = mapped_column(
         "vfolder_mounts", StructuredJSONObjectListColumn(VFolderMount), nullable=True
     )
@@ -701,8 +686,6 @@ class SessionRow(CreatedAtMixin, Base):
             images=session_data.images,
             image_ids=session_data.image_ids,
             tag=session_data.tag,
-            occupying_slots=session_data.occupying_slots,
-            requested_slots=session_data.requested_slots,
             vfolder_mounts=vfolder_mounts,
             environ=session_data.environ,
             bootstrap_script=session_data.bootstrap_script,
@@ -748,8 +731,6 @@ class SessionRow(CreatedAtMixin, Base):
             images=self.images,
             image_ids=self.image_ids,
             tag=self.tag,
-            occupying_slots=self.occupying_slots,
-            requested_slots=self.requested_slots,
             vfolder_mounts=[mount.to_dataclass() for mount in self.vfolder_mounts]
             if self.vfolder_mounts
             else None,
@@ -806,8 +787,6 @@ class SessionRow(CreatedAtMixin, Base):
             images=self.images,
             image_ids=self.image_ids,
             tag=self.tag,
-            occupying_slots=self.occupying_slots,
-            requested_slots=self.requested_slots,
             vfolder_mounts=self.vfolder_mounts,
             environ=self.environ,
             bootstrap_script=self.bootstrap_script,
@@ -854,8 +833,6 @@ class SessionRow(CreatedAtMixin, Base):
             resource=ResourceSpec(
                 cluster_mode=self.cluster_mode,
                 cluster_size=self.cluster_size,
-                occupying_slots=self.occupying_slots,
-                requested_slots=self.requested_slots,
                 resource_group_name=self.scaling_group_name,
                 target_sgroup_names=self.target_sgroup_names,
                 agent_ids=self.agent_ids,
@@ -1280,6 +1257,13 @@ def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition
 
 class SessionDependencyRow(Base):
     __tablename__ = "session_dependencies"
+    id: Mapped[SessionDependencyID] = mapped_column(
+        "id",
+        GUID(SessionDependencyID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v7()"),
+    )
     session_id: Mapped[SessionID] = mapped_column(
         "session_id",
         GUID(SessionID),
@@ -1608,49 +1592,3 @@ async def get_permission_ctx(
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ComputeSessionPermissionContextBuilder(db_session)
         return await builder.build(ctx, target_scope, requested_permission)
-
-
-async def batch_populate_session_occupied_slots(
-    db_session: SASession,
-    session_rows: Sequence[SessionRow],
-) -> None:
-    """Batch-compute occupied slots from the normalized resource_allocations table
-    and populate each SessionRow's occupying_slots attribute in-place.
-
-    This replaces the deprecated JSONB column read with a live computation
-    from the resource_allocations table (Phase 3, BA-4308).
-    """
-    if not session_rows:
-        return
-    session_ids = [row.id for row in session_rows]
-    ra = ResourceAllocationRow.__table__
-    kernels = KernelRow.__table__
-    effective = sa.func.coalesce(ra.c.used, ra.c.requested)
-    stmt = (
-        sa.select(
-            kernels.c.session_id,
-            ra.c.slot_name,
-            sa.func.sum(effective).label("total"),
-        )
-        .select_from(ra.join(kernels, ra.c.kernel_id == kernels.c.id))
-        .where(
-            kernels.c.session_id.in_(session_ids),
-            ra.c.free_at.is_(None),
-        )
-        .group_by(kernels.c.session_id, ra.c.slot_name)
-    )
-    rows = (await db_session.execute(stmt)).all()
-    slots_map: dict[SessionId, ResourceSlot] = {}
-    for r in rows:
-        sid = SessionId(r.session_id)
-        if sid not in slots_map:
-            slots_map[sid] = ResourceSlot()
-        slots_map[sid][r.slot_name] = r.total
-    for session_row in session_rows:
-        # Use set_committed_value to avoid marking the attribute as dirty
-        # in readonly sessions.
-        sa.orm.attributes.set_committed_value(
-            session_row,
-            "occupying_slots",
-            slots_map.get(SessionId(session_row.id), ResourceSlot()),
-        )

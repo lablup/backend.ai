@@ -25,6 +25,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
@@ -43,16 +44,23 @@ from ai.backend.common.types import (
     BinarySize,
     ContainerId,
     ImageAlias,
+    KernelId,
+    ResourceSlot,
     ResourceSlotEntry,
     SessionId,
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.v2.bulk.result import (
+    PartialBulkEntityResult,
+    PartialBulkResult,
+)
 from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.common.sentinel import undefined
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -71,7 +79,7 @@ from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
 )
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus, SessionTerminationStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.common import (
     InternalServerError,
@@ -103,7 +111,6 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
-from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
     BatchGetKernelResourceAllocationAction,
@@ -111,7 +118,6 @@ from ai.backend.manager.services.session.actions.batch_get_kernel_resource_alloc
 )
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
-    BatchGetSessionResourceAllocationActionResult,
 )
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
@@ -235,7 +241,6 @@ from ai.backend.manager.services.session.actions.start_service import (
 )
 from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
-    TerminateSessionsActionResult,
 )
 from ai.backend.manager.services.session.actions.update_session import (
     UpdateSessionAction,
@@ -880,7 +885,7 @@ class SessionService:
 
     async def terminate_sessions(
         self, action: TerminateSessionsAction
-    ) -> TerminateSessionsActionResult:
+    ) -> PartialBulkResult[SessionTerminationStatus]:
         """Terminate multiple sessions by their IDs."""
         reason = (
             KernelLifecycleEventReason.FORCE_TERMINATED
@@ -890,11 +895,26 @@ class SessionService:
         mark_result = await self._scheduling_controller.mark_sessions_for_termination(
             action.session_ids, reason=reason.value, forced=action.forced
         )
-        return TerminateSessionsActionResult(
-            cancelled=mark_result.cancelled_sessions,
-            terminating=mark_result.terminating_sessions,
-            force_terminated=mark_result.force_terminated_sessions,
-            skipped=mark_result.skipped_sessions,
+        # The controller answers in four buckets; the bulk shape answers per session,
+        # so the state each one ended in becomes that session's value.
+        states: dict[EntityIdentifier, SessionTerminationStatus] = {
+            SessionID(sid): state
+            for state, sids in (
+                (SessionTerminationStatus.CANCELLED, mark_result.cancelled_sessions),
+                (SessionTerminationStatus.TERMINATING, mark_result.terminating_sessions),
+                (SessionTerminationStatus.FORCE_TERMINATED, mark_result.force_terminated_sessions),
+                (SessionTerminationStatus.SKIPPED, mark_result.skipped_sessions),
+            )
+            for sid in sids
+        }
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[SessionTerminationStatus].succeeded(
+                    entity_id, state, description=state.value
+                )
+                for entity_id in action.entity_ids()
+                if (state := states.get(entity_id)) is not None
+            ]
         )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
@@ -1198,6 +1218,15 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
+        session_id = SessionId(sess.id)
+        main_kernel_id = KernelId(sess.main_kernel.id)
+        session_allocation = (
+            await self._session_repository.batch_get_resource_allocation_by_session([session_id])
+        ).get(session_id)
+        kernel_allocation = (
+            await self._session_repository.batch_get_resource_allocation_by_kernel([main_kernel_id])
+        ).get(main_kernel_id)
+
         age = datetime.now(tzutc()) - sess.created_at
         session_info = LegacySessionInfo(
             domain_name=sess.domain_name,
@@ -1211,9 +1240,11 @@ class SessionService:
             container_id=ContainerId(sess.main_kernel.container_id)
             if sess.main_kernel.container_id
             else None,
-            occupied_slots=str(sess.main_kernel.occupied_slots),  # legacy
-            occupying_slots=str(sess.occupying_slots),
-            requested_slots=str(sess.requested_slots),
+            occupied_slots=str(kernel_allocation.used if kernel_allocation else ResourceSlot()),
+            occupying_slots=str(session_allocation.used if session_allocation else ResourceSlot()),
+            requested_slots=str(
+                session_allocation.requested if session_allocation else ResourceSlot()
+            ),
             occupied_shares=str(sess.main_kernel.occupied_shares),  # legacy
             environ=str(sess.environ),
             resource_opts=str(sess.resource_opts),
@@ -1499,8 +1530,7 @@ class SessionService:
 
     async def update_session(self, action: UpdateSessionAction) -> UpdateSessionActionResult:
         session_id = action.session_id
-        spec = cast(SessionUpdaterSpec, action.updater.spec)
-        session_name = spec.name.optional_value()
+        session_name = action.updater.name.optional_value()
 
         session_row = await self._session_repository.update_session(action.updater, session_name)
         if session_row is None:
@@ -1545,20 +1575,33 @@ class SessionService:
 
     async def batch_get_session_resource_allocation(
         self, action: BatchGetSessionResourceAllocationAction
-    ) -> BatchGetSessionResourceAllocationActionResult:
+    ) -> PartialBulkResult[ResourceAllocationAggregate]:
         """Aggregate resource_allocations per session (requested/used/allocated)."""
         data = await self._session_repository.batch_get_resource_allocation_by_session(
             action.session_ids
         )
-        return BatchGetSessionResourceAllocationActionResult(data=data)
+        # Every named session is answered for: one with no allocations recorded holds
+        # nothing, which is not the same as an id naming no session.
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[ResourceAllocationAggregate].succeeded(
+                    SessionID(sid), aggregate, description="aggregated"
+                )
+                if (aggregate := data.get(sid)) is not None
+                else PartialBulkEntityResult[ResourceAllocationAggregate].nothing(
+                    SessionID(sid), description="no allocations"
+                )
+                for sid in action.session_ids
+            ]
+        )
 
     async def batch_get_kernel_resource_allocation(
         self, action: BatchGetKernelResourceAllocationAction
     ) -> BatchGetKernelResourceAllocationActionResult:
         """Aggregate resource_allocations per kernel (requested/used/allocated)."""
-        data = await self._session_repository.batch_get_resource_allocation_by_kernel(
-            action.kernel_ids
-        )
+        data = await self._session_repository.batch_get_resource_allocation_by_kernel([
+            KernelId(kernel_id) for kernel_id in action.kernel_ids
+        ])
         return BatchGetKernelResourceAllocationActionResult(data=data)
 
     async def enqueue_session(self, action: EnqueueSessionAction) -> EnqueueSessionActionResult:

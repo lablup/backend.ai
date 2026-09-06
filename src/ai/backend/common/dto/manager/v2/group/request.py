@@ -29,6 +29,7 @@ __all__ = (
     "ProjectFilter",
     "ProjectOrder",
     "PurgeProjectInput",
+    "RestoreProjectInput",
     "SearchProjectsRequest",
     "UnassignUsersFromProjectInput",
     "UpdateProjectInput",
@@ -93,6 +94,12 @@ class DeleteProjectInput(BaseRequestModel):
     """Input for soft-deleting a group."""
 
     group_id: UUID = Field(description="UUID of the group to soft-delete.")
+
+
+class RestoreProjectInput(BaseRequestModel):
+    """Input for restoring a soft-deleted group."""
+
+    group_id: UUID = Field(description="UUID of the group to restore.")
 
 
 class PurgeProjectInput(BaseRequestModel):

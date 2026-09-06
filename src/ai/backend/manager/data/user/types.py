@@ -32,6 +32,8 @@ class UserStatus(enum.StrEnum):
     INACTIVE = "inactive"
     DELETED = "deleted"
     BEFORE_VERIFICATION = "before-verification"
+    PURGING = "purging"
+    PURGE_ERROR = "purge-error"
 
     @override
     @classmethod
@@ -49,7 +51,16 @@ class UserStatus(enum.StrEnum):
                 return cls.DELETED
             case "BEFORE-VERIFICATION" | "BEFORE_VERIFICATION":
                 return cls.BEFORE_VERIFICATION
+            case "PURGING":
+                return cls.PURGING
+            case "PURGE-ERROR" | "PURGE_ERROR":
+                return cls.PURGE_ERROR
         return None
+
+    @classmethod
+    def purge_in_progress(cls) -> frozenset[UserStatus]:
+        """Statuses a purge is working through. Writes are refused while in one."""
+        return frozenset({cls.PURGING, cls.PURGE_ERROR})
 
 
 @dataclass

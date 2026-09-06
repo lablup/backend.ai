@@ -7,26 +7,26 @@ from typing import override
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
+    DeploymentInfo,
     DeploymentLifecycleStatus,
     DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
     DeploymentTargetStatuses,
+    ReplicaGroupData,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.updaters import EndpointReplicaGroupUpdater
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.models.replica_group.updaters import (
+    ReplicaGroupDeployUpdater,
+    ReplicaGroupLifecycleUpdater,
+)
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.deployment.updaters.deployment import (
-    EndpointReplicaGroupUpdaterSpec,
-)
-from ai.backend.manager.repositories.deployment.updaters.replica_group import (
-    ReplicaGroupDeployUpdaterSpec,
-    ReplicaGroupLifecycleUpdaterSpec,
-)
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
@@ -106,8 +106,8 @@ class DeployingRollingBackHandler(DeploymentHandler):
     ) -> DeploymentExecutionResult:
         rollback_targets: list[DeploymentWithHistory] = []
         failures: list[DeploymentExecutionError] = []
-        group_updaters: list[Updater[ReplicaGroupRow]] = []
-        endpoint_updaters: list[Updater[EndpointRow]] = []
+        group_updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = []
+        endpoint_updaters: list[DataUpdater[EndpointRow, DeploymentInfo]] = []
 
         for deployment in deployments:
             info = deployment.deployment_info
@@ -128,37 +128,28 @@ class DeployingRollingBackHandler(DeploymentHandler):
                 if target_group_id == info.primary_replica_group_id:
                     # Rolling: drop the in-place target and refill the current revision to the goal.
                     group_updaters.append(
-                        Updater(
-                            pk_value=target_group_id,
-                            spec=ReplicaGroupLifecycleUpdaterSpec(
-                                lifecycle=OptionalState.update(ReplicaGroupLifecycle.STABLE),
-                                desired_current_replica_count=OptionalState.update(
-                                    info.replica.target_replica_count
-                                ),
-                                desired_target_replica_count=OptionalState.update(0),
-                                scaling_status=OptionalState.update(
-                                    ReplicaGroupScalingStatus.SCALING
-                                ),
-                                target_revision_id=TriState.nullify(),
+                        ReplicaGroupLifecycleUpdater(
+                            replica_group_id=target_group_id,
+                            lifecycle=OptionalState.update(ReplicaGroupLifecycle.STABLE),
+                            desired_current_replica_count=OptionalState.update(
+                                info.replica.target_replica_count
                             ),
+                            desired_target_replica_count=OptionalState.update(0),
+                            scaling_status=OptionalState.update(ReplicaGroupScalingStatus.SCALING),
+                            target_revision_id=TriState.nullify(),
                         )
                     )
                 else:
                     # Blue-green/canary: drain the failed target group (emptied by the reconcile).
                     group_updaters.append(
-                        Updater(
-                            pk_value=target_group_id,
-                            spec=ReplicaGroupDeployUpdaterSpec(
-                                lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINING),
-                            ),
+                        ReplicaGroupDeployUpdater(
+                            replica_group_id=target_group_id,
+                            lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINING),
                         )
                     )
                 endpoint_updaters.append(
-                    Updater(
-                        pk_value=info.id,
-                        spec=EndpointReplicaGroupUpdaterSpec(
-                            target_replica_group_id=TriState.nullify(),
-                        ),
+                    EndpointReplicaGroupUpdater(
+                        deployment_id=info.id, target_replica_group_id=TriState.nullify()
                     )
                 )
             rollback_targets.append(deployment)

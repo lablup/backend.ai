@@ -19,6 +19,10 @@ from ai.backend.common.dto.manager.v2.domain.response import (
 from ai.backend.common.dto.manager.v2.domain.response import (
     PurgeDomainPayload as PurgeDomainPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.domain.response import (
+    RestoreDomainPayload as RestoreDomainPayloadDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -102,6 +106,20 @@ class DeleteDomainPayloadGQL(PydanticOutputMixin[DeleteDomainPayloadDTO]):
     """Payload for domain soft-delete."""
 
     deleted: bool = gql_field(description="Whether the deletion was successful.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for domain restore mutation.",
+    ),
+    model=RestoreDomainPayloadDTO,
+    name="RestoreDomainPayload",
+)
+class RestoreDomainPayloadGQL(PydanticOutputMixin[RestoreDomainPayloadDTO]):
+    """Payload for domain restore."""
+
+    restored: bool = gql_field(description="Whether the restore was successful.")
 
 
 @gql_pydantic_type(

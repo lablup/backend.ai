@@ -52,6 +52,8 @@ For example, when changed both `client.func` and `client.cli` with the same sign
 
 Note: maintainers may modify the PR title without notice during reviews.
 
+See `changes/KNOWLEDGE.md` for the category-to-PR-title-prefix/changelog-type mapping, including the same-release fix rule (`chore`/`misc`, not `fix`).
+
 ## Most macroscopic: Release highlights
 
 The release highlights included in our news letters and the technical blog have more abstract and high-level user-centric descriptions.

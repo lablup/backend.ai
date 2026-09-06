@@ -66,8 +66,7 @@ async def revoke_my_keypair(
     info: Info[StrawberryGQLContext],
     input: RevokeMyKeypairInputGQL,
 ) -> RevokeMyKeypairPayloadGQL | None:
-    user_id = _get_current_user_id()
-    payload = await info.context.adapters.user.revoke_my_keypair(user_id, input.access_key)
+    payload = await info.context.adapters.user.revoke_my_keypair(input.access_key)
     return RevokeMyKeypairPayloadGQL.from_pydantic(payload)
 
 
@@ -81,10 +80,7 @@ async def update_my_keypair(
     info: Info[StrawberryGQLContext],
     input: UpdateMyKeypairInputGQL,
 ) -> UpdateMyKeypairPayloadGQL | None:
-    user_id = _get_current_user_id()
-    payload = await info.context.adapters.user.update_my_keypair(
-        user_id, input.access_key, input.is_active
-    )
+    payload = await info.context.adapters.user.update_my_keypair(input.access_key, input.is_active)
     return UpdateMyKeypairPayloadGQL.from_pydantic(payload)
 
 

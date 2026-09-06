@@ -31,7 +31,9 @@ pass-through would remain.
 
 | Operation | Spec | What it carries |
 |---|---|---|
-| get | `DataQuerier` | row class, pk, `to_data` |
+| get | `DataQuerier` | row class, entity id column and value, `to_data` |
+| | `FieldQuerier` | the same, keyed by a field row's own id |
+| | `OwnedFieldQuerier` | the row an owner designates, keyed by the owner |
 | lookup | `DataLookup` | row class, key conditions, `to_data` |
 | search | `Searcher` | select, options, `to_data` |
 | create | `GlobalEntityCreator` | the row alone |

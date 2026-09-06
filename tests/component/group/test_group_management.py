@@ -26,7 +26,7 @@ from ai.backend.client.v2.exceptions import (
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.deployment.types import OrderDirection
 from ai.backend.common.dto.manager.group.request import GroupFilter, SearchGroupsRequest
 from ai.backend.common.dto.manager.group.response import (
@@ -51,9 +51,9 @@ from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -77,27 +77,25 @@ async def test_group_for_deletion(
                 resource_policy=resource_policy_fixture,
             )
         )
-        virtual_scope_id = uuid.uuid4()
+        virtual_entity_id = uuid.uuid4()
         await conn.execute(
-            sa.insert(VirtualScopeRow.__table__).values(
-                id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ScopeType.PROJECT,
+                entity_id=group_id,
             )
         )
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=group_id,
-                permission_cap=None,
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -105,9 +103,9 @@ async def test_group_for_deletion(
     # Cleanup: force delete if still exists
     async with db_engine.begin() as conn:
         await conn.execute(
-            VirtualScopeRow.__table__.delete().where(
-                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
-                VirtualScopeRow.__table__.c.scope_id == group_id,
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
         await conn.execute(
@@ -145,27 +143,25 @@ async def group_with_vfolder_mounted(
                 resource_policy=resource_policy_fixture,
             )
         )
-        virtual_scope_id = uuid.uuid4()
+        virtual_entity_id = uuid.uuid4()
         await conn.execute(
-            sa.insert(VirtualScopeRow.__table__).values(
-                id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ScopeType.PROJECT,
+                entity_id=group_id,
             )
         )
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=group_id,
-                permission_cap=None,
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -197,8 +193,6 @@ async def group_with_vfolder_mounted(
                 scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
             )
         )
         # Create active kernel with mount
@@ -221,8 +215,6 @@ async def group_with_vfolder_mounted(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
-                occupied_slots=ResourceSlot({}),
-                requested_slots=ResourceSlot({}),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -245,9 +237,9 @@ async def group_with_vfolder_mounted(
             VFolderRow.__table__.delete().where(VFolderRow.__table__.c.id == vfolder_id)
         )
         await conn.execute(
-            VirtualScopeRow.__table__.delete().where(
-                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
-                VirtualScopeRow.__table__.c.scope_id == group_id,
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
         await conn.execute(
@@ -284,27 +276,25 @@ async def group_with_active_kernel(
                 resource_policy=resource_policy_fixture,
             )
         )
-        virtual_scope_id = uuid.uuid4()
+        virtual_entity_id = uuid.uuid4()
         await conn.execute(
-            sa.insert(VirtualScopeRow.__table__).values(
-                id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ScopeType.PROJECT,
+                entity_id=group_id,
             )
         )
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=group_id,
-                permission_cap=None,
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -324,8 +314,6 @@ async def group_with_active_kernel(
                 scaling_group_name=resource_group_name,
                 resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
             )
         )
         # Create active kernel
@@ -348,8 +336,6 @@ async def group_with_active_kernel(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
-                occupied_slots=ResourceSlot({}),
-                requested_slots=ResourceSlot({}),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -368,9 +354,9 @@ async def group_with_active_kernel(
             SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
         )
         await conn.execute(
-            VirtualScopeRow.__table__.delete().where(
-                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
-                VirtualScopeRow.__table__.c.scope_id == group_id,
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
         await conn.execute(
@@ -406,27 +392,25 @@ async def group_with_active_endpoint(
                 resource_policy=resource_policy_fixture,
             )
         )
-        virtual_scope_id = uuid.uuid4()
+        virtual_entity_id = uuid.uuid4()
         await conn.execute(
-            sa.insert(VirtualScopeRow.__table__).values(
-                id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ScopeType.PROJECT,
+                entity_id=group_id,
             )
         )
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=group_id,
-                permission_cap=None,
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -489,9 +473,9 @@ async def group_with_active_endpoint(
             )
         )
         await conn.execute(
-            VirtualScopeRow.__table__.delete().where(
-                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
-                VirtualScopeRow.__table__.c.scope_id == group_id,
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
         await conn.execute(
@@ -522,27 +506,25 @@ async def multiple_test_groups(
                     resource_policy=resource_policy_fixture,
                 )
             )
-            virtual_scope_id = uuid.uuid4()
+            virtual_entity_id = uuid.uuid4()
             await conn.execute(
-                sa.insert(VirtualScopeRow.__table__).values(
-                    id=virtual_scope_id,
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=group_id,
+                sa.insert(VirtualEntityRow.__table__).values(
+                    id=virtual_entity_id,
+                    entity_type=ScopeType.PROJECT,
+                    entity_id=group_id,
                 )
             )
             await conn.execute(
                 sa.insert(EntityMembershipRow.__table__).values(
-                    virtual_scope_id=virtual_scope_id,
-                    entity_type=EntityType.PROJECT,
-                    entity_id=group_id,
-                    permission_cap=None,
+                    virtual_entity_id=virtual_entity_id,
+                    member_entity_id=virtual_entity_id,
+                    capped=False,
                 )
             )
             await conn.execute(
                 sa.insert(ScopeBindingRow.__table__).values(
-                    virtual_scope_id=virtual_scope_id,
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=group_id,
+                    virtual_entity_id=virtual_entity_id,
+                    scope_entity_id=virtual_entity_id,
                     permission_cap=None,
                 )
             )
@@ -554,9 +536,9 @@ async def multiple_test_groups(
     async with db_engine.begin() as conn:
         for group_id in group_ids:
             await conn.execute(
-                VirtualScopeRow.__table__.delete().where(
-                    VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
-                    VirtualScopeRow.__table__.c.scope_id == group_id,
+                VirtualEntityRow.__table__.delete().where(
+                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_id == group_id,
                 )
             )
             await conn.execute(

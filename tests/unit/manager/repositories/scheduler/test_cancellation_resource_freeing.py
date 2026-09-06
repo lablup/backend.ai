@@ -57,7 +57,9 @@ from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHi
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import TableOrORM, with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -249,7 +251,7 @@ class TestCancelFreesResourceAllocations:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=test_keypair_resource_policy_name,
@@ -301,8 +303,6 @@ class TestCancelFreesResourceAllocations:
                     region="local",
                     scaling_group=test_scaling_group_name,
                     resource_group_id=test_scaling_group_id,
-                    available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                    occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
                     version="1.0.0",
                     architecture="x86_64",
@@ -356,12 +356,12 @@ class TestCancelFreesResourceAllocations:
                     domain_name=domain_name,
                     domain_id=domain_id,
                     group_id=group_id,
+                    user_uuid=user_uuid,
                     scaling_group_name=resource_group_name,
                     resource_group_id=resource_group_id,
                     status=session_status,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=ResourceSlot({"cpu": cpu, "mem": mem}),
                     created_at=datetime.now(tzutc()),
                     images=[image],
                     vfolder_mounts=[],
@@ -388,8 +388,6 @@ class TestCancelFreesResourceAllocations:
                     container_id=None,
                     status=kernel_status,
                     status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot({"cpu": cpu, "mem": mem}),
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,
@@ -511,7 +509,7 @@ class TestCancelFreesResourceAllocations:
         pending_session: tuple[SessionId, KernelId],
     ) -> None:
         session_id, kernel_id = pending_session
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         result = await db_source.mark_sessions_terminating([session_id])
 
@@ -524,7 +522,7 @@ class TestCancelFreesResourceAllocations:
         pulling_session_on_agent: tuple[SessionId, KernelId, str],
     ) -> None:
         session_id, kernel_id, agent_id = pulling_session_on_agent
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         affected = await db_source.cancel_kernels_for_failed_image(
             AgentId(agent_id), "python:3.8", "image pull failed for test"
@@ -570,7 +568,7 @@ class TestCancelFreesResourceAllocations:
         await self._seed_agent_reserved(
             db_with_cleanup, agent_id, cpu=Decimal("2"), mem=Decimal("4096")
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         await db_source.cancel_kernels_for_failed_image(
             AgentId(agent_id), "python:3.8", "image pull failed for test"
@@ -590,7 +588,7 @@ class TestCancelFreesResourceAllocations:
         await self._seed_agent_reserved(
             db_with_cleanup, agent_id, cpu=Decimal("2"), mem=Decimal("4096")
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         await db_source.mark_session_cancelled(
             session_id, convert_to_status_data(RuntimeError("failed to start"))

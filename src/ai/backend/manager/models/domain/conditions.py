@@ -13,6 +13,7 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
+from ai.backend.manager.data.domain.types import DomainStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
@@ -30,6 +31,15 @@ __all__ = ("DomainConditions",)
 
 class DomainConditions:
     """Query conditions for filtering domains."""
+
+    @staticmethod
+    def not_being_purged() -> QueryCondition:
+        """Match the domains no purge is working through."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.status.not_in(DomainStatus.purge_in_progress())
+
+        return inner
 
     # ==================== ID Filters ====================
 

@@ -427,7 +427,6 @@ class TestCheckBulkPermissionWithScopeChain:
                         scope_type=scope_type,
                         scope_id=scope_id,
                         entity_type=entry.entity_type,
-                        operation=entry.operation,
                         permission=Permission.from_operation(entry.operation),
                     )
                 )
@@ -475,7 +474,6 @@ class TestCheckBulkPermissionWithScopeChain:
                     scope_type=ScopeType.PROJECT,
                     scope_id=fixture_ids.project_id,
                     entity_type=EntityType.VFOLDER,
-                    operation=OperationType.READ,
                     permission=Permission.READ,
                 )
             )
@@ -497,7 +495,7 @@ class TestCheckBulkPermissionWithScopeChain:
             )
             for vfolder_id in fixture.vfolder_ids
         ]
-        return BulkPermissionCheckInput(keys=keys, operation=operation)
+        return BulkPermissionCheckInput(keys=keys, permission=Permission.from_operation(operation))
 
     @staticmethod
     def _bool_by_entity_id(
@@ -513,7 +511,7 @@ class TestCheckBulkPermissionWithScopeChain:
     ) -> None:
         """Empty key sequence returns empty mapping."""
         result = await db_source.check_bulk_permission_with_scope_chain(
-            BulkPermissionCheckInput(keys=[], operation=OperationType.READ)
+            BulkPermissionCheckInput(keys=[], permission=Permission.READ)
         )
         assert result == {}
 

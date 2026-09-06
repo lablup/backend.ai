@@ -242,7 +242,6 @@ class PreemptionCandidate:
     # oldest/newest reclaim-order basis. None when the session never ran
     started_at: datetime | None
     # Per-agent live allocations freed by preempting this session
-    # (resource_allocations rows, not the legacy kernels.occupied_slots)
     allocated_slots_by_agent: Mapping[AgentId, Mapping[ResourceSlotName, Decimal]]
 
 

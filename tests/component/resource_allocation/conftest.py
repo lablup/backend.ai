@@ -24,6 +24,7 @@ from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
     ConcernMeta,
     GroupMeta,
 )
@@ -37,6 +38,7 @@ from ai.backend.manager.api.rest.v2.resource_allocation.registry import (
     register_v2_resource_allocation_routes,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
@@ -48,6 +50,7 @@ from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.processors import Processors
@@ -83,7 +86,7 @@ def resource_allocation_processors(
         resource_allocation_repository=ra_repo,
         resource_preset_repository=rp_repo,
     )
-    groups = processor_registry.concern(ConcernMeta("resource_allocation"))
+    groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return ResourceAllocationProcessors(
         groups.group(GroupMeta(USER_ENTITY_TYPE)),
         groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
@@ -105,7 +108,11 @@ def user_processors(
         storage_manager=AsyncMock(),
         valkey_stat_client=AsyncMock(),
         agent_registry=AsyncMock(),
-        user_repository=UserRepository(database_engine, V2DBOpsProvider(database_engine)),
+        user_repository=UserRepository(
+            database_engine,
+            V2DBOpsProvider(database_engine),
+            KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        ),
         scheduling_controller=AsyncMock(),
     )
     return UserProcessors(processor_registry.group(GroupMeta(USER_ENTITY_TYPE)), service)

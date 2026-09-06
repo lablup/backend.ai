@@ -23,7 +23,7 @@ from ai.backend.common.dto.manager.session.request import (
 from ai.backend.common.dto.manager.session.response import (
     GetStatusHistoryResponse,
 )
-from ai.backend.common.types import ResourceSlot, SessionTypes
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
@@ -62,8 +62,6 @@ def _build_kernel_values(
         scaling_group=resource_group,
         resource_group_id=resource_group_id,
         status_info="",
-        occupied_slots=ResourceSlot(),
-        requested_slots=ResourceSlot(),
         repl_in_port=0,
         repl_out_port=0,
         stdin_port=0,
@@ -126,8 +124,6 @@ async def degraded_session_seed(
                 status=SessionStatus.RUNNING_DEGRADED,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -228,8 +224,6 @@ async def full_lifecycle_session_seed(
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )

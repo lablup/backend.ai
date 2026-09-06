@@ -57,8 +57,8 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
     ResourceSpec,
 )
-from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
+from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -141,9 +141,8 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
     """Tests for DeploymentService.upsert_deployment_policy"""
 
     @pytest.fixture
-    def rolling_upserter(self, endpoint_id: uuid.UUID) -> DeploymentPolicyUpserter:
+    def rolling_upserter(self) -> DeploymentPolicyUpserter:
         return DeploymentPolicyUpserter(
-            deployment_id=endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(
                 max_surge=IntOrPercent(count=2),
@@ -152,9 +151,8 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
         )
 
     @pytest.fixture
-    def blue_green_upserter(self, endpoint_id: uuid.UUID) -> DeploymentPolicyUpserter:
+    def blue_green_upserter(self) -> DeploymentPolicyUpserter:
         return DeploymentPolicyUpserter(
-            deployment_id=endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
         )
@@ -184,7 +182,7 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
         )
 
         action = UpsertDeploymentPolicyAction(
-            deployment_id=DeploymentID(rolling_upserter.deployment_id), upserter=rolling_upserter
+            deployment_id=DeploymentID(endpoint_id), upserter=rolling_upserter
         )
 
         result = await deployment_service.upsert_deployment_policy(action)
@@ -192,15 +190,15 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
         assert result.created is True
         assert result.data == deployment_policy_data
         mock_deployment_repository.upsert_deployment_policy.assert_called_once()
-        upserter_arg = mock_deployment_repository.upsert_deployment_policy.call_args[0][0]
-        spec = upserter_arg.spec
-        assert spec.deployment_id == endpoint_id
-        assert spec.strategy == DeploymentStrategy.ROLLING
+        call_args = mock_deployment_repository.upsert_deployment_policy.call_args[0]
+        assert call_args[0] == endpoint_id
+        assert call_args[1].strategy == DeploymentStrategy.ROLLING
 
     async def test_upsert_deployment_policy_update(
         self,
         deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
+        endpoint_id: uuid.UUID,
         blue_green_upserter: DeploymentPolicyUpserter,
         blue_green_policy_data: DeploymentPolicyData,
     ) -> None:
@@ -210,7 +208,7 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
         )
 
         action = UpsertDeploymentPolicyAction(
-            deployment_id=DeploymentID(blue_green_upserter.deployment_id),
+            deployment_id=DeploymentID(endpoint_id),
             upserter=blue_green_upserter,
         )
 

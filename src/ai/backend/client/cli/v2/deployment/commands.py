@@ -8,7 +8,14 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
+from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
+    create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
+    load_v2_config,
+    print_result,
+)
 
 
 @click.group()
@@ -37,6 +44,7 @@ def deployment() -> None:
     type=bool,
     help="Filter by public access (true/false).",
 )
+@entity_label_filter_options
 def project_search(
     project_id: str,
     limit: int,
@@ -45,6 +53,7 @@ def project_search(
     name_contains: str | None,
     status: tuple[str, ...],
     open_to_public: bool | None,
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search deployments within a project."""
 
@@ -57,12 +66,14 @@ def project_search(
     )
     from ai.backend.common.dto.manager.v2.deployment.types import DeploymentOrderField
 
+    relations = entity_label_relations(label)
     filter_dto: DeploymentFilter | None = None
-    if name_contains or status or open_to_public is not None:
+    if relations or name_contains or status or open_to_public is not None:
         filter_dto = DeploymentFilter(
             name=StringFilter(contains=name_contains) if name_contains else None,
             status=DeploymentStatusFilter(in_=list(status)) if status else None,
             open_to_public=open_to_public,
+            AND=[DeploymentFilter(labels=rel) for rel in relations] or None,
         )
 
     orders: list[DeploymentOrder] | None = None

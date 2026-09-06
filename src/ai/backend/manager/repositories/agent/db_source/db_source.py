@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection
 from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
@@ -17,7 +18,6 @@ from ai.backend.manager.data.agent.types import (
     AgentDetailData,
     AgentHeartbeatUpsert,
     AgentListResult,
-    AgentStatus,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
@@ -31,10 +31,8 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -101,7 +99,14 @@ class AgentDBSource:
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:
             query = (
-                sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
+                sa.select(AgentRow)
+                .where(AgentRow.id == upsert_data.metadata.id)
+                .options(
+                    selectinload(AgentRow.agent_resource_rows).joinedload(
+                        AgentResourceRow.slot_type_row
+                    )
+                )
+                .with_for_update()
             )
             row: AgentRow | None = await session.scalar(query)
             agent_data = row.to_heartbeat_update_data() if row is not None else None
@@ -170,31 +175,6 @@ class AgentDBSource:
             raise UnresolvableResourceGroup(
                 "No initial resource group name is configured and no default scaling group is set."
             )
-
-    async def update_agent_status_exit(self, updater: Updater[AgentRow]) -> None:
-        async with self._db.begin_session() as session:
-            fetch_query = (
-                sa.select(AgentRow.status)
-                .select_from(AgentRow)
-                .where(AgentRow.id == updater.pk_value)
-                .with_for_update()
-            )
-            prev_status = await session.scalar(fetch_query)
-            if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
-                return
-
-            spec = updater.spec
-            if isinstance(spec, AgentStatusUpdaterSpec):
-                if spec.status == AgentStatus.LOST:
-                    log.warning("agent {0} heartbeat timeout detected.", updater.pk_value)
-                elif spec.status == AgentStatus.TERMINATED:
-                    log.info("agent {0} has terminated.", updater.pk_value)
-
-            await execute_updater(session, updater)
-
-    async def update_agent_status(self, updater: Updater[AgentRow]) -> None:
-        async with self._db.begin_session() as session:
-            await execute_updater(session, updater)
 
     async def update_resource_group(
         self,
@@ -286,14 +266,19 @@ class AgentDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def upsert_agent_resource_capacity(
+    async def sync_agent_resource_capacity(
         self,
+        agent_id: AgentId,
         bulk_upserter: BulkUpserter[AgentResourceRow],
+        reported_slot_names: Collection[str],
     ) -> int:
-        """Bulk UPSERT agent resource capacity rows.
+        """Bulk UPSERT agent resource capacity rows and drop the slots the agent
+        no longer reports.
 
         On INSERT: sets capacity (used defaults to 0).
         On CONFLICT: updates capacity only.
+        Rows for unreported slots are deleted only when nothing holds them, so a
+        slot that still carries an allocation survives until it is released.
 
         Returns:
             Number of rows upserted.
@@ -303,5 +288,14 @@ class AgentDBSource:
                 db_sess,
                 bulk_upserter,
                 index_elements=["agent_id", "slot_name"],
+            )
+            await db_sess.execute(
+                sa.delete(AgentResourceRow).where(
+                    (AgentResourceRow.agent_id == str(agent_id))
+                    & AgentResourceRow.slot_name.not_in(reported_slot_names)
+                    & (AgentResourceRow.used == 0)
+                    & (AgentResourceRow.reserved == 0)
+                    & (AgentResourceRow.prereserved == 0)
+                )
             )
             return result.upserted_count

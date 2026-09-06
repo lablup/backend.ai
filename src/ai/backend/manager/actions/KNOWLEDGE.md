@@ -1,9 +1,9 @@
 ---
 name: action-framework-design
 type: design-rationale
-description: v2 action shapes and derived permissions, why a field row's operations are answered for by its owning entity, why a bulk field answers per row but records per entity, audit recording principles (writes always, reads on subscription, failures always, DENIED), lookup existence-leak handling, public read gate, ops-backed backing axis
+description: v2 action shapes and derived permissions, why a link between two entities names both scopes and no entity kind, why a field row's operations are answered for by its owning entity, why a bulk field answers per row but records per entity, audit recording principles (writes always, reads on subscription, failures always, DENIED), lookup existence-leak handling, public read gate, ops-backed backing axis
 scope: src/ai/backend/manager/actions
-keywords: [BaseSingleEntityAction, BaseScopeAction, BaseGlobalAction, BaseLookupAction, BaseBulkLookupAction, BaseSingleFieldAction, BaseBulkFieldAction, FieldOwnerLookup, PublicActionProcessor, AnonymousGlobalActionProcessor, anonymous_scope, anonymous_global, AuditLogPolicy, ProcessorRegistry, wired_actions, RESTORE, soft-delete]
+keywords: [BaseRelationAction, RelationActionProcessor, audit_log_scopes, BaseSingleEntityAction, BaseScopeAction, BaseGlobalAction, BaseLookupAction, BaseBulkLookupAction, BaseSingleFieldAction, BaseBulkFieldAction, FieldOwnerLookup, PublicActionProcessor, AnonymousGlobalActionProcessor, anonymous_scope, anonymous_global, AuditLogPolicy, ProcessorRegistry, wired_actions, RESTORE, soft-delete]
 sources:
   - src/ai/backend/manager/actions/v2
   - src/ai/backend/manager/actions/registry
@@ -75,6 +75,27 @@ which is why handlers call processors, not services.
   entity, and it is that entity's permission that answers for it; a separate permission
   bit would diverge from it.
 
+## A relation names two scopes and no kind
+
+- The shape a link takes follows from containment. A user is inside a project, so that is
+  the scope shape as it stands — one scope, and the type it contains. A resource group is
+  a cluster resource several domains share, so neither is inside the other and both are
+  named.
+- Naming both means asking both. With no entity type there is nothing to read at a scope,
+  so the question degenerates to the permission on the scope itself, which is the entity
+  question the bulk validator already asks. One denied scope refuses the run: the row is
+  about both, so there is no subset left to write.
+- Not the bulk shape, which runs the operation once per entity and answers per entity.
+  A link runs once and answers once.
+- The audit row names no entity and no kind — what was written stands between two
+  entities and is neither. The scopes go to `audit_log_scopes`, which is why
+  `audit_logs.entity_type` admits NULL. The reporter still emits one message per scope,
+  since every scope is an entity and each is reported as the one it is.
+- Deriving permission from a relation was rejected: the same entity reached through
+  several relations turns revocation into reference counting, and a permission written as
+  a side effect of a business operation cannot be explained from the roles and grants.
+- Rationale: `proposals/BEP-1075-entity-relation-operations.md`.
+
 ## A field bulk answers per row and records per entity
 
 - The answer is per row the caller named. Folding it to the owner loses which item
@@ -134,3 +155,20 @@ which is why handlers call processors, not services.
   readable off a class — a single-entity action derives it from the id, and a field
   action has none until its owner is read — so the name alone has to tell two runs
   apart.
+
+## The command that reads the catalog out
+
+- `backend.ai mgr ops list` prints every wiring record. It filters on `--concern`,
+  `--entity`, `--field`, `--operation`, `--gate` and `--backing`, and `--output
+  json|tsv` changes the format. `backend.ai mgr ops entities` prints the entity types
+  and the field types under each; `backend.ai mgr ops describe <entity_type>
+  <action_name>` adds one operation's input fields and where it is defined.
+- The wiring decides concern, entity_type, field_type, kind, gate and backing, so the
+  action class carries none of them. The class declares operation and action_name.
+- The areas are declared as `Concern` members with a line each on what they hold, so a
+  new domain picks one rather than coining a name.
+- No dependency stage is started. Assembly stores handlers rather than calling them, so
+  a stand-in in place of the runtime is enough: no database, no leader election, no
+  event consumer, and nothing that collides with a running manager.
+- Only what the registry records appears. A processor still on the legacy base is wired
+  outside `ProcessorGroup` and is absent from the listing.

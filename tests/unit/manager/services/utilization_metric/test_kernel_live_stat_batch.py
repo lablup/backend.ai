@@ -3,12 +3,15 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.types import KernelId
 from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     KernelLiveStatValues,
 )
-from ai.backend.manager.services.metric.actions.live_stat import ContainerLiveStatAction
+from ai.backend.manager.services.metric.actions.batch_get_kernel_live_stats import (
+    BatchGetKernelLiveStatsAction,
+)
 from ai.backend.manager.services.metric.service import MetricService
 
 
@@ -44,8 +47,8 @@ class TestKernelLiveStatBatch:
         )
         mock_metric_repository.query_container_live_stats = AsyncMock(return_value=raw)
 
-        result = await metric_service.query_container_live_stats(
-            ContainerLiveStatAction(kernel_ids=[kid])
+        result = await metric_service.batch_get_kernel_live_stats(
+            BatchGetKernelLiveStatsAction(kernel_ids=[KernelID(kid)])
         )
 
         assert result.stats is raw
@@ -62,8 +65,8 @@ class TestKernelLiveStatBatch:
         raw = KernelLiveStatBatchResult.empty([empty_kernel])
         mock_metric_repository.query_container_live_stats = AsyncMock(return_value=raw)
 
-        result = await metric_service.query_container_live_stats(
-            ContainerLiveStatAction(kernel_ids=[empty_kernel])
+        result = await metric_service.batch_get_kernel_live_stats(
+            BatchGetKernelLiveStatsAction(kernel_ids=[KernelID(empty_kernel)])
         )
         assert result.stats.by_kernel == {empty_kernel: KernelLiveStatValues()}
 
@@ -76,8 +79,8 @@ class TestKernelLiveStatBatch:
         raw = KernelLiveStatBatchResult.empty([])
         mock_metric_repository.query_container_live_stats = AsyncMock(return_value=raw)
 
-        result = await metric_service.query_container_live_stats(
-            ContainerLiveStatAction(kernel_ids=[])
+        result = await metric_service.batch_get_kernel_live_stats(
+            BatchGetKernelLiveStatsAction(kernel_ids=[])
         )
         assert result.stats is raw
 
@@ -98,8 +101,8 @@ class TestKernelLiveStatBatch:
         )
         mock_metric_repository.query_container_live_stats = AsyncMock(return_value=raw)
 
-        result = await metric_service.query_container_live_stats(
-            ContainerLiveStatAction(kernel_ids=[kid1, kid2])
+        result = await metric_service.batch_get_kernel_live_stats(
+            BatchGetKernelLiveStatsAction(kernel_ids=[KernelID(kid1), KernelID(kid2)])
         )
 
         assert result.stats.by_kernel[kid1].instant_current["mem"] == "100"

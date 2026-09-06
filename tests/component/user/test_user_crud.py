@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.user import (
     DeleteUserRequest,
     DeleteUserResponse,
     GetUserResponse,
+    PurgeUserRequest,
     UserStatus,
 )
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -30,9 +31,9 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import users
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import UserFactory
@@ -109,6 +110,81 @@ class TestUserCreateCrud:
             )
             assoc = row.fetchone()
         assert assoc is not None, "User should be associated with the given group"
+
+    async def test_s7_create_makes_a_personal_project_with_the_user_alone(
+        self,
+        user_factory: UserFactory,
+        domain_fixture: DomainFixtureData,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-7: Creating a user through the REST path creates its personal project,
+        named after the username, with that user as its only member."""
+        result = await user_factory()
+
+        async with db_engine.begin() as conn:
+            project_id = await conn.scalar(
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.domain_name == domain_fixture.domain_name,
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.name == result.user.username,
+                )
+            )
+            assert project_id is not None, "A personal project should be created"
+            member_ids = (
+                await conn.scalars(
+                    sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(project_id),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    )
+                )
+            ).all()
+            creator_id = await conn.scalar(
+                sa.select(ProjectRow.creator_id).where(ProjectRow.id == project_id)
+            )
+        assert list(member_ids) == [str(result.user.id)]
+        assert creator_id == result.user.id
+
+    async def test_s8_purging_the_user_leaves_its_personal_project_dangling(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: DomainFixtureData,
+        resource_policy_fixture: str,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-8: What the personal project holds outlives the account. The project stays
+        with no creator, which is what marks it for the retention sweep."""
+        unique = secrets.token_hex(4)
+        created = await admin_registry.user.create(
+            CreateUserRequest(
+                email=f"purge-personal-{unique}@test.local",
+                username=f"purge-personal-{unique}",
+                password="test-password-1234",
+                domain_name=domain_fixture.domain_name,
+                resource_policy=resource_policy_fixture,
+                status=UserStatus.ACTIVE,
+            )
+        )
+        async with db_engine.begin() as conn:
+            project_id = await conn.scalar(
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.name == f"purge-personal-{unique}",
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.creator_id == str(created.user.id),
+                )
+            )
+        assert project_id is not None
+
+        await admin_registry.user.purge(PurgeUserRequest(user_id=created.user.id))
+
+        async with db_engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    sa.select(ProjectRow.creator_id).where(ProjectRow.id == project_id)
+                )
+            ).first()
+        assert row is not None, "The personal project should outlive its user"
+        assert row.creator_id is None, "Its creator should be cleared"
 
     async def test_s4_create_with_status_inactive(
         self,
@@ -281,7 +357,7 @@ class TestUserDeleteCrud:
         user_factory: UserFactory,
         db_engine: SAEngine,
     ) -> None:
-        """S-1: Admin soft deletes ACTIVE user → success=True, DB status=DELETED, keypairs deactivated."""
+        """S-1: Admin soft deletes ACTIVE user → success=True, DB status=DELETED, keypairs untouched."""
         created = await user_factory()
 
         result = await admin_registry.user.delete(DeleteUserRequest(user_id=created.user.id))
@@ -297,15 +373,14 @@ class TestUserDeleteCrud:
             user_status = user_row.scalar()
             assert user_status == UserStatus.DELETED
 
-            # Verify all keypairs deactivated
+            # Keypairs stay active: the auth status gate keeps a deleted user out,
+            # so restore does not have to re-activate them.
             kp_row = await conn.execute(
                 sa.select(keypairs.c.is_active).where(keypairs.c.user == str(created.user.id))
             )
             kp_actives = kp_row.scalars().all()
             assert len(kp_actives) > 0, "Should have at least one keypair"
-            assert all(not active for active in kp_actives), (
-                "All keypairs should be deactivated after soft delete"
-            )
+            assert all(kp_actives), "Keypairs should stay active after soft delete"
 
     async def test_s2_soft_delete_inactive_user(
         self,
@@ -440,36 +515,34 @@ class TestUserCreateAutoAssignRoles:
                     type=ProjectType.MODEL_STORE,
                 )
             )
-            virtual_scope_id = uuid.uuid4()
+            virtual_entity_id = uuid.uuid4()
             await conn.execute(
-                sa.insert(VirtualScopeRow.__table__).values(
-                    id=virtual_scope_id,
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=project_id,
+                sa.insert(VirtualEntityRow.__table__).values(
+                    id=virtual_entity_id,
+                    entity_type=ScopeType.PROJECT,
+                    entity_id=project_id,
                 )
             )
             await conn.execute(
                 sa.insert(EntityMembershipRow.__table__).values(
-                    virtual_scope_id=virtual_scope_id,
-                    entity_type=EntityType.PROJECT,
-                    entity_id=project_id,
-                    permission_cap=None,
+                    virtual_entity_id=virtual_entity_id,
+                    member_entity_id=virtual_entity_id,
+                    capped=False,
                 )
             )
             await conn.execute(
                 sa.insert(ScopeBindingRow.__table__).values(
-                    virtual_scope_id=virtual_scope_id,
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=project_id,
+                    virtual_entity_id=virtual_entity_id,
+                    scope_entity_id=virtual_entity_id,
                     permission_cap=None,
                 )
             )
         yield project_id
         async with db_engine.begin() as conn:
             await conn.execute(
-                VirtualScopeRow.__table__.delete().where(
-                    VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
-                    VirtualScopeRow.__table__.c.scope_id == project_id,
+                VirtualEntityRow.__table__.delete().where(
+                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_id == project_id,
                 )
             )
             await conn.execute(

@@ -5,7 +5,7 @@ from typing import Any, override
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction, BasePartialBulkAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
@@ -18,16 +18,26 @@ from ai.backend.manager.models.specs.creator import (
     FieldCreator,
     GlobalEntityCreator,
     RoleManagedEntityCreator,
+    RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.purger import (
-    DataBatchPurger,
+    EntityBatchPurger,
     EntityPurger,
     FieldPurger,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier, OwnedFieldQuerier
+from ai.backend.manager.models.specs.querier import (
+    BulkEntityQuerier,
+    DataQuerier,
+    FieldQuerier,
+    OwnedFieldQuerier,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
-from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
+from ai.backend.manager.models.specs.updater import (
+    DataBatchUpdater,
+    DataUpdater,
+    GuardedDataUpdater,
+)
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
     FieldUpserter,
@@ -37,6 +47,7 @@ from ai.backend.manager.models.specs.upserter import (
 __all__ = (
     "OpsBackendAction",
     "GetOpsAction",
+    "FieldGetOpsAction",
     "LookupOpsAction",
     "SearchOpsAction",
     "GlobalSearchOpsAction",
@@ -44,6 +55,7 @@ __all__ = (
     "GlobalEntityWithFieldsCreateOpsAction",
     "EntityCreateOpsAction",
     "RoleManagedEntityCreateOpsAction",
+    "GlobalRoleManagedEntityCreateOpsAction",
     "FieldCreateOpsAction",
     "GlobalEntityAtomicCreateOpsAction",
     "EntityAtomicCreateOpsAction",
@@ -72,6 +84,7 @@ __all__ = (
     "CreateGlobalWithFieldsOpsAction",
     "CreateEntityOpsAction",
     "CreateRoleManagedEntityOpsAction",
+    "CreateGlobalRoleManagedEntityOpsAction",
     "CreateFieldOpsAction",
     "AtomicCreateGlobalEntityOpsAction",
     "AtomicCreateEntityOpsAction",
@@ -87,6 +100,10 @@ __all__ = (
     "UpdateSingleEntityOpsAction",
     "DeleteSingleEntityOpsAction",
     "RestoreSingleEntityOpsAction",
+    "GuardedUpdateOpsAction",
+    "UpdateSingleEntityGuardedOpsAction",
+    "DeleteSingleEntityGuardedOpsAction",
+    "RestoreSingleEntityGuardedOpsAction",
     "UpdatePartialBulkOpsAction",
     "DeletePartialBulkOpsAction",
     "RestorePartialBulkOpsAction",
@@ -97,6 +114,8 @@ __all__ = (
     "GetGlobalOpsAction",
     "OwnedFieldGetOpsAction",
     "BulkGetOwnedFieldOpsAction",
+    "EntityPartialBulkGetOpsAction",
+    "PartialBulkGetEntityOpsAction",
 )
 
 
@@ -110,6 +129,20 @@ class GetOpsAction[TRow: Base, TData](OpsBackendAction):
 
     @abstractmethod
     def to_querier(self) -> DataQuerier[TRow, TData]:
+        """Return the read spec this action executes."""
+        raise NotImplementedError
+
+
+class FieldGetOpsAction[TRow: Base, TData: FieldData](OpsBackendAction):
+    """A read of one field row named by its own id.
+
+    Carries a :class:`FieldQuerier` rather than a ``DataQuerier``: the id names a row,
+    not an entity, and the entity the read is checked against comes from the owner
+    lookup the shape names.
+    """
+
+    @abstractmethod
+    def to_querier(self) -> FieldQuerier[TRow, TData]:
         """Return the read spec this action executes."""
         raise NotImplementedError
 
@@ -136,6 +169,20 @@ class OwnedFieldGetOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: Fiel
         The same entities ``entity_ids()`` reports, narrowed to the type the querier
         keys on.
         """
+        raise NotImplementedError
+
+
+class EntityPartialBulkGetOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A read of the entities the caller named, keyed by their own ids.
+
+    Carries a :class:`BulkEntityQuerier` for the reason :class:`GetOpsAction` carries a
+    ``DataQuerier``: the ids alone say neither which table to read nor how a row
+    becomes data.
+    """
+
+    @abstractmethod
+    def to_querier(self) -> BulkEntityQuerier[TRow, TData]:
+        """Return the read spec this action executes."""
         raise NotImplementedError
 
 
@@ -257,11 +304,21 @@ class EntityWithFieldsCreateOpsAction[TRow: Base, TData, TFieldRow: Base, TField
 
 
 class RoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the role-managed entity insert spec: the entity create plus the
-    preset-role provisioning the combined spec declares."""
+    """Carries the role-managed entity insert spec: the entity create in its scopes
+    plus the preset-role provisioning the combined spec declares."""
 
     @abstractmethod
     def to_creator(self) -> RoleManagedEntityCreator[TRow, TData]:
+        """Return the insert spec this action executes."""
+        raise NotImplementedError
+
+
+class GlobalRoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
+    """Carries the role-managed entity insert spec of an entity created in no
+    scope: the row and its preset roles."""
+
+    @abstractmethod
+    def to_creator(self) -> RoleManagedGlobalEntityCreator[TRow, TData]:
         """Return the insert spec this action executes."""
         raise NotImplementedError
 
@@ -445,6 +502,20 @@ class UpdateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
+class GuardedUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
+    """An update that declines to write unless the named row's guard holds.
+
+    Kept apart from :class:`UpdateOpsAction` because the two answer differently: a
+    guarded write that touched nothing reports the refusal, while a plain one has only
+    "no such row" to report.
+    """
+
+    @abstractmethod
+    def to_updater(self) -> GuardedDataUpdater[TRow, TData]:
+        """Return the guarded update spec this action executes."""
+        raise NotImplementedError
+
+
 class PartialBulkUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
     """An update of entities the caller named, each answered for separately.
 
@@ -499,7 +570,7 @@ class BatchPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     """A hard delete of every row matching a condition within the scopes it names."""
 
     @abstractmethod
-    def to_batch_purger(self) -> DataBatchPurger[TRow, TData]:
+    def to_batch_purger(self) -> EntityBatchPurger[TRow, TData]:
         """Return the batch delete spec this action executes."""
         raise NotImplementedError
 
@@ -513,7 +584,7 @@ class GlobalBatchPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     """A hard delete of every matching row across the table, with no scope filter."""
 
     @abstractmethod
-    def to_batch_purger(self) -> DataBatchPurger[TRow, TData]:
+    def to_batch_purger(self) -> EntityBatchPurger[TRow, TData]:
         """Return the batch delete spec this action executes."""
         raise NotImplementedError
 
@@ -579,6 +650,21 @@ class BulkGetOwnedFieldOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: 
     Bulk-shaped like :class:`BulkScopedSearchOpsAction` and for the same reason — the
     owners are named rather than being a scope — while the answer is one row per owner
     instead of a page.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+class PartialBulkGetEntityOpsAction[TRow: Base, TData](
+    BasePartialBulkAction, EntityPartialBulkGetOpsAction[TRow, TData], ABC
+):
+    """A read over the entities the caller named, each answered for on its own.
+
+    Partial rather than atomic: an id the caller may not read and one that matches no
+    row are both a failed item, and the two are told apart by the error each carries.
     """
 
     @override
@@ -665,6 +751,21 @@ class CreateRoleManagedEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
+class CreateGlobalRoleManagedEntityOpsAction[TRow: Base, TData](
+    BaseGlobalAction, GlobalRoleManagedEntityCreateOpsAction[TRow, TData], ABC
+):
+    """An insert of one role-managed entity row that belongs under no other scope.
+
+    Global-shaped rather than scope-shaped: a top-level entity has no parent scope to
+    target, and the SUPERADMIN gate is what answers for creating one.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
 class CreateFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
     BaseSingleEntityAction, FieldCreateOpsAction[TOwnerID, TRow, TData], ABC
 ):
@@ -736,7 +837,7 @@ class PurgeEntityOpsAction[TRow: Base, TData](
 
 
 class PartialBulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
-    BaseBulkAction, GlobalEntityPartialBulkPurgeOpsAction[TRow, TData], ABC
+    BasePartialBulkAction, GlobalEntityPartialBulkPurgeOpsAction[TRow, TData], ABC
 ):
     """A hard delete over the global entities the caller named."""
 
@@ -747,7 +848,7 @@ class PartialBulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
 
 
 class PartialBulkPurgeEntityOpsAction[TRow: Base, TData](
-    BaseBulkAction, EntityPartialBulkPurgeOpsAction[TRow, TData], ABC
+    BasePartialBulkAction, EntityPartialBulkPurgeOpsAction[TRow, TData], ABC
 ):
     """A hard delete over the entities the caller named."""
 
@@ -879,8 +980,42 @@ class RestoreSingleEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.RESTORE
 
 
+class UpdateSingleEntityGuardedOpsAction[TRow: Base, TData](
+    BaseSingleEntityAction, GuardedUpdateOpsAction[TRow, TData], ABC
+):
+    """A single-entity write the row's own state can refuse."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+class DeleteSingleEntityGuardedOpsAction[TRow: Base, TData](
+    BaseSingleEntityAction, GuardedUpdateOpsAction[TRow, TData], ABC
+):
+    """A single-entity soft delete the row's own state can refuse."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
+
+
+class RestoreSingleEntityGuardedOpsAction[TRow: Base, TData](
+    BaseSingleEntityAction, GuardedUpdateOpsAction[TRow, TData], ABC
+):
+    """A single-entity restore the row's own state can refuse. Recorded as ``RESTORE``
+    while checking the soft-delete permission, as the unguarded restore is."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.RESTORE
+
+
 class UpdatePartialBulkOpsAction[TRow: Base, TData](
-    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+    BasePartialBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
 ):
     """A write over the entities the caller named. A bulk soft delete carries this too."""
 
@@ -891,7 +1026,7 @@ class UpdatePartialBulkOpsAction[TRow: Base, TData](
 
 
 class DeletePartialBulkOpsAction[TRow: Base, TData](
-    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+    BasePartialBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
 ):
     """A soft delete over the entities the caller named."""
 
@@ -902,7 +1037,7 @@ class DeletePartialBulkOpsAction[TRow: Base, TData](
 
 
 class RestorePartialBulkOpsAction[TRow: Base, TData](
-    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+    BasePartialBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
 ):
     """A restore over the entities the caller named."""
 

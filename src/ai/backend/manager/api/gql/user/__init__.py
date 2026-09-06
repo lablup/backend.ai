@@ -14,6 +14,7 @@ from .resolver import (
     admin_delete_user_v2,
     admin_delete_users_v2,
     admin_purge_user_v2,
+    admin_restore_user_v2,
     admin_update_user_v2,
     # Queries
     admin_user_v2,
@@ -43,6 +44,7 @@ __all__ = [
     "update_user_v2",
     "update_my_allowed_client_ip",
     "admin_delete_user_v2",
+    "admin_restore_user_v2",
     "admin_delete_users_v2",
     "admin_purge_user_v2",
     "admin_bulk_purge_users_v2",

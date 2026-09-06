@@ -22,6 +22,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -71,7 +72,7 @@ class TestReservedConcurrency:
             cpu_capacity=cpu_capacity,
             mem_capacity=Decimal("1048576"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         # Mix of single- and multi-kernel sessions.
         session_specs: list[list[tuple[str, Decimal, Decimal]]] = [
@@ -158,7 +159,7 @@ class TestReservedConcurrency:
             cpu_capacity=Decimal("4"),
             mem_capacity=Decimal("10240"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         async def one_cycle() -> None:
             session_id, kernel_ids = await create_pending_session_with_kernels(
@@ -221,7 +222,7 @@ class TestReservedConcurrency:
             cpu_capacity=Decimal("20"),
             mem_capacity=Decimal("1048576"),
         )
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         async def allocate_session(*, run: bool) -> tuple[SessionId, KernelId]:
             session_id, kernel_ids = await create_pending_session_with_kernels(

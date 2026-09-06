@@ -46,9 +46,10 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.auth import AUTH_ENTITY_TYPE
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.defs import (
@@ -76,20 +77,14 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
     VFolderHostPermissionMap,
-    current_resource_slots,
 )
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import ProcessorDependencies
+from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import SingleEntityActionRBACValidator
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api.rest.app import build_root_app, mount_registries
 from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
@@ -116,6 +111,7 @@ from ai.backend.manager.config.unified import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.manager_status.types import ManagerStatus
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.base import pgsql_connect_opts
@@ -125,7 +121,11 @@ from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
-from ai.backend.manager.models.project import ProjectRow, association_groups_users
+from ai.backend.manager.models.project import (
+    ProjectRow,
+    ProjectType,
+    association_groups_users,
+)
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -136,18 +136,23 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
+from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.client_ip_masking.repository import (
+    ClientIPMaskingRepository,
+)
 from ai.backend.manager.repositories.db.engine import (
     connect_database,
     create_async_engine,
@@ -159,9 +164,10 @@ from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -519,6 +525,29 @@ def database(
         )
         cli_schema_oneshot.invoke(click_ctx)
 
+    # `schema oneshot` creates the tables but applies no migration, so the seed
+    # rows the migrations carry are missing. Installs load them from the fixture
+    # files; do the same for the registry the manager reads at runtime.
+    async def seed_resource_slot_types() -> None:
+        fixture_path = (
+            Path(os.environ["BACKEND_BUILD_ROOT"])
+            / "fixtures"
+            / "manager"
+            / "example-resource-slot-types.json"
+        )
+        rows = [
+            {**row, "number_format": NumberFormat(**row["number_format"])}
+            for row in json.loads(fixture_path.read_text())["resource_slot_types"]
+        ]
+        engine = create_async_engine(str(test_db_url), connect_args=pgsql_connect_opts)
+        async with engine.begin() as conn:
+            await conn.execute(
+                pg_insert(ResourceSlotTypeRow.__table__).values(rows).on_conflict_do_nothing()
+            )
+        await engine.dispose()
+
+    asyncio.run(seed_resource_slot_types())
+
 
 # ---------------------------------------------------------------------------
 # Function-scoped per-test fixtures
@@ -561,7 +590,7 @@ async def database_engine(
 async def domain_fixture(
     db_engine: SAEngine,
 ) -> AsyncIterator[DomainFixtureData]:
-    """Insert a test domain with its virtual scope and yield its identifiers."""
+    """Insert a test domain with its virtual entity and yield its identifiers."""
     domain_name = f"domain-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         result = await conn.execute(
@@ -576,36 +605,34 @@ async def domain_fixture(
             .returning(domains.c.id, domains.c.name)
         )
         row = result.one()
-        virtual_scope_id = uuid.uuid4()
+        virtual_entity_id = uuid.uuid4()
         await conn.execute(
-            sa.insert(VirtualScopeRow.__table__).values(
-                id=virtual_scope_id,
-                scope_type=ScopeType.DOMAIN,
-                scope_id=row.id,
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ScopeType.DOMAIN,
+                entity_id=row.id,
             )
         )
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                entity_type=EntityType.DOMAIN,
-                entity_id=row.id,
-                permission_cap=None,
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                scope_type=ScopeType.DOMAIN,
-                scope_id=row.id,
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
     yield DomainFixtureData(domain_name=row.name, domain_id=row.id)
     async with db_engine.begin() as conn:
         await conn.execute(
-            VirtualScopeRow.__table__.delete().where(
-                VirtualScopeRow.__table__.c.scope_type == ScopeType.DOMAIN,
-                VirtualScopeRow.__table__.c.scope_id == row.id,
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.DOMAIN,
+                VirtualEntityRow.__table__.c.entity_id == row.id,
             )
         )
         await conn.execute(domains.delete().where(domains.c.name == domain_name))
@@ -621,6 +648,7 @@ async def resource_policy_fixture(
     by the user-creation flow:
     - "default" keypair resource policy: always assigned to new keypairs
     - "default" user resource policy: always assigned to new users (e.g. signup)
+    - "default" project resource policy: assigned to the personal project
     Teardown removes both the named policies and the "default" policies.
     The "default" policies are safe to delete here because user_factory
     (which depends on this fixture) runs its teardown first, purging all
@@ -688,8 +716,44 @@ async def resource_policy_fixture(
             )
             .on_conflict_do_nothing()
         )
+        # The personal project created with every user takes "default" too.
+        await conn.execute(
+            pg_insert(ProjectResourcePolicyRow.__table__)
+            .values(
+                name=default_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            .on_conflict_do_nothing()
+        )
     yield policy_name
     async with db_engine.begin() as conn:
+        # A personal project outlives the user it was created for, so purging the
+        # users does not release the policy it holds. The fixture owning the policy
+        # clears them.
+        personal = (
+            await conn.scalars(
+                sa.select(ProjectRow.id).where(
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.resource_policy.in_([policy_name, default_policy_name]),
+                )
+            )
+        ).all()
+        if personal:
+            await conn.execute(
+                VirtualEntityRow.__table__.delete().where(
+                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_id.in_(personal),
+                )
+            )
+            await conn.execute(
+                AssociationScopesEntitiesRow.__table__.delete().where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id.in_([str(pid) for pid in personal]),
+                )
+            )
+            await conn.execute(ProjectRow.__table__.delete().where(ProjectRow.id.in_(personal)))
         await conn.execute(
             keypair_resource_policies.delete().where(
                 keypair_resource_policies.c.name == default_policy_name
@@ -712,7 +776,7 @@ async def resource_policy_fixture(
         )
         await conn.execute(
             ProjectResourcePolicyRow.__table__.delete().where(
-                ProjectResourcePolicyRow.__table__.c.name == policy_name
+                ProjectResourcePolicyRow.__table__.c.name.in_([policy_name, default_policy_name])
             )
         )
 
@@ -785,36 +849,34 @@ async def group_fixture(
                 resource_policy=resource_policy_fixture,
             )
         )
-        virtual_scope_id = uuid.uuid4()
+        virtual_entity_id = uuid.uuid4()
         await conn.execute(
-            sa.insert(VirtualScopeRow.__table__).values(
-                id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ScopeType.PROJECT,
+                entity_id=group_id,
             )
         )
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=group_id,
-                permission_cap=None,
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=group_id,
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
     yield group_id
     async with db_engine.begin() as conn:
         await conn.execute(
-            VirtualScopeRow.__table__.delete().where(
-                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
-                VirtualScopeRow.__table__.c.scope_id == group_id,
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_id == group_id,
             )
         )
         await conn.execute(
@@ -822,39 +884,37 @@ async def group_fixture(
         )
 
 
-class VirtualScopeSeeder:
-    """Seeds the RBAC virtual-scope chain rows for directly-inserted users,
+class VirtualEntitySeeder:
+    """Seeds the RBAC virtual-entity chain rows for directly-inserted users,
     mirroring the row shape the enrollment path and the backfill migration produce.
 
-    Exposed as the ``virtual_scope_seeder`` fixture so subdirectory conftests can
+    Exposed as the ``virtual_entity_seeder`` fixture so subdirectory conftests can
     use it without importing this module.
     """
 
     async def insert_user_scope(self, conn: AsyncConnection, user_uuid: UserID) -> None:
         """Give a directly-inserted user the RBAC rows ``create_full_user`` would
         have made. Without them the member-binding paths cannot resolve the user's
-        virtual scope."""
-        virtual_scope_id = uuid.uuid4()
+        virtual entity."""
+        virtual_entity_id = uuid.uuid4()
         await conn.execute(
-            sa.insert(VirtualScopeRow.__table__).values(
-                id=virtual_scope_id,
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ScopeType.USER,
+                entity_id=str(user_uuid),
             )
         )
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                entity_type=EntityType.USER,
-                entity_id=str(user_uuid),
-                permission_cap=None,
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                scope_type=ScopeType.USER,
-                scope_id=str(user_uuid),
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -862,31 +922,38 @@ class VirtualScopeSeeder:
     async def enroll_user_in_project(
         self, conn: AsyncConnection, group_id: uuid.UUID, user_uuid: UserID
     ) -> None:
-        """Write the virtual-scope chain rows the enrollment path creates for a
-        user-project membership: the user joins the project's virtual scope. The project
-        is not bound into the user's own virtual scope — a member does not hand the
+        """Write the virtual-entity chain rows the enrollment path creates for a
+        user-project membership: the user joins the project's virtual entity. The project
+        is not bound into the user's own virtual entity — a member does not hand the
         project its personal entities."""
         project_scope_id = (
             await conn.execute(
-                sa.select(VirtualScopeRow.__table__.c.id).where(
-                    VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
-                    VirtualScopeRow.__table__.c.scope_id == group_id,
+                sa.select(VirtualEntityRow.__table__.c.id).where(
+                    VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                    VirtualEntityRow.__table__.c.entity_id == group_id,
+                )
+            )
+        ).scalar_one()
+        user_scope_id = (
+            await conn.execute(
+                sa.select(VirtualEntityRow.__table__.c.id).where(
+                    VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+                    VirtualEntityRow.__table__.c.entity_id == str(user_uuid),
                 )
             )
         ).scalar_one()
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
-                virtual_scope_id=project_scope_id,
-                entity_type=EntityType.USER,
-                entity_id=str(user_uuid),
-                permission_cap=None,
+                virtual_entity_id=project_scope_id,
+                member_entity_id=user_scope_id,
+                capped=False,
             )
         )
 
 
 @pytest.fixture()
-def virtual_scope_seeder() -> VirtualScopeSeeder:
-    return VirtualScopeSeeder()
+def virtual_entity_seeder() -> VirtualEntitySeeder:
+    return VirtualEntitySeeder()
 
 
 @pytest.fixture()
@@ -895,7 +962,7 @@ async def admin_user_fixture(
     group_fixture: uuid.UUID,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
-    virtual_scope_seeder: VirtualScopeSeeder,
+    virtual_entity_seeder: VirtualEntitySeeder,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert admin user, keypair, and group membership; yield identifiers."""
     unique_id = secrets.token_hex(4)
@@ -934,7 +1001,7 @@ async def admin_user_fixture(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=data.keypair.access_key,
-                secret_key=data.keypair.secret_key,
+                secret_key=SecretValue(data.keypair.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
@@ -944,7 +1011,7 @@ async def admin_user_fixture(
                 user=str(data.user_uuid),
             )
         )
-        await virtual_scope_seeder.insert_user_scope(conn, data.user_uuid)
+        await virtual_entity_seeder.insert_user_scope(conn, data.user_uuid)
         await conn.execute(
             sa.insert(association_groups_users).values(
                 group_id=str(group_fixture),
@@ -959,7 +1026,7 @@ async def admin_user_fixture(
                 entity_id=str(data.user_uuid),
             )
         )
-        await virtual_scope_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
+        await virtual_entity_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
@@ -981,19 +1048,13 @@ async def admin_user_fixture(
             )
         )
         await conn.execute(
-            EntityMembershipRow.__table__.delete().where(
-                EntityMembershipRow.__table__.c.entity_type == EntityType.USER,
-                EntityMembershipRow.__table__.c.entity_id == str(data.user_uuid),
-            )
-        )
-        await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
         )
-        # The entity-membership and scope-binding rows cascade from the virtual scope.
+        # The entity-membership and scope-binding rows cascade from the virtual entity.
         await conn.execute(
-            VirtualScopeRow.__table__.delete().where(
-                VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
-                VirtualScopeRow.__table__.c.scope_id == str(data.user_uuid),
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+                VirtualEntityRow.__table__.c.entity_id == str(data.user_uuid),
             )
         )
         await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
@@ -1005,7 +1066,7 @@ async def regular_user_fixture(
     group_fixture: uuid.UUID,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
-    virtual_scope_seeder: VirtualScopeSeeder,
+    virtual_entity_seeder: VirtualEntitySeeder,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert regular user, keypair, and group membership; yield identifiers."""
     unique_id = secrets.token_hex(4)
@@ -1044,7 +1105,7 @@ async def regular_user_fixture(
         await conn.execute(
             sa.insert(keypairs).values(
                 access_key=data.keypair.access_key,
-                secret_key=data.keypair.secret_key,
+                secret_key=SecretValue(data.keypair.secret_key),
                 is_active=True,
                 resource_policy=resource_policy_fixture,
                 rate_limit=30000,
@@ -1054,7 +1115,7 @@ async def regular_user_fixture(
                 user=str(data.user_uuid),
             )
         )
-        await virtual_scope_seeder.insert_user_scope(conn, data.user_uuid)
+        await virtual_entity_seeder.insert_user_scope(conn, data.user_uuid)
         await conn.execute(
             sa.insert(association_groups_users).values(
                 group_id=str(group_fixture),
@@ -1069,7 +1130,7 @@ async def regular_user_fixture(
                 entity_id=str(data.user_uuid),
             )
         )
-        await virtual_scope_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
+        await virtual_entity_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
@@ -1088,19 +1149,13 @@ async def regular_user_fixture(
             )
         )
         await conn.execute(
-            EntityMembershipRow.__table__.delete().where(
-                EntityMembershipRow.__table__.c.entity_type == EntityType.USER,
-                EntityMembershipRow.__table__.c.entity_id == str(data.user_uuid),
-            )
-        )
-        await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
         )
-        # The entity-membership and scope-binding rows cascade from the virtual scope.
+        # The entity-membership and scope-binding rows cascade from the virtual entity.
         await conn.execute(
-            VirtualScopeRow.__table__.delete().where(
-                VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
-                VirtualScopeRow.__table__.c.scope_id == str(data.user_uuid),
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+                VirtualEntityRow.__table__.c.entity_id == str(data.user_uuid),
             )
         )
         await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
@@ -1146,13 +1201,6 @@ class _TestConfigProvider(ManagerConfigProvider):
         mock_etcd_loader.register_myself = AsyncMock()
         mock_etcd_loader.deregister_myself = AsyncMock()
         self._legacy_etcd_config_loader = mock_etcd_loader
-        # Set the current_resource_slots ContextVar so that ResourceSlot
-        # operations (e.g. normalize_slots) work without hitting etcd.
-        _slots = {
-            SlotName("cpu"): SlotTypes("count"),
-            SlotName("mem"): SlotTypes("bytes"),
-        }
-        current_resource_slots.set(_slots)
 
 
 @pytest.fixture()
@@ -1429,15 +1477,24 @@ def appproxy_client_pool() -> AppProxyClientPool:
 @pytest.fixture()
 def auth_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
     config_provider: ManagerConfigProvider,
     hook_plugin_ctx: HookPluginContext,
     valkey_clients: ValkeyClients,
     storage_manager: StorageSessionManager,
 ) -> AuthProcessors:
     """Real AuthProcessors wired with real AuthService and AuthRepository."""
-    repo = AuthRepository(database_engine)
+    repo = AuthRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
-    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     group_repository = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
@@ -1454,18 +1511,13 @@ def auth_processors(
         user_repository=user_repository,
         group_repository=group_repository,
         ssh_key_validator=SSHKeyValidator(),
+        client_ip_masking_repository=ClientIPMaskingRepository(database_engine),
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     return AuthProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(
-                scope=MagicMock(spec=ScopeActionRBACValidator),
-                single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
-                bulk=MagicMock(spec=BulkActionRBACValidator),
-            ),
-        ),
+        processor_registry.group(GroupMeta(AUTH_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        service,
     )
 
 
@@ -1511,9 +1563,10 @@ async def server(
         # JWT validator mock — HMAC auth only, JWT not called in tests
         jwt_validator = MagicMock()
 
-        # Insert DI-based middlewares with real plugin contexts
+        # Insert DI-based middlewares with real plugin contexts.
+        # Same order as server_main(): request_id(0) → client_ip(1) → exception(2) → auth(3)
         app.middlewares.insert(
-            1,
+            2,
             build_exception_middleware(
                 error_monitor=error_monitor,
                 stats_monitor=stats_monitor,
@@ -1521,9 +1574,12 @@ async def server(
             ),
         )
         app.middlewares.insert(
-            2,
+            3,
             build_auth_middleware(
                 db=db,
+                key_provider_pool=KeyProviderPool(
+                    providers=[], write_provider_type=KeyProviderType.PLAIN
+                ),
                 jwt_validator=jwt_validator,
                 valkey_stat=valkey_clients.stat,
                 hook_plugin_ctx=hook_plugin_ctx,

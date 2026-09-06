@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.retention.types import RetentionPurgeResult
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
 from ai.backend.manager.repositories.retention.db_source.db_source import RetentionDBSource
 
 
@@ -21,7 +21,7 @@ class RetentionRepository:
 
     def __init__(
         self,
-        ops_provider: DBOpsProvider,
+        ops_provider: RetentionOpsProvider,
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._db_source = RetentionDBSource(ops_provider, config_provider)

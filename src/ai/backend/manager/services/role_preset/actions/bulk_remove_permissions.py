@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import override
+from dataclasses import dataclass, replace
+from typing import Self, override
 
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
@@ -57,3 +57,8 @@ class BulkRemoveRolePermissionPresetsAction(
             permission_id: RolePermissionPresetPurger(permission_preset_id=permission_id)
             for permission_id in self.ids
         }
+
+    @override
+    def narrowed_to(self, field_ids: Sequence[RolePermissionPresetID]) -> Self:
+        allowed = frozenset(field_ids)
+        return replace(self, ids=[field_id for field_id in self.ids if field_id in allowed])

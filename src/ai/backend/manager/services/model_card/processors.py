@@ -100,6 +100,6 @@ class ModelCardProcessors:
             LookupModelCardResourceRequirementOwnerAction,
             LookupBulkModelCardResourceRequirementOwnerAction,
         )
-        self.scoped_search_requirements = requirements.bulk_scoped_search_ops(
+        self.scoped_search_requirements = requirements.atomic_bulk_scoped_search_ops(
             ScopedSearchModelCardResourceRequirementsAction
         )

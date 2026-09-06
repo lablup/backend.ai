@@ -15,13 +15,15 @@ from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import EntityID
+from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, FieldData
 from ai.backend.manager.errors.repository import (
     EmptyOperationScopeError,
     EntityNotFoundError,
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs import creator as specs_creator
+from ai.backend.manager.models.specs import updater as specs_updater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchPurger,
@@ -92,6 +94,7 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityPurgerResult,
     execute_rbac_entity_purger,
 )
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -211,15 +214,14 @@ class WriteOps(ReadOps):
         return creator.to_data(result.row)
 
     async def update_data[TRow: Base, TData](
-        self, updater: DataUpdater[TRow, TData]
+        self, updater: specs_updater.DataUpdater[TRow, TData]
     ) -> TData | None:
-        """Update a single row by primary key and return it as its ``data/`` type."""
-        result = await execute_updater(
-            self._sess, Updater(spec=updater, pk_value=updater.target_id_value())
-        )
-        if result is None:
-            return None
-        return updater.to_data(result.row)
+        """Update a single row by the id the spec names, returning its ``data/`` type.
+
+        For the transition: a caller whose transaction still runs legacy specs beside
+        this one reaches the v2 update here.
+        """
+        return await V2WriteOps(self._sess).update_data(updater)
 
     async def purge_data[TRow: Base, TData](self, purger: DataPurger[TRow, TData]) -> TData | None:
         """Delete a single row by primary key and return it as its ``data/`` type."""
@@ -469,6 +471,37 @@ class WriteOps(ReadOps):
             self._sess, Upserter(spec=upserter), index_elements=upserter.index_elements()
         )
         return upserter.to_data(result.row)
+
+    async def create_entity[TRow: Base, TData](
+        self, creator: specs_creator.EntityCreator[TRow, TData]
+    ) -> TData:
+        """Insert an entity row and provision it in the RBAC graph, on this session.
+
+        For the transition: a caller whose transaction still runs legacy specs
+        beside this one reaches the v2 entity write here.
+        """
+        return await V2WriteOps(self._sess).create_entity(creator)
+
+    async def create_role_managed_entity[TRow: Base, TData](
+        self, creator: specs_creator.RoleManagedEntityCreator[TRow, TData]
+    ) -> TData:
+        """Insert a role-managed entity row, provision it in the RBAC graph and create
+        its preset roles, on this session.
+
+        For the transition: a caller whose transaction still runs legacy specs
+        beside this one reaches the v2 entity write here.
+        """
+        return await V2WriteOps(self._sess).create_role_managed_entity(creator)
+
+    async def create_field[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+        self, owner_id: TOwnerID, creator: specs_creator.FieldCreator[TOwnerID, TRow, TData]
+    ) -> TData:
+        """Insert a field row under its owner, on this session.
+
+        For the transition: a caller whose transaction still runs legacy specs
+        beside this one reaches the v2 field write here.
+        """
+        return await V2WriteOps(self._sess).create_field(owner_id, creator)
 
     async def create_rbac_entity[TRow: Base](
         self, creator: RBACEntityCreator[TRow]

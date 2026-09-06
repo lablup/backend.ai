@@ -1,4 +1,7 @@
-"""Updater for repository update operations."""
+"""Updater for repository update operations.
+
+Deprecated: declare new update specs in ``models/specs/updater.py``.
+"""
 
 from __future__ import annotations
 
@@ -27,6 +30,9 @@ TRow = TypeVar("TRow", bound=Base)
 
 class UpdaterSpec[TRow: Base](ABC):
     """Abstract base class defining values to update for single-row updates.
+
+    Deprecated: use ``DataUpdater`` / ``GuardedDataUpdater`` in
+    ``models/specs/updater.py``.
 
     Implementations specify what to update by providing:
     - row_class property for target table and PK detection
@@ -86,6 +92,8 @@ class DataUpdater[TRow: Base, TData](
 
 class BatchUpdaterSpec[TRow: Base](ABC):
     """Abstract base class defining values to update for batch updates.
+
+    Deprecated: use ``DataBatchUpdater`` in ``models/specs/updater.py``.
 
     Implementations specify what to update by providing:
     - row_class property for target table access

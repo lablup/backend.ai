@@ -6,7 +6,7 @@ import asyncio
 import json
 import os
 import sys
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -18,6 +18,7 @@ from yarl import URL
 
 if TYPE_CHECKING:
     from ai.backend.client.v2.v2_registry import V2ClientRegistry
+    from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 
 CONFIG_DIR = Path.home() / ".backend.ai"
 CONFIG_FILE = CONFIG_DIR / "config.toml"
@@ -219,3 +220,65 @@ def print_result(data: Any) -> None:
         dumped = data
     json_str = json.dumps(dumped, indent=2, ensure_ascii=False, default=str)
     sys.stdout.write(json_str + "\n")
+
+
+@dataclass(frozen=True)
+class EntityLabelTerm:
+    """One ``KEY`` or ``KEY=VALUE`` a search was narrowed by."""
+
+    key: str
+    value: str | None
+
+
+def entity_label_relations(
+    terms: Sequence[EntityLabelTerm],
+) -> list[EntityLabelNestedFilter]:
+    """One relation per term, since a relation matches a single label.
+
+    Requiring every term is the entity filter's own ``AND`` over these, which the
+    command building that filter writes itself.
+    """
+    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.v2.entity_label.request import (
+        EntityLabelFilter,
+        EntityLabelNestedFilter,
+    )
+
+    return [
+        EntityLabelNestedFilter(
+            some=EntityLabelFilter(
+                key=StringFilter(equals=term.key),
+                value=StringFilter(equals=term.value) if term.value is not None else None,
+            )
+        )
+        for term in terms
+    ]
+
+
+def _parse_entity_label_terms(
+    _ctx: click.Context, _param: click.Parameter, value: tuple[str, ...]
+) -> tuple[EntityLabelTerm, ...]:
+    """Split each ``KEY=VALUE``; a bare ``KEY`` leaves the value unconstrained."""
+
+    def to_term(term: str) -> EntityLabelTerm:
+        key, sep, val = term.partition("=")
+        if not key:
+            raise click.BadParameter(f"{term!r} names no label key")
+        return EntityLabelTerm(key=key, value=val if sep else None)
+
+    return tuple(to_term(term) for term in value)
+
+
+def entity_label_filter_options(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Add ``--label`` to a search command, parsed into :class:`EntityLabelTerm` values.
+
+    Takes ``KEY=VALUE``, or ``KEY`` alone to match the key whatever its value.
+    Repeating it narrows further: an entity must carry every label given.
+    """
+    return click.option(
+        "--label",
+        multiple=True,
+        metavar="KEY[=VALUE]",
+        callback=_parse_entity_label_terms,
+        help="Only entities carrying this label. Repeatable (all must match).",
+    )(fn)

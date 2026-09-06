@@ -895,10 +895,10 @@ class SessionRepository:
 
     def __init__(
         self,
-        db: ExtendedAsyncSAEngine,
+        ops_provider: DBOpsProvider,
         redis: RedisConnectionInfo,
     ) -> None:
-        self._db_source = SessionDBSource(db)
+        self._db_source = SessionDBSource(ops_provider)
         self._cache_source = SessionCacheSource(redis)
 
     async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
@@ -1048,7 +1048,7 @@ class TestSessionRepository:
         database_engine: ExtendedAsyncSAEngine,
     ) -> SessionDBSource:
         """Fixture dedicated to this test class"""
-        return SessionDBSource(database_engine)
+        return SessionDBSource(DBOpsProvider(database_engine))
 
     @pytest.fixture
     async def session_repository(

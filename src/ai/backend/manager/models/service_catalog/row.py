@@ -37,7 +37,7 @@ class ServiceCatalogRow(Base):
     __tablename__ = "service_catalog"
 
     id: Mapped[ServiceCatalogID] = mapped_column(
-        "id", GUID(ServiceCatalogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ServiceCatalogID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     service_group: Mapped[str] = mapped_column(
         "service_group", sa.String(length=64), nullable=False
@@ -95,7 +95,7 @@ class ServiceCatalogEndpointRow(Base):
     __tablename__ = "service_catalog_endpoint"
 
     id: Mapped[ServiceCatalogID] = mapped_column(
-        "id", GUID(ServiceCatalogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ServiceCatalogID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     service_id: Mapped[ServiceCatalogID] = mapped_column(
         "service_id",

@@ -258,7 +258,10 @@ def _exception_to_task_result[**P](
             log.warning("Task cancelled")
             return TaskCancelledResult()
         except BackendAIError as e:
-            log.exception("BackendAIError in task: {}", e)
+            if e.status_code // 100 == 4:
+                log.warning("BackendAIError in task: {}", repr(e))
+            else:
+                log.exception("BackendAIError in task: {}", e)
             return TaskFailedResult(e)
         except Exception as e:
             log.exception("Unhandled error in task: {}", e)
@@ -403,7 +406,10 @@ class BackgroundTaskManager:
         except BackendAIError as e:
             status = BgtaskStatus.FAILED
             error_code = e.error_code()
-            log.exception("Task {} ({}): BackendAIError: {}", task_id, task_name, e)
+            if e.status_code // 100 == 4:
+                log.warning("Task {} ({}): BackendAIError: {}", task_id, task_name, repr(e))
+            else:
+                log.exception("Task {} ({}): BackendAIError: {}", task_id, task_name, e)
             msg = repr(e)
             return BgtaskFailedEvent(task_id=task_id, message=msg)
         except Exception as e:
@@ -439,7 +445,10 @@ class BackgroundTaskManager:
             cache_id = EventCacheDomain.BGTASK.cache_id(str(task_id))
             await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
             log.info(
-                "Task {} ({}): {}", task_id, task_name or "", bgtask_result_event.__class__.__name__
+                "Task {} ({}): {}",
+                task_id,
+                task_name or func.__name__,
+                bgtask_result_event.__class__.__name__,
             )
         finally:
             self._ongoing_tasks.pop(TaskID(task_id), None)

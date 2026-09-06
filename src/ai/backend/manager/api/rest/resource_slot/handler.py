@@ -45,7 +45,6 @@ class ResourceSlotHandler:
         body: BodyParam[SearchResourceSlotTypesRequest],
     ) -> APIResponse:
         """Search resource slot types with filters, orders, and pagination."""
-        log.info("SEARCH_RESOURCE_SLOT_TYPES")
 
         searcher = self._adapter.build_searcher(body.parsed)
 
@@ -69,7 +68,6 @@ class ResourceSlotHandler:
     ) -> APIResponse:
         """Get a single resource slot type by slot_name."""
         slot_name = path.parsed.slot_name
-        log.info("GET_RESOURCE_SLOT_TYPE (slot_name:{})", slot_name)
 
         resolved = await self._resource_slot.public_lookup_resource_slot_type.run(
             LookupResourceSlotTypeAction(slot_name=slot_name)

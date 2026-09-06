@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     ProjectFilter,
     ProjectOrder,
     PurgeProjectInput,
+    RestoreProjectInput,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
 )
@@ -33,6 +34,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
     ProjectPayload,
     ProjectStorageInfo,
     PurgeProjectPayload,
+    RestoreProjectPayload,
     UnassignUserError,
     UnassignUsersFromProjectPayload,
     VFolderHostPermissionEntry,
@@ -54,23 +56,24 @@ from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.orders import ProjectOrders
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.project.searchers import ProjectSearcher
-from ai.backend.manager.models.project.updaters import ProjectSoftDeleteUpdater, ProjectUpdater
-from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
-from ai.backend.manager.repositories.project.types import (
+from ai.backend.manager.models.project.scopes import (
     DomainProjectOperationScope,
     UserProjectOperationScope,
 )
+from ai.backend.manager.models.project.searchers import ProjectSearcher
+from ai.backend.manager.models.project.updaters import (
+    ProjectRestoreUpdater,
+    ProjectSoftDeleteUpdater,
+    ProjectUpdater,
+)
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.project.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
@@ -78,6 +81,7 @@ from ai.backend.manager.services.project.actions.assign_users_to_project import 
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
 from ai.backend.manager.services.project.actions.purge_project import PurgeProjectAction
+from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
 from ai.backend.manager.services.project.actions.search_projects import (
     GetProjectAction,
     GlobalSearchProjectsAction,
@@ -239,6 +243,14 @@ class ProjectAdapter(BaseAdapter):
             DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
         )
         return DeleteProjectPayload(deleted=True)
+
+    async def admin_restore(self, input: RestoreProjectInput) -> RestoreProjectPayload:
+        """Restore a soft-deleted project (superadmin only)."""
+        project_id = ProjectID(input.group_id)
+        await self._processors.project.restore_project.run(
+            RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=project_id))
+        )
+        return RestoreProjectPayload(restored=True)
 
     async def admin_purge(self, input: PurgeProjectInput) -> PurgeProjectPayload:
         """Permanently purge a project (superadmin only)."""

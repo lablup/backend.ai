@@ -2,6 +2,7 @@ from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import EntityOpsResult
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.services.artifact.revision.actions.approve import (
     ApproveArtifactRevisionAction,
@@ -29,7 +30,6 @@ from ai.backend.manager.services.artifact.revision.actions.disassociate_with_sto
 )
 from ai.backend.manager.services.artifact.revision.actions.get import (
     GetArtifactRevisionAction,
-    GetArtifactRevisionActionResult,
 )
 from ai.backend.manager.services.artifact.revision.actions.get_download_progress import (
     GetDownloadProgressAction,
@@ -59,7 +59,9 @@ from ai.backend.manager.services.artifact.revision.service import ArtifactRevisi
 
 
 class ArtifactRevisionProcessors:
-    get: SingleFieldActionProcessor[GetArtifactRevisionAction, GetArtifactRevisionActionResult]
+    get: SingleFieldActionProcessor[
+        GetArtifactRevisionAction, EntityOpsResult[ArtifactRevisionData]
+    ]
     get_readme: SingleFieldActionProcessor[
         GetArtifactRevisionReadmeAction, GetArtifactRevisionReadmeActionResult
     ]
@@ -102,7 +104,7 @@ class ArtifactRevisionProcessors:
         revisions: LookupFieldGroup[ArtifactRevisionData],
         service: ArtifactRevisionService,
     ) -> None:
-        self.get = revisions.single_field(GetArtifactRevisionAction, service.get)
+        self.get = revisions.get_ops(GetArtifactRevisionAction)
         self.get_readme = revisions.single_field(
             GetArtifactRevisionReadmeAction, service.get_readme
         )

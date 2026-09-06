@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
@@ -18,6 +19,9 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
+from ai.backend.manager.services.runtime_variant.actions.bulk_get import (
+    PublicBulkGetRuntimeVariantsAction,
+)
 from ai.backend.manager.services.runtime_variant.actions.create import (
     CreateRuntimeVariantAction,
 )
@@ -42,6 +46,9 @@ class RuntimeVariantProcessors:
     public_get: PublicSingleEntityActionProcessor[
         GetRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
     ]
+    public_bulk_get: PartialBulkActionProcessor[
+        PublicBulkGetRuntimeVariantsAction, RuntimeVariantData
+    ]
     global_create: GlobalActionProcessor[
         CreateRuntimeVariantAction, CreatedEntityOpsResult[RuntimeVariantData]
     ]
@@ -60,6 +67,7 @@ class RuntimeVariantProcessors:
 
     def __init__(self, group: ProcessorGroup[RuntimeVariantData]) -> None:
         self.public_get = group.public_get_ops(GetRuntimeVariantAction)
+        self.public_bulk_get = group.public_partial_bulk_get_ops(PublicBulkGetRuntimeVariantsAction)
         self.global_create = group.global_create_ops(CreateRuntimeVariantAction)
         self.update = group.single_update_ops(UpdateRuntimeVariantAction)
         self.purge = group.entity_purge_ops(PurgeRuntimeVariantAction)

@@ -67,7 +67,9 @@ from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHi
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -296,7 +298,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=test_keypair_resource_policy_name,
@@ -348,8 +350,6 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     region="local",
                     scaling_group=test_scaling_group_name,
                     resource_group_id=test_scaling_group_id,
-                    available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                    occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
                     version="1.0.0",
                     architecture="x86_64",
@@ -402,12 +402,12 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     domain_id=domain_id,
                     domain_name=domain_name,
                     group_id=group_id,
+                    user_uuid=user_uuid,
                     resource_group_id=resource_group_id,
                     scaling_group_name=resource_group_name,
                     status=SessionStatus.CREATING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=ResourceSlot({"cpu": cpu_requested, "mem": mem_requested}),
                     created_at=datetime.now(tzutc()),
                     images=["python:3.8"],
                     vfolder_mounts=[],
@@ -433,8 +433,6 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     registry="docker.io",
                     status=kernel_status,
                     status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot({"cpu": cpu_requested, "mem": mem_requested}),
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,
@@ -521,7 +519,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             mem_requested=Decimal("4096"),
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info(cpu="2", mem="4096")
         )
@@ -576,7 +574,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             mem_requested=Decimal("4096"),
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info(cpu="2", mem="4096")
         )
@@ -610,7 +608,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """update_kernel_status_running transitions kernel to RUNNING and sets occupied_slots."""
+        """update_kernel_status_running transitions kernel to RUNNING and marks the allocations used."""
         await self._seed_agent_resources(db_with_cleanup, test_agent_id)
         _, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
@@ -624,7 +622,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             agent_id=test_agent_id,
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info()
         )
@@ -636,8 +634,20 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             ).scalar_one()
             assert kernel.status == KernelStatus.RUNNING
             assert kernel.container_id == "test-container"
-            assert kernel.occupied_slots["cpu"] is not None
-            assert kernel.occupied_slots["mem"] is not None
+            allocations = (
+                (
+                    await db_sess.execute(
+                        sa.select(ResourceAllocationRow).where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            used_by_slot = {row.slot_name: row.used for row in allocations}
+            assert used_by_slot["cpu"] is not None
+            assert used_by_slot["mem"] is not None
 
     async def test_is_idempotent_via_double_call(
         self,
@@ -668,7 +678,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             mem_requested=Decimal("4096"),
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         creation_info = _make_creation_info(cpu="2", mem="4096")
 
         first = await db_source.update_kernel_status_running(kernel_id, "started", creation_info)
@@ -731,7 +741,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             mem_requested=Decimal("1024"),
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info(cpu="4", mem="1024")
         )
@@ -781,7 +791,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             kernel_status=KernelStatus.PENDING,  # Not a valid source status
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info()
         )
@@ -831,7 +841,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             kernel_status=KernelStatus.CREATING,
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         result = await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info()
         )

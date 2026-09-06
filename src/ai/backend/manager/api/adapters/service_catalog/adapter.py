@@ -21,6 +21,7 @@ from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.service_catalog.conditions import ServiceCatalogConditions
 from ai.backend.manager.models.service_catalog.orders import (
     DEFAULT_FORWARD_ORDER,
@@ -29,10 +30,6 @@ from ai.backend.manager.models.service_catalog.orders import (
 )
 from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
 )

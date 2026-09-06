@@ -37,35 +37,25 @@ from ai.backend.manager.models.resource_group import (
     sgroups_for_groups,
     sgroups_for_keypairs,
 )
+from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
     RBACScopeBindingPair,
 )
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupCreatorSpec,
     ResourceGroupForDomainCreatorSpec,
     ResourceGroupForKeypairsCreatorSpec,
     ResourceGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.resource_group.purgers import (
-    ResourceGroupNamePurgerSpec,
     create_resource_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.resource_group.scope_binders import (
     ResourceGroupDomainEntityUnbinder,
     ResourceGroupProjectEntityUnbinder,
-)
-from ai.backend.manager.repositories.resource_group.updaters import (
-    ResourceGroupDriverConfigUpdaterSpec,
-    ResourceGroupMetadataUpdaterSpec,
-    ResourceGroupNetworkConfigUpdaterSpec,
-    ResourceGroupSchedulerConfigUpdaterSpec,
-    ResourceGroupStatusUpdaterSpec,
-    ResourceGroupUpdaterSpec,
 )
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.resource_group.actions.associate_with_domain import (
@@ -396,29 +386,33 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_resource_allocation_limit_for_sessions(
         self, info: graphene.ResolveInfo
     ) -> dict[str, Any]:
-        from ai.backend.manager.models.agent import AgentRow
+        from ai.backend.manager.data.agent.types import AgentStatus
+        from ai.backend.manager.models.agent.row import AgentRow
+        from ai.backend.manager.models.resource_slot import AgentResourceRow
 
         # TODO: Allow admins to set which value to return here among "min", "max", "custom"
         graph_ctx: GraphQueryContext = info.context
-        agent_list = await AgentRow.get_schedulable_agents_by_sgroup(self.name, db=graph_ctx.db)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+            query = (
+                sa.select(
+                    AgentResourceRow.slot_name,
+                    sa.func.max(AgentResourceRow.capacity).label("max_capacity"),
+                )
+                .select_from(j)
+                .where(
+                    (AgentRow.scaling_group == self.name)
+                    & (AgentRow.status == AgentStatus.ALIVE)
+                    & (AgentRow.schedulable == sa.true())
+                )
+                .group_by(AgentResourceRow.slot_name)
+            )
+            result = await db_session.execute(query)
 
-        def _compare_each_resource_and_get_max(
-            val1: ResourceSlot, val2: ResourceSlot | None
-        ) -> ResourceSlot:
-            if val2 is None:
-                return val1
-            return_val = ResourceSlot()
-            val1.sync_keys(val2)
-            for key in val1:
-                return_val[key] = max(val1[key], val2[key])
-            return return_val
-
-        result: ResourceSlot | None = None
-        for agent_row in agent_list:
-            result = _compare_each_resource_and_get_max(agent_row.available_slots, result)
-        if result is None:
-            return {}
-        return {k: v for k, v in result.to_json().items() if v != "0"}
+            max_slots = ResourceSlot()
+            for row in result:
+                max_slots[row.slot_name] = row.max_capacity
+        return {k: v for k, v in max_slots.to_json().items() if v != "0"}
 
     # TODO: Replace this field with a generic resource slot query API
     async def resolve_own_session_occupied_resource_slots(
@@ -684,25 +678,18 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     scheduler_opts = graphene.JSONString(required=False)
     use_host_network = graphene.Boolean(required=False)
 
-    def to_updater(self, name: str) -> Updater[ResourceGroupRow]:
-        """Convert GraphQL input to Updater for scaling group modification."""
-        status_spec = ResourceGroupStatusUpdaterSpec(
+    def to_updater(self, resource_group_id: ResourceGroupID) -> ResourceGroupUpdater:
+        """Convert GraphQL input to the update spec for scaling group modification."""
+        return ResourceGroupUpdater(
+            resource_group_id=resource_group_id,
             is_active=OptionalState.from_graphql(self.is_active),
             is_public=OptionalState.from_graphql(self.is_public),
-        )
-        metadata_spec = ResourceGroupMetadataUpdaterSpec(
             description=TriState.from_graphql(self.description),
-        )
-        network_spec = ResourceGroupNetworkConfigUpdaterSpec(
             wsproxy_addr=TriState.from_graphql(self.wsproxy_addr),
             wsproxy_api_token=TriState.from_graphql(self.wsproxy_api_token),
             use_host_network=OptionalState.from_graphql(self.use_host_network),
-        )
-        driver_spec = ResourceGroupDriverConfigUpdaterSpec(
             driver=OptionalState.from_graphql(self.driver),
             driver_opts=OptionalState.from_graphql(self.driver_opts),
-        )
-        scheduler_spec = ResourceGroupSchedulerConfigUpdaterSpec(
             scheduler=OptionalState.from_graphql(self.scheduler),
             scheduler_opts=OptionalState.from_graphql(
                 ResourceGroupOpts.model_validate(self.scheduler_opts)
@@ -710,14 +697,6 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 else Undefined
             ),
         )
-        spec = ResourceGroupUpdaterSpec(
-            status=status_spec,
-            metadata=metadata_spec,
-            network=network_spec,
-            driver=driver_spec,
-            scheduler=scheduler_spec,
-        )
-        return Updater(spec=spec, pk_value=name)
 
 
 class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
@@ -740,7 +719,7 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
         props: CreateScalingGroupInput,
     ) -> CreateScalingGroup:
         graph_ctx: GraphQueryContext = info.context
-        spec = ResourceGroupCreatorSpec(
+        creator = ResourceGroupCreator(
             name=name,
             description=props.description,
             is_active=bool(props.is_active),
@@ -753,7 +732,6 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
             scheduler_opts=ResourceGroupOpts.model_validate(props.scheduler_opts),
             use_host_network=bool(props.use_host_network),
         )
-        creator = Creator(spec=spec)
         action = CreateResourceGroupAction(creator=creator)
         result = await graph_ctx.processors.resource_group.create_resource_group.run(action)
         return cls(
@@ -798,7 +776,7 @@ class ModifyScalingGroup(graphene.Mutation):  # type: ignore[misc]
         resource_group_id = await _resolve_resource_group_id(graph_ctx, name)
         await graph_ctx.processors.resource_group.update_resource_group.run(
             UpdateResourceGroupAction(
-                resource_group_id=resource_group_id, updater=props.to_updater(name)
+                resource_group_id=resource_group_id, updater=props.to_updater(resource_group_id)
             )
         )
         return cls(ok=True, msg="success")
@@ -824,10 +802,7 @@ class DeleteScalingGroup(graphene.Mutation):  # type: ignore[misc]
 
         resource_group_id = await _resolve_resource_group_id(graph_ctx, name)
         await graph_ctx.processors.resource_group.purge_resource_group.run(
-            PurgeResourceGroupAction(
-                resource_group_id=resource_group_id,
-                purger=Purger(spec=ResourceGroupNamePurgerSpec(name=name)),
-            )
+            PurgeResourceGroupAction(resource_group_id=resource_group_id)
         )
 
         return cls(ok=True, msg="success")

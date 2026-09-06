@@ -19,6 +19,9 @@ from ai.backend.manager.actions.v2.lookup.validator import (
 )
 from ai.backend.manager.actions.v2.single_entity.trigger import SingleEntityActionTriggerMeta
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.repository import EntityNotFoundError
 
 __all__ = ("LookupActionProcessor",)
 
@@ -36,6 +39,10 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
 
     A lookup every authenticated caller may resolve is this processor with no
     post-validators.
+
+    Where post-validators are wired, a key naming nothing and a key the caller may not
+    reach raise the same exception, so the status code cannot be read as an answer to
+    whether the key exists. The audit record keeps the two apart.
     """
 
     _func: Callable[[TAction], Awaitable[TResult]]
@@ -87,6 +94,14 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
         for validator in self._post_validators:
             await validator.validate(meta)
 
+    def _unresolvable(self, action: TAction) -> GenericBadRequest:
+        """The single answer a gated lookup gives to either failure.
+
+        Carries neither the key nor the id it resolved to: both are what the merged
+        answer exists to withhold.
+        """
+        return GenericBadRequest(f"Cannot resolve the given {action.entity_type()} key")
+
     async def run(self, action: TAction) -> TResult:
         started_at = datetime.now(UTC)
         action_id = uuid.uuid4()
@@ -107,6 +122,11 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
                 raise
             try:
                 result = await self._func(action)
+            except EntityNotFoundError as e:
+                run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                if not self._post_validators:
+                    raise
+                raise self._unresolvable(action) from e
             except BaseException as e:
                 run_status = ActionRunStatus.of_failure(e, during_validation=False)
                 raise
@@ -114,6 +134,9 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
                 entity_id = result.entity_id()
                 try:
                     await self._validate_resolved(action, action_id, started_at, entity_id)
+                except NotEnoughPermission as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                    raise self._unresolvable(action) from e
                 except BaseException as e:
                     run_status = ActionRunStatus.of_failure(e, during_validation=True)
                     raise

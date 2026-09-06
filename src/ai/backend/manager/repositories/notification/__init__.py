@@ -7,17 +7,14 @@ from ai.backend.manager.data.notification import (
     NotificationRuleModifier,
 )
 
-from .creators import NotificationChannelCreatorSpec, NotificationRuleCreatorSpec
 from .repositories import NotificationRepositories
 from .repository import NotificationRepository
 
 __all__ = (
-    "NotificationChannelCreatorSpec",
     "NotificationChannelData",
     "NotificationChannelModifier",
     "NotificationRepositories",
     "NotificationRepository",
-    "NotificationRuleCreatorSpec",
     "NotificationRuleData",
     "NotificationRuleModifier",
 )

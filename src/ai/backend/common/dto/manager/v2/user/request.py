@@ -41,6 +41,7 @@ __all__ = (
     "DeleteUsersInput",
     "PurgeUserInput",
     "PurgeUserV2Input",
+    "RestoreUserInput",
     "PurgeUserV2Options",
     "SearchUsersRequest",
     "UpdateMyAllowedClientIPInput",
@@ -196,6 +197,12 @@ class DeleteUserInput(BaseRequestModel):
     """Input for soft-deleting a user."""
 
     user_id: UUID = Field(description="UUID of the user to soft-delete.")
+
+
+class RestoreUserInput(BaseRequestModel):
+    """Input for restoring a soft-deleted user."""
+
+    user_id: UUID = Field(description="UUID of the user to restore.")
 
 
 class PurgeUserInput(BaseRequestModel):

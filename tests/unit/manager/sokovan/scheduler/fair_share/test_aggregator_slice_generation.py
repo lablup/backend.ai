@@ -18,7 +18,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import KernelId, ResourceSlot
 from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import (
     SLICE_DURATION_SECONDS,
     FairShareAggregator,
@@ -44,11 +44,16 @@ def mock_kernel_info() -> MagicMock:
     kernel.user_permission.user_uuid = uuid4()
     kernel.user_permission.group_id = uuid4()
     kernel.user_permission.domain_name = "default"
-    kernel.resource.occupied_slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")})
     kernel.lifecycle.starts_at = None
     kernel.lifecycle.last_observed_at = None
     kernel.lifecycle.terminated_at = None
     return kernel
+
+
+@pytest.fixture
+def mock_allocated_slots() -> ResourceSlot:
+    """The slots a mock kernel was allocated, as resource_allocations reports them."""
+    return ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")})
 
 
 @pytest.fixture
@@ -80,6 +85,7 @@ class TestPrepareKernelUsageSpecs:
         self,
         aggregator: FairShareAggregator,
         mock_kernel_info: MagicMock,
+        mock_allocated_slots: ResourceSlot,
     ) -> None:
         """First observation allows partial start slice from starts_at."""
         mock_kernel_info.lifecycle.starts_at = make_datetime(7, 42, 30)
@@ -87,7 +93,11 @@ class TestPrepareKernelUsageSpecs:
         mock_kernel_info.lifecycle.terminated_at = None  # RUNNING
 
         specs, last_observed_at = aggregator._prepare_kernel_usage_specs(
-            mock_kernel_info, ResourceGroupID(uuid4()), "default", now=make_datetime(7, 47, 0)
+            mock_kernel_info,
+            mock_allocated_slots,
+            ResourceGroupID(uuid4()),
+            "default",
+            now=make_datetime(7, 47, 0),
         )
 
         # Only one slice: 07:42:30 -> 07:45:00 (partial start)
@@ -101,6 +111,7 @@ class TestPrepareKernelUsageSpecs:
         self,
         aggregator: FairShareAggregator,
         mock_kernel_info: MagicMock,
+        mock_allocated_slots: ResourceSlot,
     ) -> None:
         """RUNNING kernel should only generate complete slices up to last boundary."""
         mock_kernel_info.lifecycle.starts_at = make_datetime(7, 40, 0)
@@ -109,7 +120,11 @@ class TestPrepareKernelUsageSpecs:
 
         # now = 07:52:30 -> floors to 07:50:00
         specs, last_observed_at = aggregator._prepare_kernel_usage_specs(
-            mock_kernel_info, ResourceGroupID(uuid4()), "default", now=make_datetime(7, 52, 30)
+            mock_kernel_info,
+            mock_allocated_slots,
+            ResourceGroupID(uuid4()),
+            "default",
+            now=make_datetime(7, 52, 30),
         )
 
         # One complete slice: 07:45:00 -> 07:50:00
@@ -123,6 +138,7 @@ class TestPrepareKernelUsageSpecs:
         self,
         aggregator: FairShareAggregator,
         mock_kernel_info: MagicMock,
+        mock_allocated_slots: ResourceSlot,
     ) -> None:
         """RUNNING kernel should generate no slices if next boundary not reached."""
         mock_kernel_info.lifecycle.starts_at = make_datetime(7, 40, 0)
@@ -131,7 +147,11 @@ class TestPrepareKernelUsageSpecs:
 
         # now = 07:48:00 -> floors to 07:45:00, same as last_observed_at
         specs, last_observed_at = aggregator._prepare_kernel_usage_specs(
-            mock_kernel_info, ResourceGroupID(uuid4()), "default", now=make_datetime(7, 48, 0)
+            mock_kernel_info,
+            mock_allocated_slots,
+            ResourceGroupID(uuid4()),
+            "default",
+            now=make_datetime(7, 48, 0),
         )
 
         # No slices: floored now (07:45:00) <= last_observed_at (07:45:00)
@@ -142,6 +162,7 @@ class TestPrepareKernelUsageSpecs:
         self,
         aggregator: FairShareAggregator,
         mock_kernel_info: MagicMock,
+        mock_allocated_slots: ResourceSlot,
     ) -> None:
         """TERMINATED kernel allows partial end slice at terminated_at."""
         mock_kernel_info.lifecycle.starts_at = make_datetime(7, 40, 0)
@@ -149,7 +170,11 @@ class TestPrepareKernelUsageSpecs:
         mock_kernel_info.lifecycle.terminated_at = make_datetime(7, 53, 30)  # TERMINATED
 
         specs, last_observed_at = aggregator._prepare_kernel_usage_specs(
-            mock_kernel_info, ResourceGroupID(uuid4()), "default", now=make_datetime(7, 55, 0)
+            mock_kernel_info,
+            mock_allocated_slots,
+            ResourceGroupID(uuid4()),
+            "default",
+            now=make_datetime(7, 55, 0),
         )
 
         # One partial slice: 07:50:00 -> 07:53:30
@@ -174,7 +199,6 @@ class TestPrepareKernelUsageRecords:
         kernel1.user_permission.user_uuid = uuid4()
         kernel1.user_permission.group_id = uuid4()
         kernel1.user_permission.domain_name = "default"
-        kernel1.resource.occupied_slots = ResourceSlot({"cpu": Decimal("2")})
         kernel1.lifecycle.starts_at = make_datetime(7, 40, 0)
         kernel1.lifecycle.last_observed_at = make_datetime(7, 45, 0)
         kernel1.lifecycle.terminated_at = None
@@ -185,7 +209,6 @@ class TestPrepareKernelUsageRecords:
         kernel2.user_permission.user_uuid = uuid4()
         kernel2.user_permission.group_id = uuid4()
         kernel2.user_permission.domain_name = "default"
-        kernel2.resource.occupied_slots = ResourceSlot({"cpu": Decimal("4")})
         kernel2.lifecycle.starts_at = make_datetime(7, 42, 0)
         kernel2.lifecycle.last_observed_at = make_datetime(7, 45, 0)
         kernel2.lifecycle.terminated_at = None
@@ -193,6 +216,10 @@ class TestPrepareKernelUsageRecords:
         resource_group_id = ResourceGroupID(uuid4())
         result = aggregator.prepare_kernel_usage_records(
             kernels=[kernel1, kernel2],
+            allocated_slots={
+                KernelId(kernel1.id): ResourceSlot({"cpu": Decimal("2")}),
+                KernelId(kernel2.id): ResourceSlot({"cpu": Decimal("4")}),
+            },
             resource_group_id=resource_group_id,
             resource_group="default",
             now=make_datetime(7, 52, 0),
@@ -232,6 +259,7 @@ class TestScenarioConsecutiveObservations:
         self,
         aggregator: FairShareAggregator,
         mock_kernel_info: MagicMock,
+        mock_allocated_slots: ResourceSlot,
     ) -> None:
         """Test full kernel lifecycle with consecutive observations."""
         all_specs: list[KernelUsageRecordCreatorSpec] = []
@@ -241,7 +269,11 @@ class TestScenarioConsecutiveObservations:
         mock_kernel_info.lifecycle.last_observed_at = None
         mock_kernel_info.lifecycle.terminated_at = None
         specs_1, last_obs_1 = aggregator._prepare_kernel_usage_specs(
-            mock_kernel_info, ResourceGroupID(uuid4()), "default", now=make_datetime(7, 47, 0)
+            mock_kernel_info,
+            mock_allocated_slots,
+            ResourceGroupID(uuid4()),
+            "default",
+            now=make_datetime(7, 47, 0),
         )
         all_specs.extend(specs_1)
 
@@ -253,7 +285,11 @@ class TestScenarioConsecutiveObservations:
         # 2nd observation: now = 07:48:00 (before next boundary)
         mock_kernel_info.lifecycle.last_observed_at = last_obs_1
         specs_2, last_obs_2 = aggregator._prepare_kernel_usage_specs(
-            mock_kernel_info, ResourceGroupID(uuid4()), "default", now=make_datetime(7, 48, 0)
+            mock_kernel_info,
+            mock_allocated_slots,
+            ResourceGroupID(uuid4()),
+            "default",
+            now=make_datetime(7, 48, 0),
         )
         all_specs.extend(specs_2)
 
@@ -263,7 +299,11 @@ class TestScenarioConsecutiveObservations:
         # 3rd observation: now = 07:52:00 (after next boundary)
         mock_kernel_info.lifecycle.last_observed_at = last_obs_2
         specs_3, last_obs_3 = aggregator._prepare_kernel_usage_specs(
-            mock_kernel_info, ResourceGroupID(uuid4()), "default", now=make_datetime(7, 52, 0)
+            mock_kernel_info,
+            mock_allocated_slots,
+            ResourceGroupID(uuid4()),
+            "default",
+            now=make_datetime(7, 52, 0),
         )
         all_specs.extend(specs_3)
 
@@ -276,7 +316,11 @@ class TestScenarioConsecutiveObservations:
         mock_kernel_info.lifecycle.last_observed_at = last_obs_3
         mock_kernel_info.lifecycle.terminated_at = make_datetime(7, 53, 30)
         specs_4, last_obs_4 = aggregator._prepare_kernel_usage_specs(
-            mock_kernel_info, ResourceGroupID(uuid4()), "default", now=make_datetime(7, 55, 0)
+            mock_kernel_info,
+            mock_allocated_slots,
+            ResourceGroupID(uuid4()),
+            "default",
+            now=make_datetime(7, 55, 0),
         )
         all_specs.extend(specs_4)
 
@@ -304,10 +348,12 @@ class TestSliceGeneration:
         self,
         aggregator: FairShareAggregator,
         mock_kernel_info: MagicMock,
+        mock_allocated_slots: ResourceSlot,
     ) -> None:
         """Test generation of multiple complete 5-minute slices."""
         specs = aggregator._generate_slice_specs(
             mock_kernel_info,
+            mock_allocated_slots,
             ResourceGroupID(uuid4()),
             "default",
             start_time=make_datetime(7, 45, 0),
@@ -327,11 +373,13 @@ class TestSliceGeneration:
         self,
         aggregator: FairShareAggregator,
         mock_kernel_info: MagicMock,
+        mock_allocated_slots: ResourceSlot,
     ) -> None:
         """Verify resource-seconds are calculated correctly."""
         # 2.5 minute slice with cpu=2, mem=4096
         specs = aggregator._generate_slice_specs(
             mock_kernel_info,
+            mock_allocated_slots,
             ResourceGroupID(uuid4()),
             "default",
             start_time=make_datetime(7, 42, 30),
@@ -348,11 +396,13 @@ class TestSliceGeneration:
         self,
         aggregator: FairShareAggregator,
         mock_kernel_info: MagicMock,
+        mock_allocated_slots: ResourceSlot,
     ) -> None:
         """Verify no slices when start_time >= end_time."""
         same_time = make_datetime(7, 45, 0)
         specs = aggregator._generate_slice_specs(
             mock_kernel_info,
+            mock_allocated_slots,
             ResourceGroupID(uuid4()),
             "default",
             same_time,

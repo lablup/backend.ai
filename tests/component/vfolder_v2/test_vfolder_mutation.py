@@ -40,10 +40,10 @@ from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
-    OperationType,
     Permission,
     ScopeType,
 )
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -56,11 +56,13 @@ from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
@@ -99,8 +101,12 @@ def vfolder_processors(
     the etcd-backed allowed-vfolder-types lookup are stubbed so that
     service-layer create paths can complete without external dependencies.
     """
-    vfolder_repository = VfolderRepository(database_engine)
-    user_repository = UserRepository(database_engine, V2DBOpsProvider(database_engine))
+    vfolder_repository = VfolderRepository(database_engine, ShareOpsProvider(database_engine))
+    user_repository = UserRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+    )
     config_provider = MagicMock()
     config_provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
         return_value=["user", "group"]
@@ -229,7 +235,6 @@ async def regular_user_vfolder_create_permission(
                 scope_type=ScopeType.PROJECT,
                 scope_id=str(group_fixture),
                 entity_type=EntityType.VFOLDER,
-                operation=OperationType.CREATE,
                 permission=Permission.CREATE,
             )
         )

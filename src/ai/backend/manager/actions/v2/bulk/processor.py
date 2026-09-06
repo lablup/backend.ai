@@ -17,7 +17,7 @@ from ai.backend.manager.actions.v2.bulk.result import (
     BulkEntityResult,
 )
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
-from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
+from ai.backend.manager.actions.v2.bulk.validator import AtomicBulkActionValidator
 
 __all__ = ("BulkActionProcessor",)
 
@@ -79,14 +79,14 @@ class BulkActionProcessor[TAction: BaseBulkAction, TResult]:
     _func: Callable[[TAction], Awaitable[TResult]]
     _judge: EntityResultJudge[TResult]
     _monitors: Sequence[BulkActionMonitor]
-    _validators: Sequence[BulkActionValidator]
+    _validators: Sequence[AtomicBulkActionValidator]
 
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TResult]],
         judge: EntityResultJudge[TResult],
         monitors: Sequence[BulkActionMonitor] | None = None,
-        validators: Sequence[BulkActionValidator] | None = None,
+        validators: Sequence[AtomicBulkActionValidator] | None = None,
     ) -> None:
         self._func = func
         self._judge = judge

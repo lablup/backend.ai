@@ -71,6 +71,7 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.notification.conditions import (
     NotificationChannelConditions,
@@ -93,10 +94,6 @@ from ai.backend.manager.models.notification.updaters import (
     NotificationRuleUpdater,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import (
-    combine_conditions_or,
-    negate_conditions,
-)
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,

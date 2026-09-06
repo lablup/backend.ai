@@ -1,7 +1,7 @@
 ---
 name: deployment-preset-service-shapes
 type: decision-table
-description: deployment preset processor fields and their shape/operation, why the slot rows are field rows of the preset, how the rank is assigned without a lock, why only the update keeps a service method, why the internal name stays DeploymentPreset while the API keeps the longer one
+description: deployment preset knowledge: why the slot rows are field rows of the preset, how the rank is assigned without a lock, why only the update keeps a service method, why the internal name stays DeploymentPreset while the API keeps the longer one
 scope: src/ai/backend/manager/services/deployment_revision_preset
 keywords: [DeploymentPresetCreator, PresetResourceSlotCreator, PresetResourceSlotID, search_ops, field_group, RANK_GAP, DeploymentPresetUpdater, create_global_entity_with_fields]
 sources:
@@ -23,14 +23,9 @@ resource slot amounts along with it, so this package covers two tables.
 
 ## The processor fields
 
-| Field | Action | Shape | Operation |
-|---|---|---|---|
-| `create` | `CreateDeploymentPresetAction` | global + fields | CREATE |
-| `get` | `GetDeploymentPresetAction` | single entity | GET |
-| `global_search` | `GlobalSearchDeploymentPresetsAction` | global | SEARCH |
-| `update` | `UpdateDeploymentPresetAction` | single entity | UPDATE |
-| `purge` | `PurgeDeploymentPresetAction` | single entity | PURGE |
-| `search_resource_slots` | `SearchPresetResourceSlotsAction` | single entity | GET |
+`backend.ai mgr ops list --concern deployment --entity deployment_preset` prints the
+wired list. Its output
+answers the entity type, shape, operation, gate and backing.
 
 ## The slot rows are field rows of the preset
 

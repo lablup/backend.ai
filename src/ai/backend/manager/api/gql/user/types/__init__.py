@@ -53,6 +53,7 @@ from .payloads import (
     MyClientIpGQL,
     PurgeUserPayloadGQL,
     PurgeUsersPayloadGQL,
+    RestoreUserPayloadGQL,
     UpdateMyAllowedClientIPPayloadGQL,
     UpdateUserPayloadGQL,
 )
@@ -109,6 +110,7 @@ __all__ = [
     "UpdateUserPayloadGQL",
     "UpdateMyAllowedClientIPPayloadGQL",
     "DeleteUserPayloadGQL",
+    "RestoreUserPayloadGQL",
     "DeleteUsersPayloadGQL",
     "PurgeUserPayloadGQL",
     "PurgeUsersPayloadGQL",

@@ -19,7 +19,6 @@ class AclHandler:
     """ACL API handler with constructor-injected dependencies."""
 
     async def get_permission(self, ctx: UserContext) -> APIResponse:
-        log.info("GET_PERMISSION (ak:{})", ctx.access_key)
         resp = GetPermissionsResponse(
             vfolder_host_permission_list=get_all_vfolder_host_permissions(),
         )

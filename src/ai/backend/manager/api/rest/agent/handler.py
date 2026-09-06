@@ -33,13 +33,10 @@ class AgentHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Search agents with filters, orders, and pagination."""
-        log.info("SEARCH_AGENTS (ak:{})", ctx.access_key)
 
         querier = self._adapter.build_querier(body.parsed)
 
-        action_result = await self._agent.search_agents.wait_for_complete(
-            SearchAgentsAction(querier=querier)
-        )
+        action_result = await self._agent.search_agents.run(SearchAgentsAction(querier=querier))
 
         resp = SearchAgentsResponse(
             items=[self._adapter.convert_to_dto(agent) for agent in action_result.agents],

@@ -37,7 +37,7 @@ class AgentAdapter(BaseFilterAdapter):
             resource_group=agent.resource_group,
             schedulable=agent.schedulable,
             available_slots=dict(agent.available_slots.to_json()),
-            occupied_slots=dict(agent.cached_occupied_slots.to_json()),
+            occupied_slots=dict(agent.occupied_slots.to_json()),
             addr=agent.addr,
             architecture=agent.architecture,
             version=agent.version,

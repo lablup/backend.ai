@@ -12,6 +12,7 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
@@ -354,6 +355,9 @@ class VFolderFilter(BaseRequestModel):
     )
     cloneable: bool | None = Field(default=None, description="Filter by cloneable flag.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None, description="Filter by the labels on the entity"
+    )
     AND: list[VFolderFilter] | None = Field(default=None, description="AND logical combinator.")
     OR: list[VFolderFilter] | None = Field(default=None, description="OR logical combinator.")
     NOT: list[VFolderFilter] | None = Field(default=None, description="NOT logical combinator.")

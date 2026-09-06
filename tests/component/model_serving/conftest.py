@@ -21,6 +21,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
@@ -44,10 +45,10 @@ def model_serving_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ModelServingProcessors:
     """Real ModelServingProcessors with real service and repository."""
-    ms_repo = ModelServingRepository(database_engine)
+    ms_repo = ModelServingRepository(database_engine, V2DBOpsProvider(database_engine))
     deployment_repo = DeploymentRepository(
         database_engine,
-        V2DBOpsProvider(database_engine),
+        ReconcileOpsProvider(database_engine),
         storage_manager,
         valkey_clients.stat,
         valkey_clients.live,
@@ -80,7 +81,7 @@ def auto_scaling_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ModelServingAutoScalingProcessors:
     """Real ModelServingAutoScalingProcessors with real AutoScalingService."""
-    repo = ModelServingRepository(database_engine)
+    repo = ModelServingRepository(database_engine, V2DBOpsProvider(database_engine))
     service = AutoScalingService(repository=repo)
     return ModelServingAutoScalingProcessors(
         processor_registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
@@ -104,7 +105,7 @@ def deployment_processors(
     """Real DeploymentProcessors with real DeploymentService and DeploymentRepository."""
     repo = DeploymentRepository(
         database_engine,
-        V2DBOpsProvider(database_engine),
+        ReconcileOpsProvider(database_engine),
         storage_manager,
         valkey_clients.stat,
         valkey_clients.live,

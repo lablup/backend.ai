@@ -72,6 +72,10 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_slot import (
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
@@ -79,6 +83,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import TableOrORM, with_tables
 
 IDLE_LOGGER_NAME = "ai.backend.manager.idle"
@@ -107,6 +112,8 @@ _IDLE_ROWS: list[TableOrORM] = [
     SessionRow,
     AgentRow,
     KernelRow,
+    ResourceSlotTypeRow,
+    ResourceAllocationRow,
     ReplicaGroupRow,
     RoutingRow,
 ]
@@ -340,7 +347,7 @@ class TestDoIdleCheck:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex[:38]}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex[:38]}")),
                     user=user_uuid,
                     is_active=True,
                     is_admin=False,
@@ -366,7 +373,6 @@ class TestDoIdleCheck:
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
         now = datetime.now(tzutc())
-        slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("2048")})
         async with db.begin_session() as db_sess:
             db_sess.add(
                 SessionRow(
@@ -383,7 +389,6 @@ class TestDoIdleCheck:
                     status=SessionStatus.RUNNING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=slots,
                     created_at=now,
                     starts_at=now,
                     images=["python:3.8"],
@@ -408,8 +413,6 @@ class TestDoIdleCheck:
                     status=KernelStatus.RUNNING,
                     status_changed=now,
                     session_type=SessionTypes.INTERACTIVE,
-                    occupied_slots=slots,
-                    requested_slots=slots,
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,

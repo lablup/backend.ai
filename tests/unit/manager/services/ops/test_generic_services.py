@@ -25,9 +25,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.role_preset import (
-    RolePresetID,
-)
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import (
     EntityData,
     EntityIdentifier,
@@ -92,7 +90,7 @@ from ai.backend.manager.models.specs.creator import (
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.purger import (
-    DataBatchPurger,
+    EntityBatchPurger,
     EntityPurger,
     FieldPurger,
 )
@@ -216,7 +214,7 @@ class _PresetCreator(EntityCreator[RolePresetRow, _PresetData]):
         return _EntityID(row.id)
 
     @override
-    def member_of(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
         return ()
 
     @override
@@ -238,7 +236,7 @@ class _PresetRoleManagedCreator(RoleManagedEntityCreator[RolePresetRow, _PresetD
         return _EntityID(row.id)
 
     @override
-    def member_of(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
         return ()
 
     @override
@@ -365,7 +363,11 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, _PresetData]):
 
 
 @dataclass
-class _PresetBatchPurger(DataBatchPurger[RolePresetRow, _PresetData]):
+class _PresetBatchPurger(EntityBatchPurger[RolePresetRow, _PresetData]):
+    @override
+    def entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
+
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[RolePresetRow]]:
         return sa.select(RolePresetRow)
@@ -388,7 +390,7 @@ class _PresetUpserter(EntityUpserter[RolePresetRow, _PresetData]):
         return _EntityID(row.id)
 
     @override
-    def member_of(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: RolePresetRow) -> Collection[EntityIdentifier]:
         return ()
 
     @override
@@ -1112,7 +1114,7 @@ class _BatchPurgeAction(BaseScopeAction, BatchPurgeOpsAction[RolePresetRow, _Pre
     scopes: list[OperationScope] = field(default_factory=list)
 
     @override
-    def to_batch_purger(self) -> DataBatchPurger[RolePresetRow, _PresetData]:
+    def to_batch_purger(self) -> EntityBatchPurger[RolePresetRow, _PresetData]:
         return self.purger
 
     @override
@@ -1222,6 +1224,7 @@ def repository(stored: _PresetData) -> MagicMock:
         "lookup",
         "create_entity",
         "create_role_managed_entity",
+        "create_role_managed_global_entity",
         "upsert_field_entity",
         "upsert_global_entity",
         "update",
@@ -1233,12 +1236,13 @@ def repository(stored: _PresetData) -> MagicMock:
     for operation in (
         "atomic_create_entities",
         "atomic_create_role_managed_entities",
+        "atomic_create_role_managed_global_entities",
         "atomic_create_global_entities",
         "atomic_create_field_entities",
         "batch_update_in_scopes",
         "batch_update_in_global",
-        "batch_purge_in_scopes",
-        "batch_purge_in_global",
+        "batch_purge_entities_in_scopes",
+        "batch_purge_entities_in_global",
     ):
         setattr(mock, operation, AsyncMock(return_value=[stored]))
     for operation in (
@@ -1422,7 +1426,7 @@ async def test_partial_bulk_update_answers_for_every_named_entity(
 
     result = await service.execute(_BulkUpdateAction(updaters=updaters))
 
-    assert list(result.successes) == [stored.id]
+    assert list(result.values()) == [stored.id]
     repository.partial_bulk_update.assert_awaited_once_with(updaters)
 
 
@@ -1434,7 +1438,7 @@ async def test_partial_bulk_delete_writes_through_the_update_path(
 
     result = await service.execute(_BulkUpdateAction(updaters=updaters))
 
-    assert list(result.successes) == [stored.id]
+    assert list(result.values()) == [stored.id]
     repository.partial_bulk_update.assert_awaited_once_with(updaters)
 
 
@@ -1446,7 +1450,7 @@ async def test_partial_bulk_purge_answers_for_every_named_entity(
 
     result = await service.execute(_BulkPurgeAction(purgers=purgers))
 
-    assert list(result.successes) == [stored.id]
+    assert list(result.values()) == [stored.id]
     repository.partial_bulk_purge_entities.assert_awaited_once_with(purgers)
 
 
@@ -1524,7 +1528,7 @@ async def test_global_partial_bulk_purge_answers_for_every_named_entity(
 
     result = await service.execute(_BulkPurgeGlobalAction(purgers=purgers))
 
-    assert list(result.successes) == [stored.id]
+    assert list(result.values()) == [stored.id]
     repository.partial_bulk_purge_entities.assert_awaited_once_with(purgers)
 
 
@@ -1587,7 +1591,7 @@ async def test_batch_purge_names_what_it_removed(
     )
 
     assert result.entity_ids() == (stored.id,)
-    repository.batch_purge_in_scopes.assert_awaited_once_with([search_scope], purger)
+    repository.batch_purge_entities_in_scopes.assert_awaited_once_with([search_scope], purger)
 
 
 async def test_search_forwards_the_searcher_and_its_scopes(

@@ -29,7 +29,7 @@ class ObjectStorageRow(Base):
     __tablename__ = "object_storages"
 
     id: Mapped[ObjectStorageID] = mapped_column(
-        "id", GUID(ObjectStorageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ObjectStorageID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String, index=True, unique=True, nullable=False)
     host: Mapped[str] = mapped_column("host", sa.String, index=True, nullable=False)

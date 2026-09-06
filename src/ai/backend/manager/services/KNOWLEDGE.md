@@ -41,7 +41,7 @@ Judgment results and their wiring/spec mapping:
 | Judgment | Condition | Action shape | Write spec |
 |---|---|---|---|
 | Scope-providing | All three yes, and it governs other entities | scope (create) / single etc. | `RoleManagedEntity*` (grants preset roles) |
-| Entity | Has a parent, handled directly | scope (create) / single / bulk | `Entity*` (own VS node + member_of) |
+| Entity | Has a parent, handled directly | scope (create) / single / bulk | `Entity*` (own virtual entity + member_of) |
 | Global | Outside RBAC scopes, handled directly | global (gate: SA or public read) | `GlobalEntity*` (no registration) |
 | Field | No independent permission, lifetime-bound | single_entity on the owner | `FieldEntity*` (requires owner_id) |
 | Action-only | No target row (behavior / non-DB) | by the target's nature, no spec | — (service kept) |

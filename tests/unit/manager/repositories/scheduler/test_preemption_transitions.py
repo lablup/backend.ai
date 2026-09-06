@@ -29,6 +29,7 @@ from ai.backend.manager.models.resource_group import ResourceGroupOpts, Resource
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -121,9 +122,9 @@ class TestMarkSessionsPreempted:
             assign_agents=True,
         )
 
-        preempted = await ScheduleDBSource(db_with_cleanup).mark_sessions_status(
-            [session_id], SessionStatus.PREEMPTED, _REASON
-        )
+        preempted = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).mark_sessions_status([session_id], SessionStatus.PREEMPTED, _REASON)
 
         assert preempted == [session_id]
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.PREEMPTED
@@ -162,9 +163,9 @@ class TestMarkSessionsPreempted:
             kernel_status=KernelStatus.TERMINATED,
         )
 
-        preempted = await ScheduleDBSource(db_with_cleanup).mark_sessions_status(
-            [session_id], SessionStatus.PREEMPTED, _REASON
-        )
+        preempted = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).mark_sessions_status([session_id], SessionStatus.PREEMPTED, _REASON)
 
         assert preempted == []
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.TERMINATED
@@ -202,9 +203,9 @@ class TestMarkSessionsRescheduling:
             assign_agents=True,
         )
 
-        marked = await ScheduleDBSource(db_with_cleanup).mark_sessions_status(
-            [session_id], SessionStatus.RESCHEDULING, _REASON
-        )
+        marked = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).mark_sessions_status([session_id], SessionStatus.RESCHEDULING, _REASON)
 
         assert marked == [session_id]
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.RESCHEDULING
@@ -248,9 +249,9 @@ class TestTerminatePreemptedVictim:
             assign_agents=True,
         )
 
-        result = await ScheduleDBSource(db_with_cleanup).mark_sessions_terminating(
-            [session_id], _REASON
-        )
+        result = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).mark_sessions_terminating([session_id], _REASON)
 
         assert result.terminating_sessions == [session_id]
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -306,7 +307,7 @@ class TestRequeueSessionsToPending:
         # Kernel termination freed the allocations before the requeue runs.
         await _free_allocations(db_with_cleanup, session_id)
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         reset = await db_source.reset_kernels_to_pending_for_sessions([session_id], _REASON)
         requeued = await db_source.mark_sessions_status(
             [session_id], SessionStatus.PENDING, _REASON
@@ -369,9 +370,9 @@ class TestRequeueSessionsToPending:
         )
         await _free_allocations(db_with_cleanup, session_id)
 
-        await ScheduleDBSource(db_with_cleanup).reset_kernels_to_pending_for_sessions(
-            [session_id], _REASON
-        )
+        await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).reset_kernels_to_pending_for_sessions([session_id], _REASON)
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             allocations = (
@@ -423,9 +424,9 @@ class TestRequeueSessionsToPending:
             kernel_status=KernelStatus.CANCELLED,
         )
 
-        requeued = await ScheduleDBSource(db_with_cleanup).mark_sessions_status(
-            [session_id], SessionStatus.PENDING, _REASON
-        )
+        requeued = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).mark_sessions_status([session_id], SessionStatus.PENDING, _REASON)
 
         assert requeued == []
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.CANCELLED
@@ -441,9 +442,9 @@ class TestGetResourceGroupPreemptionMode:
     ) -> None:
         await set_preemption_mode(PreemptionMode.RESCHEDULE)
 
-        mode = await ScheduleDBSource(db_with_cleanup).get_resource_group_preemption_mode(
-            test_scaling_group_id
-        )
+        mode = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).get_resource_group_preemption_mode(test_scaling_group_id)
 
         assert mode == PreemptionMode.RESCHEDULE
 
@@ -454,8 +455,8 @@ class TestGetResourceGroupPreemptionMode:
         test_scaling_group_name: str,
     ) -> None:
         """A group that never configured preemption reports the default mode."""
-        mode = await ScheduleDBSource(db_with_cleanup).get_resource_group_preemption_mode(
-            test_scaling_group_id
-        )
+        mode = await ScheduleDBSource(
+            db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+        ).get_resource_group_preemption_mode(test_scaling_group_id)
 
         assert mode == PreemptionMode.TERMINATE

@@ -38,7 +38,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
-from ai.backend.manager.data.project.types import ProjectData, ProjectType
+from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
@@ -47,9 +47,9 @@ from ai.backend.manager.models.association_container_registries_groups import (
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    EnumValueType,
     ResourceSlotColumn,
     SlugType,
+    StrEnumType,
     StructuredJSONColumn,
     VFolderHostPermissionColumn,
 )
@@ -123,7 +123,7 @@ class AssocGroupUserRow(Base):
     )
 
     id: Mapped[ProjectID] = mapped_column(
-        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     user_id: Mapped[UserID] = mapped_column(
         "user_id",
@@ -148,16 +148,32 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "groups"
     __table_args__ = (
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
+        # A user has at most one personal project. A dangling one — its creator gone —
+        # holds NULL, and NULLs do not collide here.
+        sa.Index(
+            "uq_groups_personal_creator",
+            "creator_id",
+            unique=True,
+            postgresql_where=sa.text("type = 'personal'"),
+        ),
     )
 
     id: Mapped[ProjectID] = mapped_column(
-        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ProjectID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column(
         "name", SlugType(length=64, allow_unicode=True, allow_dot=True), nullable=False
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, default=True)
+    status: Mapped[ProjectStatus] = mapped_column(
+        "status",
+        StrEnumType(ProjectStatus),
+        default=ProjectStatus.ACTIVE,
+        server_default=ProjectStatus.ACTIVE,
+        nullable=False,
+        index=True,
+    )
     #: Field for synchronization with external services.
     integration_id: Mapped[str | None] = mapped_column("integration_id", sa.String(length=512))
     domain_name: Mapped[str] = mapped_column(
@@ -189,9 +205,18 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     )
     type: Mapped[ProjectType] = mapped_column(
         "type",
-        EnumValueType(ProjectType),
+        StrEnumType(ProjectType),
         nullable=False,
         default=ProjectType.GENERAL,
+    )
+    # Provenance, not ownership: ownership is the scope-virtual entity-entity path
+    # alone. Nulled when the user goes; a personal project left holding NULL is
+    # dangling and the retention sweep takes it.
+    creator_id: Mapped[UserID | None] = mapped_column(
+        "creator_id",
+        GUID(UserID),
+        sa.ForeignKey("users.uuid", ondelete="SET NULL"),
+        nullable=True,
     )
     container_registry: Mapped[dict[str, Any] | None] = mapped_column(
         "container_registry",

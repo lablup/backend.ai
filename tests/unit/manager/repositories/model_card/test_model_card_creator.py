@@ -11,6 +11,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
@@ -23,6 +24,7 @@ from ai.backend.manager.data.model_card.types import (
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -32,6 +34,7 @@ from ai.backend.manager.models.model_card.creators import (
     ModelCardResourceRequirementCreator,
 )
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -50,9 +53,7 @@ from ai.backend.manager.models.resource_slot.row import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
-from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import TriState
@@ -61,9 +62,15 @@ from ai.backend.testutils.db import with_tables
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.data.permission.types import ScopeType
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 
 @dataclass(frozen=True)
@@ -90,9 +97,12 @@ class TestModelCardCreatorResourceRequirements:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
+                EntityLabelRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
                 RoleRow,
                 UserRoleRow,
                 UserRow,
@@ -225,7 +235,7 @@ class TestModelCardCreatorResourceRequirements:
                 allowed_vfolder_hosts={},
             )
             db_sess.add(group)
-            db_sess.add(VirtualScopeRow(scope_type=ScopeType.PROJECT.value, scope_id=group.id))
+            db_sess.add(VirtualEntityRow(entity_type=ScopeType.PROJECT.value, entity_id=group.id))
             await db_sess.flush()
         return group
 
@@ -255,7 +265,7 @@ class TestModelCardCreatorResourceRequirements:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ModelCardDBSource:
-        return ModelCardDBSource(db_with_cleanup)
+        return ModelCardDBSource(V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     def ops(
@@ -416,7 +426,7 @@ class TestModelCardCreatorResourceRequirements:
     ) -> None:
         """Regression: update() must sync model_card_resource_requirements.
 
-        Previously ModelCardUpdaterSpec.build_values ignored min_resource, so
+        Previously the update spec's build_values ignored min_resource, so
         a min_resource-only update produced an empty UPDATE payload and
         db_source.update raised ModelCardNotFound. After the fix the child
         rows must be rewritten and the returned ModelCardData must reflect
@@ -432,13 +442,13 @@ class TestModelCardCreatorResourceRequirements:
         # Swap in a completely different requirement set via update().
         # Reuse only slot_types seeded by the fixture (cpu, mem) so the
         # FK into resource_slot_types holds.
-        spec = ModelCardUpdaterSpec(
+        updater = ModelCardUpdater(
+            card_id=ModelCardID(created.id),
             min_resource=TriState.update([
                 ResourceRequirementEntry(slot_name="cpu", min_quantity="8"),
                 ResourceRequirementEntry(slot_name="mem", min_quantity="16384"),
             ]),
         )
-        updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
         await db_source.update(updater)
 
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -472,8 +482,7 @@ class TestModelCardCreatorResourceRequirements:
             )
         ).data
 
-        spec = ModelCardUpdaterSpec(min_resource=TriState.nullify())
-        updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
+        updater = ModelCardUpdater(card_id=ModelCardID(created.id), min_resource=TriState.nullify())
         await db_source.update(updater)
 
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -510,8 +519,8 @@ class TestModelCardCreatorResourceRequirements:
             )
         ).data
 
-        spec = ModelCardUpdaterSpec()  # every field defaults to nop
-        updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
+        # every field defaults to nop
+        updater = ModelCardUpdater(card_id=ModelCardID(created.id))
         await db_source.update(updater)
 
         async with db_with_cleanup.begin_readonly_session() as session:

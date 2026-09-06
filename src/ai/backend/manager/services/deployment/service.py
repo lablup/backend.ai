@@ -2,7 +2,6 @@
 
 import logging
 from datetime import UTC, datetime
-from typing import cast
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
@@ -46,17 +45,11 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.deployment_policy import (
-    DeploymentPolicyRow,
-)
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.updaters import DeploymentUpdaterSpec
-from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
 )
@@ -524,10 +517,10 @@ class DeploymentService:
         Returns:
             UpdateDeploymentActionResult: Result containing the updated deployment data
         """
-        log.info("Updating deployment with ID: {}", action.updater.pk_value)
-        endpoint_id = DeploymentID(cast(UUID, action.updater.pk_value))
-        spec = cast(DeploymentUpdaterSpec, action.updater.spec)
-        deployment_info = await self._deployment_controller.update_deployment(endpoint_id, spec)
+        log.info("Updating deployment with ID: {}", action.updater.deployment_id)
+        deployment_info = await self._deployment_controller.update_deployment(
+            action.updater.deployment_id, action.updater
+        )
         return UpdateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))
 
     async def replace_deployment_options(
@@ -678,14 +671,9 @@ class DeploymentService:
         self, action: UpsertDeploymentPolicyAction
     ) -> UpsertDeploymentPolicyActionResult:
         """Create or update a deployment policy using ON CONFLICT."""
-        policy_upserter = action.upserter
-        spec = DeploymentPolicyUpserterSpec(
-            deployment_id=DeploymentID(policy_upserter.deployment_id),
-            strategy=policy_upserter.strategy,
-            strategy_spec=policy_upserter.strategy_spec,
+        result = await self._deployment_repository.upsert_deployment_policy(
+            action.deployment_id, action.upserter
         )
-        repo_upserter: Upserter[DeploymentPolicyRow] = Upserter(spec=spec)
-        result = await self._deployment_repository.upsert_deployment_policy(repo_upserter)
         return UpsertDeploymentPolicyActionResult(data=result.data, created=result.created)
 
     # ========== Revision Operations ==========

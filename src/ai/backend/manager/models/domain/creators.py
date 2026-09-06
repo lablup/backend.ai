@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import ClassVar, override
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -14,12 +14,12 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
+from ai.backend.manager.models.specs.creator import RoleManagedGlobalEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class DomainCreator(RoleManagedEntityCreator[DomainRow, DomainData]):
+class DomainCreator(RoleManagedGlobalEntityCreator[DomainRow, DomainData]):
     """Registers a domain, the top-level scope everything else is created under."""
 
     name: str
@@ -31,13 +31,18 @@ class DomainCreator(RoleManagedEntityCreator[DomainRow, DomainData]):
     integration_name: str | None = None
     dotfiles: bytes | None = None
 
+    _MAX_NAME_LENGTH: ClassVar[int] = 64
+
+    def __post_init__(self) -> None:
+        candidate = self.name.strip()
+        if candidate == "" or len(candidate) > self._MAX_NAME_LENGTH:
+            raise InvalidAPIParameters(
+                f"Domain name cannot be empty or exceed {self._MAX_NAME_LENGTH} characters."
+            )
+
     @override
     def entity_id(self, row: DomainRow) -> EntityIdentifier:
         return DomainID(row.id)
-
-    @override
-    def member_of(self, row: DomainRow) -> Collection[EntityIdentifier]:
-        return ()
 
     @override
     def template_value(self, row: DomainRow) -> ScopeTemplateValue:
