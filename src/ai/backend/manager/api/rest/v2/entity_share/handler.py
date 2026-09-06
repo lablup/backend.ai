@@ -1,4 +1,4 @@
-"""REST v2 handler for entity invitations."""
+"""REST v2 handler for entity shares."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ class V2EntityShareHandler:
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def get(self, path: PathParam[ShareIdPathParam]) -> APIResponse:
-        """Read one invitation from the side that offered it."""
+        """Read one share from the side that offered it."""
         result = await self._adapter.get(EntityShareID(path.parsed.share_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -63,6 +63,6 @@ class V2EntityShareHandler:
         return APIResponse.build(status_code=200, response_model=result)
 
     async def scoped_search(self, body: BodyParam[ScopedSearchEntitySharesInput]) -> APIResponse:
-        """The invitations the named sides reach."""
+        """The shares the named scopes reach."""
         result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

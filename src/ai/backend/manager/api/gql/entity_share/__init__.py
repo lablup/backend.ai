@@ -4,7 +4,10 @@ from .resolver import (
     create_entity_share,
     entity_share,
     entity_shares,
+    leave_entity_share,
+    my_entity_shares,
     reject_entity_share,
+    revoke_entity_share,
 )
 
 __all__ = (
@@ -13,5 +16,8 @@ __all__ = (
     "create_entity_share",
     "entity_share",
     "entity_shares",
+    "leave_entity_share",
+    "my_entity_shares",
     "reject_entity_share",
+    "revoke_entity_share",
 )

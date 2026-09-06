@@ -147,7 +147,10 @@ from .entity_share import (
     create_entity_share,
     entity_share,
     entity_shares,
+    leave_entity_share,
+    my_entity_shares,
     reject_entity_share,
+    revoke_entity_share,
 )
 from .fair_share import (
     admin_bulk_upsert_domain_fair_share_weight,
@@ -765,6 +768,7 @@ class Query:
     admin_retention_policy = admin_retention_policy
     entity_share = entity_share
     entity_shares = entity_shares
+    my_entity_shares = my_entity_shares
     # Runtime Variant Preset APIs
     runtime_variant_presets = runtime_variant_presets
     runtime_variant_preset = runtime_variant_preset
@@ -1017,6 +1021,8 @@ class Mutation:
     accept_entity_share = accept_entity_share
     reject_entity_share = reject_entity_share
     cancel_entity_share = cancel_entity_share
+    revoke_entity_share = revoke_entity_share
+    leave_entity_share = leave_entity_share
     admin_update_retention_policy = admin_update_retention_policy
     admin_delete_retention_policy = admin_delete_retention_policy
     admin_purge_retention_policy = admin_purge_retention_policy

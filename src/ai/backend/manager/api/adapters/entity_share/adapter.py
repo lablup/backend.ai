@@ -75,7 +75,7 @@ def _entity_share_pagination_spec() -> PaginationSpec:
 
 
 class EntityShareAdapter(BaseAdapter):
-    """The REST v2 surface of the invitations, one entity at a time.
+    """The REST v2 surface of the shares, one entity at a time.
 
     Creating takes one address rather than a list: an offer that clashes with an open
     one is that offer's answer, not the run's.

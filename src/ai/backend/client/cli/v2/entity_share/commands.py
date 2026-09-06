@@ -1,4 +1,4 @@
-"""User-facing CLI commands for entity invitations."""
+"""User-facing CLI commands for entity shares."""
 
 from __future__ import annotations
 
@@ -14,13 +14,16 @@ from ai.backend.client.cli.v2.helpers import (
     print_result,
 )
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.dto.manager.v2.entity_share.types import EntityShareStatusDTO
+from ai.backend.common.dto.manager.v2.entity_share.types import (
+    EntityShareSideDTO,
+    EntityShareStatusDTO,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 
 
 @click.group()
 def entity_share() -> None:
-    """Entity invitation commands."""
+    """Entity share commands."""
 
 
 def _parse_targets(targets: tuple[str, ...]) -> list[tuple[str, uuid.UUID]]:
@@ -46,7 +49,14 @@ def _parse_targets(targets: tuple[str, ...]) -> list[tuple[str, uuid.UUID]]:
 @entity_share.command()
 @click.option("--entity-type", required=True, help="Type of the entity being offered.")
 @click.option("--entity-id", type=click.UUID, required=True, help="Id of the entity being offered.")
-@click.option("--email", required=True, help="Address the offer goes to.")
+@click.option("--project-id", type=click.UUID, default=None, help="Project the offer goes to.")
+@click.option(
+    "--user-id",
+    type=click.UUID,
+    default=None,
+    help="Person the offer goes to; it lands in their own project.",
+)
+@click.option("--email", default=None, help="Address the offer goes to.")
 @click.option(
     "--permission",
     "permissions",
@@ -55,9 +65,14 @@ def _parse_targets(targets: tuple[str, ...]) -> list[tuple[str, uuid.UUID]]:
     help="Permission the offer caps at (repeatable); omit for no ceiling.",
 )
 def create(
-    entity_type: str, entity_id: uuid.UUID, email: str, permissions: tuple[str, ...]
+    entity_type: str,
+    entity_id: uuid.UUID,
+    project_id: uuid.UUID | None,
+    user_id: uuid.UUID | None,
+    email: str | None,
+    permissions: tuple[str, ...],
 ) -> None:
-    """Offer one entity to one address."""
+    """Offer one entity to one project, one person, or one address."""
     from ai.backend.common.dto.manager.v2.entity_share.request import (
         CreateEntityShareInput,
     )
@@ -69,6 +84,8 @@ def create(
                 CreateEntityShareInput(
                     target_entity_type=EntityType(entity_type),
                     target_entity_id=entity_id,
+                    recipient_project_id=project_id,
+                    recipient_user_id=user_id,
                     recipient_email=email,
                     permissions=[PermissionBitDTO(p) for p in permissions],
                 )
@@ -83,7 +100,7 @@ def create(
 @entity_share.command()
 @click.argument("share_id", type=click.UUID)
 def get(share_id: uuid.UUID) -> None:
-    """Read one invitation from the side that offered it."""
+    """Read one share from the side that offered it."""
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -142,24 +159,31 @@ def cancel(share_id: uuid.UUID) -> None:
 
 @entity_share.command(name="scoped-search")
 @click.option(
-    "--invitee",
-    "invitees",
+    "--recipient",
+    "recipients",
     multiple=True,
     type=click.UUID,
-    help="User the invitations are addressed to (repeatable).",
+    help="User the shares are addressed to (repeatable).",
 )
 @click.option(
-    "--inviter",
-    "inviters",
+    "--recipient-project",
+    "recipient_projects",
     multiple=True,
     type=click.UUID,
-    help="User who sent the invitations (repeatable).",
+    help="Project the shares are addressed to (repeatable).",
+)
+@click.option(
+    "--sharer",
+    "sharers",
+    multiple=True,
+    type=click.UUID,
+    help="User who sent the shares (repeatable).",
 )
 @click.option(
     "--target",
     "targets",
     multiple=True,
-    help="Entity the invitations offer, as '<entity_type>:<entity_id>' (repeatable).",
+    help="Entity the shares lend, as '<entity_type>:<entity_id>' (repeatable).",
 )
 @click.option(
     "--status",
@@ -175,15 +199,16 @@ def cancel(share_id: uuid.UUID) -> None:
     help="Order by field:direction (e.g., created_at:desc, status:asc).",
 )
 def scoped_search(
-    invitees: tuple[uuid.UUID, ...],
-    inviters: tuple[uuid.UUID, ...],
+    recipients: tuple[uuid.UUID, ...],
+    recipient_projects: tuple[uuid.UUID, ...],
+    sharers: tuple[uuid.UUID, ...],
     targets: tuple[str, ...],
     status: str | None,
     limit: int,
     offset: int,
     order_by: tuple[str, ...],
 ) -> None:
-    """Search the invitations the named scopes reach (OR across all of them)."""
+    """Search the shares the named scopes reach (OR across all of them)."""
     from ai.backend.common.dto.manager.v2.entity_share.request import (
         EntityShareFilter,
         EntityShareOrderBy,
@@ -197,12 +222,15 @@ def scoped_search(
     )
     from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
-    if not invitees and not inviters and not targets:
-        raise click.UsageError("Name at least one of --invitee, --inviter or --target.")
+    if not recipients and not recipient_projects and not sharers and not targets:
+        raise click.UsageError(
+            "Name at least one of --recipient, --recipient-project, --sharer or --target."
+        )
 
     scope = EntityShareScope(
-        invitee=[UUIDScope(value=user_id) for user_id in invitees] or None,
-        inviter=[UUIDScope(value=user_id) for user_id in inviters] or None,
+        recipient=[UUIDScope(value=user_id) for user_id in recipients] or None,
+        recipient_project=[UUIDScope(value=pid) for pid in recipient_projects] or None,
+        sharer=[UUIDScope(value=user_id) for user_id in sharers] or None,
         target=[
             EntityShareTargetScope(entity_type=EntityType(entity_type), entity_id=entity_id)
             for entity_type, entity_id in _parse_targets(targets)
@@ -233,6 +261,66 @@ def scoped_search(
                 )
             )
             print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@entity_share.command()
+@click.argument("share_id", type=click.UUID)
+def revoke(share_id: uuid.UUID) -> None:
+    """Take back what was lent."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            print_result(await registry.entity_share.revoke(share_id))
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@entity_share.command()
+@click.argument("share_id", type=click.UUID)
+def leave(share_id: uuid.UUID) -> None:
+    """Give back what was taken."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            print_result(await registry.entity_share.leave(share_id))
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@entity_share.command(name="my")
+@click.option(
+    "--side",
+    "sides",
+    multiple=True,
+    type=click.Choice([member.value for member in EntityShareSideDTO]),
+    help="Side the caller stands on (repeatable); omit for both.",
+)
+def my_shares(sides: tuple[str, ...]) -> None:
+    """The shares the caller stands on a side of."""
+    from ai.backend.common.dto.manager.v2.entity_share.request import (
+        MySearchEntitySharesInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            chosen = [EntityShareSideDTO(s) for s in sides] or [
+                EntityShareSideDTO.RECIPIENT,
+                EntityShareSideDTO.SHARER,
+            ]
+            print_result(
+                await registry.entity_share.my_search(MySearchEntitySharesInput(sides=chosen))
+            )
         finally:
             await registry.close()
 
