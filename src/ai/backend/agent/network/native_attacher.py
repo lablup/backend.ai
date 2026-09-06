@@ -86,9 +86,12 @@ async def install_dns_redirect(gateway: str, loopback_port: int, session_id: str
     (Linux drops martian packets routed to 127/8 otherwise) — the same knob dockerd sets. ``conf.all``
     is used (the kernel ORs it with the per-device flag) so no per-bridge name is needed; the
     redirect itself is confined to ``gateway:53``, so nothing else routes to loopback."""
-    await _run(["sysctl", "-w", "net.ipv4.conf.all.route_localnet=1"], check=False)
+    # Checked: the DNAT below sends the query to 127.0.0.1, and without this knob the kernel
+    # drops it as a martian. Silently, and only for DNS -- the session comes up and cannot
+    # resolve its own peers.
+    await _run(["sysctl", "-w", "net.ipv4.conf.all.route_localnet=1"])
     await _delete_dns_rules(f"-d {gateway}/32")
-    await _run(_dns_redirect_add_args(gateway, loopback_port, session_id), check=False)
+    await _run(_dns_redirect_add_args(gateway, loopback_port, session_id))
 
 
 async def remove_dns_redirect(session_id: str) -> None:
@@ -421,11 +424,12 @@ class NativeBridgeAttachRunner:
                     await _run(ns + ["ip", "link", "set", ifname, "address", str(mac)])
                 await _run(ns + ["ip", "addr", "add", f"{ip}/{prefix}", "dev", ifname])
                 await _run(ns + ["ip", "link", "set", ifname, "up"])
-                await _run(ns + ["ip", "link", "set", "lo", "up"], check=False)
+                await _run(ns + ["ip", "link", "set", "lo", "up"])
                 if config.get("isDefaultGateway") and gateway:
-                    await _run(
-                        ns + ["ip", "route", "replace", "default", "via", gateway], check=False
-                    )
+                    # Checked: a container whose default route was not installed reaches nothing
+                    # off its own subnet, while the kernel comes up and reports itself started.
+                    # The `except` below undoes this attach so the caller sees the failure.
+                    await _run(ns + ["ip", "route", "replace", "default", "via", gateway])
             except Exception:
                 # Undo our own half-attach. Nothing else will: the caller's rollback covers the
                 # attachments that SUCCEEDED, not the one that raised, and a veth pair whose peer
@@ -459,7 +463,15 @@ class NativeBridgeAttachRunner:
 
     async def _del(self, ifname: str, container_id: str, config: Mapping[str, Any]) -> None:
         # Deleting the host veth end removes the pair (the container end goes with the netns).
-        await _run(["ip", "link", "del", _veth_name(container_id, ifname, "h")], check=False)
+        # Checked, because the address is released below on the strength of it: a veth that is
+        # still up on an address handed to the next container puts two of them on one IP. A veth
+        # that was already gone is what this is trying to achieve, so only that is success.
+        veth = _veth_name(container_id, ifname, "h")
+        try:
+            await _run(["ip", "link", "del", veth])
+        except RuntimeError as e:
+            if not command.is_absent_error(e):
+                raise
         ipam = config.get("ipam") or {}
         subnet = ipam.get("subnet")
         if ipam.get("type") != "static" and subnet:
@@ -485,10 +497,13 @@ class NativeBridgeAttachRunner:
                     raise RuntimeError(
                         f"cannot create bridge {bridge}: {err_add.decode(errors='replace').strip()}"
                     )
-        await _run(["ip", "link", "set", bridge, "mtu", mtu], check=False)
+        # Checked, both of them. An unset MTU black-holes every full-size frame the moment one
+        # crosses the tunnel, and a bridge with no gateway address routes nothing off-subnet --
+        # neither surfaces as a failed session, only as traffic that silently does not arrive.
+        await _run(["ip", "link", "set", bridge, "mtu", mtu])
         await _run(["ip", "link", "set", bridge, "up"])
         if gw_cidr:
-            await _run(["ip", "addr", "replace", gw_cidr, "dev", bridge], check=False)
+            await _run(["ip", "addr", "replace", gw_cidr, "dev", bridge])
 
     def _masq_rule(self, subnet: str) -> list[str]:
         # NAT egress leaving the node (do not masquerade intra-subnet delivery).
@@ -498,7 +513,9 @@ class NativeBridgeAttachRunner:
         rule = self._masq_rule(subnet)
         rc, _, _ = await _run(["iptables", "-t", "nat", "-C", *rule], check=False)
         if rc != 0:
-            await _run(["iptables", "-t", "nat", "-A", *rule], check=False)
+            # Checked: without the MASQUERADE nothing on this subnet reaches off-node. `-C`
+            # above is the probe and stays unchecked; its rc is the answer.
+            await _run(["iptables", "-t", "nat", "-A", *rule])
 
     async def _del_masq(self, subnet: str) -> None:
         await _run(["iptables", "-t", "nat", "-D", *self._masq_rule(subnet)], check=False)
@@ -582,7 +599,10 @@ class NativeBridgeAttachRunner:
         for rule in self._forward_accept_rules(bridge, uplink):
             rc, _, _ = await _run(["iptables", "-C", *rule], check=False)
             if rc != 0:
-                await _run(["iptables", "-I", *rule], check=False)
+                # Checked: a host with a default-DROP FORWARD policy drops everything this
+                # bridge carries until these land, and xtables lock contention is exactly the
+                # transient the caller's retry exists for.
+                await _run(["iptables", "-I", *rule])
 
     async def _del_forward_accept(self, bridge: str) -> None:
         uplink = await self._resolve_uplink()
