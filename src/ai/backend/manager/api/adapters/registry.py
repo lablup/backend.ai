@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
 from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
@@ -18,12 +19,17 @@ from ai.backend.manager.api.adapters.app_config_fragment.adapter import (
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.api.adapters.artifact_registry.adapter import ArtifactRegistryAdapter
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
+from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMaskingAdapter
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.api.adapters.entity.adapter import EntityAdapter
+from ai.backend.manager.api.adapters.entity.types import WiredEntityTypes
+from ai.backend.manager.api.adapters.entity_invitation.adapter import EntityInvitationAdapter
+from ai.backend.manager.api.adapters.entity_label.adapter import EntityLabelAdapter
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.adapters.huggingface_registry.adapter import HuggingFaceRegistryAdapter
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
@@ -60,6 +66,7 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
 )
 from ai.backend.manager.api.adapters.scheduling_handler.adapter import SchedulingHandlerAdapter
 from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
+from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.api.adapters.storage_host.adapter import StorageHostAdapter
@@ -67,6 +74,7 @@ from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNam
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapter
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -94,6 +102,8 @@ class Adapters:
         artifact: ArtifactAdapter,
         artifact_registry: ArtifactRegistryAdapter,
         audit_log: AuditLogAdapter,
+        entity: EntityAdapter,
+        entity_label: EntityLabelAdapter,
         container_registry: ContainerRegistryAdapter,
         deployment: DeploymentAdapter,
         domain: DomainAdapter,
@@ -103,6 +113,8 @@ class Adapters:
         idle_checker_assignment: IdleCheckerAssignmentAdapter,
         image: ImageAdapter,
         login_client_type: LoginClientTypeAdapter,
+        client_ip_masking: ClientIPMaskingAdapter,
+        secret: SecretAdapter,
         login_history: LoginHistoryAdapter,
         login_session: LoginSessionAdapter,
         notification: NotificationAdapter,
@@ -117,6 +129,7 @@ class Adapters:
         resource_policy: ResourcePolicyAdapter,
         resource_preset: ResourcePresetAdapter,
         resource_slot: ResourceSlotAdapter,
+        entity_invitation: EntityInvitationAdapter,
         retention_policy: RetentionPolicyAdapter,
         runtime_variant: RuntimeVariantAdapter,
         runtime_variant_preset: RuntimeVariantPresetAdapter,
@@ -142,6 +155,8 @@ class Adapters:
         self.artifact = artifact
         self.artifact_registry = artifact_registry
         self.audit_log = audit_log
+        self.entity = entity
+        self.entity_label = entity_label
         self.container_registry = container_registry
         self.deployment = deployment
         self.domain = domain
@@ -151,6 +166,8 @@ class Adapters:
         self.idle_checker_assignment = idle_checker_assignment
         self.image = image
         self.login_client_type = login_client_type
+        self.client_ip_masking = client_ip_masking
+        self.secret = secret
         self.login_history = login_history
         self.login_session = login_session
         self.notification = notification
@@ -165,6 +182,7 @@ class Adapters:
         self.resource_policy = resource_policy
         self.resource_preset = resource_preset
         self.resource_slot = resource_slot
+        self.entity_invitation = entity_invitation
         self.retention_policy = retention_policy
         self.runtime_variant = runtime_variant
         self.runtime_variant_preset = runtime_variant_preset
@@ -186,7 +204,9 @@ class Adapters:
     def create(
         cls,
         processors: Processors,
+        action_registry: ProcessorRegistry[Any],
         auth_config: AuthConfig,
+        key_provider_pool: KeyProviderPool,
         deployment_coordinator: DeploymentCoordinator,
         schedule_coordinator: ScheduleCoordinator,
         config_provider: ManagerConfigProvider | None = None,
@@ -200,6 +220,7 @@ class Adapters:
         catalog endpoints always agree with the coordinators' live
         registrations.
         """
+        entity_types = WiredEntityTypes(action_registry)
         return cls(
             agent=AgentAdapter(processors),
             app_config=AppConfigAdapter(processors),
@@ -209,6 +230,8 @@ class Adapters:
             artifact=ArtifactAdapter(processors),
             artifact_registry=ArtifactRegistryAdapter(processors),
             audit_log=AuditLogAdapter(processors),
+            entity=EntityAdapter(entity_types),
+            entity_label=EntityLabelAdapter(processors, entity_types),
             container_registry=ContainerRegistryAdapter(processors),
             deployment=DeploymentAdapter(processors, deployment_coordinator),
             domain=DomainAdapter(processors),
@@ -218,6 +241,8 @@ class Adapters:
             idle_checker_assignment=IdleCheckerAssignmentAdapter(processors),
             image=ImageAdapter(processors),
             login_client_type=LoginClientTypeAdapter(processors),
+            client_ip_masking=ClientIPMaskingAdapter(processors),
+            secret=SecretAdapter(processors),
             login_history=LoginHistoryAdapter(processors),
             login_session=LoginSessionAdapter(processors),
             notification=NotificationAdapter(processors),
@@ -234,6 +259,7 @@ class Adapters:
             resource_policy=ResourcePolicyAdapter(processors),
             resource_preset=ResourcePresetAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
+            entity_invitation=EntityInvitationAdapter(processors),
             retention_policy=RetentionPolicyAdapter(processors),
             runtime_variant=RuntimeVariantAdapter(processors),
             runtime_variant_preset=RuntimeVariantPresetAdapter(processors),
@@ -247,7 +273,7 @@ class Adapters:
             session=SessionAdapter(processors),
             storage_host=StorageHostAdapter(processors),
             storage_namespace=StorageNamespaceAdapter(processors),
-            user=UserAdapter(processors, auth_config),
+            user=UserAdapter(processors, auth_config, key_provider_pool),
             vfolder=VFolderAdapter(processors),
             vfs_storage=VFSStorageAdapter(processors),
         )

@@ -6,8 +6,10 @@ from typing import Any
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.run_status import ActionRunStatus
-from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
-from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.base import (
+    BaseRuntimeSingleFieldAction,
+    BaseSingleFieldAction,
+)
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import FieldOwnerLookupOpsResult
 from ai.backend.manager.actions.v2.single_entity.monitor import SingleEntityActionMonitor
@@ -22,12 +24,18 @@ __all__ = ("SingleFieldActionProcessor",)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-type OwnerLookupProcessor = LookupActionProcessor[
-    LookupFieldOwnerOpsAction[Any, Any], FieldOwnerLookupOpsResult
-]
+type OwnerLookupProcessor = LookupActionProcessor[Any, FieldOwnerLookupOpsResult]
+"""The step every single-field operation runs first.
+
+Typed on the result rather than the action: which lookup root a row's owner comes from
+is the action's business, and both roots answer with the same value.
+"""
 
 
-class SingleFieldActionProcessor[TAction: BaseSingleFieldAction[Any, Any], TResult]:
+class SingleFieldActionProcessor[
+    TAction: BaseSingleFieldAction[Any, Any] | BaseRuntimeSingleFieldAction[Any],
+    TResult,
+]:
     """Look the field row's owner up, then run the single-entity pipeline against it.
 
     Two runs, each recorded as what it is: a lookup reading the entity that owns the

@@ -16,6 +16,7 @@ from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    IPAddressColumn,
     StrEnumType,
 )
 
@@ -33,14 +34,17 @@ class AuditLogRow(Base):
     __table_args__ = (sa.Index("ix_audit_logs_lookup", "lookup_kind", "lookup_key"),)
 
     id: Mapped[AuditLogID] = mapped_column(
-        "id", GUID(AuditLogID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(AuditLogID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
 
     action_kind: Mapped[ActionKind | None] = mapped_column(
         "action_kind", StrEnumType(ActionKind), nullable=True
     )
 
-    entity_type: Mapped[str] = mapped_column("entity_type", sa.String, index=True, nullable=False)
+    # NULL for a relation operation: it names two scopes and no entity kind.
+    entity_type: Mapped[str | None] = mapped_column(
+        "entity_type", sa.String, index=True, nullable=True
+    )
     operation: Mapped[str] = mapped_column("operation", sa.String, index=True, nullable=False)
 
     # Declared by v2 actions; legacy rows carry the "entity_type:operation" spec type.
@@ -72,6 +76,9 @@ class AuditLogRow(Base):
     acted_as: Mapped[UserID | None] = mapped_column("acted_as", GUID(UserID), nullable=True)
     description: Mapped[str] = mapped_column("description", sa.String, nullable=False)
     duration: Mapped[timedelta | None] = mapped_column("duration", sa.Interval, nullable=True)
+    # The address of the request that produced this record, masked per the client IP
+    # masking policy. NULL when the policy records none, or the address was unusable.
+    client_ip: Mapped[str | None] = mapped_column("client_ip", IPAddressColumn, nullable=True)
 
     status: Mapped[OperationStatus] = mapped_column(
         "status",
@@ -123,4 +130,5 @@ class AuditLogRow(Base):
             triggered_by=self.triggered_by,
             acted_as=self.acted_as,
             duration=self.duration,
+            client_ip=self.client_ip,
         )

@@ -13,6 +13,7 @@ from aiohttp import web
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.types import AgentSelectionStrategy
+from ai.backend.common.web.reserved_response_headers import setup_reserved_response_headers
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
 from ai.backend.manager.config.bootstrap import BootstrapConfig
@@ -22,7 +23,7 @@ from ai.backend.manager.errors.common import (
     ServerMisconfiguredError,
 )
 
-from .middleware import build_api_metric_middleware, request_id_middleware
+from .middleware import build_api_metric_middleware, client_ip_middleware, request_id_middleware
 from .routing import RouteRegistry
 
 if TYPE_CHECKING:
@@ -181,12 +182,17 @@ def build_root_app(
     app = web.Application(
         middlewares=[
             request_id_middleware,
+            client_ip_middleware,
             # exception_middleware and auth_middleware are inserted later
             # in server_main() after dependencies are available.
-            api_middleware,
+            # The metric middleware wraps api_middleware so that requests to
+            # unregistered paths, which api_middleware rejects with 404 before
+            # reaching a handler, are still counted.
             build_api_metric_middleware(metrics.api),
+            api_middleware,
         ]
     )
+    setup_reserved_response_headers(app)
     if loop_error_handler is not None:
         loop = asyncio.get_running_loop()
         loop.set_exception_handler(loop_error_handler)

@@ -8,8 +8,8 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentSummaryData
+from ai.backend.manager.models.endpoint.scopes import ProjectDeploymentOperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.deployment.types import ProjectDeploymentOperationScope
 from ai.backend.manager.services.deployment.actions.base import (
     DeploymentScopeAction,
     DeploymentScopeActionResult,

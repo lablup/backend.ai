@@ -11,6 +11,7 @@ import msgpack
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -31,27 +32,27 @@ from ai.backend.manager.data.user.types import (
     UserSearchResult,
 )
 from ai.backend.manager.errors.user import KeyPairNotFound
+from ai.backend.manager.models.keypair.creators import KeypairCreator
+from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
-from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.keypair.row import generate_keypair_data
+from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
+from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.updater import DataUpdater
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair.types import (
-    UserKeypairOperationScope,
-)
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.user.creators import UserCreateSpec
-from ai.backend.manager.repositories.user.db_source import UserDBSource
-from ai.backend.manager.repositories.user.types import (
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.scopes import (
     DomainUserOperationScope,
     ProjectUserOperationScope,
     RoleUserOperationScope,
 )
-from ai.backend.manager.repositories.user.updaters import UserUpdateSpec
+from ai.backend.manager.models.user.updaters import UserUpdater
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.user.creators import UserCreateSpec
+from ai.backend.manager.repositories.user.db_source import UserDBSource
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -73,10 +74,18 @@ user_repository_resilience = Resilience(
 
 class UserRepository:
     _db_source: UserDBSource
+    _v2_ops: V2DBOpsProvider
+    _key_provider_pool: KeyProviderPool
 
-    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
-        self._db_source = UserDBSource(db)
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
+        self._db_source = UserDBSource(db, v2_ops_provider, key_provider_pool)
         self._v2_ops = v2_ops_provider
+        self._key_provider_pool = key_provider_pool
 
     @user_repository_resilience.apply()
     async def default_access_key(self, user_id: UserID) -> AccessKey | None:
@@ -107,7 +116,7 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def create_user_validated(
-        self, creator: Creator[UserRow], group_ids: list[str] | None
+        self, creator: UserCreator, group_ids: list[str] | None
     ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
@@ -125,20 +134,9 @@ class UserRepository:
         return await self._db_source.bulk_create_users_validated(items)
 
     @user_repository_resilience.apply()
-    async def update_user_validated(
-        self,
-        email: str,
-        updater: Updater[UserRow],
-    ) -> UserData:
-        """
-        Update user with ownership validation and handle role/group changes.
-        """
-        return await self._db_source.update_user_validated(email, updater)
-
-    @user_repository_resilience.apply()
     async def bulk_update_users_validated(
         self,
-        items: list[UserUpdateSpec],
+        items: list[UserUpdater],
     ) -> BulkUserUpdateResultData:
         """
         Update multiple users with partial failure support.
@@ -146,30 +144,19 @@ class UserRepository:
         return await self._db_source.bulk_update_users_validated(items)
 
     @user_repository_resilience.apply()
-    async def update_user_by_uuid_validated(
-        self,
-        user_uuid: UUID,
-        updater: Updater[UserRow],
-    ) -> UserData:
+    async def update_user_by_uuid_validated(self, updater: UserUpdater) -> UserData:
         """Update user by UUID with validation and handle role/group changes."""
-        return await self._db_source.update_user_by_uuid_validated(user_uuid, updater)
+        return await self._db_source.update_user_by_uuid_validated(updater)
 
     @user_repository_resilience.apply()
     async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
-        """Soft delete user by UUID, setting status to DELETED and deactivating keypairs."""
+        """Soft delete user by UUID, setting status to DELETED."""
         await self._db_source.delete_user_by_uuid_validated(user_uuid)
 
     @user_repository_resilience.apply()
-    async def soft_delete_user_validated(self, email: str) -> None:
-        """
-        Soft delete user by setting status to DELETED and deactivating keypairs.
-        """
-        await self._db_source.soft_delete_user_validated(email)
-
-    @user_repository_resilience.apply()
-    async def purge_user(self, email: str) -> None:
-        """Completely purge user and all associated data."""
-        await self._db_source.purge_user(email)
+    async def restore_user_by_uuid_validated(self, user_uuid: UUID) -> None:
+        """Restore a soft-deleted user by UUID, setting status back to ACTIVE."""
+        await self._db_source.restore_user_by_uuid_validated(user_uuid)
 
     @user_repository_resilience.apply()
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
@@ -303,19 +290,59 @@ class UserRepository:
         return await self._db_source.search_users_by_role(scope, querier)
 
     @user_repository_resilience.apply()
-    async def issue_my_keypair(self, user_uuid: UUID) -> GeneratedKeyPairData:
-        """Issue a new keypair for the current user."""
-        return await self._db_source.issue_my_keypair(user_uuid)
+    async def issue_my_keypair(self, user_id: UserID) -> GeneratedKeyPairData:
+        """Issue a new keypair for a user, following the one they authorize with."""
+        creator = await self._db_source.keypair_settings_to_inherit(user_id)
+        return await self._create_keypair(user_id, creator)
 
     @user_repository_resilience.apply()
-    async def revoke_my_keypair(self, user_uuid: UUID, access_key: str) -> None:
-        """Revoke a keypair owned by the current user."""
-        await self._db_source.revoke_my_keypair(user_uuid, access_key)
+    async def admin_create_keypair(
+        self, user_id: UserID, creator: KeyPairCreator
+    ) -> GeneratedKeyPairData:
+        """Issue a keypair for a named user."""
+        return await self._create_keypair(user_id, creator)
+
+    async def _create_keypair(
+        self, user_id: UserID, creator: KeyPairCreator
+    ) -> GeneratedKeyPairData:
+        async with self._v2_ops.write_ops() as w:
+            keypair = await w.create_field(
+                user_id,
+                KeypairCreator(
+                    secrets=await generate_keypair_data(self._key_provider_pool),
+                    is_active=creator.is_active,
+                    is_admin=creator.is_admin,
+                    resource_policy=creator.resource_policy,
+                    rate_limit=creator.rate_limit,
+                ),
+            )
+        return GeneratedKeyPairData(keypair=keypair)
 
     @user_repository_resilience.apply()
-    async def update_my_keypair(self, user_uuid: UUID, updater: Updater[KeyPairRow]) -> KeyPairData:
-        """Update a keypair owned by the current user."""
-        return await self._db_source.update_my_keypair(user_uuid, updater)
+    async def keypair(self, keypair_id: KeyPairID) -> KeyPairData:
+        """Read one keypair by its id."""
+        return await self._db_source.keypair(keypair_id)
+
+    @user_repository_resilience.apply()
+    async def purge_keypair(self, keypair_id: KeyPairID) -> KeyPairData | None:
+        """Remove one keypair unless it is the key its user authorizes with.
+
+        ``None`` when nothing was removed — the row is gone, or the guard refused.
+        """
+        async with self._v2_ops.write_ops() as w:
+            return await w.purge_guarded_field_entity(
+                NonDefaultKeypairPurger(keypair_id=keypair_id)
+            )
+
+    @user_repository_resilience.apply()
+    async def update_keypair(self, updater: KeypairUpdater) -> KeyPairData | None:
+        """Write one keypair's settings unless the write would deactivate the key its
+        user authorizes with.
+
+        ``None`` when nothing was written — the row is gone, or the guard refused.
+        """
+        async with self._v2_ops.write_ops() as w:
+            return await w.update_guarded_data(updater)
 
     @user_repository_resilience.apply()
     async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
@@ -338,23 +365,6 @@ class UserRepository:
             SearchResult with matching keypairs and pagination info.
         """
         return await self._db_source.search_my_keypairs(scope, querier)
-
-    @user_repository_resilience.apply()
-    async def admin_create_keypair(
-        self, user_id: UUID, creator: KeyPairCreator
-    ) -> GeneratedKeyPairData:
-        """Admin creates a keypair for a given user."""
-        return await self._db_source.admin_create_keypair(user_id, creator)
-
-    @user_repository_resilience.apply()
-    async def admin_update_keypair(self, updater: Updater[KeyPairRow]) -> KeyPairData:
-        """Admin updates any keypair by access key."""
-        return await self._db_source.admin_update_keypair(updater)
-
-    @user_repository_resilience.apply()
-    async def admin_delete_keypair(self, access_key: str) -> None:
-        """Admin deletes any keypair by access key."""
-        await self._db_source.admin_delete_keypair(access_key)
 
     @user_repository_resilience.apply()
     async def admin_search_keypairs(

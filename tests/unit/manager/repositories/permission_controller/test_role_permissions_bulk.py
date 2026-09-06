@@ -12,12 +12,11 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.types import (
-    EntityType,
     OperationType,
     Permission,
-    ScopeType,
 )
 from ai.backend.manager.errors.permission import RoleNotFound
 
@@ -77,10 +76,10 @@ def _spec(
 ) -> PermissionCreatorSpec:
     return PermissionCreatorSpec(
         role_id=role_id,
-        scope_type=scope_type,
+        scope_type=ScopeType(EntityType(scope_type)),
         scope_id=scope_id,
-        entity_type=entity_type,
-        operation=operation,
+        entity_type=EntityType(entity_type),
+        permission=Permission.from_operation(operation),
     )
 
 
@@ -117,11 +116,10 @@ class TestBulkRolePermissions:
                 session.add(
                     PermissionRow(
                         role_id=role_id,
-                        scope_type=ScopeType(seed_permission.scope_type.value),
+                        scope_type=seed_permission.scope_type,
                         scope_id=seed_permission.scope_id,
-                        entity_type=EntityType(seed_permission.entity_type.value),
-                        operation=seed_permission.operation,
-                        permission=Permission.from_operation(seed_permission.operation),
+                        entity_type=seed_permission.entity_type,
+                        permission=seed_permission.permission,
                     )
                 )
             await session.commit()
@@ -138,11 +136,10 @@ class TestBulkRolePermissions:
                 PermissionRow(
                     id=permission_id,
                     role_id=spec.role_id,
-                    scope_type=ScopeType(spec.scope_type.value),
+                    scope_type=spec.scope_type,
                     scope_id=spec.scope_id,
-                    entity_type=EntityType(spec.entity_type.value),
-                    operation=spec.operation,
-                    permission=Permission.from_operation(spec.operation),
+                    entity_type=spec.entity_type,
+                    permission=spec.permission,
                 )
             )
             await session.commit()
@@ -170,13 +167,13 @@ class TestBulkRolePermissions:
         role_id: uuid.UUID,
         entity_type: EntityType,
     ) -> set[OperationType]:
-        stmt = sa.select(PermissionRow.operation).where(
+        stmt = sa.select(PermissionRow.permission).where(
             PermissionRow.role_id == role_id,
             PermissionRow.entity_type == entity_type,
         )
         async with db.begin_readonly_session() as session:
             rows = (await session.execute(stmt)).scalars().all()
-        return set(rows)
+        return {permission.to_operation() for permission in rows}
 
     # ---------- bulk_add_role_permissions ----------
 
@@ -201,9 +198,9 @@ class TestBulkRolePermissions:
         result = await perm_db_source.bulk_add_role_permissions(creator)
         assert result.success_count() == len(ALL_OWNER_OPS)
         assert not result.has_failures()
-        assert await self._list_operations(db_with_cleanup, role_id, EntityType.SESSION) == set(
-            ALL_OWNER_OPS
-        )
+        assert await self._list_operations(
+            db_with_cleanup, role_id, EntityType(RBACElementType.SESSION)
+        ) == set(ALL_OWNER_OPS)
 
     async def test_bulk_add_duplicate_rows_are_recorded_as_failures(
         self,
@@ -217,9 +214,9 @@ class TestBulkRolePermissions:
         second = await perm_db_source.bulk_add_role_permissions(creator)
         assert second.success_count() == 0
         assert len(second.errors) == len(ALL_OWNER_OPS)
-        assert await self._count_permissions(db_with_cleanup, role_id, EntityType.SESSION) == len(
-            ALL_OWNER_OPS
-        )
+        assert await self._count_permissions(
+            db_with_cleanup, role_id, EntityType(RBACElementType.SESSION)
+        ) == len(ALL_OWNER_OPS)
 
     async def test_bulk_add_with_empty_creator_is_noop(
         self,
@@ -310,9 +307,9 @@ class TestBulkRolePermissions:
         )
         assert result.success_count() == len(new_specs)
         assert await self._count_permissions(db_with_cleanup, role_id) == len(new_specs)
-        assert await self._list_operations(db_with_cleanup, role_id, EntityType.SESSION) == set(
-            ALL_OWNER_OPS
-        )
+        assert await self._list_operations(
+            db_with_cleanup, role_id, EntityType(RBACElementType.SESSION)
+        ) == set(ALL_OWNER_OPS)
 
     async def test_replace_with_empty_creator_clears_role(
         self,

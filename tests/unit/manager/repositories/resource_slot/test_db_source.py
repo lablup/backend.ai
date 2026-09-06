@@ -13,7 +13,6 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import ResourceSlot, SlotName
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.agent import AgentRow
@@ -23,7 +22,10 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
@@ -31,6 +33,7 @@ from ai.backend.manager.models.resource_slot import (
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.resource_slot.db_source import ResourceSlotDBSource
@@ -99,8 +102,6 @@ class TestAgentResources:
                     region="test-region",
                     scaling_group=sg_name,
                     resource_group_id=sg_id,
-                    available_slots=ResourceSlot({SlotName("cpu"): "8"}),
-                    occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
                     version="24.12.0",
                     architecture="x86_64",
@@ -174,6 +175,8 @@ class TestResourceAllocations:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -219,6 +222,8 @@ class TestAggregation:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -287,8 +292,6 @@ class TestAggregation:
                     region="test-region",
                     scaling_group=sg_name,
                     resource_group_id=resource_group_id,
-                    available_slots=ResourceSlot({SlotName("cpu"): "8"}),
-                    occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
                     version="24.12.0",
                     architecture="x86_64",
@@ -317,7 +320,6 @@ class TestAggregation:
         """
         session_id = uuid4()
         kernel_id = uuid4()
-        empty_slots = ResourceSlot({})
         async with db.begin_session() as db_sess:
             db_sess.add(
                 SessionRow(
@@ -328,8 +330,6 @@ class TestAggregation:
                     resource_group_id=resource_group_id,
                     scaling_group_name="test-sg",
                     user_uuid=uuid4(),
-                    occupying_slots=empty_slots,
-                    requested_slots=empty_slots,
                 )
             )
             await db_sess.flush()
@@ -341,8 +341,6 @@ class TestAggregation:
                     group_id=project_id,
                     user_uuid=uuid4(),
                     status=status,
-                    occupied_slots=empty_slots,
-                    requested_slots=empty_slots,
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,
@@ -607,6 +605,8 @@ class TestComputeActualAgentResourceUsage:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -675,8 +675,6 @@ class TestComputeActualAgentResourceUsage:
                     region="test-region",
                     scaling_group=sg_name,
                     resource_group_id=resource_group_id,
-                    available_slots=ResourceSlot({SlotName("cpu"): "8"}),
-                    occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
                     version="24.12.0",
                     architecture="x86_64",
@@ -700,7 +698,6 @@ class TestComputeActualAgentResourceUsage:
     ) -> uuid.UUID:
         session_id = uuid4()
         kernel_id = uuid4()
-        empty_slots = ResourceSlot({})
         async with db.begin_session() as db_sess:
             db_sess.add(
                 SessionRow(
@@ -711,8 +708,6 @@ class TestComputeActualAgentResourceUsage:
                     resource_group_id=resource_group_id,
                     scaling_group_name="test-sg",
                     user_uuid=uuid4(),
-                    occupying_slots=empty_slots,
-                    requested_slots=empty_slots,
                 )
             )
             await db_sess.flush()
@@ -724,8 +719,6 @@ class TestComputeActualAgentResourceUsage:
                     group_id=project_id,
                     user_uuid=uuid4(),
                     status=status,
-                    occupied_slots=empty_slots,
-                    requested_slots=empty_slots,
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,

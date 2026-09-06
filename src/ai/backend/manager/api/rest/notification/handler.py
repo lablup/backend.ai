@@ -91,7 +91,6 @@ class NotificationHandler:
         body: BodyParam[CreateNotificationChannelRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("CREATE_CHANNEL (ak:{})", ctx.access_key)
         validated_spec = body.parsed.spec
         creator = NotificationChannelCreator(
             name=body.parsed.name,
@@ -207,7 +206,6 @@ class NotificationHandler:
         body: BodyParam[CreateNotificationRuleRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        log.info("CREATE_RULE (ak:{})", ctx.access_key)
         creator = NotificationRuleCreator(
             name=body.parsed.name,
             description=body.parsed.description,

@@ -61,7 +61,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
     RouteObservationResult,
@@ -388,7 +388,7 @@ class TestObserverCycleRouteScope:
     ) -> RouteCoordinator:
         repository = DeploymentRepository(
             db=db_with_cleanup,
-            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=AsyncMock(),
             valkey_stat=AsyncMock(),
             valkey_live=AsyncMock(),

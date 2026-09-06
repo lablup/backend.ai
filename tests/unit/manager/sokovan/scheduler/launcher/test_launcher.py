@@ -5,7 +5,7 @@ Based on BEP-1033 test scenarios for launcher testing.
 Test Scenarios:
 - SC-LA-001 ~ SC-LA-004: Image Pulling
 - SC-LA-005 ~ SC-LA-008: Kernel Creation
-- SC-LA-009 ~ SC-LA-013: Network Setup
+- SC-LA-009 ~ SC-LA-015: Network Setup
 """
 
 from __future__ import annotations
@@ -262,7 +262,7 @@ class TestSessionLauncherKernelCreation:
 
 
 # =============================================================================
-# TestSessionLauncherNetworkSetup (SC-LA-009 ~ SC-LA-013)
+# TestSessionLauncherNetworkSetup (SC-LA-009 ~ SC-LA-015)
 # =============================================================================
 
 
@@ -368,6 +368,55 @@ class TestSessionLauncherNetworkSetup:
 
         # Assert - Network ID was updated
         mock_repository.update_session_network_id.assert_awaited()
+
+    async def test_persistent_network_uses_ref_name(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_persistent_network: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-014: Persistent network is addressed by its ref_name.
+
+        Given: Session attached to a pre-created persistent network
+        When: Start session
+        Then: Kernels join the plugin-generated network under the network's driver
+        """
+        session_ids = [session_for_start_persistent_network.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_persistent_network],
+                image_config_default,
+            )
+
+        mock_client = mock_agent_client_pool._mock_client
+        cluster_info = mock_client.create_kernels.call_args[0][3]
+        assert cluster_info["network_config"] == {
+            "mode": "bridge",
+            "network_name": "bai-multinode-00000000-0000-0000-0000-0000000000b2-nw",
+        }
+
+    async def test_persistent_network_id_not_overwritten(
+        self,
+        launcher: SessionLauncher,
+        mock_repository: AsyncMock,
+        session_for_start_persistent_network: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-015: Persistent network reference survives the start.
+
+        Given: Session whose network_id points at a networks row
+        When: Start session
+        Then: The reference is left alone, so teardown can still resolve it
+        """
+        session_ids = [session_for_start_persistent_network.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_persistent_network],
+                image_config_default,
+            )
+
+        mock_repository.update_session_network_id.assert_not_awaited()
 
     async def test_no_network_plugin_error(
         self,

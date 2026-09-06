@@ -38,7 +38,6 @@ class ActionRunStatus:
         permission lookup timing out, say — is an ordinary ERROR.
         """
         if isinstance(exc, BackendAIError):
-            log.exception("Action processing error: {}", exc)
             error_code = exc.error_code()
             denied = during_validation and error_code.error_detail == ErrorDetail.FORBIDDEN
             return cls(

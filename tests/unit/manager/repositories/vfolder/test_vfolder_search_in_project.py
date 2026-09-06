@@ -32,9 +32,11 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.scopes import ProjectVFolderOperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import ProjectVFolderOperationScope
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -68,7 +70,9 @@ class TestVfolderSearchInProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
-        return VfolderRepository(db=db_with_cleanup)
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
+        )
 
     @pytest.fixture
     async def test_data(
@@ -149,7 +153,7 @@ class TestVfolderSearchInProject:
                 KeyPairRow(
                     user=user_id,
                     access_key="TESTKEY00000000",
-                    secret_key="test-secret",
+                    secret_key=SecretValue("test-secret"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",

@@ -18,3 +18,10 @@ Organized by target component: `common/dto/{manager|agent|storage|clients|intern
 - No business logic — validation and serialization only.
 - Check all callers across components before modifying fields.
 - Use only `v2/` DTOs (e.g., `common/dto/manager/v2/`). DTOs outside `v2/` are deprecated and must not be used in new code.
+
+## Bulk mutation payloads
+
+| Operation | Payload fields |
+|---|---|
+| Soft delete | `items: list[<Entity>Node]`, `failed: list[<Operation><Entity>Error]` |
+| Hard delete (purge) | `successes: list[UUID]`, `failed: list[<Operation><Entity>Error]` |

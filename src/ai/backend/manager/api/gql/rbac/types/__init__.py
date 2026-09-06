@@ -72,23 +72,6 @@ from .role import (
     RoleUserNestedFilterGQL,
     UpdateRoleInput,
 )
-from .role_invitation import (
-    AcceptRoleInvitationInputGQL,
-    CancelRoleInvitationInputGQL,
-    CreateRoleInvitationInputGQL,
-    CreateRoleInvitationPayload,
-    RejectRoleInvitationInputGQL,
-    RoleInvitationConnection,
-    RoleInvitationEdge,
-    RoleInvitationFilterGQL,
-    RoleInvitationGQL,
-    RoleInvitationOrderByGQL,
-    RoleInvitationOrderFieldGQL,
-    RoleInvitationRoleNestedFilterGQL,
-    RoleInvitationStateFilterGQL,
-    RoleInvitationStateGQL,
-    RoleInvitationUserNestedFilterGQL,
-)
 from .scope import RBACElementTypeFilterGQL, RBACElementTypeGQL, ScopeInputGQL
 
 __all__ = [
@@ -166,22 +149,6 @@ __all__ = [
     "EntityNode",
     "EntityEdge",
     "EntityConnection",
-    # Role invitation types
-    "RoleInvitationStateGQL",
-    "RoleInvitationGQL",
-    "RoleInvitationConnection",
-    "RoleInvitationEdge",
-    "RoleInvitationOrderFieldGQL",
-    "RoleInvitationOrderByGQL",
-    "RoleInvitationFilterGQL",
-    "RoleInvitationStateFilterGQL",
-    "RoleInvitationRoleNestedFilterGQL",
-    "RoleInvitationUserNestedFilterGQL",
-    "CreateRoleInvitationInputGQL",
-    "AcceptRoleInvitationInputGQL",
-    "RejectRoleInvitationInputGQL",
-    "CancelRoleInvitationInputGQL",
-    "CreateRoleInvitationPayload",
     # Scope types
     "ScopeInputGQL",
     # Scope-entity combination

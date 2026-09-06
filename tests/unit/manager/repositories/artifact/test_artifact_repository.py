@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactType,
@@ -22,6 +23,8 @@ from ai.backend.manager.errors.artifact import (
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact.searchers import ArtifactSearcher
+from ai.backend.manager.models.artifact.updaters import ArtifactUpdater
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -51,9 +54,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
-from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
 
@@ -276,7 +277,9 @@ class TestArtifactRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ArtifactRepository, None]:
         """Create ArtifactRepository instance with database"""
-        repo = ArtifactRepository(db=db_with_cleanup)
+        repo = ArtifactRepository(
+            db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup)
+        )
         yield repo
 
     # =========================================================================
@@ -313,11 +316,9 @@ class TestArtifactRepository:
         sample_artifact_id: uuid.UUID,
     ) -> None:
         """Test updating artifact"""
-        updater = Updater[ArtifactRow](
-            spec=ArtifactUpdaterSpec(
-                description=TriState.update("Updated description"),
-            ),
-            pk_value=sample_artifact_id,
+        updater = ArtifactUpdater(
+            artifact_id=ArtifactID(sample_artifact_id),
+            description=TriState.update("Updated description"),
         )
 
         updated_artifact = await artifact_repository.update_artifact(updater)
@@ -369,7 +370,7 @@ class TestArtifactRepository:
         sample_artifacts_for_filtering: dict[ArtifactType, uuid.UUID],
     ) -> None:
         """Test searching artifacts filtered by type returns only matching artifacts"""
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 lambda: ArtifactRow.type == ArtifactType.MODEL,
@@ -377,7 +378,7 @@ class TestArtifactRepository:
             orders=[],
         )
 
-        result = await artifact_repository.search_artifacts(querier=querier)
+        result = await artifact_repository.search_artifacts(searcher=searcher)
 
         result_artifact_ids = [artifact.id for artifact in result.items]
         assert sample_artifacts_for_filtering[ArtifactType.MODEL] in result_artifact_ids
@@ -392,7 +393,7 @@ class TestArtifactRepository:
         # First delete the artifact
         await artifact_repository.delete_artifacts([sample_artifact_id])
 
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 lambda: ArtifactRow.availability == ArtifactAvailability.ALIVE.value,
@@ -400,7 +401,7 @@ class TestArtifactRepository:
             orders=[],
         )
 
-        result = await artifact_repository.search_artifacts(querier=querier)
+        result = await artifact_repository.search_artifacts(searcher=searcher)
 
         result_artifact_ids = [artifact.id for artifact in result.items]
         assert sample_artifact_id not in result_artifact_ids
@@ -415,13 +416,13 @@ class TestArtifactRepository:
         sample_artifacts_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching artifacts ordered by name ascending"""
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[ArtifactRow.name.asc()],
         )
 
-        result = await artifact_repository.search_artifacts(querier=querier)
+        result = await artifact_repository.search_artifacts(searcher=searcher)
 
         result_names = [artifact.name for artifact in result.items]
         assert result_names == sorted(result_names)
@@ -434,13 +435,13 @@ class TestArtifactRepository:
         sample_artifacts_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching artifacts ordered by name descending"""
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[ArtifactRow.name.desc()],
         )
 
-        result = await artifact_repository.search_artifacts(querier=querier)
+        result = await artifact_repository.search_artifacts(searcher=searcher)
 
         result_names = [artifact.name for artifact in result.items]
         assert result_names == sorted(result_names, reverse=True)
@@ -457,13 +458,13 @@ class TestArtifactRepository:
         sample_artifacts_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test first page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await artifact_repository.search_artifacts(querier=querier)
+        result = await artifact_repository.search_artifacts(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -474,13 +475,13 @@ class TestArtifactRepository:
         sample_artifacts_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test second page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
 
-        result = await artifact_repository.search_artifacts(querier=querier)
+        result = await artifact_repository.search_artifacts(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -491,13 +492,13 @@ class TestArtifactRepository:
         sample_artifacts_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test last page of offset-based pagination with partial results"""
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[],
             orders=[],
         )
 
-        result = await artifact_repository.search_artifacts(querier=querier)
+        result = await artifact_repository.search_artifacts(searcher=searcher)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -515,7 +516,7 @@ class TestArtifactRepository:
         # Filter: only ALIVE artifacts
         # Order: by name descending
         # Pagination: limit 3, offset 2
-        querier = BatchQuerier(
+        searcher = ArtifactSearcher(
             pagination=OffsetPagination(limit=3, offset=2),
             conditions=[
                 lambda: ArtifactRow.availability == ArtifactAvailability.ALIVE.value,
@@ -523,7 +524,7 @@ class TestArtifactRepository:
             orders=[ArtifactRow.name.desc()],
         )
 
-        result = await artifact_repository.search_artifacts(querier=querier)
+        result = await artifact_repository.search_artifacts(searcher=searcher)
 
         # Total ALIVE artifacts: 10, so total_count should be 10
         assert result.total_count == 10

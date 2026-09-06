@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.compute_session import (
 )
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.kernel.conditions import KernelConditions
@@ -56,18 +57,20 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
         return grouped
 
     def convert_session_to_dto(
-        self, session: SessionData, kernels: list[KernelInfo] | None = None
+        self,
+        session: SessionData,
+        allocation: ResourceAllocationAggregate | None,
+        kernels: list[KernelInfo] | None = None,
     ) -> ComputeSessionDTO:
         """Convert SessionData + kernels to ComputeSessionDTO."""
         containers = [self._convert_kernel_to_container(k) for k in kernels] if kernels else []
 
-        resource_slots: dict[str, Any] | None = None
-        if session.requested_slots is not None:
-            resource_slots = dict(session.requested_slots)
-
-        occupied_slots: dict[str, Any] | None = None
-        if session.occupying_slots is not None:
-            occupied_slots = dict(session.occupying_slots)
+        resource_slots: dict[str, Any] | None = (
+            dict(allocation.requested) if allocation is not None else None
+        )
+        occupied_slots: dict[str, Any] | None = (
+            dict(allocation.used) if allocation is not None else None
+        )
 
         return ComputeSessionDTO(
             id=session.id,

@@ -31,6 +31,7 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderInvitationRow,
     VFolderRow,
 )
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -199,7 +200,9 @@ class TestInvitationGettersUsernameFallback:
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> VfolderRepository:
-        return VfolderRepository(db=db_with_cleanup)
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
+        )
 
     # ------------------------------------------------------------------
     # get_invitation_by_id

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import override
+from dataclasses import dataclass, replace
+from typing import Self, override
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -34,3 +34,8 @@ class BulkRestoreRolePresetsAction(RestorePartialBulkOpsAction[RolePresetRow, Ro
     @override
     def to_updaters(self) -> Mapping[EntityIdentifier, RolePresetRestoreUpdater]:
         return {preset_id: RolePresetRestoreUpdater(preset_id=preset_id) for preset_id in self.ids}
+
+    @override
+    def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
+        allowed = frozenset(entity_ids)
+        return replace(self, ids=[entity_id for entity_id in self.ids if entity_id in allowed])

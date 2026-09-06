@@ -10,7 +10,7 @@ from ai.backend.common.exception import (
 )
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
+from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.services.image.actions.base import ImageAction
 
 
@@ -18,7 +18,7 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 class UpdateImageAction(ImageAction):
     target: str
     architecture: str
-    updater_spec: ImageUpdaterSpec
+    update: ImageUpdate
 
     @override
     @classmethod

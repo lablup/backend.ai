@@ -19,7 +19,11 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.project.row import resolve_group_name_or_id
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -44,6 +48,8 @@ class TestResolveGroupNameOrId:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
             ],
         ):

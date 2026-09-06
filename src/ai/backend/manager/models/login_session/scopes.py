@@ -1,0 +1,70 @@
+"""Operation scopes for login sessions and login history."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import override
+from uuid import UUID
+
+import sqlalchemy as sa
+
+from ai.backend.common.exception import UserNotFound
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.user import UserRow
+
+
+@dataclass(frozen=True)
+class MyLoginSessionOperationScope(OperationScope):
+    """Scope for searching login sessions owned by the current user."""
+
+    user_id: UUID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return LoginSessionRow.user_id == user_id
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        return [
+            ExistenceCheck(
+                column=UserRow.uuid,
+                value=self.user_id,
+                error=UserNotFound(extra_data={"user_id": str(self.user_id)}),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class MyLoginHistoryOperationScope(OperationScope):
+    """Scope for searching login history of the current user."""
+
+    user_id: UUID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return LoginHistoryRow.user_id == user_id
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        return [
+            ExistenceCheck(
+                column=UserRow.uuid,
+                value=self.user_id,
+                error=UserNotFound(extra_data={"user_id": str(self.user_id)}),
+            ),
+        ]

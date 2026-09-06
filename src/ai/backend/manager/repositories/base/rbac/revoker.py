@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType
+from ai.backend.common.data.permission.types import Permission, RBACElementType
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 
@@ -32,13 +32,13 @@ class RBACRevoker:
         entity_id: The entity to revoke access from.
         entity_scope_type: The scope type for entity-as-scope in permissions table.
         target_role_ids: The role ID(s) to revoke permissions from.
-        operations: Operations to revoke. If None, revokes all operations for the entity.
+        permission: Operation bits to revoke. If None, revokes every operation on the entity.
     """
 
     entity_id: ObjectId
     entity_scope_type: RBACElementType
     target_role_ids: list[UUID]
-    operations: list[OperationType] | None = None
+    permission: Permission | None = None
 
 
 # =============================================================================
@@ -51,7 +51,7 @@ async def _delete_permissions(
     role_ids: Collection[UUID],
     entity_id: ObjectId,
     scope_type: RBACElementType,
-    operations: list[OperationType] | None,
+    permission: Permission | None,
 ) -> int:
     """Delete permissions for the given entity-as-scope and roles."""
     if not role_ids:
@@ -64,8 +64,10 @@ async def _delete_permissions(
         PermissionRow.entity_type == entity_id.entity_type,
     ]
 
-    if operations is not None:
-        conditions.append(PermissionRow.operation.in_(operations))
+    if permission is not None:
+        conditions.append(
+            PermissionRow.permission.in_([bit for bit in Permission if bit and permission & bit])
+        )
 
     result = await db_sess.execute(sa.delete(PermissionRow).where(sa.and_(*conditions)))
     return cast(CursorResult[Any], result).rowcount or 0
@@ -100,7 +102,7 @@ async def execute_rbac_revoker(
         revoker.target_role_ids,
         revoker.entity_id,
         revoker.entity_scope_type,
-        revoker.operations,
+        revoker.permission,
     )
 
     await db_sess.flush()

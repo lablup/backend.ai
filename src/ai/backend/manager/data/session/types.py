@@ -15,8 +15,9 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_dependency import SessionDependencyID
 from ai.backend.common.data.entity.session_group import SessionGroupID
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
@@ -26,7 +27,6 @@ from ai.backend.common.types import (
     CIStrEnum,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -196,8 +196,6 @@ class SessionData(EntityData):
     domain_name: str
     group_id: UUID
     user_uuid: UUID
-    occupying_slots: Any  # TODO: ResourceSlot?
-    requested_slots: Any
     use_host_network: bool
     created_at: datetime = field(compare=False)
     status: SessionStatus
@@ -240,6 +238,19 @@ class SessionData(EntityData):
         return SessionID(self.id)
 
 
+class SessionTerminationStatus(StrEnum):
+    """What a termination request did to one session.
+
+    Session-only, so it stays here rather than beside the bulk result: what a bulk
+    run's per-entity value means is the domain's to declare.
+    """
+
+    CANCELLED = "cancelled"
+    TERMINATING = "terminating"
+    FORCE_TERMINATED = "force-terminated"
+    SKIPPED = "skipped"
+
+
 @dataclass(frozen=True)
 class SessionEntityData(EntityData):
     """A session as its own row states it.
@@ -273,8 +284,6 @@ class SessionEntityData(EntityData):
     images: list[str] | None
     image_ids: list[UUID] | None
     tag: str | None
-    occupying_slots: ResourceSlot
-    requested_slots: ResourceSlot
     vfolder_mounts: list[VFolderMount] | None
     environ: dict[str, Any] | None
     bootstrap_script: str | None
@@ -300,6 +309,15 @@ class SessionEntityData(EntityData):
     @override
     def entity_id(self) -> SessionID:
         return self.id
+
+
+@dataclass(frozen=True)
+class SessionDependencyData(FieldData):
+    """One edge of the dependency graph: the session and what it waits for."""
+
+    id: SessionDependencyID
+    session_id: SessionID
+    depends_on: SessionID
 
 
 @dataclass(frozen=True)
@@ -344,8 +362,6 @@ class SessionMetadata:
 class ResourceSpec:
     cluster_mode: str
     cluster_size: int
-    occupying_slots: ResourceSlot
-    requested_slots: ResourceSlot
     resource_group_name: str | None
     target_sgroup_names: list[str] | None
     agent_ids: list[str] | None
@@ -490,7 +506,7 @@ class SubStepResult(BackendAISchema):
 
 
 @dataclass
-class SessionSchedulingHistoryData:
+class SessionSchedulingHistoryData(FieldData):
     """Domain model for session scheduling history."""
 
     id: UUID

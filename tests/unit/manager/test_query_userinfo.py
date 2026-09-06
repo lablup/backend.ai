@@ -28,6 +28,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -50,9 +51,16 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.utils import query_userinfo, query_userinfo_from_session
 from ai.backend.testutils.db import TableOrORM, with_tables
 
@@ -68,8 +76,11 @@ ALL_ROWS: list[TableOrORM] = [
     KeyPairRow,
     ProjectRow,
     AssociationScopesEntitiesRow,
-    VirtualScopeRow,
+    VirtualEntityRow,
     EntityMembershipRow,
+    EntityMembershipCapRow,
+    EntityMembershipFieldRow,
+    EntityLabelRow,
     ContainerRegistryRow,
     ImageRow,
     VFolderRow,
@@ -205,7 +216,7 @@ class TestQueryUserinfo:
             sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=user_uuid,
                     is_active=True,
                     resource_policy=kp_policy,
@@ -231,22 +242,27 @@ class TestQueryUserinfo:
                     relation_type=RelationType.AUTO,
                 )
             )
-            # Membership read model: the project's virtual scope with the user
+            # Membership read model: the project's virtual entity with the user
             # enrolled in it.
-            project_vs_id = uuid.uuid4()
-            sess.add(
-                VirtualScopeRow(
-                    id=project_vs_id,
-                    scope_type=ScopeType.PROJECT.value,
-                    scope_id=group_id,
-                )
-            )
+            project_ve_id = uuid.uuid4()
+            user_ve_id = uuid.uuid4()
+            sess.add_all([
+                VirtualEntityRow(
+                    id=project_ve_id,
+                    entity_type=ScopeType.PROJECT.value,
+                    entity_id=group_id,
+                ),
+                VirtualEntityRow(
+                    id=user_ve_id,
+                    entity_type=EntityType.USER.value,
+                    entity_id=user_uuid,
+                ),
+            ])
             await sess.flush()
             sess.add(
                 EntityMembershipRow(
-                    virtual_scope_id=project_vs_id,
-                    entity_type=EntityType.USER.value,
-                    entity_id=user_uuid,
+                    virtual_entity_id=project_ve_id,
+                    member_entity_id=user_ve_id,
                 )
             )
             await sess.commit()
@@ -331,7 +347,7 @@ class TestQueryUserinfo:
             sess.add(
                 KeyPairRow(
                     access_key=ak,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=user_uuid,
                     is_active=True,
                     resource_policy=seed.kp_policy_name,
@@ -364,7 +380,7 @@ class TestQueryUserinfo:
             sess.add(
                 KeyPairRow(
                     access_key=admin_ak,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=admin_uuid,
                     is_active=True,
                     resource_policy=seed.kp_policy_name,
@@ -604,7 +620,7 @@ class TestQueryUserinfoFromSession:
             sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key="secret",
+                    secret_key=SecretValue("secret"),
                     user=user_uuid,
                     is_active=True,
                     resource_policy=kp_policy,
@@ -630,22 +646,27 @@ class TestQueryUserinfoFromSession:
                     relation_type=RelationType.AUTO,
                 )
             )
-            # Membership read model: the project's virtual scope with the user
+            # Membership read model: the project's virtual entity with the user
             # enrolled in it.
-            project_vs_id = uuid.uuid4()
-            sess.add(
-                VirtualScopeRow(
-                    id=project_vs_id,
-                    scope_type=ScopeType.PROJECT.value,
-                    scope_id=group_id,
-                )
-            )
+            project_ve_id = uuid.uuid4()
+            user_ve_id = uuid.uuid4()
+            sess.add_all([
+                VirtualEntityRow(
+                    id=project_ve_id,
+                    entity_type=ScopeType.PROJECT.value,
+                    entity_id=group_id,
+                ),
+                VirtualEntityRow(
+                    id=user_ve_id,
+                    entity_type=EntityType.USER.value,
+                    entity_id=user_uuid,
+                ),
+            ])
             await sess.flush()
             sess.add(
                 EntityMembershipRow(
-                    virtual_scope_id=project_vs_id,
-                    entity_type=EntityType.USER.value,
-                    entity_id=user_uuid,
+                    virtual_entity_id=project_ve_id,
+                    member_entity_id=user_ve_id,
                 )
             )
             await sess.commit()

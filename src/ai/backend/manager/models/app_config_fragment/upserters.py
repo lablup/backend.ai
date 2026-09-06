@@ -56,7 +56,7 @@ class AppConfigFragmentUpserter(EntityUpserter[AppConfigFragmentRow, AppConfigFr
         return AppConfigFragmentID(row.id)
 
     @override
-    def member_of(self, row: AppConfigFragmentRow) -> Collection[EntityIdentifier]:
+    def created_in(self, row: AppConfigFragmentRow) -> Collection[EntityIdentifier]:
         return (self.owner,)
 
     @override

@@ -52,7 +52,7 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):
         "id",
         GUID(AppConfigFragmentID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     config_name: Mapped[str] = mapped_column(
         "config_name",

@@ -6,11 +6,6 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@key", "
   subscription: Subscription
 }
 
-"""Added in 26.4.4. Input for accepting a role invitation."""
-input AcceptRoleInvitationInput {
-  invitationId: UUID!
-}
-
 """Added in 25.16.0. An access token for model deployment."""
 type AccessToken implements Node {
   """The Globally Unique ID of this object"""
@@ -224,6 +219,20 @@ type AdminGetSSHKeypairPayload {
 }
 
 """
+Added in 26.9.0. What one re-encryption pass wrote, and what the columns hold afterwards.
+"""
+type AdminReencryptSecretsPayload {
+  """How many rows this pass read."""
+  scanned: Int!
+
+  """How many rows this pass wrote back."""
+  reencrypted: Int!
+
+  """The count per column and key id after this pass."""
+  status: AdminSecretStatusPayload!
+}
+
+"""
 Added in 26.4.3. Payload for admin bulk revision refresh mutation result.
 """
 type AdminRefreshDeploymentRevisionsPayload {
@@ -251,6 +260,17 @@ Added in 26.4.2. Payload returned after admin registers a user's SSH keypair.
 type AdminRegisterSSHKeypairPayload {
   """Access key whose SSH keypair was updated."""
   accessKey: String!
+}
+
+"""
+Added in 26.9.0. Which key each stored secret sits on, across every encrypted column.
+"""
+type AdminSecretStatusPayload {
+  """The key provider new and re-encrypted secrets are written through."""
+  writeProviderType: String!
+
+  """The stored secrets, grouped by column and by the key holding them."""
+  counts: [SecretKeyCount!]!
 }
 
 """Added in 26.4.2. Admin input for updating a keypair."""
@@ -283,6 +303,9 @@ input AgentFilter {
   status: AgentStatusFilter = null
   schedulable: Boolean = null
   scalingGroup: StringFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [AgentFilter!] = null
   OR: [AgentFilter!] = null
   NOT: [AgentFilter!] = null
@@ -488,6 +511,11 @@ type AgentV2 implements Node {
   id: ID!
 
   """
+  Added in 26.9.0. Agent UUID. The agent's primary key is its name, so rows keyed on the agent carry this instead.
+  """
+  uuid: UUID!
+
+  """
   Hardware resource capacity, usage, and availability information. Contains capacity (total), used (occupied by sessions), and free (available) resource slots including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources.
   """
   resourceInfo: AgentResource!
@@ -516,6 +544,9 @@ type AgentV2 implements Node {
   Name of the scaling group this agent belongs to. Scaling groups are logical collections of agents used for resource scheduling, quota management, and workload isolation across different user groups or projects.
   """
   scalingGroup: String!
+
+  """Added in 26.9.0. The labels on this agent."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 
   """Added in 26.1.0. Load the container count for this agent."""
   containerCount: Int
@@ -1432,8 +1463,10 @@ type AuditLogV2 implements Node {
   """UUID of the action that generated this log."""
   actionId: UUID!
 
-  """Type of entity this log relates to."""
-  entityType: String!
+  """
+  Type of entity this log relates to. Null for an operation that names scopes and no entity kind, such as linking two entities.
+  """
+  entityType: String
 
   """Operation performed (create, update, delete, etc.)."""
   operation: String!
@@ -1463,6 +1496,11 @@ type AuditLogV2 implements Node {
 
   """Status of the operation."""
   status: AuditLogStatus!
+
+  """
+  Added in 26.9.0. IP address of the request that produced this record, masked per the client IP masking policy. Null when the policy records none, or when the address was unavailable or unusable.
+  """
+  clientIp: String
 
   """
   The user who triggered this audit log entry, resolved from triggered_by UUID.
@@ -1831,6 +1869,17 @@ type BulkDeleteRolePresetsPayload {
   failed: [BulkRolePresetFailureInfo!]!
 }
 
+"""
+Added in 26.9.0. Failure detail for a single vfolder in a bulk soft-deletion.
+"""
+type BulkDeleteVFolderV2Error {
+  """UUID of the vfolder that failed to be soft-deleted."""
+  vfolderId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
 input BulkDeleteVFoldersV2Input {
   """List of VFolder UUIDs to soft-delete."""
@@ -1839,8 +1888,20 @@ input BulkDeleteVFoldersV2Input {
 
 """Added in 26.4.2. Payload for bulk virtual folder soft-deletion."""
 type BulkDeleteVFoldersV2Payload {
-  """Number of virtual folders successfully soft-deleted."""
-  deletedCount: Int!
+  """
+  Added in 26.9.0. The vfolders that were soft-deleted, in the order they were requested. A soft-deleted vfolder is still addressable, so it is returned whole. Together with `failed` this answers for every requested vfolder exactly once.
+  """
+  items: [VFolder!]!
+
+  """
+  Added in 26.4.2. Number of virtual folders successfully soft-deleted. Deprecated since 26.9.0.
+  """
+  deletedCount: Int! @deprecated(reason: "Use the length of items.")
+
+  """
+  Added in 26.9.0. List of errors for vfolders that failed to be soft-deleted.
+  """
+  failed: [BulkDeleteVFolderV2Error!]!
 }
 
 """Added in 26.4.4. Input for bulk-hard-deleting role presets."""
@@ -1893,8 +1954,15 @@ input BulkPurgeUsersV2Options {
 
 """Added in 26.3.0. Payload for bulk user permanent deletion mutation."""
 type BulkPurgeUsersV2Payload {
-  """Number of users successfully purged."""
-  purgedCount: Int!
+  """
+  Added in 26.9.0. UUIDs of the users that were purged, in the order they were requested. Together with `failed` this answers for every requested user exactly once.
+  """
+  successes: [UUID!]!
+
+  """
+  Added in 26.3.0. Number of users successfully purged. Deprecated since 26.9.0.
+  """
+  purgedCount: Int! @deprecated(reason: "Use the length of successes.")
 
   """List of errors for users that failed to purge."""
   failed: [BulkPurgeUserV2Error!]!
@@ -1924,8 +1992,15 @@ input BulkPurgeVFoldersV2Input {
 
 """Added in 26.4.2. Payload for bulk virtual folder purge."""
 type BulkPurgeVFoldersV2Payload {
-  """Number of virtual folders successfully purged."""
-  purgedCount: Int!
+  """
+  Added in 26.9.0. UUIDs of the vfolders that were purged, in the order they were requested. Together with `failed` this answers for every requested vfolder exactly once.
+  """
+  successes: [UUID!]!
+
+  """
+  Added in 26.4.2. Number of virtual folders successfully purged. Deprecated since 26.9.0.
+  """
+  purgedCount: Int! @deprecated(reason: "Use the length of successes.")
 
   """Added in 26.4.4. List of errors for vfolders that failed to purge."""
   failed: [BulkPurgeVFolderV2Error!]!
@@ -2155,11 +2230,6 @@ type CancelImportArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in 26.4.4. Input for canceling a role invitation."""
-input CancelRoleInvitationInput {
-  invitationId: UUID!
-}
-
 """Added in 26.3.0. Filter input for querying query preset categories."""
 input CategoryFilter {
   """Filter by name."""
@@ -2240,6 +2310,103 @@ Added in 25.14.0. Response payload for artifact revision cleanup operations. Con
 type CleanupArtifactRevisionsPayload {
   """Cleaned up artifact revisions."""
   artifactRevisions: ArtifactRevisionConnection!
+}
+
+"""
+Added in 26.9.0. Masking applied before a client IP is stored. 'none' keeps the address as observed, 'truncate' zeroes the host bits — keeping an IPv4 /24 and an IPv6 /48 — and 'drop' records no address at all.
+"""
+enum ClientIPMaskingMode {
+  NONE
+  TRUNCATE
+  DROP
+}
+
+"""
+Added in 26.9.0. The masking one target gets. A target with no policy falls back to the 'default' target, and no default means the address is recorded as observed.
+"""
+type ClientIPMaskingPolicy implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Which recorded client IP is governed."""
+  targetType: ClientIPMaskingTarget!
+
+  """Masking applied before the address is stored."""
+  mode: ClientIPMaskingMode!
+
+  """IPv4 bits 'truncate' keeps; null takes the built-in width of 24."""
+  ipv4Prefix: Int
+
+  """IPv6 bits 'truncate' keeps; null takes the built-in width of 48."""
+  ipv6Prefix: Int
+
+  """Timestamp when the policy was first written."""
+  createdAt: DateTime!
+
+  """Timestamp when the policy was last changed."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.9.0. Paginated list of client IP masking policies."""
+type ClientIPMaskingPolicyConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ClientIPMaskingPolicyEdge!]!
+
+  """Total number of policies matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ClientIPMaskingPolicyEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ClientIPMaskingPolicy!
+}
+
+"""Added in 26.9.0. Filter for client IP masking policies."""
+input ClientIPMaskingPolicyFilter {
+  """Filter by the governed target."""
+  targetType: ClientIPMaskingTarget = null
+
+  """Filter by masking mode."""
+  mode: ClientIPMaskingMode = null
+}
+
+"""Added in 26.9.0. Order specification for client IP masking policies."""
+input ClientIPMaskingPolicyOrderBy {
+  """Field to order by."""
+  field: ClientIPMaskingPolicyOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in 26.9.0. Order fields for client IP masking policies."""
+enum ClientIPMaskingPolicyOrderField {
+  TARGET_TYPE
+  MODE
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""
+Added in 26.9.0. Payload carrying the settled client IP masking policy.
+"""
+type ClientIPMaskingPolicyPayload {
+  """The policy the operation left."""
+  policy: ClientIPMaskingPolicy!
+}
+
+"""Added in 26.9.0. Which recorded client IP a masking policy governs."""
+enum ClientIPMaskingTarget {
+  DEFAULT
+  LOGIN_HISTORY
+  AUDIT_LOGS
 }
 
 """Added in 26.4.2. Input for cloning a virtual folder."""
@@ -2754,6 +2921,21 @@ type CreateDownloadSessionV2Payload {
   url: String!
 }
 
+"""Added in 26.9.0. Create entity invitation input."""
+input CreateEntityInvitationInput {
+  """Type of the entity being offered."""
+  targetEntityType: String!
+
+  """Id of the entity being offered."""
+  targetEntityId: UUID!
+
+  """Address the offer goes to."""
+  inviteeEmail: String!
+
+  """Permissions the offer caps at; empty for no ceiling."""
+  permissions: [PermissionBit!]! = []
+}
+
 """Added in 25.14.0. """
 input CreateHuggingFaceRegistryInput {
   name: String!
@@ -3238,18 +3420,6 @@ input CreateRoleInput {
   """
   autoAssign: Boolean! = false
   scopes: [ScopeInput!] = null
-}
-
-"""Added in 26.4.4. Input for creating role invitations."""
-input CreateRoleInvitationInput {
-  roleId: UUID!
-  emails: [String!]!
-}
-
-"""Added in 26.4.4. Payload for role invitation creation."""
-type CreateRoleInvitationPayload {
-  """List of created role invitations."""
-  items: [RoleInvitation!]!
 }
 
 """Added in 26.4.4. Input for creating a new role preset."""
@@ -4199,6 +4369,9 @@ input DeploymentFilter {
 
   """Added in 26.8.0. Filter by conditions on deployment replicas."""
   replicas: ReplicaNestedFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -5175,6 +5348,199 @@ input EntityFilter {
   NOT: [EntityFilter!] = null
 }
 
+"""
+Added in 26.9.0. An offer of one existing entity to one address, settled by the answer.
+"""
+type EntityInvitation implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Who sent the offer."""
+  inviterUserId: UUID!
+
+  """Address the offer goes to."""
+  inviteeEmail: String!
+
+  """Type of the entity being offered."""
+  targetEntityType: String!
+
+  """Id of the entity being offered."""
+  targetEntityId: UUID!
+
+  """Permissions the offer caps at; empty for no ceiling."""
+  permissions: [PermissionBit!]!
+
+  """Whether the invitation is still open."""
+  status: EntityInvitationStatus!
+
+  """When the offer was made."""
+  createdAt: DateTime!
+
+  """When it was last written."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.9.0. Paginated list of entity invitations."""
+type EntityInvitationConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [EntityInvitationEdge!]!
+  count: Int!
+}
+
+"""Added in 26.9.0. One entity invitation within a connection."""
+type EntityInvitationEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: EntityInvitation!
+}
+
+"""Added in 26.9.0. Filter for entity invitations."""
+input EntityInvitationFilter {
+  """Status filter."""
+  status: EntityInvitationStatus = null
+
+  """Exact address match."""
+  inviteeEmail: String = null
+}
+
+"""Added in 26.9.0. Order specification."""
+input EntityInvitationOrderBy {
+  """Field to order by."""
+  field: EntityInvitationOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "DESC"
+}
+
+"""Added in 26.9.0. Order fields for entity invitations."""
+enum EntityInvitationOrderField {
+  CREATED_AT
+  UPDATED_AT
+  STATUS
+}
+
+"""Added in 26.9.0. Entity invitation payload."""
+type EntityInvitationPayload {
+  """The invitation the run touched."""
+  invitation: EntityInvitation!
+}
+
+"""
+Added in 26.9.0. Scope for the scoped entity invitation query. All items are OR'd; raises an error if every field is empty.
+"""
+input EntityInvitationScope {
+  """Users the invitations are addressed to."""
+  invitee: [UUIDScope!] = null
+
+  """Users who sent the invitations."""
+  inviter: [UUIDScope!] = null
+
+  """Entities the invitations offer."""
+  target: [EntityInvitationTargetScope!] = null
+}
+
+"""Added in 26.9.0. Whether an invitation is still open."""
+enum EntityInvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+}
+
+"""Added in 26.9.0. One entity whose invitations are being read."""
+input EntityInvitationTargetScope {
+  """Type of the entity being offered."""
+  entityType: String!
+
+  """Id of the entity being offered."""
+  entityId: UUID!
+}
+
+"""Added in 26.9.0. One `key=value` label and the entity carrying it."""
+type EntityLabel implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Type of the labeled entity."""
+  entityType: String!
+
+  """ID of the labeled entity."""
+  entityId: UUID!
+
+  """Label key."""
+  key: String!
+
+  """Label value."""
+  value: String!
+
+  """When the label was first put on the entity."""
+  createdAt: DateTime!
+
+  """When the label's value was last replaced."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.9.0. Paginated connection for label records."""
+type EntityLabelConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [EntityLabelEdge!]!
+
+  """Total number of label records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type EntityLabelEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: EntityLabel!
+}
+
+"""
+Added in 26.9.0. Filter matching a single label. A key and a value given together constrain the same label rather than two different ones.
+"""
+input EntityLabelFilter {
+  key: StringFilter = null
+  value: StringFilter = null
+  entityType: StringFilter = null
+  entityId: UUIDFilter = null
+  AND: [EntityLabelFilter!] = null
+  OR: [EntityLabelFilter!] = null
+  NOT: [EntityLabelFilter!] = null
+}
+
+"""
+Added in 26.9.0. Filter selecting entities by the labels on them. Each relation matches one label at a time; requiring two different labels is two relations combined by the entity filter's own AND.
+"""
+input EntityLabelNestedFilter {
+  some: EntityLabelFilter = null
+  every: EntityLabelFilter = null
+  none: EntityLabelFilter = null
+}
+
+"""Added in 26.9.0. Ordering specification for labels."""
+input EntityLabelOrderBy {
+  field: EntityLabelOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.9.0. Fields available for ordering labels."""
+enum EntityLabelOrderField {
+  KEY
+  VALUE
+  CREATED_AT
+}
+
 union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
 
 """Added in 26.4.2. Valid entity-operation combination for RBAC actions."""
@@ -5229,6 +5595,17 @@ type EntityRefEdge {
 }
 
 """
+Added in 26.9.0. One entity, named by its type and its id. `entityTypes` lists the types a request may name.
+"""
+input EntityTarget {
+  """Type of the entity."""
+  entityType: String!
+
+  """ID of the entity."""
+  entityId: UUID!
+}
+
+"""
 Added in 26.2.0. Common timestamp fields for entity lifecycle tracking. Reusable across different entity types.
 """
 type EntityTimestamps {
@@ -5237,6 +5614,17 @@ type EntityTimestamps {
 
   """Timestamp when this entity was last modified."""
   modifiedAt: DateTime
+}
+
+"""
+Added in 26.9.0. One entity type the manager has operations wired for. An entity type is declared where its operations are wired, not as a fixed enum, so this is what a request may name.
+"""
+type EntityType implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The entity type, as a request names it."""
+  name: String!
 }
 
 """Added in 26.4.4. Entity reference parametrized by RBAC element type."""
@@ -7114,6 +7502,11 @@ type LoginHistoryV2 implements Node {
   """Detailed reason for the login failure."""
   failReason: String
 
+  """
+  Added in 26.9.0. IP address of the request that produced this entry, masked per the client IP masking policy. Null when the policy records none, or when the address was unavailable or unusable.
+  """
+  clientIp: String
+
   """Timestamp when the login attempt occurred."""
   createdAt: DateTime!
 
@@ -7326,6 +7719,11 @@ type ModelCardV2 implements Node {
   metadata: ModelCardV2Metadata!
 
   """
+  Minimum resource requirements for serving this model. Each entry maps a resource slot (e.g. 'cpu', 'cuda.shares') to its minimum required quantity. Used to filter compatible deployment revision presets via `available_presets`.
+  """
+  minResource: [ModelCardV2ResourceSlotEntry!]
+
+  """
   README content from the model VFolder, typically containing usage instructions and model documentation.
   """
   readme: String
@@ -7338,11 +7736,6 @@ type ModelCardV2 implements Node {
 
   """Timestamp of the last modification to this model card."""
   updatedAt: DateTime
-
-  """
-  Minimum resource requirements for serving this model. Each entry maps a resource slot (e.g. 'cpu', 'cuda.shares') to its minimum required quantity. Used to filter compatible deployment revision presets via `available_presets`. Read on demand: the requirements are their own table, so a query that does not select this field does not read it.
-  """
-  minResource: [ModelCardV2ResourceSlotEntry!]
 
   """
   The VFolder that stores this model card's files. Resolved through a DataLoader so that listing many model cards does not trigger N+1 fetches.
@@ -7584,6 +7977,9 @@ type ModelDeployment implements Node {
 
   """The access tokens of this entity."""
   accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection
+
+  """Added in 26.9.0. The labels on this deployment."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
 """Added in 25.19.0. Connection for model deployments."""
@@ -8611,6 +9007,11 @@ type Mutation {
   adminDeleteDomainV2(domainName: String!): DeleteDomainPayload
 
   """
+  Added in 26.9.0. Restore a soft-deleted domain (admin only). Requires superadmin privileges.
+  """
+  adminRestoreDomainV2(domainName: String!): RestoreDomainPayload
+
+  """
   Added in 26.4.2. Permanently purge a domain and all associated data (admin only). Requires superadmin privileges.
   """
   adminPurgeDomainV2(domainName: String!): PurgeDomainPayload
@@ -8634,6 +9035,11 @@ type Mutation {
   Added in 26.4.2. Permanently purge a project and all associated data (admin only). Requires superadmin privileges.
   """
   adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayload
+
+  """
+  Added in 26.9.0. Restore a soft-deleted project (admin only). Requires superadmin privileges.
+  """
+  adminRestoreProjectV2(projectId: UUID!): RestoreProjectPayload
 
   """
   Added in 26.4.2. Unassign users from a project. RBAC validates project admin permission.
@@ -8674,6 +9080,11 @@ type Mutation {
   Added in 26.2.0. Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data
   """
   adminDeleteUserV2(userId: UUID!): DeleteUserV2Payload
+
+  """
+  Added in 26.9.0. Restore a soft-deleted user (admin only). Requires superadmin privileges. Sets the user status back to ACTIVE
+  """
+  adminRestoreUserV2(userId: UUID!): RestoreUserV2Payload
 
   """
   Added in 26.2.0. Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data
@@ -8730,6 +9141,11 @@ type Mutation {
 
   """Added in 26.4.2. Admin clears a user's SSH keypair."""
   adminDeleteSshKeypairV2(accessKey: String!): AdminDeleteSSHKeypairPayload
+
+  """
+  Added in 26.9.0. Admin encrypts every stored secret again through the configured write provider, under a fresh data encryption key. The pass runs in chunks and reports the count per column and key id afterwards.
+  """
+  adminReencryptSecrets: AdminReencryptSecretsPayload
 
   """Added in 26.4.2. Revoke a login session. (admin only)"""
   adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload
@@ -8837,18 +9253,6 @@ type Mutation {
   """
   adminReplaceRolePermissions(input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload
 
-  """Added in 26.4.4. Create role invitations by email."""
-  createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload
-
-  """Added in 26.4.4. Accept a pending role invitation."""
-  acceptRoleInvitation(input: AcceptRoleInvitationInput!): RoleInvitation
-
-  """Added in 26.4.4. Reject a pending role invitation."""
-  rejectRoleInvitation(input: RejectRoleInvitationInput!): RoleInvitation
-
-  """Added in 26.4.4. Cancel a pending role invitation (admin only)."""
-  adminCancelRoleInvitation(input: CancelRoleInvitationInput!): RoleInvitation
-
   """Added in 26.4.2. Create a new keypair resource policy (admin only)."""
   adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInput!): CreateKeypairResourcePolicyPayload
 
@@ -8922,8 +9326,30 @@ type Mutation {
   """Added in 26.4.2. Delete multiple runtime variants (superadmin only)."""
   adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload
 
+  """
+  Added in 26.9.0. Set the client IP masking one target gets (superadmin only).
+  """
+  adminUpsertClientIpMaskingPolicy(input: UpsertClientIPMaskingPolicyInput!): ClientIPMaskingPolicyPayload
+
+  """
+  Added in 26.9.0. Drop one target's client IP masking policy so it falls back to the default (superadmin only).
+  """
+  adminPurgeClientIpMaskingPolicy(id: UUID!): ClientIPMaskingPolicyPayload
+
   """Added in 26.8.0. Create a retention policy (superadmin only)."""
   adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload
+
+  """Added in 26.9.0. Offer one entity to one address."""
+  createEntityInvitation(input: CreateEntityInvitationInput!): EntityInvitationPayload
+
+  """Added in 26.9.0. Take what was offered."""
+  acceptEntityInvitation(id: UUID!): EntityInvitationPayload
+
+  """Added in 26.9.0. Turn down what was offered."""
+  rejectEntityInvitation(id: UUID!): EntityInvitationPayload
+
+  """Added in 26.9.0. Withdraw an offer before it was answered."""
+  cancelEntityInvitation(id: UUID!): EntityInvitationPayload
 
   """Added in 26.8.0. Update a retention policy (superadmin only)."""
   adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload
@@ -9044,6 +9470,16 @@ type Mutation {
   Added in 26.9.0. Include checker-session pairs into idle checks, resetting them so checks start from the initial grace period. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
   includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload
+
+  """
+  Added in 26.9.0. Set one key on an entity, replacing the value it carries. Reachable by any caller RBAC authorizes to write the entity.
+  """
+  upsertEntityLabel(input: UpsertEntityLabelInput!): UpsertEntityLabelPayload
+
+  """
+  Added in 26.9.0. Take one label off, named by its own id. Which entity answers for it is read from the row before the delete runs.
+  """
+  purgeEntityLabel(id: ID!): PurgeEntityLabelPayload
 }
 
 """
@@ -9431,6 +9867,17 @@ type Permission implements Node {
 
   """The scope this permission applies to."""
   scope: EntityNode
+}
+
+"""
+Added in 26.9.0. One bit of a permission mask; distinct from OperationType, which names an action.
+"""
+enum PermissionBit {
+  READ
+  UPDATE
+  CREATE
+  SOFT_DELETE
+  HARD_DELETE
 }
 
 """Added in 26.3.0. Permission connection."""
@@ -10104,7 +10551,7 @@ input ProjectFairShareProjectNestedFilter {
   """Filter by project active status."""
   isActive: Boolean = null
 
-  """Filter by project type (GENERAL, MODEL_STORE)."""
+  """Filter by project type (GENERAL, MODEL_STORE, PERSONAL)."""
   type: ProjectFairShareTypeEnumFilter = null
 }
 
@@ -10118,6 +10565,7 @@ input ProjectFairShareScope {
 enum ProjectFairShareTypeEnum {
   GENERAL
   MODEL_STORE
+  PERSONAL
 }
 
 """
@@ -10285,11 +10733,12 @@ type ProjectStorageInfo {
 }
 
 """
-Added in 26.2.0. Project type determining its purpose and behavior. GENERAL: Standard project for general computation. MODEL_STORE: Project for model storage and management.
+Added in 26.2.0. Project type determining its purpose and behavior. GENERAL: Standard project for general computation. MODEL_STORE: Project for model storage and management. PERSONAL: Added in 26.9.0. Project holding one user's own resources, created and removed with that user.
 """
 enum ProjectTypeV2 {
   GENERAL
   MODEL_STORE
+  PERSONAL
 }
 
 """
@@ -10613,6 +11062,12 @@ type PurgeAppConfigDefinitionPayload {
 type PurgeDomainPayload {
   """Whether the purge was successful."""
   purged: Boolean!
+}
+
+"""Added in 26.9.0. Payload returned after taking a label off an entity."""
+type PurgeEntityLabelPayload {
+  """The label taken off the entity."""
+  label: EntityLabel!
 }
 
 """Added in 26.8.0. Identifies the idle checker assignment to purge."""
@@ -10993,6 +11448,16 @@ type Query {
   scopedAuditLogsV2(scope: AuditLogScope!, filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection
 
   """
+  Added in 26.9.0. Every entity type the manager has operations wired for, in name order. What a field taking an entity type may be given is what this lists.
+  """
+  entityTypes: [EntityType!]!
+
+  """
+  Added in 26.9.0. Read the labels on the entities named. Scope items are OR'd, and naming an entity the caller cannot read refuses the whole read.
+  """
+  entityLabels(scope: [EntityTarget!]!, filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
+
+  """
   Added in 26.4.2. List container registries with filtering, ordering, and pagination (admin only).
   """
   adminContainerRegistriesV2(filter: ContainerRegistryV2Filter = null, orderBy: [ContainerRegistryV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ContainerRegistryV2Connection
@@ -11125,6 +11590,11 @@ type Query {
   adminSshKeypairV2(accessKey: String!): AdminGetSSHKeypairPayload
 
   """
+  Added in 26.9.0. Report the stored secrets of every encrypted column per key id (admin only). Requires superadmin privileges.
+  """
+  adminSecretStatus: AdminSecretStatusPayload
+
+  """
   Added in 26.4.2. Query login sessions of the current user with pagination and filtering.
   """
   myLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection
@@ -11139,22 +11609,8 @@ type Query {
   """
   myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
 
-  """Added in 26.4.4. List the current user's role invitations."""
-  myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
-
-  """Added in 26.4.4. List role invitations sent by the current user."""
-  mySentRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
-
-  """
-  Added in 26.4.4. List all role invitations across the system (superadmin only).
-  """
-  adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
-
   """Added in 26.4.2. List roles registered in a project scope."""
   projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection
-
-  """Added in 26.4.4. List invitations for a specific role."""
-  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
 
   """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
   rbacScopeEntityCombinations: [ScopeEntityCombination!]
@@ -11423,6 +11879,11 @@ type Query {
   """Added in 26.4.2. Get a single runtime variant by ID."""
   runtimeVariant(id: UUID!): RuntimeVariant
 
+  """
+  Added in 26.9.0. Read the client IP masking set for every target (superadmin only).
+  """
+  adminClientIpMaskingPolicies(filter: ClientIPMaskingPolicyFilter = null, orderBy: [ClientIPMaskingPolicyOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ClientIPMaskingPolicyConnection
+
   """Added in 26.8.0. Search retention policies (superadmin only)."""
   adminRetentionPolicies(filter: RetentionPolicyFilter = null, orderBy: [RetentionPolicyOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RetentionPolicyConnection
 
@@ -11430,6 +11891,16 @@ type Query {
   Added in 26.8.0. Get a single retention policy by ID (superadmin only).
   """
   adminRetentionPolicy(id: UUID!): RetentionPolicy
+
+  """
+  Added in 26.9.0. Read one invitation by id, from the side that offered it. The invitee reaches theirs through the search addressed to them.
+  """
+  entityInvitation(id: UUID!): EntityInvitation
+
+  """
+  Added in 26.9.0. Page through the invitations the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  """
+  entityInvitations(scope: EntityInvitationScope!, filter: EntityInvitationFilter = null, orderBy: [EntityInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityInvitationConnection
 
   """Added in 26.4.2. Search runtime variant presets."""
   runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection
@@ -11865,11 +12336,6 @@ Added in 25.14.0. Response payload for artifact revision rejection operations. C
 type RejectArtifactPayload {
   """Rejected artifact revision."""
   artifactRevision: ArtifactRevision!
-}
-
-"""Added in 26.4.4. Input for rejecting a role invitation."""
-input RejectRoleInvitationInput {
-  invitationId: UUID!
 }
 
 """
@@ -12747,6 +13213,24 @@ type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
+"""Added in 26.9.0. Payload for domain restore mutation."""
+type RestoreDomainPayload {
+  """Whether the restore was successful."""
+  restored: Boolean!
+}
+
+"""Added in 26.9.0. Payload for project restore mutation."""
+type RestoreProjectPayload {
+  """Whether the restore was successful."""
+  restored: Boolean!
+}
+
+"""Added in 26.9.0. Payload for single user restore mutation."""
+type RestoreUserV2Payload {
+  """Whether the restore was successful."""
+  success: Boolean!
+}
+
 """
 Added in 26.4.4. Payload returned after restoring a virtual folder from trash.
 """
@@ -13021,123 +13505,6 @@ input RoleFilter {
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
-}
-
-"""Added in 26.4.4. A role invitation."""
-type RoleInvitation implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """Inviter user ID."""
-  inviterUserId: UUID
-
-  """Invitee user ID."""
-  inviteeUserId: UUID!
-
-  """Role ID."""
-  roleId: UUID!
-
-  """Invitation state."""
-  state: RoleInvitationState!
-
-  """Creation timestamp."""
-  createdAt: DateTime!
-
-  """Last update timestamp."""
-  updatedAt: DateTime
-
-  """The user who sent this invitation. Null for system-issued invitations."""
-  inviter: UserV2
-
-  """
-  The user who received this invitation. Null if the user no longer exists.
-  """
-  invitee: UserV2
-
-  """
-  The role this invitation grants on acceptance. Null if the role no longer exists.
-  """
-  role: Role
-}
-
-"""Added in 26.4.4. Role invitation connection."""
-type RoleInvitationConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [RoleInvitationEdge!]!
-  count: Int!
-}
-
-"""An edge in a connection."""
-type RoleInvitationEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: RoleInvitation!
-}
-
-"""Added in 26.4.4. Filter for role invitations."""
-input RoleInvitationFilter {
-  state: RoleInvitationStateFilter = null
-  roleId: UUIDFilter = null
-  role: RoleInvitationRoleNestedFilter = null
-  inviter: RoleInvitationUserNestedFilter = null
-  invitee: RoleInvitationUserNestedFilter = null
-  AND: [RoleInvitationFilter!] = null
-  OR: [RoleInvitationFilter!] = null
-  NOT: [RoleInvitationFilter!] = null
-}
-
-"""Added in 26.4.4. Order by specification for role invitations."""
-input RoleInvitationOrderBy {
-  field: RoleInvitationOrderField!
-  direction: OrderDirection! = DESC
-}
-
-"""Added in 26.4.4. Role invitation ordering field."""
-enum RoleInvitationOrderField {
-  CREATED_AT
-  UPDATED_AT
-  STATE
-}
-
-"""
-Added in 26.4.4. Nested filter for the role associated with an invitation.
-"""
-input RoleInvitationRoleNestedFilter {
-  name: StringFilter = null
-}
-
-"""Added in 26.4.4. Role invitation state."""
-enum RoleInvitationState {
-  PENDING
-  ACCEPTED
-  REJECTED
-  CANCELED
-}
-
-"""Added in 26.4.4. Filter for role invitation state."""
-input RoleInvitationStateFilter {
-  equals: RoleInvitationState = null
-
-  """Match any of the provided states."""
-  in: [RoleInvitationState!] = null
-
-  """Exclude exact state match."""
-  notEquals: RoleInvitationState = null
-
-  """Exclude any of the provided states."""
-  notIn: [RoleInvitationState!] = null
-}
-
-"""
-Added in 26.4.4. Nested filter for a user (inviter or invitee) of an invitation.
-"""
-input RoleInvitationUserNestedFilter {
-  email: StringFilter = null
 }
 
 """
@@ -14238,6 +14605,25 @@ input ScopedUpsertAppConfigFragmentsInput {
   items: [AppConfigFragmentUpsertItem!]!
 }
 
+"""
+Added in 26.9.0. How many stored secrets of one column one provider's one key holds.
+"""
+type SecretKeyCount {
+  """The encrypted column these secrets are stored in."""
+  column: String!
+
+  """
+  The key provider holding these secrets. 'plain' means legacy plaintext.
+  """
+  providerType: String!
+
+  """The key within that provider. Unset for plaintext."""
+  keyId: String
+
+  """How many stored secrets that key holds."""
+  count: Int!
+}
+
 """Added in 26.3.0. A registered service instance in the catalog."""
 type ServiceCatalog implements Node {
   """The Globally Unique ID of this object"""
@@ -14644,6 +15030,9 @@ type SessionV2 implements Node {
   Added in 26.8.0. Resource allocation (requested / used / allocated) computed on-demand from the resource_allocations table. Unlike the deprecated eager `resource.allocation`, `allocated` here persists after the session is freed or terminated (for statistics and billing).
   """
   resourceAllocation: ResourceAllocation!
+
+  """Added in 26.9.0. The labels on this session."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
 """Added in 26.3.0. Connection type for paginated session results."""
@@ -14673,6 +15062,9 @@ input SessionV2Filter {
   domainName: StringFilter = null
   projectId: UUIDFilter = null
   userUuid: UUIDFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [SessionV2Filter!] = null
   OR: [SessionV2Filter!] = null
   NOT: [SessionV2Filter!] = null
@@ -15940,10 +16332,10 @@ input UpdateResourcePresetV2Input {
   resourceSlots: [ResourceSlotEntryInput!] = null
 
   """Updated shared memory. Use null to clear."""
-  sharedMemory: BinarySizeInput = null
+  sharedMemory: BinarySizeInput
 
   """Updated resource group name. Use null to make global."""
-  resourceGroupName: String = null
+  resourceGroupName: String
 }
 
 """
@@ -16233,6 +16625,23 @@ type UpsertAppConfigFragmentsPayload {
 }
 
 """
+Added in 26.9.0. Set the masking one target gets, replacing the policy it already has.
+"""
+input UpsertClientIPMaskingPolicyInput {
+  """Which recorded client IP to govern."""
+  targetType: ClientIPMaskingTarget!
+
+  """Masking applied before the address is stored."""
+  mode: ClientIPMaskingMode!
+
+  """IPv4 bits 'truncate' keeps; null takes the built-in width of 24."""
+  ipv4Prefix: Int = null
+
+  """IPv6 bits 'truncate' keeps; null takes the built-in width of 48."""
+  ipv6Prefix: Int = null
+}
+
+"""
 Added in 26.1.0. Input for upserting domain fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
 """
 input UpsertDomainFairShareWeightInput {
@@ -16252,6 +16661,26 @@ input UpsertDomainFairShareWeightInput {
 type UpsertDomainFairShareWeightPayload {
   """The updated or created domain fair share record."""
   domainFairShare: DomainFairShare!
+}
+
+"""
+Added in 26.9.0. Input for putting one key on one entity. A key holds one value, so naming a key the entity already carries replaces that value.
+"""
+input UpsertEntityLabelInput {
+  """The entity to label."""
+  target: EntityTarget!
+
+  """Label key."""
+  key: String!
+
+  """Label value."""
+  value: String!
+}
+
+"""Added in 26.9.0. Payload returned after putting a label on an entity."""
+type UpsertEntityLabelPayload {
+  """The label as it now stands."""
+  label: EntityLabel!
 }
 
 """
@@ -17186,6 +17615,9 @@ type VFolder implements Node {
 
   """Added in 26.4.4. Model cards backed by this vfolder."""
   modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+
+  """Added in 26.9.0. The labels on this vfolder."""
+  entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
 
 """
@@ -17257,6 +17689,9 @@ input VFolderFilter {
   usageMode: VFolderUsageModeFilter = null
   cloneable: Boolean = null
   createdAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [VFolderFilter!] = null
   OR: [VFolderFilter!] = null
   NOT: [VFolderFilter!] = null

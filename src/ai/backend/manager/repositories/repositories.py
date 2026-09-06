@@ -7,6 +7,9 @@ from ai.backend.manager.repositories.artifact_registry.repositories import (
     ArtifactRegistryRepositories,
 )
 from ai.backend.manager.repositories.auth.repositories import AuthRepositories
+from ai.backend.manager.repositories.client_ip_masking.repositories import (
+    ClientIPMaskingRepositories,
+)
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
 )
@@ -15,6 +18,9 @@ from ai.backend.manager.repositories.deployment_revision_preset.repositories imp
     DeploymentPresetRepositories,
 )
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
+from ai.backend.manager.repositories.entity_invitation.repositories import (
+    EntityInvitationRepositories,
+)
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
 from ai.backend.manager.repositories.etcd_config.repositories import EtcdConfigRepositories
 from ai.backend.manager.repositories.events.repositories import EventsRepositories
@@ -59,6 +65,7 @@ from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepo
 from ai.backend.manager.repositories.scheduling_history.repositories import (
     SchedulingHistoryRepositories,
 )
+from ai.backend.manager.repositories.secret.repositories import SecretRepositories
 from ai.backend.manager.repositories.session.repositories import SessionRepositories
 from ai.backend.manager.repositories.storage_namespace.repositories import (
     StorageNamespaceRepositories,
@@ -95,12 +102,14 @@ class Repositories:
     model_serving: ModelServingRepositories
     notification: NotificationRepositories
     permission_controller: PermissionControllerRepositories
+    entity_invitation: EntityInvitationRepositories
     prometheus_query_preset: PrometheusQueryPresetRepositories
     replica_group: ReplicaGroupRepositories
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
     resource_slot: ResourceSlotRepositories
     runtime_variant: RuntimeVariantRepositories
+    client_ip_masking: ClientIPMaskingRepositories
     runtime_variant_preset: RuntimeVariantPresetRepositories
     deployment_revision_preset: DeploymentPresetRepositories
     model_card: ModelCardRepositories
@@ -122,6 +131,7 @@ class Repositories:
     events: EventsRepositories
     storage_namespace: StorageNamespaceRepositories
     retention: RetentionRepositories
+    secret: SecretRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -143,11 +153,13 @@ class Repositories:
         notification_repositories = NotificationRepositories.create(args)
         permission_controller_repositories = PermissionControllerRepositories.create(args)
         prometheus_query_preset_repositories = PrometheusQueryPresetRepositories.create(args)
+        entity_invitation_repositories = EntityInvitationRepositories.create(args)
         replica_group_repositories = ReplicaGroupRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         resource_slot_repositories = ResourceSlotRepositories.create(args)
         runtime_variant_repositories = RuntimeVariantRepositories.create(args)
+        client_ip_masking_repositories = ClientIPMaskingRepositories.create(args)
         runtime_variant_preset_repositories = RuntimeVariantPresetRepositories.create(args)
         deployment_revision_preset_repositories = DeploymentPresetRepositories.create(args)
         model_card_repositories = ModelCardRepositories.create(args)
@@ -169,6 +181,7 @@ class Repositories:
         events_repositories = EventsRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
         retention_repositories = RetentionRepositories.create(args)
+        secret_repositories = SecretRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -192,10 +205,12 @@ class Repositories:
             permission_controller=permission_controller_repositories,
             prometheus_query_preset=prometheus_query_preset_repositories,
             replica_group=replica_group_repositories,
+            entity_invitation=entity_invitation_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
             resource_slot=resource_slot_repositories,
             runtime_variant=runtime_variant_repositories,
+            client_ip_masking=client_ip_masking_repositories,
             runtime_variant_preset=runtime_variant_preset_repositories,
             deployment_revision_preset=deployment_revision_preset_repositories,
             model_card=model_card_repositories,
@@ -217,4 +232,5 @@ class Repositories:
             events=events_repositories,
             storage_namespace=storage_namespace_repositories,
             retention=retention_repositories,
+            secret=secret_repositories,
         )

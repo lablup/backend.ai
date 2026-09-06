@@ -54,20 +54,6 @@ class GQLMutationUnfrozenRequiredMiddleware:
         return next(root, info, **args)
 
 
-class GQLLoggingMiddleware:
-    def resolve(self, next: Any, root: Any, info: graphene.ResolveInfo, **args: Any) -> Any:
-        if info.path.prev is None:
-            graph_ctx = info.context
-            log.info(
-                "ADMIN.GQL (ak:{}, {}:{}, op:{})",
-                graph_ctx.access_key,
-                info.operation.operation,
-                info.field_name,
-                info.operation.name,
-            )
-        return next(root, info, **args)
-
-
 class AdminHandler:
     """Admin API handler with constructor-injected dependencies."""
 
@@ -113,6 +99,7 @@ class AdminHandler:
             schema=self._gql_schema,
             dataloader_manager=DataLoaderManager(),
             config_provider=gql_deps.config_provider,
+            key_provider_pool=gql_deps.key_provider_pool,
             etcd=gql_deps.etcd,
             user=request["user"],
             access_key=request["keypair"]["access_key"],
@@ -134,6 +121,7 @@ class AdminHandler:
             scheduler_repository=gql_deps.scheduler_repository,
             user_repository=gql_deps.user_repository,
             agent_repository=gql_deps.agent_repository,
+            network_repository=gql_deps.network_repository,
         )
         result = cast(
             ExecutionResult,
@@ -148,7 +136,6 @@ class AdminHandler:
                     GQLMutationUnfrozenRequiredMiddleware(manager_status),
                     GQLMetricMiddleware(),
                     GQLExceptionMiddleware(),
-                    GQLLoggingMiddleware(),
                 ],
             ),
         )
@@ -220,10 +207,6 @@ class AdminHandler:
             operation_name=params.operation_name,
             context_value=gql_ctx,
         )
-        if result.errors:
-            for e in result.errors:
-                log.error("ADMIN.GQL.V2 Exception: {}", e.formatted)
-                log.debug("{}", repr(e))
         resp = GraphQLResponse(
             data=result.data,
             errors=[dict(e.formatted) for e in result.errors] if result.errors else None,

@@ -43,6 +43,7 @@ from ai.backend.manager.errors.repository import (
     EntityNotFoundError,
 )
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
@@ -55,16 +56,22 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.lookup import DataLookup
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.specs.purger import DataBatchPurger
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.purger import EntityBatchPurger
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.ops.service import SearchService
@@ -161,6 +168,22 @@ class _PresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
         return row.to_data()
 
 
+class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
+    """The plural read: the ids come with the call, so the spec carries none."""
+
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def to_data(self, row: RolePresetRow) -> RolePresetData:
+        return row.to_data()
+
+
 @dataclass
 class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, RolePresetData]):
     """Marks every preset of one scope type deleted, in one statement."""
@@ -192,10 +215,14 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, RolePresetData]):
 
 
 @dataclass
-class _PresetBatchPurger(DataBatchPurger[RolePresetRow, RolePresetData]):
+class _PresetBatchPurger(EntityBatchPurger[RolePresetRow, RolePresetData]):
     """Removes every preset whose name matches."""
 
     name: str
+
+    @override
+    def entity_id(self, row: RolePresetRow) -> RolePresetID:
+        return RolePresetID(row.id)
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[RolePresetRow]]:
@@ -269,9 +296,12 @@ async def database(
     async with with_tables(
         database_connection,
         [
-            VirtualScopeRow,
+            VirtualEntityRow,
             EntityMembershipRow,
+            EntityMembershipCapRow,
+            EntityMembershipFieldRow,
             ScopeBindingRow,
+            EntityLabelRow,
             RoleRow,
             PermissionRow,
             RolePresetRow,
@@ -324,6 +354,36 @@ class TestGet:
     async def test_missing_row_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):
             await repository.get(_PresetQuerier(target=uuid.uuid4()))
+
+
+class TestBulkGet:
+    async def test_every_named_row_comes_back_keyed_by_its_id(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        other = await repository.create_global_entity(
+            _PresetCreator(name="analysts", scope_type=RBACScopeType.PROJECT)
+        )
+
+        found = await repository.bulk_get(_PresetBulkQuerier(), [preset.id, other.id])
+
+        assert {key: value.name for key, value in found.items()} == {
+            preset.id: "default",
+            other.id: "analysts",
+        }
+
+    async def test_a_missing_id_is_absent_rather_than_raising(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        absent = RolePresetID(uuid.uuid4())
+
+        found = await repository.bulk_get(_PresetBulkQuerier(), [preset.id, absent])
+
+        assert list(found) == [preset.id]
+
+    async def test_no_ids_reads_nothing(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        assert await repository.bulk_get(_PresetBulkQuerier(), []) == {}
 
 
 class TestLookup:
@@ -453,7 +513,9 @@ class TestBatchPurge:
             _PresetCreator(name="default", scope_type=RBACScopeType.PROJECT)
         )
 
-        removed = await repository.batch_purge_in_global(_PresetBatchPurger(name="default"))
+        removed = await repository.batch_purge_entities_in_global(
+            _PresetBatchPurger(name="default")
+        )
 
         assert len(removed) == 2
         assert {r.name for r in removed} == {"default"}
@@ -463,7 +525,9 @@ class TestBatchPurge:
     async def test_no_match_returns_nothing(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        assert await repository.batch_purge_in_global(_PresetBatchPurger(name="absent")) == []
+        assert (
+            await repository.batch_purge_entities_in_global(_PresetBatchPurger(name="absent")) == []
+        )
 
 
 class TestUpsert:

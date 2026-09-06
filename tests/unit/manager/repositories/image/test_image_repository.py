@@ -19,7 +19,7 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.types import BinarySize, KernelId, ResourceSlot, SessionId
+from ai.backend.common.types import BinarySize, KernelId, SessionId
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -40,6 +40,8 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.image.repository import ImageRepository
+from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
 
@@ -175,6 +177,7 @@ class TestImageRepositorySearch:
         mock_config = MagicMock()
         return ImageRepository(
             db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
             valkey_image=mock_valkey,
             config_provider=mock_config,
         )
@@ -475,6 +478,7 @@ class TestImageRepositoryLastUsedAt:
         mock_config = MagicMock()
         return ImageRepository(
             db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
             valkey_image=mock_valkey,
             config_provider=mock_config,
         )
@@ -484,7 +488,7 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> SessionRepository:
-        return SessionRepository(db=db_with_cleanup)
+        return SessionRepository(db=db_with_cleanup, ops_provider=DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def domain(
@@ -664,8 +668,6 @@ class TestImageRepositoryLastUsedAt:
                     group_id=group.id,
                     domain_name=domain.name,
                     scaling_group_name=resource_group,
-                    occupying_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     vfolder_mounts=[],
                 )
                 db_sess.add(session)
@@ -679,8 +681,6 @@ class TestImageRepositoryLastUsedAt:
                     domain_name=domain.name,
                     group_id=group.id,
                     user_uuid=user.uuid,
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot(),
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,

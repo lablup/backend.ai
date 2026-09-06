@@ -28,6 +28,7 @@ class ProjectType(StrEnum):
 
     GENERAL = "general"
     MODEL_STORE = "model-store"
+    PERSONAL = "personal"
 
 
 class ProjectOrderField(StrEnum):

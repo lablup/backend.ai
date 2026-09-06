@@ -23,10 +23,14 @@ if TYPE_CHECKING:
     from .domains_v2.artifact import V2ArtifactClient
     from .domains_v2.artifact_registry import V2ArtifactRegistryClient
     from .domains_v2.audit_log import V2AuditLogClient
+    from .domains_v2.client_ip_masking import V2ClientIPMaskingClient
     from .domains_v2.container_registry import V2ContainerRegistryClient
     from .domains_v2.deployment import V2DeploymentClient
     from .domains_v2.deployment_revision_preset import V2DeploymentRevisionPresetClient
     from .domains_v2.domain import V2DomainClient
+    from .domains_v2.entity_invitation import V2EntityInvitationClient
+    from .domains_v2.entity_label import V2EntityLabelClient
+    from .domains_v2.entity_type import V2EntityTypeClient
     from .domains_v2.export import V2ExportClient
     from .domains_v2.fair_share import V2FairShareClient
     from .domains_v2.gql import V2GQLClient
@@ -53,12 +57,12 @@ if TYPE_CHECKING:
     from .domains_v2.resource_slot import V2ResourceSlotClient
     from .domains_v2.resource_usage import V2ResourceUsageClient
     from .domains_v2.retention_policy import V2RetentionPolicyClient
-    from .domains_v2.role_invitation import V2RoleInvitationClient
     from .domains_v2.role_preset import V2RolePresetClient
     from .domains_v2.runtime_variant import V2RuntimeVariantClient
     from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
     from .domains_v2.scheduling_handler import V2SchedulingHandlerClient
     from .domains_v2.scheduling_history import V2SchedulingHistoryClient
+    from .domains_v2.secret import V2SecretClient
     from .domains_v2.service_catalog import V2ServiceCatalogClient
     from .domains_v2.session import V2SessionClient
     from .domains_v2.storage_host import V2StorageHostClient
@@ -143,6 +147,12 @@ class V2ClientRegistry:
         return V2AuditLogClient(self._client)
 
     @cached_property
+    def entity_invitation(self) -> V2EntityInvitationClient:
+        from .domains_v2.entity_invitation import V2EntityInvitationClient
+
+        return V2EntityInvitationClient(self._client)
+
+    @cached_property
     def idle_checker_assignment(self) -> V2IdleCheckerAssignmentClient:
         from .domains_v2.idle_checker_assignment import V2IdleCheckerAssignmentClient
 
@@ -165,6 +175,12 @@ class V2ClientRegistry:
         from .domains_v2.domain import V2DomainClient
 
         return V2DomainClient(self._client)
+
+    @cached_property
+    def entity_type(self) -> V2EntityTypeClient:
+        from .domains_v2.entity_type import V2EntityTypeClient
+
+        return V2EntityTypeClient(self._client)
 
     @cached_property
     def export(self) -> V2ExportClient:
@@ -209,10 +225,28 @@ class V2ClientRegistry:
         return V2KeypairClient(self._client)
 
     @cached_property
+    def entity_label(self) -> V2EntityLabelClient:
+        from .domains_v2.entity_label import V2EntityLabelClient
+
+        return V2EntityLabelClient(self._client)
+
+    @cached_property
     def login_client_type(self) -> V2LoginClientTypeClient:
         from .domains_v2.login_client_type import V2LoginClientTypeClient
 
         return V2LoginClientTypeClient(self._client)
+
+    @cached_property
+    def client_ip_masking(self) -> V2ClientIPMaskingClient:
+        from .domains_v2.client_ip_masking import V2ClientIPMaskingClient
+
+        return V2ClientIPMaskingClient(self._client)
+
+    @cached_property
+    def secret(self) -> V2SecretClient:
+        from .domains_v2.secret import V2SecretClient
+
+        return V2SecretClient(self._client)
 
     @cached_property
     def login_history(self) -> V2LoginHistoryClient:
@@ -249,12 +283,6 @@ class V2ClientRegistry:
         from .domains_v2.project import V2ProjectClient
 
         return V2ProjectClient(self._client)
-
-    @cached_property
-    def role_invitation(self) -> V2RoleInvitationClient:
-        from .domains_v2.role_invitation import V2RoleInvitationClient
-
-        return V2RoleInvitationClient(self._client)
 
     @cached_property
     def role_preset(self) -> V2RolePresetClient:

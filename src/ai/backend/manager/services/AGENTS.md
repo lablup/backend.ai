@@ -60,6 +60,8 @@ grows a branch; the generic services take no hook or callback to hide one in.
   However, when it is entangled with another layer, it is allowed to perform some other action in the service and then call a repository.
 - Service methods must NOT create DB sessions/transactions — delegate to the repository.
 - Each method takes an Action and returns an ActionResult — no other return type is allowed.
+- A result never carries a virtual entity id. It names a graph node, not an entity;
+  a result names entities as `EntityIdentifier`s.
 
 ## Processor rules
 
@@ -68,10 +70,12 @@ grows a branch; the generic services take no hook or callback to hide one in.
   live in `actions/AGENTS.md`.
 - `Processors.__init__` takes its `ProcessorGroup`s first and the service after them.
   Several groups are listed together, before the service.
-- A change to a domain's processor composition — a field added or removed, a different
-  factory, a different action base — updates that domain's `KNOWLEDGE.md` in the same
-  change. Its field table states the entity type, shape and operation each field runs
-  as, which the wiring silently contradicts once it moves.
+- Do NOT transcribe a domain's processor composition into `KNOWLEDGE.md` as a table.
+  `backend.ai mgr ops list --concern <name>` answers the entity type, shape, operation,
+  gate and backing.
+- Write only what that command cannot answer: the processor field names, the failure
+  mode (atomic / partial bulk), what the operation is authorized against, and why each
+  shape was chosen.
 - A domain whose composition changes and has no `KNOWLEDGE.md` yet gets one, following
   the `/knowledge` skill's schema. Record what the shapes are and why the surprising
   ones were chosen — not the wiring, which the code already shows.

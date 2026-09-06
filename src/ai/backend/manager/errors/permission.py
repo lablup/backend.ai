@@ -13,6 +13,8 @@ from ai.backend.common.exception import (
 )
 
 __all__ = (
+    "InvalidFieldPermission",
+    "InvalidPermissionOperation",
     "NotEnoughPermission",
     "ObjectPermissionNotFound",
     "PermissionNotFound",
@@ -21,7 +23,7 @@ __all__ = (
     "RoleNotAssigned",
     "RoleNotFound",
     "UserSystemRoleNotProvisioned",
-    "VirtualScopeNotFound",
+    "VirtualEntityNotFound",
 )
 
 
@@ -84,6 +86,38 @@ class RoleNotAssigned(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class InvalidFieldPermission(BackendAIError, web.HTTPBadRequest):
+    """A field scope the ops refuse: a malformed path, a bit outside READ|UPDATE,
+    or a bit stated both on every field and on a path."""
+
+    error_type = "https://api.backend.ai/probs/invalid-field-permission"
+    error_title = "The field scope is invalid."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class InvalidPermissionOperation(BackendAIError, web.HTTPBadRequest):
+    """An operation with no permission bit — a grant operation — cannot be stored
+    as a permission; sharing is judged from entity shares and scope CREATE."""
+
+    error_type = "https://api.backend.ai/probs/invalid-permission-operation"
+    error_title = "The operation cannot be stored as a permission."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class NotEnoughPermission(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/not-enough-permission"
     error_title = "Insufficient permission to perform this operation."
@@ -123,16 +157,16 @@ class ObjectPermissionNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
-class VirtualScopeNotFound(BackendAIError, web.HTTPInternalServerError):
-    """Raised when a scope's virtual scope is expected to exist but does not.
+class VirtualEntityNotFound(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a scope's virtual entity is expected to exist but does not.
 
-    A virtual scope is always created alongside any owner scope, so a missing one is
+    A virtual entity is always created alongside any owner scope, so a missing one is
     a server-side data-integrity condition (an invariant violation), not a client
     error — hence 500.
     """
 
-    error_type = "https://api.backend.ai/probs/virtual-scope-not-found"
-    error_title = "The virtual scope for the given scope does not exist."
+    error_type = "https://api.backend.ai/probs/virtual-entity-not-found"
+    error_title = "The virtual entity for the given scope does not exist."
 
     @override
     def error_code(self) -> ErrorCode:

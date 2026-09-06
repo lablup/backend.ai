@@ -192,11 +192,12 @@
   # the client IP is resolved by walking the X-Forwarded-For chain inwards from
   # the peer of the connection and taking the first address that is not one of
   # these proxies, so any number of proxy hops is supported. The X-Forwarded-URL
-  # header, which overrides the host and path used for HMAC signature
-  # verification, is honored only when the request comes directly from one of
-  # these proxies. If empty (default), the manager falls back to manual
-  # X-Forwarded-For parsing and accepts X-Forwarded-URL from any client, which
-  # is deprecated.
+  # and X-Forwarded-Prefix headers, which override the host and path used for
+  # HMAC signature verification, are honored only when the request comes
+  # directly from one of these proxies; X-Forwarded-Prefix is ignored entirely
+  # when this list is empty. If empty (default), the manager falls back to
+  # manual X-Forwarded-For parsing and accepts X-Forwarded-URL from any client,
+  # which is deprecated.
   # Added in 26.4.2
   trusted-proxies = ["10.0.0.0/8", "172.16.0.0/12"]
   # Event loop implementation to use for async operations. 'asyncio' is the

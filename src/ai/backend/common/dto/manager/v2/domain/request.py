@@ -21,6 +21,7 @@ __all__ = (
     "AdminSearchDomainsInput",
     "CreateDomainInput",
     "DeleteDomainInput",
+    "RestoreDomainInput",
     "DomainFilter",
     "DomainOrder",
     "PurgeDomainInput",
@@ -84,6 +85,12 @@ class DeleteDomainInput(BaseRequestModel):
     """Input for soft-deleting a domain."""
 
     name: str = Field(description="Name of the domain to soft-delete.")
+
+
+class RestoreDomainInput(BaseRequestModel):
+    """Input for restoring a soft-deleted domain."""
+
+    name: str = Field(description="Name of the domain to restore.")
 
 
 class PurgeDomainInput(BaseRequestModel):

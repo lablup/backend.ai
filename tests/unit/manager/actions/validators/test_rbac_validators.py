@@ -266,7 +266,6 @@ async def _grant_permission(
                 scope_type=scope_type,
                 scope_id=scope_id,
                 entity_type=entity_type,
-                operation=operation,
                 permission=Permission.from_operation(operation),
             )
         )

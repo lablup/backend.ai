@@ -29,7 +29,7 @@ from ai.backend.manager.actions.v2.bulk.result import (
     BulkEntityResult,
 )
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
-from ai.backend.manager.actions.v2.bulk.validator.base import BulkActionValidator
+from ai.backend.manager.actions.v2.bulk.validator.base import AtomicBulkActionValidator
 
 _SESSION_ENTITY_TYPE = EntityType("session")
 
@@ -86,7 +86,7 @@ class _RecordingMonitor(BulkActionMonitor):
         self.done_results.append(result)
 
 
-class _DenyingValidator(BulkActionValidator):
+class _DenyingValidator(AtomicBulkActionValidator):
     @override
     async def validate(self, meta: BulkActionTriggerMeta) -> None:
         raise PermissionDeniedError("nope")

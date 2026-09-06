@@ -47,6 +47,9 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload as BulkDeletePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
+    BulkDeleteVFolderV2Error as BulkDeleteErrorDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkPurgeVFoldersPayload as BulkPurgePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
@@ -91,6 +94,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     RestoreVFolderPayload as RestorePayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -432,6 +436,19 @@ class BulkDeleteVFoldersInputGQL(PydanticInputMixin[BulkDeleteInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Failure detail for a single vfolder in a bulk soft-deletion.",
+    ),
+    model=BulkDeleteErrorDTO,
+    name="BulkDeleteVFolderV2Error",
+)
+class BulkDeleteVFolderV2ErrorGQL(PydanticOutputMixin[BulkDeleteErrorDTO]):
+    vfolder_id: UUID = gql_field(description="UUID of the vfolder that failed to be soft-deleted.")
+    message: str = gql_field(description="Error message describing the failure.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Payload for bulk virtual folder soft-deletion.",
     ),
@@ -439,8 +456,29 @@ class BulkDeleteVFoldersInputGQL(PydanticInputMixin[BulkDeleteInputDTO]):
     name="BulkDeleteVFoldersV2Payload",
 )
 class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
-    deleted_count: int = gql_field(
-        description="Number of virtual folders successfully soft-deleted."
+    items: list[VFolderGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The vfolders that were soft-deleted, in the order they were requested. "
+                "A soft-deleted vfolder is still addressable, so it is returned whole. "
+                "Together with `failed` this answers for every requested vfolder exactly once."
+            ),
+        ),
+    )
+    deleted_count: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.2",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            description="Number of virtual folders successfully soft-deleted.",
+        ),
+        deprecation_reason="Use the length of items.",
+    )
+    failed: list[BulkDeleteVFolderV2ErrorGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="List of errors for vfolders that failed to be soft-deleted.",
+        ),
     )
 
 
@@ -515,7 +553,23 @@ class BulkPurgeVFolderV2ErrorGQL(PydanticOutputMixin[BulkPurgeErrorDTO]):
     name="BulkPurgeVFoldersV2Payload",
 )
 class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
-    purged_count: int = gql_field(description="Number of virtual folders successfully purged.")
+    successes: list[UUID] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "UUIDs of the vfolders that were purged, in the order they were requested. "
+                "Together with `failed` this answers for every requested vfolder exactly once."
+            ),
+        ),
+    )
+    purged_count: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.2",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            description="Number of virtual folders successfully purged.",
+        ),
+        deprecation_reason="Use the length of successes.",
+    )
     failed: list[BulkPurgeVFolderV2ErrorGQL] = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",

@@ -44,9 +44,9 @@ from ai.backend.manager.dto.response import (
 )
 from ai.backend.manager.errors.artifact import ArtifactImportDelegationError
 from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact.searchers import ArtifactWithRevisionsSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.retrieve_model import RetrieveModelAction
 from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
@@ -195,7 +195,7 @@ class ArtifactRegistryHandler:
         filters = body.parsed.filters
         ordering = body.parsed.ordering
 
-        # Build BatchQuerier from REST pagination options
+        # Build the searcher from REST pagination options
         offset_opts = pagination_opts.offset
         pagination = OffsetPagination(
             limit=offset_opts.limit if offset_opts and offset_opts.limit is not None else 20,
@@ -212,14 +212,12 @@ class ArtifactRegistryHandler:
         if ordering is not None:
             orders.extend(_build_artifact_query_orders(ordering))
 
-        querier = BatchQuerier(
-            pagination=pagination,
-            conditions=conditions,
-            orders=orders,
-        )
-
         action_result = await self._artifact.search_artifacts_with_revisions.run(
-            SearchArtifactsWithRevisionsAction(querier=querier)
+            SearchArtifactsWithRevisionsAction(
+                searcher=ArtifactWithRevisionsSearcher(
+                    pagination=pagination, conditions=conditions, orders=orders
+                )
+            )
         )
 
         artifacts = action_result.data
@@ -293,7 +291,7 @@ class ArtifactRegistryHandler:
 def _build_artifact_filter_conditions(
     filters: ArtifactFilterOptions,
 ) -> list[QueryCondition]:
-    """Convert ArtifactFilterOptions to a list of QueryConditions for BatchQuerier."""
+    """Convert ArtifactFilterOptions to a list of QueryConditions for the searcher."""
     conditions: list[QueryCondition] = []
 
     if filters.artifact_type:
@@ -339,7 +337,7 @@ def _build_artifact_filter_conditions(
 def _build_artifact_query_orders(
     ordering: ArtifactOrderingOptions,
 ) -> list[QueryOrder]:
-    """Convert ArtifactOrderingOptions to a list of QueryOrders for BatchQuerier."""
+    """Convert ArtifactOrderingOptions to a list of QueryOrders for the searcher."""
     orders: list[QueryOrder] = []
     for field, desc in ordering.order_by:
         column: Any = getattr(ArtifactRow, field.value.lower(), ArtifactRow.name)

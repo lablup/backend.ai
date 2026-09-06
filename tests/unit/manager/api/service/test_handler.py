@@ -21,7 +21,7 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
-    ResolveAccessKeyScopeResult,
+    PublicResolveAccessKeyScopeResult,
 )
 from ai.backend.manager.services.model_serving.actions.validate_model_service import (
     ValidateModelServiceAction,
@@ -81,13 +81,13 @@ class TestRunValidationUsesKeypairResourcePolicy:
 
     @pytest.fixture
     def mock_auth(self, keypair_resource_policy: dict[str, Any]) -> MagicMock:
-        scope_result = ResolveAccessKeyScopeResult(
+        scope_result = PublicResolveAccessKeyScopeResult(
             requester_access_key=AccessKey("TESTACCESSKEY01"),
             owner_access_key=AccessKey("TESTACCESSKEY01"),
         )
         mock = MagicMock()
-        mock.resolve_access_key_scope = MagicMock()
-        mock.resolve_access_key_scope.wait_for_complete = AsyncMock(return_value=scope_result)
+        mock.public_resolve_access_key_scope = MagicMock()
+        mock.public_resolve_access_key_scope.run = AsyncMock(return_value=scope_result)
         return mock
 
     @pytest.fixture

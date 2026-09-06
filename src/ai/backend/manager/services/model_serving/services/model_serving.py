@@ -5,7 +5,7 @@ import secrets
 import uuid
 from collections.abc import Sequence
 from http import HTTPStatus
-from typing import Any, cast
+from typing import Any
 
 import aiohttp
 from pydantic import HttpUrl
@@ -16,7 +16,6 @@ from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.deployment import DeploymentID
-from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
@@ -103,17 +102,16 @@ from ai.backend.manager.errors.service import (
     RouteNotFound,
 )
 from ai.backend.manager.models.endpoint import EndpointLifecycle
+from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    Creator,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
-from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.model_serving.actions.clear_error import (
@@ -791,21 +789,16 @@ class ModelServingService:
                 )
             token = resp_json["token"]
 
-        # Create token in database
-        token_id = DeploymentTokenID(uuid.uuid4())
-        token_creator = Creator(
-            spec=EndpointTokenCreatorSpec(
-                id=token_id,
-                token=token,
-                endpoint=DeploymentID(endpoint_data.id),
-                domain=endpoint_data.domain,
-                project=ProjectID(endpoint_data.project),
-                session_owner=UserID(endpoint_data.session_owner_id),
-            )
-        )
-
         # Access already validated above, just create the token
-        token_data = await self._repository.create_endpoint_token(token_creator)
+        token_data = await self._repository.create_endpoint_token(
+            DeploymentID(endpoint_data.id),
+            EndpointTokenCreator(
+                domain=endpoint_data.domain,
+                project_id=ProjectID(endpoint_data.project),
+                session_owner_id=UserID(endpoint_data.session_owner_id),
+                token=token,
+            ),
+        )
         if not token_data:
             raise ModelServiceNotFound
 
@@ -813,10 +806,10 @@ class ModelServingService:
         service_token_data = ServiceEndpointTokenData(
             id=token_data.id,
             token=token_data.token,
-            endpoint=token_data.endpoint,
-            session_owner=token_data.session_owner,
-            domain=token_data.domain,
-            project=token_data.project,
+            endpoint=endpoint_data.id,
+            session_owner=endpoint_data.session_owner_id,
+            domain=endpoint_data.domain,
+            project=endpoint_data.project,
             created_at=token_data.created_at,
         )
         return GenerateTokenActionResult(data=service_token_data)
@@ -837,7 +830,7 @@ class ModelServingService:
         return ForceSyncActionResult(success=True)
 
     async def update_endpoint(self, action: UpdateEndpointAction) -> UpdateEndpointActionResult:
-        spec = cast(EndpointUpdaterSpec, action.updater.spec)
+        spec = action.updater
 
         # 1. Apply endpoint-level changes (name, resource_group, replicas)
         #    via the existing repository method (which only writes endpoint columns).
@@ -899,9 +892,9 @@ class ModelServingService:
 
     async def _build_revision_overrides_from_spec(
         self,
-        spec: EndpointUpdaterSpec,
+        spec: LegacyEndpointUpdater,
     ) -> RevisionDraft:
-        """Convert ``EndpointUpdaterSpec`` overrides into a ``RevisionDraft``.
+        """Convert ``LegacyEndpointUpdater`` overrides into a ``RevisionDraft``.
 
         Only fields the user explicitly modified are populated. Fields left
         untouched stay ``None`` so that the controller's merge pipeline can

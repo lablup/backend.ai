@@ -57,6 +57,10 @@ from ai.backend.manager.models.endpoint import (
     EndpointRow,
     EndpointTokenRow,
 )
+from ai.backend.manager.models.endpoint.updaters import (
+    AutoScalingRuleUpdater,
+    LegacyEndpointUpdater,
+)
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -64,11 +68,6 @@ from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.model_serving.updaters import (
-    EndpointAutoScalingRuleUpdaterSpec,
-    EndpointUpdaterSpec,
-)
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
     LookupAutoScalingRuleDeploymentAction,
 )
@@ -392,7 +391,8 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ign
             except decimal.InvalidOperation as e:
                 raise InvalidAPIParameters(f"Cannot convert {value} to Decimal") from e
 
-        spec = EndpointAutoScalingRuleUpdaterSpec(
+        updater = AutoScalingRuleUpdater(
+            rule_id=id,
             metric_source=OptionalState.from_graphql(
                 AutoScalingMetricSource(self.metric_source)
                 if self.metric_source is not Undefined
@@ -425,7 +425,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ign
         return UpdateEndpointAutoScalingRuleAction(
             deployment_id=deployment_id,
             id=id,
-            updater=Updater(spec=spec, pk_value=id),
+            updater=updater,
         )
 
 
@@ -1074,7 +1074,8 @@ class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
 
             return [extra_mount.to_action_field(info) for extra_mount in extra_mounts_gql]
 
-        spec = EndpointUpdaterSpec(
+        updater = LegacyEndpointUpdater(
+            deployment_id=DeploymentID(endpoint_id),
             resource_slots=OptionalState.from_graphql(
                 self.resource_slots
                 if (self.resource_slots is Undefined or self.resource_slots is None)
@@ -1088,7 +1089,6 @@ class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
             ),
             cluster_size=OptionalState.from_graphql(self.cluster_size),
             replicas=OptionalState.from_graphql(self.replicas),
-            desired_session_count=OptionalState.from_graphql(self.desired_session_count),
             image=TriState.from_graphql(
                 create_image_ref_from_input(self.image) if self.image is not Undefined else None,
             ),
@@ -1116,7 +1116,7 @@ class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         return UpdateEndpointAction(
             deployment_id=DeploymentID(endpoint_id),
-            updater=Updater(spec=spec, pk_value=endpoint_id),
+            updater=updater,
         )
 
 

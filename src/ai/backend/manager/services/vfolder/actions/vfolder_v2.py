@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.services.vfolder.actions.base import VFolderAction
 
 
@@ -25,7 +26,7 @@ class DeleteVFolderV2Action(VFolderAction):
 
 @dataclass
 class DeleteVFolderV2ActionResult:
-    vfolder_id: uuid.UUID
+    vfolder: VFolderData
 
 
 @dataclass

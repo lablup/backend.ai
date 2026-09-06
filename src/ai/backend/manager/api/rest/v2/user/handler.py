@@ -10,6 +10,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.user.request import (
     CreateUserInput,
     DeleteUserInput,
+    RestoreUserInput,
     SearchUsersRequest,
     UpdateUserInput,
 )
@@ -72,6 +73,14 @@ class V2UserHandler:
     ) -> APIResponse:
         """Soft-delete a user (superadmin only)."""
         result = await self._adapter.delete_user_by_id(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def restore_user(
+        self,
+        body: BodyParam[RestoreUserInput],
+    ) -> APIResponse:
+        """Restore a soft-deleted user (superadmin only)."""
+        result = await self._adapter.restore_user_by_id(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def domain_search(

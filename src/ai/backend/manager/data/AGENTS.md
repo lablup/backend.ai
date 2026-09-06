@@ -30,6 +30,11 @@ dataclasses (established pattern); for new code, do not add re-exports — impor
 - A value spanning several rows is served by a repository in the service layer, not
   folded into ops. Where a calculation is involved or many rows are, it becomes a
   repository method of that domain.
+- A virtual entity id (`virtual_entities.id`) never appears on a data type. It names a
+  graph node, not an entity or a field; the data type carries the entity the node
+  stands for, read by the query that read the row.
+- An entity a row names is carried as one `EntityIdentifier` (`RuntimeEntityID` where
+  the kind is a value), not as an `entity_type` / `entity_id` pair.
 
 ## Legacy distinction
 

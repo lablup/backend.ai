@@ -1,22 +1,24 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Mapping, Sequence
 from typing import (
     Any,
+    cast,
     override,
 )
 
 import jwt
 import jwt.exceptions
-import sqlalchemy as sa
 from aiohttp import web
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.auth.login_session_types import LoginSessionStatus
-from ai.backend.manager.models.login_session.row import LoginSessionRow
-from ai.backend.manager.models.user import UserStatus, users
+from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.user.queriers import AuthorizingUserQuerier
+from ai.backend.manager.repositories.auth.repository import AuthRepository
 
 from .config import OIDCHookConfig
 
@@ -60,7 +62,7 @@ class OIDCHookPlugin(HookPlugin):
         params: Mapping[str, Any],
     ) -> Any:
         root_app = request.app["_root_app"]
-        db = root_app["_db"]
+        auth_repository = cast(AuthRepository, root_app["_auth_repository"])
         secret = self._config.secret
 
         stoken = params.get("stoken") or params.get("sToken") or request.cookies.get("sToken")
@@ -71,38 +73,23 @@ class OIDCHookPlugin(HookPlugin):
             return None
         try:
             payload = jwt.decode(stoken, secret, algorithms=["HS256"])
-            user_uuid = payload["user"]
+            user_id = UserID(uuid.UUID(payload["user"]))
             email = payload["email"]
         except jwt.ExpiredSignatureError:
             raise Reject("Expired authentication token") from None
-        except (jwt.PyJWTError, KeyError):
+        except (jwt.PyJWTError, KeyError, ValueError):
             raise Reject("Invalid authentication token") from None
 
         log.debug("AUTHORIZE_HOOK(openid): auth token {}", stoken)
 
-        async with db.begin_readonly() as conn:
-            query = sa.select(users).select_from(users).where(users.c.uuid == user_uuid)
-            result = await conn.execute(query)
-            row = result.fetchone()
-            if not row:
-                raise Reject("user not found")
-            user = row._mapping
-            if user["status"] != UserStatus.ACTIVE:
-                raise Reject("user is inactivated")
+        user = await auth_repository.query_user_data(AuthorizingUserQuerier(user_id))
+        if user is None:
+            raise Reject("user not found")
+        if user.status != UserStatus.ACTIVE:
+            raise Reject("user is inactivated")
 
         if payload.get("force", False):
-            async with db.begin() as conn:
-                await conn.execute(
-                    sa.update(LoginSessionRow.__table__)
-                    .where(
-                        (LoginSessionRow.__table__.c.user_id == user_uuid)
-                        & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
-                    )
-                    .values(
-                        status=LoginSessionStatus.INVALIDATED,
-                        invalidated_at=sa.func.now(),
-                    )
-                )
+            await auth_repository.invalidate_active_login_sessions(user_id)
             log.info(
                 "AUTHORIZE_HOOK(openid): force-invalidated existing login sessions for {}",
                 email,

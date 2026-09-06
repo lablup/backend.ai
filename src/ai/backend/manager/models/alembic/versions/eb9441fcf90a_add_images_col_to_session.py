@@ -6,8 +6,6 @@ Create Date: 2023-07-06 13:51:52.098587
 
 """
 
-from __future__ import annotations
-
 from collections import defaultdict
 from typing import Any, cast
 from uuid import UUID

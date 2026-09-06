@@ -19,7 +19,6 @@ from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import ResourceSlot, SlotName
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -30,13 +29,17 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.db.engine import create_async_engine
@@ -85,6 +88,8 @@ class TestReconcileAgentResources:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -184,8 +189,6 @@ class TestReconcileAgentResources:
                     region="test-region",
                     scaling_group=sg_name,
                     resource_group_id=resource_group_id,
-                    available_slots=ResourceSlot({SlotName("cpu"): "8", SlotName("mem"): "32768"}),
-                    occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
                     version="24.12.0",
                     architecture="x86_64",
@@ -230,7 +233,6 @@ class TestReconcileAgentResources:
     ) -> uuid.UUID:
         session_id = uuid4()
         kernel_id = uuid4()
-        empty_slots = ResourceSlot({})
         async with db.begin_session() as db_sess:
             db_sess.add(
                 SessionRow(
@@ -241,8 +243,6 @@ class TestReconcileAgentResources:
                     user_uuid=uuid4(),
                     resource_group_id=infra.resource_group_id,
                     scaling_group_name=infra.sg_name,
-                    occupying_slots=empty_slots,
-                    requested_slots=empty_slots,
                 )
             )
             await db_sess.flush()
@@ -254,8 +254,6 @@ class TestReconcileAgentResources:
                     group_id=infra.project_id,
                     user_uuid=uuid4(),
                     status=status,
-                    occupied_slots=empty_slots,
-                    requested_slots=empty_slots,
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,
@@ -484,6 +482,8 @@ class TestOrphanedAllocationCleanup:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -586,8 +586,6 @@ class TestOrphanedAllocationCleanup:
                     region="test-region",
                     scaling_group=sg_name,
                     resource_group_id=resource_group_id,
-                    available_slots=ResourceSlot({SlotName("cpu"): "8", SlotName("mem"): "32768"}),
-                    occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
                     version="24.12.0",
                     architecture="x86_64",
@@ -614,7 +612,6 @@ class TestOrphanedAllocationCleanup:
         spec: KernelSpec = request.param
         session_id = uuid4()
         kernel_id = uuid4()
-        empty_slots = ResourceSlot({})
         async with db.begin_session() as db_sess:
             db_sess.add(
                 SessionRow(
@@ -625,8 +622,6 @@ class TestOrphanedAllocationCleanup:
                     user_uuid=uuid4(),
                     resource_group_id=infra.resource_group_id,
                     scaling_group_name=infra.sg_name,
-                    occupying_slots=empty_slots,
-                    requested_slots=empty_slots,
                 )
             )
             await db_sess.flush()
@@ -638,8 +633,6 @@ class TestOrphanedAllocationCleanup:
                     group_id=infra.project_id,
                     user_uuid=uuid4(),
                     status=spec.status,
-                    occupied_slots=empty_slots,
-                    requested_slots=empty_slots,
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,
@@ -789,7 +782,6 @@ class TestOrphanedAllocationCleanup:
 
         Returns (orphan_kernel_id, agent_id).
         """
-        empty_slots = ResourceSlot({})
 
         # RUNNING kernel: legitimate cpu=2
         running_sid, running_kid = uuid4(), uuid4()
@@ -803,8 +795,6 @@ class TestOrphanedAllocationCleanup:
                     user_uuid=uuid4(),
                     resource_group_id=infra.resource_group_id,
                     scaling_group_name=infra.sg_name,
-                    occupying_slots=empty_slots,
-                    requested_slots=empty_slots,
                 )
             )
             await db_sess.flush()
@@ -816,8 +806,6 @@ class TestOrphanedAllocationCleanup:
                     group_id=infra.project_id,
                     user_uuid=uuid4(),
                     status=KernelStatus.RUNNING,
-                    occupied_slots=empty_slots,
-                    requested_slots=empty_slots,
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,
@@ -849,8 +837,6 @@ class TestOrphanedAllocationCleanup:
                     user_uuid=uuid4(),
                     resource_group_id=infra.resource_group_id,
                     scaling_group_name=infra.sg_name,
-                    occupying_slots=empty_slots,
-                    requested_slots=empty_slots,
                 )
             )
             await db_sess.flush()
@@ -862,8 +848,6 @@ class TestOrphanedAllocationCleanup:
                     group_id=infra.project_id,
                     user_uuid=uuid4(),
                     status=KernelStatus.CANCELLED,
-                    occupied_slots=empty_slots,
-                    requested_slots=empty_slots,
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,
@@ -958,6 +942,8 @@ class TestTerminalSessionKernelReconciliation:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 ResourceGroupRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 AgentRow,
                 ContainerRegistryRow,
@@ -1058,8 +1044,6 @@ class TestTerminalSessionKernelReconciliation:
                     region="test-region",
                     scaling_group=sg_name,
                     resource_group_id=resource_group_id,
-                    available_slots=ResourceSlot({SlotName("cpu"): "8", SlotName("mem"): "32768"}),
-                    occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
                     version="24.12.0",
                     architecture="x86_64",
@@ -1091,7 +1075,6 @@ class TestTerminalSessionKernelReconciliation:
 
         Returns (session_id, kernel_id, agent_id).
         """
-        empty_slots = ResourceSlot({})
         session_id = uuid4()
         kernel_id = uuid4()
         async with db.begin_session() as db_sess:
@@ -1105,8 +1088,6 @@ class TestTerminalSessionKernelReconciliation:
                     resource_group_id=infra.resource_group_id,
                     scaling_group_name=infra.sg_name,
                     status=session_status,
-                    occupying_slots=empty_slots,
-                    requested_slots=empty_slots,
                 )
             )
             await db_sess.flush()
@@ -1118,8 +1099,6 @@ class TestTerminalSessionKernelReconciliation:
                     group_id=infra.project_id,
                     user_uuid=uuid4(),
                     status=kernel_status,
-                    occupied_slots=empty_slots,
-                    requested_slots=empty_slots,
                     repl_in_port=0,
                     repl_out_port=0,
                     stdin_port=0,

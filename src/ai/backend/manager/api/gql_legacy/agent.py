@@ -110,8 +110,6 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
     "first_contact": ("first_contact", None),
     "lost_at": ("lost_at", None),
     "version": ("version", None),
-    "available_slots": ("available_slots", None),
-    "occupied_slots": ("occupied_slots", None),
 }
 
 
@@ -192,7 +190,7 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
             scaling_group=data.resource_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
-            occupied_slots=data.actual_occupied_slots.to_json(),
+            occupied_slots=data.occupied_slots.to_json(),
             addr=data.addr,
             architecture=data.architecture,
             first_contact=data.first_contact,
@@ -409,7 +407,7 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
             scaling_group=data.resource_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
-            occupied_slots=data.actual_occupied_slots.to_json(),
+            occupied_slots=data.occupied_slots.to_json(),
             addr=data.addr,
             architecture=data.architecture,
             first_contact=data.first_contact,
@@ -422,10 +420,10 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
             cpu_slots=data.available_slots.get("cpu", 0),
             gpu_slots=data.available_slots.get("cuda.device", 0),
             tpu_slots=data.available_slots.get("tpu.device", 0),
-            used_mem_slots=data.actual_occupied_slots.get("mem", 0) // mega,
-            used_cpu_slots=float(data.actual_occupied_slots.get("cpu", 0)),
-            used_gpu_slots=float(data.actual_occupied_slots.get("cuda.device", 0)),
-            used_tpu_slots=float(data.actual_occupied_slots.get("tpu.device", 0)),
+            used_mem_slots=data.occupied_slots.get("mem", 0) // mega,
+            used_cpu_slots=float(data.occupied_slots.get("cpu", 0)),
+            used_gpu_slots=float(data.occupied_slots.get("cuda.device", 0)),
+            used_tpu_slots=float(data.occupied_slots.get("tpu.device", 0)),
         )
 
     async def resolve_compute_containers(
@@ -514,8 +512,6 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
         "first_contact": ("first_contact", None),
         "lost_at": ("lost_at", None),
         "version": ("version", None),
-        "available_slots": ("available_slots", None),
-        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod
@@ -749,7 +745,7 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
             scaling_group=data.resource_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
-            occupied_slots=data.actual_occupied_slots.to_json(),
+            occupied_slots=data.occupied_slots.to_json(),
             architecture=data.architecture,
         )
 
@@ -765,8 +761,6 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         "status": ("status", None),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulable", None),
-        "available_slots": ("available_slots", None),
-        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod
@@ -929,7 +923,7 @@ class ModifyAgent(graphene.Mutation):  # type: ignore[misc]
                 return cls(False, f"no such scaling group: {scaling_group}")
             # The v1 mutation refuses to move an agent that still has sessions
             # under the old group; drain them first.
-            await graph_ctx.processors.agent.update_resource_group.wait_for_complete(
+            await graph_ctx.processors.agent.update_resource_group.run(
                 UpdateAgentResourceGroupAction(
                     agent_id=AgentId(id),
                     resource_group_id=ResourceGroupID(resource_group_id),

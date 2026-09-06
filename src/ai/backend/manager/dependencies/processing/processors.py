@@ -12,7 +12,11 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.v2 import validators as v2_validators
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.factory import create_processors
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
+from ai.backend.manager.services.processors import (
+    ProcessorArgs,
+    ProcessorsBundle,
+    ServiceArgs,
+)
 
 
 @dataclass
@@ -27,11 +31,14 @@ class ProcessorsProviderInput:
     v2_validators: v2_validators.ActionValidators
 
 
-class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderInput, Processors]):
+class ProcessorsDependency(
+    NonMonitorableDependencyProvider[ProcessorsProviderInput, ProcessorsBundle]
+):
     """Provides Processors lifecycle management.
 
     Creates the Processors instance via create_processors() with
-    the given ServiceArgs and action monitors.
+    the given ServiceArgs and action monitors, and hands back the registry
+    they were wired through beside them.
     """
 
     @property
@@ -41,7 +48,9 @@ class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderIn
 
     @asynccontextmanager
     @override
-    async def provide(self, setup_input: ProcessorsProviderInput) -> AsyncGenerator[Processors]:
+    async def provide(
+        self, setup_input: ProcessorsProviderInput
+    ) -> AsyncGenerator[ProcessorsBundle]:
         bundle = create_processors(
             ProcessorArgs(
                 service_args=setup_input.service_args,
@@ -52,4 +61,4 @@ class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderIn
             setup_input.action_monitors,
             setup_input.validators,
         )
-        yield bundle.processors
+        yield bundle

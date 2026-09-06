@@ -3,14 +3,13 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
 
 
 @dataclass
 class UpdateContainerRegistryAction(ContainerRegistryAction):
-    updater: Updater[ContainerRegistryRow]
+    updater: ContainerRegistryUpdater
 
     @override
     @classmethod

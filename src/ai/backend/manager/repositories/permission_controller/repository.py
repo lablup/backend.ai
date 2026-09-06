@@ -10,9 +10,6 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.actions.action.rbac_role_invitation import (
-    CreateRoleInvitationResult,
-)
 from ai.backend.manager.data.permission.entity import ElementAssociationListResult, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import (
@@ -46,17 +43,16 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
-    EntityType,
     ScopeListResult,
-    ScopeType,
 )
-from ai.backend.manager.data.permission.virtual_scope import (
-    EntityPermissionCheckKey,
-    ScopePermissionCheckKey,
+from ai.backend.manager.data.permission.virtual_entity import (
+    GovernCheckKey,
+    OwnCheckKey,
 )
-from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import (
@@ -69,16 +65,6 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
     UserRoleCreatorSpec,
-)
-from ai.backend.manager.repositories.permission_controller.types import (
-    PermissionOperationScope,
-    ScopedRoleOperationScope,
-)
-from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeOperationScope,
-    InviterOperationScope,
-    RoleInvitationOperationScope,
-    RoleInvitationSearchResult,
 )
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
@@ -185,10 +171,10 @@ class PermissionControllerRepository:
         failures = [
             BulkRolePermissionAddFailure(
                 role_id=(spec := cast(PermissionCreatorSpec, error.spec)).role_id,
-                scope_type=ScopeType(spec.scope_type.value),
+                scope_type=spec.scope_type,
                 scope_id=spec.scope_id,
-                entity_type=EntityType(spec.entity_type.value),
-                operation=spec.operation,
+                entity_type=spec.entity_type,
+                permission=spec.permission,
                 message=str(error.exception),
             )
             for error in result.errors
@@ -226,10 +212,10 @@ class PermissionControllerRepository:
         failures = [
             BulkRolePermissionAddFailure(
                 role_id=(spec := cast(PermissionCreatorSpec, error.spec)).role_id,
-                scope_type=ScopeType(spec.scope_type.value),
+                scope_type=spec.scope_type,
                 scope_id=spec.scope_id,
-                entity_type=EntityType(spec.entity_type.value),
-                operation=spec.operation,
+                entity_type=spec.entity_type,
+                permission=spec.permission,
                 message=str(error.exception),
             )
             for error in result.errors
@@ -302,7 +288,7 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def check_permission_in_scope(self, data: ScopePermissionCheckInput) -> bool:
         return await self._db_source.check_scope_permission_exist(
-            data.user_id, data.target_scope_id, data.operation
+            data.user_id, data.target_scope_id, data.permission
         )
 
     @permission_controller_repository_resilience.apply()
@@ -443,49 +429,22 @@ class PermissionControllerRepository:
         return await self._db_source.check_bulk_permission_with_scope_chain(data)
 
     @permission_controller_repository_resilience.apply()
-    async def check_single_entity_permission_via_virtual_scope(
+    async def owned_permissions(
         self,
-        key: EntityPermissionCheckKey,
-        permission: Permission,
-    ) -> bool:
-        """Permission check on a single entity through the virtual-scope chain.
-
-        Resolves the effective permission via
-        ``entity -> entity_memberships -> scope_bindings -> scope`` with per-hop
-        cap clipping and grants only when it covers every bit of ``permission``,
-        which may be a mask (``UPSERT`` requires ``CREATE | UPDATE``).
-        """
-        return await self._db_source.check_single_entity_permission_via_virtual_scope(
-            key, permission
-        )
+        keys: Collection[OwnCheckKey],
+    ) -> Mapping[OwnCheckKey, Permission]:
+        """The bits each user holds on each entity through own and govern; a key
+        nothing reaches maps to :attr:`Permission.NONE`."""
+        return await self._db_source.owned_permissions(keys)
 
     @permission_controller_repository_resilience.apply()
-    async def check_bulk_permission_via_virtual_scope(
+    async def governed_permissions(
         self,
-        keys: Collection[EntityPermissionCheckKey],
-        permission: Permission,
-    ) -> Mapping[EntityPermissionCheckKey, bool]:
-        """Batch permission check on multiple entities through the virtual-scope chain.
-
-        Same semantics as check_single_entity_permission_via_virtual_scope but
-        for an arbitrary collection of per-entity keys, batched per
-        ``(user_id, entity_type)`` group.
-        """
-        return await self._db_source.check_bulk_permission_via_virtual_scope(keys, permission)
-
-    @permission_controller_repository_resilience.apply()
-    async def check_scope_permission_via_virtual_scope(
-        self,
-        keys: Collection[ScopePermissionCheckKey],
-        permission: Permission,
-    ) -> Mapping[ScopePermissionCheckKey, bool]:
-        """Permission check on target scopes through the virtual-scope chain.
-
-        Each scope is walked as an entity while permission rows are matched on
-        the key's ``entity_type``, batched per
-        ``(user_id, scope_type, entity_type)`` group.
-        """
-        return await self._db_source.check_scope_permission_via_virtual_scope(keys, permission)
+        keys: Collection[GovernCheckKey],
+    ) -> Mapping[GovernCheckKey, Permission]:
+        """The bits each user holds on the key's entity type within the key's scope;
+        a key nothing reaches maps to :attr:`Permission.NONE`."""
+        return await self._db_source.governed_permissions(keys)
 
     @permission_controller_repository_resilience.apply()
     async def resolve_effective_permissions(
@@ -499,72 +458,8 @@ class PermissionControllerRepository:
         chain (AUTO edges) and self-scope permissions to collect all operations
         the user can perform.
         """
-        return await self._db_source.resolve_effective_permissions(keys)
-
-    # -- role invitation --
-
-    @permission_controller_repository_resilience.apply()
-    async def create_invitation_by_email(
-        self,
-        *,
-        invitee_emails: list[str],
-        inviter_user_id: uuid.UUID,
-        role_id: uuid.UUID,
-    ) -> CreateRoleInvitationResult:
-        return await self._db_source.create_invitation_by_email(
-            invitee_emails=invitee_emails,
-            inviter_user_id=inviter_user_id,
-            role_id=role_id,
-        )
-
-    @permission_controller_repository_resilience.apply()
-    async def search_invitations_by_invitee(
-        self,
-        querier: BatchQuerier,
-        scope: InviteeOperationScope,
-    ) -> RoleInvitationSearchResult:
-        return await self._db_source.search_invitations_by_invitee(querier, scope)
-
-    @permission_controller_repository_resilience.apply()
-    async def search_invitations_by_inviter(
-        self,
-        querier: BatchQuerier,
-        scope: InviterOperationScope,
-    ) -> RoleInvitationSearchResult:
-        return await self._db_source.search_invitations_by_inviter(querier, scope)
-
-    @permission_controller_repository_resilience.apply()
-    async def search_invitations_by_role(
-        self,
-        querier: BatchQuerier,
-        scope: RoleInvitationOperationScope,
-    ) -> RoleInvitationSearchResult:
-        return await self._db_source.search_invitations_by_role(querier, scope)
-
-    @permission_controller_repository_resilience.apply()
-    async def admin_search_invitations(
-        self,
-        querier: BatchQuerier,
-    ) -> RoleInvitationSearchResult:
-        return await self._db_source.admin_search_invitations(querier)
-
-    @permission_controller_repository_resilience.apply()
-    async def accept_invitation(
-        self,
-        invitation_id: uuid.UUID,
-    ) -> RoleInvitationData:
-        return await self._db_source.accept_invitation(invitation_id)
-
-    @permission_controller_repository_resilience.apply()
-    async def reject_invitation(
-        self,
-        invitation_id: uuid.UUID,
-    ) -> RoleInvitationData:
-        return await self._db_source.reject_invitation(invitation_id)
-
-    @permission_controller_repository_resilience.apply()
-    async def cancel_invitation(
-        self,
-        invitation_id: uuid.UUID,
-    ) -> RoleInvitationData:
-        return await self._db_source.cancel_invitation(invitation_id)
+        granted = await self._db_source.resolve_effective_permissions(keys)
+        return {
+            key: frozenset(bit.to_operation() for bit in Permission if bit and bits & bit)
+            for key, bits in granted.items()
+        }

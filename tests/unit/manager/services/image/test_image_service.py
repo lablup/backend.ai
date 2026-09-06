@@ -18,7 +18,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.exception import UnknownImageReference
@@ -33,20 +33,18 @@ from ai.backend.manager.data.image.types import (
     RescanImagesResult,
     ResourceLimitInput,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.image import (
     ImageAccessForbiddenError,
     ImageAliasNotFound,
     ImageNotFound,
 )
 from ai.backend.manager.models.image import ImageStatus, ImageType
+from ai.backend.manager.models.image.creators import ImageAliasCreator
+from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
 from ai.backend.manager.repositories.image.repository import ImageRepository
-from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageByIdAction,
@@ -176,12 +174,12 @@ class ImageServiceBaseFixtures:
         )
 
     @pytest.fixture
-    def image_alias_id(self) -> uuid.UUID:
+    def image_alias_id(self) -> ImageAliasID:
         """Image alias ID for test fixtures."""
-        return uuid.uuid4()
+        return ImageAliasID(uuid.uuid4())
 
     @pytest.fixture
-    def image_alias_data(self, image_alias_id: uuid.UUID) -> ImageAliasData:
+    def image_alias_data(self, image_alias_id: ImageAliasID) -> ImageAliasData:
         """Sample image alias data for testing."""
         return ImageAliasData(
             id=image_alias_id,
@@ -483,7 +481,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
         action = UpdateImageAction(
             target=image_data.name,
             architecture=image_data.architecture,
-            updater_spec=ImageUpdaterSpec(
+            update=ImageUpdate(
                 registry=OptionalState.update("cr.backend.ai2"),
             ),
         )
@@ -507,7 +505,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
         action = UpdateImageAction(
             target=image_data.name,
             architecture=image_data.architecture,
-            updater_spec=ImageUpdaterSpec(
+            update=ImageUpdate(
                 accelerators=TriState.nullify(),
             ),
         )
@@ -546,7 +544,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
         action = UpdateImageAction(
             target=image_data.name,
             architecture=image_data.architecture,
-            updater_spec=ImageUpdaterSpec(
+            update=ImageUpdate(
                 image_type=OptionalState.update(ImageType.SERVICE),
                 registry=OptionalState.update("cr.backend.ai2"),
                 accelerators=TriState.update("cuda,rocm"),
@@ -574,7 +572,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
         action = UpdateImageAction(
             target="non-existent-image",
             architecture="x86_64",
-            updater_spec=ImageUpdaterSpec(
+            update=ImageUpdate(
                 registry=OptionalState.update("cr.backend.ai2"),
             ),
         )
@@ -992,16 +990,10 @@ class TestAliasImageById(ImageServiceBaseFixtures):
         assert result.image_id == image_id
         assert result.image_alias == image_alias_data
         mock_image_repository.add_image_alias_by_id.assert_called_once()
-        creator_arg = mock_image_repository.add_image_alias_by_id.call_args[0][0]
-        assert isinstance(creator_arg, RBACEntityCreator)
-        assert isinstance(creator_arg.spec, ImageAliasCreatorSpec)
-        assert creator_arg.spec.alias == "python"
-        assert creator_arg.spec.image_id == image_id
-        assert creator_arg.element_type == RBACElementType.IMAGE_ALIAS
-        assert creator_arg.scope_ref == RBACElementRef(
-            element_type=RBACElementType.IMAGE,
-            element_id=str(image_id),
-        )
+        owner_arg, creator_arg = mock_image_repository.add_image_alias_by_id.call_args[0]
+        assert owner_arg == image_id
+        assert isinstance(creator_arg, ImageAliasCreator)
+        assert creator_arg.alias == "python"
 
 
 class TestClearImageCustomResourceLimitById(ImageServiceBaseFixtures):

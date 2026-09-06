@@ -21,6 +21,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainPurger
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
@@ -36,9 +37,15 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.session import SessionRow, SessionStatus, SessionTypes
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -60,9 +67,12 @@ class TestDomainPurgersIntegration:
                 # FK dependency order: parents before children
                 RoleRow,
                 PermissionRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
                 ScopeBindingRow,
+                EntityLabelRow,
                 DomainRow,
                 ProjectResourcePolicyRow,
                 UserResourcePolicyRow,
@@ -218,8 +228,6 @@ class TestDomainPurgersIntegration:
                     scaling_group_name=sgroup_name,
                     resource_group_id=sgroup_id,
                     user_uuid=sample_user.uuid,
-                    occupying_slots=ResourceSlot({}),
-                    requested_slots=ResourceSlot({}),
                     status=SessionStatus.TERMINATED,
                     status_info="",
                     target_sgroup_names=[],
@@ -253,8 +261,6 @@ class TestDomainPurgersIntegration:
                     user_uuid=sample_user.uuid,
                     scaling_group=sess.scaling_group_name,
                     resource_group_id=sess.resource_group_id,
-                    occupied_slots=ResourceSlot({}),
-                    requested_slots=ResourceSlot({}),
                     occupied_shares={},
                     vfolder_mounts=[],
                     status=KernelStatus.TERMINATED,
@@ -281,7 +287,9 @@ class TestDomainPurgersIntegration:
 
         # Purge kernels
         async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
-            purged = await w.batch_purge_in_global(DomainKernelPurger(name=domain_name))
+            purged = await w.batch_purge_field_entities(
+                sample_domain.domain_id, DomainKernelPurger(name=domain_name)
+            )
             assert len(purged) == len(sample_kernels)
 
         # Verify kernels are deleted

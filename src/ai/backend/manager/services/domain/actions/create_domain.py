@@ -3,19 +3,17 @@ from typing import override
 
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
-from ai.backend.manager.data.domain.types import DomainData, UserInfo
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalRoleManagedEntityOpsAction
+from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.creators import DomainCreator
+from ai.backend.manager.models.domain.row import DomainRow
 
 
 @dataclass(frozen=True)
-class CreateDomainAction(BaseGlobalAction):
-    """Register a domain. The model-store project is created along with it, which is
-    why this does not run straight against ops."""
+class CreateDomainAction(CreateGlobalRoleManagedEntityOpsAction[DomainRow, DomainData]):
+    """Register a domain, the top-level scope everything else is created under."""
 
     creator: DomainCreator
-    user_info: UserInfo
 
     @override
     @classmethod
@@ -24,15 +22,9 @@ class CreateDomainAction(BaseGlobalAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "global_create_domain"
 
-
-@dataclass(frozen=True)
-class CreateDomainActionResult:
-    domain_data: DomainData
+    @override
+    def to_creator(self) -> DomainCreator:
+        return self.creator

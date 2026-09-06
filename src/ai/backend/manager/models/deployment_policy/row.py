@@ -42,7 +42,7 @@ class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     endpoint: Mapped[DeploymentID] = mapped_column(
         "endpoint",

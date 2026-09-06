@@ -47,7 +47,7 @@ class ArtifactRow(Base):
     __tablename__ = "artifacts"
 
     id: Mapped[ArtifactID] = mapped_column(
-        "id", GUID(ArtifactID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ArtifactID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     type: Mapped[ArtifactType] = mapped_column(
         "type", sa.Enum(ArtifactType), index=True, nullable=False

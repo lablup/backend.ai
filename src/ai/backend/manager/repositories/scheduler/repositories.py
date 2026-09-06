@@ -13,6 +13,7 @@ class SchedulerRepositories:
     def create(cls, args: RepositoryArgs) -> Self:
         repository = SchedulerRepository(
             args.db,
+            args.reconcile_ops_provider,
             args.valkey_stat_client,
             args.valkey_schedule_client,
             args.config_provider,

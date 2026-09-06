@@ -51,6 +51,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import TableOrORM, with_tables
 
 
@@ -527,7 +528,7 @@ class TestDomainNestedSearchIntegration:
             for email, user_uuid in keypair_data:
                 keypair = KeyPairRow(
                     access_key=uuid.uuid4().hex[:20],
-                    secret_key=uuid.uuid4().hex[:20],
+                    secret_key=SecretValue(uuid.uuid4().hex[:20]),
                     user=user_uuid,
                     is_active=True,
                     resource_policy=kp_policy.name,

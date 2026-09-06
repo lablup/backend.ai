@@ -25,6 +25,13 @@ class ArtifactConditions:
         return inner
 
     @staticmethod
+    def by_name_and_registry(name: str, registry_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(ArtifactRow.name == name, ArtifactRow.registry_id == registry_id)
+
+        return inner
+
+    @staticmethod
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if spec.case_insensitive:

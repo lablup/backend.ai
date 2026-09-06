@@ -31,6 +31,7 @@ from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
+from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentOperationScope
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -57,7 +58,6 @@ from ai.backend.manager.repositories.idle_checker.creators import (
 )
 from ai.backend.manager.repositories.idle_checker.purgers import IdleCheckerAssignmentPurgerSpec
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckerAssignmentOperationScope
 from ai.backend.manager.repositories.idle_checker.updaters import IdleCheckerAssignmentUpdaterSpec
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.types import OptionalState

@@ -66,20 +66,18 @@ class V2KeypairHandler:
     async def revoke(
         self,
         body: BodyParam[RevokeMyKeypairInput],
-        ctx: UserContext,
     ) -> APIResponse:
         """Revoke a keypair owned by the current user."""
-        result = await self._adapter.revoke_my_keypair(ctx.user_uuid, body.parsed.access_key)
+        result = await self._adapter.revoke_my_keypair(body.parsed.access_key)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def update(
         self,
         body: BodyParam[UpdateMyKeypairInput],
-        ctx: UserContext,
     ) -> APIResponse:
         """Update a keypair owned by the current user."""
         result = await self._adapter.update_my_keypair(
-            ctx.user_uuid, body.parsed.access_key, body.parsed.is_active
+            body.parsed.access_key, body.parsed.is_active
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

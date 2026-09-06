@@ -30,6 +30,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload,
+    BulkDeleteVFolderV2Error,
     BulkPurgeVFoldersPayload,
     BulkPurgeVFolderV2Error,
     CloneVFolderPayload,
@@ -81,6 +82,7 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.errors.resource import NotAModelVFolder
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.orders import (
@@ -95,8 +97,7 @@ from ai.backend.manager.models.vfolder.orders import (
 from ai.backend.manager.models.vfolder.orders import (
     resolve_order as resolve_vfolder_order,
 )
-from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
-from ai.backend.manager.repositories.vfolder.types import (
+from ai.backend.manager.models.vfolder.scopes import (
     ProjectVFolderOperationScope,
     UserVFolderOperationScope,
 )
@@ -544,11 +545,27 @@ class VFolderAdapter(BaseAdapter):
         )
 
     async def bulk_delete(self, input: BulkDeleteVFoldersInput) -> BulkDeleteVFoldersPayload:
-        """Soft-delete multiple vfolders."""
+        """Soft-delete multiple vfolders.
+
+        Each vfolder is processed independently; per-id failures are collected into
+        ``failed`` rather than aborting the batch and leaving the earlier ids deleted
+        while the caller is told the whole call failed.
+        """
+        deleted: list[VFolderNode] = []
+        failed: list[BulkDeleteVFolderV2Error] = []
         for vfolder_id in input.ids:
             action = DeleteVFolderV2Action(vfolder_uuid=VFolderUUID(vfolder_id))
-            await self._processors.vfolder.delete_v2.run(action)
-        return BulkDeleteVFoldersPayload(deleted_count=len(input.ids))
+            try:
+                result = await self._processors.vfolder.delete_v2.run(action)
+            except BackendAIError as e:
+                failed.append(BulkDeleteVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
+                continue
+            deleted.append(self._vfolder_data_to_node(result.vfolder))
+        return BulkDeleteVFoldersPayload(
+            items=deleted,
+            deleted_count=len(deleted),
+            failed=failed,
+        )
 
     async def bulk_purge(self, input: BulkPurgeVFoldersInput) -> BulkPurgeVFoldersPayload:
         """Permanently purge multiple vfolders, optionally cascading linked model cards.
@@ -556,7 +573,7 @@ class VFolderAdapter(BaseAdapter):
         Each vfolder is processed independently; per-id failures are collected
         into ``failed`` rather than aborting the whole batch.
         """
-        purged_count = 0
+        purged: list[UUID] = []
         failed: list[BulkPurgeVFolderV2Error] = []
         for vfolder_id in input.ids:
             action = PurgeVFolderV2Action(
@@ -569,8 +586,12 @@ class VFolderAdapter(BaseAdapter):
             except BackendAIError as e:
                 failed.append(BulkPurgeVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
                 continue
-            purged_count += 1
-        return BulkPurgeVFoldersPayload(purged_count=purged_count, failed=failed)
+            purged.append(vfolder_id)
+        return BulkPurgeVFoldersPayload(
+            successes=purged,
+            purged_count=len(purged),
+            failed=failed,
+        )
 
     async def list_files(self, vfolder_id: UUID, input: ListFilesInput) -> ListFilesPayload:
         """List files in a vfolder."""
@@ -743,6 +764,10 @@ class VFolderAdapter(BaseAdapter):
                 conditions.append(c)
         if f.cloneable is not None:
             conditions.append(VFolderConditions.by_cloneable(f.cloneable))
+        if f.labels is not None:
+            conditions.extend(
+                self._convert_entity_label_nested_filter(f.labels, VFolderConditions.labels)
+            )
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_vfolder_filter(sub))

@@ -15,7 +15,6 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -29,13 +28,15 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.data.deployment.types import RouteHealthStatus
+from ai.backend.manager.data.deployment.types import (
+    ModelDeploymentAccessTokenData,
+    RouteHealthStatus,
+)
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
     EndpointAutoScalingRuleData,
     EndpointData,
-    EndpointTokenData,
     ModelServiceValidationContext,
     MutationResult,
     ResourceGroupData,
@@ -44,7 +45,6 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceSearchResult,
     UserData,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound, ServiceUnavailable
@@ -57,7 +57,11 @@ from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
     EndpointRow,
-    EndpointTokenRow,
+)
+from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.updaters import (
+    AutoScalingRuleUpdater,
+    LegacyEndpointUpdater,
 )
 from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -75,19 +79,10 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.registry import check_resource_group as registry_check_resource_group
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    Creator,
-    Updater,
     execute_batch_querier,
-    execute_creator,
-    execute_updater,
 )
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.deployment.creators import DeploymentPolicyCreatorSpec
 from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts
-from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import MountOptionModel, UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -110,9 +105,11 @@ model_serving_repository_resilience = Resilience(
 
 class ModelServingRepository:
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops_provider
 
     async def _check_inference_resource_group(
         self,
@@ -256,44 +253,6 @@ class ModelServingRepository:
             return existing_endpoint is None
 
     @model_serving_repository_resilience.apply()
-    async def create_endpoint_validated(
-        self, creator: RBACEntityCreator[EndpointRow], registry: AgentRegistry
-    ) -> EndpointData:
-        """
-        Create a new endpoint after validation.
-        """
-        async with self._db.begin_session() as db_sess:
-            result = await execute_rbac_entity_creator(db_sess, creator)
-            endpoint = result.row
-
-            # Create default rolling deployment policy
-            policy_creator_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
-            policy_creator = RBACEntityCreator(
-                spec=policy_creator_spec,
-                element_type=RBACElementType.DEPLOYMENT_POLICY,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.MODEL_DEPLOYMENT,
-                    element_id=str(endpoint.id),
-                ),
-            )
-            await execute_rbac_entity_creator(db_sess, policy_creator)
-            await db_sess.flush()
-
-            endpoint_row = await EndpointRow.get(
-                db_sess,
-                endpoint.id,
-                load_created_user=True,
-                load_session_owner=True,
-                load_revisions=True,
-                load_routes=True,
-            )
-            endpoint_before_assign_url = endpoint_row.to_data()
-            endpoint_row.url = await registry.create_appproxy_endpoint(
-                db_sess, endpoint_before_assign_url
-            )
-            return endpoint_row.to_data()
-
-    @model_serving_repository_resilience.apply()
     async def update_endpoint_lifecycle(
         self,
         endpoint_id: uuid.UUID,
@@ -428,20 +387,20 @@ class ModelServingRepository:
     @model_serving_repository_resilience.apply()
     async def create_endpoint_token(
         self,
-        creator: Creator[EndpointTokenRow],
-    ) -> EndpointTokenData | None:
+        deployment_id: DeploymentID,
+        creator: EndpointTokenCreator,
+    ) -> ModelDeploymentAccessTokenData | None:
         """
         Create endpoint token.
         Returns token data if created, None if endpoint not found.
         """
-        async with self._db.begin_session() as session:
-            endpoint_id = creator.spec.endpoint  # type: ignore[attr-defined]
-            endpoint = await self._get_endpoint_by_id(session, endpoint_id)
+        async with self._db.begin_readonly_session() as session:
+            endpoint = await self._get_endpoint_by_id(session, deployment_id)
             if not endpoint:
                 return None
 
-            result = await execute_creator(session, creator)
-            return result.row.to_dataclass()
+        async with self._v2_ops.write_ops() as w:
+            return await w.create_field(deployment_id, creator)
 
     @model_serving_repository_resilience.apply()
     async def get_resource_group_info(self, resource_group_name: str) -> ResourceGroupData | None:
@@ -696,29 +655,25 @@ class ModelServingRepository:
     @model_serving_repository_resilience.apply()
     async def update_auto_scaling_rule(
         self,
-        updater: Updater[EndpointAutoScalingRuleRow],
+        updater: AutoScalingRuleUpdater,
     ) -> EndpointAutoScalingRuleData | None:
         """
         Update auto scaling rule.
         Returns the updated rule if successful, None if not found or endpoint inactive.
         """
-        rule_id = uuid.UUID(str(updater.pk_value))
+        rule_id = uuid.UUID(str(updater.rule_id))
 
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             try:
                 # Validate lifecycle stage before update
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
-                    return None
-
-                # Use execute_updater to apply changes
-                result = await execute_updater(session, updater)
-                if result is None:
-                    return None
-
-                return result.row.to_data()
             except ObjectNotFound:
                 return None
+            if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
+                return None
+
+        async with self._v2_ops.write_ops() as w:
+            return await w.update_data(updater)
 
     @model_serving_repository_resilience.apply()
     async def delete_auto_scaling_rule(
@@ -795,7 +750,7 @@ class ModelServingRepository:
     async def modify_endpoint_fields(
         self,
         deployment_id: DeploymentID,
-        updater: Updater[EndpointRow],
+        updater: LegacyEndpointUpdater,
         agent_registry: AgentRegistry,
         legacy_etcd_config_loader: LegacyEtcdLoader,
     ) -> MutationResult:
@@ -839,10 +794,9 @@ class ModelServingRepository:
                 ):
                     raise InvalidAPIParameters("Cannot update endpoint marked for removal")
 
-                spec = cast(EndpointUpdaterSpec, updater.spec)
-
                 # Apply endpoint-level changes (replicas, resource_group, etc.)
-                spec.apply_to_row(endpoint_row)
+                for column, value in updater.build_values().items():
+                    setattr(endpoint_row, column, value)
 
                 session_owner = endpoint_row.session_owner_row
                 if session_owner is None:

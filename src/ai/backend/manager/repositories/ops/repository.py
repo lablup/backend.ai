@@ -12,12 +12,12 @@ from typing import Any
 from ai.backend.common.data.entity.types import (
     EntityData,
     EntityIdentifier,
-    EntityType,
     FieldData,
     FieldIdentifier,
+    RuntimeEntityID,
 )
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.repository import EntityNotFoundError, EntityWriteRefusedError
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
@@ -27,21 +27,33 @@ from ai.backend.manager.models.specs.creator import (
     GlobalEntityCreator,
     NestedFieldCreator,
     RoleManagedEntityCreator,
+    RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.lookup import (
     DataLookup,
+    FieldKeyLookup,
     FieldOwnerKeyLookup,
     FieldOwnerLookup,
+    RuntimeFieldOwnerLookup,
 )
 from ai.backend.manager.models.specs.purger import (
-    DataBatchPurger,
+    EntityBatchPurger,
     EntityPurger,
     FieldPurger,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier, OwnedFieldQuerier
+from ai.backend.manager.models.specs.querier import (
+    BulkEntityQuerier,
+    DataQuerier,
+    FieldQuerier,
+    OwnedFieldQuerier,
+)
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.models.specs.types import BulkResultWithFailures, EntityWithFieldsResult
-from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
+from ai.backend.manager.models.specs.updater import (
+    DataBatchUpdater,
+    DataUpdater,
+    GuardedDataUpdater,
+)
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
     FieldUpserter,
@@ -70,6 +82,29 @@ class OpsRepository[TData]:
             if data is None:
                 raise EntityNotFoundError(
                     f"{querier.row_class().__name__} {querier.entity_id_value()} not found"
+                )
+            return data
+
+    async def bulk_get(
+        self, querier: BulkEntityQuerier[Any, TData], entity_ids: Sequence[EntityIdentifier]
+    ) -> Mapping[EntityIdentifier, TData]:
+        """Read the named entities; one that is gone is absent instead of raising.
+
+        Unlike :meth:`get`, the run answers for each id separately, so a missing row is
+        one failed item rather than a failed run.
+        """
+        async with self._ops.read_ops() as r:
+            return await r.query_bulk_data(querier, entity_ids)
+
+    async def get_field[TFieldData: FieldData](
+        self, querier: FieldQuerier[Any, TFieldData]
+    ) -> TFieldData:
+        """Read one field row by its own id, raising if it is gone."""
+        async with self._ops.read_ops() as r:
+            data = await r.query_field_data(querier)
+            if data is None:
+                raise EntityNotFoundError(
+                    f"{querier.row_class().__name__} {querier.target_id_value()} not found"
                 )
             return data
 
@@ -117,6 +152,23 @@ class OpsRepository[TData]:
             raise EntityNotFoundError("No field row matches the given id")
         return owner
 
+    async def runtime_field_owners(
+        self, lookup: RuntimeFieldOwnerLookup[Any], field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, RuntimeEntityID]:
+        """Read the polymorphic owning entity of each named field row."""
+        async with self._ops.read_ops() as r:
+            return await r.lookup_runtime_field_owners(lookup, field_ids)
+
+    async def runtime_field_owner(
+        self, lookup: RuntimeFieldOwnerLookup[Any], field_id: FieldIdentifier
+    ) -> RuntimeEntityID:
+        """Read one field row's polymorphic owning entity, raising if the row is gone."""
+        owners = await self.runtime_field_owners(lookup, [field_id])
+        owner = owners.get(field_id)
+        if owner is None:
+            raise EntityNotFoundError("No field row matches the given id")
+        return owner
+
     async def field_owner_by_key[TOwnerID: EntityIdentifier](
         self, lookup: FieldOwnerKeyLookup[TOwnerID]
     ) -> TOwnerID:
@@ -130,6 +182,20 @@ class OpsRepository[TData]:
         if owner is None:
             raise EntityNotFoundError("No field row matches the given key")
         return owner
+
+    async def field_by_key[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
+        self, lookup: FieldKeyLookup[TFieldID, TOwnerID]
+    ) -> tuple[TFieldID, TOwnerID]:
+        """Read the field row the key names and its owner, raising if nothing matches.
+
+        A lookup has to produce an id, so an absent row cannot be reported by returning
+        ``None`` — the same contract the other lookups keep.
+        """
+        async with self._ops.read_ops() as r:
+            resolved = await r.lookup_field_by_key(lookup)
+        if resolved is None:
+            raise EntityNotFoundError("No field row matches the given key")
+        return resolved
 
     async def search_in_scopes(
         self,
@@ -176,7 +242,7 @@ class OpsRepository[TData]:
             return EntityWithFieldsResult(data=data, fields=fields)
 
     async def create_entity(self, creator: EntityCreator[Any, TData]) -> TData:
-        """Insert one entity row; the write provisions its virtual scope and joins
+        """Insert one entity row; the write provisions its virtual entity and joins
         the declared memberships. No roles are involved on this path."""
         async with self._ops.write_ops() as w:
             return await w.create_entity(creator)
@@ -196,11 +262,18 @@ class OpsRepository[TData]:
             fields = await w.atomic_create_field_entities(data.entity_id(), field_creators)
             return EntityWithFieldsResult(data=data, fields=fields)
 
+    async def create_role_managed_global_entity(
+        self, creator: RoleManagedGlobalEntityCreator[Any, TData]
+    ) -> TData:
+        """Insert one role-managed row created in no scope, preset roles included."""
+        async with self._ops.write_ops() as w:
+            return await w.create_role_managed_global_entity(creator)
+
     async def create_role_managed_entity(
         self, creator: RoleManagedEntityCreator[Any, TData]
     ) -> TData:
-        """Insert one role-managed entity row, additionally provisioning the roles
-        its scope type's active presets call for."""
+        """Insert one role-managed entity row, owned and governed by the scopes it is
+        created in, preset roles included."""
         async with self._ops.write_ops() as w:
             return await w.create_role_managed_entity(creator)
 
@@ -225,10 +298,19 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_entities(creators)
 
+    async def atomic_create_role_managed_global_entities(
+        self, creators: Sequence[RoleManagedGlobalEntityCreator[Any, TData]]
+    ) -> list[TData]:
+        """Insert several role-managed rows created in no scope atomically, preset
+        roles included."""
+        async with self._ops.write_ops() as w:
+            return await w.atomic_create_role_managed_global_entities(creators)
+
     async def atomic_create_role_managed_entities(
         self, creators: Sequence[RoleManagedEntityCreator[Any, TData]]
     ) -> list[TData]:
-        """Insert several role-managed entity rows atomically, preset roles included."""
+        """Insert several role-managed entity rows atomically, each owned and governed
+        by the scopes it is created in, preset roles included."""
         async with self._ops.write_ops() as w:
             return await w.atomic_create_role_managed_entities(creators)
 
@@ -240,10 +322,10 @@ class OpsRepository[TData]:
             return await w.atomic_create_field_entities(owner_id, creators)
 
     async def create_dangling_field[TFieldData: FieldData](
-        self, entity_type: EntityType, creator: DanglingFieldCreator[Any, TFieldData]
+        self, creator: DanglingFieldCreator[Any, TFieldData]
     ) -> TFieldData:
         async with self._ops.write_ops() as w:
-            return await w.create_dangling_field(entity_type, creator)
+            return await w.create_dangling_field(creator)
 
     async def atomic_create_fields[TOwnerID: EntityIdentifier, TFieldData: FieldData](
         self, creations: Sequence[FieldToCreate[TOwnerID, Any, TFieldData]]
@@ -266,24 +348,21 @@ class OpsRepository[TData]:
             return await w.atomic_create_fields_with_nested(creations, nested_creators)
 
     async def atomic_create_dangling_fields[TFieldData: FieldData](
-        self, entity_type: EntityType, creators: Sequence[DanglingFieldCreator[Any, TFieldData]]
+        self, creators: Sequence[DanglingFieldCreator[Any, TFieldData]]
     ) -> list[TFieldData]:
         async with self._ops.write_ops() as w:
-            return await w.atomic_create_dangling_fields(entity_type, creators)
+            return await w.atomic_create_dangling_fields(creators)
 
     async def atomic_create_dangling_fields_with_nested[
         TFieldData: FieldData,
         TNestedData: FieldData,
     ](
         self,
-        entity_type: EntityType,
         creators: Sequence[DanglingFieldCreator[Any, TFieldData]],
         field_creators: Sequence[NestedFieldCreator[Any, Any, TNestedData]],
     ) -> list[TFieldData]:
         async with self._ops.write_ops() as w:
-            return await w.atomic_create_dangling_fields_with_nested(
-                entity_type, creators, field_creators
-            )
+            return await w.atomic_create_dangling_fields_with_nested(creators, field_creators)
 
     async def purge_entity(self, purger: EntityPurger[Any, TData]) -> TData:
         """Hard-delete one entity row, tearing its scope down with it."""
@@ -360,6 +439,23 @@ class OpsRepository[TData]:
                 )
             return data
 
+    async def update_guarded(self, updater: GuardedDataUpdater[Any, TData]) -> TData:
+        """Apply a guarded update, telling a missing row from a refused one.
+
+        The guard rides on the UPDATE, so the row it declined is read back in the same
+        session rather than re-checked against a later state.
+        """
+        async with self._ops.write_ops() as w:
+            data = await w.update_guarded_data(updater)
+            if data is not None:
+                return data
+            row_name = f"{updater.row_class.__name__} {updater.target_id_value()}"
+            if await w.row_exists(
+                updater.row_class, updater.target_id_column(), updater.target_id_value()
+            ):
+                raise EntityWriteRefusedError(f"{row_name} refused the write")
+            raise EntityNotFoundError(f"{row_name} not found")
+
     async def partial_bulk_update(
         self, updaters: Mapping[EntityIdentifier, DataUpdater[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
@@ -383,14 +479,16 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.batch_update_in_global(updater)
 
-    async def batch_purge_in_scopes(
-        self, scopes: Sequence[OperationScope], purger: DataBatchPurger[Any, TData]
+    async def batch_purge_entities_in_scopes(
+        self, scopes: Sequence[OperationScope], purger: EntityBatchPurger[Any, TData]
     ) -> list[TData]:
         """Delete every selected row within ``scopes``, which must not be empty."""
         async with self._ops.write_ops() as w:
-            return await w.batch_purge_in_scopes(scopes, purger)
+            return await w.batch_purge_entities_in_scopes(scopes, purger)
 
-    async def batch_purge_in_global(self, purger: DataBatchPurger[Any, TData]) -> list[TData]:
+    async def batch_purge_entities_in_global(
+        self, purger: EntityBatchPurger[Any, TData]
+    ) -> list[TData]:
         """Delete every selected row across the table; caller holds the authority."""
         async with self._ops.write_ops() as w:
-            return await w.batch_purge_in_global(purger)
+            return await w.batch_purge_entities_in_global(purger)

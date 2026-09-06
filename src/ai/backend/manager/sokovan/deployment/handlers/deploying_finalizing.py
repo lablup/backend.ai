@@ -5,22 +5,20 @@ from typing import override
 
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
+    DeploymentInfo,
     DeploymentLifecycleStatus,
     DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
     DeploymentTargetStatuses,
+    ReplicaGroupData,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.updaters import EndpointReplicaGroupUpdater
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment.updaters.deployment import (
-    EndpointReplicaGroupUpdaterSpec,
-)
-from ai.backend.manager.repositories.deployment.updaters.replica_group import (
-    ReplicaGroupDeployUpdaterSpec,
-)
+from ai.backend.manager.models.replica_group.updaters import ReplicaGroupDeployUpdater
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import (
@@ -100,8 +98,8 @@ class DeployingFinalizingHandler(DeploymentHandler):
     ) -> DeploymentExecutionResult:
         successes: list[DeploymentWithHistory] = []
         failures: list[DeploymentExecutionError] = []
-        group_updaters: list[Updater[ReplicaGroupRow]] = []
-        endpoint_updaters: list[Updater[EndpointRow]] = []
+        group_updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = []
+        endpoint_updaters: list[DataUpdater[EndpointRow, DeploymentInfo]] = []
         to_finalize: list[DeploymentWithHistory] = []
 
         for deployment in deployments:
@@ -119,26 +117,22 @@ class DeployingFinalizingHandler(DeploymentHandler):
             # The target now serves all traffic; drop the superseded primary to none. Rolling
             # reuses the primary as target, so there is nothing to demote.
             group_updaters.append(
-                Updater(
-                    pk_value=target_group_id,
-                    spec=ReplicaGroupDeployUpdaterSpec(traffic_weight=OptionalState.update(100)),
+                ReplicaGroupDeployUpdater(
+                    replica_group_id=target_group_id, traffic_weight=OptionalState.update(100)
                 )
             )
             primary_group_id = info.primary_replica_group_id
             if primary_group_id is not None and primary_group_id != target_group_id:
                 group_updaters.append(
-                    Updater(
-                        pk_value=primary_group_id,
-                        spec=ReplicaGroupDeployUpdaterSpec(traffic_weight=OptionalState.update(0)),
+                    ReplicaGroupDeployUpdater(
+                        replica_group_id=primary_group_id, traffic_weight=OptionalState.update(0)
                     )
                 )
             endpoint_updaters.append(
-                Updater(
-                    pk_value=info.id,
-                    spec=EndpointReplicaGroupUpdaterSpec(
-                        primary_replica_group_id=OptionalState.update(target_group_id),
-                        target_replica_group_id=TriState.nullify(),
-                    ),
+                EndpointReplicaGroupUpdater(
+                    deployment_id=info.id,
+                    primary_replica_group_id=OptionalState.update(target_group_id),
+                    target_replica_group_id=TriState.nullify(),
                 )
             )
             to_finalize.append(deployment)

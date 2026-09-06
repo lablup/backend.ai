@@ -11,7 +11,7 @@ class HuggingFaceRegistryRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = HuggingFaceRepository(args.db)
+        repository = HuggingFaceRepository(args.db, args.artifact_registry_ops_provider)
 
         return cls(
             repository=repository,

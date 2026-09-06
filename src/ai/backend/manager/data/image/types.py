@@ -7,7 +7,8 @@ from decimal import Decimal
 from typing import Any, NamedTuple, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID, SlotName
 
 type Resources = dict[SlotName, dict[str, Any]]
@@ -16,6 +17,13 @@ type Resources = dict[SlotName, dict[str, Any]]
 class ImageStatus(enum.StrEnum):
     ALIVE = "ALIVE"
     DELETED = "DELETED"
+    PURGING = "PURGING"
+    PURGE_ERROR = "PURGE_ERROR"
+
+    @classmethod
+    def purge_in_progress(cls) -> frozenset[ImageStatus]:
+        """Statuses a purge is working through. Writes are refused while in one."""
+        return frozenset({cls.PURGING, cls.PURGE_ERROR})
 
 
 class ImageOrderField(enum.StrEnum):
@@ -163,8 +171,8 @@ class RescanImagesResult:
 
 
 @dataclass
-class ImageAliasData:
-    id: UUID = field(compare=False)
+class ImageAliasData(FieldData):
+    id: ImageAliasID = field(compare=False)
     alias: str
 
 

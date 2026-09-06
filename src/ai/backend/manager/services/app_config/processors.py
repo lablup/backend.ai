@@ -3,11 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
-    BulkOpsResult,
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
@@ -22,6 +21,9 @@ from ai.backend.manager.data.app_config.types import (
 )
 from ai.backend.manager.services.app_config.actions.allow_list.admin_search import (
     AdminSearchAppConfigAllowListAction,
+)
+from ai.backend.manager.services.app_config.actions.allow_list.bulk_get import (
+    BulkGetAppConfigAllowListsAction,
 )
 from ai.backend.manager.services.app_config.actions.allow_list.create import (
     CreateAppConfigAllowListAction,
@@ -38,6 +40,9 @@ from ai.backend.manager.services.app_config.actions.allow_list.update import (
 from ai.backend.manager.services.app_config.actions.definition.admin_search import (
     AdminSearchAppConfigDefinitionsAction,
 )
+from ai.backend.manager.services.app_config.actions.definition.bulk_get import (
+    BulkGetAppConfigDefinitionsAction,
+)
 from ai.backend.manager.services.app_config.actions.definition.create import (
     CreateAppConfigDefinitionAction,
 )
@@ -49,6 +54,9 @@ from ai.backend.manager.services.app_config.actions.definition.purge import (
 )
 from ai.backend.manager.services.app_config.actions.fragment.admin_search import (
     AdminSearchAppConfigFragmentAction,
+)
+from ai.backend.manager.services.app_config.actions.fragment.bulk_get import (
+    BulkGetAppConfigFragmentsAction,
 )
 from ai.backend.manager.services.app_config.actions.fragment.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
@@ -99,6 +107,9 @@ class AppConfigProcessors:
     definition_get: SingleEntityActionProcessor[
         GetAppConfigDefinitionAction, EntityOpsResult[AppConfigDefinitionData]
     ]
+    definition_bulk_get: PartialBulkActionProcessor[
+        BulkGetAppConfigDefinitionsAction, AppConfigDefinitionData
+    ]
     definition_purge: SingleEntityActionProcessor[
         PurgeAppConfigDefinitionAction, EntityOpsResult[AppConfigDefinitionData]
     ]
@@ -111,6 +122,9 @@ class AppConfigProcessors:
     ]
     allow_list_get: SingleEntityActionProcessor[
         GetAppConfigAllowListAction, EntityOpsResult[AppConfigAllowListData]
+    ]
+    allow_list_bulk_get: PartialBulkActionProcessor[
+        BulkGetAppConfigAllowListsAction, AppConfigAllowListData
     ]
     allow_list_update: SingleEntityActionProcessor[
         UpdateAppConfigAllowListAction, EntityOpsResult[AppConfigAllowListData]
@@ -131,6 +145,9 @@ class AppConfigProcessors:
     fragment_get: SingleEntityActionProcessor[
         GetAppConfigFragmentAction, EntityOpsResult[AppConfigFragmentData]
     ]
+    fragment_bulk_get: PartialBulkActionProcessor[
+        BulkGetAppConfigFragmentsAction, AppConfigFragmentData
+    ]
     fragment_admin_search: GlobalActionProcessor[
         AdminSearchAppConfigFragmentAction, BatchOpsResult[AppConfigFragmentData]
     ]
@@ -140,8 +157,8 @@ class AppConfigProcessors:
     fragment_purge: SingleEntityActionProcessor[
         PurgeAppConfigFragmentAction, EntityOpsResult[AppConfigFragmentData]
     ]
-    fragment_bulk_purge: BulkActionProcessor[
-        BulkPurgeAppConfigFragmentAction, BulkOpsResult[AppConfigFragmentData]
+    fragment_bulk_purge: PartialBulkActionProcessor[
+        BulkPurgeAppConfigFragmentAction, AppConfigFragmentData
     ]
 
     def __init__(
@@ -164,6 +181,9 @@ class AppConfigProcessors:
             CreateAppConfigDefinitionAction
         )
         self.definition_get = definition_group.single_get_ops(GetAppConfigDefinitionAction)
+        self.definition_bulk_get = definition_group.partial_bulk_get_ops(
+            BulkGetAppConfigDefinitionsAction
+        )
         self.definition_purge = definition_group.entity_purge_ops(PurgeAppConfigDefinitionAction)
         self.definition_global_search = definition_group.global_search_ops(
             AdminSearchAppConfigDefinitionsAction
@@ -173,6 +193,9 @@ class AppConfigProcessors:
             CreateAppConfigAllowListAction
         )
         self.allow_list_get = allow_list_group.single_get_ops(GetAppConfigAllowListAction)
+        self.allow_list_bulk_get = allow_list_group.partial_bulk_get_ops(
+            BulkGetAppConfigAllowListsAction
+        )
         self.allow_list_update = allow_list_group.single_update_ops(UpdateAppConfigAllowListAction)
         self.allow_list_purge = allow_list_group.entity_purge_ops(PurgeAppConfigAllowListAction)
         self.allow_list_global_search = allow_list_group.global_search_ops(
@@ -186,6 +209,9 @@ class AppConfigProcessors:
             GlobalBulkUpsertAppConfigFragmentsAction
         )
         self.fragment_get = fragment_group.single_get_ops(GetAppConfigFragmentAction)
+        self.fragment_bulk_get = fragment_group.partial_bulk_get_ops(
+            BulkGetAppConfigFragmentsAction
+        )
         self.fragment_admin_search = fragment_group.global_search_ops(
             AdminSearchAppConfigFragmentAction
         )

@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.group.request import PurgeProjectInput
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
-    OperationType,
     Permission,
     ScopeType,
 )
@@ -29,9 +28,9 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -63,27 +62,25 @@ async def project_with_rbac_rows(
                 resource_policy=resource_policy_fixture,
             )
         )
-        virtual_scope_id = uuid.uuid4()
+        virtual_entity_id = uuid.uuid4()
         await conn.execute(
-            sa.insert(VirtualScopeRow.__table__).values(
-                id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=project_id,
+            sa.insert(VirtualEntityRow.__table__).values(
+                id=virtual_entity_id,
+                entity_type=ScopeType.PROJECT,
+                entity_id=project_id,
             )
         )
         await conn.execute(
             sa.insert(EntityMembershipRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                entity_type=EntityType.PROJECT,
-                entity_id=project_id,
-                permission_cap=None,
+                virtual_entity_id=virtual_entity_id,
+                member_entity_id=virtual_entity_id,
+                capped=False,
             )
         )
         await conn.execute(
             sa.insert(ScopeBindingRow.__table__).values(
-                virtual_scope_id=virtual_scope_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=project_id,
+                virtual_entity_id=virtual_entity_id,
+                scope_entity_id=virtual_entity_id,
                 permission_cap=None,
             )
         )
@@ -135,7 +132,6 @@ async def project_with_rbac_rows(
                     "scope_type": ScopeType.PROJECT,
                     "scope_id": scope_id,
                     "entity_type": EntityType.PROJECT,
-                    "operation": OperationType.UPDATE,
                     "permission": Permission.UPDATE,
                 },
                 {
@@ -143,7 +139,6 @@ async def project_with_rbac_rows(
                     "scope_type": ScopeType.PROJECT,
                     "scope_id": scope_id,
                     "entity_type": EntityType.PROJECT,
-                    "operation": OperationType.READ,
                     "permission": Permission.READ,
                 },
             ])
@@ -172,9 +167,9 @@ async def project_with_rbac_rows(
             )
         )
         await conn.execute(
-            VirtualScopeRow.__table__.delete().where(
-                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
-                VirtualScopeRow.__table__.c.scope_id == project_id,
+            VirtualEntityRow.__table__.delete().where(
+                VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+                VirtualEntityRow.__table__.c.entity_id == project_id,
             )
         )
         await conn.execute(

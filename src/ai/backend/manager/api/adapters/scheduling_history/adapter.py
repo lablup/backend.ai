@@ -59,6 +59,7 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.replica_group_history.conditions import (
     ReplicaGroupHistoryConditions,
 )
@@ -92,17 +93,13 @@ from ai.backend.manager.models.scheduling_history.orders import (
     resolve_route_order,
     resolve_session_order,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.scheduling_history.types import (
+from ai.backend.manager.models.scheduling_history.scopes import (
     DeploymentHistoryOperationScope,
     RouteHistoryOperationScope,
     SessionSchedulingHistoryOperationScope,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
     LookupKernelOwnerAction,
 )
@@ -479,7 +476,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
             raise InvalidAPIParameters(
                 "Kernel scheduling history scope accepts exactly one scope item"
             )
-        # TODO: Pass KernelKernelHistoryTarget(kernel_id=...) once virtual scopes
+        # TODO: Pass KernelKernelHistoryTarget(kernel_id=...) once virtual entities
         # land and a kernel becomes a scope of its own. Kernels hold no permission
         # records today, so a kernel scope item is converted to a target on its
         # owning session and narrowed back down with a kernel_id query condition.

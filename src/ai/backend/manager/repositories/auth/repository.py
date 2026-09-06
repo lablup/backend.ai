@@ -1,29 +1,29 @@
 from collections.abc import Collection
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.auth.login_session_types import (
-    LoginAttemptResult,
-    LoginHistoryData,
-    LoginSessionData,
-)
+from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.auth.types import (
     GroupMembershipData,
+    KeyPairSigningMaterial,
     UserCreationData,
 )
-from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -31,8 +31,8 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     CredentialVerificationResult,
     LoginSessionCreationResult,
 )
-from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 auth_repository_resilience = Resilience(
     policies=[
@@ -44,8 +44,13 @@ auth_repository_resilience = Resilience(
 class AuthRepository:
     _db_source: AuthDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = AuthDBSource(db)
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        v2_ops_provider: V2DBOpsProvider,
+        key_provider_pool: KeyProviderPool,
+    ) -> None:
+        self._db_source = AuthDBSource(db, v2_ops_provider, key_provider_pool)
 
     @auth_repository_resilience.apply()
     async def get_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
@@ -56,13 +61,18 @@ class AuthRepository:
         return await self._db_source.verify_email_exists(email)
 
     @auth_repository_resilience.apply()
+    async def domain_id(self, domain_name: str) -> DomainID:
+        """The id of the domain a signup names."""
+        return await self._db_source.fetch_domain_id(domain_name)
+
+    @auth_repository_resilience.apply()
     async def create_user_with_keypair(
         self,
-        user_spec: UserCreatorSpec,
+        user_spec: UserCreator,
         project_ids: Collection[ProjectID],
         *,
         keypair_resource_policy: str,
-        keypair_rate_limit: int,
+        keypair_rate_limit: int | None = None,
     ) -> UserCreationData:
         return await self._db_source.insert_user_with_keypair(
             user_spec,
@@ -98,12 +108,25 @@ class AuthRepository:
         await self._db_source.modify_ssh_keypair(access_key, public_key, private_key)
 
     @auth_repository_resilience.apply()
-    async def get_delegation_target_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
-        return await self._db_source.fetch_user_info_by_access_key(access_key)
+    async def verify_keypair_secret(self, access_key: str, secret_key: str) -> bool:
+        """Whether an active keypair holds the given secret key."""
+        return await self._db_source.verify_keypair_secret(access_key, secret_key)
 
     @auth_repository_resilience.apply()
-    async def get_user_id_by_access_key(self, access_key: AccessKey) -> UserID:
-        return await self._db_source.fetch_user_id_by_access_key(access_key)
+    async def get_keypair_signing_material(self, access_key: str) -> KeyPairSigningMaterial:
+        """The owner and decrypted secret key of a keypair, for re-signing a request."""
+        return await self._db_source.fetch_keypair_signing_material(access_key)
+
+    @auth_repository_resilience.apply()
+    async def lookup[TEntityID: EntityIdentifier](
+        self, lookup: DataLookup[Any, TEntityID]
+    ) -> TEntityID | None:
+        """The id a key names, or None when it names nothing."""
+        return await self._db_source.lookup(lookup)
+
+    @auth_repository_resilience.apply()
+    async def get_delegation_target_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
+        return await self._db_source.fetch_user_info_by_access_key(access_key)
 
     @auth_repository_resilience.apply()
     async def get_delegation_target_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
@@ -112,6 +135,11 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def get_user_uuid_by_email(self, email: str, domain_name: str) -> UUID | None:
         return await self._db_source.fetch_user_uuid_by_email(email, domain_name)
+
+    @auth_repository_resilience.apply()
+    async def query_user_data[TData](self, querier: DataQuerier[UserRow, TData]) -> TData | None:
+        """The user a querier names, or None when it names nothing."""
+        return await self._db_source.query_user_data(querier)
 
     @auth_repository_resilience.apply()
     async def verify_credential(
@@ -137,19 +165,24 @@ class AuthRepository:
         domain_name: str,
         *,
         login_client_type_id: UUID | None = None,
+        client_ip: str | None = None,
     ) -> LoginSessionCreationResult:
         return await self._db_source.create_login_session(
             user_id,
             access_key,
             domain_name,
             login_client_type_id=login_client_type_id,
+            client_ip=client_ip,
         )
 
     @auth_repository_resilience.apply()
     async def delete_login_sessions_by_tokens(
-        self, session_tokens: list[str], result: LoginAttemptResult
+        self,
+        session_tokens: list[str],
+        result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> None:
-        await self._db_source.delete_sessions_by_tokens(session_tokens, result)
+        await self._db_source.delete_sessions_by_tokens(session_tokens, result, client_ip)
 
     @auth_repository_resilience.apply()
     async def check_credential_without_migration(
@@ -184,39 +217,34 @@ class AuthRepository:
 
     @auth_repository_resilience.apply()
     async def delete_login_session_by_token(
-        self, session_token: str, result: LoginAttemptResult
+        self,
+        session_token: str,
+        result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> None:
-        await self._db_source.delete_session_by_token(session_token, result)
+        await self._db_source.delete_session_by_token(session_token, result, client_ip)
 
     @auth_repository_resilience.apply()
     async def delete_user_login_sessions(
-        self, user_id: UUID, domain_name: str, result: LoginAttemptResult
+        self,
+        user_id: UUID,
+        domain_name: str,
+        result: LoginAttemptResult,
+        client_ip: str | None = None,
     ) -> list[str]:
-        return await self._db_source.delete_sessions_by_user(user_id, domain_name, result)
+        return await self._db_source.delete_sessions_by_user(
+            user_id, domain_name, result, client_ip
+        )
 
     @auth_repository_resilience.apply()
-    async def admin_search_login_sessions(
+    async def delete_login_session_by_id(
         self,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginSessionData]:
-        return await self._db_source.admin_search_login_sessions(querier)
-
-    @auth_repository_resilience.apply()
-    async def search_login_sessions(
-        self,
-        scope: OperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginSessionData]:
-        return await self._db_source.search_login_sessions(scope, querier)
-
-    @auth_repository_resilience.apply()
-    async def get_login_session_by_id(self, session_id: UUID) -> LoginSessionData:
-        return await self._db_source.fetch_login_session_by_id(session_id)
-
-    @auth_repository_resilience.apply()
-    async def delete_login_session_by_id(self, session_id: UUID, result: LoginAttemptResult) -> str:
+        session_id: UUID,
+        result: LoginAttemptResult,
+        client_ip: str | None = None,
+    ) -> str:
         """Delete a login session, record history, and return its session_token."""
-        return await self._db_source.delete_session_by_id(session_id, result)
+        return await self._db_source.delete_session_by_id(session_id, result, client_ip)
 
     @auth_repository_resilience.apply()
     async def record_login_history(
@@ -225,22 +253,12 @@ class AuthRepository:
         domain_name: str,
         result: LoginAttemptResult,
         fail_reason: str | None = None,
+        client_ip: str | None = None,
     ) -> None:
-        await self._db_source.record_login_history(user_id, domain_name, result, fail_reason)
-
-    # --- Login History ---
-
-    @auth_repository_resilience.apply()
-    async def admin_search_login_history(
-        self,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginHistoryData]:
-        return await self._db_source.admin_search_login_history(querier)
+        await self._db_source.record_login_history(
+            user_id, domain_name, result, fail_reason, client_ip
+        )
 
     @auth_repository_resilience.apply()
-    async def search_login_history(
-        self,
-        scope: OperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[LoginHistoryData]:
-        return await self._db_source.search_login_history(scope, querier)
+    async def invalidate_active_login_sessions(self, user_id: UserID) -> None:
+        await self._db_source.invalidate_active_login_sessions(user_id)

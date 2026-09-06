@@ -5,7 +5,9 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.huggingface_registry.searchers import (
+    HuggingFaceRegistrySearcher,
+)
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
 
 
@@ -13,7 +15,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import ArtifactR
 class SearchHuggingFaceRegistriesAction(ArtifactRegistryAction):
     """Action to search HuggingFace registries."""
 
-    querier: BatchQuerier
+    searcher: HuggingFaceRegistrySearcher
 
     @override
     @classmethod

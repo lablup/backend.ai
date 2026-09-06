@@ -71,6 +71,20 @@ class OperationTypeDTO(StrEnum):
     GRANT_HARD_DELETE = "grant:hard-delete"
 
 
+class PermissionBitDTO(StrEnum):
+    """One bit of the permission mask.
+
+    Distinct from :class:`OperationTypeDTO`, which names an action: this names what is
+    held. A cap is a set of these, and an empty set is no cap at all.
+    """
+
+    READ = "read"
+    UPDATE = "update"
+    CREATE = "create"
+    SOFT_DELETE = "soft_delete"
+    HARD_DELETE = "hard_delete"
+
+
 class RBACElementTypeDTO(StrEnum):
     """Unified RBAC element type enum for DTO layer (matches GQL schema values)."""
 

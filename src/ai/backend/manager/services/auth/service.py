@@ -16,6 +16,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionInner,
     LoginSessionTokenData,
 )
+from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
@@ -26,6 +27,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.data.client_ip.masking import ClientIPMaskingTarget
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
 from ai.backend.manager.errors.auth import (
@@ -43,7 +45,8 @@ from ai.backend.manager.errors.common import (
 )
 from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import (
+from ai.backend.manager.models.keypair.row import (
+    KEYPAIR_SECRET_KEY_CONTEXT,
     generate_ssh_keypair,
 )
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
@@ -53,14 +56,18 @@ from ai.backend.manager.models.user import (
     UserStatus,
     compare_to_hashed_password,
 )
+from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.client_ip_masking.repository import (
+    ClientIPMaskingRepository,
+)
 from ai.backend.manager.repositories.project.repository import ProjectRepository
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
@@ -69,44 +76,33 @@ from ai.backend.manager.services.auth.actions.generate_ssh_keypair import (
     GenerateSSHKeypairAction,
     GenerateSSHKeypairActionResult,
 )
-from ai.backend.manager.services.auth.actions.get_role import GetRoleAction, GetRoleActionResult
+from ai.backend.manager.services.auth.actions.get_role import (
+    PublicGetRoleAction,
+    PublicGetRoleActionResult,
+)
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
     GetSSHKeypairActionResult,
 )
 from ai.backend.manager.services.auth.actions.logout import LogoutAction, LogoutActionResult
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
-    ResolveAccessKeyScopeAction,
-    ResolveAccessKeyScopeResult,
-)
-from ai.backend.manager.services.auth.actions.resolve_user_id_by_access_key import (
-    ResolveUserIDByAccessKeyAction,
-    ResolveUserIDByAccessKeyResult,
+    PublicResolveAccessKeyScopeAction,
+    PublicResolveAccessKeyScopeResult,
 )
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
-    ResolveUserScopeAction,
-    ResolveUserScopeResult,
+    PublicResolveUserScopeAction,
+    PublicResolveUserScopeResult,
 )
 from ai.backend.manager.services.auth.actions.revoke_login_session import (
-    AdminRevokeLoginSessionAction,
-    MyRevokeLoginSessionAction,
+    GlobalRevokeLoginSessionAction,
+    RevokeLoginSessionAction,
     RevokeLoginSessionActionResult,
-)
-from ai.backend.manager.services.auth.actions.search_login_history import (
-    AdminSearchLoginHistoryAction,
-    SearchLoginHistoryAction,
-    SearchLoginHistoryActionResult,
-)
-from ai.backend.manager.services.auth.actions.search_login_sessions import (
-    AdminSearchLoginSessionsAction,
-    SearchLoginSessionsAction,
-    SearchLoginSessionsActionResult,
 )
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
 from ai.backend.manager.services.auth.actions.unblock_user import (
-    AdminUnblockUserAction,
-    AdminUnblockUserActionResult,
+    GlobalUnblockUserAction,
+    GlobalUnblockUserActionResult,
 )
 from ai.backend.manager.services.auth.actions.update_full_name import (
     UpdateFullNameAction,
@@ -149,6 +145,7 @@ class AuthService:
     _user_repository: UserRepository
     _group_repository: ProjectRepository
     _ssh_key_validator: SSHKeyValidator
+    _client_ip_masking_repository: ClientIPMaskingRepository
 
     def __init__(
         self,
@@ -160,6 +157,8 @@ class AuthService:
         user_repository: UserRepository,
         group_repository: ProjectRepository,
         ssh_key_validator: SSHKeyValidator,
+        client_ip_masking_repository: ClientIPMaskingRepository,
+        key_provider_pool: KeyProviderPool,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
@@ -169,8 +168,10 @@ class AuthService:
         self._user_repository = user_repository
         self._group_repository = group_repository
         self._ssh_key_validator = ssh_key_validator
+        self._client_ip_masking_repository = client_ip_masking_repository
+        self._key_provider_pool = key_provider_pool
 
-    async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
+    async def get_role(self, action: PublicGetRoleAction) -> PublicGetRoleActionResult:
         group_role = None
         if action.group_id is not None:
             if action.is_superadmin:
@@ -189,17 +190,21 @@ class AuthService:
                         object_name="project (user group)",
                     ) from e
 
-        return GetRoleActionResult(
+        return PublicGetRoleActionResult(
             global_role="superadmin" if action.is_superadmin else "user",
             domain_role="admin" if action.is_admin else "user",
             group_role=group_role,
         )
 
-    def _keypair_hook_payload(self, keypair: KeyPairData) -> dict[str, object]:
+    async def _secret_key_of(self, keypair: KeyPairData) -> str:
+        """The keypair's secret key as plaintext, whatever form it is stored in."""
+        return await self._key_provider_pool.decrypt(keypair.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
+
+    async def _keypair_hook_payload(self, keypair: KeyPairData) -> dict[str, object]:
         """The keypair columns POST_AUTHORIZE hands to its plugins."""
         return {
             "access_key": keypair.access_key,
-            "secret_key": keypair.secret_key,
+            "secret_key": await self._secret_key_of(keypair),
             "is_active": keypair.is_active,
             "is_admin": keypair.is_admin,
             "created_at": keypair.created_at,
@@ -305,7 +310,7 @@ class AuthService:
                 action.request,
                 action.hook_params,
                 user,
-                self._keypair_hook_payload(default_keypair),
+                await self._keypair_hook_payload(default_keypair),
             ),
             return_when=FIRST_COMPLETED,
         )
@@ -324,7 +329,9 @@ class AuthService:
                 live_sessions.append(session_info)
             else:
                 await self._auth_repository.delete_login_session_by_token(
-                    session_info.session_token, LoginAttemptResult.EXPIRED
+                    session_info.session_token,
+                    LoginAttemptResult.EXPIRED,
+                    await self._recorded_client_ip(),
                 )
 
         return default_keypair, live_sessions
@@ -405,15 +412,17 @@ class AuthService:
             access_key=keypair.access_key,
             domain_name=action.domain_name,
             login_client_type_id=login_client_type_id,
+            client_ip=await self._recorded_client_ip(),
         )
 
         if tokens_to_invalidate:
             for token in tokens_to_invalidate:
                 await self._valkey_session_client.delete_login_session(token)
             await self._auth_repository.delete_login_sessions_by_tokens(
-                tokens_to_invalidate, LoginAttemptResult.EVICTED
+                tokens_to_invalidate, LoginAttemptResult.EVICTED, await self._recorded_client_ip()
             )
 
+        secret_key = await self._secret_key_of(keypair)
         session_data = LoginSessionData(
             created=int(time.time()),
             expiration_dt=int(time.time()) + auth_config.login_session_max_age,
@@ -422,7 +431,7 @@ class AuthService:
                 token=LoginSessionTokenData(
                     type="keypair",
                     access_key=keypair.access_key,
-                    secret_key=keypair.secret_key,
+                    secret_key=secret_key,
                     role=user.role,
                     status=user.status,
                 ),
@@ -438,12 +447,18 @@ class AuthService:
             stream_response=None,
             authorization_result=AuthorizationResult(
                 access_key=AccessKey(keypair.access_key),
-                secret_key=SecretKey(keypair.secret_key),
+                secret_key=SecretKey(secret_key),
                 user_id=UserID(user.uuid),
                 role=UserRole(user.role),
                 status=user.status,
                 session_token=session_result.session_token,
             ),
+        )
+
+    async def _recorded_client_ip(self) -> str | None:
+        """The caller's address as login history keeps it, masked per the stored policy."""
+        return await self._client_ip_masking_repository.mask(
+            ClientIPMaskingTarget.LOGIN_HISTORY, current_client_ip()
         )
 
     async def _record_login_failure(
@@ -453,7 +468,9 @@ class AuthService:
         result: LoginAttemptResult,
     ) -> None:
         try:
-            await self._auth_repository.record_login_history(user_uuid, domain_name, result)
+            await self._auth_repository.record_login_history(
+                user_uuid, domain_name, result, client_ip=await self._recorded_client_ip()
+            )
         except Exception:
             log.warning("Failed to record login history: {} for user {}", result, user_uuid)
 
@@ -500,8 +517,8 @@ class AuthService:
             salt_size=auth_config.password_hash_salt_size,
         )
 
-        user_spec = UserCreatorSpec(
-            domain_name=action.domain_name,
+        user_spec = UserCreator(
+            domain_id=await self._auth_repository.domain_id(action.domain_name),
             username=action.username if action.username is not None else action.email,
             email=action.email,
             password=password_info,
@@ -515,7 +532,7 @@ class AuthService:
             sudo_session_enabled=False,
         )
         if user_data_overriden:
-            spec_fields = {f.name for f in dataclasses.fields(UserCreatorSpec)}
+            spec_fields = {f.name for f in dataclasses.fields(UserCreator)}
             overrides = {
                 # Hooks name the DB column; the spec field is integration_name.
                 ("integration_name" if key == "integration_id" else key): val
@@ -556,42 +573,39 @@ class AuthService:
         return SignupActionResult(
             user_id=user.uuid,
             access_key=keypair.access_key,
-            secret_key=keypair.secret_key,
+            secret_key=await self._secret_key_of(keypair),
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
         await self._auth_repository.delete_login_session_by_token(
-            action.session_token, LoginAttemptResult.LOGOUT
+            action.session_token, LoginAttemptResult.LOGOUT, await self._recorded_client_ip()
         )
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
 
-    async def admin_revoke_login_session(
-        self, action: AdminRevokeLoginSessionAction
+    async def global_revoke_login_session(
+        self, action: GlobalRevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
         session_token = await self._auth_repository.delete_login_session_by_id(
-            action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN
+            action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN, await self._recorded_client_ip()
         )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
 
-    async def my_revoke_login_session(
-        self, action: MyRevokeLoginSessionAction
+    async def revoke_login_session(
+        self, action: RevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
-        session_data = await self._auth_repository.get_login_session_by_id(action.session_id)
-        if session_data.user_id != action.user_id:
-            raise GenericForbidden("You can only revoke your own login sessions.")
         session_token = await self._auth_repository.delete_login_session_by_id(
-            action.session_id, LoginAttemptResult.REVOKED_BY_USER
+            action.session_id, LoginAttemptResult.REVOKED_BY_USER, await self._recorded_client_ip()
         )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
 
-    async def admin_unblock_user(
-        self, action: AdminUnblockUserAction
-    ) -> AdminUnblockUserActionResult:
+    async def global_unblock_user(
+        self, action: GlobalUnblockUserAction
+    ) -> GlobalUnblockUserActionResult:
         await self._valkey_session_client.clear_login_block(action.username)
-        return AdminUnblockUserActionResult(success=True)
+        return GlobalUnblockUserActionResult(success=True)
 
     async def signout(self, action: SignoutAction) -> SignoutActionResult:
         if action.email != action.requester_email:
@@ -603,7 +617,10 @@ class AuthService:
             action.password,
         )
         deleted_tokens = await self._auth_repository.delete_user_login_sessions(
-            action.user_id, action.domain_name, LoginAttemptResult.LOGOUT
+            action.user_id,
+            action.domain_name,
+            LoginAttemptResult.LOGOUT,
+            await self._recorded_client_ip(),
         )
         for token in deleted_tokens:
             await self._valkey_session_client.delete_login_session(token)
@@ -724,7 +741,6 @@ class AuthService:
                 ssh_public_key=pubkey,
                 ssh_private_key=privkey,
             ),
-            user_id=action.user_id,
         )
 
     async def upload_ssh_keypair(
@@ -741,18 +757,17 @@ class AuthService:
                 ssh_public_key=pubkey,
                 ssh_private_key=privkey,
             ),
-            user_id=action.user_id,
         )
 
     async def resolve_access_key_scope(
-        self, action: ResolveAccessKeyScopeAction
-    ) -> ResolveAccessKeyScopeResult:
+        self, action: PublicResolveAccessKeyScopeAction
+    ) -> PublicResolveAccessKeyScopeResult:
         requester_ak = AccessKey(action.requester_access_key)
         if (
             action.owner_access_key is None
             or action.owner_access_key == action.requester_access_key
         ):
-            return ResolveAccessKeyScopeResult(
+            return PublicResolveAccessKeyScopeResult(
                 requester_access_key=requester_ak,
                 owner_access_key=requester_ak,
             )
@@ -775,20 +790,16 @@ class AuthService:
             )
         except RuntimeError as e:
             raise GenericForbidden(str(e)) from e
-        return ResolveAccessKeyScopeResult(
+        return PublicResolveAccessKeyScopeResult(
             requester_access_key=requester_ak,
             owner_access_key=owner_ak,
         )
 
-    async def resolve_user_id_by_access_key(
-        self, action: ResolveUserIDByAccessKeyAction
-    ) -> ResolveUserIDByAccessKeyResult:
-        user_id = await self._auth_repository.get_user_id_by_access_key(action.access_key)
-        return ResolveUserIDByAccessKeyResult(user_id=user_id)
-
-    async def resolve_user_scope(self, action: ResolveUserScopeAction) -> ResolveUserScopeResult:
+    async def resolve_user_scope(
+        self, action: PublicResolveUserScopeAction
+    ) -> PublicResolveUserScopeResult:
         if action.owner_user_email is None:
-            return ResolveUserScopeResult(
+            return PublicResolveUserScopeResult(
                 owner_uuid=action.requester_uuid,
                 owner_role=action.requester_role,
             )
@@ -813,38 +824,10 @@ class AuthService:
             )
         except RuntimeError as e:
             raise GenericForbidden(str(e)) from e
-        return ResolveUserScopeResult(
+        return PublicResolveUserScopeResult(
             owner_uuid=owner_uuid,
             owner_role=owner_role,
         )
-
-    async def admin_search_login_sessions(
-        self, action: AdminSearchLoginSessionsAction
-    ) -> SearchLoginSessionsActionResult:
-        result = await self._auth_repository.admin_search_login_sessions(querier=action.querier)
-        return SearchLoginSessionsActionResult(result=result)
-
-    async def search_login_sessions(
-        self, action: SearchLoginSessionsAction
-    ) -> SearchLoginSessionsActionResult:
-        result = await self._auth_repository.search_login_sessions(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchLoginSessionsActionResult(result=result)
-
-    async def admin_search_login_history(
-        self, action: AdminSearchLoginHistoryAction
-    ) -> SearchLoginHistoryActionResult:
-        result = await self._auth_repository.admin_search_login_history(querier=action.querier)
-        return SearchLoginHistoryActionResult(result=result)
-
-    async def search_login_history(
-        self, action: SearchLoginHistoryAction
-    ) -> SearchLoginHistoryActionResult:
-        result = await self._auth_repository.search_login_history(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchLoginHistoryActionResult(result=result)
 
     async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:
         if (

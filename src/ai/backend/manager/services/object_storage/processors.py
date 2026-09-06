@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -14,6 +15,9 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
 )
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.services.object_storage.actions.bulk_get import (
+    BulkGetObjectStoragesAction,
+)
 from ai.backend.manager.services.object_storage.actions.create import (
     CreateObjectStorageAction,
 )
@@ -48,6 +52,7 @@ class ObjectStorageProcessors:
     ]
     purge: SingleEntityActionProcessor[PurgeObjectStorageAction, EntityOpsResult[ObjectStorageData]]
     get: SingleEntityActionProcessor[GetObjectStorageAction, EntityOpsResult[ObjectStorageData]]
+    bulk_get: PartialBulkActionProcessor[BulkGetObjectStoragesAction, ObjectStorageData]
     global_list_storages: GlobalActionProcessor[
         ListObjectStorageAction, BatchOpsResult[ObjectStorageData]
     ]
@@ -71,6 +76,7 @@ class ObjectStorageProcessors:
         self.update = group.single_update_ops(UpdateObjectStorageAction)
         self.purge = group.entity_purge_ops(PurgeObjectStorageAction)
         self.get = group.single_get_ops(GetObjectStorageAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetObjectStoragesAction)
         self.global_list_storages = group.global_search_ops(ListObjectStorageAction)
         self.global_search_object_storages = group.global_search_ops(SearchObjectStoragesAction)
         self.get_presigned_download_url = revision.single_field(

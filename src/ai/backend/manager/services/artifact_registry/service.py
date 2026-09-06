@@ -111,7 +111,7 @@ class ArtifactRegistryService:
         """
         Update an existing huggingface registry.
         """
-        log.info("Updating huggingface registry with id: {}", action.updater.pk_value)
+        log.info("Updating huggingface registry with id: {}", action.updater.registry_id)
         registry_data = await self._huggingface_registry_repository.update(
             action.updater, action.meta
         )
@@ -166,7 +166,7 @@ class ArtifactRegistryService:
     ) -> SearchHuggingFaceRegistriesActionResult:
         """Searches HuggingFace registries."""
         result = await self._huggingface_registry_repository.search_registries(
-            querier=action.querier,
+            searcher=action.searcher,
         )
 
         return SearchHuggingFaceRegistriesActionResult(
@@ -192,7 +192,7 @@ class ArtifactRegistryService:
         """
         Update an existing reservoir.
         """
-        log.info("Updating reservoir with id: {}", action.updater.pk_value)
+        log.info("Updating reservoir with id: {}", action.updater.registry_id)
         reservoir_data = await self._reservoir_repository.update(action.updater, action.meta)
         return UpdateReservoirRegistryActionResult(result=reservoir_data)
 
@@ -202,8 +202,8 @@ class ArtifactRegistryService:
         """
         Delete an existing reservoir.
         """
-        log.info("Deleting reservoir with id: {}", action.reservoir_id)
-        reservoir_data = await self._reservoir_repository.delete(action.reservoir_id)
+        log.info("Deleting reservoir with id: {}", action.registry_id)
+        reservoir_data = await self._reservoir_repository.delete(action.registry_id)
         return DeleteReservoirActionResult(deleted_reservoir_id=reservoir_data)
 
     async def get_reservoir_registry(
@@ -245,7 +245,7 @@ class ArtifactRegistryService:
     ) -> SearchReservoirRegistriesActionResult:
         """Searches Reservoir registries."""
         result = await self._reservoir_repository.search_registries(
-            querier=action.querier,
+            searcher=action.searcher,
         )
         return SearchReservoirRegistriesActionResult(
             registries=result.items,
@@ -277,7 +277,7 @@ class ArtifactRegistryService:
     ) -> SearchArtifactRegistriesActionResult:
         """Searches artifact registries."""
         result = await self._artifact_registry_repository.search_artifact_registries(
-            querier=action.querier,
+            searcher=action.searcher,
         )
 
         return SearchArtifactRegistriesActionResult(

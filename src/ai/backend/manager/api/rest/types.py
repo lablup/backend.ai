@@ -9,6 +9,9 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 
 from ai.backend.common.api_handlers import APIResponse, APIStreamResponse
+from ai.backend.manager.data.network.types import NetworkData
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.secret.pool import KeyProviderPool
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -62,6 +65,7 @@ class GQLContextDeps:
     """
 
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     etcd: AsyncEtcd
     db: ExtendedAsyncSAEngine
     valkey_stat: ValkeyStatClient
@@ -79,6 +83,7 @@ class GQLContextDeps:
     scheduler_repository: SchedulerRepository
     user_repository: UserRepository
     agent_repository: AgentRepository
+    network_repository: OpsRepository[NetworkData]
     strawberry_gql_adapter: BaseGQLAdapter
     adapters: Adapters
 

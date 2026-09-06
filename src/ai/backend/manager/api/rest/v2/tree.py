@@ -42,6 +42,8 @@ def build_v2_routes(
     from .artifact_registry.registry import register_v2_artifact_registry_routes
     from .audit_log.handler import V2AuditLogHandler
     from .audit_log.registry import register_v2_audit_log_routes
+    from .client_ip_masking.handler import V2ClientIPMaskingHandler
+    from .client_ip_masking.registry import register_v2_client_ip_masking_routes
     from .container_registry.handler import V2ContainerRegistryHandler
     from .container_registry.registry import register_v2_container_registry_routes
     from .deployment.handler import V2DeploymentHandler
@@ -52,6 +54,12 @@ def build_v2_routes(
     )
     from .domain.handler import V2DomainHandler
     from .domain.registry import register_v2_domain_routes
+    from .entity_invitation.handler import V2EntityInvitationHandler
+    from .entity_invitation.registry import register_v2_entity_invitation_routes
+    from .entity_label.handler import V2EntityLabelHandler
+    from .entity_label.registry import register_v2_entity_label_routes
+    from .entity_type.handler import V2EntityTypeHandler
+    from .entity_type.registry import register_v2_entity_type_routes
     from .fair_share.handler import V2FairShareHandler
     from .fair_share.registry import register_v2_fair_share_routes
     from .huggingface_registry.handler import V2HuggingFaceRegistryHandler
@@ -102,8 +110,6 @@ def build_v2_routes(
     from .resource_usage.registry import register_v2_resource_usage_routes
     from .retention_policy.handler import V2RetentionPolicyHandler
     from .retention_policy.registry import register_v2_retention_policy_routes
-    from .role_invitation.handler import V2RoleInvitationHandler
-    from .role_invitation.registry import register_v2_role_invitation_routes
     from .role_preset.handler import V2RolePresetHandler
     from .role_preset.registry import register_v2_role_preset_routes
     from .runtime_variant.handler import V2RuntimeVariantHandler
@@ -114,6 +120,8 @@ def build_v2_routes(
     from .scheduling_handler.registry import register_v2_scheduling_handler_routes
     from .scheduling_history.handler import V2SchedulingHistoryHandler
     from .scheduling_history.registry import register_v2_scheduling_history_routes
+    from .secret.handler import V2SecretHandler
+    from .secret.registry import register_v2_secret_routes
     from .service_catalog.handler import V2ServiceCatalogHandler
     from .service_catalog.registry import register_v2_service_catalog_routes
     from .session.handler import V2SessionHandler
@@ -142,9 +150,11 @@ def build_v2_routes(
     artifact_handler = V2ArtifactHandler(adapter=adapters.artifact)
     artifact_registry_handler = V2ArtifactRegistryHandler(adapter=adapters.artifact_registry)
     audit_log_handler = V2AuditLogHandler(adapter=adapters.audit_log)
+    entity_label_handler = V2EntityLabelHandler(adapter=adapters.entity_label)
     container_registry_handler = V2ContainerRegistryHandler(adapter=adapters.container_registry)
     deployment_handler = V2DeploymentHandler(adapter=adapters.deployment)
     domain_handler = V2DomainHandler(adapter=adapters.domain)
+    entity_type_handler = V2EntityTypeHandler(adapter=adapters.entity)
     fair_share_handler = V2FairShareHandler(adapter=adapters.fair_share)
     huggingface_registry_handler = V2HuggingFaceRegistryHandler(
         adapter=adapters.huggingface_registry
@@ -156,12 +166,14 @@ def build_v2_routes(
     image_handler = V2ImageHandler(adapter=adapters.image)
     keypair_handler = V2KeypairHandler(adapter=adapters.user)
     login_client_type_handler = V2LoginClientTypeHandler(adapter=adapters.login_client_type)
+    client_ip_masking_handler = V2ClientIPMaskingHandler(adapter=adapters.client_ip_masking)
+    secret_handler = V2SecretHandler(adapter=adapters.secret)
     login_history_handler = V2LoginHistoryHandler(adapter=adapters.login_history)
     login_session_handler = V2LoginSessionHandler(adapter=adapters.login_session)
     notification_handler = V2NotificationHandler(adapter=adapters.notification)
     object_storage_handler = V2ObjectStorageHandler(adapter=adapters.object_storage)
     project_handler = V2ProjectHandler(adapter=adapters.project)
-    role_invitation_handler = V2RoleInvitationHandler(adapter=adapters.rbac)
+    entity_invitation_handler = V2EntityInvitationHandler(adapter=adapters.entity_invitation)
     role_preset_handler = V2RolePresetHandler(adapter=adapters.role_preset)
     prometheus_query_preset_handler = V2PrometheusQueryPresetHandler(
         adapter=adapters.prometheus_query_preset
@@ -216,6 +228,7 @@ def build_v2_routes(
         register_v2_artifact_registry_routes(artifact_registry_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_audit_log_routes(audit_log_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_entity_label_routes(entity_label_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_container_registry_routes(container_registry_handler, route_deps)
     )
@@ -226,6 +239,7 @@ def build_v2_routes(
         )
     )
     v2_reg.add_subregistry(register_v2_domain_routes(domain_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_entity_type_routes(entity_type_handler, route_deps))
     v2_reg.add_subregistry(register_v2_fair_share_routes(fair_share_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_huggingface_registry_routes(huggingface_registry_handler, route_deps)
@@ -239,12 +253,18 @@ def build_v2_routes(
     v2_reg.add_subregistry(
         register_v2_login_client_type_routes(login_client_type_handler, route_deps)
     )
+    v2_reg.add_subregistry(
+        register_v2_client_ip_masking_routes(client_ip_masking_handler, route_deps)
+    )
+    v2_reg.add_subregistry(register_v2_secret_routes(secret_handler, route_deps))
     v2_reg.add_subregistry(register_v2_login_history_routes(login_history_handler, route_deps))
     v2_reg.add_subregistry(register_v2_login_session_routes(login_session_handler, route_deps))
     v2_reg.add_subregistry(register_v2_notification_routes(notification_handler, route_deps))
     v2_reg.add_subregistry(register_v2_object_storage_routes(object_storage_handler, route_deps))
     v2_reg.add_subregistry(register_v2_project_routes(project_handler, route_deps))
-    v2_reg.add_subregistry(register_v2_role_invitation_routes(role_invitation_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_entity_invitation_routes(entity_invitation_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_role_preset_routes(role_preset_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_prometheus_query_preset_routes(prometheus_query_preset_handler, route_deps)

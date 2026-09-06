@@ -30,6 +30,15 @@ class UserConditions:
     """Query conditions for filtering users."""
 
     @staticmethod
+    def not_being_purged() -> QueryCondition:
+        """Match the users no purge is working through."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.status.not_in(UserStatus.purge_in_progress())
+
+        return inner
+
+    @staticmethod
     def by_role_id(role_id: UUID) -> QueryCondition:
         """Match the users a role is assigned to."""
 

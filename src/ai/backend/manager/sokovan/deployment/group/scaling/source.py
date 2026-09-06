@@ -6,8 +6,6 @@ from typing import override
 
 from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
-from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.group.scaling.types import (
     GroupScalingReconcileInfo,
@@ -34,13 +32,10 @@ class GroupScalingSource(
         category: ReplicaGroupHandlerCategory,
         target_statuses: GroupScalingTargetStatuses,
     ) -> GroupScalingReconcileInfo:
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                ReplicaGroupConditions.by_scaling_statuses(target_statuses.scaling_statuses),
-            ],
-        )
+        conditions = [
+            ReplicaGroupConditions.by_scaling_statuses(target_statuses.scaling_statuses),
+        ]
         fetch = await self._replica_group_repository.fetch_scaling_reconcile_views(
-            querier, category
+            conditions, category
         )
         return GroupScalingReconcileInfo(views=fetch.views, current_time=fetch.now)

@@ -33,6 +33,7 @@ __all__ = (
     "LookupAuditLogCreator",
     "MissedLookupAuditLogCreator",
     "EmptyScopeAuditLogCreator",
+    "RelationAuditLogCreator",
     "GlobalAuditLogCreator",
     "LegacyAuditLogCreator",
     "AuditLogScopeCreator",
@@ -57,6 +58,7 @@ class BaseAuditLogFields:
     triggered_by: str | None
     acted_as: uuid.UUID | None
     duration: timedelta | None
+    client_ip: str | None
 
     @classmethod
     @abstractmethod
@@ -75,7 +77,7 @@ class BaseAuditLogFields:
     def _build_row(
         self,
         *,
-        entity_type: str,
+        entity_type: str | None,
         entity_id: EntityID | str | None = None,
         lookup_kind: str | None = None,
         lookup_key: str | None = None,
@@ -96,6 +98,7 @@ class BaseAuditLogFields:
             triggered_by=self.triggered_by,
             acted_as=self.acted_as,
             duration=self.duration,
+            client_ip=self.client_ip,
         )
 
 
@@ -116,11 +119,17 @@ class OwnedAuditLogCreator(
 
 @dataclass
 class DanglingAuditLogCreator(BaseAuditLogFields, DanglingFieldCreator[AuditLogRow, AuditLogData]):
-    """A record of an operation that named no entity, so the row has a kind and no id."""
+    """A record of an operation that named no entity, so the row has no id.
+
+    ``entity_type`` is the kind it was about, or ``None`` where the operation named no
+    kind either — a relation stands between two entities and is neither of them.
+    """
+
+    entity_type: EntityType | None
 
     @override
-    def build_row(self, entity_type: EntityType) -> AuditLogRow:
-        return self._build_row(entity_type=entity_type, entity_id=None)
+    def build_row(self) -> AuditLogRow:
+        return self._build_row(entity_type=self.entity_type, entity_id=None)
 
 
 @dataclass
@@ -188,9 +197,9 @@ class MissedLookupAuditLogCreator(DanglingAuditLogCreator):
         return ActionKind.LOOKUP
 
     @override
-    def build_row(self, entity_type: EntityType) -> AuditLogRow:
+    def build_row(self) -> AuditLogRow:
         return self._build_row(
-            entity_type=entity_type,
+            entity_type=self.entity_type,
             entity_id=None,
             lookup_kind=self.lookup_kind,
             lookup_key=self.lookup_key,
@@ -205,6 +214,20 @@ class EmptyScopeAuditLogCreator(DanglingAuditLogCreator):
     @override
     def action_kind(cls) -> ActionKind:
         return ActionKind.SCOPE
+
+
+@dataclass
+class RelationAuditLogCreator(DanglingAuditLogCreator):
+    """A run that linked or unlinked two entities.
+
+    Names no entity kind: what it wrote stands between two entities and is neither of
+    them. The scopes it was about go to ``audit_log_scopes``.
+    """
+
+    @classmethod
+    @override
+    def action_kind(cls) -> ActionKind:
+        return ActionKind.RELATION
 
 
 @dataclass

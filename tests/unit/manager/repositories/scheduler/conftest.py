@@ -73,6 +73,7 @@ from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.views.sokovan.allocation import (
     KernelAllocation,
     SessionAllocation,
@@ -273,7 +274,7 @@ async def test_access_key(
         db_sess.add(
             KeyPairRow(
                 access_key=access_key,
-                secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                 is_active=True,
                 is_admin=False,
                 resource_policy=test_keypair_resource_policy_name,
@@ -325,8 +326,6 @@ async def test_agent_id(
                 region="local",
                 scaling_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
-                available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                occupied_slots=ResourceSlot(),
                 addr=_AGENT_ADDR,
                 version="1.0.0",
                 architecture="x86_64",
@@ -444,8 +443,6 @@ async def create_pending_session_with_kernels(
     kernel_ids: list[KernelId] = []
     now = datetime.now(tzutc())
 
-    total_cpu = sum((cpu for _, cpu, _ in agent_assignments), Decimal("0"))
-    total_mem = sum((mem for _, _, mem in agent_assignments), Decimal("0"))
     cluster_mode = (
         ClusterMode.SINGLE_NODE if len(agent_assignments) == 1 else ClusterMode.MULTI_NODE
     )
@@ -468,7 +465,6 @@ async def create_pending_session_with_kernels(
                 job_priority=job_priority,
                 is_preemptible=is_preemptible,
                 cluster_mode=cluster_mode,
-                requested_slots=ResourceSlot({"cpu": total_cpu, "mem": total_mem}),
                 created_at=now,
                 starts_at=now if session_status == SessionStatus.RUNNING else None,
                 session_group_id=session_group_id,
@@ -500,12 +496,6 @@ async def create_pending_session_with_kernels(
                     registry="docker.io",
                     status=kernel_status,
                     status_changed=now,
-                    occupied_slots=(
-                        ResourceSlot({"cpu": cpu_requested, "mem": mem_requested})
-                        if usage_reported
-                        else ResourceSlot()
-                    ),
-                    requested_slots=ResourceSlot({"cpu": cpu_requested, "mem": mem_requested}),
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,

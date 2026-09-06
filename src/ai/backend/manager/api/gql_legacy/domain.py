@@ -38,6 +38,7 @@ from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater, D
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
@@ -58,6 +59,7 @@ from ai.backend.manager.services.domain.actions.update_domain_node import (
     UpdateDomainNodeAction,
     UpdateDomainNodeActionResult,
 )
+from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -690,7 +692,7 @@ class DomainInput(graphene.InputObjectType):  # type: ignore[misc]
     )
     integration_id = graphene.String(required=False, default_value=None)
 
-    def to_action(self, domain_name: str, user_info: UserInfo) -> CreateDomainAction:
+    def to_action(self, domain_name: str) -> CreateDomainAction:
         def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
@@ -706,7 +708,6 @@ class DomainInput(graphene.InputObjectType):  # type: ignore[misc]
                     integration_name=value_or_none(self.integration_id),
                 )
             ),
-            user_info=user_info,
         )
 
 
@@ -775,18 +776,20 @@ class CreateDomain(graphene.Mutation):  # type: ignore[misc]
     ) -> CreateDomain:
         ctx: GraphQueryContext = info.context
 
-        user_info: UserInfo = UserInfo(
-            id=ctx.user["uuid"],
-            role=ctx.user["role"],
-            domain_name=ctx.user["domain_name"],
+        res = await ctx.processors.domain.create_domain.run(props.to_action(name))
+        domain_data = res.data
+        await ctx.processors.project.create_project.run(
+            CreateProjectAction(
+                domain_id=domain_data.id,
+                creator=ProjectCreator.model_store(
+                    domain_id=domain_data.id, domain_name=domain_data.name
+                ),
+            )
         )
-
-        action: CreateDomainAction = props.to_action(name, user_info)
-        res = await ctx.processors.domain.create_domain.run(action)
         return cls(
             ok=True,
             msg="domain creation succeed",
-            domain=Domain.from_data(res.domain_data),
+            domain=Domain.from_data(domain_data),
         )
 
 

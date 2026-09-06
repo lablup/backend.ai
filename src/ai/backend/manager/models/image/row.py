@@ -31,6 +31,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import true
 
+from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
@@ -64,7 +65,7 @@ from ai.backend.manager.data.image.types import (
 )
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
-from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.image import ImageNotFound, ImagePurgeInProgress
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -86,7 +87,7 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.user import UserRole, UserRow
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -160,7 +161,7 @@ class ImageRow(CreatedAtMixin, Base):
     )
 
     id: Mapped[ImageID] = mapped_column(
-        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String, nullable=False, index=True)
     project: Mapped[str | None] = mapped_column("project", sa.String, nullable=True)
@@ -702,8 +703,19 @@ class ImageRow(CreatedAtMixin, Base):
         return parsed_image_info
 
     async def mark_as_deleted(self, db_session: AsyncSession) -> None:
+        self._reject_while_purging()
         self.status = ImageStatus.DELETED
         await db_session.flush()
+
+    async def mark_as_alive(self, db_session: AsyncSession) -> None:
+        self._reject_while_purging()
+        self.status = ImageStatus.ALIVE
+        await db_session.flush()
+
+    def _reject_while_purging(self) -> None:
+        """Refuse a status write while a purge is working through this image."""
+        if self.status in ImageStatus.purge_in_progress():
+            raise ImagePurgeInProgress(f"Image is being purged: {self.id}")
 
     def set_resource_limit(
         self,
@@ -842,7 +854,7 @@ async def bulk_get_image_configs(
 class ImageAliasRow(Base):
     __tablename__ = "image_aliases"
     id: Mapped[ImageID] = mapped_column(
-        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     alias: Mapped[str | None] = mapped_column("alias", sa.String, unique=True, index=True)
     image_id: Mapped[ImageID] = mapped_column(
@@ -878,7 +890,7 @@ class ImageAliasRow(Base):
         return cls(id=alias_data.id, alias=alias_data.alias, image_id=image_id)
 
     def to_dataclass(self) -> ImageAliasData:
-        return ImageAliasData(id=self.id, alias=self.alias or "")
+        return ImageAliasData(id=ImageAliasID(self.id), alias=self.alias or "")
 
 
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList

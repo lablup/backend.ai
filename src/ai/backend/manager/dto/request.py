@@ -11,10 +11,7 @@ from ai.backend.manager.data.artifact.types import (
     DelegateeTarget,
 )
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
-from ai.backend.manager.models.artifact import ArtifactRow
-from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.types import PaginationOptions, TriState
+from ai.backend.manager.types import PaginationOptions
 
 
 class DelegateScanArtifactsReq(BaseRequestModel):
@@ -156,14 +153,6 @@ class UpdateArtifactReqBodyParam(BaseRequestModel):
         default=None, description="Whether the artifact should be readonly."
     )
     description: str | None = Field(default=None, description="Updated description")
-
-    def to_updater(self, artifact_id: uuid.UUID) -> Updater[ArtifactRow]:
-        spec = ArtifactUpdaterSpec()
-        if self.readonly is not None:
-            spec.readonly = TriState.update(self.readonly)
-        if self.description is not None:
-            spec.description = TriState.update(self.description)
-        return Updater(spec=spec, pk_value=artifact_id)
 
 
 class GetDownloadProgressReqPathParam(BaseRequestModel):

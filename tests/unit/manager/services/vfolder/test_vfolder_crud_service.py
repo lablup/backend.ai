@@ -43,9 +43,9 @@ from ai.backend.manager.errors.storage import (
 from ai.backend.manager.models.project import ProjectType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderPermission
+from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfolder.types import BulkVFolderPurgeResult
-from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
     CloneVFolderActionResult,
@@ -70,6 +70,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
 )
 from ai.backend.manager.services.vfolder.actions.file_v2 import CloneVFolderV2Action
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.manager.types import OptionalState
 
 
 @pytest.fixture
@@ -663,12 +664,7 @@ class TestUpdateVFolderAttributeAction:
         )
         mock_vfolder_repository.update_vfolder_attribute = AsyncMock()
 
-        mock_name = MagicMock()
-        mock_name.value.side_effect = ValueError
-        spec = MagicMock()
-        spec.name = mock_name
-        updater = MagicMock()
-        updater.spec = spec
+        updater = VFolderAttributeUpdater(vfolder_id=VFolderUUID(vfolder_uuid))
 
         action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,
@@ -702,12 +698,10 @@ class TestUpdateVFolderAttributeAction:
             )
         )
 
-        mock_name = MagicMock()
-        mock_name.value.return_value = "existing-name"
-        spec = MagicMock()
-        spec.name = mock_name
-        updater = MagicMock()
-        updater.spec = spec
+        updater = VFolderAttributeUpdater(
+            vfolder_id=VFolderUUID(vfolder_uuid),
+            name=OptionalState[str].update("existing-name"),
+        )
 
         action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,
@@ -730,9 +724,7 @@ class TestUpdateVFolderAttributeAction:
             return_value=VFolderListResult(vfolders=[])
         )
 
-        spec = MagicMock(spec=VFolderAttributeUpdaterSpec)
-        updater = MagicMock()
-        updater.spec = spec
+        updater = VFolderAttributeUpdater(vfolder_id=VFolderUUID(vfolder_uuid))
 
         action = UpdateVFolderAttributeAction(
             user_uuid=user_uuid,

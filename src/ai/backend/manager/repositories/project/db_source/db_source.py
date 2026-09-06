@@ -13,7 +13,7 @@ import aiotools
 import msgpack
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
-from sqlalchemy.orm import joinedload
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DomainID
@@ -21,18 +21,21 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
-from ai.backend.common.types import SlotName, VFolderID
+from ai.backend.common.types import ResourceSlot, SessionId, SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.project.types import (
     ProjectData,
+    ProjectType,
     UnassignUserFailure,
     UnassignUsersResult,
 )
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
+    PersonalProjectDeletionError,
+    PersonalProjectMemberAdditionError,
     ProjectHasActiveEndpointsError,
     ProjectHasVFoldersMountedError,
     ProjectNotFound,
@@ -47,10 +50,23 @@ from ai.backend.manager.models.kernel import (
     kernels,
 )
 from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.project.purgers import (
+    ProjectEndpointPurger,
+    ProjectKernelPurger,
+    ProjectPurger,
+    ProjectScopeAssociationPurger,
+    ProjectSessionPurger,
+    SessionsByIdsPurger,
+)
 from ai.backend.manager.models.project.row import (
     ProjectRow,
 )
+from ai.backend.manager.models.project.scopes import (
+    DomainProjectOperationScope,
+    UserProjectOperationScope,
+)
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -62,38 +78,23 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
     vfolder_status_map,
 )
-from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
     Querier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.rbac.entity_purger import (
-    RBACEntityPurger,
-)
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
     RBACOpsProvider,
     RBACWriteOps,
-    ScopeDeletion,
     ScopeUserMember,
 )
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.project.purgers import (
-    ProjectEndpointBatchPurgerSpec,
-    ProjectKernelBatchPurgerSpec,
-    ProjectPurgerSpec,
-    ProjectSessionBatchPurgerSpec,
-    SessionByIdsBatchPurgerSpec,
-)
 from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
-from ai.backend.manager.repositories.project.types import (
-    DomainProjectOperationScope,
-    ProjectSearchResult,
-    UserProjectOperationScope,
-)
+from ai.backend.manager.repositories.project.types import ProjectSearchResult
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -101,10 +102,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ProjectDBSource:
     _db: ExtendedAsyncSAEngine
+    _v2_ops: V2DBOpsProvider
     _rbac_ops_provider: RBACOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db = db
+        self._v2_ops = v2_ops_provider
         self._rbac_ops_provider = RBACOpsProvider(db)
 
     async def _get_domain_id(self, w: RBACWriteOps, domain_name: str) -> DomainID:
@@ -132,12 +135,27 @@ class ProjectDBSource:
             if existing_group is None:
                 raise ProjectNotFound(f"Group not found: {project_id}")
             if user_update_mode == "add":
+                await self._refuse_personal_project(w, project_id)
                 await self._add_users_to_project(w, project_id, user_ids)
             elif user_update_mode == "remove":
                 await w.remove_bulk_members(
                     ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                     [EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=uid) for uid in user_ids],
                 )
+
+    async def _refuse_personal_project(self, w: RBACWriteOps, project_id: ProjectID) -> None:
+        """Refuse the write when the project is a personal one, which keeps its owner
+        as its only member."""
+        result = await w.batch_query_in_global(
+            sa.select(ProjectRow.id).where(
+                ProjectRow.id == project_id, ProjectRow.type == ProjectType.PERSONAL
+            ),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        if result.rows:
+            raise PersonalProjectMemberAdditionError(
+                f"Personal project takes no members: {project_id}"
+            )
 
     async def _users_addable_to_project(
         self,
@@ -150,14 +168,10 @@ class ProjectDBSource:
         project_domain_subq = (
             sa.select(ProjectRow.domain_name).where(ProjectRow.id == project_id).scalar_subquery()
         )
-        query = (
-            sa.select(UserRow)
-            .where(
-                UserRow.uuid.in_(user_ids)
-                & (UserRow.domain_name == project_domain_subq)
-                & ~user_scope_membership_exists(PROJECT_SCOPE_TYPE, project_id, UserRow.uuid)
-            )
-            .options(joinedload(UserRow.default_keypair))
+        query = sa.select(UserRow).where(
+            UserRow.uuid.in_(user_ids)
+            & (UserRow.domain_name == project_domain_subq)
+            & ~user_scope_membership_exists(PROJECT_SCOPE_TYPE, project_id, UserRow.uuid)
         )
         result = await w.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
         return [row.UserRow for row in result.rows]
@@ -219,7 +233,7 @@ class ProjectDBSource:
                     kernels.c.domain_name,
                     kernels.c.group_id,
                     kernels.c.attached_devices,
-                    kernels.c.occupied_slots,
+                    kernel_allocated_slots_expr(kernels.c.id).label("occupied_slots"),
                     kernels.c.resource_opts,
                     kernels.c.vfolder_mounts,
                     kernels.c.mounts,
@@ -382,8 +396,8 @@ class ProjectDBSource:
         start_date: datetime,
         end_date: datetime,
         project_ids: Sequence[UUID] | None = None,
-    ) -> list[KernelRow]:
-        """Fetch resource usage data for projects."""
+    ) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
+        """Fetch the project's kernels with the slots they were allocated."""
         return await fetch_resource_usage(self._db, start_date, end_date, project_ids=project_ids)
 
     async def purge_group(
@@ -393,135 +407,125 @@ class ProjectDBSource:
     ) -> bool:
         """Completely remove a group and all its associated data."""
         project_id = ProjectID(group_id)
-        async with self._rbac_ops_provider.write_ops() as w:
-            if await self._check_group_vfolders_mounted_to_active_kernels(w, group_id):
+        async with self._db.begin_readonly_session_read_committed() as sess:
+            project_type = await sess.scalar(
+                sa.select(ProjectRow.type).where(ProjectRow.id == project_id)
+            )
+            if project_type is ProjectType.PERSONAL:
+                raise PersonalProjectDeletionError(
+                    f"Personal project is purged with its user: {project_id}"
+                )
+            if await self._project_vfolders_mounted_to_active_kernels(sess, group_id):
                 raise ProjectHasVFoldersMountedError(
                     f"error on deleting project {group_id} with vfolders mounted to active kernels"
                 )
+            routed_session_ids = await self._routed_session_ids(sess, group_id)
+            target_vfs = await self._purgable_project_vfolders(sess, group_id)
 
-            await self._delete_group_endpoints(w, group_id)
-            await w.batch_purge(BatchPurger(spec=ProjectKernelBatchPurgerSpec(group_id=group_id)))
-            await w.batch_purge(BatchPurger(spec=ProjectSessionBatchPurgerSpec(group_id=group_id)))
-
-            # Finally delete the group itself as a scope: the row, its RBAC
-            # entries, and its virtual scope node.
-            result = await w.delete_scope(
-                ScopeDeletion(
-                    purger=RBACEntityPurger(
-                        spec=ProjectPurgerSpec(project_id=project_id),
-                    ),
-                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
+        async with self._v2_ops.write_ops() as w:
+            # Deployments go first (their routings cascade), then the sessions they routed.
+            await w.batch_purge_entities_in_global(ProjectEndpointPurger(project_id=project_id))
+            if routed_session_ids:
+                await w.batch_purge_entities_in_global(
+                    SessionsByIdsPurger(session_ids=routed_session_ids)
                 )
+            await w.batch_purge_field_entities(
+                project_id, ProjectKernelPurger(project_id=project_id)
             )
-            if result is None:
+            await w.batch_purge_entities_in_global(ProjectSessionPurger(project_id=project_id))
+            await w.batch_purge_field_entities(project_id, ProjectScopeAssociationPurger())
+            if await w.purge_entity(ProjectPurger(project_id=project_id)) is None:
                 raise ProjectNotFound("project not found")
 
-            await self._delete_group_vfolders(w, group_id, storage_manager)
+        await self._delete_project_vfolders(target_vfs, storage_manager)
         return True
 
-    async def _check_group_vfolders_mounted_to_active_kernels(
-        self, w: RBACWriteOps, group_id: uuid.UUID
+    async def _project_vfolders_mounted_to_active_kernels(
+        self, sess: SASession, group_id: uuid.UUID
     ) -> bool:
-        """Check if group has vfolders mounted to active kernels."""
-        vfolder_query = sa.select(VFolderRow.id).where(VFolderRow.group == group_id)
-        vfolder_result = await w.batch_query_in_global(
-            vfolder_query, BatchQuerier(pagination=NoPagination())
+        """Whether any of the project's vfolders is mounted to a kernel still running."""
+        group_vfolder_ids = set(
+            (await sess.scalars(sa.select(VFolderRow.id).where(VFolderRow.group == group_id))).all()
         )
-        group_vfolder_ids = {row.id for row in vfolder_result.rows}
-
-        kernel_query = sa.select(KernelRow.mounts).where(
-            KernelRow.group_id == group_id,
-            KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
-        )
-        kernel_result = await w.batch_query_in_global(
-            kernel_query, BatchQuerier(pagination=NoPagination())
-        )
-        for row in kernel_result.rows:
-            for _mount in row.mounts:
+        mount_lists = (
+            await sess.scalars(
+                sa.select(KernelRow.mounts).where(
+                    KernelRow.group_id == group_id,
+                    KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                )
+            )
+        ).all()
+        for mounts in mount_lists:
+            for _mount in mounts or []:
                 try:
-                    vfolder_id = uuid.UUID(_mount[2])
-                    if vfolder_id in group_vfolder_ids:
+                    if uuid.UUID(_mount[2]) in group_vfolder_ids:
                         return True
                 except Exception:
                     log.warning("Malformed mount entry in group {}, skipping: {}", group_id, _mount)
         return False
 
-    async def _delete_group_vfolders(
-        self,
-        w: RBACWriteOps,
-        group_id: uuid.UUID,
-        storage_manager: StorageSessionManager,
-    ) -> int:
-        """Delete all vfolders belonging to the group."""
-        query = sa.select(VFolderRow).where(
-            sa.and_(
-                VFolderRow.group == group_id,
-                VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.OWNER_PURGABLE]),
+    async def _routed_session_ids(self, sess: SASession, group_id: uuid.UUID) -> list[SessionId]:
+        """The sessions the project's deployments route to, read before the deployments go.
+
+        Refuses while a deployment is still live.
+        """
+        endpoints = (
+            await sess.execute(
+                sa.select(EndpointRow.id, EndpointRow.lifecycle_stage).where(
+                    EndpointRow.project == group_id
+                )
             )
-        )
-        result = await w.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
-        target_vfs = [
-            VFolderDeletionInfo(
-                VFolderID.from_row(row.VFolderRow),
-                row.VFolderRow.host,
-                row.VFolderRow.unmanaged_path,
+        ).all()
+        if not endpoints:
+            return []
+        if any(
+            ep.lifecycle_stage in (EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING)
+            for ep in endpoints
+        ):
+            raise ProjectHasActiveEndpointsError(f"project {group_id} has active endpoints")
+        routed = (
+            await sess.scalars(
+                sa.select(RoutingRow.session).where(
+                    RoutingRow.endpoint.in_([ep.id for ep in endpoints]),
+                    RoutingRow.session.is_not(None),
+                )
             )
-            for row in result.rows
+        ).all()
+        return [SessionId(session_id) for session_id in routed if session_id is not None]
+
+    async def _purgable_project_vfolders(
+        self, sess: SASession, group_id: uuid.UUID
+    ) -> list[VFolderDeletionInfo]:
+        """The project's vfolders whose status allows the owner to purge them."""
+        rows = (
+            await sess.scalars(
+                sa.select(VFolderRow).where(
+                    VFolderRow.group == group_id,
+                    VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.OWNER_PURGABLE]),
+                )
+            )
+        ).all()
+        return [
+            VFolderDeletionInfo(VFolderID.from_row(row), row.host, row.unmanaged_path)
+            for row in rows
         ]
 
+    async def _delete_project_vfolders(
+        self,
+        target_vfs: list[VFolderDeletionInfo],
+        storage_manager: StorageSessionManager,
+    ) -> None:
+        """Hand the project's purgable vfolders to the storage-side deletion."""
+        if not target_vfs:
+            return
         storage_ptask_group = aiotools.PersistentTaskGroup()
         await initiate_vfolder_deletion(
             self._db,
+            self._v2_ops,
             target_vfs,
             storage_manager,
             storage_ptask_group,
         )
-
-        return len(target_vfs)
-
-    async def _delete_group_endpoints(self, w: RBACWriteOps, group_id: uuid.UUID) -> None:
-        """Delete all endpoints belonging to the group."""
-        endpoint_query = sa.select(EndpointRow.id, EndpointRow.lifecycle_stage).where(
-            EndpointRow.project == group_id
-        )
-        endpoint_result = await w.batch_query_in_global(
-            endpoint_query, BatchQuerier(pagination=NoPagination())
-        )
-        endpoints = endpoint_result.rows
-
-        if len(endpoints) == 0:
-            return
-
-        active_endpoints = [
-            ep.id
-            for ep in endpoints
-            if ep.lifecycle_stage in (EndpointLifecycle.CREATED, EndpointLifecycle.DESTROYING)
-        ]
-        if len(active_endpoints) > 0:
-            raise ProjectHasActiveEndpointsError(f"project {group_id} has active endpoints")
-
-        # Collect session IDs first (must be done before endpoint/routing deletion
-        # as the query depends on RoutingRow)
-        endpoint_ids = [ep.id for ep in endpoints]
-        session_id_query = sa.select(RoutingRow.session).where(
-            sa.and_(
-                RoutingRow.endpoint.in_(endpoint_ids),
-                RoutingRow.session.is_not(None),
-            )
-        )
-        session_ids_result = await w.batch_query_in_global(
-            session_id_query, BatchQuerier(pagination=NoPagination())
-        )
-        session_ids = [row.session for row in session_ids_result.rows if row.session is not None]
-
-        # Delete endpoints first (routings are CASCADE deleted automatically)
-        await w.batch_purge(BatchPurger(spec=ProjectEndpointBatchPurgerSpec(project_id=group_id)))
-
-        # Delete sessions using the collected IDs
-        if session_ids:
-            await w.batch_purge(
-                BatchPurger(spec=SessionByIdsBatchPurgerSpec(session_ids=session_ids))
-            )
 
     async def assign_users_to_project(
         self, project_id: ProjectID, user_ids: list[UserID], role_id: UUID
@@ -529,7 +533,7 @@ class ProjectDBSource:
         """Assign users to a project with domain validation via the RBAC member ops.
 
         Validates that the role exists, filters to users in the project's domain
-        that are not already assigned, writes each new member's virtual-scope
+        that are not already assigned, writes each new member's virtual-entity
         membership and scope association, and creates user-role mappings for the
         specified role. Membership grants the project's ``auto_assign`` roles on
         top of that role.
@@ -540,6 +544,7 @@ class ProjectDBSource:
             return []
 
         async with self._rbac_ops_provider.write_ops() as w:
+            await self._refuse_personal_project(w, project_id)
             # TODO: https://github.com/lablup/backend.ai/issues/10687
             role = await w.query(Querier(row_class=RoleRow, pk_value=role_id))
             if role is None:
@@ -567,7 +572,7 @@ class ProjectDBSource:
     ) -> UnassignUsersResult:
         """Remove users from a project and return unassigned users and failures.
 
-        Deletes each member's virtual-scope membership and scope association via
+        Deletes each member's virtual-entity membership and scope association via
         the RBAC member ops. Reports which requested user IDs could not be
         unassigned and why.
         """
@@ -582,15 +587,11 @@ class ProjectDBSource:
             existing_ids = {row.UserRow.uuid for row in existing_result.rows}
 
             # Fetch users that are actually members before removing
-            actual_assoc_query = (
-                sa.select(UserRow)
-                .where(
-                    UserRow.uuid.in_(unbinder.user_uuids)
-                    & user_scope_membership_exists(
-                        PROJECT_SCOPE_TYPE, ProjectID(unbinder.project_id), UserRow.uuid
-                    )
+            actual_assoc_query = sa.select(UserRow).where(
+                UserRow.uuid.in_(unbinder.user_uuids)
+                & user_scope_membership_exists(
+                    PROJECT_SCOPE_TYPE, ProjectID(unbinder.project_id), UserRow.uuid
                 )
-                .options(joinedload(UserRow.default_keypair))
             )
             assoc_result = await w.batch_query_in_global(
                 actual_assoc_query, BatchQuerier(pagination=NoPagination())
@@ -628,6 +629,7 @@ class ProjectDBSource:
         Idempotent: adding an existing member is a no-op.
         """
         async with self._rbac_ops_provider.write_ops() as w:
+            await self._refuse_personal_project(w, project_id)
             await w.add_bulk_members(
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
@@ -747,7 +749,7 @@ class ProjectDBSource:
     ) -> ProjectSearchResult:
         """Search projects a user is member of.
 
-        Membership comes from the projects' virtual scopes; the scope supplies
+        Membership comes from the projects' virtual entities; the scope supplies
         the membership predicate.
 
         Args:

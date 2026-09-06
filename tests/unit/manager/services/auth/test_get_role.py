@@ -3,13 +3,15 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
-from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
+from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.services.auth.actions.get_role import PublicGetRoleAction
 from ai.backend.manager.services.auth.service import AuthService
 
 
@@ -25,6 +27,7 @@ def auth_service(
     mock_config_provider: AsyncMock,
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
+    mock_client_ip_masking_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
@@ -35,6 +38,8 @@ def auth_service(
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
         ssh_key_validator=AsyncMock(),
+        client_ip_masking_repository=mock_client_ip_masking_repository,
+        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
 
 
@@ -55,7 +60,7 @@ async def test_get_role_simple_cases(
     expected_domain: str,
 ) -> None:
     """Test role retrieval for simple cases without group logic"""
-    action = GetRoleAction(
+    action = PublicGetRoleAction(
         user_id=UUID("12345678-1234-5678-1234-567812345678"),
         is_superadmin=is_superadmin,
         is_admin=is_admin,
@@ -83,7 +88,7 @@ async def test_get_role_with_valid_group_membership(
         "user_id": user_id,
     }
 
-    action = GetRoleAction(
+    action = PublicGetRoleAction(
         user_id=user_id,
         is_superadmin=False,
         is_admin=False,
@@ -110,7 +115,7 @@ async def test_get_role_without_group_membership_raises_error(
         "No such project or you are not the member of it."
     )
 
-    action = GetRoleAction(
+    action = PublicGetRoleAction(
         user_id=user_id,
         is_superadmin=False,
         is_admin=False,
@@ -129,7 +134,7 @@ async def test_get_role_verifies_correct_parameters(
     user_id = UUID("abcdef12-3456-7890-abcd-ef1234567890")
     group_id = UUID("fedcba98-7654-3210-fedc-ba9876543210")
 
-    action = GetRoleAction(
+    action = PublicGetRoleAction(
         user_id=user_id,
         is_superadmin=False,
         is_admin=True,

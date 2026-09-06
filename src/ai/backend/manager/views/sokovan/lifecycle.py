@@ -178,22 +178,6 @@ class PreparedSessionsWithImages:
 
 
 @dataclass(frozen=True)
-class SessionRunningData:
-    """Data for updating a session to RUNNING state.
-
-    .. deprecated::
-        ``occupying_slots`` is retained for backward compatibility but
-        is no longer written to the ``sessions.occupying_slots`` JSONB column
-        (Phase 3, BA-4308).  Resource allocations are now tracked via the
-        normalized ``resource_allocations`` / ``agent_resources`` tables.
-        This field will be removed in a future major version.
-    """
-
-    session_id: SessionId
-    occupying_slots: ResourceSlot
-
-
-@dataclass(frozen=True)
 class LastPhase:
     """The session's last scheduling-history record of the phase in progress.
 

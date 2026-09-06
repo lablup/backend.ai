@@ -35,15 +35,12 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.resource_preset.conditions import ResourcePresetConditions
 from ai.backend.manager.models.resource_preset.orders import ResourcePresetOrders
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec

@@ -20,9 +20,11 @@ from ai.backend.common.dto.manager.v2.storage_namespace.response import (
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.storage_namespace.conditions import StorageNamespaceConditions
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
 from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
+from ai.backend.manager.services.storage_namespace.actions.bulk_get import (
+    BulkGetStorageNamespacesAction,
+)
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.lookup import (
     LookupStorageNamespaceAction,
@@ -83,24 +85,24 @@ class StorageNamespaceAdapter(BaseAdapter):
 
     async def batch_load_by_ids(
         self, ids: Sequence[uuid.UUID]
-    ) -> list[StorageNamespaceNode | None]:
-        """Batch load storage namespaces by IDs for DataLoader use.
+    ) -> list[StorageNamespaceNode | Exception | None]:
+        """Batch load storage namespaces by id for DataLoader use.
 
-        Returns StorageNamespaceNode DTOs in the same order as the input ids list.
+        One answer per id in the given order: the node, ``None`` for an id matching no
+        row, and the denial for one the caller may not read.
         """
         if not ids:
             return []
-        searcher = StorageNamespaceSearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[StorageNamespaceConditions.by_ids(ids)],
+        entity_ids = [StorageNamespaceID(value) for value in ids]
+        result = await self._processors.storage_namespace.bulk_get.run(
+            BulkGetStorageNamespacesAction(ids=entity_ids)
         )
-        action_result = await self._processors.storage_namespace.global_search.run(
-            SearchStorageNamespacesAction(searcher=searcher)
-        )
-        namespace_map = {
-            item.id: self._storage_namespace_data_to_dto(item) for item in action_result.items
-        }
-        return [namespace_map.get(StorageNamespaceID(namespace_id)) for namespace_id in ids]
+        return [
+            self._storage_namespace_data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def search(
         self, input: AdminSearchStorageNamespacesInput

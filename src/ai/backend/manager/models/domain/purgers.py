@@ -24,7 +24,7 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
 )
 from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.specs.purger import DataBatchPurger, EntityPurger
+from ai.backend.manager.models.specs.purger import EntityPurger, FieldBatchPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user import UserRow
 
@@ -67,17 +67,23 @@ class DomainPurger(EntityPurger[DomainRow, DomainData]):
 
 
 @dataclass
-class DomainKernelPurger(DataBatchPurger[KernelRow, KernelId]):
+class DomainKernelPurger(FieldBatchPurger[DomainID, KernelRow, KernelId]):
     """Clears the kernel rows a domain leaves behind, before the domain itself goes.
 
-    Kernels stand outside the RBAC graph, so nothing is torn down with them.
+    Kernels stand outside the RBAC graph, so nothing is torn down with them. The owner
+    here is the domain the purge is authorized on, not the session each kernel belongs
+    to: the sweep is bounded by the domain going away.
     """
 
     name: str
 
     @override
-    def build_subquery(self) -> sa.sql.Select[Any]:
-        return sa.select(KernelRow).where(KernelRow.domain_name == self.name)
+    def build_subquery(self, owner_id: DomainID) -> sa.sql.Select[Any]:
+        return (
+            sa.select(KernelRow)
+            .join(DomainRow, DomainRow.name == KernelRow.domain_name)
+            .where(DomainRow.id == owner_id)
+        )
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:

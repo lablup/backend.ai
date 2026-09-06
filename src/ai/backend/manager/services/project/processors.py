@@ -105,8 +105,8 @@ class ProjectProcessors:
         self.search_projects_by_domain = group.scope_search_ops(SearchProjectsByDomainAction)
         self.search_projects_by_user = group.scope_search_ops(SearchProjectsByUserAction)
         self.create_project = group.role_managed_create_ops(CreateProjectAction)
-        self.delete_project = group.single_delete_ops(DeleteProjectAction)
-        self.restore_project = group.single_restore_ops(RestoreProjectAction)
+        self.delete_project = group.single_guarded_delete_ops(DeleteProjectAction)
+        self.restore_project = group.single_guarded_restore_ops(RestoreProjectAction)
         self.update_project = group.single_entity(UpdateProjectAction, group_service.update_group)
         self.purge_project = group.single_entity(PurgeProjectAction, group_service.purge_group)
         self.usage_per_month = group.global_scope(

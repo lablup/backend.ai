@@ -7,10 +7,13 @@ from __future__ import annotations
 
 import uuid
 
+from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.rbac import (
     CreatePermissionRequest,
     PermissionDTO,
 )
+from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.repositories.base import Creator, Purger
 from ai.backend.manager.repositories.permission_controller.creators import (
@@ -34,7 +37,7 @@ class PermissionAdapter:
         return PermissionDTO(
             id=data.id,
             entity_type=data.entity_type,
-            operation=data.operation,
+            operation=data.permission.to_operation(),
         )
 
     @staticmethod
@@ -43,10 +46,10 @@ class PermissionAdapter:
         creator = Creator(
             spec=PermissionCreatorSpec(
                 role_id=request.role_id,
-                scope_type=request.scope_type.to_element(),
+                scope_type=ScopeType(EntityType(request.scope_type)),
                 scope_id=request.scope_id,
-                entity_type=request.entity_type.to_element(),
-                operation=request.operation,
+                entity_type=EntityType(request.entity_type),
+                permission=single_bit(Permission.from_operation(request.operation)),
             )
         )
         return CreatePermissionAction(creator=creator)

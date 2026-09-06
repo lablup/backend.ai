@@ -63,9 +63,15 @@ def upgrade() -> None:
                 #   - "sessionresults" was created by b6b884fbae1f (2022, sessions.result)
                 #   - ffcf0ed13a26 skipped rename because both existed
                 # Fix: alter sessions.result to use the singular type, then drop plural.
+                # DROP DEFAULT first — Postgres cannot auto-cast the existing
+                # 'UNDEFINED'::sessionresults default to the new enum type.
+                conn.exec_driver_sql("ALTER TABLE sessions ALTER COLUMN result DROP DEFAULT")
                 conn.exec_driver_sql(
                     "ALTER TABLE sessions ALTER COLUMN result"
                     " TYPE sessionresult USING result::text::sessionresult"
+                )
+                conn.exec_driver_sql(
+                    "ALTER TABLE sessions ALTER COLUMN result SET DEFAULT 'UNDEFINED'::sessionresult"
                 )
                 conn.exec_driver_sql("DROP TYPE sessionresults")
             elif has_plural and not has_singular:
@@ -103,9 +109,13 @@ def downgrade() -> None:
                 conn.exec_driver_sql(
                     "CREATE TYPE sessionresults AS ENUM ('UNDEFINED', 'SUCCESS', 'FAILURE')"
                 )
+                conn.exec_driver_sql("ALTER TABLE sessions ALTER COLUMN result DROP DEFAULT")
                 conn.exec_driver_sql(
                     "ALTER TABLE sessions ALTER COLUMN result"
                     " TYPE sessionresults USING result::text::sessionresults"
+                )
+                conn.exec_driver_sql(
+                    "ALTER TABLE sessions ALTER COLUMN result SET DEFAULT 'UNDEFINED'::sessionresults"
                 )
     except sa.exc.DBAPIError as e:
         if not _is_expected_divergence(e):

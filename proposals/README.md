@@ -143,6 +143,11 @@ BEP numbers start from 1000.
 | [1070](BEP-1070-cpu-unit.md) | CPU Unit Resource Specification | HyeokJin Kim | Draft |
 | [1071](BEP-1071-keypair-user-resource-policy.md) | Keypair to User Resource Policy Merge | HyeokJin Kim | Draft |
 | [1072](BEP-1072-release-branching-and-backport.md) | Release Branch Isolation and Backport Automation | HyeokJin Kim | Draft |
+| [1073](BEP-1073-entity-labels.md) | Entity Labels | Sanghun Lee | Draft |
+| [1074](BEP-1074-container-secret-references.md) | Container Secret References | HyeokJin Kim | Draft |
+| [1075](BEP-1075-entity-relation-operations.md) | Entity Relation Operations | HyeokJin Kim | Draft |
+| [1076](BEP-1076-project-membership.md) | Project Membership | HyeokJin Kim | Draft |
+| [1077](BEP-1077-project-scoped-ownership.md) | Project-Scoped Ownership and Access | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure

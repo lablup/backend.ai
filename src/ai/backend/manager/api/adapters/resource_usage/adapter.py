@@ -51,10 +51,16 @@ from ai.backend.common.dto.manager.v2.resource_usage.types import (
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
     UserUsageBucketRow,
+)
+from ai.backend.manager.models.resource_usage_history.scopes import (
+    DomainUsageBucketOperationScope,
+    ProjectUsageBucketOperationScope,
+    UserUsageBucketOperationScope,
 )
 from ai.backend.manager.models.resource_usage_history.searchers import (
     DomainUsageBucketSearcher,
@@ -62,23 +68,16 @@ from ai.backend.manager.models.resource_usage_history.searchers import (
     UserUsageBucketSearcher,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.resource_usage_history import (
     DomainUsageBucketConditions,
     DomainUsageBucketData,
-    DomainUsageBucketOperationScope,
     DomainUsageBucketOrders,
     ProjectUsageBucketConditions,
     ProjectUsageBucketData,
-    ProjectUsageBucketOperationScope,
     ProjectUsageBucketOrders,
     UserUsageBucketConditions,
     UserUsageBucketData,
-    UserUsageBucketOperationScope,
     UserUsageBucketOrders,
 )
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction

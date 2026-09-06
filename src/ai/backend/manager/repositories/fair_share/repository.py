@@ -30,6 +30,11 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareSearchResult,
 )
 from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
+from ai.backend.manager.models.fair_share.scopes import (
+    DomainFairShareOperationScope,
+    ProjectFairShareOperationScope,
+    UserFairShareOperationScope,
+)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,
@@ -37,16 +42,13 @@ from ai.backend.manager.repositories.base import (
     Creator,
     Upserter,
 )
+from ai.backend.manager.repositories.fair_share.types import (
+    DomainFairShareEntitySearchResult,
+    ProjectFairShareEntitySearchResult,
+    UserFairShareEntitySearchResult,
+)
 
 from .db_source import FairShareDBSource
-from .types import (
-    DomainFairShareEntitySearchResult,
-    DomainFairShareOperationScope,
-    ProjectFairShareEntitySearchResult,
-    ProjectFairShareOperationScope,
-    UserFairShareEntitySearchResult,
-    UserFairShareOperationScope,
-)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.fair_share import (

@@ -30,7 +30,7 @@ class VFSStorageRow(Base):
     __tablename__ = "vfs_storages"
 
     id: Mapped[VFSStorageID] = mapped_column(
-        "id", GUID(VFSStorageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(VFSStorageID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String, index=True, unique=True, nullable=False)
     host: Mapped[str] = mapped_column("host", sa.String, nullable=False)

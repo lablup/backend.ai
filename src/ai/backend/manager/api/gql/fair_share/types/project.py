@@ -185,6 +185,7 @@ class ProjectFairShareTypeEnum(StrEnum):
 
     GENERAL = "general"
     MODEL_STORE = "model-store"
+    PERSONAL = "personal"
 
 
 @gql_pydantic_input(
@@ -229,7 +230,7 @@ class ProjectFairShareProjectNestedFilter(
     )
     is_active: bool | None = gql_field(description="Filter by project active status.", default=None)
     type: ProjectFairShareTypeEnumFilter | None = gql_field(
-        description="Filter by project type (GENERAL, MODEL_STORE).", default=None
+        description="Filter by project type (GENERAL, MODEL_STORE, PERSONAL).", default=None
     )
 
 

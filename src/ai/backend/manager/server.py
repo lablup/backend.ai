@@ -97,6 +97,8 @@ async def webapp_plugin_ctx(
     root_app["_config_provider"] = r.bootstrap.config_provider
     root_app["_etcd"] = r.bootstrap.etcd
     root_app["_valkey_stat"] = r.infrastructure.valkey.stat
+    root_app["_key_provider_pool"] = r.bootstrap.key_provider_pool
+    root_app["_auth_repository"] = r.domain.repositories.auth.repository
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
         if pidx == 0:
             log.info("Loading webapp plugin: {0}", plugin_name)
@@ -340,9 +342,9 @@ async def server_main(
         _error_monitor_ref = dep_resources.monitoring.error_monitor
 
         # Insert DI-based middlewares now that dependencies are available.
-        # Maintain order: request_id(0) → exception(1) → auth(2) → api → metric
+        # Maintain order: request_id(0) → client_ip(1) → exception(2) → auth(3) → metric → api
         root_app.middlewares.insert(
-            1,
+            2,
             build_exception_middleware(
                 error_monitor=dep_resources.monitoring.error_monitor,
                 stats_monitor=dep_resources.monitoring.stats_monitor,
@@ -350,9 +352,10 @@ async def server_main(
             ),
         )
         root_app.middlewares.insert(
-            2,
+            3,
             build_auth_middleware(
                 db=dep_resources.infrastructure.db,
+                key_provider_pool=dep_resources.bootstrap.key_provider_pool,
                 jwt_validator=dep_resources.system.jwt_validator,
                 valkey_stat=dep_resources.infrastructure.valkey.stat,
                 hook_plugin_ctx=dep_resources.plugins.hook_plugin_ctx,

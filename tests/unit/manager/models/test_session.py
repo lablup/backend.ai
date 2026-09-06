@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.common.types import BinarySize
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -65,7 +65,7 @@ class TestConfig:
     second_session_status: SessionStatus
 
 
-class TestSessionUniqueNamePerUser:
+class SessionFixtures:
     @pytest.fixture
     async def database_with_tables(
         self, database_connection: ExtendedAsyncSAEngine
@@ -238,6 +238,8 @@ class TestSessionUniqueNamePerUser:
 
         yield group
 
+
+class TestSessionUniqueNamePerUser(SessionFixtures):
     @pytest.fixture
     async def prepared_first_session(
         self,
@@ -260,8 +262,6 @@ class TestSessionUniqueNamePerUser:
             resource_group_id=resource_group.id,
             scaling_group_name=resource_group.name,
             status=status,
-            occupying_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             vfolder_mounts=[],
         )
 
@@ -310,8 +310,6 @@ class TestSessionUniqueNamePerUser:
                 resource_group_id=prepared_first_session.resource_group_id,
                 scaling_group_name=prepared_first_session.resource_group_name,
                 status=test_config.second_session_status,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 vfolder_mounts=[],
             )
 
@@ -343,8 +341,6 @@ class TestSessionUniqueNamePerUser:
             resource_group_id=prepared_first_session.resource_group_id,
             scaling_group_name=prepared_first_session.resource_group_name,
             status=test_config.second_session_status,
-            occupying_slots=ResourceSlot(),
-            requested_slots=ResourceSlot(),
             vfolder_mounts=[],
         )
 
@@ -387,11 +383,34 @@ class TestSessionUniqueNamePerUser:
                 resource_group_id=prepared_first_session.resource_group_id,
                 scaling_group_name=prepared_first_session.resource_group_name,
                 status=test_config.second_session_status,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 vfolder_mounts=[],
             )
 
             # This should succeed without IntegrityError
             db_sess.add(duplicate_session)
             await db_sess.flush()
+
+
+class TestSessionOwnerRequired(SessionFixtures):
+    async def test_session_without_owner_is_rejected(
+        self,
+        database_with_tables: ExtendedAsyncSAEngine,
+        group: ProjectRow,
+        domain: DomainRow,
+        resource_group: ResourceGroupRow,
+    ) -> None:
+        session = SessionRow(
+            name=f"test-{uuid.uuid4()!s}",
+            group_id=group.id,
+            domain_id=domain.id,
+            domain_name=domain.name,
+            resource_group_id=resource_group.id,
+            scaling_group_name=resource_group.name,
+            status=SessionStatus.PENDING,
+            vfolder_mounts=[],
+        )
+
+        with pytest.raises(IntegrityError):
+            async with database_with_tables.begin_session() as db_sess:
+                db_sess.add(session)
+                await db_sess.flush()

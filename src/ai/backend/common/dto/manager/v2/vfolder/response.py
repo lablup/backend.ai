@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     FileEntryType,
@@ -23,6 +24,7 @@ from .types import (
 )
 
 __all__ = (
+    "BulkDeleteVFolderV2Error",
     "BulkDeleteVFoldersPayload",
     "BulkPurgeVFolderV2Error",
     "BulkPurgeVFoldersPayload",
@@ -133,10 +135,35 @@ class PurgeVFolderPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the purged virtual folder.")
 
 
+class BulkDeleteVFolderV2Error(BaseResponseModel):
+    """Error information for a single vfolder that failed during bulk soft-deletion."""
+
+    vfolder_id: UUID = Field(description="UUID of the vfolder that failed to be soft-deleted.")
+    message: str = Field(description="Error message describing the failure.")
+
+
 class BulkDeleteVFoldersPayload(BaseResponseModel):
     """Payload for bulk virtual folder soft-deletion."""
 
-    deleted_count: int = Field(description="Number of virtual folders successfully soft-deleted.")
+    items: list[VFolderNode] = Field(
+        default_factory=list,
+        description=(
+            "The vfolders that were soft-deleted, in the order they were requested. "
+            "A soft-deleted vfolder is still addressable, so it is returned whole. "
+            "Together with `failed` this answers for every requested vfolder exactly once."
+        ),
+    )
+    deleted_count: int = Field(
+        description=(
+            "Number of virtual folders successfully soft-deleted. "
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the length of items."
+        ),
+        deprecated=True,
+    )
+    failed: list[BulkDeleteVFolderV2Error] = Field(
+        default_factory=list,
+        description="List of errors for vfolders that failed to be soft-deleted.",
+    )
 
 
 class BulkPurgeVFolderV2Error(BaseResponseModel):
@@ -149,7 +176,20 @@ class BulkPurgeVFolderV2Error(BaseResponseModel):
 class BulkPurgeVFoldersPayload(BaseResponseModel):
     """Payload for bulk virtual folder purge."""
 
-    purged_count: int = Field(description="Number of virtual folders successfully purged.")
+    successes: list[UUID] = Field(
+        default_factory=list,
+        description=(
+            "UUIDs of the vfolders that were purged, in the order they were requested. "
+            "Together with `failed` this answers for every requested vfolder exactly once."
+        ),
+    )
+    purged_count: int = Field(
+        description=(
+            "Number of virtual folders successfully purged. "
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the length of successes."
+        ),
+        deprecated=True,
+    )
     failed: list[BulkPurgeVFolderV2Error] = Field(
         description="List of errors for vfolders that failed to purge."
     )

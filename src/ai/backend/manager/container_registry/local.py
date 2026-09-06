@@ -76,7 +76,7 @@ class LocalRegistry(BaseContainerRegistry):
             summary = {
                 "Id": data["Id"],
                 "RepoDigests": data.get("RepoDigests", []),
-                "Config.Image": data["Config"]["Image"],
+                "Config.Image": data["Config"].get("Image"),
                 "ContainerConfig.Image": data.get("ContainerConfig", {}).get("Image", None),
                 "Architecture": architecture,
             }

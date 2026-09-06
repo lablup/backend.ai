@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import override
+from dataclasses import dataclass, replace
+from typing import Self, override
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PartialBulkPurgeEntityOpsAction
@@ -31,3 +31,11 @@ class BulkPurgeAppConfigFragmentAction(
     @override
     def to_purgers(self) -> Mapping[EntityIdentifier, AppConfigFragmentPurger]:
         return {purger.entity_id(): purger for purger in self.purgers}
+
+    @override
+    def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
+        allowed = frozenset(entity_ids)
+        return replace(
+            self,
+            purgers=[purger for purger in self.purgers if purger.entity_id() in allowed],
+        )

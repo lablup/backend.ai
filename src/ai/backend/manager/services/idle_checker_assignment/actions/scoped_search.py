@@ -13,9 +13,9 @@ from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentOperationScope
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckerAssignmentOperationScope
 
 
 @dataclass(frozen=True)

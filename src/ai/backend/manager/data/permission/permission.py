@@ -4,10 +4,10 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
+from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.manager.data.common.types import SearchResult
 
-from .id import ScopeId
-from .types import EntityType, OperationType, Permission, ScopeType
+from .types import Permission
 
 
 @dataclass
@@ -16,7 +16,6 @@ class PermissionCreator:
     scope_type: ScopeType
     scope_id: str
     entity_type: EntityType
-    operation: OperationType
     permission: Permission
 
 
@@ -24,10 +23,9 @@ class PermissionCreator:
 class PermissionData:
     id: uuid.UUID
     role_id: uuid.UUID
-    scope_type: ScopeType
+    scope_type: EntityType
     scope_id: str
     entity_type: EntityType
-    operation: OperationType
     permission: Permission
     created_at: datetime
 
@@ -42,11 +40,7 @@ class ScopedPermissionCreateInput:
     scope_type: ScopeType
     scope_id: str
     entity_type: EntityType
-    operation: OperationType
-
-    def to_scope_id(self) -> ScopeId:
-        """Convert to ScopeId."""
-        return ScopeId(scope_type=self.scope_type, scope_id=self.scope_id)
+    permission: Permission
 
 
 @dataclass(frozen=True)

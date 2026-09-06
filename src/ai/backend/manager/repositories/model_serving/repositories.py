@@ -11,7 +11,7 @@ class ModelServingRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = ModelServingRepository(args.db)
+        repository = ModelServingRepository(args.db, args.v2_ops_provider)
 
         return cls(
             repository=repository,

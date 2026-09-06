@@ -11,6 +11,7 @@ from http import HTTPStatus
 from typing import Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.config.request import (
     CreateUserDotfileRequest,
@@ -34,7 +35,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
-    ResolveAccessKeyScopeAction,
+    PublicResolveAccessKeyScopeAction,
 )
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.user.actions.bootstrap_script import (
@@ -47,7 +48,10 @@ from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
 from ai.backend.manager.services.user.actions.delete_keypair_dotfile import (
     DeleteKeypairDotfileAction,
 )
-from ai.backend.manager.services.user.actions.keypair_ops import AdminGetKeypairAction
+from ai.backend.manager.services.user.actions.keypair_ops import GetKeypairAction
+from ai.backend.manager.services.user.actions.lookup_keypair import (
+    LookupKeypairByAccessKeyAction,
+)
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupKeypairOwnerByAccessKeyAction,
 )
@@ -67,8 +71,8 @@ class UserConfigHandler:
         self._user = user
 
     async def _owner_access_key(self, ctx: UserContext, owner: str | None) -> AccessKey:
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
+        scope = await self._auth.public_resolve_access_key_scope.run(
+            PublicResolveAccessKeyScopeAction(
                 requester_access_key=ctx.access_key,
                 requester_role=ctx.user_role,
                 requester_domain=ctx.user_domain,
@@ -76,6 +80,12 @@ class UserConfigHandler:
             )
         )
         return AccessKey(scope.owner_access_key)
+
+    async def _keypair_id(self, access_key: AccessKey) -> KeyPairID:
+        result = await self._user.lookup_keypair.run(
+            LookupKeypairByAccessKeyAction(access_key=access_key)
+        )
+        return KeyPairID(result.field_id)
 
     async def _owner(self, access_key: AccessKey) -> UserID:
         result = await self._user.lookup_keypair_owner.run(
@@ -90,7 +100,6 @@ class UserConfigHandler:
     ) -> APIResponse:
         params = body.parsed
         access_key = await self._owner_access_key(ctx, params.owner_access_key)
-        log.info("USERCONFIG.CREATE(ak:{})", access_key)
         await self._user.create_dotfile.run(
             CreateKeypairDotfileAction(
                 user_id=await self._owner(access_key),
@@ -107,9 +116,8 @@ class UserConfigHandler:
     ) -> APIResponse:
         params = query.parsed
         access_key = await self._owner_access_key(ctx, params.owner_access_key)
-        log.info("USERCONFIG.LIST_OR_GET(ak:{})", access_key)
-        keypair = await self._user.admin_get_keypair.run(
-            AdminGetKeypairAction(user_id=await self._owner(access_key), access_key=access_key)
+        keypair = await self._user.get_keypair.run(
+            GetKeypairAction(keypair_id=await self._keypair_id(access_key))
         )
         entries = DotfileEntries.unpack(keypair.keypair.dotfiles)
         if params.path:
@@ -130,7 +138,6 @@ class UserConfigHandler:
     ) -> APIResponse:
         params = body.parsed
         access_key = await self._owner_access_key(ctx, params.owner_access_key)
-        log.info("USERCONFIG.UPDATE(ak:{})", access_key)
         await self._user.update_dotfile.run(
             UpdateKeypairDotfileAction(
                 user_id=await self._owner(access_key),
@@ -147,7 +154,6 @@ class UserConfigHandler:
     ) -> APIResponse:
         params = query.parsed
         access_key = await self._owner_access_key(ctx, params.owner_access_key)
-        log.info("USERCONFIG.DELETE(ak:{})", access_key)
         await self._user.delete_dotfile.run(
             DeleteKeypairDotfileAction(
                 user_id=await self._owner(access_key),
@@ -163,7 +169,6 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         access_key = AccessKey(ctx.access_key)
-        log.info("USERCONFIG.UPDATE_BOOTSTRAP_SCRIPT(ak:{})", access_key)
         await self._user.update_bootstrap_script.run(
             UpdateBootstrapScriptAction(
                 user_id=await self._owner(access_key),
@@ -178,7 +183,6 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         access_key = AccessKey(ctx.access_key)
-        log.info("USERCONFIG.GET_BOOTSTRAP_SCRIPT(ak:{})", access_key)
         result = await self._user.get_bootstrap_script.run(
             GetBootstrapScriptAction(user_id=await self._owner(access_key), access_key=access_key)
         )

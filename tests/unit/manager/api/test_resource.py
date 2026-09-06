@@ -155,13 +155,11 @@ class TestWatcherAgentStart:
         expected_data = {"started": True}
         mock_result = MagicMock()
         mock_result.data = expected_data
-        mock_processors.agent.watcher_agent_start.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.agent.watcher_agent_start.run = AsyncMock(return_value=mock_result)
 
         response = await handler.watcher_agent_start(body, superadmin_context)
 
-        call_args = mock_processors.agent.watcher_agent_start.wait_for_complete.call_args
+        call_args = mock_processors.agent.watcher_agent_start.run.call_args
         action = call_args[0][0]
         assert action.agent_id == "agent-001"
         assert response.status_code == HTTPStatus.OK
@@ -183,13 +181,11 @@ class TestWatcherAgentStop:
         expected_data = {"stopped": True}
         mock_result = MagicMock()
         mock_result.data = expected_data
-        mock_processors.agent.watcher_agent_stop.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.agent.watcher_agent_stop.run = AsyncMock(return_value=mock_result)
 
         response = await handler.watcher_agent_stop(body, superadmin_context)
 
-        call_args = mock_processors.agent.watcher_agent_stop.wait_for_complete.call_args
+        call_args = mock_processors.agent.watcher_agent_stop.run.call_args
         action = call_args[0][0]
         assert action.agent_id == "agent-001"
         assert response.status_code == HTTPStatus.OK
@@ -211,13 +207,11 @@ class TestWatcherAgentRestart:
         expected_data = {"restarted": True}
         mock_result = MagicMock()
         mock_result.data = expected_data
-        mock_processors.agent.watcher_agent_restart.wait_for_complete = AsyncMock(
-            return_value=mock_result
-        )
+        mock_processors.agent.watcher_agent_restart.run = AsyncMock(return_value=mock_result)
 
         response = await handler.watcher_agent_restart(body, superadmin_context)
 
-        call_args = mock_processors.agent.watcher_agent_restart.wait_for_complete.call_args
+        call_args = mock_processors.agent.watcher_agent_restart.run.call_args
         action = call_args[0][0]
         assert action.agent_id == "agent-001"
         assert response.status_code == HTTPStatus.OK

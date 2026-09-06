@@ -4,8 +4,7 @@ from typing import override
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryModifierMeta
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
-from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.models.huggingface_registry.updaters import HuggingFaceRegistryUpdater
 from ai.backend.manager.services.artifact_registry.actions.base import (
     ArtifactRegistrySingleEntityAction,
 )
@@ -13,7 +12,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import (
 
 @dataclass
 class UpdateHuggingFaceRegistryAction(ArtifactRegistrySingleEntityAction):
-    updater: Updater[HuggingFaceRegistryRow]
+    updater: HuggingFaceRegistryUpdater
     meta: ArtifactRegistryModifierMeta
 
     @override

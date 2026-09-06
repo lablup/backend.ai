@@ -27,14 +27,13 @@ from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE, SessionID
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import AgentId, ResourceSlot, SessionTypes
+from ai.backend.common.types import AgentId, SessionTypes
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
     ConcernMeta,
     GroupMeta,
 )
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -50,6 +49,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
@@ -61,7 +61,6 @@ from ai.backend.manager.services.session.resource_allocation.processors import (
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -100,7 +99,7 @@ def session_repository(
     """Real ``SessionRepository`` exposed as a fixture so individual tests can
     override or stub specific methods (e.g., ``resolve_image``) without
     monkey-patching the class globally."""
-    return SessionRepository(database_engine)
+    return SessionRepository(database_engine, DBOpsProvider(database_engine))
 
 
 @pytest.fixture()
@@ -128,7 +127,7 @@ async def session_processors(
         user_repository=AsyncMock(),
     )
     service = SessionService(args)
-    groups = processor_registry.concern(ConcernMeta("resource_allocation"))
+    groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return SessionProcessors(
         processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
         ResourceAllocationProcessors(
@@ -151,10 +150,6 @@ def agent_processors_mock(processor_registry: ProcessorRegistry[Any]) -> AgentPr
         processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
         AsyncMock(),
         [],
-        ActionValidators(
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
-        ),
     )
 
 
@@ -211,8 +206,6 @@ async def agent_fixture(
                 region="local",
                 scaling_group=resource_group_name,
                 resource_group_id=resource_group_id,
-                available_slots=ResourceSlot(),
-                occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",
                 version="test",
                 architecture="x86_64",
@@ -270,8 +263,6 @@ async def session_seed(
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -296,8 +287,6 @@ async def session_seed(
                 agent=agent_fixture,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -367,8 +356,6 @@ async def terminated_session_seed(
                 status=SessionStatus.TERMINATED,
                 status_info="user-requested",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
                 terminated_at=now,
             )
@@ -393,8 +380,6 @@ async def terminated_session_seed(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.TERMINATED,
                 status_info="user-requested",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,
@@ -461,8 +446,6 @@ async def user_session_seed(
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 created_at=now,
             )
         )
@@ -486,8 +469,6 @@ async def user_session_seed(
                 resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
                 repl_in_port=0,
                 repl_out_port=0,
                 stdin_port=0,

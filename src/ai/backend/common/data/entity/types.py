@@ -35,7 +35,7 @@ class EntityType(str):
 # reverse direction stays an explicit declaration (`ScopeType(<entity type>)`).
 ScopeType = NewType("ScopeType", EntityType)
 
-# The installation itself, for a global operation that names nothing else. Wiring
+# The system itself, for a global operation that names nothing else. Wiring
 # only — see `manager/actions/AGENTS.md`.
 GLOBAL_ENTITY_TYPE = EntityType("global")
 

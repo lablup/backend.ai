@@ -43,7 +43,7 @@ def resource_group_processors(
     database_engine: ExtendedAsyncSAEngine,
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourceGroupProcessors:
-    repo = ResourceGroupRepository(database_engine)
+    repo = ResourceGroupRepository(database_engine, V2DBOpsProvider(database_engine))
     service = ResourceGroupService(repo)
     return ResourceGroupProcessors(
         processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), service

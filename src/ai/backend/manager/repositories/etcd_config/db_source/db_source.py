@@ -10,6 +10,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -42,15 +43,17 @@ class EtcdConfigDBSource:
     @etcd_config_db_source_resilience.apply()
     async def get_available_agent_slots(self, sgroup: str) -> set[str]:
         """Get the set of available slot keys from alive, schedulable agents in a scaling group."""
-        available_slot_keys: set[str] = set()
         async with self._db.begin_readonly_session() as db_sess:
-            result = await db_sess.execute(
-                sa.select(AgentRow).where(
+            result = await db_sess.scalars(
+                sa.select(AgentResourceRow.slot_name)
+                .select_from(
+                    sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id)
+                )
+                .where(
                     (AgentRow.status == AgentStatus.ALIVE)
                     & (AgentRow.scaling_group == sgroup)
                     & (AgentRow.schedulable == sa.true())
                 )
+                .distinct()
             )
-            for agent in result.scalars().all():
-                available_slot_keys.update(agent.available_slots.keys())
-        return available_slot_keys
+            return set(result.all())

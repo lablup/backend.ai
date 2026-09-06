@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, override
 from uuid import UUID
 
@@ -51,6 +51,40 @@ class RetentionPolicyUpdater(DataUpdater[RetentionPolicyRow, RetentionPolicyData
         self.retention_period.update_dict(to_update, "retention_period")
         self.enabled.update_dict(to_update, "enabled")
         return to_update
+
+    @override
+    def to_data(self, row: RetentionPolicyRow) -> RetentionPolicyData:
+        return row.to_data()
+
+
+@dataclass
+class LastSweptAtUpdater(DataUpdater[RetentionPolicyRow, RetentionPolicyData]):
+    """Stamps a policy's ``last_swept_at`` after its category is swept."""
+
+    policy_id: RetentionPolicyID
+    last_swept_at: datetime
+
+    @property
+    @override
+    def row_class(self) -> type[RetentionPolicyRow]:
+        return RetentionPolicyRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RetentionPolicyRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.policy_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"last_swept_at": self.last_swept_at}
 
     @override
     def to_data(self, row: RetentionPolicyRow) -> RetentionPolicyData:

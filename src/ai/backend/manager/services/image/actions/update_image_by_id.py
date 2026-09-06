@@ -4,14 +4,14 @@ from typing import override
 from ai.backend.common.types import ImageID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
+from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.services.image.actions.base import ImageAction
 
 
 @dataclass
 class UpdateImageByIdAction(ImageAction):
     image_id: ImageID
-    updater_spec: ImageUpdaterSpec
+    update: ImageUpdate
 
     @override
     @classmethod

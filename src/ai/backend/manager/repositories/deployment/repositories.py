@@ -19,7 +19,7 @@ class DeploymentRepositories:
         """Create deployment repositories."""
         repository = DeploymentRepository(
             args.db,
-            args.v2_ops_provider,
+            args.reconcile_ops_provider,
             args.storage_manager,
             args.valkey_stat_client,
             args.valkey_live_client,

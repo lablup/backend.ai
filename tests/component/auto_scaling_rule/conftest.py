@@ -30,7 +30,7 @@ from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -66,7 +66,7 @@ def deployment_processors(
     """Real DeploymentProcessors for auto-scaling-rule tests."""
     repo = DeploymentRepository(
         database_engine,
-        V2DBOpsProvider(database_engine),
+        ReconcileOpsProvider(database_engine),
         storage_manager,
         valkey_clients.stat,
         valkey_clients.live,

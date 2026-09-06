@@ -41,13 +41,19 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_slot import (
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -73,6 +79,8 @@ class TestPersistentNetworkNotRecreated:
                 AgentRow,
                 SessionRow,
                 KernelRow,
+                ResourceSlotTypeRow,
+                ResourceAllocationRow,
             ],
         ):
             yield database_connection
@@ -184,11 +192,6 @@ class TestPersistentNetworkNotRecreated:
                     region="local",
                     scaling_group=sg_name,
                     resource_group_id=sg_id,
-                    available_slots=ResourceSlot({
-                        "cpu": Decimal("10"),
-                        "mem": Decimal("10240"),
-                    }),
-                    occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
                     version="1.0.0",
                     architecture="x86_64",
@@ -199,7 +202,7 @@ class TestPersistentNetworkNotRecreated:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex[:38]}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex[:38]}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=keypair_policy_name,
@@ -248,10 +251,6 @@ class TestPersistentNetworkNotRecreated:
                     status=SessionStatus.PREPARED,
                     status_info="prepared",
                     cluster_mode=ClusterMode.MULTI_NODE,
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("2"),
-                        "mem": Decimal("4096"),
-                    }),
                     created_at=datetime.now(tzutc()),
                     images=["python:3.8"],
                     vfolder_mounts=[],
@@ -279,11 +278,6 @@ class TestPersistentNetworkNotRecreated:
                     registry="docker.io",
                     status=KernelStatus.PREPARED,
                     status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot(),
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("2"),
-                        "mem": Decimal("4096"),
-                    }),
                     domain_name=env["domain_name"],
                     group_id=env["group_id"],
                     user_uuid=env["user_uuid"],
@@ -314,7 +308,7 @@ class TestPersistentNetworkNotRecreated:
             network_id=pre_created_network_id,
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[SessionConditions.by_ids([session_id])],

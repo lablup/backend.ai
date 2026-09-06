@@ -4,13 +4,12 @@ from typing import override
 
 from aiohttp import web
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthAction
+from ai.backend.manager.services.auth.actions.base import UserGlobalAction
 
 
-@dataclass
-class SignupAction(AuthAction):
+@dataclass(frozen=True)
+class SignupAction(UserGlobalAction):
     request: web.Request
     domain_name: str
     email: str
@@ -20,13 +19,14 @@ class SignupAction(AuthAction):
     description: str | None
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "signup"
 
     @property
     def hook_params(self) -> dict[str, str]:
@@ -44,12 +44,8 @@ class SignupAction(AuthAction):
         return params
 
 
-@dataclass
-class SignupActionResult(BaseActionResult):
+@dataclass(frozen=True)
+class SignupActionResult:
     user_id: uuid.UUID
     access_key: str
     secret_key: str
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.user_id)

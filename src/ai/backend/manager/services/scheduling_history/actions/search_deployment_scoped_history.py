@@ -7,10 +7,8 @@ from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData
+from ai.backend.manager.models.scheduling_history.scopes import DeploymentHistoryOperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.scheduling_history.types import (
-    DeploymentHistoryOperationScope,
-)
 
 from .base import DeploymentSchedulingHistoryAction, SchedulingHistoryScopeActionResult
 

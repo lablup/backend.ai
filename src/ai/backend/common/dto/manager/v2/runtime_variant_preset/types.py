@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import StrEnum
 from typing import Self
 
@@ -25,6 +26,30 @@ class PresetValueType(StrEnum):
     FLOAT = "float"
     BOOL = "bool"
     FLAG = "flag"
+
+
+_VALID_BOOL_VALUES = ("true", "false", "1", "0")
+
+
+def _validate_bool(v: str) -> bool:
+    if v.lower() not in _VALID_BOOL_VALUES:
+        raise ValueError(f"expected one of {_VALID_BOOL_VALUES}, got '{v}'")
+    return v.lower() in ("true", "1")
+
+
+def _validate_flag(v: str) -> bool:
+    if v.lower() not in _VALID_BOOL_VALUES:
+        raise ValueError(f"expected one of {_VALID_BOOL_VALUES}, got '{v}'")
+    return v.lower() in ("true", "1")
+
+
+VALUE_TYPE_VALIDATORS: dict[PresetValueType, Callable[[str], object]] = {
+    PresetValueType.STR: str,
+    PresetValueType.INT: int,
+    PresetValueType.FLOAT: float,
+    PresetValueType.BOOL: _validate_bool,
+    PresetValueType.FLAG: _validate_flag,
+}
 
 
 class UIType(StrEnum):

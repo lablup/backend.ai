@@ -76,6 +76,7 @@ from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -317,6 +318,7 @@ class TestAutoMountVFolderResolution:
         """
         return SchedulerRepository(
             db_with_cleanup,
+            ReconcileOpsProvider(db_with_cleanup),
             AsyncMock(spec=ValkeyStatClient),
             AsyncMock(spec=ValkeyScheduleClient),
             mock_config_provider,

@@ -1,28 +1,22 @@
 """Write primitives every v2 write concern shares.
 
-Row insert/delete/upsert with spec-declared check execution, integrity-error
-parsing and matching, and membership recording/removal with the transitional
-dual-write. No public operation lives here — the per-concern write ops inherit
-these on top of :class:`~.base.V2OpsBase`.
+Row insert/delete/upsert with spec-declared check execution, and integrity-error
+parsing and matching. No public operation and no graph relation lives here — the
+per-concern write ops inherit these on top of :class:`~.base.V2OpsBase`; the graph
+is :class:`~.graph_write.V2GraphWriteOpsBase`, and the relations over existing
+entities are the share and relation write ops.
 """
 
 from __future__ import annotations
 
-import uuid
-from collections.abc import Collection, Mapping, Sequence
-from typing import Any, ClassVar, NoReturn
+from collections.abc import Callable, Collection, Mapping, Sequence
+from typing import Any, ClassVar, NoReturn, cast
 
 import sqlalchemy as sa
 from asyncpg.exceptions import PostgresError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.types import (
-    EntityIdentifier,
-    EntityType,
-)
-from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
-from ai.backend.manager.errors.permission import VirtualScopeNotFound
 from ai.backend.manager.errors.repository import (
     CheckConstraintViolationError,
     ExclusionViolationError,
@@ -33,95 +27,12 @@ from ai.backend.manager.errors.repository import (
     UpsertEmptyResultError,
 )
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.specs.membership import EntityMembershipEntry
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
 
 class V2WriteOpsBase(V2OpsBase):
     """The shared write primitives, bound to a single session."""
-
-    async def _provision_entities(self, entities: Sequence[EntityIdentifier]) -> None:
-        """Put each entity into the RBAC graph: its virtual scope node, its self
-        entity-membership and its self scope-binding (permission_cap NULL). The reverse
-        of :meth:`_teardown_entity`. Idempotent: an existing node is a no-op."""
-        if not entities:
-            return
-        values = [{"scope_type": e.entity_type(), "scope_id": e} for e in entities]
-        insert_stmt = (
-            pg_insert(VirtualScopeRow)
-            .values(values)
-            .on_conflict_do_nothing(index_elements=["scope_type", "scope_id"])
-            .returning(
-                VirtualScopeRow.id,
-                VirtualScopeRow.scope_type,
-                VirtualScopeRow.scope_id,
-            )
-        )
-        inserted = (await self._sess.execute(insert_stmt)).all()
-        if not inserted:
-            return
-        membership_stmt = (
-            pg_insert(EntityMembershipRow)
-            .values([
-                {
-                    "virtual_scope_id": row.id,
-                    "entity_type": row.scope_type,
-                    "entity_id": row.scope_id,
-                    "permission_cap": None,
-                }
-                for row in inserted
-            ])
-            .on_conflict_do_nothing()
-        )
-        await self._sess.execute(membership_stmt)
-        binding_stmt = (
-            pg_insert(ScopeBindingRow)
-            .values([
-                {
-                    "virtual_scope_id": row.id,
-                    "scope_type": row.scope_type,
-                    "scope_id": row.scope_id,
-                    "permission_cap": None,
-                }
-                for row in inserted
-            ])
-            .on_conflict_do_nothing()
-        )
-        await self._sess.execute(binding_stmt)
-
-    async def _teardown_entity(self, entity: EntityIdentifier) -> None:
-        """Remove what the entity left in the RBAC graph: permissions granted on it,
-        its virtual scope node if it provisioned one, and its membership edges.
-
-        The permission delete keys on the id alone, which is a UUID and so already
-        names one entity; the type would only narrow it to what it already is.
-        """
-        await self._sess.execute(
-            sa.delete(PermissionRow).where(PermissionRow.scope_id == str(entity))
-        )
-        await self._sess.execute(
-            sa.delete(VirtualScopeRow).where(
-                VirtualScopeRow.scope_type == entity.entity_type(),
-                VirtualScopeRow.scope_id == entity,
-            )
-        )
-        await self._sess.execute(
-            sa.delete(ScopeBindingRow).where(
-                ScopeBindingRow.scope_type == entity.entity_type(),
-                ScopeBindingRow.scope_id == entity,
-            )
-        )
-        await self._sess.execute(
-            sa.delete(EntityMembershipRow).where(
-                EntityMembershipRow.entity_type == entity.entity_type(),
-                EntityMembershipRow.entity_id == entity,
-            )
-        )
 
     _SQLSTATE_TO_ERROR: ClassVar[Mapping[str, type[RepositoryIntegrityError]]] = {
         "23505": UniqueConstraintViolationError,
@@ -289,6 +200,36 @@ class V2WriteOpsBase(V2OpsBase):
             self._match_integrity_error(self._parse_integrity_error(e), checks)
         return result.scalar_one_or_none()
 
+    async def _update_guarded_row_returning[TRow: Base](
+        self,
+        row_class: type[TRow],
+        id_column: InstrumentedAttribute[Any],
+        id_value: Any,
+        guards: Sequence[Callable[[], sa.sql.expression.ColumnElement[bool]]],
+        values: dict[str, Any],
+        checks: Sequence[IntegrityErrorCheck],
+    ) -> TRow | None:
+        """Update the row the id names while its guards hold; ``None`` if none matched.
+
+        The guards ride on the statement, so no separate read and no row lock stand
+        between the check and the write. With nothing to set, reads the current row
+        instead, so callers can tell "nothing to change" apart from "row not found".
+        """
+        table = row_class.__table__
+        if not values:
+            existing = await self._sess.execute(sa.select(row_class).where(id_column == id_value))
+            return existing.scalar_one_or_none()
+        stmt = sa.update(table).values(values).where(id_column == id_value)
+        for guard in guards:
+            stmt = stmt.where(guard())
+        # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
+        select_stmt = sa.select(row_class).from_statement(stmt.returning(*table.columns))
+        try:
+            result = await self._sess.execute(select_stmt)
+        except sa.exc.IntegrityError as e:
+            self._match_integrity_error(self._parse_integrity_error(e), checks)
+        return result.scalar_one_or_none()
+
     async def _delete_row_returning[TRow: Base](
         self, row_class: type[TRow], id_column: InstrumentedAttribute[Any], id_value: Any
     ) -> TRow | None:
@@ -343,59 +284,40 @@ class V2WriteOpsBase(V2OpsBase):
         await self._sess.execute(stmt)
         await self._sess.flush()
 
-    async def _record_memberships(self, entries: Sequence[EntityMembershipEntry]) -> None:
-        """Record declared memberships in the parents' virtual scopes, idempotently;
-        a declared parent without a virtual scope fails (resolve-or-fail)."""
-        if not entries:
-            return
-        scope_ids = await self._resolve_virtual_scope_ids([e.parent for e in entries])
-        await self._bulk_insert_ignore_conflicts(
-            [
-                EntityMembershipRow(
-                    virtual_scope_id=scope_ids[(entry.parent.entity_type(), entry.parent)],
-                    entity_type=entry.member.entity_type(),
-                    entity_id=entry.member,
-                    permission_cap=None,
-                )
-                for entry in entries
-            ],
-        )
+    async def _batch_purge_returning[TRow: Base, TData](
+        self,
+        scope_condition: sa.ColumnElement[bool] | None,
+        build_subquery: Callable[[], sa.sql.Select[Any]],
+        conflict_checks: Sequence[ConflictCheck],
+        to_data: Callable[[TRow], TData],
+        batch_size: int = 1000,
+    ) -> list[TData]:
+        base_subquery = build_subquery()
+        entity = base_subquery.column_descriptions[0]["entity"]
+        table = sa.inspect(entity).local_table
+        pk_columns = list(table.primary_key.columns)
+        row_class = cast("type[TRow]", entity)
 
-    async def _remove_memberships(self, members: Sequence[EntityIdentifier]) -> None:
-        """Remove every membership the members hold, so a purge cannot leave
-        orphan registrations behind."""
-        if not members:
-            return
-        await self._sess.execute(
-            sa.delete(EntityMembershipRow).where(
-                sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
-                    (m.entity_type(), m) for m in members
-                ])
-            )
-        )
+        await self._validate_conflict_checks(conflict_checks)
 
-    async def _resolve_virtual_scope_ids(
-        self, entities: Sequence[EntityIdentifier]
-    ) -> dict[tuple[EntityType, uuid.UUID], VirtualScopeID]:
-        """Resolve-or-fail, never get-or-create: a declared parent without a virtual
-        scope raises :class:`VirtualScopeNotFound` naming every missing scope."""
-        stmt = sa.select(
-            VirtualScopeRow.scope_type,
-            VirtualScopeRow.scope_id,
-            VirtualScopeRow.id,
-        ).where(
-            sa.tuple_(VirtualScopeRow.scope_type, VirtualScopeRow.scope_id).in_([
-                (e.entity_type(), e) for e in entities
-            ])
-        )
-        resolved = {
-            (EntityType(row.scope_type), row.scope_id): row.id
-            for row in (await self._sess.execute(stmt)).all()
-        }
-        missing = [e for e in entities if (e.entity_type(), e) not in resolved]
-        if missing:
-            raise VirtualScopeNotFound(
-                "No virtual scope for entities: "
-                + ", ".join(f"{e.entity_type()}:{e}" for e in missing)
+        removed: list[TData] = []
+        while True:
+            selecting = build_subquery()
+            if scope_condition is not None:
+                selecting = selecting.where(scope_condition)
+            sub = selecting.subquery()
+            pk_subquery = sa.select(*[sub.c[pk.key] for pk in pk_columns]).limit(batch_size)
+            stmt = (
+                sa.delete(table)
+                .where(sa.tuple_(*pk_columns).in_(pk_subquery))
+                .returning(*table.columns)
             )
-        return resolved
+            try:
+                result = await self._sess.execute(stmt)
+            except sa.exc.IntegrityError as e:
+                raise self._parse_integrity_error(e) from e
+            rows = result.fetchall()
+            removed.extend(to_data(row_class(**dict(r._mapping))) for r in rows)
+            if len(rows) < batch_size:
+                break
+        return removed

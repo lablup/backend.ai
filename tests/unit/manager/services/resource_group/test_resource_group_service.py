@@ -41,21 +41,20 @@ from ai.backend.manager.models.resource_group import (
     ResourceGroupForKeypairsRow,
     ResourceGroupForProjectRow,
     ResourceGroupOpts,
-    ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.registry import check_resource_group
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
     RBACScopeBindingPair,
 )
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
 from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupCreatorSpec,
     ResourceGroupForDomainCreatorSpec,
     ResourceGroupForKeypairsCreatorSpec,
     ResourceGroupForProjectCreatorSpec,
@@ -66,11 +65,6 @@ from ai.backend.manager.repositories.resource_group.purgers import (
 from ai.backend.manager.repositories.resource_group.scope_binders import (
     ResourceGroupDomainEntityUnbinder,
     ResourceGroupProjectEntityUnbinder,
-)
-from ai.backend.manager.repositories.resource_group.updaters import (
-    ResourceGroupMetadataUpdaterSpec,
-    ResourceGroupStatusUpdaterSpec,
-    ResourceGroupUpdaterSpec,
 )
 from ai.backend.manager.services.resource_group.actions.associate_with_domain import (
     AssociateResourceGroupWithDomainsAction,
@@ -93,9 +87,6 @@ from ai.backend.manager.services.resource_group.actions.disassociate_with_user_g
 )
 from ai.backend.manager.services.resource_group.actions.get_wsproxy_version import (
     GetWsproxyVersionAction,
-)
-from ai.backend.manager.services.resource_group.actions.list_allowed import (
-    ListAllowedResourceGroupsAction,
 )
 from ai.backend.manager.services.resource_group.actions.list_resource_groups import (
     SearchResourceGroupsAction,
@@ -175,7 +166,7 @@ class TestScalingGroupService:
         )
 
     @pytest.fixture
-    def resource_group_creator_full(self) -> Creator[ResourceGroupRow]:
+    def resource_group_creator_full(self) -> ResourceGroupCreator:
         """Creator with full configuration for testing create_scaling_group success"""
         scheduler_opts = ResourceGroupOpts(
             allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
@@ -183,7 +174,7 @@ class TestScalingGroupService:
             config={"max_sessions": 10},
             agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
         )
-        spec = ResourceGroupCreatorSpec(
+        return ResourceGroupCreator(
             name="test-sgroup-full",
             driver="docker",
             scheduler="fifo",
@@ -196,7 +187,6 @@ class TestScalingGroupService:
             scheduler_opts=scheduler_opts,
             use_host_network=True,
         )
-        return Creator(spec=spec)
 
     async def test_search_scaling_groups_with_default_querier(
         self,
@@ -365,7 +355,7 @@ class TestScalingGroupService:
         resource_group_service: ResourceGroupService,
         mock_repository: MagicMock,
         sample_scaling_group: ResourceGroupData,
-        resource_group_creator_full: Creator[ResourceGroupRow],
+        resource_group_creator_full: ResourceGroupCreator,
     ) -> None:
         """Test creating a scaling group successfully"""
         mock_repository.create_resource_group = AsyncMock(return_value=sample_scaling_group)
@@ -380,7 +370,7 @@ class TestScalingGroupService:
         self,
         resource_group_service: ResourceGroupService,
         mock_repository: MagicMock,
-        resource_group_creator_full: Creator[ResourceGroupRow],
+        resource_group_creator_full: ResourceGroupCreator,
     ) -> None:
         """Test that ScalingGroupConflict propagates through the service"""
         mock_repository.create_resource_group = AsyncMock(
@@ -403,18 +393,13 @@ class TestScalingGroupService:
         """Test modifying a scaling group successfully"""
         mock_repository.update_resource_group = AsyncMock(return_value=sample_scaling_group)
 
-        spec = ResourceGroupUpdaterSpec(
-            status=ResourceGroupStatusUpdaterSpec(
-                is_active=OptionalState.update(False),
-            ),
-            metadata=ResourceGroupMetadataUpdaterSpec(
-                description=TriState.update("Updated description"),
-            ),
+        resource_group_id = ResourceGroupID(uuid.uuid4())
+        updater = ResourceGroupUpdater(
+            resource_group_id=resource_group_id,
+            is_active=OptionalState.update(False),
+            description=TriState.update("Updated description"),
         )
-        updater = Updater(spec=spec, pk_value="default")
-        action = UpdateResourceGroupAction(
-            resource_group_id=ResourceGroupID(uuid.uuid4()), updater=updater
-        )
+        action = UpdateResourceGroupAction(resource_group_id=resource_group_id, updater=updater)
         result = await resource_group_service.update_resource_group(action)
 
         assert result.resource_group == sample_scaling_group
@@ -430,15 +415,12 @@ class TestScalingGroupService:
             side_effect=ResourceGroupNotFound("Scaling group not found: nonexistent")
         )
 
-        spec = ResourceGroupUpdaterSpec(
-            metadata=ResourceGroupMetadataUpdaterSpec(
-                description=TriState.update("Updated description"),
-            ),
+        resource_group_id = ResourceGroupID(uuid.uuid4())
+        updater = ResourceGroupUpdater(
+            resource_group_id=resource_group_id,
+            description=TriState.update("Updated description"),
         )
-        updater = Updater(spec=spec, pk_value="nonexistent")
-        action = UpdateResourceGroupAction(
-            resource_group_id=ResourceGroupID(uuid.uuid4()), updater=updater
-        )
+        action = UpdateResourceGroupAction(resource_group_id=resource_group_id, updater=updater)
 
         with pytest.raises(ResourceGroupNotFound):
             await resource_group_service.update_resource_group(action)
@@ -859,112 +841,3 @@ class TestGetWsproxyVersion:
 
         with pytest.raises(ObjectNotFound):
             await service.get_wsproxy_version(action)
-
-
-class TestListAllowedScalingGroups:
-    """Tests for ResourceGroupService.list_allowed_sgroups"""
-
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        return MagicMock(spec=ResourceGroupRepository)
-
-    @pytest.fixture
-    def resource_group_service(self, mock_repository: MagicMock) -> ResourceGroupService:
-        return ResourceGroupService(repository=mock_repository)
-
-    def _make_sgroup(self, name: str, *, is_public: bool = True) -> ResourceGroupData:
-        return ResourceGroupData(
-            id=ResourceGroupID(uuid.uuid4()),
-            name=name,
-            status=ResourceGroupStatus(is_active=True, is_public=is_public, is_default=False),
-            metadata=ResourceGroupMetadata(
-                description=f"{name} group",
-                created_at=datetime.now(tz=UTC),
-            ),
-            network=ResourceGroupNetworkConfig(
-                wsproxy_addr="", wsproxy_api_token="", use_host_network=False
-            ),
-            driver=ResourceGroupDriverConfig(name="static", options={}),
-            scheduler=ResourceGroupSchedulerConfig(
-                name=SchedulerType.FIFO,
-                options=ResourceGroupSchedulerOptions(
-                    allowed_session_types=[SessionTypes.INTERACTIVE],
-                    pending_timeout=timedelta(seconds=0),
-                    config={},
-                    agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
-                    agent_selector_config={},
-                    allow_fractional_resource_fragmentation=True,
-                    route_cleanup_target_statuses=["unhealthy"],
-                ),
-            ),
-            fair_share_spec=FairShareResourceGroupSpec(
-                half_life_days=7,
-                lookback_days=28,
-                decay_unit_days=1,
-                default_weight=Decimal("1.0"),
-                resource_weights=ResourceSlot(),
-            ),
-            default_deployment_options=DeploymentOptions(),
-            default_session_options=DefaultSessionOptions(),
-        )
-
-    async def test_admin_returns_all_groups(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Admin returns all groups including private."""
-        public_sg = self._make_sgroup("public-group", is_public=True)
-        private_sg = self._make_sgroup("private-group", is_public=False)
-        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[public_sg, private_sg])
-
-        action = ListAllowedResourceGroupsAction(
-            domain_name="default",
-            group="default",
-            access_key="AKTEST123",
-            is_admin=True,
-        )
-
-        result = await resource_group_service.list_allowed_sgroups(action)
-
-        assert set(result.resource_group_names) == {"public-group", "private-group"}
-
-    async def test_non_admin_returns_public_only(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Non-admin returns only public groups."""
-        public_sg = self._make_sgroup("public-group", is_public=True)
-        private_sg = self._make_sgroup("private-group", is_public=False)
-        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[public_sg, private_sg])
-
-        action = ListAllowedResourceGroupsAction(
-            domain_name="default",
-            group="default",
-            access_key="AKTEST123",
-            is_admin=False,
-        )
-
-        result = await resource_group_service.list_allowed_sgroups(action)
-
-        assert result.resource_group_names == ["public-group"]
-
-    async def test_no_allowed_groups_returns_empty(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """No allowed groups returns empty list."""
-        mock_repository.list_allowed_sgroups = AsyncMock(return_value=[])
-
-        action = ListAllowedResourceGroupsAction(
-            domain_name="default",
-            group="default",
-            access_key="AKTEST123",
-            is_admin=False,
-        )
-
-        result = await resource_group_service.list_allowed_sgroups(action)
-
-        assert result.resource_group_names == []

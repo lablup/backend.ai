@@ -169,7 +169,6 @@ class ManagerHandler:
     # ------------------------------------------------------------------
 
     async def fetch_manager_status(self, req: RequestCtx) -> APIResponse:
-        log.info("MANAGER.FETCH_MANAGER_STATUS ()")
         try:
             action = FetchManagerStatusAction()
             result = await self._manager_admin.fetch_status.run(action)
@@ -206,11 +205,6 @@ class ManagerHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info(
-            "MANAGER.UPDATE_MANAGER_STATUS (status:{}, force_kill:{})",
-            params.status,
-            params.force_kill,
-        )
         action = UpdateManagerStatusAction(
             status=params.status,
             force_kill=params.force_kill,

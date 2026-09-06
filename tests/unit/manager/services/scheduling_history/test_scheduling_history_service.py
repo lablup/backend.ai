@@ -41,16 +41,16 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SessionSchedulingHistoryListResult,
 )
-from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
-from ai.backend.manager.repositories.scheduling_history.types import (
+from ai.backend.manager.models.scheduling_history.scopes import (
     DeploymentHistoryOperationScope,
     DeploymentReplicaGroupHistoryOperationScope,
     RouteHistoryOperationScope,
     SessionKernelHistoryOperationScope,
     SessionSchedulingHistoryOperationScope,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
     GlobalSearchReplicaGroupHistoryAction,
 )

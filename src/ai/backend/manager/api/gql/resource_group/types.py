@@ -605,7 +605,7 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
 
     resource_group_name: str = gql_field(description="Name of the resource group to update.")
 
-    # Status fields (ResourceGroupStatusUpdaterSpec)
+    # Status fields
     is_active: bool | None = gql_field(
         description="Whether the resource group is active. Leave null to keep existing value.",
         default=None,
@@ -626,12 +626,12 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
         default=None,
     )
 
-    # Metadata fields (ResourceGroupMetadataUpdaterSpec)
+    # Metadata fields
     description: str | None = gql_field(
         description="Human-readable description. Leave null to keep existing value.", default=None
     )
 
-    # Network config fields (ResourceGroupNetworkConfigUpdaterSpec)
+    # Network config fields
     app_proxy_addr: str | None = gql_field(
         description="App proxy address. Leave null to keep existing value.", default=None
     )
@@ -643,7 +643,7 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
         default=None,
     )
 
-    # Scheduler config fields (ResourceGroupSchedulerConfigUpdaterSpec)
+    # Scheduler config fields
     scheduler_type: SchedulerTypeGQL | None = gql_field(
         description="Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.",
         default=None,

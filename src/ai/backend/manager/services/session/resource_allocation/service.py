@@ -146,11 +146,14 @@ class ResourceAllocationService:
         preset_data_list = await self._resource_preset_repository.list_presets(
             action.resource_group,
         )
+        known_slot_types = await self._resource_preset_repository.known_slot_types()
 
         presets: list[PresetAvailabilityData] = []
         for preset_data in preset_data_list:
             preset_slots = resource_slot_to_quantities(
-                preset_data.resource_slots.normalize_slots(ignore_unknown=True)
+                preset_data.resource_slots.normalize_slots_by_known_slots(
+                    known_slot_types, ignore_unknown=True
+                )
             )
             allocatable = quantities_ge(allocation.assignable, preset_slots)
             # Also check max_per_node if resource group data is available

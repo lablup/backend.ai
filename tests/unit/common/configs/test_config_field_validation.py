@@ -114,12 +114,18 @@ def get_secret_fields(
 
         # Check if it's marked as secret
         is_marked_secret = False
+        is_composite = False
         if get_origin(annotation) is Annotated:
             args = get_args(annotation)
             for arg in args[1:]:
-                if isinstance(arg, BackendAIConfigMeta) and arg.secret:
-                    is_marked_secret = True
+                if isinstance(arg, BackendAIConfigMeta):
+                    is_marked_secret = arg.secret
+                    is_composite = arg.composite is not None
                     break
+
+        # A composite section holds no value of its own to mask.
+        if is_composite:
+            continue
 
         yield (field_path, is_marked_secret)
 

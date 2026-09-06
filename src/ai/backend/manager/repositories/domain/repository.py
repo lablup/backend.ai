@@ -12,12 +12,10 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.errors.resource import DomainDeletionFailed
+from ai.backend.manager.errors.resource import DomainDeletionFailed, DomainPurgeInProgress
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainPurger
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater, DomainUpdater
-from ai.backend.manager.models.project.creators import ProjectCreator
-from ai.backend.manager.models.project.row import ProjectType
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.db_source import DomainDBSource
@@ -49,27 +47,10 @@ class DomainRepository:
         self._v2_ops = v2_ops_provider
 
     @domain_repository_resilience.apply()
-    async def create_domain(self, creator: DomainCreator) -> DomainData:
-        """Register a domain together with the model-store project every domain has."""
-        async with self._v2_ops.write_ops() as w:
-            data = await w.create_role_managed_entity(creator)
-            await w.create_role_managed_entity(
-                ProjectCreator(
-                    name="model-store",
-                    domain_id=data.id,
-                    domain_name=data.name,
-                    description="Model Store",
-                    resource_policy="default",
-                    type=ProjectType.MODEL_STORE,
-                )
-            )
-            return data
-
-    @domain_repository_resilience.apply()
     async def purge_domain(self, domain_id: DomainID, domain_name: str) -> DomainData:
         """Remove a domain and the kernel rows it left, in one transaction."""
         async with self._v2_ops.write_ops() as w:
-            await w.batch_purge_in_global(DomainKernelPurger(name=domain_name))
+            await w.batch_purge_field_entities(domain_id, DomainKernelPurger(name=domain_name))
             data = await w.purge_entity(DomainPurger(domain_id=domain_id, name=domain_name))
             if data is None:
                 raise DomainDeletionFailed(f"Failed to delete domain: {domain_name}")
@@ -85,7 +66,7 @@ class DomainRepository:
         side of the pair, so the v2 ops layer has no primitive that writes one.
         """
         async with self._v2_ops.write_ops() as w:
-            data = await w.create_role_managed_entity(creator)
+            data = await w.create_role_managed_global_entity(creator)
         if resource_group_ids:
             async with self._db.begin_session() as session:
                 await session.execute(
@@ -128,10 +109,14 @@ class DomainRepository:
                         ),
                     )
         async with self._v2_ops.write_ops() as w:
-            data = await w.update_data(updater)
-            if data is None:
-                raise DomainNotFound(f"Domain not found: {updater.target_id_value()}")
-            return data
+            data = await w.update_guarded_data(updater)
+            if data is not None:
+                return data
+            if await w.row_exists(
+                updater.row_class, updater.target_id_column(), updater.target_id_value()
+            ):
+                raise DomainPurgeInProgress(f"Domain is being purged: {updater.target_id_value()}")
+            raise DomainNotFound(f"Domain not found: {updater.target_id_value()}")
 
     @domain_repository_resilience.apply()
     async def update_dotfiles(self, updater: DomainDotfilesUpdater) -> DomainData:

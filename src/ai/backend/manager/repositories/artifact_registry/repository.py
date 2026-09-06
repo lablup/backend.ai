@@ -10,13 +10,12 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryData,
     ArtifactRegistryListResult,
 )
-from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
+from ai.backend.manager.models.artifact_registries.searchers import ArtifactRegistrySearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact_registry.db_source.db_source import (
     ArtifactRegistryDBSource,
 )
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 artifact_registry_repository_resilience = Resilience(
     policies=[
@@ -39,15 +38,11 @@ class ArtifactRegistryRepository:
     """Repository layer that delegates to data source."""
 
     _db_source: ArtifactRegistryDBSource
+    _v2_ops: V2DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db_source = ArtifactRegistryDBSource(db)
-
-    @artifact_registry_repository_resilience.apply()
-    async def create_artifact_registry(
-        self, creator: RBACEntityCreator[ArtifactRegistryRow]
-    ) -> ArtifactRegistryData:
-        return await self._db_source.create_artifact_registry(creator)
+        self._v2_ops = v2_ops_provider
 
     @artifact_registry_repository_resilience.apply()
     async def get_artifact_registry_data(self, registry_id: uuid.UUID) -> ArtifactRegistryData:
@@ -74,7 +69,14 @@ class ArtifactRegistryRepository:
     @artifact_registry_repository_resilience.apply()
     async def search_artifact_registries(
         self,
-        querier: BatchQuerier,
+        searcher: ArtifactRegistrySearcher,
     ) -> ArtifactRegistryListResult:
         """Searches artifact registries with total count."""
-        return await self._db_source.search_artifact_registries(querier=querier)
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return ArtifactRegistryListResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

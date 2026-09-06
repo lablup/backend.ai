@@ -17,13 +17,20 @@ from typing import Any
 from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.v2.bulk.result import (
+    PartialBulkEntityResult,
+    PartialBulkResult,
+)
 from ai.backend.manager.actions.v2.field.bulk_lookup import (
     BulkFieldOwnerLookupOpsResult,
     LookupBulkFieldOwnerOpsAction,
+    LookupBulkRuntimeFieldOwnerOpsAction,
 )
 from ai.backend.manager.actions.v2.field.lookup import (
+    FieldKeyLookupOpsAction,
     FieldOwnerKeyLookupOpsAction,
     FieldOwnerLookupOpsAction,
+    RuntimeFieldOwnerLookupOpsAction,
 )
 from ai.backend.manager.actions.v2.lookup.bulk_base import BulkLookupKeyResult
 from ai.backend.manager.actions.v2.ops.base import (
@@ -39,6 +46,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     EntityWithFieldsCreateOpsAction,
     FieldAtomicCreateOpsAction,
     FieldCreateOpsAction,
+    FieldGetOpsAction,
     FieldPartialBulkPurgeOpsAction,
     FieldPurgeOpsAction,
     FieldUpsertOpsAction,
@@ -51,8 +59,11 @@ from ai.backend.manager.actions.v2.ops.base import (
     GlobalEntityPartialBulkPurgeOpsAction,
     GlobalEntityUpsertOpsAction,
     GlobalEntityWithFieldsCreateOpsAction,
+    GlobalRoleManagedEntityCreateOpsAction,
     GlobalSearchOpsAction,
+    GuardedUpdateOpsAction,
     LookupOpsAction,
+    PartialBulkGetEntityOpsAction,
     PartialBulkUpdateOpsAction,
     RoleManagedEntityAtomicCreateOpsAction,
     RoleManagedEntityCreateOpsAction,
@@ -62,12 +73,12 @@ from ai.backend.manager.actions.v2.ops.base import (
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     BulkFieldOpsResult,
-    BulkOpsResult,
     CreatedEntityOpsResult,
     CreatedEntityWithFieldsOpsResult,
     CreatedFieldOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
+    FieldKeyLookupOpsResult,
     FieldOwnerLookupOpsResult,
     FieldsOpsResult,
     LookupOpsResult,
@@ -75,13 +86,17 @@ from ai.backend.manager.actions.v2.ops.result import (
     ScopedBatchOpsResult,
     ScopedFieldsOpsResult,
 )
+from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = (
     "GetService",
+    "PartialBulkGetService",
     "BulkOwnedFieldGetService",
     "LookupService",
     "BulkFieldOwnerLookupService",
+    "FieldKeyLookupService",
     "FieldOwnerKeyLookupService",
     "FieldOwnerLookupService",
     "SearchService",
@@ -107,6 +122,7 @@ __all__ = (
     "GlobalAtomicUpsertService",
     "FieldUpsertService",
     "UpdateService",
+    "GuardedUpdateService",
     "DeleteService",
     "RestoreService",
     "PartialBulkUpdateService",
@@ -119,6 +135,26 @@ __all__ = (
 )
 
 
+def _partial_bulk_items[TData](
+    result: BulkResultWithFailures[TData],
+) -> list[PartialBulkEntityResult[TData]]:
+    """Turn a write's per-entity answer into the standard items.
+
+    Order is not settled here: the processor holds the ids the caller named and puts
+    these back in that order.
+    """
+    return [
+        *(
+            PartialBulkEntityResult[TData].succeeded(entity_id, data)
+            for entity_id, data in result.successes.items()
+        ),
+        *(
+            PartialBulkEntityResult[TData].failed(entity_id, error)
+            for entity_id, error in result.errors.items()
+        ),
+    ]
+
+
 class GetService[TData]:
     """Reads the entity the action's querier names."""
 
@@ -129,6 +165,20 @@ class GetService[TData]:
 
     async def execute(self, action: GetOpsAction[Any, TData]) -> EntityOpsResult[TData]:
         return EntityOpsResult(data=await self._repository.get(action.to_querier()))
+
+
+class FieldGetService[TFieldData: FieldData]:
+    """Reads the field row the action's querier names."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: FieldGetOpsAction[Any, TFieldData]
+    ) -> EntityOpsResult[TFieldData]:
+        return EntityOpsResult(data=await self._repository.get_field(action.to_querier()))
 
 
 class BulkOwnedFieldGetService[TFieldData: FieldData]:
@@ -144,6 +194,37 @@ class BulkOwnedFieldGetService[TFieldData: FieldData]:
     ) -> OwnedFieldsOpsResult[Any, TFieldData]:
         designated = await self._repository.owned_fields(action.to_querier(), action.owner_ids())
         return OwnedFieldsOpsResult(designated=designated)
+
+
+class PartialBulkGetService[TData]:
+    """Reads the entities the action names, answering for each one.
+
+    Reads them off the action like every other generic service: the entities the
+    caller may not reach are gone from it by the time this runs.
+    """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: PartialBulkGetEntityOpsAction[Any, TData]
+    ) -> PartialBulkResult[TData]:
+        entity_ids = action.entity_ids()
+        querier = action.to_querier()
+        found = await self._repository.bulk_get(querier, entity_ids)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[TData].succeeded(entity_id, found[entity_id])
+                if entity_id in found
+                else PartialBulkEntityResult[TData].failed(
+                    entity_id,
+                    EntityNotFoundError(f"{querier.row_class().__name__} {entity_id} not found"),
+                )
+                for entity_id in entity_ids
+            ]
+        )
 
 
 class LookupService[TData: EntityData]:
@@ -188,6 +269,36 @@ class FieldOwnerKeyLookupService:
         return FieldOwnerLookupOpsResult(owner_entity_id=owner_entity_id)
 
 
+class FieldKeyLookupService:
+    """Reads the id of the field row a key names, and of the entity that owns it."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: FieldKeyLookupOpsAction[Any, Any]) -> FieldKeyLookupOpsResult:
+        field_id, owner_entity_id = await self._repository.field_by_key(action.to_field_lookup())
+        return FieldKeyLookupOpsResult(field_id=field_id, owner_entity_id=owner_entity_id)
+
+
+class RuntimeFieldOwnerLookupService:
+    """Reads the id of the polymorphic entity that owns a field row."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: RuntimeFieldOwnerLookupOpsAction[Any]
+    ) -> FieldOwnerLookupOpsResult:
+        owner_entity_id = await self._repository.runtime_field_owner(
+            action.to_owner_lookup(), action.field_id()
+        )
+        return FieldOwnerLookupOpsResult(owner_entity_id=owner_entity_id)
+
+
 class BulkFieldOwnerLookupService:
     """Reads the entities owning the field rows an action names, answering per row."""
 
@@ -201,6 +312,35 @@ class BulkFieldOwnerLookupService:
     ) -> BulkFieldOwnerLookupOpsResult[Any]:
         field_ids = action.field_ids()
         owners = await self._repository.field_owners(action.to_owner_lookup(), field_ids)
+        found = ActionRunStatus.success()
+        key_results = [
+            BulkLookupKeyResult(
+                key=action.to_lookup_key(field_id),
+                status=found.status if field_id in owners else OperationStatus.ERROR,
+                description=found.description
+                if field_id in owners
+                else "No field row matches the given id.",
+                error_code=None,
+                entity_id=owners.get(field_id),
+            )
+            for field_id in field_ids
+        ]
+        return BulkFieldOwnerLookupOpsResult(owners=owners, key_results=key_results)
+
+
+class BulkRuntimeFieldOwnerLookupService:
+    """Reads the polymorphic entities owning the field rows an action names."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: LookupBulkRuntimeFieldOwnerOpsAction[Any]
+    ) -> BulkFieldOwnerLookupOpsResult[Any]:
+        field_ids = action.field_ids()
+        owners = await self._repository.runtime_field_owners(action.to_owner_lookup(), field_ids)
         found = ActionRunStatus.success()
         key_results = [
             BulkLookupKeyResult(
@@ -357,7 +497,7 @@ class EntityCreateWithFieldsService[TData: EntityData]:
 
 
 class RoleManagedEntityCreateService[TData: EntityData]:
-    """Inserts the role-managed entity row, preset roles included."""
+    """Inserts the role-managed entity row in its scopes, preset roles included."""
 
     _repository: OpsRepository[TData]
 
@@ -369,6 +509,23 @@ class RoleManagedEntityCreateService[TData: EntityData]:
     ) -> CreatedEntityOpsResult[TData]:
         return CreatedEntityOpsResult(
             data=await self._repository.create_role_managed_entity(action.to_creator())
+        )
+
+
+class GlobalRoleManagedEntityCreateService[TData: EntityData]:
+    """Inserts the role-managed entity row created in no scope, preset roles
+    included."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: GlobalRoleManagedEntityCreateOpsAction[Any, TData]
+    ) -> CreatedEntityOpsResult[TData]:
+        return CreatedEntityOpsResult(
+            data=await self._repository.create_role_managed_global_entity(action.to_creator())
         )
 
 
@@ -500,9 +657,9 @@ class GlobalPartialBulkPurgeService[TData]:
 
     async def execute(
         self, action: GlobalEntityPartialBulkPurgeOpsAction[Any, TData]
-    ) -> BulkOpsResult[TData]:
+    ) -> PartialBulkResult[TData]:
         result = await self._repository.partial_bulk_purge_entities(action.to_purgers())
-        return BulkOpsResult(successes=result.successes, errors=result.errors)
+        return PartialBulkResult(items=_partial_bulk_items(result))
 
 
 class EntityPartialBulkPurgeService[TData]:
@@ -515,9 +672,9 @@ class EntityPartialBulkPurgeService[TData]:
 
     async def execute(
         self, action: EntityPartialBulkPurgeOpsAction[Any, TData]
-    ) -> BulkOpsResult[TData]:
+    ) -> PartialBulkResult[TData]:
         result = await self._repository.partial_bulk_purge_entities(action.to_purgers())
-        return BulkOpsResult(successes=result.successes, errors=result.errors)
+        return PartialBulkResult(items=_partial_bulk_items(result))
 
 
 class FieldPartialBulkPurgeService[TData: FieldData]:
@@ -659,6 +816,22 @@ class RestoreService[TData]:
         return EntityOpsResult(data=await self._repository.update(action.to_updater()))
 
 
+class GuardedUpdateService[TData]:
+    """Applies the action's guarded updater.
+
+    Serves the update, delete and restore shapes alike: which column moves is the
+    updater's business, and the shape is what says how the write is recorded.
+    """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: GuardedUpdateOpsAction[Any, TData]) -> EntityOpsResult[TData]:
+        return EntityOpsResult(data=await self._repository.update_guarded(action.to_updater()))
+
+
 class PartialBulkUpdateService[TData]:
     """Updates each entity the action named, answering for every one of them."""
 
@@ -667,9 +840,11 @@ class PartialBulkUpdateService[TData]:
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(self, action: PartialBulkUpdateOpsAction[Any, TData]) -> BulkOpsResult[TData]:
+    async def execute(
+        self, action: PartialBulkUpdateOpsAction[Any, TData]
+    ) -> PartialBulkResult[TData]:
         result = await self._repository.partial_bulk_update(action.to_updaters())
-        return BulkOpsResult(successes=result.successes, errors=result.errors)
+        return PartialBulkResult(items=_partial_bulk_items(result))
 
 
 class PartialBulkDeleteService[TData]:
@@ -684,9 +859,11 @@ class PartialBulkDeleteService[TData]:
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(self, action: PartialBulkUpdateOpsAction[Any, TData]) -> BulkOpsResult[TData]:
+    async def execute(
+        self, action: PartialBulkUpdateOpsAction[Any, TData]
+    ) -> PartialBulkResult[TData]:
         result = await self._repository.partial_bulk_update(action.to_updaters())
-        return BulkOpsResult(successes=result.successes, errors=result.errors)
+        return PartialBulkResult(items=_partial_bulk_items(result))
 
 
 class PartialBulkRestoreService[TData]:
@@ -697,9 +874,11 @@ class PartialBulkRestoreService[TData]:
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(self, action: PartialBulkUpdateOpsAction[Any, TData]) -> BulkOpsResult[TData]:
+    async def execute(
+        self, action: PartialBulkUpdateOpsAction[Any, TData]
+    ) -> PartialBulkResult[TData]:
         result = await self._repository.partial_bulk_update(action.to_updaters())
-        return BulkOpsResult(successes=result.successes, errors=result.errors)
+        return PartialBulkResult(items=_partial_bulk_items(result))
 
 
 class BatchUpdateService[TData: EntityData]:
@@ -744,7 +923,7 @@ class BatchPurgeService[TData: EntityData]:
 
     async def execute(self, action: BatchPurgeOpsAction[Any, TData]) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
-            items=await self._repository.batch_purge_in_scopes(
+            items=await self._repository.batch_purge_entities_in_scopes(
                 action.operation_scopes(), action.to_batch_purger()
             )
         )
@@ -762,5 +941,5 @@ class GlobalBatchPurgeService[TData: EntityData]:
         self, action: GlobalBatchPurgeOpsAction[Any, TData]
     ) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
-            items=await self._repository.batch_purge_in_global(action.to_batch_purger())
+            items=await self._repository.batch_purge_entities_in_global(action.to_batch_purger())
         )

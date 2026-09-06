@@ -114,7 +114,7 @@ class ContainerRegistryRow(Base):
         "id",
         GUID(ContainerRegistryID),
         primary_key=True,
-        server_default=sa.text("uuid_generate_v4()"),
+        server_default=sa.text("uuid_generate_v7()"),
     )
     url: Mapped[str] = mapped_column("url", sa.String(length=512), index=True, nullable=False)
     registry_name: Mapped[str] = mapped_column(

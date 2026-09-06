@@ -19,6 +19,9 @@ depends_on = None
 
 def upgrade() -> None:
     # Convert status: native ENUM → VARCHAR
+    # Drop the enum-typed default first — Postgres cannot auto-cast it to
+    # VARCHAR, and leaving it in place also blocks DROP TYPE routestatus below.
+    op.execute(sa.text("ALTER TABLE routings ALTER COLUMN status DROP DEFAULT"))
     op.alter_column(
         "routings",
         "status",
@@ -74,6 +77,9 @@ def downgrade() -> None:
         ),
         existing_nullable=False,
         postgresql_using="status::routestatus",
+    )
+    op.execute(
+        sa.text("ALTER TABLE routings ALTER COLUMN status SET DEFAULT 'provisioning'::routestatus")
     )
     # Drop the VARCHAR default before altering the type, otherwise Postgres
     # cannot automatically cast the existing default ('active'::text) to the

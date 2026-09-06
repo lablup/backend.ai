@@ -479,7 +479,6 @@ class TestResolveEffectivePermissions:
                         scope_type=scope_type,
                         scope_id=scope_id,
                         entity_type=entry.entity_type,
-                        operation=entry.operation,
                         permission=Permission.from_operation(entry.operation),
                     )
                 )
@@ -504,9 +503,12 @@ class TestResolveEffectivePermissions:
 
     @staticmethod
     def _ops_by_entity_id(
-        result: Mapping[PermissionResolutionKey, frozenset[OperationType]],
+        result: Mapping[PermissionResolutionKey, Permission],
     ) -> dict[str, frozenset[OperationType]]:
-        return {key.entity_id: ops for key, ops in result.items()}
+        return {
+            key.entity_id: frozenset(bit.to_operation() for bit in Permission if bit and bits & bit)
+            for key, bits in result.items()
+        }
 
     # ── Tests: empty / no permission ──
 
@@ -831,7 +833,6 @@ class TestResolveEffectivePermissions:
                     scope_type=ScopeType.PROJECT,
                     scope_id=fixture.project_id,
                     entity_type=EntityType.VFOLDER,
-                    operation=OperationType.READ,
                     permission=Permission.READ,
                 )
             )
@@ -867,7 +868,6 @@ class TestResolveEffectivePermissions:
                     scope_type=ScopeType.PROJECT,
                     scope_id=fixture.project_id,
                     entity_type=EntityType.VFOLDER,
-                    operation=OperationType.READ,
                     permission=Permission.READ,
                 )
             )
@@ -878,7 +878,6 @@ class TestResolveEffectivePermissions:
                     scope_type=ScopeType.PROJECT,
                     scope_id=fixture.project_id,
                     entity_type=EntityType.VFOLDER,
-                    operation=OperationType.UPDATE,
                     permission=Permission.UPDATE,
                 )
             )

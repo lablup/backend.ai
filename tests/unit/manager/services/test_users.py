@@ -18,7 +18,7 @@ from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.user.types import (
@@ -29,11 +29,10 @@ from ai.backend.manager.data.user.types import (
 )
 from ai.backend.manager.errors.user import UserNotFound, UserPurgeFailure
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.repositories.user.repository import UserRepository
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -109,7 +108,7 @@ class TestCreateUser:
             id=KeyPairID(uuid.uuid4()),
             user_id=sample_user_uuid,
             access_key=AccessKey("TESTKEY1234567890"),
-            secret_key=SecretKey("test-secret-key"),
+            secret_key=SecretValue("test-secret-key"),
             is_active=True,
             is_admin=False,
             is_default=True,
@@ -155,17 +154,14 @@ class TestCreateUser:
         assert sample_user_data.need_password_change is not None
         assert sample_user_data.domain_name is not None
         action = CreateUserAction(
-            creator=Creator(
-                spec=UserCreatorSpec(
-                    email=sample_user_data.email,
-                    username=sample_user_data.username,
-                    password=sample_password_info,
-                    need_password_change=sample_user_data.need_password_change,
-                    domain_name=sample_user_data.domain_name,
-                )
+            creator=UserCreator(
+                email=sample_user_data.email,
+                username=sample_user_data.username,
+                password=sample_password_info,
+                need_password_change=sample_user_data.need_password_change,
+                domain_id=DomainID(uuid.uuid4()),
             ),
             group_ids=None,
-            domain_id=DomainID(uuid.uuid4()),
         )
 
         result = await service.create_user(action)
@@ -191,17 +187,14 @@ class TestCreateUser:
         assert sample_user_data.domain_name is not None
         group_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
         action = CreateUserAction(
-            creator=Creator(
-                spec=UserCreatorSpec(
-                    email=sample_user_data.email,
-                    username=sample_user_data.username,
-                    password=sample_password_info,
-                    need_password_change=sample_user_data.need_password_change,
-                    domain_name=sample_user_data.domain_name,
-                )
+            creator=UserCreator(
+                email=sample_user_data.email,
+                username=sample_user_data.username,
+                password=sample_password_info,
+                need_password_change=sample_user_data.need_password_change,
+                domain_id=DomainID(uuid.uuid4()),
             ),
             group_ids=group_ids,
-            domain_id=DomainID(uuid.uuid4()),
         )
 
         result = await service.create_user(action)
@@ -223,16 +216,13 @@ class TestCreateUser:
         )
 
         action = CreateUserAction(
-            creator=Creator(
-                spec=UserCreatorSpec(
-                    email="existing@example.com",
-                    username="existinguser",
-                    password=sample_password_info,
-                    need_password_change=False,
-                    domain_name="default",
-                )
+            creator=UserCreator(
+                email="existing@example.com",
+                username="existinguser",
+                password=sample_password_info,
+                need_password_change=False,
+                domain_id=DomainID(uuid.uuid4()),
             ),
-            domain_id=DomainID(uuid.uuid4()),
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -301,12 +291,9 @@ class TestModifyUser:
 
         assert modified_user_data.username is not None
         action = UpdateUserAction(
-            user_id=UserID(uuid.uuid4()),
-            updater=Updater(
-                spec=UserUpdaterSpec(
-                    username=OptionalState.update(modified_user_data.username),
-                ),
-                pk_value=modified_user_data.email,
+            updater=UserUpdater(
+                user_id=UserID(uuid.uuid4()),
+                username=OptionalState.update(modified_user_data.username),
             ),
         )
 
@@ -314,10 +301,7 @@ class TestModifyUser:
 
         assert result.data is not None
         assert result.data.username == modified_user_data.username
-        mock_user_repository.update_user_by_uuid_validated.assert_called_once_with(
-            user_uuid=action.user_id,
-            updater=action.updater,
-        )
+        mock_user_repository.update_user_by_uuid_validated.assert_called_once_with(action.updater)
 
     async def test_modify_nonexistent_user_raises_error(
         self,
@@ -330,12 +314,9 @@ class TestModifyUser:
         )
 
         action = UpdateUserAction(
-            user_id=UserID(uuid.uuid4()),
-            updater=Updater(
-                spec=UserUpdaterSpec(
-                    username=OptionalState.update("new_username"),
-                ),
-                pk_value="nonexistent@example.com",
+            updater=UserUpdater(
+                user_id=UserID(uuid.uuid4()),
+                username=OptionalState.update("new_username"),
             ),
         )
 

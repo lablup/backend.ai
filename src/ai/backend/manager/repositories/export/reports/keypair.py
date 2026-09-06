@@ -9,6 +9,7 @@ from typing import Any
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_group import ResourceGroupForKeypairsRow, ResourceGroupRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+from ai.backend.manager.models.resource_slot.aggregates import session_requested_slots_expr
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import (
@@ -395,7 +396,7 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         name="Session Resource Requested",
         description="Requested resource slots for session",
         field_type=ExportFieldType.JSON,
-        column=SessionRow.requested_slots,
+        column=session_requested_slots_expr(SessionRow.id),
         formatter=_serialize_json,
         joins=frozenset({SESSION_JOIN}),
     ),

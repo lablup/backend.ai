@@ -52,6 +52,10 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
+from ai.backend.manager.services.image.actions.restore_image import (
+    RestoreImageByIdAction,
+    RestoreImageByIdActionResult,
+)
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
@@ -92,6 +96,9 @@ class ImageProcessors:
     forget_image: GlobalActionProcessor[ForgetImageAction, ForgetImageActionResult]
     forget_image_by_id: SingleEntityActionProcessor[
         ForgetImageByIdAction, ForgetImageByIdActionResult
+    ]
+    restore_image_by_id: SingleEntityActionProcessor[
+        RestoreImageByIdAction, RestoreImageByIdActionResult
     ]
     purge_image_by_id: SingleEntityActionProcessor[PurgeImageByIdAction, PurgeImageByIdActionResult]
     alias_image: GlobalActionProcessor[AliasImageAction, AliasImageActionResult]
@@ -151,6 +158,9 @@ class ImageProcessors:
 
         self.forget_image_by_id = group.single_entity(
             ForgetImageByIdAction, service.forget_image_by_id
+        )
+        self.restore_image_by_id = group.single_entity(
+            RestoreImageByIdAction, service.restore_image_by_id
         )
         self.purge_image_by_id = group.single_entity(
             PurgeImageByIdAction, service.purge_image_by_id

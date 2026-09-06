@@ -12,10 +12,12 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
@@ -53,32 +55,23 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.storage import VFolderPermissionError
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.creators import (
-    DeploymentCreatorSpec,
+from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.endpoint.creators import (
+    DeploymentCreator,
     DeploymentMetadataFields,
     DeploymentNetworkFields,
     DeploymentReplicaFields,
 )
-from ai.backend.manager.repositories.deployment.creators.revision import (
-    DeploymentRevisionCreatorSpec,
-)
-from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentUpdaterSpec,
-    RouteUpdaterSpec,
-)
+from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.routing.updaters import ReplicaUpdater
+from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.exceptions import (
     InvalidEndpointState,
 )
@@ -194,14 +187,14 @@ class DeploymentController:
                     ResourceGroupName(metadata.resource_group)
                 )
             )
-        creator_spec = DeploymentCreatorSpec(
+        deployment_creator = DeploymentCreator(
             metadata=DeploymentMetadataFields(
                 name=metadata.name,
                 domain=metadata.domain,
-                project_id=metadata.project,
+                project_id=ProjectID(metadata.project),
                 resource_group=metadata.resource_group,
                 created_user_id=metadata.created_user,
-                session_owner_id=metadata.session_owner,
+                session_owner_id=UserID(metadata.session_owner),
                 revision_history_limit=metadata.revision_history_limit,
                 tag=metadata.tag,
             ),
@@ -214,17 +207,10 @@ class DeploymentController:
                 url=network_spec.url,
             ),
             options=options,
-            revision=None,
         )
-        rbac_creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
-            spec=creator_spec,
-            element_type=RBACElementType.MODEL_DEPLOYMENT,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.USER, element_id=str(metadata.created_user)
-            ),
-            additional_scope_refs=[],
+        return await self._deployment_repository.create_endpoint(
+            deployment_creator, resolved.policy
         )
-        return await self._deployment_repository.create_endpoint(rbac_creator, resolved.policy)
 
     async def build_creator_from_legacy_draft(
         self,
@@ -305,20 +291,19 @@ class DeploymentController:
     async def update_deployment(
         self,
         endpoint_id: DeploymentID,
-        spec: DeploymentUpdaterSpec,
+        updater: DeploymentUpdater,
     ) -> DeploymentInfo:
         """
         Update an existing deployment with new specifications.
 
         Args:
             endpoint_id: ID of the deployment to update
-            spec: Deployment updater specification
+            updater: Update spec for the deployment
 
         Returns:
             DeploymentInfo: Information about the updated deployment
         """
         log.info("Updating deployment {}", endpoint_id)
-        updater = Updater[EndpointRow](spec=spec, pk_value=endpoint_id)
         modified_endpoint = await self._deployment_repository.get_modified_endpoint(
             endpoint_id=endpoint_id, updater=updater
         )
@@ -437,8 +422,7 @@ class DeploymentController:
         resolved_model_definition = merged.model_definition.to_resolved()
         if not resolved_model_definition.models:
             raise InvalidAPIParameters("model_definition.models must contain at least one entry")
-        spec = DeploymentRevisionCreatorSpec(
-            deployment_id=DeploymentID(endpoint_id),
+        revision_creator = DeploymentRevisionCreator(
             image_id=merged.image_id,
             resource_group=endpoint_info.metadata.resource_group,
             resource_slots=ResourceSlot(merged.resource_slots or {}),
@@ -464,17 +448,9 @@ class DeploymentController:
             revision_preset_id=preset_id,
         )
         validation_ctx = await self._build_deployment_revision_validation_context()
-        self._deployment_revision_validator.validate(spec, validation_ctx)
-        rbac_creator = RBACEntityCreator(
-            spec=spec,
-            element_type=RBACElementType.DEPLOYMENT_REVISION,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.MODEL_DEPLOYMENT,
-                element_id=str(endpoint_id),
-            ),
-        )
+        self._deployment_revision_validator.validate(revision_creator, validation_ctx)
         revision_data = await self._deployment_repository.create_revision_with_next_number(
-            rbac_creator, endpoint_id
+            revision_creator, endpoint_id
         )
         await self._prune_revision_history(
             endpoint_id, endpoint_info.metadata.revision_history_limit
@@ -840,10 +816,10 @@ class DeploymentController:
         Returns:
             Updated RouteInfo if found, None otherwise
         """
-        spec = RouteUpdaterSpec(
+        updater = ReplicaUpdater(
+            replica_id=ReplicaID(route_id),
             traffic_status=OptionalState.update(traffic_status),
         )
-        updater: Updater[RoutingRow] = Updater(spec=spec, pk_value=route_id)
         success = await self._deployment_repository.update_route(updater)
         if not success:
             return None

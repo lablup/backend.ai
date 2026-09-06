@@ -12,30 +12,43 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission, VFolderOwnershipType
 from ai.backend.manager.models.agent import AgentRow  # noqa: F401
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow  # noqa: F401
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.vfolder.purgers import (
+    VFolderInvitationBatchPurger,
+    VFolderPermissionBatchPurger,
+)
 from ai.backend.manager.models.vfolder.row import (
     VFolderInvitationRow,
     VFolderPermissionRow,
     VFolderRow,
 )
-from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
-from ai.backend.manager.repositories.vfolder.purgers import (
-    VFolderInvitationBatchPurgerSpec,
-    VFolderPermissionBatchPurgerSpec,
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
 )
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
@@ -63,6 +76,15 @@ class TestVFolderPurgersIntegration:
                 VFolderRow,
                 VFolderInvitationRow,
                 VFolderPermissionRow,
+                # An entity batch purge tears the graph down with each row.
+                VirtualEntityRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
+                ScopeBindingRow,
+                EntityLabelRow,
+                RoleRow,
+                PermissionRow,
             ],
         ):
             yield database_connection
@@ -236,10 +258,11 @@ class TestVFolderPurgersIntegration:
         vfolder_ids = [sample_vfolder.id]
 
         # Purge invitations
-        async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=VFolderInvitationBatchPurgerSpec(vfolder_ids=vfolder_ids))
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == len(sample_invitations)
+        async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
+            removed = await w.batch_purge_entities_in_global(
+                VFolderInvitationBatchPurger(vfolder_ids=vfolder_ids)
+            )
+            assert len(removed) == len(sample_invitations)
 
         # Verify invitations are deleted
         async with db_with_cleanup.begin_session() as session:
@@ -260,10 +283,11 @@ class TestVFolderPurgersIntegration:
         vfolder_ids = [sample_vfolder.id]
 
         # Purge permissions
-        async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=VFolderPermissionBatchPurgerSpec(vfolder_ids=vfolder_ids))
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == len(sample_permissions)
+        async with V2DBOpsProvider(db_with_cleanup).write_ops() as w:
+            removed = await w.batch_purge_field_entities(
+                VFolderUUID(sample_vfolder.id), VFolderPermissionBatchPurger()
+            )
+            assert len(removed) == len(sample_permissions)
 
         # Verify permissions are deleted
         async with db_with_cleanup.begin_session() as session:

@@ -7,10 +7,10 @@ updater building, and data-to-DTO conversion.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import cast
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.user import (
@@ -30,7 +30,6 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 
 
 class TestUserAdapterSearcher:
@@ -388,8 +387,7 @@ class TestUserAdapterUpdater:
         )
 
         adapter = UserAdapter()
-        updater = adapter.build_updater(request, email="old@example.com")
-        spec = cast(UserUpdaterSpec, updater.spec)
+        spec = adapter.build_updater(request, user_id=UserID(uuid4()))
 
         assert spec.username.value() == "newuser"
         assert spec.need_password_change.value() is True
@@ -406,8 +404,6 @@ class TestUserAdapterUpdater:
         assert spec.container_main_gid.value() == 1000
         assert spec.container_gids.value() == [1000, 1001]
         assert spec.group_ids.value() == ["group-1", "group-2"]
-        # pk_value is dummy UUID(int=0) since email-based lookup is used
-        assert updater.pk_value == UUID(int=0)
 
     def test_build_updater_partial_fields(self) -> None:
         """Test building updater with only some fields set"""
@@ -417,8 +413,7 @@ class TestUserAdapterUpdater:
         )
 
         adapter = UserAdapter()
-        updater = adapter.build_updater(request, email="user@example.com")
-        spec = cast(UserUpdaterSpec, updater.spec)
+        spec = adapter.build_updater(request, user_id=UserID(uuid4()))
 
         assert spec.username.value() == "updated-name"
         assert spec.status.value() == UserStatus.INACTIVE
@@ -451,10 +446,7 @@ class TestUserAdapterUpdater:
         )
 
         adapter = UserAdapter()
-        updater = adapter.build_updater(
-            request, email="user@example.com", password_info=password_info
-        )
-        spec = cast(UserUpdaterSpec, updater.spec)
+        spec = adapter.build_updater(request, user_id=UserID(uuid4()), password_info=password_info)
 
         assert spec.username.value() == "updated-name"
         assert spec.password.value() == password_info

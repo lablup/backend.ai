@@ -26,7 +26,7 @@ class UserRoleRow(Base):
     __table_args__ = (sa.UniqueConstraint("user_id", "role_id", name="uq_user_id_role_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     user_id: Mapped[UserID] = mapped_column(
         "user_id",

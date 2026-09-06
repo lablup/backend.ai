@@ -111,6 +111,19 @@ def container_registry() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.client_ip_masking:client_ip_masking_policy",
+)
+def client_ip_masking_policy() -> None:
+    """Admin client IP masking policy commands."""
+
+
+@admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.secret:secret")
+def secret() -> None:
+    """Admin stored secret commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.login_history:login_history",
 )
 def login_history() -> None:
@@ -240,14 +253,6 @@ def model_card() -> None:
 )
 def scheduling_handler() -> None:
     """Admin scheduling handler commands."""
-
-
-@admin.group(
-    cls=LazyGroup,
-    import_name="ai.backend.client.cli.v2.admin.invitation:invitation",
-)
-def invitation() -> None:
-    """Admin role invitation commands."""
 
 
 @admin.group(

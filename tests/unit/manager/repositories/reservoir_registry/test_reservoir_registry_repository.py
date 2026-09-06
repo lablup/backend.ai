@@ -14,9 +14,12 @@ from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
+from ai.backend.manager.models.reservoir_registry.searchers import ReservoirRegistrySearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
+    ArtifactRegistryOpsProvider,
+)
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
@@ -149,7 +152,10 @@ class TestReservoirRegistryRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ReservoirRegistryRepository, None]:
         """Create ReservoirRegistryRepository instance with database"""
-        repo = ReservoirRegistryRepository(db=db_with_cleanup)
+        repo = ReservoirRegistryRepository(
+            db=db_with_cleanup,
+            registry_ops_provider=ArtifactRegistryOpsProvider(db_with_cleanup),
+        )
         yield repo
 
     # =========================================================================
@@ -259,7 +265,7 @@ class TestReservoirRegistryRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test first page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ReservoirRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -268,7 +274,7 @@ class TestReservoirRegistryRepository:
             orders=[],
         )
 
-        result = await reservoir_repository.search_registries(querier=querier)
+        result = await reservoir_repository.search_registries(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -279,7 +285,7 @@ class TestReservoirRegistryRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test second page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ReservoirRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -288,7 +294,7 @@ class TestReservoirRegistryRepository:
             orders=[],
         )
 
-        result = await reservoir_repository.search_registries(querier=querier)
+        result = await reservoir_repository.search_registries(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -299,7 +305,7 @@ class TestReservoirRegistryRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test last page of offset-based pagination with partial results"""
-        querier = BatchQuerier(
+        searcher = ReservoirRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -308,7 +314,7 @@ class TestReservoirRegistryRepository:
             orders=[],
         )
 
-        result = await reservoir_repository.search_registries(querier=querier)
+        result = await reservoir_repository.search_registries(searcher=searcher)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -323,7 +329,7 @@ class TestReservoirRegistryRepository:
         sample_registries_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching Reservoir registries ordered by endpoint ascending"""
-        querier = BatchQuerier(
+        searcher = ReservoirRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -337,7 +343,7 @@ class TestReservoirRegistryRepository:
             orders=[ReservoirRegistryRow.endpoint.asc()],
         )
 
-        result = await reservoir_repository.search_registries(querier=querier)
+        result = await reservoir_repository.search_registries(searcher=searcher)
 
         result_endpoints = [registry.endpoint for registry in result.items]
         assert result_endpoints == sorted(result_endpoints)
@@ -348,7 +354,7 @@ class TestReservoirRegistryRepository:
         sample_registries_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching Reservoir registries ordered by endpoint descending"""
-        querier = BatchQuerier(
+        searcher = ReservoirRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -362,7 +368,7 @@ class TestReservoirRegistryRepository:
             orders=[ReservoirRegistryRow.endpoint.desc()],
         )
 
-        result = await reservoir_repository.search_registries(querier=querier)
+        result = await reservoir_repository.search_registries(searcher=searcher)
 
         result_endpoints = [registry.endpoint for registry in result.items]
         assert result_endpoints == sorted(result_endpoints, reverse=True)
@@ -377,7 +383,7 @@ class TestReservoirRegistryRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test searching Reservoir registries with pagination, filter, and ordering combined"""
-        querier = BatchQuerier(
+        searcher = ReservoirRegistrySearcher(
             pagination=OffsetPagination(limit=5, offset=5),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -386,7 +392,7 @@ class TestReservoirRegistryRepository:
             orders=[ReservoirRegistryRow.endpoint.asc()],
         )
 
-        result = await reservoir_repository.search_registries(querier=querier)
+        result = await reservoir_repository.search_registries(searcher=searcher)
 
         # Total matching registries: 25, so total_count should be 25
         assert result.total_count == 25

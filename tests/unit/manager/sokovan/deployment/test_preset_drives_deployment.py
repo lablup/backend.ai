@@ -28,9 +28,6 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
 )
-from ai.backend.manager.repositories.deployment.creators.deployment import (
-    DeploymentCreatorSpec,
-)
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
 )
@@ -144,8 +141,7 @@ class TestDeploymentFromPreset:
         await deployment_controller.create_deployment(preset_only_creator)
 
         mock_deployment_repository.create_endpoint.assert_awaited_once()
-        rbac_creator, policy_config = mock_deployment_repository.create_endpoint.await_args.args
-        spec: DeploymentCreatorSpec = rbac_creator.spec
+        spec, policy_config = mock_deployment_repository.create_endpoint.await_args.args
         assert spec.replica.replica_count == preset_data.replica_count
         assert spec.network.open_to_public == preset_data.open_to_public
         assert spec.metadata.revision_history_limit == preset_data.revision_history_limit

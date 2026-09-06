@@ -10,10 +10,17 @@ from strawberry import Info
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput, PurgeUserInput
+from ai.backend.common.dto.manager.v2.user.request import (
+    DeleteUserInput,
+    PurgeUserInput,
+    RestoreUserInput,
+)
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AccessKey, ReadableCIDR
+from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -35,6 +42,7 @@ from ai.backend.manager.api.gql.user.types import (
     DeleteUsersPayloadGQL,
     PurgeUserInputGQL,
     PurgeUserPayloadGQL,
+    RestoreUserPayloadGQL,
     UpdateMyAllowedClientIPInputGQL,
     UpdateMyAllowedClientIPPayloadGQL,
     UpdateUserPayloadGQL,
@@ -46,10 +54,8 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     UserCreateSpec,
@@ -58,7 +64,6 @@ from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAct
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
     UpdateUserAction,
-    UserUpdateSpec,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -92,12 +97,18 @@ async def admin_create_user_v2(
     return CreateUserPayloadGQL.from_pydantic(payload)
 
 
-def _build_bulk_create_user_action(
+async def _build_bulk_create_user_action(
     input: BulkCreateUserV2InputGQL,
     auth_config: AuthConfig,
+    adapter: UserAdapter,
 ) -> BulkCreateUserAction:
-    """Build a BulkCreateUserAction from a bulk-create GraphQL input."""
+    """Build a BulkCreateUserAction from a bulk-create GraphQL input.
+
+    Every item names its domain by name, so the ids are resolved here, once per
+    distinct name; an unknown name fails the whole request.
+    """
     items: list[UserCreateSpec] = []
+    domain_ids: dict[str, DomainID] = {}
     for user_input in input.users:
         dto = user_input.to_pydantic()
         password_info = PasswordInfo(
@@ -107,12 +118,15 @@ def _build_bulk_create_user_action(
             salt_size=auth_config.password_hash_salt_size,
         )
 
-        spec = UserCreatorSpec(
+        if dto.domain_name not in domain_ids:
+            domain_ids[dto.domain_name] = await adapter.resolve_domain_id(dto.domain_name)
+
+        creator = UserCreator(
+            domain_id=domain_ids[dto.domain_name],
             email=dto.email,
             username=dto.username,
             password=password_info,
             need_password_change=dto.need_password_change,
-            domain_name=dto.domain_name,
             full_name=dto.full_name,
             description=dto.description,
             status=UserStatus(dto.status),
@@ -127,7 +141,7 @@ def _build_bulk_create_user_action(
         )
 
         group_ids = [str(gid) for gid in dto.group_ids] if dto.group_ids else None
-        items.append(UserCreateSpec(creator=Creator(spec=spec), group_ids=group_ids))
+        items.append(UserCreateSpec(creator=creator, group_ids=group_ids))
 
     return BulkCreateUserAction(items=items)
 
@@ -158,7 +172,9 @@ async def admin_bulk_create_users_v2(
     """
     check_admin_only()
     ctx = info.context
-    action = _build_bulk_create_user_action(input, ctx.config_provider.config.auth)
+    action = await _build_bulk_create_user_action(
+        input, ctx.config_provider.config.auth, ctx.adapters.user
+    )
     payload = await ctx.adapters.user.bulk_create_users(action)
     return BulkCreateUsersV2PayloadGQL.from_pydantic(payload)
 
@@ -188,7 +204,9 @@ async def admin_bulk_create_users_with_keypair_v2(
     """
     check_admin_only()
     ctx = info.context
-    action = _build_bulk_create_user_action(input, ctx.config_provider.config.auth)
+    action = await _build_bulk_create_user_action(
+        input, ctx.config_provider.config.auth, ctx.adapters.user
+    )
     payload = await ctx.adapters.user.bulk_create_users_with_keypair(action)
     return BulkCreateUsersWithKeypairV2PayloadGQL.from_pydantic(payload)
 
@@ -248,12 +266,13 @@ async def admin_bulk_update_users_v2(
     ctx = info.context
     auth_config = ctx.config_provider.config.auth
 
-    items: list[UserUpdateSpec] = []
+    items: list[UserUpdater] = []
     default_key_switches: dict[UserID, AccessKey] = {}
     for user_item in input.users:
         dto = user_item.input.to_pydantic()
 
-        updater_spec = UserUpdaterSpec(
+        updater = UserUpdater(
+            user_id=UserID(user_item.user_id),
             username=(
                 OptionalState.update(dto.username)
                 if dto.username is not None
@@ -344,7 +363,7 @@ async def admin_bulk_update_users_v2(
 
         if not isinstance(dto.main_access_key, Sentinel) and dto.main_access_key is not None:
             default_key_switches[UserID(user_item.user_id)] = AccessKey(dto.main_access_key)
-        items.append(UserUpdateSpec(user_id=UserID(user_item.user_id), updater_spec=updater_spec))
+        items.append(updater)
 
     action = BulkUpdateUserAction(items=items)
     payload = await ctx.adapters.user.bulk_modify_users(action, default_key_switches)
@@ -408,6 +427,23 @@ async def admin_delete_user_v2(
     ctx = info.context
     await ctx.adapters.user.delete_user_by_id(DeleteUserInput(user_id=user_id))
     return DeleteUserPayloadGQL(success=True)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Restore a soft-deleted user (admin only). Requires superadmin privileges. Sets the user status back to ACTIVE",
+    )
+)
+async def admin_restore_user_v2(
+    info: Info[StrawberryGQLContext],
+    user_id: UUID,
+) -> RestoreUserPayloadGQL | None:
+    """Restore a single soft-deleted user."""
+    check_admin_only()
+    ctx = info.context
+    await ctx.adapters.user.restore_user_by_id(RestoreUserInput(user_id=user_id))
+    return RestoreUserPayloadGQL(success=True)
 
 
 @gql_mutation(
@@ -603,10 +639,8 @@ async def update_my_allowed_client_ip(
     else:
         allowed_client_ip = TriState.nullify()
 
-    updater_spec = UserUpdaterSpec(allowed_client_ip=allowed_client_ip)
     action = UpdateUserAction(
-        user_id=UserID(me.user_id),
-        updater=Updater(spec=updater_spec, pk_value=me.user_id),
+        updater=UserUpdater(user_id=UserID(me.user_id), allowed_client_ip=allowed_client_ip)
     )
     await ctx.adapters.user.update_user(action)
 

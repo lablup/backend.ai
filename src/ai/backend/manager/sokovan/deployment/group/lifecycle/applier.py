@@ -11,17 +11,14 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment.updaters.replica_group import (
-    ReplicaGroupLifecycleUpdaterSpec,
+from ai.backend.manager.models.replica_group.updaters import ReplicaGroupLifecycleUpdater
+from ai.backend.manager.models.replica_group_history.creators import (
+    ReplicaGroupHistoryCreator,
 )
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.repositories.replica_group.types import (
     ReplicaGroupLifecycleReconcileApply,
     ReplicaGroupReconcileTransition,
-)
-from ai.backend.manager.repositories.scheduling_history.creators import (
-    ReplicaGroupHistoryCreatorSpec,
 )
 from ai.backend.manager.sokovan.deployment.group.categories import GroupReconcileKind
 from ai.backend.manager.sokovan.deployment.group.lifecycle.types import (
@@ -83,25 +80,23 @@ class GroupLifecycleApplier(
             lifecycle_state = OptionalState[ReplicaGroupLifecycle].nop()
             scaling_state = OptionalState[ReplicaGroupScalingStatus].nop()
             to_status = None
-        updater = Updater(
-            spec=ReplicaGroupLifecycleUpdaterSpec(
-                lifecycle=lifecycle_state,
-                desired_current_replica_count=OptionalState.update(
-                    decision.next_desired_current_replica_count
-                ),
-                desired_target_replica_count=OptionalState.update(
-                    decision.next_desired_target_replica_count
-                ),
-                scaling_status=scaling_state,
-                current_revision_id=decision.next_current_revision_id,
-                target_revision_id=decision.next_target_revision_id,
+        updater = ReplicaGroupLifecycleUpdater(
+            replica_group_id=decision.replica_group_id,
+            lifecycle=lifecycle_state,
+            desired_current_replica_count=OptionalState.update(
+                decision.next_desired_current_replica_count
             ),
-            pk_value=decision.replica_group_id,
+            desired_target_replica_count=OptionalState.update(
+                decision.next_desired_target_replica_count
+            ),
+            scaling_status=scaling_state,
+            current_revision_id=decision.next_current_revision_id,
+            target_revision_id=decision.next_target_revision_id,
         )
         return ReplicaGroupReconcileTransition(
-            history_spec=ReplicaGroupHistoryCreatorSpec(
+            deployment_id=decision.deployment_id,
+            history_creator=ReplicaGroupHistoryCreator(
                 replica_group_id=decision.replica_group_id,
-                deployment_id=decision.deployment_id,
                 category=metadata.category,
                 phase=metadata.phase,
                 result=result,

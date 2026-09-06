@@ -1,0 +1,52 @@
+name: migration-edit-check
+
+# Advisory only: this workflow is deliberately kept out of the required status
+# checks, so a red run asks a reviewer to look rather than blocking the merge.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+    branches:
+      - 'main'
+      - '[0-9][0-9].[0-9]'
+      - '[0-9][0-9].[0-9][0-9]'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-migration-edits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the revision
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+          # The check diffs against the merge base and reads the base revision
+          # of every migration it finds edited, so it needs the history. The
+          # filter keeps that from fetching every blob behind it.
+          fetch-depth: 0
+          filter: blob:none
+      - name: Check whether an existing migration is edited
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          status=0
+          findings=$(.github/scripts/check-migration-edits.sh \
+            --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA" \
+            --base-ref "$BASE_REF" \
+            --labels "$PR_LABELS") || status=$?
+          while IFS=$'\t' read -r severity verb path what; do
+            [ -n "$path" ] || continue
+            if [ "$severity" = released ]; then level=error; else level=warning; fi
+            echo "::${level} file=${path},title=Edited migration::This pull request ${verb} a migration ${what}."
+          done <<< "$findings"
+          exit $status

@@ -52,13 +52,7 @@ from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVaria
 from ai.backend.manager.data.deployment.types import LegacyDeploymentData, ModelRevisionData
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentMetadataUpdaterSpec,
-    DeploymentUpdaterSpec,
-    ReplicaSpecUpdaterSpec,
-)
+from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
 )
@@ -251,26 +245,18 @@ class DeploymentAPIHandler:
         body: BodyParam[UpdateDeploymentRequest],
     ) -> APIResponse:
         """Update an existing deployment."""
-        # Build sub-specs only if fields are provided
-        metadata_spec: DeploymentMetadataUpdaterSpec | None = None
-        if body.parsed.name is not None:
-            metadata_spec = DeploymentMetadataUpdaterSpec(
-                name=OptionalState.update(body.parsed.name),
-            )
-
-        replica_spec: ReplicaSpecUpdaterSpec | None = None
-        if body.parsed.replica_count is not None:
-            replica_spec = ReplicaSpecUpdaterSpec(
-                replica_count=OptionalState.update(body.parsed.replica_count),
-            )
-
-        updater_spec = DeploymentUpdaterSpec(
-            metadata=metadata_spec,
-            replica_spec=replica_spec,
-        )
-        updater = Updater[EndpointRow](
-            spec=updater_spec,
-            pk_value=path.parsed.deployment_id,
+        updater = DeploymentUpdater(
+            deployment_id=DeploymentID(path.parsed.deployment_id),
+            name=(
+                OptionalState.update(body.parsed.name)
+                if body.parsed.name is not None
+                else OptionalState[str].nop()
+            ),
+            replica_count=(
+                OptionalState.update(body.parsed.replica_count)
+                if body.parsed.replica_count is not None
+                else OptionalState[int].nop()
+            ),
         )
 
         # Call service action
@@ -474,9 +460,7 @@ class DeploymentAPIHandler:
 
         Uses PostgreSQL ON CONFLICT to atomically insert or update.
         """
-        upserter = self._policy_adapter.build_upserter(
-            body.parsed, deployment_id=path.parsed.deployment_id
-        )
+        upserter = self._policy_adapter.build_upserter(body.parsed)
         result = await self._deployment.upsert_deployment_policy.run(
             UpsertDeploymentPolicyAction(
                 deployment_id=DeploymentID(path.parsed.deployment_id), upserter=upserter

@@ -95,7 +95,7 @@ Lives in `repositories/permission_controller/db_source/db_source.py`. **But it i
 | ✅ | `resolve_effective_permissions_via_virtual_scope(keys)` — joins `entity → entity_memberships → scope_bindings → scope → permissions → roles → user_roles` in **one path, one hop**. Clips with `granted & scope_cap & entity_cap` (nullable = no ceiling), then OR-combines. One query per `(user_id, entity_type)` group |
 | ✅ | `check_permission_via_virtual_scope` / `check_bulk_permission_via_virtual_scope` — bitwise checks |
 | ✅ | (in use today) recursive scope-walk — `_build_scope_walk_cte(..., recursive=True)` traverses the scope hierarchy recursively |
-| ⚠️ | Resolution can only reach through a scope_binding. Ownership (an owner seeing its own entities) is also expressed via a **self scope_binding**, but nothing creates that binding today (3.(c)) |
+| ✅ | Resolution reaches a scope through a scope_binding. Ownership — an owner seeing its own entities — goes through a **self scope_binding**, written together with the VS node when an entity is provisioned (3.(c)) |
 | ➕ | Reverse lookups: `scope → readable entities`, `entity → authorizing scopes` (RBAC page, 3.(b)) |
 | ➕ | Wire into validators + remove the recursive scope-walk (3.(d), section 4) |
 
@@ -181,8 +181,8 @@ So the enrollment record (association) and the permission grant (`user_roles`) d
   as hierarchy/association/invitation. (Chosen over adding an owner-only special branch to the query.)
 - **Delete:** `delete_scope` drops the VS node, and FK `ON DELETE CASCADE` removes its bindings and memberships.
 - **Invariant:** every owner scope has a VS (`_resolve_virtual_scope_id` raises 500 otherwise).
-- **Where it wires:** VS writes are owned by the RBAC ops provider's grant method, and the domain/project/user/resource_group
-  operations use that provider/ops (2.3). No domain code touches the VS tables directly.
+- **Where it wires:** the entity write ops provision the VS node, the self entity_membership and the self scope_binding as
+  one step of creating any entity, and tear them down on removal. No domain code touches the VS tables directly.
 
 ### (d) Expressing hierarchy without recursion
 
@@ -200,7 +200,8 @@ Removing recursion is this BEP's goal, so domain→project→user inheritance is
 | **Invitation** (sharing) | grant a specific target access to a specific entity | `entity_memberships` on the **target's VS** | only what was granted (e.g. read\|write) |
 
 - Invitation is not a separate table or a direct-permission layer — it is **adding that entity as a member of the invitee's VS.**
-- The invitee sees entities in its own VS via the self-binding path, so once invited it can read the entity immediately.
+- Accepting adds that entity to the **invitee's own VS** carrying the offered `permission_cap`. The invitee reaches it
+  through their self-binding path, and what they may do there is their own permission clipped by that cap.
 - `permission_cap` enforces "only what was granted" — even if the target holds a stronger role in its own scope,
   it is clipped by `role permission & entity_cap`, so **permissions do not leak** (the cap replaces BEP-1048's escalation prevention).
 
@@ -228,6 +229,8 @@ Removing recursion is this BEP's goal, so domain→project→user inheritance is
 - auto (permission delegation) → owner VS membership + (for hierarchy/association) scope_binding.
 - ref (read-only reference / invitation) → invitee VS membership + `permission_cap` (3.(e)).
 - The `association_scopes_entities.relation_type` column and its branching are dropped after migration.
+- This is BEP-1048's delegation-versus-reference axis. It is **separate from the sharing context** — what an invitation
+  carries is the cap, not a relation kind.
 
 ### (i) Scope itself as an entity
 

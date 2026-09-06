@@ -27,7 +27,7 @@ from ai.backend.manager.api.gql.user.types import (
     UserV2GQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.repositories.user.types import (
+from ai.backend.manager.models.user.scopes import (
     DomainUserOperationScope,
     ProjectUserOperationScope,
 )

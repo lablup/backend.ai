@@ -22,9 +22,24 @@ from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
+class ProjectStatus(enum.StrEnum):
+    """Lifecycle status of a project."""
+
+    ACTIVE = "active"
+    DELETED = "deleted"
+    PURGING = "purging"
+    PURGE_ERROR = "purge-error"
+
+    @classmethod
+    def purge_in_progress(cls) -> frozenset[ProjectStatus]:
+        """Statuses a purge is working through. Writes are refused while in one."""
+        return frozenset({cls.PURGING, cls.PURGE_ERROR})
+
+
 class ProjectType(enum.StrEnum):
     GENERAL = "general"
     MODEL_STORE = "model-store"
+    PERSONAL = "personal"
 
     @classmethod
     @override
@@ -38,6 +53,8 @@ class ProjectType(enum.StrEnum):
                 return cls.GENERAL
             case "MODEL_STORE" | "MODEL-STORE":
                 return cls.MODEL_STORE
+            case "PERSONAL":
+                return cls.PERSONAL
             case _:
                 return None
 

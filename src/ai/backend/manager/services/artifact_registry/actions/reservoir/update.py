@@ -4,8 +4,7 @@ from typing import override
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryModifierMeta
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
-from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.models.reservoir_registry.updaters import ReservoirRegistryUpdater
 from ai.backend.manager.services.artifact_registry.actions.base import (
     ArtifactRegistrySingleEntityAction,
 )
@@ -13,7 +12,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import (
 
 @dataclass
 class UpdateReservoirRegistryAction(ArtifactRegistrySingleEntityAction):
-    updater: Updater[ReservoirRegistryRow]
+    updater: ReservoirRegistryUpdater
     meta: ArtifactRegistryModifierMeta
 
     @override

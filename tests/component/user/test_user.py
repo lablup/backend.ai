@@ -42,7 +42,6 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
-    OperationType,
     Permission,
     ScopeType,
 )
@@ -450,7 +449,6 @@ async def user_with_rbac_rows(
                 scope_type=ScopeType.USER,
                 scope_id=scope_id,
                 entity_type=EntityType.USER,
-                operation=OperationType.READ,
                 permission=Permission.READ,
             )
         )

@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.bulk.trigger import BulkActionTriggerMeta
-from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
+from ai.backend.manager.actions.v2.bulk.validator import AtomicBulkActionValidator
 from ai.backend.manager.actions.v2.lookup.bulk_base import (
     BaseBulkLookupAction,
     BaseBulkLookupActionResult,
@@ -43,14 +43,14 @@ class BulkLookupActionProcessor[TAction: BaseBulkLookupAction, TResult: BaseBulk
     _func: Callable[[TAction], Awaitable[TResult]]
     _monitors: Sequence[BulkLookupActionMonitor]
     _validators: Sequence[BulkLookupActionValidator]
-    _post_validators: Sequence[BulkActionValidator]
+    _post_validators: Sequence[AtomicBulkActionValidator]
 
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TResult]],
         monitors: Sequence[BulkLookupActionMonitor] | None = None,
         validators: Sequence[BulkLookupActionValidator] | None = None,
-        post_validators: Sequence[BulkActionValidator] | None = None,
+        post_validators: Sequence[AtomicBulkActionValidator] | None = None,
     ) -> None:
         self._func = func
         self._monitors = monitors or []

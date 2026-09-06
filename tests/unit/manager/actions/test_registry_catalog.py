@@ -30,10 +30,13 @@ from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
 from ai.backend.common.data.entity.artifact_registry import ARTIFACT_REGISTRY_ENTITY_TYPE
 from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
 from ai.backend.common.data.entity.audit_log import AUDIT_LOG_FIELD_TYPE
+from ai.backend.common.data.entity.auth import AUTH_ENTITY_TYPE
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.entity_invitation import ENTITY_INVITATION_ENTITY_TYPE
+from ai.backend.common.data.entity.entity_label import ENTITY_LABEL_FIELD_TYPE
 from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
 from ai.backend.common.data.entity.fair_share import (
     DOMAIN_FAIR_SHARE_ENTITY_TYPE,
@@ -78,23 +81,30 @@ from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
     ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
 )
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
-from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.actions.v2.field.base import (
+    BaseRuntimeSingleFieldAction,
+    BaseSingleFieldAction,
+)
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.lookup.bulk_base import BaseBulkLookupAction
+from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
@@ -104,12 +114,21 @@ from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
 from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
+from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.entity_invitation.processors import (
+    EntityInvitationProcessors,
+)
+from ai.backend.manager.services.entity_label.actions.lookup_owner import (
+    LookupBulkEntityLabelOwnerAction,
+    LookupEntityLabelOwnerAction,
+)
+from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
@@ -120,6 +139,7 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
 from ai.backend.manager.services.login_client_type.processors import (
     LoginClientTypeProcessors,
 )
+from ai.backend.manager.services.metric.processors import MetricProcessors
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
@@ -175,10 +195,12 @@ _V2_ACTION_BASES: tuple[type[Any], ...] = (
     BaseSingleEntityAction,
     BaseBulkAction,
     BaseScopeAction,
+    BaseRelationAction,
     BaseGlobalAction,
     BaseLookupAction,
     BaseBulkLookupAction,
     BaseSingleFieldAction,
+    BaseRuntimeSingleFieldAction,
     BaseBulkFieldAction,
 )
 
@@ -218,16 +240,18 @@ def test_every_defined_v2_action_is_wired() -> None:
     # One shared registry, as in the production wiring: every v2 package registers
     # through it, so its wired_actions() is the complete catalog of registered actions.
     registry = _ops_registry()
-    fair_share_groups = registry.concern(ConcernMeta("fair_share"))
+    fair_share_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     artifact_revisions = registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
         FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
         ArtifactRevisionData,
         LookupArtifactRevisionOwnerAction,
         LookupBulkArtifactRevisionOwnerAction,
     )
-    resource_slot_groups = registry.concern(ConcernMeta("resource_slot"))
-    scheduling_history_groups = registry.concern(ConcernMeta("scheduling_history"))
-    resource_allocation_groups = registry.concern(ConcernMeta("resource_allocation"))
+    resource_slot_groups = registry.concern(ConcernMeta(Concern.SYSTEM))
+    scheduling_history_groups = registry.concern(ConcernMeta(Concern.SESSION))
+    resource_allocation_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
+    agent_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
+    AgentProcessors(agent_groups.group(GroupMeta(AGENT_ENTITY_TYPE)), MagicMock(), [])
     AppConfigProcessors(
         registry.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),
         registry.group(GroupMeta(APP_CONFIG_DEFINITION_ENTITY_TYPE)),
@@ -249,6 +273,9 @@ def test_every_defined_v2_action_is_wired() -> None:
     UserResourcePolicyProcessors(registry.group(GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE)))
     KeypairResourcePolicyProcessors(registry.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE)))
     RolePresetProcessors(registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)), MagicMock())
+    EntityInvitationProcessors(
+        registry.group(GroupMeta(ENTITY_INVITATION_ENTITY_TYPE)), MagicMock()
+    )
     RuntimeVariantProcessors(registry.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE)))
     ObjectStorageProcessors(
         registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
@@ -264,11 +291,24 @@ def test_every_defined_v2_action_is_wired() -> None:
     PrometheusQueryPresetCategoryProcessors(
         registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE))
     )
+    MetricProcessors(
+        registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)),
+        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        MagicMock(),
+    )
     RuntimeVariantPresetProcessors(
         registry.group(GroupMeta(RUNTIME_VARIANT_PRESET_ENTITY_TYPE)), MagicMock()
     )
     AuditLogProcessors(
         registry.dangling_field_group(FieldGroupMeta(AUDIT_LOG_FIELD_TYPE), AuditLogData)
+    )
+    EntityLabelProcessors(
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(ENTITY_LABEL_FIELD_TYPE),
+            EntityLabelData,
+            LookupEntityLabelOwnerAction,
+            LookupBulkEntityLabelOwnerAction,
+        )
     )
     PrometheusQueryPresetProcessors(
         registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)), MagicMock()
@@ -280,6 +320,11 @@ def test_every_defined_v2_action_is_wired() -> None:
     DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
     ProjectProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), MagicMock())
     UserProcessors(
+        registry.group(GroupMeta(USER_ENTITY_TYPE)),
+        MagicMock(),
+    )
+    AuthProcessors(
+        registry.group(GroupMeta(AUTH_ENTITY_TYPE)),
         registry.group(GroupMeta(USER_ENTITY_TYPE)),
         MagicMock(),
     )
@@ -340,7 +385,9 @@ def test_every_defined_v2_action_is_wired() -> None:
         registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock()
     )
 
-    wired = sorted(cls.action_name() for cls in registry.wired_actions())
+    # One action class may be wired more than once -- an owner lookup is built by every
+    # field operation that runs it first -- and the catalog is which classes are wired.
+    wired = sorted({cls.action_name() for cls in registry.wired_actions()})
     defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())
 
     assert wired == defined

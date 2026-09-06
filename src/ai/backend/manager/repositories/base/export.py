@@ -17,6 +17,7 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 
 if TYPE_CHECKING:
     from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from sqlalchemy.sql import ColumnElement
 
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -72,7 +73,7 @@ class ExportFieldDef:
         name: Name displayed in CSV header
         description: Field description (displayed in client UI)
         field_type: Field type for client display
-        column: ORM column reference for SELECT query building
+        column: column expression for SELECT query building; filtering needs an ORM attribute
         formatter: Custom formatter (None uses default conversion)
         joins: Set of JoinDef required to access this field (None = no joins needed)
     """
@@ -81,7 +82,7 @@ class ExportFieldDef:
     name: str
     description: str
     field_type: ExportFieldType
-    column: InstrumentedAttribute[Any]
+    column: InstrumentedAttribute[Any] | ColumnElement[Any]
     formatter: ExportFormatter | None = None
     joins: tuple[JoinDef, ...] | frozenset[JoinDef] | None = None
 

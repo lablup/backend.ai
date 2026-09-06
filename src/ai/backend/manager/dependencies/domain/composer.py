@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.secret.pool import KeyProviderPool
 
 
 @dataclass
@@ -38,6 +39,7 @@ class DomainInput:
     """
 
     config_provider: ManagerConfigProvider
+    key_provider_pool: KeyProviderPool
     db: ExtendedAsyncSAEngine
     etcd: AsyncEtcd
     storage_manager: StorageSessionManager
@@ -110,6 +112,7 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
             db=setup_input.db,
             storage_manager=setup_input.storage_manager,
             config_provider=setup_input.config_provider,
+            key_provider_pool=setup_input.key_provider_pool,
             valkey_stat=setup_input.valkey_stat,
             valkey_live=setup_input.valkey_live,
             valkey_schedule=setup_input.valkey_schedule,

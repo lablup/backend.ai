@@ -5,7 +5,7 @@ entry points project their respective input shape to a normalized
 :class:`ResourceSlot` and fail when any globally-required slot is
 absent or non-positive:
 
-- v2 path: ``DeploymentRevisionCreatorSpec.resource_slots`` is already
+- v2 path: ``DeploymentRevisionCreator.resource_slots`` is already
   a :class:`ResourceSlot`.
 - legacy path: ``ModelRevisionSpec.resource_spec.resource_slots`` is a
   raw mapping; we wrap it in :class:`ResourceSlot` here.
@@ -20,8 +20,8 @@ from typing import override
 from ai.backend.common.types import ResourceSlot, SlotName
 from ai.backend.manager.data.deployment.types import ModelRevisionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.repositories.deployment.creators.revision import (
-    DeploymentRevisionCreatorSpec,
+from ai.backend.manager.models.deployment_revision.creators import (
+    DeploymentRevisionCreator,
 )
 from ai.backend.manager.sokovan.deployment.validators.base import (
     DeploymentRevisionValidationContext,
@@ -39,7 +39,7 @@ class RequiredResourceSlotRule(DeploymentRevisionValidatorRule):
     @override
     def validate(
         self,
-        spec: DeploymentRevisionCreatorSpec,
+        spec: DeploymentRevisionCreator,
         context: DeploymentRevisionValidationContext,
     ) -> None:
         self._check_resource_slots(spec.resource_slots, context.required_slot_names)

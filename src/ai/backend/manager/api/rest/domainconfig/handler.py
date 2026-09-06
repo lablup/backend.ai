@@ -57,7 +57,6 @@ class DomainConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info("DOMAINCONFIG.CREATE(domain:{})", params.domain)
         target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
         await self._domain.create_dotfile.run(
             CreateDomainDotfileAction(
@@ -74,7 +73,6 @@ class DomainConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        log.info("DOMAINCONFIG.LIST_OR_GET(domain:{})", params.domain)
         resolved = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
         target = await self._domain.get.run(GetDomainAction(domain_id=resolved.entity_id()))
         entries = DotfileEntries.unpack(target.data.dotfiles)
@@ -95,7 +93,6 @@ class DomainConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = body.parsed
-        log.info("DOMAINCONFIG.UPDATE(domain:{})", params.domain)
         target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
         await self._domain.update_dotfile.run(
             UpdateDomainDotfileAction(
@@ -112,7 +109,6 @@ class DomainConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        log.info("DOMAINCONFIG.DELETE(domain:{})", params.domain)
         target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(params.domain)))
         await self._domain.delete_dotfile.run(
             DeleteDomainDotfileAction(

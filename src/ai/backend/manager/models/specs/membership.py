@@ -1,4 +1,4 @@
-"""The membership record the entity writes carry to the ops layer."""
+"""The membership records the entity writes carry to the ops layer."""
 
 from __future__ import annotations
 

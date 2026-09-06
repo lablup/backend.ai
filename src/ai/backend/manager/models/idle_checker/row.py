@@ -26,7 +26,7 @@ class IdleCheckerRow(LifecycleTimestampsMixin, Base):
     )
 
     id: Mapped[IdleCheckerID] = mapped_column(
-        "id", GUID(IdleCheckerID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(IdleCheckerID), primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=128), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
@@ -84,7 +84,7 @@ class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
     )
     scope_type: Mapped[str] = mapped_column("scope_type", sa.String(length=64), nullable=False)
     scope_id: Mapped[uuid.UUID] = mapped_column("scope_id", GUID, nullable=False)

@@ -116,7 +116,6 @@ class TestRevokerBasic:
                     scope_type=entity_scope_type.to_scope_type(),
                     scope_id=entity_id.entity_id,
                     entity_type=entity_id.entity_type,
-                    operation=op,
                     permission=Permission.from_operation(op),
                 )
                 db_sess.add(perm)
@@ -148,7 +147,7 @@ class TestRevokerBasic:
                 entity_id=ctx.entity_id,
                 entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id],
-                operations=None,  # Revoke all operations
+                permission=None,  # Revoke all operations
             )
             await execute_rbac_revoker(db_sess, revoker)
 
@@ -172,7 +171,7 @@ class TestRevokerBasic:
                 entity_id=ctx.entity_id,
                 entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[],
-                operations=None,
+                permission=None,
             )
             await execute_rbac_revoker(db_sess, revoker)
 
@@ -194,14 +193,14 @@ class TestRevokerBasic:
                 entity_id=ctx.entity_id,
                 entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id],
-                operations=[OperationType.READ],
+                permission=Permission.READ,
             )
             await execute_rbac_revoker(db_sess, revoker)
 
             # Verify UPDATE still exists
             remaining_perms = (await db_sess.scalars(sa.select(PermissionRow))).all()
             assert len(remaining_perms) == 1
-            assert remaining_perms[0].operation == OperationType.UPDATE
+            assert remaining_perms[0].permission == Permission.UPDATE
 
     async def test_revoker_with_none_operations_removes_all(
         self,
@@ -217,7 +216,7 @@ class TestRevokerBasic:
                 entity_id=ctx.entity_id,
                 entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id],
-                operations=None,
+                permission=None,
             )
             await execute_rbac_revoker(db_sess, revoker)
 
@@ -265,7 +264,6 @@ class TestRevokerMultipleRoles:
                     scope_type=entity_scope_type.to_scope_type(),
                     scope_id=entity_id.entity_id,
                     entity_type=entity_id.entity_type,
-                    operation=OperationType.READ,
                     permission=Permission.READ,
                 )
                 db_sess.add(perm)
@@ -295,7 +293,7 @@ class TestRevokerMultipleRoles:
                 entity_id=ctx.entity_id,
                 entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id1, ctx.role_id2],
-                operations=None,
+                permission=None,
             )
             await execute_rbac_revoker(db_sess, revoker)
 
@@ -317,7 +315,7 @@ class TestRevokerMultipleRoles:
                 entity_id=ctx.entity_id,
                 entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id1],
-                operations=None,
+                permission=None,
             )
             await execute_rbac_revoker(db_sess, revoker)
 
@@ -356,7 +354,6 @@ class TestRevokerIdempotent:
                 scope_type=entity_scope_type.to_scope_type(),
                 scope_id=entity_id.entity_id,
                 entity_type=entity_id.entity_type,
-                operation=OperationType.READ,
                 permission=Permission.READ,
             )
             db_sess.add(perm)
@@ -383,7 +380,7 @@ class TestRevokerIdempotent:
                 entity_id=ctx.entity_id,
                 entity_scope_type=ctx.entity_scope_type,
                 target_role_ids=[ctx.role_id],
-                operations=None,
+                permission=None,
             )
 
             # First revoke

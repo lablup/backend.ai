@@ -57,7 +57,7 @@ class RunningRouteHandler(RouteHandler):
     @override
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
-            lifecycle=[RouteStatus.RUNNING],
+            lifecycle=[RouteStatus.PROVISIONING, RouteStatus.RUNNING],
         )
 
     @classmethod

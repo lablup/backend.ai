@@ -3,8 +3,7 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.services.session.base import (
     SessionAction,
 )
@@ -12,7 +11,7 @@ from ai.backend.manager.services.session.base import (
 
 @dataclass
 class UpdateSessionAction(SessionAction):
-    updater: Updater[SessionRow]
+    updater: SessionUpdater
 
     @override
     @classmethod

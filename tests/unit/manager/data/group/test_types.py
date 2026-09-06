@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
+
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.types import OperationType
@@ -40,3 +42,16 @@ class TestGroupDataEntityOperations:
         # Sanity check: existing admin entries still receive full admin operations.
         assert set(operations[RBACElementType.VFOLDER]) == OperationType.admin_operations()
         assert set(operations[RBACElementType.USER]) == OperationType.admin_operations()
+
+
+class TestProjectType:
+    def test_personal_value(self) -> None:
+        assert ProjectType.PERSONAL.value == "personal"
+
+    def test_missing_accepts_upper_form(self) -> None:
+        assert ProjectType("PERSONAL") is ProjectType.PERSONAL
+        assert ProjectType("personal") is ProjectType.PERSONAL
+
+    def test_missing_returns_none_for_unknown(self) -> None:
+        with pytest.raises(ValueError):
+            ProjectType("no-such-type")

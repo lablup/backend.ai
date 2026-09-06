@@ -1,7 +1,7 @@
 ---
 name: domain-service-composition
 type: decision-table
-description: 도메인 처리기의 모양 선택, dotfile이 도메인 컬럼인 이유, 서비스가 남은 연산과 그 근거
+description: why a domain's operations take the shapes they do, why dotfiles are a column of the domain row, which operations keep a service method and why
 scope: src/ai/backend/manager/services/domain
 keywords:
   - DomainProcessors
@@ -20,56 +20,13 @@ generated:
 status: draft
 ---
 
-# 도메인 서비스
+# Domain service
 
-도메인은 다른 모든 것이 그 아래에 만들어지는 최상위 scope다. 아래에 놓일 상위 entity가
-없으므로 생성은 global 모양이고, 이미 만들어진 도메인을 지목하는 연산은 single_entity다.
+A domain is the top scope everything else is created under. No parent entity sits
+above it, so creation is global-shaped, and an operation naming an existing domain is
+single-entity.
 
-## 처리기 구성
+## The processor composition
 
-| 필드 | 모양 | 연산 |
-|---|---|---|
-| `lookup` | lookup (public) | 이름 → 도메인 |
-| `global_search` | global | 전체 도메인 페이지 |
-| `public_search_rg_domains` | public | 리소스 그룹이 서비스하는 도메인 |
-| `update_domain` | single_entity | UPDATE |
-| `delete_domain` | single_entity | DELETE (소프트) |
-| `restore_domain` | single_entity | RESTORE |
-| `create_domain` | global | CREATE |
-| `create_domain_node` | global | CREATE |
-| `update_domain_node` | single_entity | UPDATE |
-| `purge_domain` | single_entity | PURGE |
-| `create_dotfile` / `update_dotfile` / `delete_dotfile` | single_entity | UPDATE |
-
-## 도메인은 role-managed entity다
-
-`RoleManagedEntityCreator`를 구현하는 세 entity 중 하나다. 생성 시 자기 virtual scope
-노드를 세우고 role preset이 요구하는 역할을 함께 만든다. `member_of`는 비어 있다.
-
-## dotfile은 도메인 행의 컬럼이다
-
-`domains.dotfiles`에 msgpack으로 묶여 저장되며 `DomainData`가 그 값을 들고 있다.
-읽기는 도메인을 읽으면 딸려 오므로 별도 연산이 없고, 쓰기 셋만 존재한다.
-중복 경로·개수·용량 판정은 I/O가 없으므로 `data/dotfile/types.py`의 `DotfileEntries`가
-답하고, 세 저장 위치(도메인·프로젝트·키페어)가 같은 판정을 공유한다.
-
-## 리소스 그룹은 도메인이 속하는 scope가 아니다
-
-`search_rg_domains`는 scope 검색이 아니라 조건이 붙은 전역 검색이다. 리소스 그룹은
-도메인을 담는 scope가 아니라 연관 테이블로 이어진 상대이므로, 그 연관은 searcher의
-조건으로 표현한다.
-
-## 서비스가 남은 연산
-
-| 연산 | 남은 이유 |
-|---|---|
-| `create_domain` | 도메인마다 있는 model-store 프로젝트를 같은 트랜잭션에서 만든다 |
-| `create_domain_node` / `update_domain_node` | 리소스 그룹 연관 행을 함께 쓴다 |
-| `purge_domain` | 도메인이 남긴 커널 행을 먼저 지운다 |
-| dotfile 쓰기 셋 | 읽고 병합한 뒤 쓴다 |
-
-## 연관 행은 별도 트랜잭션이다
-
-`ScalingGroupForDomainRow`는 도메인에도 리소스 그룹에도 속하지 않는 연관 행이라
-v2 ops에 그 행을 쓰는 원시 연산이 없다. 도메인 노드 생성·수정은 도메인 쪽 쓰기와
-연관 쪽 쓰기가 서로 다른 트랜잭션에서 일어난다.
+`backend.ai mgr ops list --concern organization --entity domain` prints the wired list.
+Its output answers the entity type, shape, operation, gate and backing.

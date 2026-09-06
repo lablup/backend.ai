@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.agent.types import (
     ConflictingSessionCleanupPolicyEnum,
     OrderDirection,
 )
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.types import AgentId
 
 __all__ = (
@@ -69,6 +70,9 @@ class AgentFilter(BaseRequestModel):
             "Supports equals, contains, starts_with, ends_with, "
             "and their case-insensitive and negated variants."
         ),
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None, description="Filter by the labels on the entity"
     )
     AND: list[AgentFilter] | None = Field(
         default=None, description="All sub-conditions must match."

@@ -13,6 +13,7 @@ filename = "CHANGELOG.md"
 directory = "changes/"
 title_format = ""  # embedded inside the template
 template = "changes/template.md"
+ignore = ["KNOWLEDGE.md"]
 start_string = "<!-- towncrier release notes start -->\n"
 issue_format = "([#{issue}](https://github.com/lablup/backend.ai/issues/{issue}))"
 underlines = ["", "", ""]

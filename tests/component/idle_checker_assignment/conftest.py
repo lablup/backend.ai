@@ -66,7 +66,7 @@ from ai.backend.manager.services.idle_checker_assignment.processors import (
 )
 from ai.backend.manager.services.idle_checker_assignment.service import IdleCheckerAssignmentService
 from ai.backend.manager.services.processors import Processors
-from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
+from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -99,7 +99,7 @@ def idle_checker_assignment_processors(
                 single_entity=SingleEntityActionRBACValidator(permission_repo, MagicMock()),
                 bulk=BulkActionRBACValidator(permission_repo, MagicMock()),
             ),
-            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
+            virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
         ),
     )
 
@@ -325,7 +325,6 @@ async def project_read_permission(
                 scope_type=ScopeType.PROJECT,
                 scope_id=str(assignment_seed.project_id),
                 entity_type=EntityType.PROJECT,
-                operation=OperationType.READ,
                 permission=Permission.from_operation(OperationType.READ),
             )
         )
@@ -371,7 +370,6 @@ async def project_assignment_manage_permission(
                     scope_type=ScopeType.PROJECT,
                     scope_id=str(assignment_seed.project_id),
                     entity_type=EntityType.IDLE_CHECKER_ASSIGNMENT,
-                    operation=operation,
                     permission=Permission.from_operation(operation),
                 )
             )
@@ -415,7 +413,6 @@ async def user_self_scope_permission(
                     scope_type=ScopeType.USER,
                     scope_id=str(regular_user_fixture.user_uuid),
                     entity_type=EntityType.USER,
-                    operation=operation,
                     permission=Permission.from_operation(operation),
                 )
             )

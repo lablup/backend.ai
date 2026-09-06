@@ -25,11 +25,15 @@ from ai.backend.common.dto.manager.v2.group.response import (
     PurgeProjectPayload as PurgeProjectPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
+    RestoreProjectPayload as RestoreProjectPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import (
     UnassignUserError as UnassignUserErrorDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     UnassignUsersFromProjectPayload as UnassignUsersFromProjectPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -112,6 +116,20 @@ class DeleteProjectPayloadGQL(PydanticOutputMixin[DeleteProjectPayloadDTO]):
     """Payload for project soft-delete."""
 
     deleted: bool = gql_field(description="Whether the deletion was successful.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for project restore mutation.",
+    ),
+    model=RestoreProjectPayloadDTO,
+    name="RestoreProjectPayload",
+)
+class RestoreProjectPayloadGQL(PydanticOutputMixin[RestoreProjectPayloadDTO]):
+    """Payload for project restore."""
+
+    restored: bool = gql_field(description="Whether the restore was successful.")
 
 
 @gql_pydantic_type(

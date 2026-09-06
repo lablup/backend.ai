@@ -11,7 +11,7 @@ class UserRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = UserRepository(args.db, args.v2_ops_provider)
+        repository = UserRepository(args.db, args.v2_ops_provider, args.key_provider_pool)
 
         return cls(
             repository=repository,

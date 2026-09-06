@@ -41,6 +41,7 @@ from ai.backend.manager.dto.response import (
     RejectArtifactRevisionResponse,
     UpdateArtifactResponse,
 )
+from ai.backend.manager.models.artifact.updaters import ArtifactUpdater
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
 from ai.backend.manager.services.artifact.revision.actions.approve import (
     ApproveArtifactRevisionAction,
@@ -66,6 +67,7 @@ from ai.backend.manager.services.artifact.revision.actions.import_revision impor
 from ai.backend.manager.services.artifact.revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
+from ai.backend.manager.types import TriState
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.artifact.processors import ArtifactProcessors
@@ -245,7 +247,11 @@ class ArtifactHandler:
         action_result = await self._artifact.update.run(
             UpdateArtifactAction(
                 artifact_id=ArtifactID(path.parsed.artifact_id),
-                updater=body.parsed.to_updater(path.parsed.artifact_id),
+                updater=ArtifactUpdater(
+                    artifact_id=ArtifactID(path.parsed.artifact_id),
+                    readonly=TriState.from_nullable(body.parsed.readonly),
+                    description=TriState.from_nullable(body.parsed.description),
+                ),
             )
         )
 

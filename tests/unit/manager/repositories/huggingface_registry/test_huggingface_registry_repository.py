@@ -14,10 +14,15 @@ from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+from ai.backend.manager.models.huggingface_registry.searchers import (
+    HuggingFaceRegistrySearcher,
+)
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
+from ai.backend.manager.repositories.ops.v2.artifact_registry.provider import (
+    ArtifactRegistryOpsProvider,
+)
 from ai.backend.testutils.db import with_tables
 
 
@@ -141,7 +146,10 @@ class TestHuggingFaceRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[HuggingFaceRepository, None]:
         """Create HuggingFaceRepository instance with database"""
-        repo = HuggingFaceRepository(db=db_with_cleanup)
+        repo = HuggingFaceRepository(
+            db=db_with_cleanup,
+            registry_ops_provider=ArtifactRegistryOpsProvider(db_with_cleanup),
+        )
         yield repo
 
     # =========================================================================
@@ -251,7 +259,7 @@ class TestHuggingFaceRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test first page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -260,7 +268,7 @@ class TestHuggingFaceRepository:
             orders=[],
         )
 
-        result = await huggingface_repository.search_registries(querier=querier)
+        result = await huggingface_repository.search_registries(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -271,7 +279,7 @@ class TestHuggingFaceRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test second page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -280,7 +288,7 @@ class TestHuggingFaceRepository:
             orders=[],
         )
 
-        result = await huggingface_repository.search_registries(querier=querier)
+        result = await huggingface_repository.search_registries(searcher=searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
@@ -291,7 +299,7 @@ class TestHuggingFaceRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test last page of offset-based pagination with partial results"""
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -300,7 +308,7 @@ class TestHuggingFaceRepository:
             orders=[],
         )
 
-        result = await huggingface_repository.search_registries(querier=querier)
+        result = await huggingface_repository.search_registries(searcher=searcher)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -315,7 +323,7 @@ class TestHuggingFaceRepository:
         sample_registries_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching HuggingFace registries ordered by url ascending"""
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -329,7 +337,7 @@ class TestHuggingFaceRepository:
             orders=[HuggingFaceRegistryRow.url.asc()],
         )
 
-        result = await huggingface_repository.search_registries(querier=querier)
+        result = await huggingface_repository.search_registries(searcher=searcher)
 
         result_urls = [registry.url for registry in result.items]
         assert result_urls == sorted(result_urls)
@@ -340,7 +348,7 @@ class TestHuggingFaceRepository:
         sample_registries_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching HuggingFace registries ordered by url descending"""
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -354,7 +362,7 @@ class TestHuggingFaceRepository:
             orders=[HuggingFaceRegistryRow.url.desc()],
         )
 
-        result = await huggingface_repository.search_registries(querier=querier)
+        result = await huggingface_repository.search_registries(searcher=searcher)
 
         result_urls = [registry.url for registry in result.items]
         assert result_urls == sorted(result_urls, reverse=True)
@@ -369,7 +377,7 @@ class TestHuggingFaceRepository:
         sample_registries_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test searching HuggingFace registries with pagination, filter, and ordering combined"""
-        querier = BatchQuerier(
+        searcher = HuggingFaceRegistrySearcher(
             pagination=OffsetPagination(limit=5, offset=5),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -378,7 +386,7 @@ class TestHuggingFaceRepository:
             orders=[HuggingFaceRegistryRow.url.asc()],
         )
 
-        result = await huggingface_repository.search_registries(querier=querier)
+        result = await huggingface_repository.search_registries(searcher=searcher)
 
         # Total matching registries: 25, so total_count should be 25
         assert result.total_count == 25

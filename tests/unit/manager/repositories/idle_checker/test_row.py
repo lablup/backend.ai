@@ -19,7 +19,6 @@ from ai.backend.common.data.idle_checker.types import (
 )
 from ai.backend.common.types import (
     ClusterMode,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -144,8 +143,6 @@ class TestSessionIdleCheckRow:
                     starts_at=created_at,
                     startup_command=None,
                     callback_url=None,
-                    occupying_slots=ResourceSlot({"cpu": "1"}),
-                    requested_slots=ResourceSlot({"cpu": "1"}),
                     vfolder_mounts=[],
                     environ=None,
                     bootstrap_script=None,

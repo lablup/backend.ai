@@ -15,12 +15,17 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.project.types import ProjectData, UnassignUsersResult
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.resource import InvalidUserUpdateMode, ProjectNotFound
+from ai.backend.manager.errors.resource import (
+    InvalidUserUpdateMode,
+    ProjectNotFound,
+    ProjectPurgeInProgress,
+)
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -60,7 +65,7 @@ class ProjectRepository:
         valkey_stat_client: ValkeyStatClient,
         storage_manager: StorageSessionManager,
     ) -> None:
-        self._db_source = ProjectDBSource(db)
+        self._db_source = ProjectDBSource(db, v2_ops_provider)
         self._v2_ops = v2_ops_provider
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
@@ -82,7 +87,14 @@ class ProjectRepository:
                 project_id, user_update_mode, [UserID(uid) for uid in user_uuids]
             )
         async with self._v2_ops.write_ops() as w:
-            return await w.update_data(updater)
+            data = await w.update_guarded_data(updater)
+            if data is None and await w.row_exists(
+                updater.row_class, updater.target_id_column(), updater.target_id_value()
+            ):
+                raise ProjectPurgeInProgress(
+                    f"Project is being purged: {updater.target_id_value()}"
+                )
+            return data
 
     @project_repository_resilience.apply()
     async def update_dotfiles(self, updater: ProjectDotfilesUpdater) -> ProjectData:
@@ -115,8 +127,8 @@ class ProjectRepository:
         start_date: datetime,
         end_date: datetime,
         project_ids: Sequence[UUID] | None = None,
-    ) -> list[KernelRow]:
-        """Fetch resource usage data for projects."""
+    ) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
+        """Fetch the project's kernels with the slots they were allocated."""
         return await self._db_source.fetch_project_resource_usage(start_date, end_date, project_ids)
 
     @project_repository_resilience.apply()

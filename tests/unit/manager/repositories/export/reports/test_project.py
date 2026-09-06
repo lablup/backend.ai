@@ -30,7 +30,11 @@ from ai.backend.manager.models.resource_group import (
     ResourceGroupOpts,
     ResourceGroupRow,
 )
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
@@ -752,6 +756,8 @@ class TestProjectExportExecuteStreamingDB:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 ResourceGroupRow,
                 ResourceGroupForProjectRow,
@@ -1024,6 +1030,8 @@ class TestGlobalContainerRegistryExport:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 ResourceGroupRow,
                 ResourceGroupForProjectRow,

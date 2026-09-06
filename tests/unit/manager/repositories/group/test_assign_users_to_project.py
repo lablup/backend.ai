@@ -15,10 +15,12 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.errors.resource import PersonalProjectMemberAdditionError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -41,14 +43,21 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.db_source import ProjectDBSource
 from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
-from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 
 class TestAssignUsersToProject:
@@ -93,9 +102,12 @@ class TestAssignUsersToProject:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
+                EntityLabelRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -199,9 +211,49 @@ class TestAssignUsersToProject:
                 )
             )
             session.add(
-                VirtualScopeRow(
-                    scope_type=ScopeType.PROJECT.value,
-                    scope_id=project_id,
+                VirtualEntityRow(
+                    entity_type=ScopeType.PROJECT.value,
+                    entity_id=project_id,
+                )
+            )
+            await session.commit()
+        return project_id
+
+    @pytest.fixture
+    async def personal_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+    ) -> ProjectID:
+        project_id = ProjectID(uuid.uuid4())
+        policy_name = f"personal-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_network_count=3,
+                )
+            )
+            session.add(
+                ProjectRow(
+                    id=project_id,
+                    name=f"personal-project-{project_id.hex[:8]}",
+                    description="Personal project",
+                    is_active=True,
+                    domain_name=test_domain.domain_name,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                    integration_id=None,
+                    resource_policy=policy_name,
+                    type=ProjectType.PERSONAL,
+                )
+            )
+            session.add(
+                VirtualEntityRow(
+                    entity_type=ScopeType.PROJECT.value,
+                    entity_id=project_id,
                 )
             )
             await session.commit()
@@ -236,7 +288,7 @@ class TestAssignUsersToProject:
                     domain_id=domain_id,
                 )
             )
-            await VirtualScopeSeeder().seed_user_scope(session, user_uuid)
+            await VirtualEntitySeeder().seed_user_scope(session, user_uuid)
             await session.commit()
         return user_uuid
 
@@ -297,7 +349,7 @@ class TestAssignUsersToProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ProjectDBSource:
-        return ProjectDBSource(db=db_with_cleanup)
+        return ProjectDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
 
     # --- Test cases ---
 
@@ -468,43 +520,76 @@ class TestAssignUsersToProject:
         test_role: uuid.UUID,
         same_domain_user_1: UserID,
     ) -> None:
-        """Assigned users become members of the project's virtual scope, and the project
+        """Assigned users become members of the project's virtual entity, and the project
         is not bound into theirs — project-scoped permissions must not reach the entities
         a member owns."""
         await group_db_source.assign_users_to_project(test_project, [same_domain_user_1], test_role)
 
         async with db_with_cleanup.begin_readonly_session() as session:
             user_vs_id = await session.scalar(
-                sa.select(VirtualScopeRow.id).where(
-                    VirtualScopeRow.scope_type == ScopeType.USER.value,
-                    VirtualScopeRow.scope_id == same_domain_user_1,
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == ScopeType.USER.value,
+                    VirtualEntityRow.entity_id == same_domain_user_1,
                 )
             )
             project_vs_id = await session.scalar(
-                sa.select(VirtualScopeRow.id).where(
-                    VirtualScopeRow.scope_type == ScopeType.PROJECT.value,
-                    VirtualScopeRow.scope_id == test_project,
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                    VirtualEntityRow.entity_id == test_project,
                 )
             )
             bindings_into_user_scope = (
                 await session.scalars(
-                    sa.select(ScopeBindingRow.scope_id).where(
-                        ScopeBindingRow.virtual_scope_id == user_vs_id,
-                        ScopeBindingRow.scope_id == test_project,
+                    sa.select(ScopeBindingRow.scope_entity_id).where(
+                        ScopeBindingRow.virtual_entity_id == user_vs_id,
+                        ScopeBindingRow.scope_entity_id == project_vs_id,
                     )
                 )
             ).all()
             memberships_in_project_scope = (
                 await session.scalars(
-                    sa.select(EntityMembershipRow.entity_id).where(
-                        EntityMembershipRow.virtual_scope_id == project_vs_id,
-                        EntityMembershipRow.entity_id == same_domain_user_1,
+                    sa.select(EntityMembershipRow.member_entity_id).where(
+                        EntityMembershipRow.virtual_entity_id == project_vs_id,
+                        EntityMembershipRow.member_entity_id == user_vs_id,
                     )
                 )
             ).all()
 
         assert list(bindings_into_user_scope) == []
-        assert list(memberships_in_project_scope) == [same_domain_user_1]
+        assert list(memberships_in_project_scope) == [user_vs_id]
+
+    async def test_assign_users_to_personal_project_refused(
+        self,
+        group_db_source: ProjectDBSource,
+        personal_project: ProjectID,
+        test_role: uuid.UUID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """A personal project keeps its owner as its only member."""
+        with pytest.raises(PersonalProjectMemberAdditionError):
+            await group_db_source.assign_users_to_project(
+                personal_project, [same_domain_user_1], test_role
+            )
+
+    async def test_bind_user_to_personal_project_refused(
+        self,
+        group_db_source: ProjectDBSource,
+        personal_project: ProjectID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """The membership-only write is refused for a personal project too."""
+        with pytest.raises(PersonalProjectMemberAdditionError):
+            await group_db_source.bind_user_to_project(same_domain_user_1, personal_project)
+
+    async def test_update_members_add_to_personal_project_refused(
+        self,
+        group_db_source: ProjectDBSource,
+        personal_project: ProjectID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """The legacy add path is refused for a personal project."""
+        with pytest.raises(PersonalProjectMemberAdditionError):
+            await group_db_source.update_members(personal_project, "add", [same_domain_user_1])
 
 
 class TestUnassignUsersFromProject:
@@ -548,9 +633,11 @@ class TestUnassignUsersFromProject:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
-                VirtualScopeRow,
+                VirtualEntityRow,
                 ScopeBindingRow,
                 EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
             ],
         ):
             yield database_connection
@@ -630,9 +717,9 @@ class TestUnassignUsersFromProject:
                 )
             )
             session.add(
-                VirtualScopeRow(
-                    scope_type=ScopeType.PROJECT.value,
-                    scope_id=project_id,
+                VirtualEntityRow(
+                    entity_type=ScopeType.PROJECT.value,
+                    entity_id=project_id,
                 )
             )
             await session.commit()
@@ -667,7 +754,7 @@ class TestUnassignUsersFromProject:
                     domain_id=domain_id,
                 )
             )
-            await VirtualScopeSeeder().seed_user_scope(session, user_uuid)
+            await VirtualEntitySeeder().seed_user_scope(session, user_uuid)
             await session.commit()
         return user_uuid
 
@@ -736,7 +823,7 @@ class TestUnassignUsersFromProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ProjectDBSource:
-        return ProjectDBSource(db=db_with_cleanup)
+        return ProjectDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
 
     # --- Test cases ---
 

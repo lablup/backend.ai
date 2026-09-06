@@ -3,7 +3,7 @@ name: entity-type-catalog
 type: reference
 description: entity classification (Entity/Public entity/Global/Field/Virtual), ownership and reference relations, the foreign-key rule for assignments
 scope: src/ai/backend/common/data/entity
-keywords: [EntityType, ENTITY_TYPE, EntityCreator, GlobalEntityCreator, FieldEntityCreator, member_of, virtual scope, ownership, entity relation]
+keywords: [EntityType, ENTITY_TYPE, EntityCreator, GlobalEntityCreator, FieldEntityCreator, member_of, virtual entity, ownership, entity relation]
 sources:
   - src/ai/backend/common/data/entity
   - src/ai/backend/manager/models
@@ -191,7 +191,7 @@ artifact registry
 ## Assignment
 
 An administrator assigns a shared resource to a scope. Neither side contains the other,
-so this is not a virtual-scope edge; an assignment table is not an entity itself but a
+so this is not a virtual-entity edge; an assignment table is not an entity itself but a
 relation between two entities.
 
 ### resource group
@@ -226,7 +226,23 @@ Built without a row of its own. It exists only as the subject of audit and autho
 
 ## Out of scope
 
-A virtual scope is the layer that expresses ownership, not an entity.
+A virtual entity is the layer that expresses ownership, not an entity.
+
+### What names a node
+
+- The two graph edge tables (`entity_memberships`, `scope_bindings`) name both ends by
+  `virtual_entities.id` foreign keys. A scope is an entity and has its own node, so the
+  scope side of a binding is a node foreign key too. Deleting a node cascades to its edges.
+- `permissions` / `field_permissions` keep their scope pair: they must name the global
+  scope, which is no entity.
+- `entity_labels` / `entity_invitations` keep their `(entity_type, entity_id)` pair. They
+  are attributes of an entity, not graph edges; the pair's index answers their reads
+  directly, and they must attach to legacy entities that have no node. Going through
+  the node would add one node resolution per read and make the node a precondition.
+- A node id stays inside the repository layer. `data/` types and service results carry
+  the entity as one `EntityIdentifier`, never the node id.
+- A node is looked up by the `(entity_type, entity_id)` unique index or by primary key.
+  A lookup by `entity_id` alone cannot use the index, so none is written.
 
 ## Missing foreign keys
 

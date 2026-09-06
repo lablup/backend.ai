@@ -344,7 +344,7 @@ class ArtifactService:
 
     async def search(self, action: SearchArtifactsAction) -> SearchArtifactsActionResult:
         result = await self._artifact_repository.search_artifacts(
-            querier=action.querier,
+            searcher=action.searcher,
         )
         return SearchArtifactsActionResult(
             data=result.items,
@@ -356,9 +356,9 @@ class ArtifactService:
     async def search_with_revisions(
         self, action: SearchArtifactsWithRevisionsAction
     ) -> SearchArtifactsWithRevisionsActionResult:
-        """Search artifacts with their revisions using BatchQuerier pattern."""
+        """Search artifacts with their revisions."""
         result = await self._artifact_repository.search_artifacts_with_revisions(
-            querier=action.querier,
+            searcher=action.searcher,
         )
         return SearchArtifactsWithRevisionsActionResult(
             data=result.items,

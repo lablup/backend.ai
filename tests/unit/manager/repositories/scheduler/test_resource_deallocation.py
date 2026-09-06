@@ -60,7 +60,9 @@ from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHi
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -256,7 +258,7 @@ class TestForceTerminateResourceDeallocation:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=test_keypair_resource_policy_name,
@@ -308,8 +310,6 @@ class TestForceTerminateResourceDeallocation:
                     region="local",
                     scaling_group=test_scaling_group_name,
                     resource_group_id=test_scaling_group_id,
-                    available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                    occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
                     version="1.0.0",
                     architecture="x86_64",
@@ -360,12 +360,12 @@ class TestForceTerminateResourceDeallocation:
                     domain_id=domain_id,
                     domain_name=domain_name,
                     group_id=group_id,
+                    user_uuid=user_uuid,
                     resource_group_id=resource_group_id,
                     scaling_group_name=resource_group_name,
                     status=session_status,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
                     created_at=datetime.now(tzutc()),
                     images=["python:3.8"],
                     vfolder_mounts=[],
@@ -392,8 +392,6 @@ class TestForceTerminateResourceDeallocation:
                     container_id=f"container-{uuid.uuid4().hex[:8]}",
                     status=kernel_status,
                     status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,
@@ -480,7 +478,7 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """Force-terminate sets free_at on allocations and decrements agent_resources.used."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
@@ -551,7 +549,7 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """When agent_id is NULL (offline agent), free_at is still set on allocations."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
@@ -602,7 +600,7 @@ class TestForceTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """Forced termination must also apply to sessions already in TERMINATING."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         session_id, kernel_id = await self._create_session_with_kernel_and_resources(
             db_with_cleanup,
@@ -836,7 +834,7 @@ class TestBulkTerminateResourceDeallocation:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=test_keypair_resource_policy_name,
@@ -888,8 +886,6 @@ class TestBulkTerminateResourceDeallocation:
                     region="local",
                     scaling_group=test_scaling_group_name,
                     resource_group_id=test_scaling_group_id,
-                    available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                    occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
                     version="1.0.0",
                     architecture="x86_64",
@@ -938,12 +934,12 @@ class TestBulkTerminateResourceDeallocation:
                     domain_id=domain_id,
                     domain_name=domain_name,
                     group_id=group_id,
+                    user_uuid=user_uuid,
                     resource_group_id=resource_group_id,
                     scaling_group_name=resource_group_name,
                     status=SessionStatus.RUNNING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
                     created_at=datetime.now(tzutc()),
                     images=["python:3.8"],
                     vfolder_mounts=[],
@@ -970,8 +966,6 @@ class TestBulkTerminateResourceDeallocation:
                     container_id=f"container-{uuid.uuid4().hex[:8]}",
                     status=kernel_status,
                     status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,
@@ -1054,7 +1048,7 @@ class TestBulkTerminateResourceDeallocation:
         resource_slot_types: None,
     ) -> None:
         """update_kernels_to_terminated sets free_at and decrements agent_resources.used."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         _, kernel_id = await self._create_kernel_with_resources(
             db_with_cleanup,
@@ -1293,7 +1287,7 @@ class TestNegativeValueGuard:
             db_sess.add(
                 KeyPairRow(
                     access_key=access_key,
-                    secret_key=SecretKey(f"SK{uuid.uuid4().hex}"),
+                    secret_key=SecretValue(SecretKey(f"SK{uuid.uuid4().hex}")),
                     is_active=True,
                     is_admin=False,
                     resource_policy=test_keypair_resource_policy_name,
@@ -1345,8 +1339,6 @@ class TestNegativeValueGuard:
                     region="local",
                     scaling_group=test_scaling_group_name,
                     resource_group_id=test_scaling_group_id,
-                    available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
-                    occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
                     version="1.0.0",
                     architecture="x86_64",
@@ -1380,7 +1372,7 @@ class TestNegativeValueGuard:
         resource_slot_types: None,
     ) -> None:
         """Calling update_kernel_status_terminated twice doesn't produce negative used values."""
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
         cpu_used = Decimal("2")
@@ -1395,12 +1387,12 @@ class TestNegativeValueGuard:
                     domain_id=test_domain_id,
                     domain_name=test_domain.domain_name,
                     group_id=test_group_id,
+                    user_uuid=test_user_uuid,
                     resource_group_id=test_scaling_group_id,
                     scaling_group_name=test_scaling_group_name,
                     status=SessionStatus.RUNNING,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
                     created_at=datetime.now(tzutc()),
                     images=["python:3.8"],
                     vfolder_mounts=[],
@@ -1427,8 +1419,6 @@ class TestNegativeValueGuard:
                     container_id=f"container-{uuid.uuid4().hex[:8]}",
                     status=KernelStatus.RUNNING,
                     status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
-                    requested_slots=ResourceSlot({"cpu": cpu_used, "mem": mem_used}),
                     domain_name=test_domain.domain_name,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,

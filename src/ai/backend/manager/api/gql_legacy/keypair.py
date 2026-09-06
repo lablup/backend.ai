@@ -20,6 +20,7 @@ from ai.backend.manager.models.keypair import (
     KeyPairRow,
     keypairs,
 )
+from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 
 from .session import ComputeSession
 
@@ -136,6 +137,14 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         )
     )
 
+    async def resolve_secret_key(self, info: graphene.ResolveInfo) -> str | None:
+        """The stored secret key as plaintext; the column holds it encrypted once a
+        write provider is named."""
+        if self.secret_key is None:
+            return None
+        ctx: GraphQueryContext = info.context
+        return await ctx.key_provider_pool.decrypt(self.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
+
     async def resolve_user_info(
         self,
         info: graphene.ResolveInfo,
@@ -197,7 +206,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             human_readable_name="ratelimit",
         )
         try:
-            return await valkey_client.get_rolling_count(self.access_key)
+            return await valkey_client.get_rolling_count(UserID(self.user))
         finally:
             await valkey_client.close()
 
@@ -308,7 +317,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
-        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
+        from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
         ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
@@ -346,7 +355,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
-        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
+        from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
         ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
@@ -399,7 +408,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
-        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
+        from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
         ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
@@ -443,7 +452,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.project.row import groups
         from ai.backend.manager.models.user.row import users
-        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
+        from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
         ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
@@ -565,6 +574,10 @@ class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]
         set_if_set(props, data, "rate_limit")
         # props.concurrency_limit is always ignored
         update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
+        if data.get("is_active") is False:
+            # An inactive default keypair locks its user out, so the marker is a
+            # precondition carried in the statement.
+            update_query = update_query.where(sa.not_(keypairs.c.is_default))
         return await simple_db_mutate(cls, ctx, update_query)
 
 
@@ -593,5 +606,11 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
                 return DeleteKeyPair(
                     False, "the keypair is used as the default access key by a user"
                 )
-        delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
+        # The marker is re-evaluated inside the DELETE, so a keypair that becomes the
+        # default after the read above is not removed.
+        delete_query = (
+            sa.delete(keypairs)
+            .where(keypairs.c.access_key == access_key)
+            .where(sa.not_(keypairs.c.is_default))
+        )
         return await simple_db_mutate(cls, ctx, delete_query)

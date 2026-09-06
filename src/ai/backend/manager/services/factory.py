@@ -11,10 +11,14 @@ from ai.backend.common.data.entity.artifact import ARTIFACT_ENTITY_TYPE
 from ai.backend.common.data.entity.artifact_registry import ARTIFACT_REGISTRY_ENTITY_TYPE
 from ai.backend.common.data.entity.artifact_revision import ARTIFACT_REVISION_FIELD_TYPE
 from ai.backend.common.data.entity.audit_log import AUDIT_LOG_FIELD_TYPE
+from ai.backend.common.data.entity.auth import AUTH_ENTITY_TYPE
+from ai.backend.common.data.entity.client_ip_masking import CLIENT_IP_MASKING_POLICY_ENTITY_TYPE
 from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
 from ai.backend.common.data.entity.deployment_preset import DEPLOYMENT_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
+from ai.backend.common.data.entity.entity_invitation import ENTITY_INVITATION_ENTITY_TYPE
+from ai.backend.common.data.entity.entity_label import ENTITY_LABEL_FIELD_TYPE
 from ai.backend.common.data.entity.etcd_config import ETCD_CONFIG_ENTITY_TYPE
 from ai.backend.common.data.entity.export import EXPORT_ENTITY_TYPE
 from ai.backend.common.data.entity.fair_share import (
@@ -50,6 +54,7 @@ from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTI
 from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
 from ai.backend.common.data.entity.runtime_variant_preset import RUNTIME_VARIANT_PRESET_ENTITY_TYPE
+from ai.backend.common.data.entity.secret import SECRET_ENTITY_TYPE
 from ai.backend.common.data.entity.service_catalog import SERVICE_CATALOG_ENTITY_TYPE
 from ai.backend.common.data.entity.session import SESSION_ENTITY_TYPE
 from ai.backend.common.data.entity.session_template import SESSION_TEMPLATE_ENTITY_TYPE
@@ -67,6 +72,7 @@ from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
     ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
@@ -76,6 +82,7 @@ from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
@@ -106,6 +113,7 @@ from ai.backend.manager.services.artifact_registry.service import ArtifactRegist
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.manager.services.client_ip_masking.processors import ClientIPMaskingProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
@@ -118,6 +126,15 @@ from ai.backend.manager.services.deployment_revision_preset.service import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.entity_invitation.processors import (
+    EntityInvitationProcessors,
+)
+from ai.backend.manager.services.entity_invitation.service import EntityInvitationService
+from ai.backend.manager.services.entity_label.actions.lookup_owner import (
+    LookupBulkEntityLabelOwnerAction,
+    LookupEntityLabelOwnerAction,
+)
+from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 from ai.backend.manager.services.events.service import EventsService
@@ -201,6 +218,8 @@ from ai.backend.manager.services.runtime_variant_preset.processors import (
 from ai.backend.manager.services.runtime_variant_preset.service import RuntimeVariantPresetService
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
+from ai.backend.manager.services.secret.processors import SecretProcessors
+from ai.backend.manager.services.secret.service import SecretService
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -244,9 +263,6 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.agent.repository,
             repositories.scheduler.repository,
             args.scheduling_controller,
-            args.hook_plugin_ctx,
-            args.event_producer,
-            args.agent_cache,
         ),
         app_config=AppConfigService(OpsRepository(repositories.v2_ops_provider)),
         domain=DomainService(repositories.domain.repository),
@@ -330,6 +346,7 @@ def create_services(args: ServiceArgs) -> Services:
                 user_repository=repositories.user.repository,
             )
         ),
+        secret=SecretService(repositories.secret.repository),
         manager_admin=ManagerAdminService(
             repository=repositories.manager_admin.repository,
             config_provider=args.config_provider,
@@ -349,8 +366,12 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         resource_slot=ResourceSlotService(repositories.resource_slot.repository),
         role_preset=RolePresetService(OpsRepository(repositories.v2_ops_provider)),
+        entity_invitation=EntityInvitationService(
+            repositories.entity_invitation.repository,
+        ),
         runtime_variant_preset=RuntimeVariantPresetService(
             repositories.runtime_variant_preset.repository,
+            OpsRepository(repositories.v2_ops_provider),
         ),
         deployment_revision_preset=DeploymentPresetService(
             repositories.deployment_revision_preset.repository,
@@ -394,6 +415,8 @@ def create_services(args: ServiceArgs) -> Services:
             user_repository=repositories.user.repository,
             group_repository=repositories.project.repository,
             ssh_key_validator=args.ssh_key_validator,
+            client_ip_masking_repository=repositories.client_ip_masking.repository,
+            key_provider_pool=args.key_provider_pool,
         ),
         notification=NotificationService(
             repository=repositories.notification.repository,
@@ -401,6 +424,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         object_storage=ObjectStorageService(
             artifact_repository=repositories.artifact.repository,
+            revision_ops=OpsRepository(repositories.v2_ops_provider),
             object_storage_repository=repositories.object_storage.repository,
             storage_namespace_repository=repositories.storage_namespace.repository,
             storage_manager=args.storage_manager,
@@ -427,6 +451,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         artifact_revision=ArtifactRevisionService(
             artifact_repository=repositories.artifact.repository,
+            revision_ops=OpsRepository(repositories.v2_ops_provider),
             artifact_registry_repository=repositories.artifact_registry.repository,
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,
@@ -493,165 +518,209 @@ def create_processors(
             repository=OpsRepository(repositories.v2_ops_provider),
         )
     )
-    # Areas covering several entities: every group made here names the area.
-    fair_share_groups = registry.concern(ConcernMeta("fair_share"))
-    artifact_revisions = registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
+    # Every group is made through the area it belongs to, so every wiring names one.
+    app_config_groups = registry.concern(ConcernMeta(Concern.APP_CONFIG))
+    artifact_groups = registry.concern(ConcernMeta(Concern.ARTIFACT_REGISTRY))
+    container_registry_groups = registry.concern(ConcernMeta(Concern.CONTAINER_REGISTRY))
+    deployment_groups = registry.concern(ConcernMeta(Concern.DEPLOYMENT))
+    metric_groups = registry.concern(ConcernMeta(Concern.METRIC))
+    notification_groups = registry.concern(ConcernMeta(Concern.NOTIFICATION_CENTER))
+    organization_groups = registry.concern(ConcernMeta(Concern.ORGANIZATION))
+    rbac_groups = registry.concern(ConcernMeta(Concern.RBAC))
+    resource_group_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
+    resource_policy_groups = registry.concern(ConcernMeta(Concern.RESOURCE_POLICY))
+    session_groups = registry.concern(ConcernMeta(Concern.SESSION))
+    system_groups = registry.concern(ConcernMeta(Concern.SYSTEM))
+    vfolder_groups = registry.concern(ConcernMeta(Concern.VFOLDER))
+    visibility_groups = registry.concern(ConcernMeta(Concern.VISIBILITY))
+    artifact_revisions = artifact_groups.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
         FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
         ArtifactRevisionData,
         LookupArtifactRevisionOwnerAction,
         LookupBulkArtifactRevisionOwnerAction,
     )
-    resource_slot_groups = registry.concern(ConcernMeta("resource_slot"))
-    scheduling_history_groups = registry.concern(ConcernMeta("scheduling_history"))
-    resource_allocation_groups = registry.concern(ConcernMeta("resource_allocation"))
     processors = Processors(
         event_hub=args.event_hub,
         event_fetcher=args.event_fetcher,
         events_service=services.events,
         agent=AgentProcessors(
-            registry.group(GroupMeta(AGENT_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(AGENT_ENTITY_TYPE)),
             services.agent,
             action_monitors,
-            validators,
         ),
         app_config=AppConfigProcessors(
-            registry.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),
-            registry.group(GroupMeta(APP_CONFIG_DEFINITION_ENTITY_TYPE)),
-            registry.group(GroupMeta(APP_CONFIG_ALLOW_LIST_ENTITY_TYPE)),
-            registry.group(GroupMeta(APP_CONFIG_FRAGMENT_ENTITY_TYPE)),
+            app_config_groups.group(GroupMeta(APP_CONFIG_ENTITY_TYPE)),
+            app_config_groups.group(GroupMeta(APP_CONFIG_DEFINITION_ENTITY_TYPE)),
+            app_config_groups.group(GroupMeta(APP_CONFIG_ALLOW_LIST_ENTITY_TYPE)),
+            app_config_groups.group(GroupMeta(APP_CONFIG_FRAGMENT_ENTITY_TYPE)),
             services.app_config,
         ),
         domain=DomainProcessors(
-            registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), services.domain, action_monitors
+            organization_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+            services.domain,
+            action_monitors,
         ),
         etcd_config=EtcdConfigProcessors(
-            registry.group(GroupMeta(ETCD_CONFIG_ENTITY_TYPE)), services.etcd_config
+            system_groups.group(GroupMeta(ETCD_CONFIG_ENTITY_TYPE)), services.etcd_config
         ),
-        export=ExportProcessors(registry.group(GroupMeta(EXPORT_ENTITY_TYPE)), services.export),
+        export=ExportProcessors(
+            visibility_groups.group(GroupMeta(EXPORT_ENTITY_TYPE)), services.export
+        ),
         fair_share=FairShareProcessors(
-            fair_share_groups.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)),
-            fair_share_groups.group(GroupMeta(PROJECT_FAIR_SHARE_ENTITY_TYPE)),
-            fair_share_groups.group(GroupMeta(USER_FAIR_SHARE_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(DOMAIN_FAIR_SHARE_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(PROJECT_FAIR_SHARE_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(USER_FAIR_SHARE_ENTITY_TYPE)),
             services.fair_share,
         ),
-        project=ProjectProcessors(registry.group(GroupMeta(PROJECT_ENTITY_TYPE)), services.project),
+        project=ProjectProcessors(
+            organization_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)), services.project
+        ),
         user=UserProcessors(
-            registry.group(GroupMeta(USER_ENTITY_TYPE)),
+            organization_groups.group(GroupMeta(USER_ENTITY_TYPE)),
             services.user,
         ),
         idle_checker=IdleCheckerProcessors(
-            registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.idle_checker, action_monitors
+            session_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            services.idle_checker,
+            action_monitors,
         ),
-        image=ImageProcessors(registry.group(GroupMeta(IMAGE_ENTITY_TYPE)), services.image),
+        image=ImageProcessors(
+            container_registry_groups.group(GroupMeta(IMAGE_ENTITY_TYPE)), services.image
+        ),
         container_registry=ContainerRegistryProcessors(
-            registry.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)), services.container_registry
+            container_registry_groups.group(GroupMeta(CONTAINER_REGISTRY_ENTITY_TYPE)),
+            services.container_registry,
         ),
-        vfolder=VFolderProcessors(registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder),
+        vfolder=VFolderProcessors(
+            vfolder_groups.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder
+        ),
         vfolder_admin=VFolderAdminProcessors(
-            registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder_admin
+            vfolder_groups.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder_admin
         ),
         vfolder_file=VFolderFileProcessors(
-            registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder_file
+            vfolder_groups.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder_file
         ),
         vfolder_invite=VFolderInviteProcessors(
-            registry.group(GroupMeta(VFOLDER_INVITATION_ENTITY_TYPE)), services.vfolder_invite
+            vfolder_groups.group(GroupMeta(VFOLDER_INVITATION_ENTITY_TYPE)),
+            services.vfolder_invite,
         ),
         vfolder_sharing=VFolderSharingProcessors(
-            registry.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder_sharing
+            vfolder_groups.group(GroupMeta(VFOLDER_ENTITY_TYPE)), services.vfolder_sharing
         ),
         session=SessionProcessors(
-            registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            session_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
             ResourceAllocationProcessors(
-                resource_allocation_groups.group(GroupMeta(USER_ENTITY_TYPE)),
-                resource_allocation_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
-                resource_allocation_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
-                resource_allocation_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
-                resource_allocation_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-                resource_allocation_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+                resource_group_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+                resource_group_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+                resource_group_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+                resource_group_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+                resource_group_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+                resource_group_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
                 services.resource_allocation,
             ),
             services.session,
         ),
         keypair_resource_policy=KeypairResourcePolicyProcessors(
-            registry.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE))
+            resource_policy_groups.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE))
         ),
         manager_admin=ManagerAdminProcessors(
-            registry.group(GroupMeta(MANAGER_ADMIN_ENTITY_TYPE)), services.manager_admin
+            system_groups.group(GroupMeta(MANAGER_ADMIN_ENTITY_TYPE)), services.manager_admin
+        ),
+        secret=SecretProcessors(
+            system_groups.group(GroupMeta(SECRET_ENTITY_TYPE)), services.secret
         ),
         user_resource_policy=UserResourcePolicyProcessors(
-            registry.group(GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE))
+            resource_policy_groups.group(GroupMeta(USER_RESOURCE_POLICY_ENTITY_TYPE))
         ),
         project_resource_policy=ProjectResourcePolicyProcessors(
-            registry.group(GroupMeta(PROJECT_RESOURCE_POLICY_ENTITY_TYPE))
+            resource_policy_groups.group(GroupMeta(PROJECT_RESOURCE_POLICY_ENTITY_TYPE))
         ),
         prometheus_query_preset=PrometheusQueryPresetProcessors(
-            registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)),
+            metric_groups.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)),
             services.prometheus_query_preset,
         ),
         prometheus_query_preset_category=PrometheusQueryPresetCategoryProcessors(
-            registry.group(GroupMeta(PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE))
+            metric_groups.group(GroupMeta(PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE))
         ),
         resource_preset=ResourcePresetProcessors(
-            registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), services.resource_preset
+            resource_group_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            services.resource_preset,
         ),
         resource_slot=ResourceSlotProcessors(
-            resource_slot_groups.group(GroupMeta(RESOURCE_SLOT_TYPE_ENTITY_TYPE)),
-            resource_slot_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            resource_slot_groups.group(GroupMeta(AGENT_ENTITY_TYPE)),
+            system_groups.group(GroupMeta(RESOURCE_SLOT_TYPE_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(AGENT_ENTITY_TYPE)),
             services.resource_slot,
         ),
         retention_policy=RetentionPolicyProcessors(
-            registry.group(GroupMeta(RETENTION_POLICY_ENTITY_TYPE))
+            system_groups.group(GroupMeta(RETENTION_POLICY_ENTITY_TYPE))
         ),
         role_preset=RolePresetProcessors(
-            registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)), services.role_preset
+            rbac_groups.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)), services.role_preset
         ),
         runtime_variant=RuntimeVariantProcessors(
-            registry.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE))
+            system_groups.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE))
+        ),
+        client_ip_masking=ClientIPMaskingProcessors(
+            system_groups.group(GroupMeta(CLIENT_IP_MASKING_POLICY_ENTITY_TYPE))
+        ),
+        entity_invitation=EntityInvitationProcessors(
+            rbac_groups.group(GroupMeta(ENTITY_INVITATION_ENTITY_TYPE)),
+            services.entity_invitation,
         ),
         runtime_variant_preset=RuntimeVariantPresetProcessors(
-            registry.group(GroupMeta(RUNTIME_VARIANT_PRESET_ENTITY_TYPE)),
+            system_groups.group(GroupMeta(RUNTIME_VARIANT_PRESET_ENTITY_TYPE)),
             services.runtime_variant_preset,
         ),
         deployment_revision_preset=DeploymentPresetProcessors(
-            registry.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)),
+            deployment_groups.group(GroupMeta(DEPLOYMENT_PRESET_ENTITY_TYPE)),
             services.deployment_revision_preset,
         ),
         model_card=ModelCardProcessors(
-            registry.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), services.model_card
+            deployment_groups.group(GroupMeta(MODEL_CARD_ENTITY_TYPE)), services.model_card
         ),
         resource_usage=ResourceUsageProcessors(
-            registry.dangling_field_group(
+            resource_group_groups.dangling_field_group(
                 FieldGroupMeta(DOMAIN_USAGE_BUCKET_FIELD_TYPE), DomainUsageBucketData
             ),
-            registry.dangling_field_group(
+            resource_group_groups.dangling_field_group(
                 FieldGroupMeta(PROJECT_USAGE_BUCKET_FIELD_TYPE), ProjectUsageBucketData
             ),
-            registry.dangling_field_group(
+            resource_group_groups.dangling_field_group(
                 FieldGroupMeta(USER_USAGE_BUCKET_FIELD_TYPE), UserUsageBucketData
             ),
         ),
         resource_group=ResourceGroupProcessors(
-            registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), services.resource_group
+            resource_group_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+            services.resource_group,
         ),
-        metric=MetricProcessors(services.metric, action_monitors, validators),
+        metric=MetricProcessors(
+            metric_groups.group(GroupMeta(PROMETHEUS_QUERY_PRESET_ENTITY_TYPE)),
+            session_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            services.metric,
+        ),
         model_serving=ModelServingProcessors(
-            registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), services.model_serving
+            deployment_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), services.model_serving
         ),
         model_serving_auto_scaling=ModelServingAutoScalingProcessors(
-            registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), services.model_serving_auto_scaling
+            deployment_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+            services.model_serving_auto_scaling,
         ),
-        auth=AuthProcessors(services.auth, action_monitors, validators),
+        auth=AuthProcessors(
+            organization_groups.group(GroupMeta(AUTH_ENTITY_TYPE)),
+            organization_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+            services.auth,
+        ),
         login_client_type=LoginClientTypeProcessors(
-            registry.group(GroupMeta(LOGIN_CLIENT_TYPE_ENTITY_TYPE))
+            system_groups.group(GroupMeta(LOGIN_CLIENT_TYPE_ENTITY_TYPE))
         ),
         notification=NotificationProcessors(
-            registry.group(GroupMeta(NOTIFICATION_CHANNEL_ENTITY_TYPE)),
-            registry.group(GroupMeta(NOTIFICATION_RULE_ENTITY_TYPE)),
+            notification_groups.group(GroupMeta(NOTIFICATION_CHANNEL_ENTITY_TYPE)),
+            notification_groups.group(GroupMeta(NOTIFICATION_RULE_ENTITY_TYPE)),
             services.notification,
         ),
         object_storage=ObjectStorageProcessors(
-            registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
+            artifact_groups.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),
             artifact_revisions,
             services.object_storage,
         ),
@@ -659,44 +728,57 @@ def create_processors(
             services.permission_controller, action_monitors, validators
         ),
         vfs_storage=VFSStorageProcessors(
-            registry.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), services.vfs_storage
+            artifact_groups.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), services.vfs_storage
         ),
         artifact=ArtifactProcessors(
-            registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+            artifact_groups.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
             ArtifactRevisionProcessors(
-                registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+                artifact_groups.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
                 artifact_revisions,
                 services.artifact_revision,
             ),
             services.artifact,
         ),
         artifact_registry=ArtifactRegistryProcessors(
-            registry.group(GroupMeta(ARTIFACT_REGISTRY_ENTITY_TYPE)), services.artifact_registry
+            artifact_groups.group(GroupMeta(ARTIFACT_REGISTRY_ENTITY_TYPE)),
+            services.artifact_registry,
         ),
         deployment=DeploymentProcessors(
-            registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), services.deployment
+            deployment_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), services.deployment
         ),
         storage_namespace=StorageNamespaceProcessors(
-            registry.group(GroupMeta(STORAGE_NAMESPACE_ENTITY_TYPE))
+            artifact_groups.group(GroupMeta(STORAGE_NAMESPACE_ENTITY_TYPE))
         ),
         audit_log=AuditLogProcessors(
-            registry.dangling_field_group(FieldGroupMeta(AUDIT_LOG_FIELD_TYPE), AuditLogData)
+            visibility_groups.dangling_field_group(
+                FieldGroupMeta(AUDIT_LOG_FIELD_TYPE), AuditLogData
+            )
+        ),
+        entity_label=EntityLabelProcessors(
+            registry.dangling_lookup_field_group(
+                FieldGroupMeta(ENTITY_LABEL_FIELD_TYPE),
+                EntityLabelData,
+                LookupEntityLabelOwnerAction,
+                LookupBulkEntityLabelOwnerAction,
+            )
         ),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             services.idle_checker_assignment, action_monitors, validators
         ),
         scheduling_history=SchedulingHistoryProcessors(
-            scheduling_history_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
-            scheduling_history_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
-            scheduling_history_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+            session_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            deployment_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+            deployment_groups.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
             services.scheduling_history,
         ),
         service_catalog=ServiceCatalogProcessors(
-            registry.group(GroupMeta(SERVICE_CATALOG_ENTITY_TYPE))
+            system_groups.group(GroupMeta(SERVICE_CATALOG_ENTITY_TYPE))
         ),
         template=TemplateProcessors(
-            registry.group(GroupMeta(SESSION_TEMPLATE_ENTITY_TYPE)), services.template
+            session_groups.group(GroupMeta(SESSION_TEMPLATE_ENTITY_TYPE)), services.template
         ),
-        stream=StreamProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), services.stream),
+        stream=StreamProcessors(
+            session_groups.group(GroupMeta(SESSION_ENTITY_TYPE)), services.stream
+        ),
     )
     return ProcessorsBundle(processors=processors, registry=registry)

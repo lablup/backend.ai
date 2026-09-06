@@ -28,7 +28,11 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry_quota.repositories import (
     PerProjectRegistryQuotaRepositories,
@@ -97,6 +101,8 @@ class TestPerProjectRegistryQuotaRepository:
             [
                 DomainRow,
                 ProjectResourcePolicyRow,
+                UserResourcePolicyRow,
+                UserRow,
                 ProjectRow,
                 ContainerRegistryRow,
             ],

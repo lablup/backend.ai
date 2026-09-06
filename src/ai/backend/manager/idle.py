@@ -73,6 +73,10 @@ from .errors.kernel import IdlePolicyNotFound
 from .models.kernel import LIVE_STATUS, kernels
 from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
+from .models.resource_slot.aggregates import (
+    kernel_requested_slots_expr,
+    kernel_used_slots_expr,
+)
 from .models.user import users
 from .types import DistributedLockFactory
 
@@ -272,8 +276,8 @@ class IdleCheckerHost:
                     kernels.c.session_type,
                     kernels.c.created_at,
                     kernels.c.starts_at,
-                    kernels.c.occupied_slots,
-                    kernels.c.requested_slots,
+                    kernel_used_slots_expr(kernels.c.id).label("occupied_slots"),
+                    kernel_requested_slots_expr(kernels.c.id).label("requested_slots"),
                     kernels.c.cluster_size,
                     users.c.created_at.label("user_created_at"),
                     keypairs.c.access_key.label("default_access_key"),

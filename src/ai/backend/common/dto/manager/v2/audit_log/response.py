@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import AuditLogStatus
 
@@ -22,7 +23,13 @@ class AuditLogNode(BaseResponseModel):
 
     id: UUID = Field(description="Audit log entry ID")
     action_id: UUID = Field(description="UUID of the action that generated this log")
-    entity_type: str = Field(description="Type of entity this log relates to")
+    entity_type: str | None = Field(
+        default=None,
+        description=(
+            "Type of entity this log relates to. Null for an operation that names "
+            "scopes and no entity kind, such as linking two entities."
+        ),
+    )
     operation: str = Field(description="Operation performed")
     entity_id: str | None = Field(default=None, description="ID of the affected entity")
     created_at: datetime = Field(description="Timestamp when the audit log was created")
@@ -39,6 +46,14 @@ class AuditLogNode(BaseResponseModel):
     )
     description: str = Field(description="Human-readable description of the operation")
     duration: str | None = Field(default=None, description="Duration of the operation as a string")
+    client_ip: str | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. IP address of the request that produced this "
+            "record, masked per the client IP masking policy. Null when the policy records "
+            "none, or when the address was unavailable or unusable."
+        ),
+    )
     status: AuditLogStatus = Field(description="Status of the operation")
 
 

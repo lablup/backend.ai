@@ -24,6 +24,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -133,7 +134,7 @@ class TestPrereservationLifecycle:
         kernel_ids: list[KernelId],
         agent_id: str,
     ) -> list[SessionId]:
-        db_source = ScheduleDBSource(db)
+        db_source = ScheduleDBSource(db, ReconcileOpsProvider(db))
         allocations = make_session_allocations(
             session_id=session_id,
             kernel_assignments=[(kernel_id, agent_id) for kernel_id in kernel_ids],
@@ -207,7 +208,7 @@ class TestPrereservationLifecycle:
             mem_used=Decimal("4096"),
         )
         await self._reserve(db_with_cleanup, session_id, kernel_ids, agent_id)
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         # Victims still hold too much: used 3 + hold 2 > capacity 4
         admitted = await db_source.admit_prereserved_kernels([session_id])
@@ -244,7 +245,7 @@ class TestPrereservationLifecycle:
             mem_capacity=Decimal("4096"),
         )
         await self._reserve(db_with_cleanup, session_id, kernel_ids, agent_id)
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         admitted = await db_source.admit_prereserved_kernels([session_id])
         assert admitted == kernel_ids
 
@@ -288,7 +289,7 @@ class TestPrereservationLifecycle:
             mem_used=Decimal("4096"),
         )
         await self._reserve(db_with_cleanup, session_id, kernel_ids, agent_id)
-        db_source = ScheduleDBSource(db_with_cleanup)
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         async with db_with_cleanup.begin_session_read_committed() as db_sess:
             now = await db_source._get_db_now_in_session(db_sess)

@@ -10,7 +10,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
 @dataclass
@@ -29,6 +29,22 @@ class RuntimeVariantQuerier(DataQuerier[RuntimeVariantRow, RuntimeVariantData]):
     @override
     def entity_id_value(self) -> RuntimeVariantID:
         return self.variant_id
+
+    @override
+    def to_data(self, row: RuntimeVariantRow) -> RuntimeVariantData:
+        return row.to_data()
+
+
+class BulkRuntimeVariantQuerier(BulkEntityQuerier[RuntimeVariantRow, RuntimeVariantData]):
+    """The runtime variants the caller named."""
+
+    @override
+    def row_class(self) -> type[RuntimeVariantRow]:
+        return RuntimeVariantRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return RuntimeVariantRow.id
 
     @override
     def to_data(self, row: RuntimeVariantRow) -> RuntimeVariantData:

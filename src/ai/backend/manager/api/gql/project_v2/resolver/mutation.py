@@ -6,7 +6,12 @@ from uuid import UUID
 
 from strawberry import Info
 
-from ai.backend.common.dto.manager.v2.group.request import DeleteProjectInput, PurgeProjectInput
+from ai.backend.common.dto.manager.v2.group.request import (
+    DeleteProjectInput,
+    PurgeProjectInput,
+    RestoreProjectInput,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -16,6 +21,7 @@ from ai.backend.manager.api.gql.project_v2.types.mutations import (
     DeleteProjectPayloadGQL,
     ProjectPayloadGQL,
     PurgeProjectPayloadGQL,
+    RestoreProjectPayloadGQL,
     UnassignUsersFromProjectInputGQL,
     UnassignUsersFromProjectPayloadGQL,
     UpdateProjectInputGQL,
@@ -74,6 +80,23 @@ async def admin_delete_project_v2(
     ctx = info.context
     payload = await ctx.adapters.project.admin_delete(DeleteProjectInput(group_id=project_id))
     return DeleteProjectPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Restore a soft-deleted project (admin only). Requires superadmin privileges.",
+    )
+)
+async def admin_restore_project_v2(
+    info: Info[StrawberryGQLContext],
+    project_id: UUID,
+) -> RestoreProjectPayloadGQL | None:
+    """Restore a soft-deleted project."""
+    check_admin_only()
+    ctx = info.context
+    payload = await ctx.adapters.project.admin_restore(RestoreProjectInput(group_id=project_id))
+    return RestoreProjectPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(

@@ -29,6 +29,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.scopes import ProjectDeploymentOperationScope
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -52,8 +53,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import ProjectDeploymentOperationScope
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -290,7 +290,7 @@ class TestEndpointSearchInProject:
         mock_valkey_schedule = AsyncMock()
         return DeploymentRepository(
             db=db_with_cleanup,
-            v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=mock_storage_manager,
             valkey_stat=mock_valkey_stat,
             valkey_live=mock_valkey_live,

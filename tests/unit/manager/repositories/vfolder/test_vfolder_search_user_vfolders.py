@@ -34,9 +34,11 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
+from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import UserVFolderOperationScope
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
 
@@ -71,7 +73,9 @@ class TestVfolderSearchUserVfolders:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> VfolderRepository:
-        return VfolderRepository(db=db_with_cleanup)
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
+        )
 
     @pytest.fixture
     async def test_data(
@@ -167,7 +171,7 @@ class TestVfolderSearchUserVfolders:
                 KeyPairRow(
                     user=user_a_id,
                     access_key="TESTKEY0000000A",
-                    secret_key="test-secret-a",
+                    secret_key=SecretValue("test-secret-a"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -178,7 +182,7 @@ class TestVfolderSearchUserVfolders:
                 KeyPairRow(
                     user=user_b_id,
                     access_key="TESTKEY0000000B",
-                    secret_key="test-secret-b",
+                    secret_key=SecretValue("test-secret-b"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -372,7 +376,7 @@ class TestVfolderSearchUserVfolders:
                 KeyPairRow(
                     user=user_id,
                     access_key="TESTKEY0000000M",
-                    secret_key="test-secret-m",
+                    secret_key=SecretValue("test-secret-m"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -587,7 +591,7 @@ class TestVfolderSearchUserVfolders:
                 KeyPairRow(
                     user=user_a_id,
                     access_key="TESTKEY0000000P",
-                    secret_key="test-secret-p",
+                    secret_key=SecretValue("test-secret-p"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",
@@ -598,7 +602,7 @@ class TestVfolderSearchUserVfolders:
                 KeyPairRow(
                     user=user_b_id,
                     access_key="TESTKEY0000000Q",
-                    secret_key="test-secret-q",
+                    secret_key=SecretValue("test-secret-q"),
                     is_active=True,
                     is_admin=False,
                     resource_policy="default",

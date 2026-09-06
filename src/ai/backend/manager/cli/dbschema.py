@@ -11,6 +11,7 @@ import click
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.resource import ConfigurationLoadFailed
+from ai.backend.manager.models.uuid7 import UUID_GENERATE_V7_DDL
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -249,6 +250,7 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
         engine = create_async_engine(sa_url)
         async with engine.begin() as connection:
             await connection.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
+            await connection.exec_driver_sql(UUID_GENERATE_V7_DDL)
             current_rev = await connection.run_sync(_get_current_rev_sync)
         if current_rev is None:
             # For a fresh clean database, create all from scratch.

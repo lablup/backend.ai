@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     DealiasImageInput,
     ForgetImageInput,
     PurgeImageInput,
+    RestoreImageInput,
     UpdateImageInput,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -49,6 +50,11 @@ class V2ImageHandler:
     async def admin_forget(self, body: BodyParam[ForgetImageInput]) -> APIResponse:
         """Forget (soft-delete) an image."""
         result = await self._adapter.admin_forget(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_restore(self, body: BodyParam[RestoreImageInput]) -> APIResponse:
+        """Restore a forgotten (soft-deleted) image."""
+        result = await self._adapter.admin_restore(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(self, body: BodyParam[PurgeImageInput]) -> APIResponse:

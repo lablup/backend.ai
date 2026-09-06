@@ -51,8 +51,9 @@ from ai.backend.manager.models.session import (
     KernelLoadingStrategy,
     SessionDependencyRow,
     SessionRow,
-    batch_populate_session_occupied_slots,
 )
+from ai.backend.manager.models.session.scopes import ProjectSessionOperationScope
+from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow
@@ -61,10 +62,9 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
-from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
 from ai.backend.manager.utils import query_userinfo
 
 
@@ -72,9 +72,9 @@ class SessionDBSource:
     _db: ExtendedAsyncSAEngine
     _ops: DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: DBOpsProvider) -> None:
         self._db = db
-        self._ops = DBOpsProvider(db)
+        self._ops = ops_provider
 
     async def resolve_session_id(
         self,
@@ -141,7 +141,6 @@ class SessionDBSource:
                 sa.select(UserRow)
                 .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
                 .where(SessionRow.id == session_id)
-                .options(joinedload(UserRow.default_keypair))
             )
             user = await db_sess.scalar(query)
             if user is None:
@@ -375,10 +374,10 @@ class SessionDBSource:
 
     async def update_session(
         self,
-        updater: Updater[SessionRow],
+        updater: SessionUpdater,
         session_name: str | None = None,
     ) -> SessionRow | None:
-        session_id = updater.pk_value
+        session_id = updater.session_id
 
         async with self._db.begin_session() as db_session:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
@@ -401,9 +400,8 @@ class SessionDBSource:
                         f"Duplicate session name. Session(id:{sess.id}) already has the name"
                     )
 
-            # Use execute_updater to apply changes
-            result = await execute_updater(db_session, updater)
-            if result is None:
+            updated = await V2WriteOps(db_session).update_data(updater)
+            if updated is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name:
@@ -624,7 +622,6 @@ class SessionDBSource:
             )
 
             session_rows = [row.SessionRow for row in result.rows]
-            await batch_populate_session_occupied_slots(db_sess, session_rows)
             items = [row.to_dataclass() for row in session_rows]
 
             return SessionListResult(
@@ -659,7 +656,6 @@ class SessionDBSource:
             )
 
             session_rows = [row.SessionRow for row in result.rows]
-            await batch_populate_session_occupied_slots(db_sess, session_rows)
             items = [row.to_dataclass() for row in session_rows]
 
             return SessionListResult(
