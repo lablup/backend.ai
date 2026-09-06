@@ -380,3 +380,44 @@ class NetworkStateStoreConflict(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.CONFLICT,
         )
+
+
+class PrivilegedNetworkHelperFailed(BackendAIError, web.HTTPInternalServerError):
+    """The privileged network helper refused or failed a request.
+
+    A `BackendAIError` because it reaches session creation, and what arrives at the manager
+    decides what an operator is told. A built-in `ConnectionRefusedError` carries errno 111 and
+    nothing else -- not which node, not which socket, not that the whole data plane on that node
+    is down rather than one operation having failed.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/privileged-network-helper-failed"
+    error_title = "The privileged network helper could not carry out the request."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class PrivilegedNetworkHelperUnreachable(PrivilegedNetworkHelperFailed):
+    """The helper could not be reached at all, rather than refusing one request.
+
+    A subclass, so every caller that already degrades on a failed request keeps doing so; the
+    distinction is for the ones that want to say why, and for readiness, which reports a node
+    whose helper is down instead of letting each session discover it at create time.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/privileged-network-helper-unreachable"
+    error_title = "The privileged network helper is not reachable on this node."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
