@@ -1717,17 +1717,23 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
 
     async def _ensure_forward_accept(self, vni: int) -> None:
         """Idempotently accept intra-bridge forwarding on the overlay bridge, so a DROP FORWARD
-        policy (br_netfilter + a Docker/hardened host) cannot silently kill the overlay. Best-effort:
-        harmless where FORWARD already accepts, and a host without iptables has no such policy."""
+        policy (br_netfilter + a Docker/hardened host) cannot silently kill the overlay.
+
+        Skipped where there is no iptables to ask -- a host without it has no such policy either,
+        and requiring the rule there would refuse sessions that work. Everywhere else the install
+        has to succeed: a host that has iptables may well have the DROP policy this exists for, and
+        a refusal there is an overlay that carries nothing while reporting itself up.
+        """
         try:
             await self._runner(forward_accept_check_args(vni))
             return  # already present
-        except (RuntimeError, OSError):
-            pass  # absent, or iptables unavailable -- try to add it
-        try:
-            await self._runner(forward_accept_add_args(vni))
-        except (RuntimeError, OSError) as e:
-            log.warning("could not install overlay FORWARD-ACCEPT for {}: {}", bridge_dev(vni), e)
+        except OSError as e:
+            # No iptables binary: nothing on this host is filtering FORWARD.
+            log.debug("skipping overlay FORWARD-ACCEPT for {}: {}", bridge_dev(vni), e)
+            return
+        except RuntimeError:
+            pass  # the rule is absent -- install it
+        await self._runner(forward_accept_add_args(vni))
 
     async def _del_forward_accept(self, vni: int, failures: list[str] | None = None) -> None:
         await self._remove(forward_accept_del_args(vni), failures)
@@ -2417,6 +2423,11 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # behind, and teardown skips a session it has no meta for -- so the device outlived every
         # record of it, and the next session that drew the same VNI (the manager hands them back)
         # inherited a stranger's device. Undo what landed and let the caller see the failure.
+        # One scope for all of it, and BaseException, not Exception: a cancelled setup -- the
+        # kernel-creation timeout, the agent shutting down -- otherwise walks away from whatever
+        # had already landed. Teardown skips a session it has no meta for, so a device left here
+        # outlives every record of it, and the next session the manager gives this VNI to
+        # inherits a stranger's tunnel.
         try:
             await self._runner(
                 vxlan_link_add_args(
@@ -2433,30 +2444,46 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             await self._runner(set_master_args(vni))
             await self._runner(link_up_args(vxlan_dev(vni)))
             await self._runner(link_up_args(bridge_dev(vni)))
-        except Exception:
-            for dev in (bridge_dev(vni), vxlan_dev(vni)):
-                await self._delete_link_quiet(dev)
-            raise
-        await self._ensure_forward_accept(vni)
-        if meta.encryption_key is not None:
-            try:
+            await self._ensure_forward_accept(vni)
+            if meta.encryption_key is not None:
                 await self._ensure_output_mark(vni, meta.vxlan_port)
                 # The guard before the drop: from here on, a lost mark stops the traffic instead
                 # of sending it in clear text.
                 await self._ensure_egress_guard(vni, meta.vxlan_port)
                 await self._ensure_plaintext_drop(vni, meta.vxlan_port)
-            except Exception:
-                rollback: list[str] = []
-                await self._del_output_mark(vni, meta.vxlan_port, rollback)
-                await self._del_egress_guard(vni, meta.vxlan_port, rollback)
-                await self._del_forward_accept(vni, rollback)
-                for dev in (bridge_dev(vni), vxlan_dev(vni)):
-                    await self._delete_link_quiet(dev)
-                raise
+        except BaseException:
+            await asyncio.shield(
+                asyncio.ensure_future(self._undo_partial_setup(vni, meta.vxlan_port))
+            )
+            raise
         self._sessions[meta.session_id] = meta
         self._register_security_state(meta)
         if self_member.vtep_ip is not None:
             self._self_vteps[meta.session_id] = self_member.vtep_ip
+
+    async def _undo_partial_setup(self, vni: int, vxlan_port: int) -> None:
+        """Take back everything `setup_session_network` may have put on this host for ``vni``.
+
+        Every step is best-effort and safe on something that was never created: the caller does
+        not know how far it got, and stopping at the first absent object would leave the rest.
+        Shielded by the caller, so a cancellation cannot cut this short either.
+        """
+        rollback: list[str] = []
+        with contextlib.suppress(Exception):
+            await self._del_plaintext_drop(vni, vxlan_port, rollback)
+        with contextlib.suppress(Exception):
+            await self._del_output_mark(vni, vxlan_port, rollback)
+        with contextlib.suppress(Exception):
+            await self._del_egress_guard(vni, vxlan_port, rollback)
+        with contextlib.suppress(Exception):
+            await self._del_forward_accept(vni, rollback)
+        for dev in (bridge_dev(vni), vxlan_dev(vni)):
+            with contextlib.suppress(Exception):
+                await self._delete_link_quiet(dev)
+        if rollback:
+            log.warning(
+                "undid a partial vxlan setup for vni {}: {}", vni, ", ".join(sorted(rollback))
+            )
 
     def encrypted_peers(self, session_id: str) -> frozenset[str]:
         """The peer VTEPs this node still holds ESP state for, in this session.
