@@ -17,7 +17,8 @@ import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.entity_share import EntityShareID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.manager.data.entity_share.types import (
     EntityShareData,
     EntityShareStatus,
@@ -27,6 +28,7 @@ from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 __all__ = (
     "EntityShareAcceptUpdater",
@@ -37,14 +39,19 @@ __all__ = (
 
 @dataclass
 class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShareData]):
-    """What the invitee's two answers share: the row is pending, and it is theirs.
+    """What the receiving side's two answers share: the offer is open, and it is theirs.
 
-    The address is read back from ``users`` inside the statement, so an invitation
-    addressed to somebody else reads as one that was not there.
+    Open is pending and still in time. An offer whose moment has passed reads as one
+    that was not there, which is what expiry means without a sweep writing a state, and
+    an offer with no moment stays open.
+
+    Theirs means addressed to the scope answering. A person is addressed two ways, by
+    the node they hold and by the address that reached them before they had an account,
+    so both are read back inside the statement.
     """
 
     share_id: EntityShareID
-    recipient_user_id: UserID
+    answering_scope: EntityIdentifier
 
     @property
     @override
@@ -61,17 +68,35 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
 
     @override
     def guard_conditions(self) -> list[QueryCondition]:
-        recipient_user_id = self.recipient_user_id
+        scope = self.answering_scope
 
         def pending() -> sa.sql.expression.ColumnElement[bool]:
             return EntityShareRow.status == EntityShareStatus.PENDING
 
-        def addressed_to_invitee() -> sa.sql.expression.ColumnElement[bool]:
-            return EntityShareRow.recipient_email == (
-                sa.select(UserRow.email).where(UserRow.uuid == recipient_user_id).scalar_subquery()
+        def in_time() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.or_(
+                EntityShareRow.expires_at.is_(None),
+                EntityShareRow.expires_at > sa.func.now(),
             )
 
-        return [pending, addressed_to_invitee]
+        def addressed_to_scope() -> sa.sql.expression.ColumnElement[bool]:
+            named = EntityShareRow.recipient_virtual_entity_id == (
+                sa.select(VirtualEntityRow.id)
+                .where(
+                    VirtualEntityRow.entity_type == scope.entity_type(),
+                    VirtualEntityRow.entity_id == scope,
+                )
+                .scalar_subquery()
+            )
+            if scope.entity_type() != USER_ENTITY_TYPE:
+                return named
+            return sa.or_(
+                named,
+                EntityShareRow.recipient_email
+                == (sa.select(UserRow.email).where(UserRow.uuid == scope).scalar_subquery()),
+            )
+
+        return [pending, in_time, addressed_to_scope]
 
     @property
     @override
@@ -85,11 +110,28 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
 
 @dataclass
 class EntityShareAcceptUpdater(_RecipientInvitationUpdater):
-    """The invitee takes what was offered."""
+    """The receiving side takes what was offered.
+
+    Settling records the node the answering scope holds. An offer that named a node
+    already carries the same one, because the guard would not have matched otherwise;
+    an offer that reached an address gains it here, and from then on an accepted row
+    always names one.
+    """
 
     @override
     def build_values(self) -> dict[str, Any]:
-        return {"status": EntityShareStatus.ACCEPTED}
+        scope = self.answering_scope
+        return {
+            "status": EntityShareStatus.ACCEPTED,
+            "recipient_virtual_entity_id": (
+                sa.select(VirtualEntityRow.id)
+                .where(
+                    VirtualEntityRow.entity_type == scope.entity_type(),
+                    VirtualEntityRow.entity_id == scope,
+                )
+                .scalar_subquery()
+            ),
+        }
 
 
 @dataclass

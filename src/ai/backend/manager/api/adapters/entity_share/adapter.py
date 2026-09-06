@@ -110,7 +110,7 @@ class EntityShareAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         result = await self._processors.entity_share.accept.run(
-            AcceptEntityShareAction(share_id=share_id, recipient_user_id=UserID(me.user_id))
+            AcceptEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
         )
         return EntitySharePayload(invitation=self._to_node(result.data))
 
@@ -119,7 +119,7 @@ class EntityShareAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         result = await self._processors.entity_share.reject.run(
-            RejectEntityShareAction(share_id=share_id, recipient_user_id=UserID(me.user_id))
+            RejectEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
         )
         return EntitySharePayload(invitation=self._to_node(result.data))
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.common.data.entity.entity_share import EntityShareID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.errors.entity_share import EntityShareNotFound
 from ai.backend.manager.models.entity_share.updaters import (
@@ -28,24 +28,28 @@ class EntityShareRepository:
     def __init__(self, ops_provider: ShareOpsProvider) -> None:
         self._ops = ops_provider
 
-    async def accept(self, share_id: EntityShareID, recipient_user_id: UserID) -> EntityShareData:
-        """Take what was offered: the invitation is settled and the entity granted."""
+    async def accept(
+        self, share_id: EntityShareID, answering_scope: EntityIdentifier
+    ) -> EntityShareData:
+        """Take what was offered: the offer is settled and the entity lent."""
         async with self._ops.write_ops() as w:
-            data = await w.accept_invitation(
-                EntityShareAcceptUpdater(share_id=share_id, recipient_user_id=recipient_user_id)
+            data = await w.accept_share(
+                EntityShareAcceptUpdater(share_id=share_id, answering_scope=answering_scope)
             )
             if data is None:
-                raise EntityShareNotFound(f"No pending invitation {share_id} to accept")
+                raise EntityShareNotFound(f"No open offer {share_id} to accept")
             return data
 
-    async def reject(self, share_id: EntityShareID, recipient_user_id: UserID) -> EntityShareData:
-        """Turn down what was offered, granting nothing."""
+    async def reject(
+        self, share_id: EntityShareID, answering_scope: EntityIdentifier
+    ) -> EntityShareData:
+        """Turn down what was offered, lending nothing."""
         async with self._ops.write_ops() as w:
             data = await w.update_guarded_data(
-                EntityShareRejectUpdater(share_id=share_id, recipient_user_id=recipient_user_id)
+                EntityShareRejectUpdater(share_id=share_id, answering_scope=answering_scope)
             )
             if data is None:
-                raise EntityShareNotFound(f"No pending invitation {share_id} to reject")
+                raise EntityShareNotFound(f"No open offer {share_id} to reject")
             return data
 
     async def cancel(self, share_id: EntityShareID) -> EntityShareData:
@@ -53,5 +57,5 @@ class EntityShareRepository:
         async with self._ops.write_ops() as w:
             data = await w.update_guarded_data(EntityShareCancelUpdater(share_id=share_id))
             if data is None:
-                raise EntityShareNotFound(f"No pending invitation {share_id} to cancel")
+                raise EntityShareNotFound(f"No open offer {share_id} to cancel")
             return data

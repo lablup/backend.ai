@@ -17,7 +17,8 @@ from sqlalchemy.orm import aliased
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.entity_share import EntityShareID
-from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot
@@ -26,6 +27,7 @@ from ai.backend.manager.data.entity_share.types import (
     EntityShareData,
     EntityShareStatus,
 )
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.entity_share import (
     DuplicateEntityShareError,
     EntityShareNotFound,
@@ -36,9 +38,13 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -66,6 +72,8 @@ _TARGET_TYPE = EntityType("vfolder")
 
 _INVITER_ID = UserID(uuid4())
 _INVITEE_ID = UserID(uuid4())
+_INVITEE_PROJECT_ID = ProjectID(uuid4())
+_OUTSIDER_PROJECT_ID = ProjectID(uuid4())
 _OUTSIDER_ID = UserID(uuid4())
 _INVITEE_EMAIL = "invitee@example.com"
 
@@ -95,6 +103,18 @@ def _password() -> PasswordInfo:
         algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
         rounds=100_000,
         salt_size=32,
+    )
+
+
+def _personal_project(project_id: ProjectID, creator_id: UserID) -> ProjectRow:
+    return ProjectRow(
+        id=project_id,
+        name=f"p-{project_id.hex[:8]}",
+        domain_name=_DOMAIN,
+        type=ProjectType.PERSONAL,
+        creator_id=creator_id,
+        resource_policy=_POLICY,
+        total_resource_slots=ResourceSlot(),
     )
 
 
@@ -128,7 +148,9 @@ async def database(
             PermissionRow,
             DomainRow,
             UserResourcePolicyRow,
+            ProjectResourcePolicyRow,
             UserRow,
+            ProjectRow,
             EntityShareRow,
         ],
     ):
@@ -143,10 +165,25 @@ async def database(
                     max_customized_image_count=10,
                 )
             )
+            session.add(
+                ProjectResourcePolicyRow(
+                    name=_POLICY,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_network_count=0,
+                )
+            )
             session.add_all([
                 _user(_INVITER_ID, "inviter@example.com"),
                 _user(_INVITEE_ID, _INVITEE_EMAIL),
                 _user(_OUTSIDER_ID, "outsider@example.com"),
+            ])
+            await session.flush()
+            # Every account has the project that is theirs alone, which is where what
+            # they take lands.
+            session.add_all([
+                _personal_project(_INVITEE_PROJECT_ID, _INVITEE_ID),
+                _personal_project(_OUTSIDER_PROJECT_ID, _OUTSIDER_ID),
             ])
             await session.flush()
             # The target entity and the people are reachable in the graph; the
@@ -155,6 +192,8 @@ async def database(
                 VirtualEntityRow(entity_type=_TARGET_TYPE, entity_id=_TARGET_ID),
                 VirtualEntityRow(entity_type=USER_ENTITY_TYPE, entity_id=_INVITEE_ID),
                 VirtualEntityRow(entity_type=USER_ENTITY_TYPE, entity_id=_OUTSIDER_ID),
+                VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=_INVITEE_PROJECT_ID),
+                VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=_OUTSIDER_PROJECT_ID),
             ])
         yield database_connection
 
@@ -178,8 +217,10 @@ async def _status(database: ExtendedAsyncSAEngine, share_id: EntityShareID) -> E
         ).scalar_one()
 
 
-async def _cap(database: ExtendedAsyncSAEngine, grantee: UserID) -> tuple[bool, Permission | None]:
-    """Whether the invitee holds the target at all, and under what ceiling."""
+async def _cap(
+    database: ExtendedAsyncSAEngine, grantee: EntityIdentifier
+) -> tuple[bool, Permission | None]:
+    """Whether the scope holds the target at all, and under what ceiling."""
     target = aliased(VirtualEntityRow, name="target_virtual_entity")
     async with database.begin_readonly_session() as session:
         rows = (
@@ -193,7 +234,7 @@ async def _cap(database: ExtendedAsyncSAEngine, grantee: UserID) -> tuple[bool, 
                 )
                 .join(target, target.id == EntityMembershipRow.member_entity_id)
                 .where(
-                    VirtualEntityRow.entity_type == USER_ENTITY_TYPE,
+                    VirtualEntityRow.entity_type == grantee.entity_type(),
                     VirtualEntityRow.entity_id == grantee,
                     target.entity_type == _TARGET_TYPE,
                     target.entity_id == _TARGET_ID,
@@ -210,7 +251,7 @@ async def _cap(database: ExtendedAsyncSAEngine, grantee: UserID) -> tuple[bool, 
 
 async def _share(database: ExtendedAsyncSAEngine, cap: Permission) -> None:
     async with ShareOpsProvider(database).write_ops() as w:
-        await w.replace_share(_INVITEE_ID, _target(), cap)
+        await w.replace_share(_INVITEE_PROJECT_ID, _target(), cap)
 
 
 async def _belong(database: ExtendedAsyncSAEngine) -> None:
@@ -235,7 +276,7 @@ class TestAccept:
         data = await repository.accept(created.id, _INVITEE_ID)
         assert data.status == EntityShareStatus.ACCEPTED
         assert await _status(database, created.id) == EntityShareStatus.ACCEPTED
-        assert await _cap(database, _INVITEE_ID) == (True, Permission.READ)
+        assert await _cap(database, _INVITEE_PROJECT_ID) == (True, Permission.READ)
 
     async def test_widens_what_the_invitee_already_held(
         self,
@@ -246,7 +287,7 @@ class TestAccept:
         await _share(database, Permission.UPDATE)
         created = await ops.create_entity(_creator(cap=Permission.READ))
         await repository.accept(created.id, _INVITEE_ID)
-        assert await _cap(database, _INVITEE_ID) == (
+        assert await _cap(database, _INVITEE_PROJECT_ID) == (
             True,
             Permission.READ | Permission.UPDATE,
         )
@@ -260,7 +301,7 @@ class TestAccept:
         await _belong(database)
         created = await ops.create_entity(_creator(cap=Permission.READ))
         await repository.accept(created.id, _INVITEE_ID)
-        assert await _cap(database, _INVITEE_ID) == (True, None)
+        assert await _cap(database, _INVITEE_PROJECT_ID) == (True, None)
 
     async def test_somebody_elses_invitation_is_not_found(
         self,
@@ -302,7 +343,7 @@ class TestReject:
         created = await ops.create_entity(_creator())
         data = await repository.reject(created.id, _INVITEE_ID)
         assert data.status == EntityShareStatus.REJECTED
-        assert await _cap(database, _INVITEE_ID) == (False, None)
+        assert await _cap(database, _INVITEE_PROJECT_ID) == (False, None)
 
     async def test_somebody_elses_invitation_is_not_found(
         self,
@@ -326,7 +367,7 @@ class TestCancel:
         created = await ops.create_entity(_creator())
         data = await repository.cancel(created.id)
         assert data.status == EntityShareStatus.CANCELED
-        assert await _cap(database, _INVITEE_ID) == (False, None)
+        assert await _cap(database, _INVITEE_PROJECT_ID) == (False, None)
 
     async def test_an_answered_invitation_is_not_found(
         self,

@@ -31,8 +31,8 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
     The recipient is a virtual entity, the coordinates the graph edge uses, so a project
     receives as well as a person. An address with no account yet stays an email until it
     is answered, and answering fills the virtual entity in — which is why both are
-    nullable and a check holds them: one of the two is always there. Tying an accepted
-    row to a resolved recipient comes with the write that resolves it.
+    nullable and two checks hold them: one of the two is always there, and an accepted
+    row always names the node, which answering records.
 
     The target is a polymorphic pair with no foreign key. A pending row is not a graph
     edge, so it does not name the target's node either.
@@ -42,7 +42,11 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
     __table_args__ = (
         sa.CheckConstraint(
             "recipient_virtual_entity_id IS NOT NULL OR recipient_email IS NOT NULL",
-            name="ck_entity_shares_addressed",
+            name="addressed",
+        ),
+        sa.CheckConstraint(
+            "status <> 'accepted' OR recipient_virtual_entity_id IS NOT NULL",
+            name="accepted_resolved",
         ),
         sa.Index(
             "uq_entity_shares_pending_email",

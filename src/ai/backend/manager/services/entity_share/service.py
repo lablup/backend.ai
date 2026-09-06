@@ -25,11 +25,11 @@ class EntityShareService:
         self._repository = repository
 
     async def accept(self, action: AcceptEntityShareAction) -> EntityShareAnswerResult:
-        data = await self._repository.accept(action.share_id, action.recipient_user_id)
+        data = await self._repository.accept(action.share_id, action.answering_scope)
         return EntityShareAnswerResult(data=data)
 
     async def reject(self, action: RejectEntityShareAction) -> EntityShareAnswerResult:
-        data = await self._repository.reject(action.share_id, action.recipient_user_id)
+        data = await self._repository.reject(action.share_id, action.answering_scope)
         return EntityShareAnswerResult(data=data)
 
     async def cancel(self, action: CancelEntityShareAction) -> CancelEntityShareActionResult:

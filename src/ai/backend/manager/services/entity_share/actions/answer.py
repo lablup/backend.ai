@@ -10,8 +10,7 @@ from ai.backend.common.data.entity.entity_share import (
     ENTITY_SHARE_ENTITY_TYPE,
     EntityShareID,
 )
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
@@ -29,16 +28,16 @@ __all__ = (
 
 @dataclass
 class _RecipientAnswerAction(BaseScopeAction):
-    """Base for an answer the invitee gives.
+    """Base for an answer the receiving side gives.
 
-    Scoped to the answering person rather than to the invitation: they were reached by
-    email and hold no permission on it, so what is checked is that they may answer
-    invitations of their own at all. Which invitation is theirs is decided by the
-    write, whose guard matches their address.
+    Scoped to what answers rather than to the offer: an offer that reached an address
+    carries no permission for its recipient to hold, so what is checked is that the
+    caller may answer offers at that scope at all. Whether the offer is addressed there
+    is decided by the write, whose guard matches the scope.
     """
 
     share_id: EntityShareID
-    recipient_user_id: UserID
+    answering_scope: EntityIdentifier
 
     @override
     @classmethod
@@ -52,7 +51,8 @@ class _RecipientAnswerAction(BaseScopeAction):
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
-        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.recipient_user_id),)
+        scope = self.answering_scope
+        return (ScopeRef(scope_type=ScopeType(scope.entity_type()), scope_id=scope),)
 
 
 @dataclass
