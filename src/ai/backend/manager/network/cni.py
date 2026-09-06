@@ -12,9 +12,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 import uuid
 from collections.abc import Mapping
-from typing import Any, override
+from typing import Any, Final, override
 
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -67,6 +68,24 @@ _DEFAULT_UNDERLAY_MTU = 1500
 # larger than the path can carry, so both sides must read one definition.
 _VXLAN_OVERHEAD = VXLAN_OVERHEAD
 _ESP_OVERHEAD = ESP_OVERHEAD
+
+
+#: Bookkeeping the session meta carries for the create itself, stripped from what callers see.
+_OWNER: Final = "_owner"
+_STATE: Final = "_state"
+_CREATING: Final = "creating"
+_READY: Final = "ready"
+
+#: How long a second manager waits for the one that claimed a session to finish before taking it
+#: over. Long enough to cover a slow create, short enough that a manager killed mid-create does
+#: not hold the session up until somebody notices.
+_CREATE_HANDOVER_SEC: Final = 60.0
+_CREATE_POLL_SEC: Final = 0.5
+
+
+def _published(meta: Mapping[str, Any]) -> dict[str, Any]:
+    """The session meta as its callers see it, without the create's own bookkeeping."""
+    return {key: value for key, value in meta.items() if key not in (_OWNER, _STATE)}
 
 
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
@@ -136,6 +155,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # allocator claims exactly this block and fails on overlap instead of auto-sizing.
         requested_subnet = options.get("subnet")
 
+        token = uuid.uuid4().hex
         await self._require_members_cni_capable(member_agents)
         # A session start that failed downstream is retried with the same id, so this can be a
         # second call for a session that already has an allocation. Allocating again would give
@@ -143,18 +163,39 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # releases only what the meta records. Converge on what is already there instead.
         if (existing := await self._existing_allocation(etcd, session_id, endpoints)) is not None:
             return existing
-        backend = self._select_backend(forced_backend)
-        # Size the session subnet to hold every endpoint (removes the fixed-/24 254 cap).
-        # A failure to acquire the subnet claims nothing, so it needs no rollback; every
-        # subsequent claim (VNI, endpoint IPs, meta/member keys) is undone on any failure so a
-        # partial create never leaks a block/VNI or lets a retry consume fresh ones.
-        subnet = await self._subnet_allocator.acquire(
-            session_id,
-            host_count=max(len(endpoints), 1),
-            subnet=str(requested_subnet) if requested_subnet else None,
-        )
+        # Claim the session before claiming anything for it. Two managers can be here at once,
+        # and only one of them may hold the subnet and the VNI: the other converges on the same
+        # ones, so if both were allowed to allocate, the one that failed would give back what the
+        # one that succeeded is already handing to its agents. Winning this is what makes "undo
+        # what I did" meaningful.
+        if not await etcd.put_if_absent(
+            session_meta_key(session_id), json.dumps({_OWNER: token, _STATE: _CREATING})
+        ):
+            if (published := await self._await_ready(etcd, session_id, endpoints)) is not None:
+                return published
+            # It never finished. Take the session over: from here its owner's rollback finds a
+            # stranger's token on the record and leaves everything alone.
+            log.warning(
+                "taking over session {}'s network: the manager that claimed it did not finish"
+                " within {}s",
+                session_id,
+                _CREATE_HANDOVER_SEC,
+            )
+            await etcd.put(
+                session_meta_key(session_id),
+                json.dumps({_OWNER: token, _STATE: _CREATING}),
+                scope=ConfigScopes.GLOBAL,
+            )
+        subnet: str | None = None
         vni: int | None = None
         try:
+            backend = self._select_backend(forced_backend)
+            # Size the session subnet to hold every endpoint (removes the fixed-/24 254 cap).
+            subnet = await self._subnet_allocator.acquire(
+                session_id,
+                host_count=max(len(endpoints), 1),
+                subnet=str(requested_subnet) if requested_subnet else None,
+            )
             # Encrypt the overlay for the encapsulating (VXLAN) backend unless something opted
             # OUT -- see `_encryption_enabled`. The key is the CLUSTER's, not this session's: ESP
             # policies select on the outer packet, where nothing identifies a session, so sessions
@@ -193,6 +234,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 "mtu": mtu,
                 "vxlan_port": vxlan_port,
                 "encryption_key": encryption_key,
+                # Who is building this session, and whether they finished. Two managers can be
+                # here at once for one session; the allocation they converge on is shared, so
+                # "undo what I did" is only meaningful against a record that says whose it is.
+                _OWNER: token,
+                _STATE: _CREATING,
             }
             await etcd.put(
                 session_meta_key(session_id), json.dumps(meta), scope=ConfigScopes.GLOBAL
@@ -220,15 +266,23 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # watch convergence (no regression).
             if backend is NetworkBackendKind.VXLAN:
                 await self._preseed_members(session_id, member_agents)
+            # Ready only now: everything the session needs is on record. A waiter returns at
+            # this point, and not before -- a create that fails after publishing undoes itself,
+            # and anyone who had already been handed the half-built record would be holding a
+            # subnet and a VNI the pool has since given to somebody else.
+            meta[_STATE] = _READY
+            await etcd.put(
+                session_meta_key(session_id), json.dumps(meta), scope=ConfigScopes.GLOBAL
+            )
             return NetworkInfo(
-                network_id=session_id, options={**meta, "endpoint_ips": endpoint_ips}
+                network_id=session_id, options={**_published(meta), "endpoint_ips": endpoint_ips}
             )
         except BaseException:
             # BaseException, not Exception: a cancelled create -- the launcher's timeout, a
             # manager shutdown -- otherwise walks away holding the subnet and the VNI. Shielded
             # so the rollback's own awaits are not cancelled in turn and leave it half done.
             await asyncio.shield(
-                asyncio.ensure_future(self._rollback_create(session_id, subnet, vni))
+                asyncio.ensure_future(self._rollback_create(session_id, subnet, vni, token))
             )
             raise
 
@@ -244,6 +298,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         if raw is None:
             return None
         meta = json.loads(raw)
+        if meta.get(_STATE) not in (None, _READY):
+            # Still being built, by us on a previous attempt or by another manager. Not something
+            # to hand back: the subnet and VNI it names are not committed until whoever owns it
+            # says so, and a create that fails after this point takes them away again.
+            return None
         subnet = str(meta["subnet"])
         # A meta is only worth reusing while the pool still agrees it is ours. A rollback that
         # freed the allocation but could not delete the record leaves one that names a block and
@@ -276,7 +335,46 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             subnet,
             meta.get("vni"),
         )
-        return NetworkInfo(network_id=session_id, options={**meta, "endpoint_ips": endpoint_ips})
+        return NetworkInfo(
+            network_id=session_id, options={**_published(meta), "endpoint_ips": endpoint_ips}
+        )
+
+    async def _await_ready(
+        self, etcd: AsyncEtcd, session_id: str, endpoints: list[Any]
+    ) -> NetworkInfo | None:
+        """What the manager that claimed this session built, once it says it is finished.
+
+        None when it has not finished within `_CREATE_HANDOVER_SEC` -- it died, or it is so slow
+        that waiting longer is worse than taking over.
+        """
+        deadline = time.monotonic() + _CREATE_HANDOVER_SEC
+        while True:
+            raw = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
+            if raw is None:
+                return None  # they rolled back; nothing to wait for
+            meta = json.loads(raw)
+            if meta.get(_STATE) == _READY:
+                return await self._existing_allocation(etcd, session_id, endpoints)
+            if time.monotonic() >= deadline:
+                return None
+            await asyncio.sleep(_CREATE_POLL_SEC)
+
+    async def _owns_session_record(self, session_id: str, token: str) -> bool:
+        """Whether the session's record is still the one this call put there.
+
+        Undoing a create means undoing *this* create. The allocation is shared with whoever else
+        is creating the same session, so a failure here must not release a subnet or a VNI that
+        a manager which did finish is now handing to its agents.
+        """
+        raw = await self._require_etcd().get(
+            session_meta_key(session_id), scope=ConfigScopes.GLOBAL
+        )
+        if raw is None:
+            return False
+        try:
+            return bool(json.loads(raw).get(_OWNER) == token)
+        except ValueError:
+            return False
 
     async def _still_ours(self, session_id: str, subnet: str, vni: Any) -> bool:
         """Whether the pool still records this session as the holder of both."""
@@ -286,11 +384,25 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             return True
         return await self._vni_allocator.holder(int(vni)) == session_id
 
-    async def _rollback_create(self, session_id: str, subnet: str, vni: int | None) -> None:
+    async def _rollback_create(
+        self, session_id: str, subnet: str | None, vni: int | None, token: str
+    ) -> None:
         """Undo a partially-created session network: release the VNI and subnet blocks and
         delete every key written under the session (meta / endpoints / ipam / members). Each
         step is best-effort and idempotent (deletes of absent keys are no-ops) so cleanup runs
-        to completion regardless of how far create_network got before failing."""
+        to completion regardless of how far create_network got before failing.
+
+        Only when the session's record is still this call's. Two managers creating one session
+        converge on one subnet and one VNI, so a rollback that did not check would undo the
+        allocation of whichever of them succeeded -- deleting a live session's record and putting
+        its VNI back in the pool for the next session to draw, while its own caller went on
+        believing it had a network.
+        """
+        if not await self._owns_session_record(session_id, token):
+            log.info(
+                "not rolling back session {}: its record belongs to another create", session_id
+            )
+            return
         etcd = self._require_etcd()
         try:
             await etcd.delete_prefix(
@@ -313,10 +425,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 await self._vni_allocator.release(vni, session_id)
             except Exception:
                 log.exception("rollback: failed to release VNI {} for {}", vni, session_id)
-        try:
-            await self._subnet_allocator.release(subnet, session_id)
-        except Exception:
-            log.exception("rollback: failed to release subnet {} for {}", subnet, session_id)
+        if subnet is not None:
+            try:
+                await self._subnet_allocator.release(subnet, session_id)
+            except Exception:
+                log.exception("rollback: failed to release subnet {} for {}", subnet, session_id)
 
     async def _preseed_members(self, session_id: str, member_agents: list[str]) -> None:
         etcd = self._require_etcd()
