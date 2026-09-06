@@ -14,7 +14,8 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | C2 | **A create that does not finish claims nothing.** Exception, `CancelledError`, or process death leaves either nothing claimed, or only claims a retry provably reuses. | A cancelled launcher call strands a subnet and a VNI. | `TestACreateThatNeverFinished` |
 | C3 | **An address implies an endpoint record.** Whatever order the writes land in, a container that holds an IP appears in `endpoints/`. | Session runs; peers never program FDB/ARP for it, so cross-node traffic to that kernel is black-holed while everything reports healthy. | `TestAnAddressWithNoEndpointRecord` |
 | C4 | **Meta never outlives what it names.** The session's meta and its subnet/VNI claims are released together, or neither is. | Rollback half-fails; the meta survives pointing at a VNI another session now owns, and the next retry hands out a stranger's data plane. | `TestAMetaThatOutlivedItsAllocation` |
-| C5 | **A claim is released only by its owner.** | One session's teardown frees the block a later session is using. | `TestAllocationOwnership` |
+| C5 | **A claim is released only by its owner.** Including between two creates of the *same* session: they share the allocation, so only the one that owns the session record may undo. | One session's teardown frees the block a later session is using; or a create that failed beside one that succeeded releases what the successful one already handed to its agents. | `TestAllocationOwnership`, `TestACreateThatFailedBesideOneThatDidNot` |
+| C7 | **A block counts as held only when every unit of it is.** | A `/23` whose second half nothing holds is handed back as complete, and the pool gives that half to the next session. | `TestABlockClaimedOnlyInPart` |
 | C6 | **Allocation cost does not grow with the pool.** Claiming the Nth session is O(1) round trips, not O(N). | A cluster with a few hundred sessions spends minutes in etcd per launch. | `TestAllocationRoundTrips` |
 
 ## D — Data plane (agent)
@@ -25,6 +26,7 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | D2 | **Setup is all-or-nothing on the host.** A setup that raises *or is cancelled* leaves no bridge, VXLAN device, XFRM state, veth or rule behind. | A cancelled launch strands a VXLAN device; the next session drawing that VNI inherits it. | `TestASetupThatWasCancelled`, G19 |
 | D3 | **Teardown reports, and keeps what a retry needs.** A detach that failed says so, and the plan naming the leftovers survives until the detach actually happens. | Teardown returns success over a veth and an address that are still allocated. | `TestADetachThatDidNotGoThrough`, `TestADetachWhosePlanMustSurvive` |
 | D4 | **An agent touches only what it owns.** On a host running two agents, one's recovery does not disturb the other's devices. | Restarting agent A drops agent B's session traffic. | G24, A7 |
+| D6 | **What reaches the manager names the failure.** A node whose privileged helper is down says so, with the socket and what it means. | An operator sees errno 111 and cannot tell which node, or that its whole data plane is down. | `TestWhatReachesTheManagerWhenThePrivnetIsDown` |
 | D5 | **The overlay is encrypted, or the session does not start.** Under the default policy a node that cannot do the profile is refused, not silently downgraded. | Cluster traffic crosses the wire in clear text. | G20, G21 |
 
 ## R — Release quality
@@ -51,8 +53,17 @@ fail against the code as it stood before the fix.
 | D1 | default route, bridge MTU, gateway address, MASQUERADE, FORWARD accept and `route_localnet` all ran unchecked | checked; probes and best-effort deletes stay unchecked |
 | D2 | `except Exception` let a cancelled setup leave a VXLAN device behind, and the forward-accept rules sat outside every rollback scope | one scope over the whole of setup, `BaseException`, undone under a shield |
 | D3 | the privnet dropped the plan before the detach it describes; a failed one left nothing to retry with, and teardown walked past it | the plan goes once the detach has happened, and a stuck one raises `OverlayTeardownIncomplete` |
-| D4 | the preflight downed every tunnel on the node, another agent's included | a VNI the registry attributes to another agent that is still running containers on it is left alone |
+| D4 | the preflight downed every tunnel on the node, another agent's included | a VNI whose binding is *built*, whose owner is another agent, and whose owner is running a container of that session, is left alone -- matching on the session alone let a dead agent's reservation except an unverified tunnel |
 | D5 | met | met |
+| D6 | a bare `RuntimeError` carrying errno 111 | `PrivilegedNetworkHelperUnreachable`, with the socket and an error code |
+
+Second round, against the same bar:
+
+| # | Was | Now |
+|---|-----|-----|
+| C5 | two creates of one session share the allocation, and the one that failed released what the one that succeeded had already handed to its agents -- deleting its meta and endpoint with it | the session is claimed before anything is claimed for it; only the owner of that record allocates or undoes, and a loser waits for the winner rather than building alongside it |
+| C7 | `_already_held` answered on one unit of a wide block | every unit, and a partial claim is finished or given back |
+| D2 | the container attach caught `Exception`, so a cancelled one left applied interfaces, a veth and a lease with nothing naming them | `BaseException`, shielded, each DEL reported; and the failure carries the plan so the leftovers have a name to be torn down by |
 
 R1 met (`# noqa` and `# type: ignore` both absent from the feature). R2 met: the BEP now says
 privnet delegation is opt-in and that Docker is the runtime wired today.
