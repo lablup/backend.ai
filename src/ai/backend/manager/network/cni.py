@@ -21,14 +21,18 @@ from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.network.keys import (
     agent_vtep_key,
+    endpoints_prefix,
     member_key,
     members_prefix,
+    session_ipam_prefix,
     session_meta_key,
     session_prefix,
 )
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
     ESP_OVERHEAD,
+    SESSION_META_READY,
+    SESSION_META_STATE,
     VXLAN_OVERHEAD,
     Member,
     NetworkBackendKind,
@@ -73,9 +77,13 @@ _ESP_OVERHEAD = ESP_OVERHEAD
 
 #: Bookkeeping the session meta carries for the create itself, stripped from what callers see.
 _OWNER: Final = "_owner"
-_STATE: Final = "_state"
+#: Both halves of the contract an agent reads too -- see `SESSION_META_STATE`.
+_STATE: Final = SESSION_META_STATE
+_READY: Final = SESSION_META_READY
 _CREATING: Final = "creating"
-_READY: Final = "ready"
+#: A create that is undoing itself. The record stays under this state until its keys are deleted
+#: and its subnet and VNI are back in the pool, because it is the only thing that names them.
+_DELETING: Final = "deleting"
 
 #: How long a second manager waits for the one that claimed a session to finish before taking it
 #: over. Long enough to cover a slow create, short enough that a manager killed mid-create does
@@ -230,6 +238,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # Assign each endpoint a disjoint overlay IP and record it under endpoints/ (the
             # coordinator programs FDB/ARP from there). Returned map is threaded per-kernel by
             # the launcher into KernelCreationConfig["cluster_network_ip"].
+            #
+            # Written after the compare-and-swap above and outside it, which is safe only because
+            # two creates of one session converge: the pool hands `acquire` the block this session
+            # already holds, and `assign` returns the address a container already has. So a create
+            # that has been superseded writes the values the one that superseded it writes.
             endpoint_ips: dict[str, str] = {}
             for endpoint in endpoints:
                 container_id = str(endpoint["container_id"])
@@ -434,62 +447,73 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
     async def _rollback_create(
         self, session_id: str, subnet: str | None, vni: int | None, held: str
     ) -> None:
-        """Undo a partially-created session network: release the VNI and subnet blocks and
-        delete every key written under the session (meta / endpoints / ipam / members). Each
-        step is best-effort and idempotent (deletes of absent keys are no-ops) so cleanup runs
-        to completion regardless of how far create_network got before failing.
+        """Undo a partially-created session network, in the one order that survives failing.
 
-        Only when the session's record is still this call's. Two managers creating one session
-        converge on one subnet and one VNI, so a rollback that did not check would undo the
-        allocation of whichever of them succeeded -- deleting a live session's record and putting
-        its VNI back in the pool for the next session to draw, while its own caller went on
-        believing it had a network.
+        The record is turned into a tombstone naming the subnet and the VNI, and deleted last --
+        see the comments below. Only when it is still this call's.
         """
         etcd = self._require_etcd()
-        # Give up ownership and check it in one step. A separate read-then-delete let the record
-        # be taken between the two, and the delete below would then have removed the new owner's
-        # work. Losing this means the session is somebody else's now, and nothing here is ours
-        # to undo -- including the subnet and the VNI, which that owner has converged onto.
-        if not held or not await etcd.delete_if_value(session_meta_key(session_id), held):
+        # Take the record over into a tombstone instead of deleting it, and do it in one step:
+        # a separate read-then-delete let the record be taken between the two, and everything
+        # below would then have undone the new owner's work.
+        #
+        # A tombstone, because the record is the only thing that names this session's subnet and
+        # VNI. Deleting it first and then failing to finish left them allocated to a session no
+        # key mentions: `destroy_network` reads the meta to know what to give back, so there was
+        # nothing left to give it back from, and the block and the VNI leaked for the cluster's
+        # lifetime. It also let a new creator in while the old rollback was still deleting, whose
+        # keys the old rollback then removed.
+        try:
+            owner = json.loads(held).get(_OWNER) if held else None
+        except ValueError:
+            owner = None
+        tombstone = json.dumps({"subnet": subnet, "vni": vni, _OWNER: owner, _STATE: _DELETING})
+        if not held or not await etcd.replace(session_meta_key(session_id), held, tombstone):
             log.info(
                 "not rolling back session {}: its record is no longer this create's", session_id
             )
             return
-        try:
-            await etcd.delete_prefix(
-                session_prefix(session_id).rstrip("/"), scope=ConfigScopes.GLOBAL
-            )
-        except Exception:
-            # The meta names the subnet and the VNI, and it is what a retry reads. Releasing them
-            # while it survives puts this session's record on resources the pool is free to hand
-            # to the next one -- and the retry would then return a stranger's data plane as its
-            # own. Keeping the allocation costs one block and one VNI until the session is
-            # destroyed; releasing it under a live record costs correctness.
-            log.exception(
-                "rollback: could not delete the keys of session {}; keeping its subnet and VNI"
-                " allocated so its meta cannot outlive them",
-                session_id,
-            )
-            return
+        # Everything under the session except the tombstone. Nobody reads a session whose record
+        # is not READY, and what is left is named by the tombstone until the last line.
+        for prefix in (endpoints_prefix, members_prefix, session_ipam_prefix):
+            try:
+                await etcd.delete_prefix(prefix(session_id).rstrip("/"), scope=ConfigScopes.GLOBAL)
+            except Exception:
+                log.exception(
+                    "rollback: could not delete the {} keys of session {}; its record stays as a"
+                    " tombstone so a later destroy can finish from it",
+                    prefix(session_id),
+                    session_id,
+                )
+                return
         if vni is not None:
             try:
                 await self._vni_allocator.release(vni, session_id)
             except Exception:
                 log.exception("rollback: failed to release VNI {} for {}", vni, session_id)
+                return
         if subnet is not None:
             try:
                 await self._subnet_allocator.release(subnet, session_id)
             except Exception:
                 log.exception("rollback: failed to release subnet {} for {}", subnet, session_id)
+                return
+        # Last, and only over the tombstone this call wrote: nothing it names is outstanding now.
+        await etcd.delete_if_value(session_meta_key(session_id), tombstone)
 
     async def _preseed_members(self, session_id: str, member_agents: list[str]) -> None:
+        """Publish each member agent's VTEP, but only where no record stands already.
+
+        Never over one: the agent's own record carries ``joined=true``, the teardown
+        acknowledgement `destroy_network` reads before it hands the VNI back to the pool.
+        """
         etcd = self._require_etcd()
         for agent_id in member_agents:
             vtep = await etcd.get(agent_vtep_key(agent_id), scope=ConfigScopes.GLOBAL)
             if not vtep:
                 continue
             member = Member(agent_id=agent_id, host_ip=vtep, vtep_ip=vtep)
-            await etcd.put(
+            await etcd.put_if_absent(
                 member_key(session_id, agent_id),
                 json.dumps(member.to_etcd_payload()),
                 scope=ConfigScopes.GLOBAL,

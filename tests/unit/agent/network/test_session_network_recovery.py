@@ -12,6 +12,7 @@ defaults, so a signature change breaks them rather than passing over a stub.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Collection
 from pathlib import Path
 from typing import Any, cast
@@ -413,3 +414,46 @@ class TestWhatTheOtherAgentOnThisHostIsUsing:
         net = _network()
         spared = await self._spared(net, registry, {("whatever", "i-other")})
         assert spared == frozenset()
+
+
+class _Etcd:
+    """The one call `_read_session_meta` makes."""
+
+    def __init__(self, store: dict[str, str]) -> None:
+        self.store = store
+
+    async def get(self, key: str) -> str | None:
+        return self.store.get(key)
+
+
+class TestARecordTheManagerHasNotFinished:
+    """The manager's session record carries how far it got. Anything but "ready" names a subnet
+    and a VNI committed to nobody -- a create still running, or one undoing itself -- and it
+    carries none of the rest of the meta. Reading it as a session is how a node builds a data
+    plane on an allocation the pool is about to hand to somebody else."""
+
+    _READY = {"subnet": "10.128.5.0/24", "vni": 4097, "backend": "vxlan", "mtu": 1450}
+
+    def _network_reading(self, record: dict[str, Any] | None) -> SessionNetwork:
+        store = {} if record is None else {"network/session/s1/meta": json.dumps(record)}
+        network = _network(vxlan=_Backend())
+        network._etcd = cast(Any, _Etcd(store))
+        return network
+
+    async def test_a_tombstone_is_not_a_session(self) -> None:
+        network = self._network_reading({**self._READY, "_state": "deleting"})
+        assert await network._read_session_meta("s1") is None
+
+    async def test_neither_is_one_still_being_built(self) -> None:
+        network = self._network_reading({"_owner": "tok1", "_state": "creating"})
+        assert await network._read_session_meta("s1") is None
+
+    async def test_a_finished_one_is(self) -> None:
+        network = self._network_reading({**self._READY, "_state": "ready"})
+        meta = await network._read_session_meta("s1")
+        assert meta is not None and meta.vni == 4097
+
+    async def test_and_so_is_our_own_single_node_meta_which_has_no_state(self) -> None:
+        network = self._network_reading(self._READY)
+        meta = await network._read_session_meta("s1")
+        assert meta is not None and meta.subnet == "10.128.5.0/24"

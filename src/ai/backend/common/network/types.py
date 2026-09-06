@@ -45,6 +45,16 @@ ESP_OVERHEAD = 38
 """Transport-mode ESP/AES-GCM added on top of VXLAN when overlay encryption is on: 8 ESP header
 (SPI + seq) + 8 IV + 16 ICV + up to 6 pad/trailer. See overlay-encryption.md."""
 
+SESSION_META_STATE: Final = "_state"
+"""Where the manager records how far a session's network record got.
+
+Absent on a record an agent wrote for its own single-node session; on the manager's, anything but
+``SESSION_META_READY`` is a session still being built or being undone, whose subnet and VNI are
+not committed to anybody."""
+
+SESSION_META_READY: Final = "ready"
+"""The one value of ``SESSION_META_STATE`` that means the record may be acted on."""
+
 
 def mac_for_ip(ip: str) -> str:
     """Derive a stable, locally-administered unicast MAC from an IPv4 address.

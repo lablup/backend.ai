@@ -882,6 +882,57 @@ class TestPlaintextDrop:
             await plugin.setup_session_network(_ENC_META, _SELF)
         assert {vxlan_dev(4097), bridge_dev(4097)} <= plugin.unclosed_devices()
 
+
+class _RefusesRuleDeletes(Recorder):
+    """The u32 match is missing, and from then on iptables refuses every removal.
+
+    Only from then on: the setup's own installs must fail first, or there is nothing to undo.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.unwinding = False
+
+    @override
+    async def __call__(self, argv: Sequence[str]) -> None:
+        await super().__call__(argv)
+        if argv[0] == "iptables" and "--u32" in argv and "-D" not in argv:
+            self.unwinding = True
+            raise RuntimeError("iptables: No chain/target/match by that name")
+        if self.unwinding and argv[0] == "iptables" and "-D" in argv:
+            raise RuntimeError("iptables: Permission denied (you must be root?)")
+
+
+class TestRulesAPartialSetupCouldNotRemove:
+    """A failed setup's rules outlive every record of the session -- it never joins `_sessions`,
+    so no teardown looks for it. Left behind, they act on whatever the manager gives that VNI to
+    next: the plaintext-drop rule silently drops an unencrypted session's traffic."""
+
+    async def test_they_become_debt_rather_than_a_log_line(self) -> None:
+        plugin = _plugin(_RefusesRuleDeletes())
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(_ENC_META, _SELF)
+        debt = plugin.cleanup_debt()
+        assert list(debt) == ["vxlan:leftover:vni4097"]
+        assert "4789" in debt["vxlan:leftover:vni4097"]
+
+    async def test_the_node_stops_calling_itself_ready(self) -> None:
+        backend = _RefusesRuleDeletes()
+        plugin = _plugin(backend)
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(_ENC_META, _SELF)
+        assert plugin.cleanup_debt(), "readiness reads this; empty means the node looks healthy"
+
+    async def test_the_retry_clears_them_once_the_host_lets_go(self) -> None:
+        backend = _RefusesRuleDeletes()
+        plugin = _plugin(backend)
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(_ENC_META, _SELF)
+        backend.unwinding = False  # iptables answers again
+        remaining = await plugin.retry_fail_close()
+        assert plugin.cleanup_debt() == {}
+        assert not [what for what in remaining if what.startswith("vxlan:leftover")]
+
     async def test_teardown_removes_it(self) -> None:
         rec = Recorder()
         plugin = _plugin(rec)

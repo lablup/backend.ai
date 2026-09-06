@@ -485,10 +485,7 @@ class NativeBridgeAttachRunner:
         """Give back the veth and the address of an attach that did not finish.
 
         The address only once the veth is gone, exactly as `_del` does it: the half-attached veth
-        already carries it, so releasing it over a link that would not go down hands the next
-        container an address a live interface is using. A lease kept costs one address until the
-        failed attach's plan is detached again (`_retry_pending_detaches`, which reaches this host
-        veth by name); a lease released early costs two containers one IP.
+        already carries it, and a lease kept is cheaper than two containers on one IP.
         """
         removed = True
         try:

@@ -46,17 +46,9 @@ class ContainerNetworkProvisioner:
     ) -> tuple[EndpointPlan, dict[NetworkRole, str]]:
         """Attach a running container (identified by its task PID) to its session network.
 
-        Returns the applied plan (kept by the caller for later detach) and the assigned IP
-        per interface role (LOCAL is the host-reachable control address; OVERLAY is for
-        cross-node kernel traffic).
-
-        ``on_planned`` is handed the plan before a single interface is applied. The plan names
-        the host veth, the address and the rules an attach puts on this host, and until the
-        caller holds it nothing knows the name of what a failure leaves behind -- so it is
-        delivered first rather than carried out on an exception, which is the only way a
-        *cancelled* attach (the kernel-creation timeout, the agent stopping) can leave the
-        caller able to tear its leftovers down. The attacher undoes its own partial work; this
-        covers the DEL that could not run.
+        Returns the applied plan (kept by the caller for later detach) and the assigned IP per
+        interface role. ``on_planned`` is handed the plan before a single interface is applied --
+        the only way a *cancelled* attach leaves the caller able to name its leftovers.
         """
         plan = await self._backend.attach_endpoint(kernel_config, cluster_info, meta=meta)
         if on_planned is not None:

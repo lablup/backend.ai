@@ -16,6 +16,7 @@ import pytest
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.network.types import (
     OVERLAY_ENCRYPTION_PROFILE,
+    Member,
     NetworkBackendKind,
     mac_for_ip,
 )
@@ -27,6 +28,7 @@ from ai.backend.manager.errors.network import (
     RequestedSubnetInvalid,
     RequestedSubnetUnavailable,
     SessionRecordContested,
+    SubnetClaimStranded,
     VNIPoolExhausted,
 )
 from ai.backend.manager.network import cni
@@ -1188,6 +1190,110 @@ class TestASessionTakenFromItsCreator:
         assert etcd.store[_META_KEY] == took[0][0]
 
 
+class TestAMemberRecordTheAgentWrote:
+    """The member record IS the teardown acknowledgement: the agent writes it with ``joined``
+    once its devices, XFRM state and firewall rules are up, and `destroy_network` refuses to hand
+    the VNI back while one stands. Anything of the manager's that overwrote it -- the pre-seed,
+    which says only which nodes are *expected* -- put the VNI in the pool over live state."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "member_agents": ["a1"],
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    @staticmethod
+    def _agent_joined(etcd: FakeEtcd) -> None:
+        etcd.store["network/agent/a1/vtep"] = "10.0.0.1"
+        etcd.store["network/session/s1/members/a1"] = json.dumps(
+            Member(
+                agent_id="a1", host_ip="10.0.0.1", vtep_ip="10.0.0.1", joined=True
+            ).to_etcd_payload()
+        )
+
+    async def test_a_preseed_does_not_take_it_back(self) -> None:
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        self._agent_joined(etcd)
+
+        await plugin._preseed_members("s1", ["a1"])
+
+        member = json.loads(etcd.store["network/session/s1/members/a1"])
+        assert member["joined"] is True, "the pre-seed downgraded a node that had joined"
+
+    async def test_the_vni_is_not_handed_back_over_a_joined_node(self) -> None:
+        # The shape this comes in: a create that was taken over for being slow wakes up and
+        # carries on through its own remaining steps, of which the pre-seed is one -- by then the
+        # winner's session is running and its agents have published themselves.
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        winner = _plugin_with(etcd)
+        info = await winner.create_network(identifier="s1", options=dict(self._OPTIONS))
+        self._agent_joined(etcd)
+
+        await _plugin_with(etcd)._preseed_members("s1", ["a1"])
+
+        with pytest.raises(OverlayTeardownPending):
+            await winner.destroy_network("s1")
+        assert await winner._vni_allocator.holder(int(cast(int, info.options["vni"]))) == "s1"
+
+
+class TestARollbackThatCouldNotFinish:
+    """C4b. The record is the only thing that names the session's subnet and VNI. A rollback that
+    deleted it first and then failed left them allocated to a session no key mentions -- and
+    `destroy_network`, which reads the meta to know what to give back, had nothing to read."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    class _RefusesPrefixDeletes(FakeEtcd):
+        def __init__(self) -> None:
+            super().__init__()
+            self.refusing = True
+
+        @override
+        async def delete_prefix(self, prefix: str, **kwargs: Any) -> None:
+            if self.refusing:
+                raise RuntimeError("etcd is unreachable")
+            await super().delete_prefix(prefix, **kwargs)
+
+    async def _rolled_back(self) -> tuple[_RefusesPrefixDeletes, CNINetworkPlugin, Any]:
+        etcd = self._RefusesPrefixDeletes()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        await plugin._rollback_create(
+            "s1",
+            str(info.options["subnet"]),
+            int(cast(int, info.options["vni"])),
+            etcd.store[_META_KEY],
+        )
+        return etcd, plugin, info
+
+    async def test_the_record_stays_as_a_tombstone_naming_the_allocation(self) -> None:
+        etcd, plugin, info = await self._rolled_back()
+        meta = json.loads(etcd.store[_META_KEY])
+        assert meta["_state"] == "deleting"
+        assert meta["subnet"] == info.options["subnet"]
+        assert meta["vni"] == info.options["vni"]
+        assert await plugin._subnet_allocator.holder(str(info.options["subnet"])) == "s1"
+
+    async def test_a_tombstone_is_not_handed_to_the_next_caller(self) -> None:
+        etcd, plugin, _info = await self._rolled_back()
+        assert await plugin._existing_allocation(cast(AsyncEtcd, etcd), "s1", []) is None
+
+    async def test_destroy_finishes_from_it(self) -> None:
+        etcd, plugin, _info = await self._rolled_back()
+        etcd.refusing = False  # etcd is back
+
+        await plugin.destroy_network("s1")
+
+        assert _pool_claims(etcd) == [], "the subnet and VNI outlived the session"
+        assert _META_KEY not in etcd.store
+
+
 class TestAnAddressWithNoEndpointRecord:
     """C3. The address claim and the endpoint record are two writes. Everything downstream reads
     the record -- peers program FDB and ARP from it, the resolver answers from it -- so a
@@ -1465,3 +1571,21 @@ class TestABlockClaimedOnlyInPart:
 
         assert etcd.attempted == [_allocated_key(unit) for unit in units], "it stopped at the first"
         assert _allocated_key("10.128.1.0/24") not in etcd.store
+
+    async def test_a_claim_that_cannot_be_given_back_fails_the_acquire(self) -> None:
+        # The units it could not release are named by no meta and released by nothing later, so
+        # moving on to the next block would report a healthy session over a pool that has shrunk.
+        class _RefusesDeletes(FakeEtcd):
+            @override
+            async def delete_if_value(self, key: str, expected: str, **kwargs: Any) -> bool:
+                raise RuntimeError("etcd is unreachable")
+
+        etcd = _RefusesDeletes()
+        allocator = _subnet_allocator(etcd)
+        # The second unit of the block went to somebody else between the pool read and the CAS.
+        etcd.store[_allocated_key("10.128.1.0/24")] = _claim("s2", "10.128.1.0/24")
+
+        with pytest.raises(SubnetClaimStranded):
+            await allocator._try_claim_units(
+                ipaddress.ip_network("10.128.0.0/23"), _claim("s1", "10.128.0.0/23")
+            )
