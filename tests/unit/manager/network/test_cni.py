@@ -9,7 +9,7 @@ create/destroy remain contract guards until P2 fills them in.
 import asyncio
 import ipaddress
 import json
-from typing import Any, cast, override
+from typing import Any, TypeVar, cast, override
 
 import pytest
 
@@ -294,14 +294,20 @@ class TestEndpointAllocator:
             await alloc.assign("s1", "c3", "10.128.5.0/30", agent_id="a1")
 
 
-def _plugin_with(etcd: FakeEtcd) -> CNINetworkPlugin:
-    """Build a plugin with the allocators wired to a fake etcd, bypassing init()."""
-    plugin = CNINetworkPlugin({}, {})
+_P = TypeVar("_P", bound=CNINetworkPlugin)
+
+
+def _wire[P: CNINetworkPlugin](plugin: P, etcd: FakeEtcd) -> P:
+    """Point a plugin's allocators at a fake etcd, bypassing init()."""
     plugin._etcd = cast(AsyncEtcd, etcd)
     plugin._subnet_allocator = SubnetAllocator(cast(AsyncEtcd, etcd))
     plugin._vni_allocator = VNIAllocator(cast(AsyncEtcd, etcd))
     plugin._endpoint_allocator = EndpointAllocator(cast(AsyncEtcd, etcd))
     return plugin
+
+
+def _plugin_with(etcd: FakeEtcd) -> CNINetworkPlugin:
+    return _wire(CNINetworkPlugin({}, {}), etcd)
 
 
 class TestSelectBackend:
@@ -1112,9 +1118,13 @@ class TestAMetaThatOutlivedItsAllocation:
         plugin = _plugin_with(etcd)
         subnet = await plugin._subnet_allocator.acquire("s1")
         vni = await plugin._vni_allocator.acquire("s1")
-        etcd.store["network/session/s1/meta"] = json.dumps({"subnet": subnet, "vni": vni})
+        etcd.store["network/session/s1/meta"] = json.dumps({
+            "subnet": subnet,
+            "vni": vni,
+            "_owner": "mine",
+        })
 
-        await plugin._rollback_create("s1", subnet, vni)
+        await plugin._rollback_create("s1", subnet, vni, "mine")
 
         # Nothing was released, so nothing else can be given what the surviving record names.
         assert await plugin._subnet_allocator.holder(subnet) == "s1"
@@ -1153,3 +1163,77 @@ class TestAllocationRoundTrips:
         assert etcd.cas - before == 2, (
             "one compare-and-swap each; anything more is a scan over the taken blocks"
         )
+
+
+class _MetaBlindEtcd(FakeEtcd):
+    """A store whose session meta reads come back empty until released.
+
+    That is the window the race lives in: both managers look for an existing session, both are
+    told there is none, and both go on to build one.
+    """
+
+    def __init__(self, gate: asyncio.Event) -> None:
+        super().__init__()
+        self._gate = gate
+
+    @override
+    async def get(self, key: str, **kwargs: Any) -> str | None:
+        if key.endswith("/meta") and not self._gate.is_set():
+            return None
+        return await super().get(key, **kwargs)
+
+
+class TestACreateThatFailedBesideOneThatDidNot:
+    """C1, the other half. Two managers building one session share the subnet and the VNI they
+    converge on, so "undo what I did" is only meaningful against a record saying whose it is.
+    Without that, the one that failed released the allocation the one that succeeded had already
+    handed to its agents -- and the pool was free to give that VNI to the next session, while the
+    caller of the successful create went on believing it had a network."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    async def _one_fails_beside_one_that_works(self) -> tuple[FakeEtcd, Any]:
+        gate = asyncio.Event()
+        etcd = _MetaBlindEtcd(gate)
+        reached = asyncio.Event()
+
+        class FailsAtTheLastStep(CNINetworkPlugin):
+            @override
+            async def _preseed_members(self, session_id: str, member_agents: list[str]) -> None:
+                reached.set()
+                await asyncio.sleep(0.05)
+                raise RuntimeError("this create was cancelled")
+
+        loser = _wire(FailsAtTheLastStep({}, {}), etcd)
+        winner = _plugin_with(etcd)
+        failing = asyncio.create_task(
+            loser.create_network(identifier="s1", options=dict(self._OPTIONS))
+        )
+        await reached.wait()
+        gate.set()
+        good = await winner.create_network(identifier="s1", options=dict(self._OPTIONS))
+        with pytest.raises(RuntimeError):
+            await failing
+        return etcd, good
+
+    async def test_the_successful_session_keeps_its_record(self) -> None:
+        etcd, _good = await self._one_fails_beside_one_that_works()
+        assert "network/session/s1/meta" in etcd.store
+        assert "network/session/s1/endpoints/k1" in etcd.store
+
+    async def test_the_successful_session_keeps_its_allocation(self) -> None:
+        etcd, good = await self._one_fails_beside_one_that_works()
+        plugin = _plugin_with(etcd)
+        assert await plugin._subnet_allocator.holder(good.options["subnet"]) == "s1"
+        assert await plugin._vni_allocator.holder(int(good.options["vni"])) == "s1"
+
+    async def test_what_it_hands_back_carries_no_bookkeeping(self) -> None:
+        # `_owner` and `_state` are the create's own; a caller threading them into a kernel's
+        # network config would be passing our internals to the agents.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        assert not [key for key in info.options if key.startswith("_")]
