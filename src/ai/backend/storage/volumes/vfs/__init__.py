@@ -18,7 +18,10 @@ import janus
 import trafaret as t
 
 from ai.backend.common.asyncio import run_in_executor_with_context
-from ai.backend.common.data.storage.types import StorageBackendType
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
@@ -50,7 +53,6 @@ from ai.backend.storage.types import (
 from ai.backend.storage.utils import fstime2datetime
 from ai.backend.storage.volumes.abc import (
     _CURRENT_DIR,
-    CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
     AbstractVolume,
@@ -421,8 +423,8 @@ class BaseVolume(AbstractVolume):
         )
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([StorageBackendCapability.VFOLDER])
 
     @override
     async def get_hwinfo(self) -> HardwareMetadata:
