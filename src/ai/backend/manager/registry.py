@@ -504,9 +504,7 @@ class AgentRegistry:
                     session,
                     [image_ref],
                 )
-            if (
-                _owner_id := image_row.labels.get("ai.backend.customized-image.owner")
-            ) and _owner_id != f"user:{user_scope.user_uuid}":
+            if image_row.customized and image_row.creator_id != user_scope.user_uuid:
                 raise ImageNotFound
             if not image_ref.is_local:
                 async with self.db.begin_readonly() as conn:

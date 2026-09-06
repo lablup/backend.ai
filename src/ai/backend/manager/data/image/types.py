@@ -9,6 +9,7 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.types import EntityData, FieldData
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID, SlotName
 
 type Resources = dict[SlotName, dict[str, Any]]
@@ -93,6 +94,11 @@ class ImageData(EntityData):
     resource_limits: list[ResourceLimit]
     tags: list[ImageTagEntry]
     status: ImageStatus
+    #: Whether a session commit made this image.
+    customized: bool
+    #: The user a customized image was committed for. ``None`` where the image is not
+    #: customized, or where that user is gone.
+    creator_id: UserID | None
     last_used_at: datetime | None = field(default=None, compare=False)
 
     @override
@@ -133,6 +139,11 @@ class ImageDataWithDetails:
     is_local: bool
     status: ImageStatus
     resource_limits: list[ResourceLimit]
+    #: Whether a session commit made this image.
+    customized: bool
+    #: The user a customized image was committed for. ``None`` where the image is not
+    #: customized, or where that user is gone.
+    creator_id: UserID | None
     supported_accelerators: list[str] = field(default_factory=list)
     digest: str | None = field(default=None)
     labels: list[KVPair] = field(default_factory=list)

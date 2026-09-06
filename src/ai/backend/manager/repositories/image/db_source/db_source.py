@@ -239,13 +239,13 @@ class ImageDBSource:
 
     async def validate_image_ownership(self, image_id: UUID, user_id: UUID) -> bool:
         """
-        Checks if user owns the image.
-        Returns True if user owns the image, False otherwise.
+        Checks if the image was committed for the user.
+        Returns True if it was, False otherwise.
         Raises ImageNotFound if image doesn't exist.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             image_row = await self._get_image_by_id(session, image_id)
-            return image_row.is_owned_by(user_id)
+            return image_row.customized and image_row.creator_id == user_id
 
     async def insert_image_alias(
         self, alias: str, image_canonical: str, architecture: str

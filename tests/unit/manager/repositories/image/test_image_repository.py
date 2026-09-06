@@ -60,6 +60,12 @@ class TestImageRepositorySearch:
         async with with_tables(
             database_connection,
             [
+                # images.creator_id points at users, so the user chain comes first.
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
                 ImageAliasRow,

@@ -153,8 +153,7 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
             # Check for existing customized image
             existing_row = await self._session_repository.get_existing_customized_image(
                 new_canonical,
-                manifest.image_visibility.value,
-                manifest.image_owner_id,
+                uuid.UUID(manifest.image_owner_id),
                 manifest.image_name,
             )
 

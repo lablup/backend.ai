@@ -157,23 +157,18 @@ class SessionRepository:
         return await self._db_source.resolve_image(image_identifiers, alive_only)
 
     @session_repository_resilience.apply()
-    async def get_customized_image_count(
-        self,
-        image_visibility: str,
-        image_owner_id: str,
-    ) -> int:
-        return await self._db_source.get_customized_image_count(image_visibility, image_owner_id)
+    async def get_customized_image_count(self, user_id: uuid.UUID) -> int:
+        return await self._db_source.get_customized_image_count(user_id)
 
     @session_repository_resilience.apply()
     async def get_existing_customized_image(
         self,
         new_canonical: str,
-        image_visibility: str,
-        image_owner_id: str,
+        user_id: uuid.UUID,
         image_name: str,
     ) -> ImageRow | None:
         return await self._db_source.get_existing_customized_image(
-            new_canonical, image_visibility, image_owner_id, image_name
+            new_canonical, user_id, image_name
         )
 
     @session_repository_resilience.apply()

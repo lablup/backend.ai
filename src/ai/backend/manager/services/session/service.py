@@ -415,7 +415,7 @@ class SessionService:
 
         # check if user has passed its limit of customized image count
         existing_image_count = await self._session_repository.get_customized_image_count(
-            image_visibility.value, str(image_owner_id)
+            image_owner_id
         )
         customized_image_count_limit = action.max_customized_image_count
         if customized_image_count_limit <= existing_image_count:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import logging
-import uuid
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Any, override
@@ -11,16 +9,13 @@ from typing import Any, override
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.docker import LabelName
-from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus, ImageType
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.specs.creator import EntityCreator, FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -28,7 +23,10 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
     """Creator for an image.
 
     The image joins the registry it was scanned from; a customized image additionally
-    joins the user its owner label names, which is what restricts it to that user.
+    joins the project it is created in. ``customized`` records that a session commit
+    made it and ``creator_id`` the user it was made for. All three come from the
+    customized-owner label, which the caller reads at write time and no read goes
+    back to.
     """
 
     name: str
@@ -45,6 +43,9 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
     accelerators: str | None = None
     labels: dict[str, Any] | None = None
     status: ImageStatus = ImageStatus.ALIVE
+    customized: bool = False
+    creator_id: UserID | None = None
+    created_in_project_id: ProjectID | None = None
 
     @override
     def entity_id(self, row: ImageRow) -> ImageID:
@@ -52,10 +53,9 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
 
     @override
     def created_in(self, row: ImageRow) -> Collection[EntityIdentifier]:
-        owner = self._customized_owner()
-        if owner is None:
+        if self.created_in_project_id is None:
             return (self.registry_id,)
-        return (self.registry_id, owner)
+        return (self.registry_id, self.created_in_project_id)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
@@ -78,25 +78,13 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
             accelerators=self.accelerators,
             labels=self.labels,
             status=self.status,
+            customized=self.customized,
+            creator_id=self.creator_id,
         )
 
     @override
     def to_data(self, row: ImageRow) -> ImageData:
         return row.to_dataclass()
-
-    def _customized_owner(self) -> UserID | None:
-        """The user a customized image belongs to, read off its owner label."""
-        owner_label = (self.labels or {}).get(LabelName.CUSTOMIZED_OWNER)
-        if owner_label is None:
-            return None
-        prefix, sep, owner_id = owner_label.partition(":")
-        if prefix and sep and owner_id:
-            try:
-                return UserID(uuid.UUID(owner_id))
-            except ValueError:
-                pass
-        log.warning("Invalid {} label value: {!r}", LabelName.CUSTOMIZED_OWNER, owner_label)
-        return None
 
 
 @dataclass

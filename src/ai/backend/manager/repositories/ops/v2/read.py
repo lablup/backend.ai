@@ -35,10 +35,10 @@ from ai.backend.manager.models.specs.querier import (
     OwnedFieldQuerier,
 )
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
-from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
+from ai.backend.manager.repositories.ops.v2.graph_read import V2GraphReadOpsBase
 
 
-class V2ReadOps(V2OpsBase):
+class V2ReadOps(V2GraphReadOpsBase):
     """Read-only operations bound to a single session; data-returning paths only."""
 
     async def current_time(self) -> datetime:
