@@ -21,6 +21,7 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.entity_share.types import EntityShareData, EntityShareStatus
 from ai.backend.manager.errors.permission import InvalidFieldPermission
 from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
@@ -161,11 +162,26 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
         rather than adding a second row: one live row stands per pair. A taken share has
         its edge restated with it, so narrowing takes effect at once — what was lent is
         the lending side's to set, the way withdrawing it already is.
+
+        An offer still waiting is replaced outright, so it carries whoever made it now
+        and starts its time again. One already taken keeps both: it is no longer an
+        offer, and who changed what it lends is a question the audit trail answers.
         """
         table = EntityShareRow.__table__
+        pending = EntityShareRow.status == EntityShareStatus.PENDING
         stmt = (
             sa.update(table)
-            .values({"permission_cap": creator.permission_cap})
+            .values({
+                "permission_cap": creator.permission_cap,
+                "sharer_user_id": sa.case(
+                    (pending, sa.literal(creator.sharer_user_id, GUID(UserID))),
+                    else_=EntityShareRow.sharer_user_id,
+                ),
+                "expires_at": sa.case(
+                    (pending, sa.literal(creator.expires_at, sa.DateTime(timezone=True))),
+                    else_=sa.null(),
+                ),
+            })
             .where(
                 EntityShareRow.target_entity_type == creator.target.entity_type(),
                 EntityShareRow.target_entity_id == creator.target,

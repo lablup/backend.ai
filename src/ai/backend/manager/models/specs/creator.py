@@ -1,7 +1,9 @@
 """Insert specs of the v2 lineage.
 
-The roots below are deliberately unrelated — no common ABC. See AGENTS.md
-in this package before typing anything against more than one of them.
+The roots below are deliberately unrelated — no common ABC — with one exception: an
+entity creator answers preconditions, and the one that has none says so once rather
+than every spec repeating it. See AGENTS.md in this package before typing anything
+against more than one of them.
 """
 
 from __future__ import annotations
@@ -9,6 +11,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
+from typing import final, override
 
 from ai.backend.common.data.entity.types import (
     EntityIdentifier,
@@ -17,7 +20,7 @@ from ai.backend.common.data.entity.types import (
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.role_template import RoleTemplateSource
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 
 
 class GlobalEntityCreator[TRow: Base, TData](ABC):
@@ -49,14 +52,27 @@ class GlobalEntityCreator[TRow: Base, TData](ABC):
         raise NotImplementedError
 
 
-class EntityCreator[TRow: Base, TData](ABC):
-    """Insert spec of an entity: creating a row always provisions it in the RBAC graph
-    (its virtual entity node, which owns and governs itself) and puts it under the
-    scopes ``created_in`` declares: each owns it and governs it.
+class GuardedEntityCreator[TRow: Base, TData](ABC):
+    """Insert spec of an entity that declines to write unless the graph allows it.
 
-    The spec knows nothing about roles; entities that allow role presets use
-    :class:`RoleManagedEntityCreator`.
+    The same insert :class:`EntityCreator` describes, behind preconditions the database
+    cannot state as constraints of its own: a state elsewhere that makes the write
+    wrong rather than impossible. What to look for is declared, not executed, so the
+    spec stays a value and the read runs where the write does.
+
+    The guard an updater or a purger carries is a different thing: a condition on the
+    row already named, riding on the statement. This names rows in another table, and
+    finding one raises.
+
+    The root every entity creator shares, so one ops path serves both and a spec
+    carrying refusals cannot reach a path that would skip them: the write always runs
+    them, and a spec with none answers an empty list once.
     """
+
+    @abstractmethod
+    def precondition_checks(self) -> Sequence[PreconditionCheck]:
+        """What must not be there for this write to stand."""
+        raise NotImplementedError
 
     @abstractmethod
     def entity_id(self, row: TRow) -> EntityIdentifier:
@@ -67,8 +83,7 @@ class EntityCreator[TRow: Base, TData](ABC):
 
     @abstractmethod
     def created_in(self, row: TRow) -> Collection[EntityIdentifier]:
-        """The scopes the new entity is created in (a session's project and user). Each
-        owns it and governs it. Empty for a top-level entity."""
+        """The scopes the new entity is created in. Each owns it and governs it."""
         raise NotImplementedError
 
     @abstractmethod
@@ -82,6 +97,23 @@ class EntityCreator[TRow: Base, TData](ABC):
     @abstractmethod
     def to_data(self, row: TRow) -> TData:
         raise NotImplementedError
+
+
+class EntityCreator[TRow: Base, TData](GuardedEntityCreator[TRow, TData], ABC):
+    """Insert spec of an entity nothing outside the row can refuse.
+
+    Everything :class:`GuardedEntityCreator` describes, with no preconditions: the
+    database's own constraints are the whole of what can turn this write away. A spec
+    that needs more inherits the guarded root directly rather than answering here.
+
+    The spec knows nothing about roles; entities that allow role presets use
+    :class:`RoleManagedEntityCreator`.
+    """
+
+    @final
+    @override
+    def precondition_checks(self) -> Sequence[PreconditionCheck]:
+        return ()
 
 
 class RoleManagedGlobalEntityCreator[TRow: Base, TData](RoleTemplateSource[TRow], ABC):

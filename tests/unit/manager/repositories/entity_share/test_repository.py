@@ -32,6 +32,8 @@ from ai.backend.manager.data.entity_share.types import (
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.entity_share import (
     EntityShareNotFound,
+    ShareToAPersonalProject,
+    ShareToTheOwningScope,
 )
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.domain import DomainRow
@@ -302,7 +304,7 @@ class TestAccept:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         data = await repository.accept(created.id, _INVITEE_ID)
         assert data.status == EntityShareStatus.ACCEPTED
         assert await _status(database, created.id) == EntityShareStatus.ACCEPTED
@@ -315,7 +317,7 @@ class TestAccept:
         repository: EntityShareRepository,
     ) -> None:
         await _share(database, Permission.UPDATE)
-        created = await ops.create_entity(_creator(cap=Permission.READ))
+        created = await repository.create(_creator(cap=Permission.READ))
         await repository.accept(created.id, _INVITEE_ID)
         assert await _cap(database, _INVITEE_PROJECT_ID) == (
             True,
@@ -329,7 +331,7 @@ class TestAccept:
         repository: EntityShareRepository,
     ) -> None:
         await _belong(database)
-        created = await ops.create_entity(_creator(cap=Permission.READ))
+        created = await repository.create(_creator(cap=Permission.READ))
         await repository.accept(created.id, _INVITEE_ID)
         assert await _cap(database, _INVITEE_PROJECT_ID) == (True, None)
 
@@ -339,7 +341,7 @@ class TestAccept:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         with pytest.raises(EntityShareNotFound):
             await repository.accept(created.id, _OUTSIDER_ID)
         assert await _status(database, created.id) == EntityShareStatus.PENDING
@@ -350,7 +352,7 @@ class TestAccept:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         await repository.accept(created.id, _INVITEE_ID)
         with pytest.raises(EntityShareNotFound):
             await repository.accept(created.id, _INVITEE_ID)
@@ -370,7 +372,7 @@ class TestReject:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         data = await repository.reject(created.id, _INVITEE_ID)
         assert data.status == EntityShareStatus.REJECTED
         assert await _cap(database, _INVITEE_PROJECT_ID) == (False, None)
@@ -381,7 +383,7 @@ class TestReject:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         with pytest.raises(EntityShareNotFound):
             await repository.reject(created.id, _OUTSIDER_ID)
         assert await _status(database, created.id) == EntityShareStatus.PENDING
@@ -394,7 +396,7 @@ class TestCancel:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         data = await repository.cancel(created.id)
         assert data.status == EntityShareStatus.CANCELED
         assert await _cap(database, _INVITEE_PROJECT_ID) == (False, None)
@@ -404,7 +406,7 @@ class TestCancel:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         await repository.cancel(created.id)
         with pytest.raises(EntityShareNotFound):
             await repository.cancel(created.id)
@@ -443,8 +445,9 @@ class TestCreate:
         self,
         database: ExtendedAsyncSAEngine,
         ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         member = aliased(VirtualEntityRow, name="member_virtual_entity")
         async with database.begin_readonly_session() as session:
             joined: list[UUID] = list(
@@ -477,7 +480,7 @@ class TestAProjectAnswering:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator_to(_TEAM_PROJECT_ID))
+        created = await repository.create(_creator_to(_TEAM_PROJECT_ID))
         data = await repository.accept(created.id, _TEAM_PROJECT_ID)
         assert data.status == EntityShareStatus.ACCEPTED
         assert data.recipient == RuntimeEntityID(PROJECT_ENTITY_TYPE, _TEAM_PROJECT_ID)
@@ -489,7 +492,7 @@ class TestAProjectAnswering:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator_to(_TEAM_PROJECT_ID))
+        created = await repository.create(_creator_to(_TEAM_PROJECT_ID))
         await repository.accept(created.id, _TEAM_PROJECT_ID)
         await repository.leave(created.id, _TEAM_PROJECT_ID)
         assert await _status(database, created.id) == EntityShareStatus.REVOKED
@@ -500,7 +503,7 @@ class TestAProjectAnswering:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator_to(_TEAM_PROJECT_ID))
+        created = await repository.create(_creator_to(_TEAM_PROJECT_ID))
         with pytest.raises(EntityShareNotFound):
             await repository.accept(created.id, _INVITEE_ID)
 
@@ -512,7 +515,7 @@ class TestExpiry:
         repository: EntityShareRepository,
     ) -> None:
         past = datetime.now(UTC) - timedelta(minutes=1)
-        created = await ops.create_entity(_creator(expires_at=past))
+        created = await repository.create(_creator(expires_at=past))
         with pytest.raises(EntityShareNotFound):
             await repository.accept(created.id, _INVITEE_ID)
 
@@ -522,7 +525,7 @@ class TestExpiry:
         repository: EntityShareRepository,
     ) -> None:
         ahead = datetime.now(UTC) + timedelta(minutes=1)
-        created = await ops.create_entity(_creator(expires_at=ahead))
+        created = await repository.create(_creator(expires_at=ahead))
         data = await repository.accept(created.id, _INVITEE_ID)
         assert data.status == EntityShareStatus.ACCEPTED
 
@@ -533,7 +536,7 @@ class TestAddressedByEmail:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         assert created.recipient is None
         data = await repository.accept(created.id, _INVITEE_ID)
         assert data.recipient == RuntimeEntityID(USER_ENTITY_TYPE, _INVITEE_ID)
@@ -546,7 +549,7 @@ class TestRevoke:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         await repository.accept(created.id, _INVITEE_ID)
         await repository.revoke(created.id)
         assert await _status(database, created.id) == EntityShareStatus.REVOKED
@@ -557,7 +560,7 @@ class TestRevoke:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         with pytest.raises(EntityShareNotFound):
             await repository.revoke(created.id)
 
@@ -566,7 +569,7 @@ class TestRevoke:
         ops: OpsRepository[EntityShareData],
         repository: EntityShareRepository,
     ) -> None:
-        created = await ops.create_entity(_creator())
+        created = await repository.create(_creator())
         await repository.accept(created.id, _INVITEE_ID)
         with pytest.raises(EntityShareNotFound):
             await repository.cancel(created.id)
@@ -576,12 +579,13 @@ class TestWhatCannotBeNamed:
     async def test_an_entity_outside_the_graph_cannot_be_offered(
         self,
         ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
     ) -> None:
         """The graph holds the pair unique and the row points at it, so an entity with
         no node has nothing to point at."""
         stranger = RuntimeEntityID(_TARGET_TYPE, uuid4())
         with pytest.raises(BackendAIError):
-            await ops.create_entity(
+            await repository.create(
                 EntityShareCreator(
                     sharer_user_id=_INVITER_ID,
                     recipient_email=_INVITEE_EMAIL,
@@ -593,7 +597,95 @@ class TestWhatCannotBeNamed:
     async def test_a_scope_outside_the_graph_cannot_receive(
         self,
         ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
     ) -> None:
         stranger = ProjectID(uuid4())
         with pytest.raises(BackendAIError):
-            await ops.create_entity(_creator_to(stranger))
+            await repository.create(_creator_to(stranger))
+
+
+class TestWhatIsRefused:
+    async def test_a_scope_owning_the_entity_is_refused(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: EntityShareRepository,
+    ) -> None:
+        """Lending states what holds now, so an owner would end up with less."""
+        async with ShareOpsProvider(database).write_ops() as w:
+            await w.transfer([], [_TEAM_PROJECT_ID], _target())
+        with pytest.raises(ShareToTheOwningScope):
+            await repository.create(_creator_to(_TEAM_PROJECT_ID))
+
+    async def test_a_personal_project_is_refused(
+        self,
+        repository: EntityShareRepository,
+    ) -> None:
+        """A person is reached as a person, so their own project is not a second handle."""
+        with pytest.raises(ShareToAPersonalProject):
+            await repository.create(_creator_to(_INVITEE_PROJECT_ID))
+
+
+class TestRestatingCarriesTheMoment:
+    async def test_restating_an_offer_takes_the_new_sender_and_moment(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: EntityShareRepository,
+    ) -> None:
+        first = await repository.create(
+            _creator(expires_at=datetime.now(UTC) + timedelta(minutes=5))
+        )
+        ahead = datetime.now(UTC) + timedelta(hours=1)
+        again = await repository.create(
+            EntityShareCreator(
+                sharer_user_id=_OUTSIDER_ID,
+                recipient_email=_INVITEE_EMAIL,
+                target=_target(),
+                permission_cap=Permission.READ,
+                expires_at=ahead,
+            )
+        )
+        assert again.id == first.id
+        assert again.sharer_user_id == _OUTSIDER_ID
+        assert first.expires_at is not None
+        assert again.expires_at is not None
+        assert again.expires_at > first.expires_at
+
+    async def test_taking_an_offer_clears_the_moment(
+        self,
+        repository: EntityShareRepository,
+    ) -> None:
+        offered = await repository.create(
+            _creator(expires_at=datetime.now(UTC) + timedelta(minutes=5))
+        )
+        taken = await repository.accept(offered.id, _INVITEE_ID)
+        assert taken.expires_at is None
+
+    async def test_restating_a_taken_share_keeps_its_sender_and_no_moment(
+        self,
+        repository: EntityShareRepository,
+    ) -> None:
+        offered = await repository.create(_creator())
+        await repository.accept(offered.id, _INVITEE_ID)
+        again = await repository.create(
+            EntityShareCreator(
+                sharer_user_id=_OUTSIDER_ID,
+                recipient_email=_INVITEE_EMAIL,
+                target=_target(),
+                permission_cap=Permission.UPDATE,
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+            )
+        )
+        assert again.sharer_user_id == _INVITER_ID
+        assert again.expires_at is None
+        assert again.permission_cap == Permission.UPDATE
+
+    async def test_an_ended_offer_is_left_alone(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: EntityShareRepository,
+    ) -> None:
+        first = await repository.create(_creator())
+        await repository.reject(first.id, _INVITEE_ID)
+        second = await repository.create(_creator())
+        assert second.id != first.id
+        assert await _status(database, first.id) == EntityShareStatus.REJECTED

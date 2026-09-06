@@ -34,6 +34,9 @@ class EntityShareRepository:
     async def create(self, creator: EntityShareCreator) -> EntityShareData:
         """Write the offer, or restate what already stands for the same pair.
 
+        What the spec refuses runs inside the write, so an offer to a scope that owns
+        the entity, or to a person named by their own project, never lands.
+
         One live row stands per recipient and entity, so offering again to somewhere
         that already holds the entity sets what it lends rather than adding a second
         row. Looking and writing share one transaction, so two offers racing cannot

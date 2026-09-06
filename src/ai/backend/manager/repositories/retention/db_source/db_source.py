@@ -178,11 +178,20 @@ class RetentionDBSource:
                         VFolderInvitationRow.state.in_(VFolderInvitationState.declined_states()),
                     ),
                 ),
+                # An offer that ran out is settled by its own moment rather than by
+                # age, so it is drained on that; what ended some other way is history
+                # and goes on the age of the answer.
+                RetentionDrain(
+                    EntityShareRow,
+                    EntityShareRow.expires_at,
+                    threshold,
+                    conditions=(EntityShareRow.status == EntityShareStatus.PENDING,),
+                ),
                 RetentionDrain(
                     EntityShareRow,
                     EntityShareRow.updated_at,
                     threshold,
-                    conditions=(EntityShareRow.status.in_(EntityShareStatus.unsettled_states()),),
+                    conditions=(EntityShareRow.status.in_(EntityShareStatus.terminal_statuses()),),
                 ),
             ),
             RetentionCategory.USAGE_RECORDS: (

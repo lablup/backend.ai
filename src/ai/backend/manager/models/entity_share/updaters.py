@@ -117,10 +117,12 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
 class EntityShareAcceptUpdater(_RecipientInvitationUpdater):
     """The receiving side takes what was offered.
 
-    Settling records the node the answering scope holds. An offer that named a node
-    already carries the same one, because the guard would not have matched otherwise;
-    an offer that reached an address gains it here, and from then on an accepted row
-    always names one.
+    Settling records the scope that answered. An offer that named one already carries
+    the same, because the guard would not have matched otherwise; an offer that reached
+    an address gains it here, and from then on an accepted row always names one.
+
+    The moment is cleared with it: a share that was taken does not run out, and only an
+    offer still waiting has one.
     """
 
     @override
@@ -130,6 +132,7 @@ class EntityShareAcceptUpdater(_RecipientInvitationUpdater):
             "status": EntityShareStatus.ACCEPTED,
             "recipient_entity_type": scope.entity_type(),
             "recipient_entity_id": scope,
+            "expires_at": None,
         }
 
 

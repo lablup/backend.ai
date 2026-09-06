@@ -37,13 +37,14 @@ class EntityShareStatus(enum.StrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def unsettled_states(cls) -> frozenset[EntityShareStatus]:
-        """Every state other than ACCEPTED: waiting, turned down, withdrawn, taken back.
+    def terminal_statuses(cls) -> frozenset[EntityShareStatus]:
+        """Turned down, withdrawn, taken back: the states an offer stops in.
 
-        An accepted share holds a graph edge and stays. The retention sweep removes the
-        rest once their period passes, so a share nobody answered does not sit forever.
+        An accepted share holds a graph edge and stays; a waiting one is settled by its
+        moment passing rather than by age. What is left is history, which the retention
+        sweep removes once its period passes.
         """
-        return frozenset((cls.PENDING, cls.REJECTED, cls.CANCELED, cls.REVOKED))
+        return frozenset((cls.REJECTED, cls.CANCELED, cls.REVOKED))
 
 
 @dataclass(frozen=True)

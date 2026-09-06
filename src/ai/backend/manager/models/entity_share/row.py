@@ -38,6 +38,9 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
 
     One live row stands per recipient and entity, live meaning offered or taken. Ended
     rows pile up beside it, so the same entity can go out again after it came back.
+
+    Only an offer still waiting runs out of time, which the last check holds: taking one
+    clears the moment, and what was taken stands until it is given or taken back.
     """
 
     __tablename__ = "entity_shares"
@@ -62,6 +65,10 @@ class EntityShareRow(LifecycleTimestampsMixin, Base):
         sa.CheckConstraint(
             "status <> 'accepted' OR recipient_entity_type IS NOT NULL",
             name="accepted_resolved",
+        ),
+        sa.CheckConstraint(
+            "status <> 'accepted' OR expires_at IS NULL",
+            name="accepted_does_not_expire",
         ),
         sa.Index(
             "uq_entity_shares_live_email",

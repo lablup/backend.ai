@@ -198,6 +198,16 @@ class TestAuthRepository:
                 max_customized_image_count=10,
             )
             db_sess.add(policy)
+            # Creating a user creates the project that is theirs alone, which takes the
+            # default project policy.
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=-1,
+                    max_network_count=10,
+                )
+            )
             await db_sess.commit()
         yield ResourcePolicyTestData(name=policy_name)
 
