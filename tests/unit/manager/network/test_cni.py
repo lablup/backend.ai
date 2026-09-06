@@ -26,8 +26,10 @@ from ai.backend.manager.errors.network import (
     OverlayTeardownPending,
     RequestedSubnetInvalid,
     RequestedSubnetUnavailable,
+    SessionRecordContested,
     VNIPoolExhausted,
 )
+from ai.backend.manager.network import cni
 from ai.backend.manager.network.cni import CNINetworkPlugin
 from ai.backend.manager.network.ipam import (
     EndpointAllocator,
@@ -37,6 +39,7 @@ from ai.backend.manager.network.ipam import (
     _claim,
     _prefix_for_hosts,
 )
+from ai.backend.manager.plugin.network import NetworkInfo
 
 
 class FakeEtcd:
@@ -59,6 +62,17 @@ class FakeEtcd:
 
     async def delete(self, key: str, **kwargs: Any) -> None:
         self.store.pop(key, None)
+
+    async def replace(self, key: str, initial_val: str, new_val: str, **kwargs: Any) -> bool:
+        """etcd's compare-and-swap on the value: the write lands only over what was expected.
+
+        Modelled because it is the fence the control plane rests on -- a manager that has been
+        superseded must find out here rather than overwriting whoever succeeded it.
+        """
+        if self.store.get(key) != initial_val:
+            return False
+        self.store[key] = new_val
+        return True
 
     async def delete_if_value(self, key: str, expected: str, **kwargs: Any) -> bool:
         if self.store.get(key) != expected:
@@ -1055,6 +1069,125 @@ class TestTwoManagersCreatingOneSession:
         assert {r.options["subnet"] for r in results} == {meta["subnet"]}
 
 
+class _GateOnGet(FakeEtcd):
+    """A store that holds every single-key read at a barrier.
+
+    That is the shape of the takeover race: two waiters read one record and each decides, on the
+    strength of that same read, that the session is now theirs.
+    """
+
+    def __init__(self, gate: asyncio.Event) -> None:
+        super().__init__()
+        self._gate = gate
+
+    @override
+    async def get(self, key: str, **kwargs: Any) -> str | None:
+        found = await super().get(key, **kwargs)
+        await self._gate.wait()
+        return found
+
+
+_META_KEY = "network/session/s1/meta"
+
+
+class TestASessionTakenFromItsCreator:
+    """C5b. A create that is only slow and one that died look the same from outside, and the
+    handover cannot tell them apart -- so it takes the session from both. A manager that has been
+    superseded therefore has to find out at its next write: what it publishes over, rolls back and
+    destroys is the record it still holds, or nothing at all."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    @staticmethod
+    def _hand_over_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
+        """Take the session over on the first look, instead of a minute from now."""
+        monkeypatch.setattr(cni, "_CREATE_HANDOVER_SEC", 0.0)
+
+    async def _taken_over(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> tuple[FakeEtcd, CNINetworkPlugin, str, NetworkInfo]:
+        """One manager claims the session and stalls; a second takes it over and finishes it.
+
+        Returns the record the first one still believes it holds, and what the second published.
+        """
+        etcd = FakeEtcd()
+        superseded = _plugin_with(etcd)
+        held, published = await superseded._claim_session(cast(AsyncEtcd, etcd), "s1", "tok1", [])
+        assert published is None
+        self._hand_over_at_once(monkeypatch)
+        info = await _plugin_with(etcd).create_network(identifier="s1", options=dict(self._OPTIONS))
+        return etcd, superseded, held, info
+
+    async def test_the_superseded_create_cannot_publish_over_the_new_owner(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        etcd, superseded, held, info = await self._taken_over(monkeypatch)
+        with pytest.raises(SessionRecordContested):
+            await superseded._publish(
+                cast(AsyncEtcd, etcd),
+                "s1",
+                held,
+                {"subnet": "10.128.9.0/24", "vni": 9999, "_owner": "tok1", "_state": "ready"},
+            )
+        # Not a word of the loser's is on the record -- including the "ready" that would have
+        # handed its caller a subnet and a VNI the pool has given to the winner.
+        meta = json.loads(etcd.store[_META_KEY])
+        assert meta["subnet"] == info.options["subnet"]
+        assert meta["vni"] == info.options["vni"]
+
+    async def test_its_rollback_leaves_the_new_owner_whole(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        etcd, superseded, held, info = await self._taken_over(monkeypatch)
+        await superseded._rollback_create(
+            "s1", str(info.options["subnet"]), int(cast(int, info.options["vni"])), held
+        )
+        assert _META_KEY in etcd.store, "the winner's record was deleted by the loser's rollback"
+        assert await superseded._subnet_allocator.holder(str(info.options["subnet"])) == "s1"
+        assert await superseded._vni_allocator.holder(int(cast(int, info.options["vni"]))) == "s1"
+        assert etcd.store["network/session/s1/endpoints/k1"]
+
+    async def test_a_destroyed_session_cannot_be_resurrected(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        held = etcd.store[_META_KEY]  # what a create still running would be holding
+        await plugin.destroy_network("s1")
+        with pytest.raises(SessionRecordContested):
+            await plugin._publish(
+                cast(AsyncEtcd, etcd),
+                "s1",
+                held,
+                {"subnet": info.options["subnet"], "_state": "ready"},
+            )
+        assert _META_KEY not in etcd.store, "a destroyed session was written back into etcd"
+
+    async def test_only_one_of_two_waiters_takes_the_session(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        gate = asyncio.Event()
+        etcd = _GateOnGet(gate)
+        etcd.store[_META_KEY] = json.dumps({"_owner": "tok-dead", "_state": "creating"})
+        self._hand_over_at_once(monkeypatch)
+        tasks = [
+            asyncio.create_task(
+                _plugin_with(etcd)._claim_session(cast(AsyncEtcd, etcd), "s1", f"tok{n}", [])
+            )
+            for n in range(2)
+        ]
+        await asyncio.sleep(0)  # both reach the read, and so both see the dead creator's record
+        gate.set()
+        outcomes = await asyncio.gather(*tasks, return_exceptions=True)
+        took = [outcome for outcome in outcomes if not isinstance(outcome, BaseException)]
+        refused = [outcome for outcome in outcomes if isinstance(outcome, SessionRecordContested)]
+        assert len(took) == 1, f"two waiters both believe they own the session: {outcomes}"
+        assert len(refused) == 1, f"the loser was not told: {outcomes}"
+        assert etcd.store[_META_KEY] == took[0][0]
+
+
 class TestAnAddressWithNoEndpointRecord:
     """C3. The address claim and the endpoint record are two writes. Everything downstream reads
     the record -- peers program FDB and ARP from it, the resolver answers from it -- so a
@@ -1120,13 +1253,11 @@ class TestAMetaThatOutlivedItsAllocation:
         plugin = _plugin_with(etcd)
         subnet = await plugin._subnet_allocator.acquire("s1")
         vni = await plugin._vni_allocator.acquire("s1")
-        etcd.store["network/session/s1/meta"] = json.dumps({
-            "subnet": subnet,
-            "vni": vni,
-            "_owner": "mine",
-        })
+        # The exact bytes the create holds: everything it does afterwards is conditional on them.
+        record = json.dumps({"subnet": subnet, "vni": vni, "_owner": "mine", "_state": "creating"})
+        etcd.store["network/session/s1/meta"] = record
 
-        await plugin._rollback_create("s1", subnet, vni, "mine")
+        await plugin._rollback_create("s1", subnet, vni, record)
 
         # Nothing was released, so nothing else can be given what the surviving record names.
         assert await plugin._subnet_allocator.holder(subnet) == "s1"
@@ -1305,3 +1436,32 @@ class TestABlockClaimedOnlyInPart:
             await task
 
         assert not [k for k in etcd.store if k.startswith("network/ipam/allocated/")]
+
+    async def test_a_unit_that_would_not_go_back_does_not_hold_up_the_rest(self) -> None:
+        # Giving a partial claim back is best-effort per unit -- the caller is on its way to the
+        # next candidate block -- but stopping at the first etcd hiccup would leave the units
+        # after it claimed by a session whose meta names a different subnet, and no later release
+        # names them. The failure is logged; the rest still go back.
+        class _RefusesTheFirstDelete(FakeEtcd):
+            def __init__(self) -> None:
+                super().__init__()
+                self.attempted: list[str] = []
+
+            @override
+            async def delete_if_value(self, key: str, expected: str, **kwargs: Any) -> bool:
+                self.attempted.append(key)
+                if len(self.attempted) == 1:
+                    raise RuntimeError("etcd is unreachable")
+                return await super().delete_if_value(key, expected, **kwargs)
+
+        etcd = _RefusesTheFirstDelete()
+        allocator = _subnet_allocator(etcd)
+        units = ["10.128.0.0/24", "10.128.1.0/24"]
+        payload = _claim("s1", "10.128.0.0/23")
+        for unit in units:
+            etcd.store[_allocated_key(unit)] = payload
+
+        await allocator._give_back(units, payload)
+
+        assert etcd.attempted == [_allocated_key(unit) for unit in units], "it stopped at the first"
+        assert _allocated_key("10.128.1.0/24") not in etcd.store
