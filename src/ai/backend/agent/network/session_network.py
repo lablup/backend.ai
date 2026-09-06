@@ -879,7 +879,7 @@ class SessionNetwork:
                 # session rather than leaving one that can never be recovered or torn down.
                 if meta.backend is NetworkBackendKind.BRIDGE:
                     await self._persist_session_meta(meta)
-            except Exception:
+            except BaseException:
                 # Unwind what WE built, and nothing else. A failed *setup* leaves a coordinator that
                 # may already have published this node's membership and started its watch tasks, and
                 # that is about to go out of scope unregistered — nobody could ever stop it — so it
@@ -889,9 +889,15 @@ class SessionNetwork:
                 # block of a data plane this node did not build and whose kernels are still running
                 # on it. And the failure that trips the adopt is the same transient etcd error that
                 # made the resume fail in the first place — correlated, not hypothetical.
+                #
+                # BaseException, and shielded: a cancelled kernel creation is the ordinary way this
+                # is interrupted, and it left the coordinator unregistered with its watch tasks
+                # running and this node's membership published -- a session nothing on this node
+                # could stop, on devices no teardown would ever look for.
                 if coordinator is not None and not adopted:
-                    with contextlib.suppress(Exception):
-                        await coordinator.stop(session_id)
+                    await asyncio.shield(
+                        asyncio.ensure_future(self._stop_quietly(coordinator, session_id))
+                    )
                 self._tracker.release_pending(kernel_id)
                 raise
             # Register only AFTER a successful start, so a partial failure (which raises here)
@@ -1403,6 +1409,22 @@ class SessionNetwork:
         """
         await self._detach_attachment(container_id)
         await self._release_container(container_id)
+
+    @staticmethod
+    async def _stop_quietly(coordinator: SessionNetworkCoordinator, session_id: str) -> None:
+        """Stop a coordinator that never got registered, reporting rather than raising.
+
+        The caller is already unwinding and has a failure to re-raise; a second one from the
+        cleanup would replace it with something less useful.
+        """
+        try:
+            await coordinator.stop(session_id)
+        except Exception:
+            log.exception(
+                "could not unwind the half-built network of session {}; its devices and LOCAL"
+                " block stay until recovery reclaims them",
+                session_id,
+            )
 
     async def _retry_pending_detaches(self, session_id: str) -> None:
         """Detach again for every container of this session whose detach did not go through.
