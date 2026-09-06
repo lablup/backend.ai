@@ -21,6 +21,7 @@ from graphql import Undefined, UndefinedType
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.types import (
     AgentId,
@@ -193,9 +194,13 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
     # legacy field
     hash = graphene.String()
 
+    # Carried alongside the GraphQL fields, not one of them: the user the image was
+    # committed for, which the load filters below judge against.
+    creator_id: UserID | None
+
     @classmethod
     def from_image_with_agent_install_status(cls, data: ImageWithAgentInstallStatus) -> Self:
-        return cls(
+        item = cls(
             id=data.image.id,
             name=data.image.name,
             namespace=data.image.namespace,
@@ -227,6 +232,8 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
             # legacy
             hash=data.image.digest,
         )
+        item.creator_id = data.image.creator_id
+        return item
 
     @classmethod
     async def batch_load_by_canonical(
@@ -347,11 +354,23 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
         """
         Determine if the image is filtered according to the `load_filters` parameter.
         """
-        user_role = ctx.user["role"]
-
-        # If the image filtered by any of its labels, return False early.
-        # If the image is not filtered and is determiend to be valid by any of its labels, `is_valid = True`.
+        # Filtered out by ownership or by a label, return False early; determined valid
+        # by either, `is_valid = True`.
         is_valid = ImageLoadFilter.GENERAL in load_filters
+        if self.is_customized_image:
+            if (
+                ImageLoadFilter.CUSTOMIZED not in load_filters
+                and ImageLoadFilter.CUSTOMIZED_GLOBAL not in load_filters
+            ):
+                return False
+            if ImageLoadFilter.CUSTOMIZED in load_filters:
+                if self.creator_id != ctx.user["uuid"]:
+                    return False
+                is_valid = True
+            if ImageLoadFilter.CUSTOMIZED_GLOBAL in load_filters:
+                if ctx.user["role"] != UserRole.SUPERADMIN:
+                    return False
+                is_valid = True
         for label in self.labels:
             match label.key:
                 case LabelName.FEATURES if KernelFeatures.OPERATION.value in label.value:
@@ -359,30 +378,12 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
                         is_valid = True
                     else:
                         return False
-                case LabelName.CUSTOMIZED_OWNER:
-                    if (
-                        ImageLoadFilter.CUSTOMIZED not in load_filters
-                        and ImageLoadFilter.CUSTOMIZED_GLOBAL not in load_filters
-                    ):
-                        return False
-                    if ImageLoadFilter.CUSTOMIZED in load_filters:
-                        if label.value == f"user:{ctx.user['uuid']}":
-                            is_valid = True
-                        else:
-                            return False
-                    if ImageLoadFilter.CUSTOMIZED_GLOBAL in load_filters:
-                        if user_role == UserRole.SUPERADMIN:
-                            is_valid = True
-                        else:
-                            return False
         return is_valid
 
     @property
     def is_customized_image(self) -> bool:
-        for label in self.labels:
-            if label.key == LabelName.CUSTOMIZED_OWNER.value:
-                return True
-        return False
+        """Whether the image was committed for a user, which is what customized means."""
+        return self.creator_id is not None
 
 
 class ImagePermissionValueField(graphene.Scalar):  # type: ignore[misc]

@@ -20,8 +20,15 @@ from ai.backend.manager.models.agent import AgentRow
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 
@@ -42,6 +49,12 @@ class TestImageRowResolve:
         async with with_tables(
             database_connection,
             [
+                # images.creator_id points at users, so the user chain comes first.
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
                 ImageAliasRow,

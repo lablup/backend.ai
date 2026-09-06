@@ -78,6 +78,7 @@ def create_image_data(
         ],
         tags=[ImageTagEntry(key="runtime", value="python")],
         status=status,
+        creator_id=None,
     )
 
 
@@ -105,6 +106,7 @@ def create_image_data_with_details(
         resource_limits=[
             ResourceLimit(key="cpu", min=Decimal("1"), max=Decimal("8")),
         ],
+        creator_id=None,
         supported_accelerators=["cuda"],
         digest="sha256:abc123",
         labels=[KVPair(key="ai.backend.role", value="compute")],

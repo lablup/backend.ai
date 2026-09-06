@@ -194,6 +194,7 @@ def sample_image_data() -> ImageData:
         is_local=False,
         type=ImageType.COMPUTE,
         status=ImageStatus.ALIVE,
+        creator_id=None,
         accelerators="",
         labels=ImageLabelsData(label_data={}),
         resources=ImageResourcesData(resources_data={}),

@@ -292,20 +292,16 @@ class SessionDBSource:
                 ],
             )
 
-    async def get_customized_image_count(
-        self,
-        image_visibility: str,
-        image_owner_id: str,
-    ) -> int:
+    async def get_customized_image_count(self, user_id: uuid.UUID) -> int:
+        """How many live customized images were committed for the user."""
         async with self._db.begin_readonly_session_read_committed() as sess:
             query = (
                 sa.select(sa.func.count())
                 .select_from(ImageRow)
                 .where(
-                    ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                    == f"{image_visibility}:{image_owner_id}"
+                    self._committed_for(user_id),
+                    ImageRow.status == ImageStatus.ALIVE,
                 )
-                .where(ImageRow.status == ImageStatus.ALIVE)
             )
             result = await sess.scalar(query)
             return result or 0
@@ -313,21 +309,23 @@ class SessionDBSource:
     async def get_existing_customized_image(
         self,
         new_canonical: str,
-        image_visibility: str,
-        image_owner_id: str,
+        user_id: uuid.UUID,
         image_name: str,
     ) -> ImageRow | None:
         async with self._db.begin_readonly_session_read_committed() as sess:
             query = sa.select(ImageRow).where(
                 sa.and_(
                     ImageRow.name.like(f"{new_canonical}%"),
-                    ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                    == f"{image_visibility}:{image_owner_id}",
+                    self._committed_for(user_id),
                     ImageRow.labels["ai.backend.customized-image.name"].as_string() == image_name,
                     ImageRow.status == ImageStatus.ALIVE,
                 )
             )
             return cast(ImageRow | None, await sess.scalar(query))
+
+    def _committed_for(self, user_id: uuid.UUID) -> sa.ColumnElement[bool]:
+        """The image is customized and was committed for this user."""
+        return ImageRow.creator_id == user_id
 
     async def get_group_name_by_domain_and_id(
         self,

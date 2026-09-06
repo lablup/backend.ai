@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import logging
+import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
@@ -23,8 +24,11 @@ import yarl
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import (
     ImageRef,
+    LabelName,
     arch_name_aliases,
     validate_image_labels,
 )
@@ -69,6 +73,36 @@ rescan_counts: ContextVar[RescanCounts] = ContextVar("rescan_counts")
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
+
+
+def _created_in_project(
+    labels: Mapping[str, Any], personal_projects: Mapping[UserID, ProjectID]
+) -> ProjectID | None:
+    """The project a scanned image is created in: the personal project of the user its
+    owner label names, or none where it names nobody."""
+    user_id = _customized_owner_user_id(labels)
+    if user_id is None:
+        return None
+    return personal_projects.get(user_id)
+
+
+def _customized_owner_user_id(labels: Mapping[str, Any]) -> UserID | None:
+    """The user a customized image was committed for, read off its owner label.
+
+    Write-time input only: what it settles — the creator column and the project the
+    image is created in — is what every read goes to.
+    """
+    owner_label = labels.get(LabelName.CUSTOMIZED_OWNER)
+    if owner_label is None:
+        return None
+    prefix, sep, user_id = owner_label.partition(":")
+    if prefix and sep and user_id:
+        try:
+            return UserID(uuid.UUID(user_id))
+        except ValueError:
+            pass
+    log.warning("Invalid {} label value: {!r}", LabelName.CUSTOMIZED_OWNER, owner_label)
+    return None
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
@@ -181,6 +215,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             log.info("No images found in registry {0}", self.registry_url)
         else:
             image_identifiers = [(k.canonical, k.architecture) for k in _all_updates.keys()]
+            scanned_projects = await self._scanned_customized_projects(_all_updates)
             async with self.db.begin_session_read_committed() as session:
                 existing_images = await session.scalars(
                     sa.select(ImageRow).where(
@@ -243,6 +278,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             accelerators=update.get("accels"),
                             labels=update["labels"],
                             status=ImageStatus.ALIVE,
+                            creator_id=_customized_owner_user_id(update["labels"]),
+                            created_in_project_id=_created_in_project(
+                                update["labels"], scanned_projects
+                            ),
                         ),
                     )
 
@@ -251,8 +290,24 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             scanned_images.extend(await self._create_scanned_images(creators))
         return scanned_images
 
+    async def _scanned_customized_projects(
+        self, updates: Mapping[ImageIdentifier, Any]
+    ) -> dict[UserID, ProjectID]:
+        """The personal project of every user a scanned customized-owner label names,
+        which is the scope those images are created in."""
+        user_ids = {
+            user_id
+            for update in updates.values()
+            if (user_id := _customized_owner_user_id(update["labels"])) is not None
+        }
+        if not user_ids:
+            return {}
+        async with self._ops_provider.read_ops() as r:
+            return await r.personal_projects(list(user_ids))
+
     async def _create_scanned_images(self, creators: list[ImageCreator]) -> list[ImageData]:
-        """Insert the images the scan found, each joining the registry it came from."""
+        """Insert the images the scan found, each joining the registry it came from and
+        the project that owns it."""
         if not creators:
             return []
         async with self._ops_provider.write_ops() as w:

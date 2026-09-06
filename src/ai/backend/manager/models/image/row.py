@@ -33,6 +33,7 @@ from sqlalchemy.sql.expression import true
 
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
@@ -193,6 +194,15 @@ class ImageRow(CreatedAtMixin, Base):
     type: Mapped[ImageType] = mapped_column("type", sa.Enum(ImageType), nullable=False)
     accelerators: Mapped[str | None] = mapped_column("accelerators", sa.String, nullable=True)
     labels: Mapped[dict[str, Any]] = mapped_column("labels", sa.JSON, nullable=False, default=dict)
+    # Provenance, not ownership: the user a customized image was committed for. NULL
+    # for an image that is not customized, and nulled when the user goes.
+    creator_id: Mapped[UserID | None] = mapped_column(
+        "creator_id",
+        GUID(UserID),
+        sa.ForeignKey("users.uuid", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     _resources: Mapped[dict[str, Any]] = mapped_column(
         "resources",
         StructuredJSONColumn(
@@ -245,6 +255,7 @@ class ImageRow(CreatedAtMixin, Base):
         labels: dict[str, Any] | None = None,
         resources: dict[str, Any] | None = None,
         status: ImageStatus = ImageStatus.ALIVE,
+        creator_id: UserID | None = None,
     ) -> None:
         self.name = name
         self.project = project
@@ -261,6 +272,7 @@ class ImageRow(CreatedAtMixin, Base):
         self.labels = labels  # type: ignore[assignment]
         self._resources = resources  # type: ignore[assignment]
         self.status = status
+        self.creator_id = creator_id
 
     @property
     def trimmed_digest(self) -> str:
@@ -283,7 +295,8 @@ class ImageRow(CreatedAtMixin, Base):
 
     @property
     def customized(self) -> bool:
-        return self.labels.get("ai.backend.customized-image.owner") is not None
+        """Whether the image was committed for a user, which is what customized means."""
+        return self.creator_id is not None
 
     @classmethod
     async def from_alias(
@@ -732,14 +745,6 @@ class ImageRow(CreatedAtMixin, Base):
 
         self._resources = resources
 
-    def is_owned_by(self, user_id: UUID) -> bool:
-        if not self.customized:
-            return False
-        result: bool = self.labels["ai.backend.customized-image.owner"].split(":")[1] == str(
-            user_id
-        )
-        return result
-
     def to_dataclass(self) -> ImageData:
         _, ptag_set = self.image_ref.tag_set
         return ImageData(
@@ -767,6 +772,7 @@ class ImageRow(CreatedAtMixin, Base):
             ],
             tags=[ImageTagEntry(key=k, value=v) for k, v in ptag_set.items()],
             status=self.status,
+            creator_id=self.creator_id,
             last_used_at=self.last_used_at,
         )
 
@@ -797,6 +803,7 @@ class ImageRow(CreatedAtMixin, Base):
                 for k, v in self.resources.items()
             ],
             supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
+            creator_id=self.creator_id,
             created_at=self.created_at,
             last_used_at=self.last_used_at,
             # legacy
@@ -963,16 +970,18 @@ class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow
 
 @dataclass
 class ImageAccessCriteria:
+    """What one user may reach: the registries allowed to them, and a customized image
+    only where it was committed for them."""
+
     user_id: UUID
     allowed_registries: set[str]
 
     def is_accessible_image(self, image: ImageRow) -> bool:
-        """
-        Check if the image is accessible by the user.
-        """
         if image.registry not in self.allowed_registries:
             return False
-        return not (image.customized and not image.is_owned_by(self.user_id))
+        if image.creator_id is None:
+            return True
+        return image.creator_id == self.user_id
 
 
 class ImagePermissionContextBuilder(
@@ -1120,7 +1129,7 @@ class ImagePermissionContextBuilder(
         img_query_stmt = (
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
-            .options(load_only(ImageRow.id, ImageRow.labels, ImageRow.registry))
+            .options(load_only(ImageRow.id, ImageRow.registry, ImageRow.creator_id))
             .where(ContainerRegistryRow.is_global == true())
         )
 
@@ -1161,7 +1170,7 @@ class ImagePermissionContextBuilder(
         img_query_stmt = (
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
-            .options(load_only(ImageRow.id, ImageRow.registry, ImageRow.labels))
+            .options(load_only(ImageRow.id, ImageRow.registry, ImageRow.creator_id))
             .where(ContainerRegistryRow.is_global == true())
         )
 
@@ -1245,15 +1254,14 @@ class ImagePermissionContextBuilder(
 
         image_id_to_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
 
+        access_criteria = ImageAccessCriteria(
+            user_id=ctx.user_id,
+            allowed_registries=await self._get_allowed_registries_for_user(ctx, ctx.user_id),
+        )
+
         result = (await self.db_session.scalars(image_select_stmt)).unique()
         for row in result:
             img_row = row
-
-            allowed_registries = await self._get_allowed_registries_for_user(ctx, ctx.user_id)
-            access_criteria = ImageAccessCriteria(
-                user_id=ctx.user_id,
-                allowed_registries=allowed_registries,
-            )
 
             if not access_criteria.is_accessible_image(img_row):
                 continue

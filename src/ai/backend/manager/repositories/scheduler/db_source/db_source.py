@@ -3549,12 +3549,18 @@ class ScheduleDBSource:
         :raises ImageNotFound: If the image is not found
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            image_row = await db_sess.scalar(sa.select(ImageRow).where(ImageRow.id == image_id))
+            # An image committed for somebody else reads as absent, as it did when the
+            # owner label decided this.
+            image_row = await db_sess.scalar(
+                sa.select(ImageRow).where(
+                    ImageRow.id == image_id,
+                    sa.or_(
+                        ImageRow.creator_id.is_(None),
+                        ImageRow.creator_id == user_uuid,
+                    ),
+                )
+            )
             if image_row is None:
-                raise ImageNotFound
-            if (
-                _owner_id := image_row.labels.get("ai.backend.customized-image.owner")
-            ) and _owner_id != f"user:{user_uuid}":
                 raise ImageNotFound
             if not image_row.is_local:
                 query = (

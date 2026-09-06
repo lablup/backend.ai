@@ -25,21 +25,28 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 
 
 class VirtualEntitySeeder:
-    async def get_or_create_scope(
-        self, sess: AsyncSession, scope_type: ScopeType, scope_id: uuid.UUID
+    async def get_or_create_node(
+        self, sess: AsyncSession, entity_type: str, entity_id: uuid.UUID
     ) -> uuid.UUID:
+        """The entity's virtual entity, made if it is not there yet. The node alone —
+        the self membership and binding are :meth:`seed_user_scope`'s to write."""
         existing = await sess.scalar(
             sa.select(VirtualEntityRow.id).where(
-                VirtualEntityRow.entity_type == scope_type,
-                VirtualEntityRow.entity_id == scope_id,
+                VirtualEntityRow.entity_type == entity_type,
+                VirtualEntityRow.entity_id == entity_id,
             )
         )
         if existing is not None:
             return existing
-        row = VirtualEntityRow(entity_type=scope_type, entity_id=scope_id)
+        row = VirtualEntityRow(entity_type=entity_type, entity_id=entity_id)
         sess.add(row)
         await sess.flush()
         return row.id
+
+    async def get_or_create_scope(
+        self, sess: AsyncSession, scope_type: ScopeType, scope_id: uuid.UUID
+    ) -> uuid.UUID:
+        return await self.get_or_create_node(sess, scope_type, scope_id)
 
     async def seed_user_scope(self, sess: AsyncSession, user_id: uuid.UUID) -> None:
         """Give a directly-inserted user the chain rows ``create_full_user`` would
