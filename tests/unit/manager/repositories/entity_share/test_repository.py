@@ -9,6 +9,7 @@ conflict is: everything else about it is a plain entity insert.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -21,6 +22,7 @@ from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.entity_share.types import (
@@ -73,6 +75,7 @@ _TARGET_TYPE = EntityType("vfolder")
 _INVITER_ID = UserID(uuid4())
 _INVITEE_ID = UserID(uuid4())
 _INVITEE_PROJECT_ID = ProjectID(uuid4())
+_TEAM_PROJECT_ID = ProjectID(uuid4())
 _OUTSIDER_PROJECT_ID = ProjectID(uuid4())
 _OUTSIDER_ID = UserID(uuid4())
 _INVITEE_EMAIL = "invitee@example.com"
@@ -88,10 +91,24 @@ _TARGET_ID = uuid4()
 def _creator(
     email: str = _INVITEE_EMAIL,
     cap: Permission | None = Permission.READ,
+    expires_at: datetime | None = None,
 ) -> EntityShareCreator:
     return EntityShareCreator(
         sharer_user_id=_INVITER_ID,
         recipient_email=email,
+        target=_target(),
+        permission_cap=cap,
+        expires_at=expires_at,
+    )
+
+
+def _creator_to(
+    recipient: EntityIdentifier, cap: Permission | None = Permission.READ
+) -> EntityShareCreator:
+    """An offer naming a scope rather than an address."""
+    return EntityShareCreator(
+        sharer_user_id=_INVITER_ID,
+        recipient=recipient,
         target=_target(),
         permission_cap=cap,
     )
@@ -113,6 +130,18 @@ def _personal_project(project_id: ProjectID, creator_id: UserID) -> ProjectRow:
         domain_name=_DOMAIN,
         type=ProjectType.PERSONAL,
         creator_id=creator_id,
+        resource_policy=_POLICY,
+        total_resource_slots=ResourceSlot(),
+    )
+
+
+def _team_project(project_id: ProjectID) -> ProjectRow:
+    """A project people share into, which belongs to nobody in particular."""
+    return ProjectRow(
+        id=project_id,
+        name=f"t-{project_id.hex[:8]}",
+        domain_name=_DOMAIN,
+        type=ProjectType.GENERAL,
         resource_policy=_POLICY,
         total_resource_slots=ResourceSlot(),
     )
@@ -184,6 +213,7 @@ async def database(
             session.add_all([
                 _personal_project(_INVITEE_PROJECT_ID, _INVITEE_ID),
                 _personal_project(_OUTSIDER_PROJECT_ID, _OUTSIDER_ID),
+                _team_project(_TEAM_PROJECT_ID),
             ])
             await session.flush()
             # The target entity and the people are reachable in the graph; the
@@ -194,6 +224,7 @@ async def database(
                 VirtualEntityRow(entity_type=USER_ENTITY_TYPE, entity_id=_OUTSIDER_ID),
                 VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=_INVITEE_PROJECT_ID),
                 VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=_OUTSIDER_PROJECT_ID),
+                VirtualEntityRow(entity_type=PROJECT_ENTITY_TYPE, entity_id=_TEAM_PROJECT_ID),
             ])
         yield database_connection
 
@@ -428,3 +459,132 @@ class TestCreate:
                 ).scalars()
             )
         assert joined == [created.id]
+
+
+class TestAProjectAnswering:
+    async def test_a_project_takes_what_it_was_offered(
+        self,
+        database: ExtendedAsyncSAEngine,
+        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
+    ) -> None:
+        created = await ops.create_entity(_creator_to(_TEAM_PROJECT_ID))
+        data = await repository.accept(created.id, _TEAM_PROJECT_ID)
+        assert data.status == EntityShareStatus.ACCEPTED
+        assert data.recipient == RuntimeEntityID(PROJECT_ENTITY_TYPE, _TEAM_PROJECT_ID)
+        assert await _cap(database, _TEAM_PROJECT_ID) == (True, Permission.READ)
+
+    async def test_a_project_gives_back_what_it_took(
+        self,
+        database: ExtendedAsyncSAEngine,
+        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
+    ) -> None:
+        created = await ops.create_entity(_creator_to(_TEAM_PROJECT_ID))
+        await repository.accept(created.id, _TEAM_PROJECT_ID)
+        await repository.leave(created.id, _TEAM_PROJECT_ID)
+        assert await _status(database, created.id) == EntityShareStatus.REVOKED
+        assert await _cap(database, _TEAM_PROJECT_ID) == (False, None)
+
+    async def test_an_offer_addressed_elsewhere_is_not_found(
+        self,
+        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
+    ) -> None:
+        created = await ops.create_entity(_creator_to(_TEAM_PROJECT_ID))
+        with pytest.raises(EntityShareNotFound):
+            await repository.accept(created.id, _INVITEE_ID)
+
+
+class TestExpiry:
+    async def test_an_offer_out_of_time_is_not_found(
+        self,
+        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
+    ) -> None:
+        past = datetime.now(UTC) - timedelta(minutes=1)
+        created = await ops.create_entity(_creator(expires_at=past))
+        with pytest.raises(EntityShareNotFound):
+            await repository.accept(created.id, _INVITEE_ID)
+
+    async def test_an_offer_still_in_time_is_taken(
+        self,
+        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
+    ) -> None:
+        ahead = datetime.now(UTC) + timedelta(minutes=1)
+        created = await ops.create_entity(_creator(expires_at=ahead))
+        data = await repository.accept(created.id, _INVITEE_ID)
+        assert data.status == EntityShareStatus.ACCEPTED
+
+
+class TestAddressedByEmail:
+    async def test_answering_records_the_scope_that_answered(
+        self,
+        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
+    ) -> None:
+        created = await ops.create_entity(_creator())
+        assert created.recipient is None
+        data = await repository.accept(created.id, _INVITEE_ID)
+        assert data.recipient == RuntimeEntityID(USER_ENTITY_TYPE, _INVITEE_ID)
+
+
+class TestRevoke:
+    async def test_takes_the_entity_from_where_it_landed(
+        self,
+        database: ExtendedAsyncSAEngine,
+        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
+    ) -> None:
+        created = await ops.create_entity(_creator())
+        await repository.accept(created.id, _INVITEE_ID)
+        await repository.revoke(created.id)
+        assert await _status(database, created.id) == EntityShareStatus.REVOKED
+        assert await _cap(database, _INVITEE_PROJECT_ID) == (False, None)
+
+    async def test_a_pending_offer_is_not_found(
+        self,
+        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
+    ) -> None:
+        created = await ops.create_entity(_creator())
+        with pytest.raises(EntityShareNotFound):
+            await repository.revoke(created.id)
+
+    async def test_cancel_does_not_reach_what_was_taken(
+        self,
+        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
+    ) -> None:
+        created = await ops.create_entity(_creator())
+        await repository.accept(created.id, _INVITEE_ID)
+        with pytest.raises(EntityShareNotFound):
+            await repository.cancel(created.id)
+
+
+class TestWhatCannotBeNamed:
+    async def test_an_entity_outside_the_graph_cannot_be_offered(
+        self,
+        ops: OpsRepository[EntityShareData],
+    ) -> None:
+        """The graph holds the pair unique and the row points at it, so an entity with
+        no node has nothing to point at."""
+        stranger = RuntimeEntityID(_TARGET_TYPE, uuid4())
+        with pytest.raises(BackendAIError):
+            await ops.create_entity(
+                EntityShareCreator(
+                    sharer_user_id=_INVITER_ID,
+                    recipient_email=_INVITEE_EMAIL,
+                    target=stranger,
+                    permission_cap=Permission.READ,
+                )
+            )
+
+    async def test_a_scope_outside_the_graph_cannot_receive(
+        self,
+        ops: OpsRepository[EntityShareData],
+    ) -> None:
+        stranger = ProjectID(uuid4())
+        with pytest.raises(BackendAIError):
+            await ops.create_entity(_creator_to(stranger))
