@@ -2119,10 +2119,17 @@ class PrivNetServer:
         if entry is None:
             await self._journal.forget_attachment(container_id)
             return
-        entry.local_ips.pop(container_id, None)
-        plan = entry.attached.pop(container_id, None)
+        plan = entry.attached.get(container_id)
         if plan is not None:
+            # The plan names the host veth, the address and the DNAT rules this detach has to
+            # give back, and it is the only record of them. Dropping it before the detach ran
+            # meant a failed one left nothing to retry with: the next call found no plan, took
+            # the branch above, deleted the journal entry and reported success over a veth and
+            # an address that were still there. It goes once the detach it describes has
+            # happened, and not before.
             await self._del_attachment(plan, container_id)
+        entry.attached.pop(container_id, None)
+        entry.local_ips.pop(container_id, None)
         await self._journal.forget_attachment(container_id)
 
     async def _del_attachment(self, plan: Any, container_id: str) -> None:
