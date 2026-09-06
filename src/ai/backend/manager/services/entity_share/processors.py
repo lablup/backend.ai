@@ -14,7 +14,10 @@ from ai.backend.manager.services.entity_share.actions.answer import (
     CancelEntityShareAction,
     CancelEntityShareActionResult,
     EntityShareAnswerResult,
+    LeaveEntityShareAction,
     RejectEntityShareAction,
+    RevokeEntityShareAction,
+    RevokeEntityShareActionResult,
 )
 from ai.backend.manager.services.entity_share.actions.create import (
     CreateEntityShareAction,
@@ -39,6 +42,8 @@ class EntityShareProcessors:
     accept: ScopeActionProcessor[AcceptEntityShareAction, EntityShareAnswerResult]
     reject: ScopeActionProcessor[RejectEntityShareAction, EntityShareAnswerResult]
     cancel: SingleEntityActionProcessor[CancelEntityShareAction, CancelEntityShareActionResult]
+    revoke: SingleEntityActionProcessor[RevokeEntityShareAction, RevokeEntityShareActionResult]
+    leave: ScopeActionProcessor[LeaveEntityShareAction, EntityShareAnswerResult]
 
     def __init__(
         self,
@@ -51,3 +56,5 @@ class EntityShareProcessors:
         self.accept = group.scope(AcceptEntityShareAction, service.accept)
         self.reject = group.scope(RejectEntityShareAction, service.reject)
         self.cancel = group.single_entity(CancelEntityShareAction, service.cancel)
+        self.revoke = group.single_entity(RevokeEntityShareAction, service.revoke)
+        self.leave = group.scope(LeaveEntityShareAction, service.leave)

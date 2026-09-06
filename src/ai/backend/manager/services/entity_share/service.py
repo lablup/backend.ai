@@ -6,7 +6,10 @@ from ai.backend.manager.services.entity_share.actions.answer import (
     CancelEntityShareAction,
     CancelEntityShareActionResult,
     EntityShareAnswerResult,
+    LeaveEntityShareAction,
     RejectEntityShareAction,
+    RevokeEntityShareAction,
+    RevokeEntityShareActionResult,
 )
 
 __all__ = ("EntityShareService",)
@@ -31,6 +34,14 @@ class EntityShareService:
     async def reject(self, action: RejectEntityShareAction) -> EntityShareAnswerResult:
         data = await self._repository.reject(action.share_id, action.answering_scope)
         return EntityShareAnswerResult(data=data)
+
+    async def leave(self, action: LeaveEntityShareAction) -> EntityShareAnswerResult:
+        data = await self._repository.leave(action.share_id, action.answering_scope)
+        return EntityShareAnswerResult(data=data)
+
+    async def revoke(self, action: RevokeEntityShareAction) -> RevokeEntityShareActionResult:
+        data = await self._repository.revoke(action.share_id)
+        return RevokeEntityShareActionResult(data=data)
 
     async def cancel(self, action: CancelEntityShareAction) -> CancelEntityShareActionResult:
         data = await self._repository.cancel(action.share_id)

@@ -1,4 +1,4 @@
-"""Route registry for the REST v2 entity invitation endpoints."""
+"""Route registry for the REST v2 entity share endpoints."""
 
 from __future__ import annotations
 
@@ -24,6 +24,8 @@ def register_v2_entity_share_routes(
     registry.add("POST", "/{share_id}/accept", handler.accept, middlewares=[auth_required])
     registry.add("POST", "/{share_id}/reject", handler.reject, middlewares=[auth_required])
     registry.add("DELETE", "/{share_id}", handler.cancel, middlewares=[auth_required])
+    registry.add("POST", "/{share_id}/revoke", handler.revoke, middlewares=[auth_required])
+    registry.add("POST", "/{share_id}/leave", handler.leave, middlewares=[auth_required])
     registry.add("POST", "/scoped/search", handler.scoped_search, middlewares=[auth_required])
 
     return registry

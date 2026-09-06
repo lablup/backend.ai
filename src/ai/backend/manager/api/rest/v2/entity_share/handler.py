@@ -41,6 +41,16 @@ class V2EntityShareHandler:
         result = await self._adapter.reject(EntityShareID(path.parsed.share_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def revoke(self, path: PathParam[ShareIdPathParam]) -> APIResponse:
+        """Take back what was lent."""
+        result = await self._adapter.revoke(EntityShareID(path.parsed.share_id))
+        return APIResponse.build(status_code=200, response_model=result)
+
+    async def leave(self, path: PathParam[ShareIdPathParam]) -> APIResponse:
+        """Give back what was taken."""
+        result = await self._adapter.leave(EntityShareID(path.parsed.share_id))
+        return APIResponse.build(status_code=200, response_model=result)
+
     async def cancel(self, path: PathParam[ShareIdPathParam]) -> APIResponse:
         """Withdraw the offer before it was answered."""
         result = await self._adapter.cancel(EntityShareID(path.parsed.share_id))

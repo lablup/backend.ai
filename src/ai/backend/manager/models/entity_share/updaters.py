@@ -33,7 +33,9 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 __all__ = (
     "EntityShareAcceptUpdater",
     "EntityShareCancelUpdater",
+    "EntityShareLeaveUpdater",
     "EntityShareRejectUpdater",
+    "EntityShareRevokeUpdater",
 )
 
 
@@ -66,20 +68,15 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
     def target_id_value(self) -> UUID:
         return self.share_id
 
-    @override
-    def guard_conditions(self) -> list[QueryCondition]:
+    def addressed_to_scope(self) -> QueryCondition:
+        """The offer is addressed to the scope answering.
+
+        A person is addressed two ways, by the node they hold and by the address that
+        reached them before they had an account, so both are read back here.
+        """
         scope = self.answering_scope
 
-        def pending() -> sa.sql.expression.ColumnElement[bool]:
-            return EntityShareRow.status == EntityShareStatus.PENDING
-
-        def in_time() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                EntityShareRow.expires_at.is_(None),
-                EntityShareRow.expires_at > sa.func.now(),
-            )
-
-        def addressed_to_scope() -> sa.sql.expression.ColumnElement[bool]:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
             named = EntityShareRow.recipient_virtual_entity_id == (
                 sa.select(VirtualEntityRow.id)
                 .where(
@@ -96,7 +93,20 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
                 == (sa.select(UserRow.email).where(UserRow.uuid == scope).scalar_subquery()),
             )
 
-        return [pending, in_time, addressed_to_scope]
+        return inner
+
+    @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        def pending() -> sa.sql.expression.ColumnElement[bool]:
+            return EntityShareRow.status == EntityShareStatus.PENDING
+
+        def in_time() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.or_(
+                EntityShareRow.expires_at.is_(None),
+                EntityShareRow.expires_at > sa.func.now(),
+            )
+
+        return [pending, in_time, self.addressed_to_scope()]
 
     @property
     @override
@@ -136,11 +146,77 @@ class EntityShareAcceptUpdater(_RecipientInvitationUpdater):
 
 @dataclass
 class EntityShareRejectUpdater(_RecipientInvitationUpdater):
-    """The invitee turns down what was offered."""
+    """The receiving side turns down what was offered."""
 
     @override
     def build_values(self) -> dict[str, Any]:
         return {"status": EntityShareStatus.REJECTED}
+
+
+@dataclass
+class EntityShareLeaveUpdater(_RecipientInvitationUpdater):
+    """The receiving side gives back what it took.
+
+    The same transition the lending side reaches by revoking, guarded on the scope that
+    holds it rather than on the entity that was lent.
+    """
+
+    @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        def taken() -> sa.sql.expression.ColumnElement[bool]:
+            return EntityShareRow.status == EntityShareStatus.ACCEPTED
+
+        return [taken, self.addressed_to_scope()]
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"status": EntityShareStatus.REVOKED}
+
+
+@dataclass
+class EntityShareRevokeUpdater(GuardedDataUpdater[EntityShareRow, EntityShareData]):
+    """What was lent is taken back.
+
+    Guarded on the share still being held, so taking it back twice settles nothing
+    rather than rewriting a row that was already returned. No address guard: whoever
+    may reach the entity that was lent may take it back, and the permission check
+    upstream is what says so.
+    """
+
+    share_id: EntityShareID
+
+    @property
+    @override
+    def row_class(self) -> type[EntityShareRow]:
+        return EntityShareRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return EntityShareRow.id
+
+    @override
+    def target_id_value(self) -> UUID:
+        return self.share_id
+
+    @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        def taken() -> sa.sql.expression.ColumnElement[bool]:
+            return EntityShareRow.status == EntityShareStatus.ACCEPTED
+
+        return [taken]
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"status": EntityShareStatus.REVOKED}
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: EntityShareRow) -> EntityShareData:
+        return row.to_data()
 
 
 @dataclass

@@ -7,7 +7,9 @@ from ai.backend.manager.errors.entity_share import EntityShareNotFound
 from ai.backend.manager.models.entity_share.updaters import (
     EntityShareAcceptUpdater,
     EntityShareCancelUpdater,
+    EntityShareLeaveUpdater,
     EntityShareRejectUpdater,
+    EntityShareRevokeUpdater,
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
@@ -50,6 +52,26 @@ class EntityShareRepository:
             )
             if data is None:
                 raise EntityShareNotFound(f"No open offer {share_id} to reject")
+            return data
+
+    async def revoke(self, share_id: EntityShareID) -> EntityShareData:
+        """Take back what was lent, from wherever it landed."""
+        async with self._ops.write_ops() as w:
+            data = await w.revoke_share(EntityShareRevokeUpdater(share_id=share_id))
+            if data is None:
+                raise EntityShareNotFound(f"No held share {share_id} to take back")
+            return data
+
+    async def leave(
+        self, share_id: EntityShareID, answering_scope: EntityIdentifier
+    ) -> EntityShareData:
+        """Give back what was taken."""
+        async with self._ops.write_ops() as w:
+            data = await w.revoke_share(
+                EntityShareLeaveUpdater(share_id=share_id, answering_scope=answering_scope)
+            )
+            if data is None:
+                raise EntityShareNotFound(f"No held share {share_id} to give back")
             return data
 
     async def cancel(self, share_id: EntityShareID) -> EntityShareData:

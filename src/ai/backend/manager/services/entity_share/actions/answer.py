@@ -1,4 +1,4 @@
-"""The invitee's two answers, and the offering side's withdrawal."""
+"""The receiving side's answers, and the lending side's withdrawals."""
 
 from __future__ import annotations
 
@@ -22,7 +22,10 @@ __all__ = (
     "CancelEntityShareAction",
     "CancelEntityShareActionResult",
     "EntityShareAnswerResult",
+    "LeaveEntityShareAction",
     "RejectEntityShareAction",
+    "RevokeEntityShareAction",
+    "RevokeEntityShareActionResult",
 )
 
 
@@ -114,5 +117,52 @@ class CancelEntityShareAction(BaseSingleEntityAction):
 @dataclass
 class CancelEntityShareActionResult:
     """The withdrawn invitation. The shape already names it, so nothing is restated."""
+
+    data: EntityShareData
+
+
+@dataclass
+class LeaveEntityShareAction(_RecipientAnswerAction):
+    """The receiving side gives back what it took."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "leave_entity_share"
+
+
+@dataclass
+class RevokeEntityShareAction(BaseSingleEntityAction):
+    """Take back what was lent.
+
+    Named on the share itself: whoever may reach the entity it lends may reach the
+    share, so there is a permission to check here.
+    """
+
+    share_id: EntityShareID
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "revoke_entity_share"
+
+    @override
+    def entity_id(self) -> EntityShareID:
+        return self.share_id
+
+
+@dataclass
+class RevokeEntityShareActionResult:
+    """The share that was taken back."""
 
     data: EntityShareData

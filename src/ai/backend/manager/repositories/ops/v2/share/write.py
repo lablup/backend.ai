@@ -12,15 +12,21 @@ from __future__ import annotations
 import re
 from collections.abc import Collection, Mapping, Sequence
 
-from ai.backend.common.data.entity.types import EntityIdentifier
+import sqlalchemy as sa
+
+from ai.backend.common.data.entity.types import EntityIdentifier, RuntimeEntityID
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
+from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.data.entity_share.types import EntityShareData
 from ai.backend.manager.errors.permission import InvalidFieldPermission
 from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.cap import V2CapOps
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
@@ -146,6 +152,47 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
             data.permission_cap if data.permission_cap is not None else Permission.full(),
         )
         return data
+
+    async def revoke_share(
+        self, updater: GuardedDataUpdater[EntityShareRow, EntityShareData]
+    ) -> EntityShareData | None:
+        """Settle the share as taken back and take the entity from where it landed.
+
+        ``None`` when nothing was settled — the share is gone, was never taken, or was
+        already returned; the guards do not say which. The settle and the taking cannot
+        come apart, which is why this is a primitive.
+
+        Where it landed is read back from the node the row names, the same derivation
+        acceptance made.
+        """
+        row = await self._update_guarded_row_returning(
+            updater.row_class,
+            updater.target_id_column(),
+            updater.target_id_value(),
+            updater.guard_conditions(),
+            updater.build_values(),
+            updater.integrity_error_checks,
+        )
+        if row is None:
+            return None
+        data = updater.to_data(row)
+        if data.recipient_virtual_entity_id is not None:
+            landed = await self._landing_scope(
+                await self._scope_of_node(data.recipient_virtual_entity_id)
+            )
+            await self.unshare(landed, [data.target])
+        return data
+
+    async def _scope_of_node(self, node: VirtualEntityID) -> EntityIdentifier:
+        """The entity a node stands for."""
+        row = (
+            await self._sess.execute(
+                sa.select(VirtualEntityRow.entity_type, VirtualEntityRow.entity_id).where(
+                    VirtualEntityRow.id == node
+                )
+            )
+        ).one()
+        return RuntimeEntityID(row.entity_type, row.entity_id)
 
     async def _landing_scope(self, answering_scope: EntityIdentifier) -> EntityIdentifier:
         """Where what a scope takes is put under.

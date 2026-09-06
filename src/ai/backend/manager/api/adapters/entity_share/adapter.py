@@ -42,7 +42,9 @@ from ai.backend.manager.models.entity_share.searchers import EntityShareSearcher
 from ai.backend.manager.services.entity_share.actions.answer import (
     AcceptEntityShareAction,
     CancelEntityShareAction,
+    LeaveEntityShareAction,
     RejectEntityShareAction,
+    RevokeEntityShareAction,
 )
 from ai.backend.manager.services.entity_share.actions.create import (
     CreateEntityShareAction,
@@ -126,6 +128,21 @@ class EntityShareAdapter(BaseAdapter):
     async def cancel(self, share_id: EntityShareID) -> EntitySharePayload:
         result = await self._processors.entity_share.cancel.run(
             CancelEntityShareAction(share_id=share_id)
+        )
+        return EntitySharePayload(invitation=self._to_node(result.data))
+
+    async def revoke(self, share_id: EntityShareID) -> EntitySharePayload:
+        result = await self._processors.entity_share.revoke.run(
+            RevokeEntityShareAction(share_id=share_id)
+        )
+        return EntitySharePayload(invitation=self._to_node(result.data))
+
+    async def leave(self, share_id: EntityShareID) -> EntitySharePayload:
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        result = await self._processors.entity_share.leave.run(
+            LeaveEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
         )
         return EntitySharePayload(invitation=self._to_node(result.data))
 
