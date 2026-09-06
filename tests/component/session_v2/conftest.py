@@ -167,6 +167,7 @@ async def session_processors(
     service = SessionService(args)
     return SessionProcessors(
         processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
         ResourceAllocationProcessors(
             processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
             processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),
@@ -714,6 +715,7 @@ async def compute_session_processors(
     service = SessionService(args)
     return SessionProcessors(
         processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        processor_registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
         ResourceAllocationProcessors(
             processor_registry.group(GroupMeta(USER_ENTITY_TYPE)),
             processor_registry.group(GroupMeta(PROJECT_ENTITY_TYPE)),

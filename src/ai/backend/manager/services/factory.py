@@ -609,6 +609,7 @@ def create_processors(
         ),
         session=SessionProcessors(
             session_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
             ResourceAllocationProcessors(
                 resource_group_groups.group(GroupMeta(USER_ENTITY_TYPE)),
                 resource_group_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),

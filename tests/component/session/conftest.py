@@ -130,6 +130,7 @@ async def session_processors(
     groups = processor_registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
     return SessionProcessors(
         processor_registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
         ResourceAllocationProcessors(
             groups.group(GroupMeta(USER_ENTITY_TYPE)),
             groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),

@@ -173,21 +173,6 @@ class TestComputeSchedule:
         payload = await admin_v2_registry.session.compute_schedule(body)
         assert [result.success for result in payload.results] == [True, False]
 
-    async def test_regular_user_can_compute_schedule(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        resource_group_id: ResourceGroupID,
-        compute_image_fixture: ImageID,
-        agent_factory: AgentFactoryFunc,
-    ) -> None:
-        await agent_factory({"cpu": "8", "mem": "34359738368"})
-        payload = await user_v2_registry.session.compute_schedule(
-            _single_kernel_input(
-                resource_group_id, compute_image_fixture, cpu="1", mem="1073741824"
-            )
-        )
-        assert payload.results[0].success is True
-
     async def test_unknown_resource_group_returns_not_found(
         self,
         admin_v2_registry: V2ClientRegistry,

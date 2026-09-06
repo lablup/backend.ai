@@ -32,6 +32,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
     BackendAIGQLMeta(added_version="25.15.0", description="Get aggregate agent resource statistics")
 )  # type: ignore[misc]
 async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL | None:
+    check_admin_only()
     total = await info.context.adapters.agent.get_total_resources()
     resource = AgentResourceGQL(
         free=cast(JSON, total.total_free_slots.to_json()),
