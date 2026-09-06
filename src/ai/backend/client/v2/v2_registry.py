@@ -28,8 +28,8 @@ if TYPE_CHECKING:
     from .domains_v2.deployment import V2DeploymentClient
     from .domains_v2.deployment_revision_preset import V2DeploymentRevisionPresetClient
     from .domains_v2.domain import V2DomainClient
-    from .domains_v2.entity_invitation import V2EntityInvitationClient
     from .domains_v2.entity_label import V2EntityLabelClient
+    from .domains_v2.entity_share import V2EntityShareClient
     from .domains_v2.entity_type import V2EntityTypeClient
     from .domains_v2.export import V2ExportClient
     from .domains_v2.fair_share import V2FairShareClient
@@ -147,10 +147,10 @@ class V2ClientRegistry:
         return V2AuditLogClient(self._client)
 
     @cached_property
-    def entity_invitation(self) -> V2EntityInvitationClient:
-        from .domains_v2.entity_invitation import V2EntityInvitationClient
+    def entity_share(self) -> V2EntityShareClient:
+        from .domains_v2.entity_share import V2EntityShareClient
 
-        return V2EntityInvitationClient(self._client)
+        return V2EntityShareClient(self._client)
 
     @cached_property
     def idle_checker_assignment(self) -> V2IdleCheckerAssignmentClient:

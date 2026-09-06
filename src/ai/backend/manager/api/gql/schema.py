@@ -136,18 +136,21 @@ from .domain_v2 import (
     rg_domains_v2,
 )
 from .entity.resolver import entity_types
-from .entity_invitation import (
-    accept_entity_invitation,
-    cancel_entity_invitation,
-    create_entity_invitation,
-    entity_invitation,
-    entity_invitations,
-    reject_entity_invitation,
-)
 from .entity_label.resolver import (
     entity_labels,
     purge_entity_label,
     upsert_entity_label,
+)
+from .entity_share import (
+    accept_entity_share,
+    cancel_entity_share,
+    create_entity_share,
+    entity_share,
+    entity_shares,
+    leave_entity_share,
+    my_entity_shares,
+    reject_entity_share,
+    revoke_entity_share,
 )
 from .fair_share import (
     admin_bulk_upsert_domain_fair_share_weight,
@@ -763,8 +766,9 @@ class Query:
     # Retention Policy APIs
     admin_retention_policies = admin_retention_policies
     admin_retention_policy = admin_retention_policy
-    entity_invitation = entity_invitation
-    entity_invitations = entity_invitations
+    entity_share = entity_share
+    entity_shares = entity_shares
+    my_entity_shares = my_entity_shares
     # Runtime Variant Preset APIs
     runtime_variant_presets = runtime_variant_presets
     runtime_variant_preset = runtime_variant_preset
@@ -1013,10 +1017,12 @@ class Mutation:
     admin_purge_client_ip_masking_policy = admin_purge_client_ip_masking_policy
     # Retention Policy mutations
     admin_create_retention_policy = admin_create_retention_policy
-    create_entity_invitation = create_entity_invitation
-    accept_entity_invitation = accept_entity_invitation
-    reject_entity_invitation = reject_entity_invitation
-    cancel_entity_invitation = cancel_entity_invitation
+    create_entity_share = create_entity_share
+    accept_entity_share = accept_entity_share
+    reject_entity_share = reject_entity_share
+    cancel_entity_share = cancel_entity_share
+    revoke_entity_share = revoke_entity_share
+    leave_entity_share = leave_entity_share
     admin_update_retention_policy = admin_update_retention_policy
     admin_delete_retention_policy = admin_delete_retention_policy
     admin_purge_retention_policy = admin_purge_retention_policy

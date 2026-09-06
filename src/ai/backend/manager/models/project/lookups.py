@@ -8,6 +8,8 @@ from typing import override
 
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.specs.lookup import DataLookup
@@ -32,6 +34,32 @@ class ProjectNameInDomainLookup(DataLookup[ProjectRow, ProjectID]):
         return [
             lambda: ProjectRow.domain_name == self.domain_name,
             lambda: ProjectRow.name == self.project_name,
+        ]
+
+    @override
+    def to_entity_id(self, row: ProjectRow) -> ProjectID:
+        return ProjectID(row.id)
+
+
+@dataclass
+class PersonalProjectOfUserLookup(DataLookup[ProjectRow, ProjectID]):
+    """Resolves a user into the project that is theirs alone.
+
+    A partial unique index holds a user to at most one, so the creating user and the
+    personal type together answer with a single row.
+    """
+
+    user_id: UserID
+
+    @override
+    def row_class(self) -> type[ProjectRow]:
+        return ProjectRow
+
+    @override
+    def conditions(self) -> Sequence[QueryCondition]:
+        return [
+            lambda: ProjectRow.creator_id == self.user_id,
+            lambda: ProjectRow.type == ProjectType.PERSONAL,
         ]
 
     @override

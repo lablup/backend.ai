@@ -4,7 +4,9 @@ result shapes the ops execution answers with."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+import sqlalchemy as sa
 
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
@@ -31,6 +33,28 @@ class ConflictCheck:
 
 
 @dataclass(frozen=True)
+class PreconditionCheck:
+    """A state elsewhere that forbids the write, declared beside the spec that makes it.
+
+    The database answers some of these through its own constraints, which
+    :class:`IntegrityErrorCheck` maps back to a domain error. This is for the ones it
+    cannot state: a row in another table that makes the write wrong rather than
+    impossible. What to look for is declared here and run by the ops that writes, so
+    the spec stays a value.
+
+    Unlike the guard conditions an updater or a purger carries, this is not a condition
+    the named row must satisfy: it names rows whose presence turns the write away, and
+    failing it raises rather than writing nothing.
+    """
+
+    finder: sa.Select[Any]
+    """Selects the rows whose presence turns the write away."""
+
+    error: BackendAIError
+    """The domain error to raise when one is found."""
+
+
+@dataclass
 class IntegrityErrorCheck:
     """Defines an integrity error check for declarative error matching.
 

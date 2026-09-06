@@ -20,7 +20,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.login_session_types import LoginSessionStatus
 from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle, RouteStatus
-from ai.backend.manager.data.entity_invitation.types import EntityInvitationStatus
+from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.retention.types import (
@@ -34,7 +34,7 @@ from ai.backend.manager.errors.retention import RetentionCategoryNotSupportedErr
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
-from ai.backend.manager.models.entity_invitation.row import EntityInvitationRow
+from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
 from ai.backend.manager.models.kernel.row import KernelRow
@@ -178,13 +178,20 @@ class RetentionDBSource:
                         VFolderInvitationRow.state.in_(VFolderInvitationState.declined_states()),
                     ),
                 ),
+                # An offer that ran out is settled by its own moment rather than by
+                # age, so it is drained on that; what ended some other way is history
+                # and goes on the age of the answer.
                 RetentionDrain(
-                    EntityInvitationRow,
-                    EntityInvitationRow.updated_at,
+                    EntityShareRow,
+                    EntityShareRow.expires_at,
                     threshold,
-                    conditions=(
-                        EntityInvitationRow.status.in_(EntityInvitationStatus.unsettled_states()),
-                    ),
+                    conditions=(EntityShareRow.status == EntityShareStatus.PENDING,),
+                ),
+                RetentionDrain(
+                    EntityShareRow,
+                    EntityShareRow.updated_at,
+                    threshold,
+                    conditions=(EntityShareRow.status.in_(EntityShareStatus.terminal_statuses()),),
                 ),
             ),
             RetentionCategory.USAGE_RECORDS: (

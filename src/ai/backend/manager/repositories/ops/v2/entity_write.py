@@ -55,6 +55,7 @@ from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.specs.creator import (
     EntityCreator,
+    GuardedEntityCreator,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
@@ -98,10 +99,19 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             undefined=jinja2.StrictUndefined,
         )
 
-    async def create_entity[TRow: Base, TData](self, creator: EntityCreator[TRow, TData]) -> TData:
+    async def create_entity[TRow: Base, TData](
+        self, creator: GuardedEntityCreator[TRow, TData]
+    ) -> TData:
         """Insert one entity row: the row, its virtual entity node (self membership
         which owns and governs itself), owned and governed by each ``created_in`` scope — one
-        transaction. No roles are involved on this path."""
+        transaction. No roles are involved on this path.
+
+        What the spec refuses runs first, each answering with its own error so a caller
+        learns which one stood in the way. A spec with nothing to refuse passes through.
+        """
+        for check in creator.precondition_checks():
+            if (await self._sess.execute(check.finder)).first() is not None:
+                raise check.error
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         entity = creator.entity_id(row)

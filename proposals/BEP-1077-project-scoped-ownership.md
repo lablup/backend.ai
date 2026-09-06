@@ -91,7 +91,7 @@ Each area states its question first, then splits **✅ what exists** from **➕ 
 | | Content |
 |---|---|
 | ✅ | Only virtual-folder invitations exist, on two legacy tables. Sessions, deployments, images, and model cards have none |
-| ✅ | The share primitive takes the recipient as an entity identifier. The invitation table assumes an email recipient and has no expiry — `models/specs/membership.py:21`, `models/entity_invitation/row.py:32` |
+| ✅ | The share primitive takes the recipient as an entity identifier, and the sharing record names it the same way and carries an expiry — `models/entity_share/row.py` |
 | ✅ | `permission_cap` carries only operation bits, so it cannot express which fields are handed over |
 | ➕ | A sharing-record table and named caps carrying a field axis |
 | ➕ | Add sessions, deployments, images, and model cards as sharing targets |
@@ -271,10 +271,12 @@ An invisible target cannot be named.
 
 | Target | Address | Acceptance |
 |---|---|---|
-| Person (same-domain account) | Email | Not needed |
-| Person (outside the domain or unregistered) | Email | Needed |
-| A project I am a member of | Project | Not needed; the receiving side's acceptance setting answers |
+| Person (with an account) | User id or email | Always needed |
+| Person (without one) | Email | Always needed |
+| Project | Project id | Always needed |
 | Ownership transfer | | Recipient must accept |
+
+A personal project is not addressed as a project. It is one person under another name, so that person is addressed as a person. Allowing both would stand two rows for one recipient where the graph holds a single edge.
 
 To give to an outside team, give to a person on that team who then puts it into their own team. What is given to a person lands in that person's personal project.
 
@@ -306,7 +308,15 @@ Invitations, shares, and revocations live in one table, separate from `entity_me
 | Declined, expired | None |
 | Revoked | Deleted |
 
-A direct share skips the invited state and starts active. Nothing about the recipient is exposed beyond what the inviter already knows. The recipient's user identifier is not recorded; email reuse is blocked by expiry and cleanup at user purge.
+There is no separate direct-share path. Every handover of one entity's access begins as an offer and is settled by the receiving side. What a person takes lands in the project that is theirs alone; what a project takes lands in that project.
+
+Accepting records the scope that answered. An offer that reached an address holds no scope until then, so acceptance fills it in.
+
+One live row stands per recipient and entity, live meaning offered or taken; the ended ones pile up beside it. Offering again to somewhere a share already stands does not add a row: it states afresh what that share lends. On one already taken the graph edge is restated with it, so narrowing takes effect at once. What is lent is the lending side's to set, the way revocation already is.
+
+A scope that owns the entity cannot be offered it. Lending states what holds now, so accepting would leave the owning edge capped and the scope with less than it had.
+
+Only an offer still waiting expires. Accepting clears the moment, and what was taken stands until it is revoked.
 
 Deletion is defined by BEP-1069. The sharing side decides three things.
 
@@ -401,8 +411,8 @@ Opening project-folder creation and narrowing user information are the intended 
 | Cap-0 sharing | Leaves enrollment only and grants nothing; for surfacing in the owner's project view |
 | Reference fields | Identifiers are default-visible; dereferencing takes the target entity's permission and is rejected without it |
 | Scoped reads | Filter instead of rejecting; write actions keep rejecting |
-| Sharing address | Invisible targets cannot be named. People by email, projects only those I am a member of |
-| Share acceptance | Unneeded when only capability grows; projects answer with an acceptance setting |
+| Sharing address | Invisible targets cannot be named. People by user id or email, projects by project id; a personal project is not addressed as a project |
+| Share acceptance | Always needed, because what is taken lands in the receiving scope. There is no acceptance setting |
 | Share caps | One cap row per bit on each share row. `replace_share` covers every field, `replace_share_fields` field paths. A named cap is a convenience calling both |
 | Re-sharing | Closed by default; opening requires cascading revocation |
 | Sharing records | Separate from `entity_memberships`; the invited state has no graph row |

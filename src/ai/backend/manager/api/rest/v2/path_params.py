@@ -126,8 +126,8 @@ class AccessKeyPathParam(BaseRequestModel):
     access_key: str = Field(description="Access key string")
 
 
-class InvitationIdPathParam(BaseRequestModel):
-    invitation_id: UUID = Field(description="Invitation UUID")
+class ShareIdPathParam(BaseRequestModel):
+    share_id: UUID = Field(description="Entity share UUID")
 
 
 class IdleCheckerAssignmentIdPathParam(BaseRequestModel):
