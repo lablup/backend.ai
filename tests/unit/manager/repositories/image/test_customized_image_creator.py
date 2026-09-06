@@ -251,6 +251,7 @@ class TestImageOwnershipGraph:
         *,
         owner_user_id: UserID | None = None,
         created_in_project_id: ProjectID | None = None,
+        customized: bool | None = None,
         status: ImageStatus = ImageStatus.ALIVE,
     ) -> tuple[ImageID, str]:
         canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:{tag}"
@@ -269,6 +270,7 @@ class TestImageOwnershipGraph:
                     type=ImageType.COMPUTE,
                     labels=self._customized_labels(owner_user_id),
                     status=status,
+                    customized=customized if customized is not None else owner_user_id is not None,
                     creator_id=owner_user_id,
                     created_in_project_id=created_in_project_id,
                 )
@@ -289,6 +291,19 @@ class TestImageOwnershipGraph:
             LabelName.CUSTOMIZED_OWNER.value: f"user:{owner_user_id}",
             LabelName.CUSTOMIZED_NAME.value: "my-image",
         }
+
+    async def _kind_and_creator(
+        self, db: ExtendedAsyncSAEngine, image_id: ImageID
+    ) -> tuple[bool, UUID | None]:
+        async with db.begin_readonly_session() as sess:
+            row = (
+                await sess.execute(
+                    sa.select(ImageRow.customized, ImageRow.creator_id).where(
+                        ImageRow.id == image_id
+                    )
+                )
+            ).one()
+            return row.customized, row.creator_id
 
     async def _owning_projects(self, db: ExtendedAsyncSAEngine, image_id: ImageID) -> list[UUID]:
         async with V2DBOpsProvider(db).read_ops() as r:
@@ -432,7 +447,7 @@ class TestImageOwnershipGraph:
                 db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
             ).check_available_image(image_id, DOMAIN_NAME, user_id)
 
-    async def test_an_image_no_project_owns_is_reachable_by_anyone(
+    async def test_an_image_that_is_not_customized_is_reachable_by_anyone(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_id: DomainID,
@@ -444,6 +459,40 @@ class TestImageOwnershipGraph:
         await ScheduleDBSource(
             db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
         ).check_available_image(image_id, DOMAIN_NAME, user_id)
+
+    async def test_a_customized_image_with_no_creator_is_reachable_by_nobody(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        user_id = await self._create_user(db_with_cleanup, domain_id, "owner@test.io")
+        image_id, _ = await self._create_image(db_with_cleanup, registry_id, "a", customized=True)
+
+        with pytest.raises(ImageNotFound):
+            await ScheduleDBSource(
+                db_with_cleanup, ReconcileOpsProvider(db_with_cleanup)
+            ).check_available_image(image_id, DOMAIN_NAME, user_id)
+
+    async def test_purging_the_creator_leaves_the_image_reachable_by_nobody(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        owner_id = await self._create_user(db_with_cleanup, domain_id, "owner@test.io")
+        onlooker_id = await self._create_user(db_with_cleanup, domain_id, "other@test.io")
+        image_id, _ = await self._create_image(
+            db_with_cleanup, registry_id, "a", owner_user_id=owner_id
+        )
+        async with db_with_cleanup.begin_session() as sess:
+            await sess.execute(sa.delete(UserRow).where(UserRow.uuid == owner_id))
+            await sess.commit()
+
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+
+        with pytest.raises(ImageNotFound):
+            await db_source.check_available_image(image_id, DOMAIN_NAME, onlooker_id)
 
     # -- what the scan writes ----------------------------------------------------------
 
@@ -463,7 +512,7 @@ class TestImageOwnershipGraph:
             {ImageIdentifier(canonical, "x86_64"): self._scan_payload(user_id)},
         )
 
-        assert [image.creator_id for image in scanned] == [user_id]
+        assert [(image.customized, image.creator_id) for image in scanned] == [(True, user_id)]
         assert await self._owning_projects(db_with_cleanup, scanned[0].id) == [project_id]
 
     async def test_a_scanned_image_stays_unowned_without_a_personal_project(
@@ -481,7 +530,7 @@ class TestImageOwnershipGraph:
             {ImageIdentifier(canonical, "x86_64"): self._scan_payload(user_id)},
         )
 
-        assert [image.creator_id for image in scanned] == [user_id]
+        assert [(image.customized, image.creator_id) for image in scanned] == [(True, user_id)]
         assert await self._owning_projects(db_with_cleanup, scanned[0].id) == []
 
     async def test_rescanning_an_image_on_file_leaves_the_graph_alone(
@@ -503,3 +552,38 @@ class TestImageOwnershipGraph:
         )
 
         assert await self._owning_projects(db_with_cleanup, image_id) == []
+
+    async def test_rescanning_refreshes_the_kind_and_the_creator_from_the_labels(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        user_id = await self._create_user(db_with_cleanup, domain_id, "owner@test.io")
+        image_id, canonical = await self._create_image(db_with_cleanup, registry_id, "a")
+
+        await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {ImageIdentifier(canonical, "x86_64"): self._scan_payload(user_id)},
+        )
+
+        assert await self._kind_and_creator(db_with_cleanup, image_id) == (True, user_id)
+
+    async def test_rescanning_an_unreadable_owner_label_marks_it_customized_alone(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        image_id, canonical = await self._create_image(db_with_cleanup, registry_id, "a")
+        payload = self._scan_payload(None)
+        payload["labels"] = {LabelName.CUSTOMIZED_OWNER.value: "user:not-a-uuid"}
+
+        await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {ImageIdentifier(canonical, "x86_64"): payload},
+        )
+
+        assert await self._kind_and_creator(db_with_cleanup, image_id) == (True, None)

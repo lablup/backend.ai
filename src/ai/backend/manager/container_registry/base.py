@@ -86,6 +86,15 @@ def _created_in_project(
     return personal_projects.get(user_id)
 
 
+def _is_customized(labels: Mapping[str, Any]) -> bool:
+    """Whether a session commit made the image, which its owner label is what says.
+
+    Separate from :func:`_customized_owner_user_id`: a label naming a user nobody knows
+    still marks the image customized, and so leaves it reachable by nobody.
+    """
+    return labels.get(LabelName.CUSTOMIZED_OWNER) is not None
+
+
 def _customized_owner_user_id(labels: Mapping[str, Any]) -> UserID | None:
     """The user a customized image was committed for, read off its owner label.
 
@@ -232,6 +241,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.size_bytes = update["size_bytes"]
                         image_row.accelerators = update.get("accels")
                         image_row.labels = update["labels"]
+                        image_row.customized = _is_customized(update["labels"])
+                        image_row.creator_id = _customized_owner_user_id(update["labels"])
                         image_row.is_local = is_local
                         scanned_images.append(image_row.to_dataclass())
 
@@ -278,6 +289,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             accelerators=update.get("accels"),
                             labels=update["labels"],
                             status=ImageStatus.ALIVE,
+                            customized=_is_customized(update["labels"]),
                             creator_id=_customized_owner_user_id(update["labels"]),
                             created_in_project_id=_created_in_project(
                                 update["labels"], scanned_projects

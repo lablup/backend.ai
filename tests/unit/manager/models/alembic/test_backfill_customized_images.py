@@ -1,8 +1,8 @@
-"""Verifies the customized-image creator backfill against a real database.
+"""Verifies the customized-image backfill against a real database.
 
 Static analysis does not reach the migration's SQL, so the data migration is exercised
-here: images carrying every owner-label shape go in, the backfill runs, and the column
-it wrote is read back.
+here: images carrying every owner-label shape go in, the backfill runs, and the two
+columns it wrote are read back.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
-from ai.backend.manager.models.alembic.versions.a3f57c4d90e2_record_a_customized_image_creator import (
+from ai.backend.manager.models.alembic.versions.a3f57c4d90e2_mark_customized_images_and_their_creator import (
     backfill,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -181,16 +181,20 @@ async def _run_backfill(db: ExtendedAsyncSAEngine) -> None:
         await conn.run_sync(lambda sync_conn: backfill(sync_conn))
 
 
-async def _creator_id(db: ExtendedAsyncSAEngine, image_id: uuid.UUID) -> uuid.UUID | None:
+async def _kind_and_creator(
+    db: ExtendedAsyncSAEngine, image_id: uuid.UUID
+) -> tuple[bool, uuid.UUID | None]:
     async with db.begin_readonly_session() as session:
-        return cast(
-            uuid.UUID | None,
-            await session.scalar(sa.select(ImageRow.creator_id).where(ImageRow.id == image_id)),
-        )
+        row = (
+            await session.execute(
+                sa.select(ImageRow.customized, ImageRow.creator_id).where(ImageRow.id == image_id)
+            )
+        ).one()
+        return cast(tuple[bool, uuid.UUID | None], (row.customized, row.creator_id))
 
 
-class TestBackfillImageCreators:
-    async def test_a_well_formed_owner_label_names_the_creator(
+class TestBackfillCustomizedImages:
+    async def test_a_well_formed_owner_label_marks_the_image_and_names_the_creator(
         self,
         db: ExtendedAsyncSAEngine,
         domain: DomainFixture,
@@ -201,9 +205,9 @@ class TestBackfillImageCreators:
 
         await _run_backfill(db)
 
-        assert await _creator_id(db, image_id) == user_uuid
+        assert await _kind_and_creator(db, image_id) == (True, user_uuid)
 
-    async def test_an_image_without_the_label_records_nobody(
+    async def test_an_image_without_the_label_is_not_customized(
         self,
         db: ExtendedAsyncSAEngine,
         domain: DomainFixture,
@@ -213,13 +217,13 @@ class TestBackfillImageCreators:
 
         await _run_backfill(db)
 
-        assert await _creator_id(db, image_id) is None
+        assert await _kind_and_creator(db, image_id) == (False, None)
 
     @pytest.mark.parametrize(
         "label_value",
         ["user:not-a-uuid", "user:", "", f"{uuid.uuid4()}"],
     )
-    async def test_an_unreadable_owner_label_records_nobody(
+    async def test_an_unreadable_owner_label_marks_the_image_and_names_nobody(
         self,
         db: ExtendedAsyncSAEngine,
         domain: DomainFixture,
@@ -230,9 +234,9 @@ class TestBackfillImageCreators:
 
         await _run_backfill(db)
 
-        assert await _creator_id(db, image_id) is None
+        assert await _kind_and_creator(db, image_id) == (True, None)
 
-    async def test_a_label_naming_a_user_who_is_gone_records_nobody(
+    async def test_a_label_naming_a_user_who_is_gone_marks_the_image_and_names_nobody(
         self,
         db: ExtendedAsyncSAEngine,
         domain: DomainFixture,
@@ -242,4 +246,4 @@ class TestBackfillImageCreators:
 
         await _run_backfill(db)
 
-        assert await _creator_id(db, image_id) is None
+        assert await _kind_and_creator(db, image_id) == (True, None)

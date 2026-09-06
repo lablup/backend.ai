@@ -194,8 +194,9 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
     # legacy field
     hash = graphene.String()
 
-    # Carried alongside the GraphQL fields, not one of them: the user the image was
-    # committed for, which the load filters below judge against.
+    # Carried alongside the GraphQL fields, not one of them: whether a session commit
+    # made the image and who for, which the load filters below judge against.
+    customized: bool
     creator_id: UserID | None
 
     @classmethod
@@ -232,6 +233,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
             # legacy
             hash=data.image.digest,
         )
+        item.customized = data.image.customized
         item.creator_id = data.image.creator_id
         return item
 
@@ -382,8 +384,8 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
 
     @property
     def is_customized_image(self) -> bool:
-        """Whether the image was committed for a user, which is what customized means."""
-        return self.creator_id is not None
+        """Whether a session commit made the image."""
+        return self.customized
 
 
 class ImagePermissionValueField(graphene.Scalar):  # type: ignore[misc]

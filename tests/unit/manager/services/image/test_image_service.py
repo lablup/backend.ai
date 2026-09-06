@@ -170,6 +170,7 @@ class ImageServiceBaseFixtures:
             resource_limits=[],
             tags=[],
             status=ImageStatus.ALIVE,
+            customized=False,
             creator_id=None,
             created_at=datetime(2023, 9, 30, 15, 0, 0, tzinfo=UTC),
         )

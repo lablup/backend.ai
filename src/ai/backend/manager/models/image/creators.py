@@ -23,9 +23,10 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
     """Creator for an image.
 
     The image joins the registry it was scanned from; a customized image additionally
-    joins the project it is created in. ``creator_id`` records the user it was
-    committed for. Both come from the customized-owner label, which the caller reads
-    at write time and no read goes back to.
+    joins the project it is created in. ``customized`` records that a session commit
+    made it and ``creator_id`` the user it was made for. All three come from the
+    customized-owner label, which the caller reads at write time and no read goes
+    back to.
     """
 
     name: str
@@ -42,6 +43,7 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
     accelerators: str | None = None
     labels: dict[str, Any] | None = None
     status: ImageStatus = ImageStatus.ALIVE
+    customized: bool = False
     creator_id: UserID | None = None
     created_in_project_id: ProjectID | None = None
 
@@ -76,6 +78,7 @@ class ImageCreator(EntityCreator[ImageRow, ImageData]):
             accelerators=self.accelerators,
             labels=self.labels,
             status=self.status,
+            customized=self.customized,
             creator_id=self.creator_id,
         )
 

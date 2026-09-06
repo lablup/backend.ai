@@ -325,7 +325,7 @@ class SessionDBSource:
 
     def _committed_for(self, user_id: uuid.UUID) -> sa.ColumnElement[bool]:
         """The image is customized and was committed for this user."""
-        return ImageRow.creator_id == user_id
+        return sa.and_(ImageRow.customized.is_(True), ImageRow.creator_id == user_id)
 
     async def get_group_name_by_domain_and_id(
         self,

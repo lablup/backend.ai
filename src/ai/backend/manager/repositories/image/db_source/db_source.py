@@ -245,7 +245,7 @@ class ImageDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             image_row = await self._get_image_by_id(session, image_id)
-            return image_row.creator_id == user_id
+            return image_row.customized and image_row.creator_id == user_id
 
     async def insert_image_alias(
         self, alias: str, image_canonical: str, architecture: str

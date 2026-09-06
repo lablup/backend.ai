@@ -94,6 +94,8 @@ class ImageData(EntityData):
     resource_limits: list[ResourceLimit]
     tags: list[ImageTagEntry]
     status: ImageStatus
+    #: Whether a session commit made this image.
+    customized: bool
     #: The user a customized image was committed for. ``None`` where the image is not
     #: customized, or where that user is gone.
     creator_id: UserID | None
@@ -137,6 +139,8 @@ class ImageDataWithDetails:
     is_local: bool
     status: ImageStatus
     resource_limits: list[ResourceLimit]
+    #: Whether a session commit made this image.
+    customized: bool
     #: The user a customized image was committed for. ``None`` where the image is not
     #: customized, or where that user is gone.
     creator_id: UserID | None

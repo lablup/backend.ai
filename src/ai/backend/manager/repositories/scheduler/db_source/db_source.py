@@ -3549,13 +3549,13 @@ class ScheduleDBSource:
         :raises ImageNotFound: If the image is not found
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # An image committed for somebody else reads as absent, as it did when the
-            # owner label decided this.
+            # A customized image reads as absent unless it was committed for this user,
+            # a creator who is gone included.
             image_row = await db_sess.scalar(
                 sa.select(ImageRow).where(
                     ImageRow.id == image_id,
                     sa.or_(
-                        ImageRow.creator_id.is_(None),
+                        ImageRow.customized.is_(False),
                         ImageRow.creator_id == user_uuid,
                     ),
                 )

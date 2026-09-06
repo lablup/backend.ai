@@ -194,8 +194,19 @@ class ImageRow(CreatedAtMixin, Base):
     type: Mapped[ImageType] = mapped_column("type", sa.Enum(ImageType), nullable=False)
     accelerators: Mapped[str | None] = mapped_column("accelerators", sa.String, nullable=True)
     labels: Mapped[dict[str, Any]] = mapped_column("labels", sa.JSON, nullable=False, default=dict)
-    # Provenance, not ownership: the user a customized image was committed for. NULL
-    # for an image that is not customized, and nulled when the user goes.
+    # Whether a session commit made this image. A kind, not a person: who it was made
+    # for is `creator_id`, and that column empties when the user goes while this one
+    # stays. The owner label's prefix (`user:`) already carries a visibility kind, so
+    # this widens to an enum once a project can commit an image of its own.
+    customized: Mapped[bool] = mapped_column(
+        "customized",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.sql.expression.false(),
+    )
+    # Provenance, not ownership: the user a customized image was committed for. Nulled
+    # when that user goes, which leaves the image customized and reachable by nobody.
     creator_id: Mapped[UserID | None] = mapped_column(
         "creator_id",
         GUID(UserID),
@@ -255,6 +266,7 @@ class ImageRow(CreatedAtMixin, Base):
         labels: dict[str, Any] | None = None,
         resources: dict[str, Any] | None = None,
         status: ImageStatus = ImageStatus.ALIVE,
+        customized: bool = False,
         creator_id: UserID | None = None,
     ) -> None:
         self.name = name
@@ -272,6 +284,7 @@ class ImageRow(CreatedAtMixin, Base):
         self.labels = labels  # type: ignore[assignment]
         self._resources = resources  # type: ignore[assignment]
         self.status = status
+        self.customized = customized
         self.creator_id = creator_id
 
     @property
@@ -292,11 +305,6 @@ class ImageRow(CreatedAtMixin, Base):
         return ImageRef(
             image_name, self.project, tag, self.registry, self.architecture, self.is_local
         )
-
-    @property
-    def customized(self) -> bool:
-        """Whether the image was committed for a user, which is what customized means."""
-        return self.creator_id is not None
 
     @classmethod
     async def from_alias(
@@ -772,6 +780,7 @@ class ImageRow(CreatedAtMixin, Base):
             ],
             tags=[ImageTagEntry(key=k, value=v) for k, v in ptag_set.items()],
             status=self.status,
+            customized=self.customized,
             creator_id=self.creator_id,
             last_used_at=self.last_used_at,
         )
@@ -803,6 +812,7 @@ class ImageRow(CreatedAtMixin, Base):
                 for k, v in self.resources.items()
             ],
             supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
+            customized=self.customized,
             creator_id=self.creator_id,
             created_at=self.created_at,
             last_used_at=self.last_used_at,
@@ -971,7 +981,11 @@ class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow
 @dataclass
 class ImageAccessCriteria:
     """What one user may reach: the registries allowed to them, and a customized image
-    only where it was committed for them."""
+    only where it was committed for them.
+
+    A customized image whose creator is gone is reachable by nobody — the kind outlives
+    the person, so the image does not fall open when the account does.
+    """
 
     user_id: UUID
     allowed_registries: set[str]
@@ -979,7 +993,7 @@ class ImageAccessCriteria:
     def is_accessible_image(self, image: ImageRow) -> bool:
         if image.registry not in self.allowed_registries:
             return False
-        if image.creator_id is None:
+        if not image.customized:
             return True
         return image.creator_id == self.user_id
 
@@ -1129,7 +1143,9 @@ class ImagePermissionContextBuilder(
         img_query_stmt = (
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
-            .options(load_only(ImageRow.id, ImageRow.registry, ImageRow.creator_id))
+            .options(
+                load_only(ImageRow.id, ImageRow.registry, ImageRow.customized, ImageRow.creator_id)
+            )
             .where(ContainerRegistryRow.is_global == true())
         )
 
@@ -1170,7 +1186,9 @@ class ImagePermissionContextBuilder(
         img_query_stmt = (
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
-            .options(load_only(ImageRow.id, ImageRow.registry, ImageRow.creator_id))
+            .options(
+                load_only(ImageRow.id, ImageRow.registry, ImageRow.customized, ImageRow.creator_id)
+            )
             .where(ContainerRegistryRow.is_global == true())
         )
 

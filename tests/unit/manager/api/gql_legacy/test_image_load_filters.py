@@ -25,12 +25,15 @@ def _ctx(user_role: UserRole) -> Any:
     return ctx
 
 
-def _image(creator_id: UserID | None, *, operational: bool = False) -> Image:
+def _image(
+    creator_id: UserID | None, *, customized: bool | None = None, operational: bool = False
+) -> Image:
     item = Image(
         id=uuid.uuid4(),
         name="cr.test.io/stable/python:3.11",
         labels=[KVPair(key=LabelName.FEATURES.value, value="operation")] if operational else [],
     )
+    item.customized = customized if customized is not None else creator_id is not None
     item.creator_id = creator_id
     return item
 
@@ -73,3 +76,13 @@ class TestMatchesFilter:
 
         assert item.matches_filter(ctx, {ImageLoadFilter.OPERATIONAL})
         assert not item.matches_filter(ctx, {ImageLoadFilter.GENERAL})
+
+    def test_customized_filter_rejects_an_image_whose_creator_is_gone(self) -> None:
+        item = _image(None, customized=True)
+
+        assert not item.matches_filter(_ctx(UserRole.USER), {ImageLoadFilter.CUSTOMIZED})
+
+    def test_general_filter_rejects_an_image_whose_creator_is_gone(self) -> None:
+        item = _image(None, customized=True)
+
+        assert not item.matches_filter(_ctx(UserRole.USER), {ImageLoadFilter.GENERAL})
