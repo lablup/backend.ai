@@ -18,6 +18,7 @@ import pytest
 
 from ai.backend.agent.docker.gate import GATE_READY_TIMEOUT_SEC, stage_gate, wait_gated_pid
 from ai.backend.agent.docker.session_network import make_docker_locator
+from ai.backend.agent.errors.network import OverlayTeardownIncomplete
 from ai.backend.agent.gate import READY_MARKER
 from ai.backend.agent.network.session_network import SessionNetwork
 
@@ -178,6 +179,22 @@ class TestADetachThatDidNotGoThrough:
 
         await net.detach_container("c1")
 
+        assert "c1" in net._attachments
+
+    async def test_teardown_stops_when_it_still_cannot_detach(self) -> None:
+        # The coordinator goes next, and with it the last thing that knows what the leftovers
+        # are. Walking past a failed detach here is what makes the veth and the address
+        # permanent; raising puts the session back in front of the teardown retry.
+        class _Orchestrator:
+            async def detach(self, container_id: str, *, plan: Any, task_pid: int) -> None:
+                raise RuntimeError("iproute2 said no")
+
+        net = self._net()
+        net._attachments["c1"] = ("s1", cast(Any, object()), 4242)
+        net._orchestrators["s1"] = cast(Any, _Orchestrator())
+
+        with pytest.raises(OverlayTeardownIncomplete):
+            await net._retry_pending_detaches("s1")
         assert "c1" in net._attachments
 
     async def test_teardown_tries_it_again(self) -> None:
