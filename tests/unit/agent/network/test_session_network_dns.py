@@ -13,6 +13,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any, cast
 
+import pytest
+
 from ai.backend.agent.errors.network import ClusterDNSStartError
 from ai.backend.agent.network.session_network import SessionNetwork
 
@@ -108,6 +110,24 @@ class TestTwoKernelsAttachingAtOnce:
         assert len(backend.redirects) == 1, "each kernel started its own resolver"
         await network._stop_cluster_dns(_SESSION)
 
+    async def test_a_cancelled_start_leaves_nothing_for_the_next_kernel_to_read(self) -> None:
+        # The kernel-creation timeout and the agent stopping both arrive here as a cancellation,
+        # and `except Exception` did not catch it: the entry stayed for a redirect that never
+        # landed, and the next kernel read it as a resolver that was up.
+        backend = _Backend()
+        network = _network(backend)
+        first = asyncio.create_task(network.ensure_cluster_dns(_SESSION))
+        await backend.reached.wait()
+        first.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await first
+        assert _SESSION not in network._dns_servers
+
+        backend.release.set()
+        await network.ensure_cluster_dns(_SESSION)
+        assert backend.redirects == [(_SESSION, network._dns_servers[_SESSION].port)]
+        await network._stop_cluster_dns(_SESSION)
+
     async def test_a_session_this_node_never_set_up_is_a_no_op(self) -> None:
         backend = _Backend()
         network = _network(backend)
@@ -126,6 +146,20 @@ class TestTheLockIsNotTheSetupLock:
             await asyncio.wait_for(network.ensure_cluster_dns(_SESSION), timeout=5)
         assert len(backend.redirects) == 1
         await network._stop_cluster_dns(_SESSION)
+
+    async def test_a_teardown_waits_for_a_start_instead_of_crossing_it(self) -> None:
+        # `_stop_cluster_dns` pops the entry; running it while a start is midway through writing
+        # one leaves a live resolver for a session that is gone.
+        backend = _Backend()
+        network = _network(backend)
+        start = asyncio.create_task(network.ensure_cluster_dns(_SESSION))
+        await backend.reached.wait()
+        stop = asyncio.create_task(network._stop_cluster_dns(_SESSION))
+        await _settle()
+        assert not stop.done(), "the teardown cut into a start"
+        backend.release.set()
+        await asyncio.gather(start, stop)
+        assert _SESSION not in network._dns_servers
 
     async def test_the_lock_dict_shrinks_back_to_empty(self) -> None:
         backend = _Backend()

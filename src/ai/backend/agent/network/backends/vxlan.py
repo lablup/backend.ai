@@ -1499,6 +1499,11 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     #: continues in degraded mode after that failure, and a device nothing can classify is
     #: an open path: setup refuses the VNI that names one until it is actually closed.
     _unclosed_devices: set[str]
+    #: Firewall rules a partial setup could not take back off this host, by (vni, dstport).
+    #: Nothing else names them -- a session that failed to set up never joins `_sessions`, so no
+    #: teardown will look for it -- and left standing they drop the traffic of whatever plaintext
+    #: session the manager next gives that VNI to.
+    _rule_debt: dict[tuple[int, int], str]
 
     def __init__(
         self,
@@ -1521,6 +1526,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._runner = runner or _run_command
         self._reader = reader or _read_command
         self._unclosed_devices = set()
+        self._rule_debt = {}
         self._protection_task = None
         self._session_guards = {}
         self._pair_journal = pair_journal or PairJournal()
@@ -2468,33 +2474,62 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         not know how far it got, and stopping at the first absent object would leave the rest.
         Shielded by the caller, so a cancellation cannot cut this short either.
         """
-        rollback: list[str] = []
-        with contextlib.suppress(Exception):
-            await self._del_plaintext_drop(vni, vxlan_port, rollback)
-        with contextlib.suppress(Exception):
-            await self._del_output_mark(vni, vxlan_port, rollback)
-        with contextlib.suppress(Exception):
-            await self._del_egress_guard(vni, vxlan_port, rollback)
-        with contextlib.suppress(Exception):
-            await self._del_forward_accept(vni, rollback)
+        failed = await self._remove_partial_rules(vni, vxlan_port)
         for dev in (bridge_dev(vni), vxlan_dev(vni)):
             try:
                 await self._delete_link_quiet(dev)
-            except Exception:
+            except Exception as e:
                 # Suppressed, because the failure the caller is undoing is the one worth raising
-                # -- but recorded, which it was not. `_delete_link_quiet` reports anything but
-                # absence precisely so a device that is still up is not mistaken for a clean
-                # host, and this session joins `_sessions` only on success, so nothing else will
-                # ever come back for it. `retry_fail_close` reads this set, and readiness reports
-                # it: a device left here carries a VNI the manager is free to allocate again.
+                # -- but owed, which it was not. `retry_fail_close` comes back for this set and
+                # readiness reports it.
                 self._unclosed_devices.add(dev)
+                failed.append(f"ip link del {dev}: {e}")
                 log.exception(
                     "could not remove {} while undoing a partial vxlan setup for vni {}", dev, vni
                 )
-        if rollback:
-            log.warning(
-                "undid a partial vxlan setup for vni {}: {}", vni, ", ".join(sorted(rollback))
+        self._owe_cleanup(vni, vxlan_port, failed)
+
+    async def _remove_partial_rules(self, vni: int, dstport: int) -> list[str]:
+        """Remove the firewall rules a setup may have installed for this VNI.
+
+        Returns the removals that did not happen; every one is attempted.
+        """
+        failed: list[str] = []
+        for remove_keyed in (
+            self._del_plaintext_drop,
+            self._del_output_mark,
+            self._del_egress_guard,
+        ):
+            with contextlib.suppress(Exception):
+                await remove_keyed(vni, dstport, failed)
+        with contextlib.suppress(Exception):
+            await self._del_forward_accept(vni, failed)
+        return failed
+
+    def _owe_cleanup(self, vni: int, dstport: int, failed: Sequence[str]) -> None:
+        """Record, or clear, what an undo could not take back off this host for one VNI."""
+        if not failed:
+            if self._rule_debt.pop((vni, dstport), None) is not None:
+                log.info("the leftovers of a partial vxlan setup for vni {} are finally gone", vni)
+            return
+        self._rule_debt[(vni, dstport)] = "; ".join(sorted(failed))
+        log.error(
+            "a partial vxlan setup for vni {} left {} thing(s) on this host: {}. This node will"
+            " report itself unready until they are gone.",
+            vni,
+            len(failed),
+            ", ".join(sorted(failed)),
+        )
+
+    def cleanup_debt(self) -> Mapping[str, str]:
+        """What this backend could not take back off the host, and why. Empty is healthy."""
+        return {
+            f"vxlan:leftover:vni{vni}": (
+                f"a partial setup for VNI {vni} on udp/{dstport} left state this node could not"
+                f" remove ({why}); a session given that VNI would run into it"
             )
+            for (vni, dstport), why in sorted(self._rule_debt.items())
+        }
 
     def encrypted_peers(self, session_id: str) -> frozenset[str]:
         """The peer VTEPs this node still holds ESP state for, in this session.
@@ -2759,7 +2794,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             if await self._hold_vxlan_down_or_absent(dev):
                 self._unclosed_devices.discard(dev)
                 log.info("surviving tunnel {} is finally down", dev)
-        return self.unclosed_devices()
+        for vni, dstport in list(self._rule_debt):
+            self._owe_cleanup(vni, dstport, await self._remove_partial_rules(vni, dstport))
+        return self.unclosed_devices() | frozenset(self.cleanup_debt())
 
     def _require_vni_unused(self, meta: SessionNetMeta) -> None:
         """Refuse a VNI another session of THIS process already holds or is building on.

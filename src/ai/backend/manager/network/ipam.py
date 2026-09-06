@@ -27,6 +27,7 @@ from ai.backend.manager.errors.network import (
     NetworkPoolExhausted,
     RequestedSubnetInvalid,
     RequestedSubnetUnavailable,
+    SubnetClaimStranded,
     VNIPoolExhausted,
 )
 
@@ -260,7 +261,11 @@ class SubnetAllocator:
                     block,
                     unit,
                 )
-                await self._give_back(won, payload)
+                if stuck := await self._give_back(won, payload):
+                    raise SubnetClaimStranded(
+                        f"could not give back session {session_id}'s partial claim on {block}"
+                        f" ({', '.join(stuck)}); the pool cannot be accounted for"
+                    )
                 return None
             log.info("completed session {}'s partial claim on {}", session_id, block)
             return block
@@ -329,33 +334,35 @@ class SubnetAllocator:
             for unit in units:
                 if await self._etcd.put_if_absent(_allocated_key(unit), payload):
                     continue
-                await self._give_back(units, payload)
+                # Fail, rather than move on to the next block: a unit that would not go back is
+                # named by no meta and released by nothing, so carrying on would report a healthy
+                # session over a pool that has silently shrunk.
+                if stuck := await self._give_back(units, payload):
+                    raise SubnetClaimStranded(
+                        f"could not give back the partial claim {payload} on"
+                        f" {', '.join(stuck)}; the pool cannot be accounted for"
+                    )
                 return False
         except BaseException:
+            # Best-effort here and nothing more: this is the cancelled/failed path, and raising
+            # over it would replace the failure being unwound.
             await asyncio.shield(asyncio.ensure_future(self._give_back(units, payload)))
             raise
         return True
 
-    async def _give_back(self, units: Sequence[str], payload: str) -> None:
-        """Release every unit of a block this claim owns.
+    async def _give_back(self, units: Sequence[str], payload: str) -> list[str]:
+        """Release every unit of a block this claim owns; return the ones that would not go back.
 
         Every unit, rather than the ones the loop recorded: a claim whose compare-and-swap
-        committed and whose answer never came back -- the awaiting task cancelled, the connection
-        dropped -- is held by this session and named in no list. Only units carrying this exact
-        claim are touched, so a unit that went to somebody else is left alone.
-
-        A unit that would not go back is said out loud rather than suppressed: the caller goes on
-        to the next candidate block, `release` only ever runs against the subnet a session's meta
-        records, and nothing else names this one -- so it is a hole in the pool for the cluster's
-        lifetime, and the pool's size is an operator's number.
+        committed and whose answer never came back is held by this session and named in no list.
         """
         stuck: list[str] = []
         for unit in units:
             try:
                 await self._etcd.delete_if_value(_allocated_key(unit), payload)
             except Exception:
-                # Kept going, not raised: this runs while a claim is being abandoned, and the
-                # remaining units are worth more than reporting the first failure.
+                # Kept going, not raised: the remaining units are worth more than the first
+                # failure, and the caller decides what an incomplete give-back means.
                 stuck.append(unit)
         if stuck:
             log.error(
@@ -365,6 +372,7 @@ class SubnetAllocator:
                 ", ".join(stuck),
                 payload,
             )
+        return stuck
 
     async def holder(self, subnet: str) -> str | None:
         """The session every unit block of ``subnet`` is claimed by, or None if they disagree or
