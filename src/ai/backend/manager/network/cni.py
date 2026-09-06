@@ -39,6 +39,7 @@ from ai.backend.manager.errors.network import (
     ForcedBackendUnsupported,
     NetworkBackendMismatch,
     OverlayTeardownPending,
+    SessionRecordContested,
 )
 from ai.backend.manager.network.ipam import (
     DEFAULT_BLOCK_PREFIXLEN,
@@ -168,24 +169,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # ones, so if both were allowed to allocate, the one that failed would give back what the
         # one that succeeded is already handing to its agents. Winning this is what makes "undo
         # what I did" meaningful.
-        if not await etcd.put_if_absent(
-            session_meta_key(session_id), json.dumps({_OWNER: token, _STATE: _CREATING})
-        ):
-            if (published := await self._await_ready(etcd, session_id, endpoints)) is not None:
-                return published
-            # It never finished. Take the session over: from here its owner's rollback finds a
-            # stranger's token on the record and leaves everything alone.
-            log.warning(
-                "taking over session {}'s network: the manager that claimed it did not finish"
-                " within {}s",
-                session_id,
-                _CREATE_HANDOVER_SEC,
-            )
-            await etcd.put(
-                session_meta_key(session_id),
-                json.dumps({_OWNER: token, _STATE: _CREATING}),
-                scope=ConfigScopes.GLOBAL,
-            )
+        held, published = await self._claim_session(etcd, session_id, token, endpoints)
+        if published is not None:
+            return published
         subnet: str | None = None
         vni: int | None = None
         try:
@@ -240,9 +226,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 _OWNER: token,
                 _STATE: _CREATING,
             }
-            await etcd.put(
-                session_meta_key(session_id), json.dumps(meta), scope=ConfigScopes.GLOBAL
-            )
+            held = await self._publish(etcd, session_id, held, meta)
             # Assign each endpoint a disjoint overlay IP and record it under endpoints/ (the
             # coordinator programs FDB/ARP from there). Returned map is threaded per-kernel by
             # the launcher into KernelCreationConfig["cluster_network_ip"].
@@ -271,9 +255,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # and anyone who had already been handed the half-built record would be holding a
             # subnet and a VNI the pool has since given to somebody else.
             meta[_STATE] = _READY
-            await etcd.put(
-                session_meta_key(session_id), json.dumps(meta), scope=ConfigScopes.GLOBAL
-            )
+            held = await self._publish(etcd, session_id, held, meta)
             return NetworkInfo(
                 network_id=session_id, options={**_published(meta), "endpoint_ips": endpoint_ips}
             )
@@ -282,7 +264,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # manager shutdown -- otherwise walks away holding the subnet and the VNI. Shielded
             # so the rollback's own awaits are not cancelled in turn and leave it half done.
             await asyncio.shield(
-                asyncio.ensure_future(self._rollback_create(session_id, subnet, vni, token))
+                asyncio.ensure_future(self._rollback_create(session_id, subnet, vni, held))
             )
             raise
 
@@ -339,6 +321,88 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             network_id=session_id, options={**_published(meta), "endpoint_ips": endpoint_ips}
         )
 
+    async def _claim_session(
+        self, etcd: AsyncEtcd, session_id: str, token: str, endpoints: list[Any]
+    ) -> tuple[str, NetworkInfo | None]:
+        """Own the session's record, or hand back what a finished create published.
+
+        Returns ``(the record this call now holds, what somebody else built)``; exactly one of
+        the two is meaningful. Ownership is the record's exact bytes, not the token inside them:
+        every later write is a compare-and-swap against those bytes, so a call that has been
+        superseded finds out when it tries to write rather than overwriting whoever succeeded it.
+
+        Raises:
+            SessionRecordContested: nobody could be established as the owner within the bound --
+                a stream of managers taking the session from each other. Retryable, and reported
+                rather than looped on forever.
+        """
+        ours = json.dumps({_OWNER: token, _STATE: _CREATING})
+        key = session_meta_key(session_id)
+        handover = time.monotonic() + _CREATE_HANDOVER_SEC
+        give_up = handover + _CREATE_HANDOVER_SEC
+        # Every way round this loop ends in a return, a raise, or the poll below. A `continue`
+        # that skipped it spun on the CPU without ever yielding to the event loop -- and the
+        # record it was waiting on (a READY one whose allocation is gone) is one nothing else was
+        # ever going to change, so the manager hung there rather than polling.
+        while True:
+            if await etcd.put_if_absent(key, ours):
+                return ours, None
+            raw = await etcd.get(key, scope=ConfigScopes.GLOBAL)
+            if raw is not None:
+                if json.loads(raw).get(_STATE) == _READY:
+                    published = await self._existing_allocation(etcd, session_id, endpoints)
+                    if published is not None:
+                        return "", published
+                    # Finished, and worth nothing: the pool no longer records the subnet and the
+                    # VNI it names as this session's, so there is no owner to wait for. Take it
+                    # from those exact bytes and build the session again.
+                    if await etcd.replace(key, raw, ours):
+                        log.warning(
+                            "session {}'s network record outlived its allocation; building it"
+                            " again",
+                            session_id,
+                        )
+                        return ours, None
+                elif time.monotonic() >= handover:
+                    # Take it over, from the exact record just read and no other. An unconditional
+                    # write here would let two waiters that timed out together each believe they
+                    # own the session, and would let a create that was only slow carry on writing
+                    # over whoever replaced it.
+                    if await etcd.replace(key, raw, ours):
+                        log.warning(
+                            "taking over session {}'s network: the manager that claimed it did"
+                            " not finish within {}s",
+                            session_id,
+                            _CREATE_HANDOVER_SEC,
+                        )
+                        return ours, None
+            if time.monotonic() >= give_up:
+                raise SessionRecordContested(
+                    f"could not establish an owner for session {session_id}'s network within"
+                    f" {_CREATE_HANDOVER_SEC * 2}s; another manager keeps taking it"
+                )
+            await asyncio.sleep(_CREATE_POLL_SEC)
+
+    async def _publish(
+        self, etcd: AsyncEtcd, session_id: str, held: str, meta: Mapping[str, Any]
+    ) -> str:
+        """Write the session's record, but only over the one this call still holds.
+
+        Returns the bytes now held. Everything this create does afterwards is conditional on
+        them, which is what stops a superseded create from resurrecting a session that was taken
+        over, rolled back, or destroyed underneath it.
+
+        Raises:
+            SessionRecordContested: the record is no longer this call's.
+        """
+        raw = json.dumps(dict(meta))
+        if not await etcd.replace(session_meta_key(session_id), held, raw):
+            raise SessionRecordContested(
+                f"session {session_id}'s network record was taken by another manager while this"
+                " create was running; it owns what happens to the session now"
+            )
+        return raw
+
     async def _await_ready(
         self, etcd: AsyncEtcd, session_id: str, endpoints: list[Any]
     ) -> NetworkInfo | None:
@@ -359,23 +423,6 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 return None
             await asyncio.sleep(_CREATE_POLL_SEC)
 
-    async def _owns_session_record(self, session_id: str, token: str) -> bool:
-        """Whether the session's record is still the one this call put there.
-
-        Undoing a create means undoing *this* create. The allocation is shared with whoever else
-        is creating the same session, so a failure here must not release a subnet or a VNI that
-        a manager which did finish is now handing to its agents.
-        """
-        raw = await self._require_etcd().get(
-            session_meta_key(session_id), scope=ConfigScopes.GLOBAL
-        )
-        if raw is None:
-            return False
-        try:
-            return bool(json.loads(raw).get(_OWNER) == token)
-        except ValueError:
-            return False
-
     async def _still_ours(self, session_id: str, subnet: str, vni: Any) -> bool:
         """Whether the pool still records this session as the holder of both."""
         if await self._subnet_allocator.holder(subnet) != session_id:
@@ -385,7 +432,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         return await self._vni_allocator.holder(int(vni)) == session_id
 
     async def _rollback_create(
-        self, session_id: str, subnet: str | None, vni: int | None, token: str
+        self, session_id: str, subnet: str | None, vni: int | None, held: str
     ) -> None:
         """Undo a partially-created session network: release the VNI and subnet blocks and
         delete every key written under the session (meta / endpoints / ipam / members). Each
@@ -398,12 +445,16 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         its VNI back in the pool for the next session to draw, while its own caller went on
         believing it had a network.
         """
-        if not await self._owns_session_record(session_id, token):
+        etcd = self._require_etcd()
+        # Give up ownership and check it in one step. A separate read-then-delete let the record
+        # be taken between the two, and the delete below would then have removed the new owner's
+        # work. Losing this means the session is somebody else's now, and nothing here is ours
+        # to undo -- including the subnet and the VNI, which that owner has converged onto.
+        if not held or not await etcd.delete_if_value(session_meta_key(session_id), held):
             log.info(
-                "not rolling back session {}: its record belongs to another create", session_id
+                "not rolling back session {}: its record is no longer this create's", session_id
             )
             return
-        etcd = self._require_etcd()
         try:
             await etcd.delete_prefix(
                 session_prefix(session_id).rstrip("/"), scope=ConfigScopes.GLOBAL

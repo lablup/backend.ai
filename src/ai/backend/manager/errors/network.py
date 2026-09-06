@@ -18,6 +18,19 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 
 
+class NetworkNotFound(EntityNotFoundError):
+    error_type = "https://api.backend.ai/probs/network-not-found"
+    error_title = "The network does not exist."
+
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        operation: ActionOperationType = ActionOperationType.GET,
+    ) -> None:
+        super().__init__(extra_msg, entity_type=NetworkEntityType(), operation=operation)
+
+
 class NetworkPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/network-pool-exhausted"
     error_title = "No free subnet is available in the cluster-network IPAM pool."
@@ -148,14 +161,23 @@ class NetworkBackendMismatch(BackendAIError, web.HTTPConflict):
         )
 
 
-class NetworkNotFound(EntityNotFoundError):
-    error_type = "https://api.backend.ai/probs/network-not-found"
-    error_title = "The network does not exist."
+class SessionRecordContested(BackendAIError, web.HTTPConflict):
+    """Another manager took this session's network record while a create was running.
 
-    def __init__(
-        self,
-        extra_msg: str | None = None,
-        *,
-        operation: ActionOperationType = ActionOperationType.GET,
-    ) -> None:
-        super().__init__(extra_msg, entity_type=NetworkEntityType(), operation=operation)
+    Two managers can build one session at once -- an HA pair, a retry landing elsewhere. They
+    converge on one subnet and one VNI, so only the call holding the record may write or undo;
+    the other finding out here is what stops it overwriting, resurrecting or releasing what the
+    holder is already handing to its agents. Retryable: the session is somebody's, and the next
+    attempt reads what they published.
+    """
+
+    error_type = "https://api.backend.ai/probs/manager/session-network-record-contested"
+    error_title = "The session's network record belongs to another manager."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
