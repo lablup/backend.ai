@@ -71,3 +71,28 @@ async def _kill(proc: asyncio.subprocess.Process) -> None:
         proc.kill()
     with contextlib.suppress(Exception):
         await proc.wait()
+
+
+_ABSENT_MARKERS: Final = (
+    "does a matching rule exist",  # iptables -D, rule not present
+    "no chain/target/match by that name",  # iptables -D/-X, chain not present
+    "cannot find device",  # ip link del
+    "no such process",  # ip xfrm state/policy del (ESRCH)
+    "no such file or directory",  # bridge fdb del, ip neigh del
+    "cannot delete",  # iptables -X on a chain that was never created
+)
+
+
+def is_absent_error(exc: BaseException) -> bool:
+    """Whether a removal failed only because its target is already gone.
+
+    Teardown treats exactly this as success. Everything else -- EPERM, a held xtables lock, EBUSY,
+    an nft backend error -- is a real failure that leaves state on the host, and calling it success
+    is what turns a retryable problem into a permanent leak.
+
+    A missing binary is NOT absence. `ip` or `iptables` disappearing from PATH after the devices
+    and rules were made says nothing about whether they are still there; it says this node can no
+    longer clean up, which is a failure to report, not a teardown to record as done.
+    """
+    text = str(exc).lower()
+    return any(marker in text for marker in _ABSENT_MARKERS)
