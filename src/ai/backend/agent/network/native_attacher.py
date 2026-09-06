@@ -61,6 +61,12 @@ async def _delete_dns_rules(match: str) -> None:
     ``bai-dns:<session>`` tag (teardown: only this session's rule) or a ``-d <gateway>/32`` (install:
     every DNS rule on this gateway, whatever session tagged it).
 
+    Checked, all of it. This runs on the replacement path, where a stale rule that outlives its
+    delete sits ahead of the new one and goes on sending ``:53`` to a resolver port that is gone --
+    a session that comes up and cannot resolve its own peers, with nothing having reported a
+    failure. The listing is re-read afterwards because the exit codes alone do not say the chain
+    is clear.
+
     Two subtleties this gets right, both learned the hard way:
     - ``iptables -S`` prints the comment value **quoted** (``--comment "bai-dns:x"``); replaying that
       token verbatim as ``-D`` never matches, so the rule silently leaks. Strip the quotes.
@@ -69,14 +75,31 @@ async def _delete_dns_rules(match: str) -> None:
       rule sits first in PREROUTING and DNATs ``:53`` to a now-dead loopback port, shadowing the new
       session's resolver. Comment-based, so it needs neither the old port nor the old session id.
     """
-    _, out, _ = await _run(["iptables", "-t", "nat", "-S", "PREROUTING"], check=False)
+    _, out, _ = await _run(["iptables", "-t", "nat", "-S", "PREROUTING"])
+    stale = 0
     for line in out.decode(errors="replace").splitlines():
         if _DNS_COMMENT_PREFIX not in line or match not in line:
             continue
         args = [tok.strip('"') for tok in line.split()]
         if args and args[0] == "-A":
             args[0] = "-D"
-            await _run(["iptables", "-t", "nat", *args], check=False)
+            await _run(["iptables", "-t", "nat", *args])
+            stale += 1
+    if stale:
+        # The chain is the caller's evidence, not the exit codes: a rule that survived its own
+        # delete sits ahead of the one about to be appended and keeps sending :53 at whatever
+        # port it names.
+        _, after, _ = await _run(["iptables", "-t", "nat", "-S", "PREROUTING"])
+        survivors = [
+            line
+            for line in after.decode(errors="replace").splitlines()
+            if _DNS_COMMENT_PREFIX in line and match in line
+        ]
+        if survivors:
+            raise RuntimeError(
+                f"{len(survivors)} DNS redirect rule(s) for {match} could not be removed;"
+                f" the first of them still answers :53: {survivors[0].strip()}"
+            )
 
 
 async def install_dns_redirect(gateway: str, loopback_port: int, session_id: str) -> None:

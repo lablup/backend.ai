@@ -1439,20 +1439,41 @@ class SessionNetwork:
         if registry.unusable_reason() is not None:
             return frozenset()
         try:
-            live = await self._live_containers()
+            running = await self._live_session_owners()
         except Exception:
             log.exception("could not list this node's containers; sparing no tunnel")
             return frozenset()
-        if not live:
+        if not running:
             return frozenset()
-        sessions = set(live.values())
         spare: set[int] = set()
         for vni in await registry.bound_vnis():
             for holder in await registry.holders(vni):
-                if holder.agent_id != self._agent_id and holder.session_id in sessions:
+                # All three, and the same agent throughout. `built` because a binding that only
+                # reserved the VNI describes no device to spare. The owner matched against the
+                # container's own owner because "some agent holds this VNI and some container of
+                # that session is running" is satisfied by a dead agent's leftover binding beside
+                # a container belonging to somebody else -- or to us -- and would then except our
+                # own unverified tunnel from the fail-close it exists for.
+                if (
+                    holder.agent_id != self._agent_id
+                    and holder.built
+                    and (holder.session_id, holder.agent_id) in running
+                ):
                     spare.add(vni)
                     break
         return frozenset(spare)
+
+    async def _live_session_owners(self) -> set[tuple[str, str]]:
+        """``{(session_id, owning agent)}`` for every kernel container running on this node.
+
+        The owner is the half that matters here: a container says which session it belongs to and
+        which agent placed it, and only the pair identifies a tunnel as another agent's.
+        """
+        return {
+            (container.session_id, container.owner_agent_id)
+            for container in (await self._locator.live_sessions()).values()
+            if container.owner_agent_id is not None
+        }
 
     @staticmethod
     async def _stop_quietly(coordinator: SessionNetworkCoordinator, session_id: str) -> None:
