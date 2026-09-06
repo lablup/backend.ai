@@ -9,12 +9,16 @@ supplies the container's netns and a real runner. Everything here is pure/testab
 
 from __future__ import annotations
 
-import contextlib
-from collections.abc import Awaitable, Callable, Mapping
+import asyncio
+import logging
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
 from ai.backend.common.network.types import AttachKind, EndpointPlan, NetworkRole
+from ai.backend.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
@@ -105,17 +109,46 @@ class CniAttacher:
                 if ip is not None:
                     assigned[inv.role] = ip
             return assigned
-        except Exception:
-            for inv in reversed(applied):
-                with contextlib.suppress(Exception):
-                    await self._runner(
-                        "DEL",
-                        ifname=inv.ifname,
-                        netns=netns,
-                        container_id=container_id,
-                        config=inv.effective_config(),
-                    )
+        except BaseException:
+            # BaseException, and shielded: a cancelled attach -- the kernel-creation timeout, the
+            # agent shutting down -- is the ordinary way this is interrupted, and it left every
+            # interface the plan had already applied on the host with nothing naming them. The
+            # caller records the plan only once attach returns, so nothing else knows they exist.
+            await asyncio.shield(
+                asyncio.ensure_future(self._undo(applied, container_id=container_id, netns=netns))
+            )
             raise
+
+    async def _undo(
+        self, applied: Sequence[CniInvocation], *, container_id: str, netns: str
+    ) -> None:
+        """Remove the interfaces an attach had already applied, in reverse.
+
+        Each DEL that fails is reported and the rest still run: stopping at the first would leave
+        the earlier ones behind, and they are the ones this is here for.
+        """
+        undone = 0
+        for inv in reversed(applied):
+            try:
+                await self._runner(
+                    "DEL",
+                    ifname=inv.ifname,
+                    netns=netns,
+                    container_id=container_id,
+                    config=inv.effective_config(),
+                )
+                undone += 1
+            except Exception:
+                log.exception(
+                    "could not remove {} from container {} while undoing a failed attach;"
+                    " it stays on the host until teardown reclaims it",
+                    inv.ifname,
+                    container_id,
+                )
+        if undone != len(applied):
+            log.warning(
+                "undid {} of {} interface(s) of container {}", undone, len(applied), container_id
+            )
 
     async def detach(self, plan: EndpointPlan, *, container_id: str, netns: str) -> None:
         # tear down in reverse order of attach

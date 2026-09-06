@@ -430,22 +430,50 @@ class NativeBridgeAttachRunner:
                     # off its own subnet, while the kernel comes up and reports itself started.
                     # The `except` below undoes this attach so the caller sees the failure.
                     await _run(ns + ["ip", "route", "replace", "default", "via", gateway])
-            except Exception:
+            except BaseException:
                 # Undo our own half-attach. Nothing else will: the caller's rollback covers the
                 # attachments that SUCCEEDED, not the one that raised, and a veth pair whose peer
                 # never reached a netns is reaped by nothing — it sits in the host namespace, with
                 # its address still claimed, until someone notices. The container-side end goes with
                 # the host end, and the address claim is this owner's to give back.
-                await _run(["ip", "link", "del", host_veth], check=False)
-                if ipam.get("type") != "static" and subnet:
-                    with contextlib.suppress(Exception):
-                        await self._ipam.release(subnet, container_id, ifname)
+                #
+                # BaseException, and shielded: cancellation is how this is interrupted in practice
+                # -- the kernel-creation timeout, the agent stopping -- and it used to walk out
+                # leaving exactly that veth and that lease behind.
+                await asyncio.shield(
+                    asyncio.ensure_future(
+                        self._undo_half_attach(host_veth, container_id, ifname, ipam, subnet)
+                    )
+                )
                 raise
 
         if config.get("ipMasq") and subnet:
             await self._ensure_masq(subnet)
             await self._ensure_forward_accept(bridge)
         return {"ips": [{"address": f"{ip}/{prefix}"}]}
+
+    async def _undo_half_attach(
+        self,
+        host_veth: str,
+        container_id: str,
+        ifname: str,
+        ipam: Mapping[str, Any],
+        subnet: str | None,
+    ) -> None:
+        """Give back the veth and the address of an attach that did not finish."""
+        try:
+            await _run(["ip", "link", "del", host_veth])
+        except RuntimeError as e:
+            if not command.is_absent_error(e):
+                log.warning(
+                    "could not remove {} while undoing a failed attach of {}: {}",
+                    host_veth,
+                    container_id,
+                    e,
+                )
+        if ipam.get("type") != "static" and subnet:
+            with contextlib.suppress(Exception):
+                await self._ipam.release(subnet, container_id, ifname)
 
     async def _is_wired(self, host_veth: str, netns: str, ifname: str) -> bool:
         """Is this container already attached — really attached, both ends?
