@@ -13,7 +13,12 @@ from ai.backend.manager.models.domain.row import DomainRow
 
 @dataclass(frozen=True)
 class GetDomainAction(GetSingleEntityOpsAction[DomainRow, DomainData]):
-    """Read one domain by its id."""
+    """Read one domain by its id.
+
+    Read on the domain is the gate, the same as the project read: a domain is an
+    RBAC entity, and the row carries resource limits, allowed vfolder hosts,
+    allowed registries and dotfiles, none of which every caller may see.
+    """
 
     domain_id: DomainID
 

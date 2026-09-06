@@ -254,7 +254,7 @@ class AgentService:
         return GetTotalResourcesActionResult(total_resources=total_resources)
 
     async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
-        """Searches agents. It is used by superadmin only."""
+        """Searches agents."""
         result = await self._agent_repository.search_agents(
             querier=action.querier,
         )

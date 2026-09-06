@@ -377,9 +377,8 @@ class SessionAdapter(BaseAdapter):
         """Probe whether each kernel of a would-be session fits the target
         resource group's nodes, without provisioning.
 
-        A self-service query: the requesting user is resolved from the request
-        context and passed as ``user_uuid``. The service resolves that user's
-        default access key from it, so the adapter supplies no access key.
+        The read is answered for the named resource group, so the action carries
+        that group as its entity and the gate checks read on it.
         """
         cluster_mode = (
             ClusterMode.MULTI_NODE

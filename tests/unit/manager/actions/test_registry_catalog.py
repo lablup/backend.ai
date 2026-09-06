@@ -87,6 +87,7 @@ from ai.backend.manager.actions.registry.types import (
     GroupMeta,
     ProcessorDependencies,
 )
+from ai.backend.manager.actions.types import ActionGate, ActionKind
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.field.base import (
     BaseRuntimeSingleFieldAction,
@@ -104,6 +105,11 @@ from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.agent.actions.get_total_resources import (
+    GetTotalResourcesAction,
+)
+from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
+from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
@@ -120,6 +126,7 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
+from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupBulkEntityLabelOwnerAction,
@@ -172,6 +179,9 @@ from ai.backend.manager.services.scheduling_history.processors import (
     SchedulingHistoryProcessors,
 )
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.session.actions.compute_schedule import (
+    ComputeScheduleAction,
+)
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
@@ -361,6 +371,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     )
     SessionProcessors(
         registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        resource_allocation_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
         ResourceAllocationProcessors(
             resource_allocation_groups.group(GroupMeta(USER_ENTITY_TYPE)),
             resource_allocation_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
@@ -415,3 +426,53 @@ def test_action_name_is_unique_across_v2_actions() -> None:
             f"{cls.__module__}.{cls.__qualname__} and {holder.__module__}.{holder.__qualname__} "
             f"both record as {name!r}; declare a distinct action_name() on one of them."
         )
+
+
+def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
+    """Pins the five reads BA-7673 ruled on, so a rewiring has to restate the ruling.
+
+    The gate is decided by the factory a processor is wired through, not by the action
+    class, so the catalog record is what the assertion reads.
+    """
+    registry = _ops_registry()
+    resource_group_groups = registry.concern(ConcernMeta(Concern.RESOURCE_GROUP))
+    AgentProcessors(resource_group_groups.group(GroupMeta(AGENT_ENTITY_TYPE)), MagicMock(), [])
+    DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
+    SessionProcessors(
+        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        resource_group_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+        ResourceAllocationProcessors(
+            resource_group_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(PROJECT_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(DOMAIN_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
+            resource_group_groups.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)),
+            MagicMock(),
+        ),
+        MagicMock(),
+    )
+
+    judged = {
+        ComputeScheduleAction: (
+            RESOURCE_GROUP_ENTITY_TYPE,
+            ActionKind.SINGLE_ENTITY,
+            ActionGate.PERMISSION,
+        ),
+        GetDomainAction: (
+            DOMAIN_ENTITY_TYPE,
+            ActionKind.SINGLE_ENTITY,
+            ActionGate.PERMISSION,
+        ),
+        GetTotalResourcesAction: (AGENT_ENTITY_TYPE, ActionKind.GLOBAL, ActionGate.PERMISSION),
+        # Public until the agent DataLoaders stop reading agents through this search.
+        SearchAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.GLOBAL, ActionGate.PUBLIC),
+        # The lookup carries no permission; the read that follows it is checked.
+        LookupAgentAction: (AGENT_ENTITY_TYPE, ActionKind.LOOKUP, ActionGate.PUBLIC),
+    }
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.action_cls in judged
+    }
+    assert recorded == judged

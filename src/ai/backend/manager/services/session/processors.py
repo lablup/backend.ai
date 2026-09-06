@@ -2,11 +2,11 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.field.bulk_processor import BulkFieldActionProcessor
-from ai.backend.manager.actions.v2.global_scope.processor import PublicActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionEntityData, SessionTerminationStatus
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
@@ -159,7 +159,9 @@ from ai.backend.manager.services.session.service import SessionService
 
 class SessionProcessors:
     commit_session: SingleEntityActionProcessor[CommitSessionAction, CommitSessionActionResult]
-    compute_schedule: PublicActionProcessor[ComputeScheduleAction, ComputeScheduleActionResult]
+    compute_schedule: SingleEntityActionProcessor[
+        ComputeScheduleAction, ComputeScheduleActionResult
+    ]
     complete: SingleEntityActionProcessor[CompleteAction, CompleteActionResult]
     convert_session_to_image: SingleEntityActionProcessor[
         ConvertSessionToImageAction, ConvertSessionToImageActionResult
@@ -232,6 +234,7 @@ class SessionProcessors:
     def __init__(
         self,
         group: ProcessorGroup[SessionEntityData],
+        resource_group: ProcessorGroup[ResourceGroupData],
         resource_allocation: ResourceAllocationProcessors,
         service: SessionService,
     ) -> None:
@@ -239,7 +242,9 @@ class SessionProcessors:
         # Actions without RBAC validation (internal/legacy)
         self.lookup = group.public_lookup_ops(LookupSessionAction)
         self.commit_session = group.single_entity(CommitSessionAction, service.commit_session)
-        self.compute_schedule = group.public(ComputeScheduleAction, service.compute_schedule)
+        self.compute_schedule = resource_group.single_entity(
+            ComputeScheduleAction, service.compute_schedule
+        )
         self.complete = group.single_entity(CompleteAction, service.complete)
         self.convert_session_to_image = group.single_entity(
             ConvertSessionToImageAction, service.convert_session_to_image

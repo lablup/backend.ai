@@ -10,6 +10,13 @@ from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 @dataclass(frozen=True)
 class GetTotalResourcesAction(BaseGlobalAction):
+    """Read the cluster-wide free, used and total agent capacity.
+
+    Operator state: it sums every agent regardless of which resource groups the
+    caller reaches, so SUPERADMIN is the gate. A caller's own occupancy is
+    answered by the scoped resource overviews instead.
+    """
+
     @override
     @classmethod
     def entity_type(cls) -> EntityType:

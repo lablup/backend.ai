@@ -13,7 +13,6 @@ from ai.backend.manager.actions.v2.ops.result import (
     LookupOpsResult,
 )
 from ai.backend.manager.actions.v2.single_entity.processor import (
-    PublicSingleEntityActionProcessor,
     SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.domain.types import DomainData
@@ -53,7 +52,7 @@ from ai.backend.manager.services.domain.service import DomainService
 
 
 class DomainProcessors:
-    get: PublicSingleEntityActionProcessor[GetDomainAction, EntityOpsResult[DomainData]]
+    get: SingleEntityActionProcessor[GetDomainAction, EntityOpsResult[DomainData]]
     lookup: LookupActionProcessor[LookupDomainAction, LookupOpsResult[DomainID]]
     global_search: GlobalActionProcessor[GlobalSearchDomainsAction, BatchOpsResult[DomainData]]
     public_search_rg_domains: PublicActionProcessor[
@@ -84,7 +83,7 @@ class DomainProcessors:
         service: DomainService,
         action_monitors: list[ActionMonitor],
     ) -> None:
-        self.get = group.public_get_ops(GetDomainAction)
+        self.get = group.single_get_ops(GetDomainAction)
         self.lookup = group.public_lookup_ops(LookupDomainAction)
         self.global_search = group.global_search_ops(GlobalSearchDomainsAction)
         self.public_search_rg_domains = group.public_search_ops(SearchRGDomainsAction)

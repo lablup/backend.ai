@@ -69,7 +69,7 @@ class AgentProcessors:
     update_resource_group: GlobalActionProcessor[
         UpdateAgentResourceGroupAction, UpdateAgentResourceGroupActionResult
     ]
-    get_total_resources: PublicActionProcessor[
+    get_total_resources: GlobalActionProcessor[
         GetTotalResourcesAction, GetTotalResourcesActionResult
     ]
     search_agents: PublicActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
@@ -105,7 +105,7 @@ class AgentProcessors:
         self.update_resource_group = group.global_scope(
             UpdateAgentResourceGroupAction, service.update_resource_group
         )
-        self.get_total_resources = group.public(
+        self.get_total_resources = group.global_scope(
             GetTotalResourcesAction, service.get_total_resources
         )
         self.search_agents = group.public(SearchAgentsAction, service.search_agents)

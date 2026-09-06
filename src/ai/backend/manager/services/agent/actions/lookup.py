@@ -29,7 +29,12 @@ class AgentNameKey(LookupKey):
 
 @dataclass
 class LookupAgentAction(LookupEntityOpsAction[AgentRow, AgentUUID]):
-    """Resolve the operator-facing agent id into the agent it names."""
+    """Resolve the operator-facing agent id into the agent it names.
+
+    Every authenticated caller may resolve the key: the lookup carries no
+    permission onto the agent, and the read that follows it is checked against
+    the agent itself.
+    """
 
     agent_id: AgentId
 
