@@ -522,17 +522,33 @@ class TestClusterDnsRedirect:
         assert "-d 172.30.1.1/32" in flat  # the subnet's first host = the gateway
         assert "--to-destination 127.0.0.1:40000" in flat
 
-    def _recorder_with_rules(self, s_output: bytes) -> _RunRecorder:
-        """A recorder whose ``iptables -S PREROUTING`` returns ``s_output`` (quoted comments, as real
-        iptables does), so removal has rules to match against."""
+    def _recorder_with_rules(self, s_output: bytes, *, undeletable: bool = False) -> _RunRecorder:
+        """A recorder whose ``iptables -S PREROUTING`` returns ``s_output`` (quoted comments, as
+        real iptables does), so removal has rules to match against.
+
+        A rule that is deleted stops being listed, as the real chain does -- the replacement path
+        re-reads it to decide whether the chain is actually clear. With ``undeletable`` the delete
+        reports success and the rule stays, which is the failure that path exists to catch.
+        """
 
         class _Rec(_RunRecorder):
+            def __init__(self) -> None:
+                super().__init__()
+                self.rules = [line for line in s_output.decode().splitlines() if line.strip()]
+
             @override
             async def __call__(self, argv: Any, *, check: bool = True) -> tuple[int, bytes, bytes]:
                 argv = list(argv)
                 if argv[:4] == ["iptables", "-t", "nat", "-S"]:
                     self.calls.append(argv)
-                    return 0, s_output, b""
+                    return 0, ("\n".join(self.rules) + "\n").encode(), b""
+                if argv[:4] == ["iptables", "-t", "nat", "-D"] and not undeletable:
+                    comment = next(
+                        (argv[i + 1] for i, tok in enumerate(argv) if tok == "--comment"), None
+                    )
+                    self.rules = [
+                        rule for rule in self.rules if comment is None or f'"{comment}"' not in rule
+                    ]
                 return await super().__call__(argv, check=check)
 
         return _Rec()
@@ -552,6 +568,17 @@ class TestClusterDnsRedirect:
         assert "iptables -t nat -D PREROUTING" in rec.flat()
         assert "--comment bai-dns:sid-3" in rec.flat()
         assert '"bai-dns:sid-3"' not in rec.flat()
+
+    async def test_a_stale_rule_that_survived_its_delete_is_reported(
+        self, monkeypatch: Any
+    ) -> None:
+        # It sits ahead of the rule about to be appended and keeps sending :53 at a port that is
+        # gone -- a session that comes up and cannot resolve its own peers, with nothing having
+        # reported a failure. The exit codes say nothing here; the chain does.
+        rec = self._recorder_with_rules(self._RULE, undeletable=True)
+        monkeypatch.setattr(na, "_run", rec)
+        with pytest.raises(RuntimeError, match="could not be removed"):
+            await na.install_dns_redirect("172.30.1.1", 40001, "sid-4")
 
     async def test_install_clears_a_stale_rule_on_the_same_gateway(self, monkeypatch: Any) -> None:
         # A rule a DIFFERENT (dead) session left on this gateway must be removed on install, else it
