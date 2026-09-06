@@ -245,6 +245,19 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             return None
         meta = json.loads(raw)
         subnet = str(meta["subnet"])
+        # A meta is only worth reusing while the pool still agrees it is ours. A rollback that
+        # freed the allocation but could not delete the record leaves one that names a block and
+        # a VNI the next session may already hold; returning it would hand this session their
+        # data plane. Treat that as no allocation at all and build a fresh one.
+        if not await self._still_ours(session_id, subnet, meta.get("vni")):
+            log.warning(
+                "session {}'s recorded overlay allocation (subnet {}, vni {}) is no longer held"
+                " by it; allocating again",
+                session_id,
+                subnet,
+                meta.get("vni"),
+            )
+            return None
         endpoint_ips: dict[str, str] = {}
         for endpoint in endpoints:
             container_id = str(endpoint["container_id"])
@@ -265,6 +278,14 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         )
         return NetworkInfo(network_id=session_id, options={**meta, "endpoint_ips": endpoint_ips})
 
+    async def _still_ours(self, session_id: str, subnet: str, vni: Any) -> bool:
+        """Whether the pool still records this session as the holder of both."""
+        if await self._subnet_allocator.holder(subnet) != session_id:
+            return False
+        if vni is None:
+            return True
+        return await self._vni_allocator.holder(int(vni)) == session_id
+
     async def _rollback_create(self, session_id: str, subnet: str, vni: int | None) -> None:
         """Undo a partially-created session network: release the VNI and subnet blocks and
         delete every key written under the session (meta / endpoints / ipam / members). Each
@@ -276,7 +297,17 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 session_prefix(session_id).rstrip("/"), scope=ConfigScopes.GLOBAL
             )
         except Exception:
-            log.exception("rollback: failed to delete session keys for {}", session_id)
+            # The meta names the subnet and the VNI, and it is what a retry reads. Releasing them
+            # while it survives puts this session's record on resources the pool is free to hand
+            # to the next one -- and the retry would then return a stranger's data plane as its
+            # own. Keeping the allocation costs one block and one VNI until the session is
+            # destroyed; releasing it under a live record costs correctness.
+            log.exception(
+                "rollback: could not delete the keys of session {}; keeping its subnet and VNI"
+                " allocated so its meta cannot outlive them",
+                session_id,
+            )
+            return
         if vni is not None:
             try:
                 await self._vni_allocator.release(vni, session_id)
