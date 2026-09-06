@@ -1,6 +1,7 @@
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseFieldModel
+from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.types import VolumeID
 
 
@@ -9,8 +10,8 @@ class VolumeMetaField(BaseFieldModel):
     backend: str = Field(description="Specifies the storage backend to determine handling methods.")
     path: str = Field(description="Defines the volume's location for access and management.")
     fsprefix: str | None = Field(description="Indicates the filesystem prefix for path resolution.")
-    capabilities: list[str] = Field(
-        description="Lists allowed operations like read or write access."
+    capabilities: list[StorageBackendCapability] = Field(
+        description="Lists what the volume's backend implementation can do."
     )
 
 

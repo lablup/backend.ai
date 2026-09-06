@@ -23,7 +23,10 @@ from tenacity import (
     wait_fixed,
 )
 
-from ai.backend.common.data.storage.types import StorageBackendType
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import (
@@ -50,11 +53,6 @@ from ai.backend.storage.types import (
 )
 from ai.backend.storage.utils import fstime2datetime
 from ai.backend.storage.volumes.abc import (
-    CAP_FAST_FS_SIZE,
-    CAP_FAST_SIZE,
-    CAP_METRIC,
-    CAP_QUOTA,
-    CAP_VFOLDER,
     AbstractFSOpModel,
     AbstractQuotaModel,
 )
@@ -524,8 +522,14 @@ class NetAppVolume(BaseVolume):
         await self.netapp_client.aclose()
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER, CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_QUOTA, CAP_METRIC])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([
+            StorageBackendCapability.VFOLDER,
+            StorageBackendCapability.FAST_FS_SIZE,
+            StorageBackendCapability.FAST_SIZE,
+            StorageBackendCapability.QUOTA,
+            StorageBackendCapability.METRIC,
+        ])
 
     @override
     async def get_hwinfo(self) -> HardwareMetadata:
