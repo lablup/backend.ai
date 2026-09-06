@@ -1120,3 +1120,36 @@ class TestAMetaThatOutlivedItsAllocation:
         assert await plugin._subnet_allocator.holder(subnet) == "s1"
         assert await plugin._vni_allocator.holder(vni) == "s1"
         assert await plugin._subnet_allocator.acquire("s2") != subnet
+
+
+class TestAllocationRoundTrips:
+    """C6. Claiming the Nth session must not cost N round trips.
+
+    The plain low-to-high scan issued one compare-and-swap per block already taken, so a cluster
+    with a few hundred live sessions spent that many etcd calls on every launch -- quadratic over
+    the pool's lifetime. Reading the pool once rules candidates out; the CAS still decides.
+    """
+
+    class _Counting(FakeEtcd):
+        def __init__(self) -> None:
+            super().__init__()
+            self.cas = 0
+
+        @override
+        async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
+            self.cas += 1
+            return await super().put_if_absent(key, val, **kwargs)
+
+    async def test_the_hundredth_session_costs_what_the_first_did(self) -> None:
+        etcd = self._Counting()
+        subnets = SubnetAllocator(cast(AsyncEtcd, etcd))
+        vnis = VNIAllocator(cast(AsyncEtcd, etcd))
+        for i in range(100):
+            await subnets.acquire(f"s{i}")
+            await vnis.acquire(f"s{i}")
+        before = etcd.cas
+        await subnets.acquire("s100")
+        await vnis.acquire("s100")
+        assert etcd.cas - before == 2, (
+            "one compare-and-swap each; anything more is a scan over the taken blocks"
+        )
