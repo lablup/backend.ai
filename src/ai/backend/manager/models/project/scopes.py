@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
@@ -71,23 +71,23 @@ class UserProjectOperationScope(OperationScope):
     Membership is read from the projects' virtual entities.
     """
 
-    user_uuid: UUID
-    """Required. The user UUID to search projects for."""
+    user_id: UserID
+    """Required. The user to search projects for."""
 
     @override
     def to_condition(self) -> QueryCondition:
         """Membership predicate: the user is enrolled in the project's virtual
         scope."""
-        user_uuid = self.user_uuid
+        user_id = self.user_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, user_uuid)
+            return user_scope_membership_exists(PROJECT_SCOPE_TYPE, ProjectRow.id, user_id)
 
         return inner
 
     @property
     @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+    def existence_checks(self) -> Sequence[ExistenceCheck[UserID]]:
         """Return existence checks for scope validation.
 
         Note: User existence is typically already validated by auth layer.

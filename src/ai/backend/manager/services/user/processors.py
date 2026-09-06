@@ -97,13 +97,10 @@ from ai.backend.manager.services.user.actions.restore_user import (
     RestoreUserAction,
     RestoreUserActionResult,
 )
+from ai.backend.manager.services.user.actions.scoped_search import (
+    ScopedSearchUsersAction,
+)
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
-from ai.backend.manager.services.user.actions.search_users_by_domain import (
-    SearchUsersByDomainAction,
-)
-from ai.backend.manager.services.user.actions.search_users_by_project import (
-    SearchUsersByProjectAction,
-)
 from ai.backend.manager.services.user.actions.search_users_by_role import SearchUsersByRoleAction
 from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
     UpdateKeypairDotfileAction,
@@ -135,12 +132,7 @@ class UserProcessors:
     keypair_group: LookupFieldGroup[KeyPairData]
     error_log: ErrorLogProcessors
     global_search: GlobalActionProcessor[GlobalSearchUsersAction, BatchOpsResult[UserData]]
-    search_users_by_domain: ScopeActionProcessor[
-        SearchUsersByDomainAction, ScopedBatchOpsResult[UserData]
-    ]
-    search_users_by_project: ScopeActionProcessor[
-        SearchUsersByProjectAction, ScopedBatchOpsResult[UserData]
-    ]
+    scoped_search: ScopeActionProcessor[ScopedSearchUsersAction, ScopedBatchOpsResult[UserData]]
     search_users_by_role: GlobalActionProcessor[SearchUsersByRoleAction, BatchOpsResult[UserData]]
     create_user: ScopeActionProcessor[CreateUserAction, CreateUserActionResult]
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
@@ -204,8 +196,7 @@ class UserProcessors:
         self.lookup = group.public_lookup_ops(LookupUserAction)
         self.lookup_keypair_owner = group.key_owner_lookup_ops(LookupKeypairOwnerByAccessKeyAction)
         self.global_search = group.global_search_ops(GlobalSearchUsersAction)
-        self.search_users_by_domain = group.scope_search_ops(SearchUsersByDomainAction)
-        self.search_users_by_project = group.scope_search_ops(SearchUsersByProjectAction)
+        self.scoped_search = group.scope_search_ops(ScopedSearchUsersAction)
         self.search_users_by_role = group.global_search_ops(SearchUsersByRoleAction)
         self.create_user = group.scope(CreateUserAction, user_service.create_user)
         self.get_user = group.single_entity(GetUserAction, user_service.get_user)

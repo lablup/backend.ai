@@ -32,11 +32,12 @@ from ai.backend.manager.services.project.actions.purge_project import (
     PurgeProjectActionResult,
 )
 from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
+from ai.backend.manager.services.project.actions.scoped_search import (
+    ScopedSearchProjectsAction,
+)
 from ai.backend.manager.services.project.actions.search_projects import (
     GetProjectAction,
     GlobalSearchProjectsAction,
-    SearchProjectsByDomainAction,
-    SearchProjectsByUserAction,
 )
 from ai.backend.manager.services.project.actions.unassign_users import (
     UnassignUsersFromProjectAction,
@@ -65,11 +66,8 @@ class ProjectProcessors:
     lookup: LookupActionProcessor[LookupProjectAction, LookupOpsResult[ProjectID]]
     get_project: SingleEntityActionProcessor[GetProjectAction, EntityOpsResult[ProjectData]]
     global_search: GlobalActionProcessor[GlobalSearchProjectsAction, BatchOpsResult[ProjectData]]
-    search_projects_by_domain: ScopeActionProcessor[
-        SearchProjectsByDomainAction, ScopedBatchOpsResult[ProjectData]
-    ]
-    search_projects_by_user: ScopeActionProcessor[
-        SearchProjectsByUserAction, ScopedBatchOpsResult[ProjectData]
+    scoped_search: ScopeActionProcessor[
+        ScopedSearchProjectsAction, ScopedBatchOpsResult[ProjectData]
     ]
     create_project: ScopeActionProcessor[CreateProjectAction, CreatedEntityOpsResult[ProjectData]]
     delete_project: SingleEntityActionProcessor[DeleteProjectAction, EntityOpsResult[ProjectData]]
@@ -102,8 +100,7 @@ class ProjectProcessors:
         self.lookup = group.public_lookup_ops(LookupProjectAction)
         self.get_project = group.single_get_ops(GetProjectAction)
         self.global_search = group.global_search_ops(GlobalSearchProjectsAction)
-        self.search_projects_by_domain = group.scope_search_ops(SearchProjectsByDomainAction)
-        self.search_projects_by_user = group.scope_search_ops(SearchProjectsByUserAction)
+        self.scoped_search = group.scope_search_ops(ScopedSearchProjectsAction)
         self.create_project = group.role_managed_create_ops(CreateProjectAction)
         self.delete_project = group.single_guarded_delete_ops(DeleteProjectAction)
         self.restore_project = group.single_guarded_restore_ops(RestoreProjectAction)

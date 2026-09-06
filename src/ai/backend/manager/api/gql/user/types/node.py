@@ -10,6 +10,7 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.dto.manager.v2.user.types import UserFairShareScope, UserUsageScope
 from ai.backend.common.exception import InvalidAPIParameters
@@ -249,11 +250,9 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             ProjectV2Edge,
             ProjectV2GQL,
         )
-        from ai.backend.manager.models.project.scopes import UserProjectOperationScope
 
-        scope = UserProjectOperationScope(user_uuid=UUID(str(self.id)))
         payload = await info.context.adapters.project.search_by_user(
-            scope=scope,
+            user_id=UserID(UUID(str(self.id))),
             input=AdminSearchProjectsInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
