@@ -35,15 +35,6 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
     """
 
     __tablename__ = "storage_volumes"
-    __table_args__ = (
-        # Partial unique index: at most one row may have is_default = true.
-        sa.Index(
-            "uq_storage_volumes_is_default",
-            "is_default",
-            unique=True,
-            postgresql_where=sa.text("is_default"),
-        ),
-    )
 
     id: Mapped[StorageVolumeID] = mapped_column(
         "id",
@@ -57,12 +48,6 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
         GUID(StorageBackendID),
         sa.ForeignKey("storage_backends.id", ondelete="RESTRICT"),
         nullable=False,
-    )
-    # At most one volume may be the default at a time, enforced by the partial unique
-    # index in ``__table_args__`` (a minimum of one is NOT guaranteed). To switch the
-    # default, clear the previous one before setting the new one in the same transaction.
-    is_default: Mapped[bool] = mapped_column(
-        "is_default", sa.Boolean, nullable=False, server_default=sa.false()
     )
     # How long this may go without a fresh check before its status counts as stale.
     status_stale_after: Mapped[timedelta] = mapped_column(
@@ -138,4 +123,17 @@ class ResourceGroupStorageVolumeRow(LifecycleTimestampsMixin, Base):
     )
     enabled: Mapped[bool] = mapped_column(
         "enabled", sa.Boolean, nullable=False, server_default=sa.true()
+    )
+    # At most one volume may be the default within a resource group.
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, nullable=False, server_default=sa.false()
+    )
+
+    __table_args__ = (
+        sa.Index(
+            "uq_rg_storage_volumes_is_default",
+            "resource_group_id",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
     )
