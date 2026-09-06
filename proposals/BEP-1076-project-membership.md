@@ -57,7 +57,7 @@ an edit of the user, not a membership operation. This proposal covers projects o
 
 ### The invitation that exists
 
-`entity_invitations` offers **access to an entity**.
+`entity_shares` offers **access to an entity**.
 
 | Column | Value |
 |---|---|
@@ -130,9 +130,9 @@ retention and go away.
 
 ### The invitation has its own table
 
-A different axis from `entity_invitations`.
+A different axis from `entity_shares`.
 
-| | `entity_invitations` | Project invitation |
+| | `entity_shares` | Project invitation |
 |---|---|---|
 | What is offered | access to an entity | project membership |
 | Value carried | `permission_cap` | a role, or `auto_assign` |
