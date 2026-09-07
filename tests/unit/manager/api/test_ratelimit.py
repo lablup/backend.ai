@@ -102,11 +102,20 @@ class TestRlimMiddleware:
         caller: Caller = request.getfixturevalue(request.param)
         return caller
 
-    async def test_an_authorized_query_is_judged_by_the_user_window(
+    @pytest.mark.parametrize(
+        ("caller", "expected_limit"),
+        [
+            ("anonymous_caller", _ANONYMOUS_RATELIMIT),
+            ("authorized_caller", _RATE_LIMIT),
+        ],
+        indirect=["caller"],
+    )
+    async def test_a_query_is_judged_by_its_own_window(
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
-        authorized_caller: Caller,
+        caller: Caller,
+        expected_limit: int,
         mock_handler: AsyncMock,
     ) -> None:
         """The two windows stand apart, so the limit reported says which one governed."""
@@ -119,34 +128,11 @@ class TestRlimMiddleware:
         )
 
         # Act
-        response = await middleware(authorized_caller.request, mock_handler)
-        await apply_reserved_response_headers(authorized_caller.request, response)
+        response = await middleware(caller.request, mock_handler)
+        await apply_reserved_response_headers(caller.request, response)
 
         # Assert
-        assert response.headers["X-RateLimit-Limit"] == str(_RATE_LIMIT)
-
-    async def test_an_anonymous_query_is_judged_by_the_client_address_window(
-        self,
-        middleware: Any,
-        mock_valkey_client: MagicMock,
-        anonymous_caller: Caller,
-        mock_handler: AsyncMock,
-    ) -> None:
-        """A request that names no keypair is held to the anonymous window, not a user's."""
-        # Arrange
-        mock_valkey_client.consume_user_rate_limit.return_value = RateLimitState(
-            count=1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
-        )
-        mock_valkey_client.consume_ip_rate_limit.return_value = RateLimitState(
-            count=1, limit=_ANONYMOUS_RATELIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
-        )
-
-        # Act
-        response = await middleware(anonymous_caller.request, mock_handler)
-        await apply_reserved_response_headers(anonymous_caller.request, response)
-
-        # Assert
-        assert response.headers["X-RateLimit-Limit"] == str(_ANONYMOUS_RATELIMIT)
+        assert response.headers["X-RateLimit-Limit"] == str(expected_limit)
 
     @pytest.mark.parametrize("caller", ["anonymous_caller", "authorized_caller"], indirect=True)
     @pytest.mark.parametrize(
