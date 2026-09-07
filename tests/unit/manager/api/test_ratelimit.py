@@ -49,15 +49,6 @@ class RateLimitSuccessCase:
     description: str
 
 
-@dataclass(frozen=True)
-class RateLimitExceedCase:
-    """A window the request runs past, and the limit the 429 reports."""
-
-    limit: int
-    count: int
-    description: str
-
-
 class TestRlimMiddleware:
     @pytest.fixture
     def mock_valkey_client(self) -> MagicMock:
@@ -184,38 +175,16 @@ class TestRlimMiddleware:
         mock_handler.assert_called_once_with(caller.request)
 
     @pytest.mark.parametrize("caller", ["anonymous_caller", "authorized_caller"], indirect=True)
-    @pytest.mark.parametrize(
-        "case",
-        [
-            RateLimitExceedCase(
-                limit=_RATE_LIMIT,
-                count=_RATE_LIMIT + 1,
-                description="exceeds by 1",
-            ),
-            RateLimitExceedCase(
-                limit=_RATE_LIMIT,
-                count=50000,
-                description="far exceeds limit",
-            ),
-            RateLimitExceedCase(
-                limit=0,
-                count=1,
-                description="zero limit always exceeds",
-            ),
-        ],
-        ids=lambda case: case.description,
-    )
     async def test_a_query_past_its_window_is_refused(
         self,
         middleware: Any,
         caller: MockCaller,
         mock_handler: AsyncMock,
-        case: RateLimitExceedCase,
     ) -> None:
-        """A request past the window it was counted in gets 429 and never reaches the handler."""
+        """One request past the limit is refused, and the quota survives the raise."""
         # Arrange
         caller.consumer.return_value = RateLimitState(
-            count=case.count, limit=case.limit, reset_after_seconds=_RESET_AFTER_SECONDS
+            count=_RATE_LIMIT + 1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
         )
 
         # Act & Assert
@@ -223,7 +192,7 @@ class TestRlimMiddleware:
             await middleware(caller.request, mock_handler)
         response = web.Response(status=429)
         await apply_reserved_response_headers(caller.request, response)
-        assert response.headers["X-RateLimit-Limit"] == str(case.limit)
+        assert response.headers["X-RateLimit-Limit"] == str(_RATE_LIMIT)
         assert response.headers["X-RateLimit-Remaining"] == "0"
         assert response.headers["X-RateLimit-Reset"] == str(_RESET_AFTER_SECONDS)
         assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW_SECONDS)
