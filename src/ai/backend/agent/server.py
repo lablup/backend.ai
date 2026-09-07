@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import functools
 import logging
 import os
@@ -26,6 +27,7 @@ from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
+    IO,
     Any,
     ClassVar,
     Final,
@@ -53,6 +55,7 @@ from ai.backend.agent.errors import (
     AgentInitializationError,
     ResourceError,
 )
+from ai.backend.agent.errors.agent import AgentAlreadyRunning
 from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
@@ -1662,6 +1665,42 @@ async def server_main(
         await agent_init_stack.__aexit__(None, None, None)
 
 
+#: Open handles whose file locks must outlive the call that took them. A lock released is a lock
+#: that was not held: closing the pid file would let a second agent start under this id while the
+#: first is still running, which is the whole thing `_hold_pid_file` exists to stop.
+_held_locks: Final[list[IO[str]]] = []
+
+
+def _hold_pid_file(pid_file: Path) -> None:
+    """Take the agent's pid file exclusively and record this process in it.
+
+    An advisory `flock`, held open for the life of the process. Writing the pid and letting go --
+    which is what this did -- records who the agent is without stopping a second one, and a second
+    agent under the same id is a split brain the rest of the system cannot see: every name the
+    cluster identifies this node's state by is the agent id, so the two are one identity to the
+    manager, to the node-wide VNI registry and to the privnet's journal. The session generation
+    does not separate them either; they are working on the same session.
+
+    Raises:
+        AgentAlreadyRunning: another process holds the file.
+    """
+    handle = pid_file.open("a+")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as e:
+        handle.close()
+        raise AgentAlreadyRunning(
+            f"another agent already holds {pid_file}; refusing to start a second process under"
+            " this agent id, which would share its membership, its VNI claims and its privnet"
+            " journal with the one already running"
+        ) from e
+    handle.seek(0)
+    handle.truncate()
+    handle.write(str(os.getpid()))
+    handle.flush()
+    _held_locks.append(handle)
+
+
 @click.group(invoke_without_command=True)
 @click.option(
     "-f",
@@ -1752,7 +1791,15 @@ def main(
         raise click.Abort() from e
 
     if not is_invoked_subcommand:
-        server_config.agent_common.pid_file.write_text(str(os.getpid()))
+        # Held for the life of the process, not merely written. Two agents under one id share
+        # every name the cluster identifies this node's state by -- the member key
+        # `network/session/{sid}/members/{agent_id}`, the node-wide VNI claim's owner, the
+        # privnet's journal -- and the session generation cannot tell them apart, because they
+        # are the SAME session. During a supervisor restart the outgoing process can then
+        # withdraw the incoming one's membership and tear down the data plane it just adopted.
+        # An advisory exclusive lock is what stops the second process rather than the second
+        # session. The handle stays open for the life of the process (see `_held_locks`).
+        _hold_pid_file(server_config.agent_common.pid_file)
         image_commit_path = server_config.agent_common.image_commit_path
         image_commit_path.mkdir(parents=True, exist_ok=True)
         ipc_base_path = server_config.agent_common.ipc_base_path

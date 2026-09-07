@@ -17,6 +17,28 @@ from ai.backend.common.exception import (
 )
 
 
+class AgentAlreadyRunning(BackendAIError, web.HTTPConflict):
+    """Another process already holds this agent's pid file.
+
+    Two agents under one id are one identity to everything that names this node's state: the
+    session membership key, the node-wide VNI claim's owner, the privnet's journal. They are
+    working on the same sessions, so no session-level fence separates them -- the outgoing process
+    of a restart can withdraw the incoming one's membership and tear down the data plane it has
+    just adopted. The second process is refused instead.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/already-running"
+    error_title = "Another agent process is already running under this id."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.START,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class ImageArchitectureMismatchError(BackendAIError, web.HTTPBadRequest):
     """Raised when image architecture does not match the agent's architecture."""
 

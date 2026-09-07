@@ -1008,7 +1008,12 @@ class TestACreateThatNeverFinished:
 
         class NeverReturns(VNIAllocator):
             @override
-            async def acquire(self, session_id: str, generation: str | None = None) -> int:
+            async def acquire(
+                self,
+                session_id: str,
+                generation: str | None = None,
+                guards: Mapping[str, str] | None = None,
+            ) -> int:
                 started.set()
                 await asyncio.sleep(60)
                 raise AssertionError("unreachable")
@@ -1044,9 +1049,14 @@ class TestACreateThatNeverFinished:
 
 
 class _GatedEtcd(FakeEtcd):
-    """A store that holds every prefix read at a barrier, so two callers see one snapshot.
+    """A store that holds the ALLOCATION prefix reads at a barrier, so two callers see one
+    snapshot.
 
     That is the shape of the race: two managers both find no meta, and both go on to allocate.
+
+    Scoped to the pool and the session's own subtree. A create reads other prefixes on the way in
+    -- what earlier incarnations of the id still owe, for one -- and holding those at the barrier
+    stops both callers before either reaches the race this models.
     """
 
     def __init__(self, gate: asyncio.Event) -> None:
@@ -1056,7 +1066,8 @@ class _GatedEtcd(FakeEtcd):
     @override
     async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
         found = await super().get_prefix(prefix, **kwargs)
-        await self._gate.wait()
+        if prefix.startswith(("network/ipam", "network/session")):
+            await self._gate.wait()
         return found
 
 
@@ -1947,6 +1958,116 @@ class TestACleanupThatCouldNotFinishIsRetried:
         assert f"network/cleanup-debt/s1/{generation}" not in etcd.store
 
 
+class _RecordsGuards(FakeEtcd):
+    """Remembers what each write was conditional on, so a missing guard is visible."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.guarded: dict[str, dict[str, str]] = {}
+
+    @override
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: Mapping[str, str],
+        **kwargs: Any,
+    ) -> bool:
+        written = await super().compare_and_put(
+            key, val, expected=expected, guards=guards, **kwargs
+        )
+        if written:
+            self.guarded[key] = dict(guards)
+        return written
+
+
+class TestTheGuardIsWiredIntoTheRealPath:
+    """C18. A guard that exists on the allocator and is not passed by `create_network` protects
+    nothing. Asserted through the PUBLIC entry points -- create, reuse, teardown -- and never by
+    handing the allocator a guard the test made up, because that is exactly the mistake this
+    catches: `TestAChildKeyWrittenUnderNoRecord` passed while every real call site was unguarded.
+    """
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+        "member_agents": ["a1"],
+    }
+
+    async def test_create_guards_every_key_it_writes_on_the_session_record(self) -> None:
+        etcd = _RecordsGuards()
+        etcd.store["network/agent/a1/vtep"] = "192.168.105.7"
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        written = {
+            key: guards for key, guards in etcd.guarded.items() if key.startswith("network/")
+        }
+        unguarded = [key for key, guards in written.items() if _META_KEY not in guards]
+        assert written, "nothing went through the guarded write at all"
+        assert not unguarded, (
+            f"these keys were written without naming the session record: {sorted(unguarded)}"
+        )
+
+    async def test_the_pool_claims_are_guarded_too(self) -> None:
+        etcd = _RecordsGuards()
+        plugin = _plugin_with(etcd)
+
+        await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+
+        pool = [key for key in etcd.guarded if key.startswith("network/ipam/")]
+        assert pool, "no pool claim went through the guarded write"
+        for key in pool:
+            assert _META_KEY in etcd.guarded[key], f"{key} was claimed under no record"
+
+    async def test_a_create_whose_record_is_taken_writes_nothing_further(self) -> None:
+        """The guard's actual job, through the real path: the record is replaced mid-create, and
+        the endpoint keys that follow must not be written under it."""
+
+        class _TakenMidCreate(_RecordsGuards):
+            def __init__(self) -> None:
+                super().__init__()
+                self.armed = False
+
+            @override
+            async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
+                found: dict[str, str] = await super().get_prefix(prefix, **kwargs)
+                if self.armed and prefix.rstrip("/").endswith("/ipam"):
+                    self.armed = False
+                    # Somebody else takes the session while this create is assigning addresses.
+                    self.store[_META_KEY] = json.dumps({
+                        "_owner": "someone-else",
+                        "_state": "ready",
+                    })
+                return found
+
+        etcd = _TakenMidCreate()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        etcd.armed = True
+
+        with pytest.raises(EndpointSuperseded):
+            await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        assert "network/session/s1/endpoints/k1" not in etcd.store, (
+            "it wrote an endpoint under a record it no longer held"
+        )
+
+    async def test_the_preseeded_member_names_the_record(self) -> None:
+        etcd = _RecordsGuards()
+        etcd.store["network/agent/a1/vtep"] = "192.168.105.7"
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        assert _META_KEY in etcd.guarded[member_key("s1", "a1")]
+
+
 class TestADestroyThatFindsNoRecordAtAll:
     """C7b. "No record" is what the destroy READ, not something it holds. A create claims the id
     with a compare-and-swap on that same key, so between the read and any delete it can publish a
@@ -2109,6 +2230,10 @@ class TestAllocationRoundTrips:
     """
 
     class _Counting(FakeEtcd):
+        """Counts every compare-and-swap the pool costs, whichever primitive makes it: a claim is
+        a guarded `compare_and_put` now, and counting only `put_if_absent` would report a scan
+        over the taken blocks as free."""
+
         def __init__(self) -> None:
             super().__init__()
             self.cas = 0
@@ -2117,6 +2242,11 @@ class TestAllocationRoundTrips:
         async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
             self.cas += 1
             return await super().put_if_absent(key, val, **kwargs)
+
+        @override
+        async def compare_and_put(self, key: str, val: str, **kwargs: Any) -> bool:
+            self.cas += 1
+            return await super().compare_and_put(key, val, **kwargs)
 
     async def test_the_hundredth_session_costs_what_the_first_did(self) -> None:
         etcd = self._Counting()
@@ -2261,8 +2391,8 @@ class TestABlockClaimedOnlyInPart:
 
         class StallsBetweenUnits(FakeEtcd):
             @override
-            async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
-                claimed = await super().put_if_absent(key, val, **kwargs)
+            async def compare_and_put(self, key: str, val: str, **kwargs: Any) -> bool:
+                claimed = await super().compare_and_put(key, val, **kwargs)
                 if claimed and not started.is_set():
                     started.set()
                     await asyncio.sleep(60)

@@ -24,6 +24,8 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | C12 | **A table shared with another incarnation is read as one.** Endpoints and members carrying a different generation are not programmed. | A leftover record points this node's FDB and ARP at an address the live session's kernels do not hold, and the frames leave with nothing answering. | `TestATableSharedWithAnotherIncarnation` |
 | C13 | **A pool claim is owned by an incarnation, not a session id.** Adoption, partial-claim completion and release all match on both. | A later incarnation adopts a stalled one's block; the stalled one's cleanup gives it back, and the pool hands it to a third session while the live one is on it -- two tenants at one address range. | `TestASubnetTwoIncarnationsBothClaim` |
 | C14 | **A child key is created under the record that makes it legitimate, in one store operation.** Endpoint, address and member writes name the session record as a guard. | A stamp says whose a key is but cannot stop one being MADE: a stale create finds the address free (because the session was torn down) and attaches its state to a session that no longer exists. | `TestAChildKeyWrittenUnderNoRecord` |
+| C16 | **A guard is wired into the path that needs it.** The create, the reuse and the pre-seed pass the session record; the pool claims do too. | A guard that exists on the allocator and is not passed by its caller protects nothing, and a test that supplies its own guard passes over the gap. | `TestTheGuardIsWiredIntoTheRealPath` |
+| C17 | **One agent id, one agent process.** The pid file is held under an exclusive lock. | Two agents under one id are one identity to the manager, the VNI registry and the privnet journal; no session-level fence separates them, so a restart's outgoing process can withdraw the incoming one's membership. | `_hold_pid_file` |
 | C15 | **A cleanup that cannot finish is written down and retried.** The orphan sweep records what it owes per incarnation and clears it only when nothing is left. | The sweep has no tombstone to work from -- the record already names its successor -- so one transient etcd error leaks a VNI, a subnet and their keys for the cluster's life. | `TestACleanupThatCouldNotFinishIsRetried` |
 
 ## D — Data plane (agent)
@@ -152,3 +154,20 @@ Known and NOT addressed: two agent processes sharing one agent id and one incarn
 apart -- there is no process-incarnation token below the session generation. It is out of reach of
 this fencing scheme, which is per session, and is a misconfiguration rather than a race, but a node
 running two agents under one id can still have one withdraw the other's membership.
+
+
+Sixth round, against the same bar:
+
+| # | Was | Now |
+|---|-----|-----|
+| C16 | `EndpointAllocator.assign` grew a `guards` parameter and NOT ONE of its three call sites passed it -- an editing script raised partway and wrote nothing, and the round's own test supplied its own guard, so it passed over the gap | the create, the reuse and the pre-seed all pass the record they hold, and the test asserts it through `create_network` rather than through the allocator |
+| C13 | pool claims were made with no guard at all, so a create stalled past the handover could claim a subnet and a VNI on behalf of a session that had moved on -- and be killed before publishing, leaving them named by no meta, no tombstone and no debt | the unit and VNI claims are guarded on the session record in the same store operation |
+| C13 | an unstamped claim was adoptable by every incarnation at once and was never rewritten, so two of them read one claim as theirs | adoption promotes the claim to the adopting incarnation by value-CAS, in place; a promotion that loses falls back to a block of its own |
+| C15 | a debt that could not be written was logged and the sweep continued; a debt that could not be READ let the create carry on | both are consequential: the read raises so the caller retries, and a sweep that fails with no note behind it is reported as unrecoverable |
+| C17 | the pid file was written and closed, so nothing stopped a second agent under one id | held under `flock` for the life of the process; the second refuses to start |
+
+R3 remains un-run against the current HEAD. Nothing in C8-C18 or D7-D10 has been exercised on real
+nodes, and A1/A2/A3/A9/A10 are still unrun -- which matters more this round than last, because C17
+changes agent STARTUP: a node whose pid file is held by a stale process now refuses to start where
+it previously started and raced. That is the intended behaviour and it is exactly the kind of
+change only a real restart shows.
