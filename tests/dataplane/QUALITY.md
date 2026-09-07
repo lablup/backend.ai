@@ -28,6 +28,9 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | C17 | **One agent id, one agent process.** The pid file is held under an exclusive lock. | Two agents under one id are one identity to the manager, the VNI registry and the privnet journal; no session-level fence separates them, so a restart's outgoing process can withdraw the incoming one's membership. | `_hold_pid_file` |
 | C18 | **A lost claim is one candidate; an expired guard is all of them.** Both allocators tell the two apart at the first miss. | Read as a conflict, an expired guard walks the whole VNI range -- ~16.7M swaps and prefix reads -- holding the manager and its etcd for as long as that takes. | `TestAGuardThatExpiredMidScan` |
 | C19 | **A claim from before the field is taken, not shared.** A legacy subnet or VNI is promoted to the adopting incarnation before it is used, all units or none. | Two incarnations read one claim as theirs: the newer runs on it, the older's cleanup gives it back, and the pool hands a live session's VNI or half its subnet to another tenant. | `TestALegacyClaimTwoIncarnationsCanRead`, `TestAWideBlockOnTwoIncarnations` |
+| C24 | **A promotion touches only a claim that is still this session's.** Every unit is checked to be this session's claim on this block before it is rewritten. | A promotion driven from a RECORD has no claim in front of it, and a compare-and-swap naming "whatever bytes are there" rewrites another session's claim into this one's -- two sessions then believe they own one subnet. | `test_promotion_does_not_take_a_block_another_session_now_holds` |
+| C25 | **A reuse that cannot take its allocation hands back nothing.** | Warning and continuing builds a data plane on a subnet or VNI this session does not hold, or on one an earlier cleanup can still give away. | `test_a_reuse_that_cannot_take_its_allocation_hands_back_nothing` |
+| C26 | **Compatible is not in use.** An unstamped claim counts as live only where the record names that very subnet or VNI. | Anything else under the id is read as live forever: promotion follows the record and never reaches it, and the sweep skips it. | `test_an_extra_unstamped_claim_of_a_live_session_is_reclaimed` |
 | C23 | **A live unstamped claim is TAKEN, not merely preserved.** The startup sweep and the reuse path stamp it with the incarnation its record names; a cleanup for an incarnation the record has moved on from will not take an unstamped claim. | Unstamped is compatible with every incarnation, so between "preserved" and "promoted" any earlier cleanup gives a running session's subnet and VNI back to the pool. | `test_the_sweep_takes_a_preserved_legacy_claim_rather_than_leaving_it`, `test_an_earlier_cleanup_does_not_take_a_live_unstamped_claim` |
 | C22 | **An unstamped claim is compatible, not garbage.** The reconciler judges by `of_generation`, the same rule the allocators use. | Comparing the two generations directly makes every claim carried over an upgrade a mismatch -- so the first start of the manager that upgraded them deletes the live subnet and VNI of every such session. | `test_a_live_sessions_legacy_subnet_survives_the_sweep` |
 | C21 | **A judgement and the delete it justifies are one operation.** The reconciler carries the record state it judged on into the delete as a guard. | It reads a claim, finds no session, and deletes -- while in between the session is rebuilt over that very unit. A re-read before the delete conditions it on the claim the sweep never judged, and takes a live tenant's subnet. | `test_a_claim_retaken_between_the_judgement_and_the_delete_survives` |
@@ -262,3 +265,22 @@ R3 unchanged: no run against this HEAD. C18-C23 and D7-D10 remain unexercised on
 the upgrade path this round is about -- a session carried across the incarnation field, at the
 first start of the manager that upgraded it -- is a rolling restart, which is exactly the test
 that has not been run.
+
+
+Eleventh round, against the same bar:
+
+| # | Was | Now |
+|---|-----|-----|
+| C24 | `promote` read the pool and handed the block to `_claim_as_ours`, which rewrote each unit by compare-and-swap over whatever bytes it found -- with no check that the bytes were this session's. Called from a record rather than from a claim the pool had just handed out, that is a cross-session overwrite: the block is given back and re-allocated, and s1's promotion rewrites s2's claim into its own | every unit is checked to be this session's claim on this block first, and a partial promotion is undone. The VNI path already did this; the subnet path did not |
+| C25 | `_take_allocation` warned on failure and the reuse path carried on, so a record naming an allocation the session does not hold was still handed back as one | it returns whether the allocation is wholly this incarnation's, and the reuse reports no allocation at all when it is not -- the same answer `_still_ours` gives in the same situation. The pool is re-checked once more after the endpoints are written |
+| C26 | the sweep asked only `of_generation`, and unstamped is compatible with every incarnation -- so a second, older claim under a live session's id was read as live, never promoted (promotion follows the record) and never reclaimed | an unstamped claim is live only where the record names that very subnet or VNI |
+| — | the promotion queue was per CLAIM, so a wide block queued one promotion per unit and each re-read the whole pool: quadratic in legacy sessions | keyed by session |
+
+Still NOT done, unchanged: no leader-only periodic reconciliation; no health surface for
+`unrecoverable_leaks()`; the startup sweep is unpaginated; `compare_and_delete` is exercised only
+against the in-memory fake.
+
+R3 unchanged. This is the third consecutive round in which the defect found was in code the
+previous round added rather than in the original design, and every one of them was in the
+reconciliation path. That path is reasoned about only against a model of etcd; it has never run
+against a real one, let alone a rolling restart.

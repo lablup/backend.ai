@@ -353,6 +353,13 @@ class SubnetAllocator:
         half to somebody else while this session is running on the whole block. Units this call
         rewrote are put back as they were if a later one will not go.
 
+        Every unit is checked to be THIS session's claim on THIS block before it is rewritten.
+        The compare-and-swap alone does not say that: it names the bytes to replace, and those
+        bytes are whatever is there -- including another session's claim, if the block was given
+        back and re-allocated between the caller reading its own record and arriving here. A
+        promotion driven from a record rather than from a claim the pool just handed out (see
+        `promote`) has no other check in front of it.
+
         :return: ``True`` if every unit of the block is now this incarnation's.
         """
         if generation is None:
@@ -367,6 +374,16 @@ class SubnetAllocator:
                 return False
             if raw == payload:
                 continue
+            if _claimed_subnet(raw, session_id, generation) != subnet:
+                # Not this session's claim on this block any more. Whoever holds it now holds it.
+                log.warning(
+                    "not promoting {}: it is no longer session {}'s claim on {}",
+                    unit,
+                    session_id,
+                    subnet,
+                )
+                await self._undo_promotion(promoted, payload)
+                return False
             if not await self._etcd.compare_and_put(
                 _allocated_key(unit), payload, expected=raw, guards=guard_keys
             ):
