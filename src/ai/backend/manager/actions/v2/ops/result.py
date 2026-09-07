@@ -23,6 +23,10 @@ from ai.backend.common.data.entity.types import (
     FieldIdentifier,
 )
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
+from ai.backend.manager.actions.v2.lookup.bulk_base import (
+    BaseBulkLookupActionResult,
+    BulkLookupKeyResult,
+)
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 
 __all__ = (
@@ -30,6 +34,7 @@ __all__ = (
     "CreatedEntityOpsResult",
     "CreatedEntityWithFieldsOpsResult",
     "LookupOpsResult",
+    "BulkLookupOpsResult",
     "OwnedFieldsOpsResult",
     "CreatedFieldOpsResult",
     "FieldsOpsResult",
@@ -97,6 +102,33 @@ class LookupOpsResult[TEntityID: EntityIdentifier](BaseLookupActionResult):
     @override
     def entity_id(self) -> TEntityID:
         return self.resolved_entity_id
+
+
+class BulkLookupOpsResult[TKey, TEntityID: EntityIdentifier](BaseBulkLookupActionResult):
+    """The id each key of a bulk lookup names, and which keys named nothing.
+
+    A key that named nothing is one failed key, so the operation that follows can
+    answer for it beside the rest rather than being refused as a whole.
+    """
+
+    _resolved: Mapping[TKey, TEntityID]
+    _key_results: Sequence[BulkLookupKeyResult]
+
+    def __init__(
+        self,
+        resolved: Mapping[TKey, TEntityID],
+        key_results: Sequence[BulkLookupKeyResult],
+    ) -> None:
+        self._resolved = resolved
+        self._key_results = key_results
+
+    @property
+    def resolved(self) -> Mapping[TKey, TEntityID]:
+        return self._resolved
+
+    @override
+    def key_results(self) -> Sequence[BulkLookupKeyResult]:
+        return self._key_results
 
 
 @dataclass

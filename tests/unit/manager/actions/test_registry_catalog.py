@@ -107,6 +107,7 @@ from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.agent.actions.bulk_lookup import BulkLookupAgentsAction
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
 )
@@ -484,6 +485,7 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
         SearchAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.GLOBAL, ActionGate.PUBLIC),
         # The lookup carries no permission; the read that follows it is checked.
         LookupAgentAction: (AGENT_ENTITY_TYPE, ActionKind.LOOKUP, ActionGate.PUBLIC),
+        BulkLookupAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.LOOKUP, ActionGate.PUBLIC),
     }
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)

@@ -54,7 +54,7 @@ from ai.backend.manager.models.rbac_models.role_preset.updaters import (
 )
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
-from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.purger import EntityBatchPurger
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
@@ -182,6 +182,18 @@ class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
         return row.to_data()
+
+
+class _PresetsByName(BulkDataLookup[str, EntityIdentifier]):
+    """The plural key resolution: the names come with the call."""
+
+    @override
+    def build_query(self, keys: Sequence[str]) -> sa.sql.Select[Any]:
+        return sa.select(RolePresetRow.name, RolePresetRow.id).where(RolePresetRow.name.in_(keys))
+
+    @override
+    def to_entity_id(self, value: uuid.UUID) -> EntityIdentifier:
+        return RolePresetID(value)
 
 
 @dataclass
@@ -408,6 +420,31 @@ class TestLookup:
 
         with pytest.raises(AmbiguousEntityKeyError):
             await repository.lookup(_PresetByName(name="default"))
+
+
+class TestBulkLookup:
+    async def test_every_named_key_comes_back_keyed_by_itself(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        other = await repository.create_global_entity(
+            _PresetCreator(name="analysts", scope_type=RBACScopeType.PROJECT)
+        )
+
+        found = await repository.bulk_lookup(_PresetsByName(), ["default", "analysts"])
+
+        assert found == {"default": preset.id, "analysts": other.id}
+
+    async def test_a_key_naming_nothing_is_absent_rather_than_raising(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        found = await repository.bulk_lookup(_PresetsByName(), ["default", "absent"])
+
+        assert list(found) == ["default"]
+
+    async def test_no_keys_reads_nothing(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        assert await repository.bulk_lookup(_PresetsByName(), []) == {}
 
 
 class TestUpdate:

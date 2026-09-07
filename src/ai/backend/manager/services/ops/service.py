@@ -37,6 +37,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
     BulkGetOwnedFieldOpsAction,
+    BulkLookupEntityOpsAction,
     EntityAtomicCreateOpsAction,
     EntityAtomicUpsertOpsAction,
     EntityCreateOpsAction,
@@ -73,6 +74,7 @@ from ai.backend.manager.actions.v2.ops.base import (
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     BulkFieldOpsResult,
+    BulkLookupOpsResult,
     CreatedEntityOpsResult,
     CreatedEntityWithFieldsOpsResult,
     CreatedFieldOpsResult,
@@ -237,6 +239,35 @@ class LookupService[TData: EntityData]:
 
     async def execute(self, action: LookupOpsAction[Any, Any]) -> LookupOpsResult[Any]:
         return LookupOpsResult(resolved_entity_id=await self._repository.lookup(action.to_lookup()))
+
+
+class BulkLookupService:
+    """Resolves the keys an action names into entity ids, answering per key."""
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: BulkLookupEntityOpsAction[Any, Any]
+    ) -> BulkLookupOpsResult[Any, Any]:
+        keys = action.keys()
+        resolved = await self._repository.bulk_lookup(action.to_lookup(), keys)
+        found = ActionRunStatus.success()
+        key_results = [
+            BulkLookupKeyResult(
+                key=action.to_lookup_key(key),
+                status=found.status if key in resolved else OperationStatus.ERROR,
+                description=found.description
+                if key in resolved
+                else "No entity matches the given key.",
+                error_code=None,
+                entity_id=resolved.get(key),
+            )
+            for key in keys
+        ]
+        return BulkLookupOpsResult(resolved=resolved, key_results=key_results)
 
 
 class FieldOwnerLookupService:

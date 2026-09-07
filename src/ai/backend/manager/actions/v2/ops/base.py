@@ -7,7 +7,8 @@ from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityI
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction, BasePartialBulkAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
-from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
+from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, LookupKey
+from ai.backend.manager.actions.v2.lookup.bulk_base import BaseBulkLookupAction
 from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -20,7 +21,7 @@ from ai.backend.manager.models.specs.creator import (
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
-from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
     EntityPurger,
@@ -49,6 +50,7 @@ __all__ = (
     "GetOpsAction",
     "FieldGetOpsAction",
     "LookupOpsAction",
+    "BulkLookupOpsAction",
     "SearchOpsAction",
     "GlobalSearchOpsAction",
     "GlobalEntityCreateOpsAction",
@@ -196,6 +198,24 @@ class LookupOpsAction[TRow: Base, TEntityID: EntityIdentifier](OpsBackendAction)
 
     @abstractmethod
     def to_lookup(self) -> DataLookup[TRow, TEntityID]:
+        """Return the key-resolution spec this action executes."""
+        raise NotImplementedError
+
+
+class BulkLookupOpsAction[TKey, TEntityID: EntityIdentifier](OpsBackendAction):
+    """A read of several entities' ids by keys that are not those ids.
+
+    The plural of :class:`LookupOpsAction`: the keys are the caller's, so the action
+    carries them and the spec says how they resolve.
+    """
+
+    @abstractmethod
+    def keys(self) -> Sequence[TKey]:
+        """Return the keys being resolved."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_lookup(self) -> BulkDataLookup[TKey, TEntityID]:
         """Return the key-resolution spec this action executes."""
         raise NotImplementedError
 
@@ -597,6 +617,25 @@ class LookupEntityOpsAction[TRow: Base, TEntityID: EntityIdentifier](
     Declares nothing further — the shape fixes the operation, and the spec carries
     the key's columns and the conversion.
     """
+
+
+class BulkLookupEntityOpsAction[TKey, TEntityID: EntityIdentifier](
+    BaseBulkLookupAction, BulkLookupOpsAction[TKey, TEntityID], ABC
+):
+    """A bulk key resolution backed by ops: the bulk lookup shape paired with its spec.
+
+    ``lookup_keys()`` is derived from ``keys()``, so a key and its record cannot come
+    apart.
+    """
+
+    @abstractmethod
+    def to_lookup_key(self, key: TKey) -> LookupKey:
+        """Return the record's name for one key."""
+        raise NotImplementedError
+
+    @override
+    def lookup_keys(self) -> Sequence[LookupKey]:
+        return tuple(self.to_lookup_key(key) for key in self.keys())
 
 
 class GetSingleEntityOpsAction[TRow: Base, TData](

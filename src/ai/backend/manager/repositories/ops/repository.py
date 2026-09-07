@@ -30,6 +30,7 @@ from ai.backend.manager.models.specs.creator import (
     RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.lookup import (
+    BulkDataLookup,
     DataLookup,
     FieldKeyLookup,
     FieldOwnerKeyLookup,
@@ -121,6 +122,13 @@ class OpsRepository[TData]:
             if entity_id is None:
                 raise EntityNotFoundError(f"No {lookup.row_class().__name__} matches the given key")
             return entity_id
+
+    async def bulk_lookup[TKey, TEntityID: EntityIdentifier](
+        self, lookup: BulkDataLookup[TKey, TEntityID], keys: Sequence[TKey]
+    ) -> Mapping[TKey, TEntityID]:
+        """Resolve several keys into the ids they name; a key naming nothing is absent."""
+        async with self._ops.read_ops() as r:
+            return await r.lookup_entity_ids(lookup, keys)
 
     async def owned_fields[TOwnerID: EntityIdentifier, TFieldData: FieldData](
         self,

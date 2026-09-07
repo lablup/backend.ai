@@ -1,4 +1,4 @@
-"""Lookup specs of the v2 lineage: read one entity by an external key."""
+"""Lookup specs of the v2 lineage: read one entity, or several, by an external key."""
 
 from __future__ import annotations
 
@@ -70,6 +70,34 @@ class DataLookup[TRow: Base, TEntityID: EntityIdentifier](ABC):
     @abstractmethod
     def to_entity_id(self, row: TRow) -> TEntityID:
         """Return the id of the entity the matched row is."""
+        raise NotImplementedError
+
+
+class BulkDataLookup[TKey, TEntityID: EntityIdentifier](ABC):
+    """Resolves several external keys into the ids of the entities they name.
+
+    The plural :class:`DataLookup`. A query rather than conditions, for the same reason
+    :class:`FieldOwnerLookup` is one: it selects the pair, so which entity each key
+    named survives the batch. A key matching no row is absent from the answer.
+
+    Example:
+        class AgentNamesLookup(BulkDataLookup[AgentId, AgentUUID]):
+            def build_query(self, keys):
+                return sa.select(AgentRow.id, AgentRow.uuid).where(AgentRow.id.in_(keys))
+
+            def to_entity_id(self, value: UUID) -> AgentUUID:
+                return AgentUUID(value)
+    """
+
+    @abstractmethod
+    def build_query(self, keys: Sequence[TKey]) -> sa.sql.Select[Any]:
+        """Build the query selecting each key and the id of the entity it names, in
+        that order."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_entity_id(self, value: UUID) -> TEntityID:
+        """Convert the selected value into the entity's identifier."""
         raise NotImplementedError
 
 

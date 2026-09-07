@@ -76,6 +76,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
 )
 from ai.backend.manager.actions.v2.global_scope.validator import GlobalActionValidator
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLookupActionResult
+from ai.backend.manager.actions.v2.lookup.bulk_monitor import BulkLookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.processor import (
@@ -92,6 +93,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeScopeOpsAction,
     BatchUpdateGlobalOpsAction,
     BatchUpdateScopeOpsAction,
+    BulkLookupEntityOpsAction,
     CreateEntityOpsAction,
     CreateEntityWithFieldsOpsAction,
     CreateGlobalOpsAction,
@@ -122,6 +124,7 @@ from ai.backend.manager.actions.v2.ops.base import (
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkLookupOpsResult,
     CreatedEntityOpsResult,
     CreatedEntityWithFieldsOpsResult,
     EntitiesOpsResult,
@@ -148,6 +151,7 @@ from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
     BatchUpdateService,
     BulkFieldOwnerLookupService,
+    BulkLookupService,
     DeleteService,
     EntityAtomicCreateService,
     EntityAtomicUpsertService,
@@ -492,6 +496,35 @@ class ProcessorGroup[TData: EntityData]:
             LookupService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.lookup, *monitors),
             validators=(*self._deps.validators.lookup, *validators),
+        )
+
+    def bulk_lookup_ops[TAction: BulkLookupEntityOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        monitors: Sequence[BulkLookupActionMonitor] = (),
+    ) -> BulkLookupActionProcessor[TAction, BulkLookupOpsResult[Any, Any]]:
+        """Several keys resolved at once, each answered for; the entities they named
+        are then checked together, as a bulk read of them would be."""
+        self._record(action_cls, ActionKind.LOOKUP, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return BulkLookupActionProcessor(
+            BulkLookupService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk_lookup, *monitors),
+            post_validators=self._deps.validators.atomic_bulk,
+        )
+
+    def public_bulk_lookup_ops[TAction: BulkLookupEntityOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        monitors: Sequence[BulkLookupActionMonitor] = (),
+    ) -> BulkLookupActionProcessor[TAction, BulkLookupOpsResult[Any, Any]]:
+        """Keys every authenticated caller may resolve: no post-validators, so the
+        resolved entities carry no permission."""
+        self._record(action_cls, ActionKind.LOOKUP, ActionGate.PUBLIC, ActionBacking.GENERIC)
+        return BulkLookupActionProcessor(
+            BulkLookupService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk_lookup, *monitors),
         )
 
     def key_owner_lookup_ops[TAction: LookupFieldOwnerByKeyOpsAction[Any]](

@@ -106,8 +106,10 @@ which is why handlers call processors, not services.
   distinct descriptions and would not collapse anyway, and volume is a retention
   problem.
 - The batch owner read is a lookup action too. Going straight to the repository leaves
-  that read unrecorded and a missing row unmentioned. `bulk_lookup` answers per key,
-  and a key that named nothing is a failed key rather than a failed run.
+  that read unrecorded and a missing row unmentioned. The bulk lookup processor
+  (`field_group` builds it for owners; `bulk_lookup_ops` / `public_bulk_lookup_ops` for
+  entity keys) answers per key, and a key that named nothing is a failed key rather
+  than a failed run.
 
 ## Many-row writes: the failure mode is named, never an argument
 

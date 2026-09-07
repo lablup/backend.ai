@@ -37,7 +37,7 @@ from ai.backend.common.data.entity.types import (
     ScopeType,
 )
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, LookupKey
@@ -45,6 +45,7 @@ from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
+    BulkLookupEntityOpsAction,
     EntityAtomicCreateOpsAction,
     EntityCreateOpsAction,
     EntityPartialBulkPurgeOpsAction,
@@ -87,7 +88,7 @@ from ai.backend.manager.models.specs.creator import (
     GlobalEntityCreator,
     RoleManagedEntityCreator,
 )
-from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
@@ -111,6 +112,7 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
     BatchUpdateService,
+    BulkLookupService,
     DeleteService,
     EntityAtomicCreateService,
     EntityCreateService,
@@ -318,6 +320,16 @@ class _PresetPurger(EntityPurger[RolePresetRow, _PresetData]):
     @override
     def to_data(self, row: RolePresetRow) -> _PresetData:
         return _PresetData(id=row.id, name=row.name)
+
+
+class _PresetsByName(BulkDataLookup[str, EntityIdentifier]):
+    @override
+    def build_query(self, keys: Sequence[str]) -> sa.sql.Select[Any]:
+        return sa.select(RolePresetRow.name, RolePresetRow.id).where(RolePresetRow.name.in_(keys))
+
+    @override
+    def to_entity_id(self, value: uuid.UUID) -> EntityIdentifier:
+        return _EntityID(value)
 
 
 @dataclass
@@ -760,6 +772,33 @@ class _NameKey(LookupKey):
     @override
     def to_dict(self) -> dict[str, Any]:
         return {"name": self.name}
+
+
+@dataclass
+class _BulkLookupAction(BulkLookupEntityOpsAction[str, EntityIdentifier]):
+    names: Sequence[str]
+
+    @override
+    def keys(self) -> Sequence[str]:
+        return tuple(self.names)
+
+    @override
+    def to_lookup_key(self, key: str) -> LookupKey:
+        return _NameKey(name=key)
+
+    @override
+    def to_lookup(self) -> BulkDataLookup[str, EntityIdentifier]:
+        return _PresetsByName()
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "bulk_lookup_role_presets"
 
 
 @dataclass
@@ -1386,6 +1425,24 @@ async def test_lookup_forwards_the_action_s_lookup_spec(
 
     assert result.entity_id() == stored.id
     repository.lookup.assert_awaited_once_with(lookup)
+
+
+async def test_bulk_lookup_answers_for_every_named_key(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service = BulkLookupService(repository)
+    repository.bulk_lookup = AsyncMock(return_value={"default": stored.id})
+
+    result = await service.execute(_BulkLookupAction(names=["default", "absent"]))
+
+    # A key naming nothing is one failed key, not a failed run.
+    assert result.resolved == {"default": stored.id}
+    assert [(r.key, r.status, r.entity_id) for r in result.key_results()] == [
+        (_NameKey(name="default"), OperationStatus.SUCCESS, stored.id),
+        (_NameKey(name="absent"), OperationStatus.ERROR, None),
+    ]
+    repository.bulk_lookup.assert_awaited_once()
+    assert repository.bulk_lookup.await_args.args[1] == ("default", "absent")
 
 
 async def test_lookup_runs_under_the_lookup_processor(

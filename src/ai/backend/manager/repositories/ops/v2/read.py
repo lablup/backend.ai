@@ -22,6 +22,7 @@ from ai.backend.manager.errors.repository import (
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.lookup import (
+    BulkDataLookup,
     DataLookup,
     FieldKeyLookup,
     FieldOwnerKeyLookup,
@@ -101,6 +102,20 @@ class V2ReadOps(V2GraphReadOpsBase):
                 f"The given key matches more than one {row_class.__name__}"
             )
         return lookup.to_entity_id(rows[0])
+
+    async def lookup_entity_ids[TKey, TEntityID: EntityIdentifier](
+        self, lookup: BulkDataLookup[TKey, TEntityID], keys: Sequence[TKey]
+    ) -> Mapping[TKey, TEntityID]:
+        """Resolve several keys into the ids of the entities they name.
+
+        A key matching no row is absent from the mapping rather than an error: the
+        caller decides whether that is a miss or one failed item among many.
+        """
+        if not keys:
+            return {}
+        rows = (await self._sess.execute(lookup.build_query(keys))).all()
+        resolved = {row[0]: lookup.to_entity_id(row[1]) for row in rows}
+        return {key: resolved[key] for key in keys if key in resolved}
 
     async def lookup_field_owners(
         self, lookup: FieldOwnerLookup[Any, Any], field_ids: Sequence[FieldIdentifier]

@@ -1,13 +1,16 @@
 from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
-from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
+from ai.backend.manager.actions.v2.ops.result import BulkLookupOpsResult, LookupOpsResult
 from ai.backend.manager.data.agent.types import AgentData
+from ai.backend.manager.services.agent.actions.bulk_lookup import BulkLookupAgentsAction
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -54,6 +57,9 @@ from ai.backend.manager.services.agent.service import AgentService
 
 class AgentProcessors:
     lookup: LookupActionProcessor[LookupAgentAction, LookupOpsResult[AgentUUID]]
+    bulk_lookup: BulkLookupActionProcessor[
+        BulkLookupAgentsAction, BulkLookupOpsResult[AgentId, AgentUUID]
+    ]
     sync_agent_registry: GlobalActionProcessor[
         SyncAgentRegistryAction, SyncAgentRegistryActionResult
     ]
@@ -84,6 +90,7 @@ class AgentProcessors:
         action_monitors: list[ActionMonitor],
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupAgentAction)
+        self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupAgentsAction)
         self.sync_agent_registry = group.global_scope(
             SyncAgentRegistryAction, service.sync_agent_registry
         )

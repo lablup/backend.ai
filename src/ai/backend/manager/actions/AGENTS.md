@@ -16,7 +16,7 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 | `bulk` | several entities |
 | `scope` | the scope itself — searches within it, and creates |
 | `global` | none (system-wide) |
-| `lookup` / `bulk_lookup` | an external key into an internal id |
+| `lookup` / `bulk_lookup` | an external key into an internal id, one or several |
 | `single_field` / `bulk_field` | field rows |
 | `relation` | two entities, linked or unlinked |
 
@@ -181,14 +181,16 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 - A gated action wired to a REST route with no auth middleware fails at request time
   with no context to check. Decide the route's middleware and the action's gate
   together.
-- `lookup` and `bulk_lookup` check authentication first and the permission on whatever
-  the key resolved to after. The check splits in two because the entity a key names is
-  not known until the run produces it. The second half takes the `single_entity` and
-  `bulk` validators respectively — `LOOKUP` is a read, so it asks for read on that
-  entity.
+- `lookup_ops` and `bulk_lookup_ops` check authentication first and the permission on
+  whatever the key resolved to after. The check splits in two because the entity a key
+  names is not known until the run produces it. The second half takes the
+  `single_entity` and `atomic_bulk` validators respectively — `LOOKUP` is a read, so it
+  asks for read on that entity.
 - A key that named nothing offers no entity to check. It is one failed key.
-- Wiring through `public_lookup_ops` leaves the second half empty, so every
-  authenticated caller may resolve.
+- Wiring through `public_lookup_ops` / `public_bulk_lookup_ops` leaves the second half
+  empty, so every authenticated caller may resolve. A bulk lookup feeding a
+  `partial_bulk_get_ops` read is wired public: the read answers per entity, and a
+  lookup refusing the whole batch over one entity would take that away.
 - A lookup with post-validators answers a key naming nothing and a key the caller may
   not reach with one exception, so no status code says whether the key exists. The
   processor merges them; adapters must not split them apart again. The audit record
