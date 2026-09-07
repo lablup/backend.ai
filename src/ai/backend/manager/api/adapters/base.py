@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
+from ai.backend.common.data.entity.types import FieldIdentifier
+from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAction
+from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions,
     PaginationSpec,
@@ -127,6 +131,30 @@ class BaseAdapter(BaseFilterAdapter):
         if f.none is not None:
             conditions.append(nested.none(self._convert_entity_label_filter(f.none)))
         return conditions
+
+    async def batch_load_fields[TAction: BasePartialBulkFieldAction[Any, Any], TData, TNode](
+        self,
+        processor: PartialBulkFieldActionProcessor[TAction, TData],
+        action: TAction,
+        field_ids: Sequence[FieldIdentifier],
+        to_node: Callable[[TData], TNode],
+    ) -> list[TNode | Exception | None]:
+        """One answer per named field row, in the given order, for a DataLoader.
+
+        The node for a row that was read, ``None`` for an id matching no row, and the
+        denial for a row whose owner the caller may not read. A batch naming no
+        existing row at all is every id missing, not a failed run.
+        """
+        try:
+            result: BulkFieldOpsResult[TData] = await processor.run(action)
+        except EntityNotFoundError:
+            return [None for _ in field_ids]
+        return [
+            to_node(result.successes[field_id])
+            if field_id in result.successes
+            else self.batch_load_failure(result.errors.get(field_id))
+            for field_id in field_ids
+        ]
 
     def batch_load_failure(self, error: Exception | None) -> Exception | None:
         """What a DataLoader is handed for an id a bulk read returned no data for.

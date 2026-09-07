@@ -132,7 +132,11 @@ from ai.backend.manager.services.agent.actions.scoped_search_resources import (
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
+from ai.backend.manager.services.artifact.actions.bulk_get import BulkGetArtifactsAction
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
+from ai.backend.manager.services.artifact.revision.actions.bulk_get import (
+    BulkGetArtifactRevisionsAction,
+)
 from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
     LookupArtifactRevisionOwnerAction,
     LookupBulkArtifactRevisionOwnerAction,
@@ -145,6 +149,25 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.deployment.actions.access_token.bulk_get_access_tokens import (
+    BulkGetAccessTokensAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
+    BulkGetDeploymentPoliciesAction,
+)
+from ai.backend.manager.services.deployment.actions.lookup_owner import (
+    LookupBulkDeploymentAccessTokenOwnerAction,
+    LookupBulkReplicaOwnerAction,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.bulk_get_revisions import (
+    BulkGetRevisionsAction,
+)
+from ai.backend.manager.services.deployment.actions.replica.bulk_get_replicas import (
+    BulkGetReplicasAction,
+)
+from ai.backend.manager.services.deployment.actions.route.bulk_get_routes import (
+    BulkGetRoutesAction,
+)
 from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsAction,
 )
@@ -152,6 +175,8 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
+from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAction
+from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
@@ -184,6 +209,10 @@ from ai.backend.manager.services.model_serving.processors.auto_scaling import (
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
+from ai.backend.manager.services.notification.actions.bulk_get_channels import (
+    BulkGetChannelsAction,
+)
+from ai.backend.manager.services.notification.actions.bulk_get_rules import BulkGetRulesAction
 from ai.backend.manager.services.notification.processors import NotificationProcessors
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.permission_contoller.processors import (
@@ -198,6 +227,12 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 )
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
+)
+from ai.backend.manager.services.resource_group.actions.bulk_get import (
+    BulkGetResourceGroupsAction,
+)
+from ai.backend.manager.services.resource_group.actions.bulk_lookup import (
+    BulkLookupResourceGroupsAction,
 )
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
@@ -216,6 +251,22 @@ from ai.backend.manager.services.role_preset.processors import RolePresetProcess
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 from ai.backend.manager.services.runtime_variant_preset.processors import (
     RuntimeVariantPresetProcessors,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_histories import (
+    BulkGetDeploymentHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_kernel_histories import (
+    BulkGetKernelHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_route_histories import (
+    BulkGetRouteHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_session_histories import (
+    BulkGetSessionHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.lookup_owner import (
+    LookupBulkKernelSchedulingHistoryOwnerAction,
+    LookupBulkSessionSchedulingHistoryOwnerAction,
 )
 from ai.backend.manager.services.scheduling_history.processors import (
     SchedulingHistoryProcessors,
@@ -648,4 +699,133 @@ def test_scoped_deployment_read_is_a_scoped_permission_read() -> None:
         DEPLOYMENT_ENTITY_TYPE,
         ActionKind.SCOPE,
         ActionGate.PERMISSION,
+    )
+
+
+def test_field_data_loader_reads_are_partial_permission_reads() -> None:
+    """The DataLoaders over field rows read per named row, checked per owning entity.
+
+    The owner lookup a partial field read runs first is recorded public beside its
+    permission-gated record: it refuses nothing, the read that follows answers per owner.
+    """
+    registry = _ops_registry()
+    DeploymentProcessors(registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock())
+    SchedulingHistoryProcessors(
+        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+        registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.BULK
+    }
+    partial = (DEPLOYMENT_ENTITY_TYPE, ActionKind.BULK, ActionGate.PERMISSION)
+    assert recorded[BulkGetRevisionsAction] == partial
+    assert recorded[BulkGetReplicasAction] == partial
+    assert recorded[BulkGetRoutesAction] == partial
+    assert recorded[BulkGetAccessTokensAction] == partial
+    assert recorded[BulkGetDeploymentPoliciesAction] == partial
+    assert recorded[BulkGetDeploymentHistoriesAction] == partial
+    assert recorded[BulkGetRouteHistoriesAction] == partial
+    assert recorded[BulkGetSessionHistoriesAction] == (
+        SESSION_ENTITY_TYPE,
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetKernelHistoriesAction] == (
+        SESSION_ENTITY_TYPE,
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+    lookup_gates = {
+        (record.action_cls, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.LOOKUP
+    }
+    for owner_lookup in (
+        LookupBulkReplicaOwnerAction,
+        LookupBulkDeploymentAccessTokenOwnerAction,
+        LookupBulkSessionSchedulingHistoryOwnerAction,
+        LookupBulkKernelSchedulingHistoryOwnerAction,
+    ):
+        assert (owner_lookup, ActionGate.PUBLIC) in lookup_gates
+        assert (owner_lookup, ActionGate.PERMISSION) in lookup_gates
+
+
+def test_entity_data_loader_reads_are_checked_per_entity_except_domains() -> None:
+    """The resource group, notification and artifact DataLoaders read per named
+    entity; the domain one is public, since a regular user holds no read on domains.
+    """
+    registry = _ops_registry()
+    ResourceGroupProcessors(registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), MagicMock())
+    DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
+    NotificationProcessors(
+        registry.group(GroupMeta(NOTIFICATION_CHANNEL_ENTITY_TYPE)),
+        registry.group(GroupMeta(NOTIFICATION_RULE_ENTITY_TYPE)),
+        MagicMock(),
+    )
+    artifact_revisions = registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
+        FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+        ArtifactRevisionData,
+        LookupArtifactRevisionOwnerAction,
+        LookupBulkArtifactRevisionOwnerAction,
+    )
+    ArtifactProcessors(
+        registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+        artifact_revisions,
+        ArtifactRevisionProcessors(
+            registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+            artifact_revisions,
+            MagicMock(),
+        ),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[BulkGetResourceGroupsAction] == (
+        RESOURCE_GROUP_ENTITY_TYPE,
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkLookupResourceGroupsAction] == (
+        RESOURCE_GROUP_ENTITY_TYPE,
+        ActionKind.LOOKUP,
+        ActionGate.PUBLIC,
+    )
+    assert recorded[BulkGetChannelsAction] == (
+        NOTIFICATION_CHANNEL_ENTITY_TYPE,
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetRulesAction] == (
+        NOTIFICATION_RULE_ENTITY_TYPE,
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetArtifactsAction] == (
+        ARTIFACT_ENTITY_TYPE,
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetArtifactRevisionsAction] == (
+        ARTIFACT_ENTITY_TYPE,
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetDomainsAction] == (
+        DOMAIN_ENTITY_TYPE,
+        ActionKind.BULK,
+        ActionGate.PUBLIC,
+    )
+    assert recorded[BulkLookupDomainsAction] == (
+        DOMAIN_ENTITY_TYPE,
+        ActionKind.LOOKUP,
+        ActionGate.PUBLIC,
     )

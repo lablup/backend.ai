@@ -1,10 +1,12 @@
 from ai.backend.manager.actions.registry.field import FieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import ScopedFieldsOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
+from ai.backend.manager.services.artifact.actions.bulk_get import BulkGetArtifactsAction
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
@@ -62,6 +64,8 @@ from .service import ArtifactService
 class ArtifactProcessors:
     scan: GlobalActionProcessor[ScanArtifactsAction, ScanArtifactsActionResult]
     get: SingleEntityActionProcessor[GetArtifactAction, GetArtifactActionResult]
+    # What the DataLoader reads: checked per artifact.
+    bulk_get: PartialBulkActionProcessor[BulkGetArtifactsAction, ArtifactData]
     search_artifacts: GlobalActionProcessor[SearchArtifactsAction, SearchArtifactsActionResult]
     search_artifacts_with_revisions: GlobalActionProcessor[
         SearchArtifactsWithRevisionsAction, SearchArtifactsWithRevisionsActionResult
@@ -95,6 +99,7 @@ class ArtifactProcessors:
         # TODO: Move scan action to ArtifactRegistryService
         self.scan = group.global_scope(ScanArtifactsAction, service.scan)
         self.get = group.single_entity(GetArtifactAction, service.get)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetArtifactsAction)
         self.search_artifacts = group.global_scope(SearchArtifactsAction, service.search)
         self.search_artifacts_with_revisions = group.global_scope(
             SearchArtifactsWithRevisionsAction, service.search_with_revisions

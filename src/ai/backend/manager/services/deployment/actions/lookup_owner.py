@@ -8,6 +8,7 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.replica import ReplicaID
@@ -18,6 +19,7 @@ from ai.backend.manager.actions.v2.field.lookup import (
     LookupFieldOwnerOpsAction,
 )
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
+from ai.backend.manager.models.deployment_policy.lookups import DeploymentPolicyOwnerLookup
 from ai.backend.manager.models.deployment_revision.lookups import DeploymentRevisionOwnerLookup
 from ai.backend.manager.models.endpoint.lookups import (
     AutoScalingRuleDeploymentLookup,
@@ -291,3 +293,80 @@ class LookupBulkDeploymentAccessTokenOwnerAction(
     @override
     def to_owner_lookup(self) -> DeploymentAccessTokenOwnerLookup:
         return DeploymentAccessTokenOwnerLookup()
+
+
+@dataclass(frozen=True)
+class DeploymentPolicyIDLookupKey(LookupKey):
+    """A policy's id, resolved into the deployment it belongs to."""
+
+    policy_id: DeploymentPolicyID
+
+    @override
+    def kind(self) -> str:
+        return "deployment_policy_id"
+
+    @override
+    def to_dict(self) -> dict[str, Any]:
+        return {"id": str(self.policy_id)}
+
+
+@dataclass
+class LookupDeploymentPolicyOwnerAction(
+    LookupFieldOwnerOpsAction[DeploymentPolicyID, DeploymentID]
+):
+    """The deployment a policy belongs to."""
+
+    policy_id: DeploymentPolicyID
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DEPLOYMENT_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_deployment_policy_owner"
+
+    @override
+    def lookup_key(self) -> LookupKey:
+        return DeploymentPolicyIDLookupKey(self.policy_id)
+
+    @override
+    def field_id(self) -> DeploymentPolicyID:
+        return self.policy_id
+
+    @override
+    def to_owner_lookup(self) -> DeploymentPolicyOwnerLookup:
+        return DeploymentPolicyOwnerLookup()
+
+
+@dataclass
+class LookupBulkDeploymentPolicyOwnerAction(
+    LookupBulkFieldOwnerOpsAction[DeploymentPolicyID, DeploymentID]
+):
+    """The deployments several policies belong to."""
+
+    policy_ids: Sequence[DeploymentPolicyID]
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DEPLOYMENT_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "lookup_bulk_deployment_policy_owner"
+
+    @override
+    def to_lookup_key(self, field_id: DeploymentPolicyID) -> LookupKey:
+        return DeploymentPolicyIDLookupKey(field_id)
+
+    @override
+    def field_ids(self) -> Sequence[DeploymentPolicyID]:
+        return tuple(self.policy_ids)
+
+    @override
+    def to_owner_lookup(self) -> DeploymentPolicyOwnerLookup:
+        return DeploymentPolicyOwnerLookup()

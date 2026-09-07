@@ -1,5 +1,6 @@
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import EntityOpsResult
@@ -11,6 +12,9 @@ from ai.backend.manager.services.artifact.revision.actions.approve import (
 from ai.backend.manager.services.artifact.revision.actions.associate_with_storage import (
     AssociateWithStorageAction,
     AssociateWithStorageActionResult,
+)
+from ai.backend.manager.services.artifact.revision.actions.bulk_get import (
+    BulkGetArtifactRevisionsAction,
 )
 from ai.backend.manager.services.artifact.revision.actions.cancel_import import (
     CancelImportAction,
@@ -59,6 +63,8 @@ from ai.backend.manager.services.artifact.revision.service import ArtifactRevisi
 
 
 class ArtifactRevisionProcessors:
+    # What the DataLoader reads: checked per owning artifact.
+    bulk_get: PartialBulkFieldActionProcessor[BulkGetArtifactRevisionsAction, ArtifactRevisionData]
     get: SingleFieldActionProcessor[
         GetArtifactRevisionAction, EntityOpsResult[ArtifactRevisionData]
     ]
@@ -105,6 +111,7 @@ class ArtifactRevisionProcessors:
         service: ArtifactRevisionService,
     ) -> None:
         self.get = revisions.get_ops(GetArtifactRevisionAction)
+        self.bulk_get = revisions.partial_bulk_get_ops(BulkGetArtifactRevisionsAction)
         self.get_readme = revisions.single_field(
             GetArtifactRevisionReadmeAction, service.get_readme
         )

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-import uuid
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.logging import BraceStyleAdapter
@@ -41,8 +41,11 @@ class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):
         sa.Index("ix_deployment_policies_endpoint", "endpoint"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
+    id: Mapped[DeploymentPolicyID] = mapped_column(
+        "id",
+        GUID(DeploymentPolicyID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v7()"),
     )
     endpoint: Mapped[DeploymentID] = mapped_column(
         "endpoint",

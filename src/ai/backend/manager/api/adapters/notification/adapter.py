@@ -93,7 +93,6 @@ from ai.backend.manager.models.notification.updaters import (
     NotificationChannelUpdater,
     NotificationRuleUpdater,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,
@@ -108,6 +107,10 @@ from ai.backend.manager.services.notification.actions import (
     ValidateChannelAction,
     ValidateRuleAction,
 )
+from ai.backend.manager.services.notification.actions.bulk_get_channels import (
+    BulkGetChannelsAction,
+)
+from ai.backend.manager.services.notification.actions.bulk_get_rules import BulkGetRulesAction
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -163,41 +166,35 @@ class NotificationAdapter(BaseAdapter):
 
     async def batch_load_channels_by_ids(
         self, ids: Sequence[UUID]
-    ) -> list[NotificationChannelNode | None]:
-        """Batch load notification channels by ID for DataLoader use.
-
-        Returns NotificationChannelNode DTOs in the same order as the input ids list.
-        """
+    ) -> list[NotificationChannelNode | Exception | None]:
+        """Batch load notification channels by ID for DataLoader use, checked per channel."""
         if not ids:
             return []
-        searcher = NotificationChannelSearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[NotificationChannelConditions.by_ids(ids)],
+        result = await self._processors.notification.bulk_get_channels.run(
+            BulkGetChannelsAction(ids=[NotificationChannelID(channel_id) for channel_id in ids])
         )
-        action_result = await self._processors.notification.search_channels.run(
-            SearchChannelsAction(searcher=searcher)
-        )
-        channel_map = {ch.id: self._channel_data_to_dto(ch) for ch in action_result.items}
-        return [channel_map.get(NotificationChannelID(channel_id)) for channel_id in ids]
+        return [
+            self._channel_data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def batch_load_rules_by_ids(
         self, ids: Sequence[UUID]
-    ) -> list[NotificationRuleNode | None]:
-        """Batch load notification rules by ID for DataLoader use.
-
-        Returns NotificationRuleNode DTOs in the same order as the input ids list.
-        """
+    ) -> list[NotificationRuleNode | Exception | None]:
+        """Batch load notification rules by ID for DataLoader use, checked per rule."""
         if not ids:
             return []
-        searcher = NotificationRuleSearcher(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[NotificationRuleConditions.by_ids(ids)],
+        result = await self._processors.notification.bulk_get_rules.run(
+            BulkGetRulesAction(ids=[NotificationRuleID(rule_id) for rule_id in ids])
         )
-        action_result = await self._processors.notification.search_rules.run(
-            SearchRulesAction(searcher=searcher)
-        )
-        rule_map = {rule.id: self._rule_data_to_dto(rule) for rule in action_result.items}
-        return [rule_map.get(NotificationRuleID(rule_id)) for rule_id in ids]
+        return [
+            self._rule_data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     # ------------------------------------------------------------------ channels
 

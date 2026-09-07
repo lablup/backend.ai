@@ -16,6 +16,7 @@ from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceC
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
@@ -23,8 +24,10 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
+from ai.backend.common.schema.deployment import RollingUpdateSpec
 from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.monitors import ActionMonitors
@@ -33,6 +36,7 @@ from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDepend
 from ai.backend.manager.actions.v2.global_scope.validator.superadmin import (
     SuperAdminActionValidator,
 )
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, OwnedFieldsOpsResult
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
 from ai.backend.manager.actions.v2.validators import ActionValidators
@@ -42,7 +46,9 @@ from ai.backend.manager.api.adapters.deployment.adapter import (
 )
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    DeploymentPolicyData,
     ExecutionData,
+    ModelDeploymentAccessTokenData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
@@ -50,12 +56,16 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.types import TriState
+
+DENIED_TOKEN = DeploymentTokenID(uuid4())
 
 
 class TestRevisionDataToDTO:
@@ -240,3 +250,107 @@ class TestDeploymentSearchGates:
     ) -> None:
         with with_user(regular_user), pytest.raises(InsufficientPrivilege):
             await adapter.admin_search(AdminSearchDeploymentsInput(limit=10, offset=0))
+
+
+class TestFieldBatchLoads:
+    """The field DataLoaders answer per named row, each checked through its deployment."""
+
+    @pytest.fixture
+    def token(self) -> ModelDeploymentAccessTokenData:
+        return ModelDeploymentAccessTokenData(
+            id=uuid4(),
+            token="tok",
+            expires_at=None,
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
+        )
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on this deployment")
+
+    @pytest.fixture
+    def adapter(
+        self, token: ModelDeploymentAccessTokenData, denial: GenericForbidden
+    ) -> tuple[DeploymentAdapter, MagicMock]:
+        processors = MagicMock()
+        processors.deployment.bulk_get_access_tokens.run = AsyncMock(
+            return_value=BulkFieldOpsResult(
+                successes={DeploymentTokenID(token.id): token},
+                errors={DENIED_TOKEN: denial},
+            )
+        )
+        return DeploymentAdapter(processors, MagicMock()), processors
+
+    async def test_access_tokens_answer_per_id(
+        self,
+        adapter: tuple[DeploymentAdapter, MagicMock],
+        token: ModelDeploymentAccessTokenData,
+        denial: GenericForbidden,
+    ) -> None:
+        deployment_adapter, processors = adapter
+        absent = uuid4()
+
+        nodes = await deployment_adapter.batch_load_access_tokens_by_ids([
+            token.id,
+            DENIED_TOKEN,
+            absent,
+        ])
+
+        node, refused, missing = nodes
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == token.id
+        # A denial reaches the resolver; an id matching nothing stays None.
+        assert refused is denial
+        assert missing is None
+        action = processors.deployment.bulk_get_access_tokens.run.await_args.args[0]
+        assert list(action.field_ids()) == [
+            DeploymentTokenID(token.id),
+            DENIED_TOKEN,
+            DeploymentTokenID(absent),
+        ]
+
+    async def test_a_batch_naming_no_row_is_every_id_missing(
+        self, adapter: tuple[DeploymentAdapter, MagicMock]
+    ) -> None:
+        deployment_adapter, processors = adapter
+        processors.deployment.bulk_get_access_tokens.run = AsyncMock(
+            side_effect=EntityNotFoundError("No field row matches the given ids")
+        )
+
+        assert await deployment_adapter.batch_load_access_tokens_by_ids([uuid4(), uuid4()]) == [
+            None,
+            None,
+        ]
+
+    async def test_no_ids_read_nothing(self, adapter: tuple[DeploymentAdapter, MagicMock]) -> None:
+        deployment_adapter, processors = adapter
+        assert await deployment_adapter.batch_load_access_tokens_by_ids([]) == []
+        processors.deployment.bulk_get_access_tokens.run.assert_not_awaited()
+
+    async def test_policies_answer_per_deployment(self) -> None:
+        deployment_id = DeploymentID(uuid4())
+        policy = DeploymentPolicyData(
+            id=uuid4(),
+            endpoint=deployment_id,
+            strategy=DeploymentStrategy.ROLLING,
+            strategy_spec=RollingUpdateSpec(),
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
+            updated_at=datetime(2024, 1, 1, tzinfo=UTC),
+        )
+        processors = MagicMock()
+        processors.deployment.bulk_get_deployment_policies.run = AsyncMock(
+            return_value=OwnedFieldsOpsResult(designated={deployment_id: policy})
+        )
+        deployment_adapter = DeploymentAdapter(processors, MagicMock())
+        without_policy = uuid4()
+
+        nodes = await deployment_adapter.batch_load_policies_by_endpoint_ids([
+            deployment_id,
+            without_policy,
+        ])
+
+        node, none = nodes
+        assert node is not None and node.id == policy.id
+        assert none is None
+        action = processors.deployment.bulk_get_deployment_policies.run.await_args.args[0]
+        assert list(action.owner_ids()) == [deployment_id, DeploymentID(without_policy)]

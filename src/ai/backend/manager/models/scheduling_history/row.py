@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import override
 
@@ -8,10 +7,13 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_history import DeploymentHistoryID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.route_history import RouteHistoryID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_scheduling_history import SessionSchedulingHistoryID
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
@@ -44,9 +46,15 @@ __all__ = (
 class SessionSchedulingHistoryRow(ReconcileHistoryMixin, Base):
     __tablename__ = "session_scheduling_history"
 
-    # Common columns (id, phase, from/to_status, result, error_code, message,
-    # sub_steps, attempts, created_at, updated_at) come from the mixin; the merge
-    # rule below replaces the mixin's.
+    # Common columns (phase, from/to_status, result, error_code, message,
+    # sub_steps, attempts, created_at, updated_at) come from the mixin; the id is
+    # typed here and the merge rule below replaces the mixin's.
+    id: Mapped[SessionSchedulingHistoryID] = mapped_column(
+        "id",
+        GUID(SessionSchedulingHistoryID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v7()"),
+    )
     session_id: Mapped[SessionID] = mapped_column(
         "session_id", GUID(SessionID), nullable=False, index=True
     )
@@ -169,8 +177,11 @@ class KernelSchedulingHistoryRow(Base):
 class DeploymentHistoryRow(Base):
     __tablename__ = "deployment_history"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
+    id: Mapped[DeploymentHistoryID] = mapped_column(
+        "id",
+        GUID(DeploymentHistoryID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v7()"),
     )
     deployment_id: Mapped[DeploymentID] = mapped_column(
         "deployment_id", GUID(DeploymentID), nullable=False, index=True
@@ -239,8 +250,11 @@ class DeploymentHistoryRow(Base):
 class RouteHistoryRow(Base):
     __tablename__ = "route_history"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
+    id: Mapped[RouteHistoryID] = mapped_column(
+        "id",
+        GUID(RouteHistoryID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v7()"),
     )
     route_id: Mapped[ReplicaID] = mapped_column(
         "route_id", GUID(ReplicaID), nullable=False, index=True

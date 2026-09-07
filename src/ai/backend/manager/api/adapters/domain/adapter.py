@@ -45,7 +45,8 @@ from ai.backend.manager.models.domain.updaters import (
     DomainSoftDeleteUpdater,
     DomainUpdater,
 )
-from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAction
+from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
@@ -73,39 +74,48 @@ _DOMAIN_PAGINATION_SPEC = PaginationSpec(
 class DomainAdapter(BaseAdapter):
     """Adapter for domain operations."""
 
-    async def batch_load_by_names(self, names: Sequence[str]) -> list[DomainNode | None]:
+    async def batch_load_by_names(
+        self, names: Sequence[str]
+    ) -> list[DomainNode | Exception | None]:
         """Batch load domains by name for DataLoader use.
 
-        Returns DomainNode DTOs in the same order as the input names list.
+        One answer per name in the given order: the node, ``None`` for a name matching
+        no domain.
         """
         if not names:
             return []
-        searcher = DomainSearcher(
-            pagination=NoPagination(),
-            conditions=[DomainConditions.by_names(names)],
-        )
-        result = await self._processors.domain.global_search.run(
-            GlobalSearchDomainsAction(searcher=searcher)
-        )
-        domain_map = {data.name: self._domain_data_to_node(data) for data in result.items}
-        return [domain_map.get(name) for name in names]
+        keys = [DomainName(name) for name in names]
+        lookup = await self._processors.domain.bulk_lookup.run(BulkLookupDomainsAction(names=keys))
+        ids = [lookup.resolved[key] for key in keys if key in lookup.resolved]
+        got = await self._processors.domain.bulk_get.run(BulkGetDomainsAction(ids=ids))
+        domains = got.values()
+        errors = got.errors()
+        nodes: list[DomainNode | Exception | None] = []
+        for key in keys:
+            domain_id = lookup.resolved.get(key)
+            if domain_id is None:
+                nodes.append(None)
+                continue
+            data = domains.get(domain_id)
+            if data is None:
+                nodes.append(self.batch_load_failure(errors.get(domain_id)))
+                continue
+            nodes.append(self._domain_data_to_node(data))
+        return nodes
 
-    async def batch_load_by_ids(self, ids: Sequence[DomainID]) -> list[DomainNode | None]:
-        """Batch load domains by UUID for DataLoader use.
-
-        Returns DomainNode DTOs in the same order as the input ids list.
-        """
+    async def batch_load_by_ids(
+        self, ids: Sequence[DomainID]
+    ) -> list[DomainNode | Exception | None]:
+        """Batch load domains by UUID for DataLoader use."""
         if not ids:
             return []
-        searcher = DomainSearcher(
-            pagination=NoPagination(),
-            conditions=[DomainConditions.by_ids(ids)],
-        )
-        result = await self._processors.domain.global_search.run(
-            GlobalSearchDomainsAction(searcher=searcher)
-        )
-        domain_map = {data.id: self._domain_data_to_node(data) for data in result.items}
-        return [domain_map.get(domain_id) for domain_id in ids]
+        result = await self._processors.domain.bulk_get.run(BulkGetDomainsAction(ids=list(ids)))
+        return [
+            self._domain_data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def get(self, domain_name: str) -> DomainNode:
         """Retrieve a single domain by name."""

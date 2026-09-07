@@ -6,10 +6,13 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_history import DeploymentHistoryID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.route_history import RouteHistoryID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_scheduling_history import SessionSchedulingHistoryID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchDeploymentHistoriesInput,
@@ -98,10 +101,21 @@ from ai.backend.manager.models.scheduling_history.scopes import (
     RouteHistoryOperationScope,
     SessionSchedulingHistoryOperationScope,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
     LookupKernelOwnerAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_histories import (
+    BulkGetDeploymentHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_kernel_histories import (
+    BulkGetKernelHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_route_histories import (
+    BulkGetRouteHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_session_histories import (
+    BulkGetSessionHistoriesAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
     GlobalSearchReplicaGroupHistoryAction,
@@ -184,79 +198,58 @@ class SchedulingHistoryAdapter(BaseAdapter):
 
     async def batch_load_session_histories_by_ids(
         self, ids: Sequence[UUID]
-    ) -> list[SessionHistoryNode | None]:
-        """Batch load session scheduling histories by their IDs for DataLoader use.
-
-        Returns SessionHistoryNode DTOs in the same order as the input ids list.
-        """
+    ) -> list[SessionHistoryNode | Exception | None]:
+        """Batch load session scheduling histories for DataLoader use, checked per session."""
         if not ids:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[SessionSchedulingHistoryConditions.by_ids(ids)],
+        history_ids = [SessionSchedulingHistoryID(history_id) for history_id in ids]
+        return await self.batch_load_fields(
+            self._processors.scheduling_history.bulk_get_session_histories,
+            BulkGetSessionHistoriesAction(ids=history_ids),
+            history_ids,
+            self._session_data_to_dto,
         )
-        action_result = await self._processors.scheduling_history.search_session_history.run(
-            SearchSessionHistoryAction(querier=querier)
-        )
-        history_map = {h.id: self._session_data_to_dto(h) for h in action_result.histories}
-        return [history_map.get(history_id) for history_id in ids]
 
     async def batch_load_kernel_histories_by_ids(
         self, ids: Sequence[KernelSchedulingHistoryID]
-    ) -> list[KernelHistoryNode | None]:
-        """Batch load kernel scheduling histories by their IDs for DataLoader use.
-
-        Returns KernelHistoryNode DTOs in the same order as the input ids list.
-        """
+    ) -> list[KernelHistoryNode | Exception | None]:
+        """Batch load kernel scheduling histories for DataLoader use, checked per session."""
         if not ids:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[KernelSchedulingHistoryConditions.by_ids(ids)],
+        return await self.batch_load_fields(
+            self._processors.scheduling_history.bulk_get_kernel_histories,
+            BulkGetKernelHistoriesAction(ids=ids),
+            ids,
+            self._kernel_data_to_dto,
         )
-        action_result = await self._processors.scheduling_history.search_kernel_history.run(
-            SearchKernelHistoryAction(querier=querier)
-        )
-        history_map = {h.id: self._kernel_data_to_dto(h) for h in action_result.items}
-        return [history_map.get(history_id) for history_id in ids]
 
     async def batch_load_deployment_histories_by_ids(
         self, ids: Sequence[UUID]
-    ) -> list[DeploymentHistoryNode | None]:
-        """Batch load deployment histories by their IDs for DataLoader use.
-
-        Returns DeploymentHistoryNode DTOs in the same order as the input ids list.
-        """
+    ) -> list[DeploymentHistoryNode | Exception | None]:
+        """Batch load deployment histories for DataLoader use, checked per deployment."""
         if not ids:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[DeploymentHistoryConditions.by_ids(ids)],
+        history_ids = [DeploymentHistoryID(history_id) for history_id in ids]
+        return await self.batch_load_fields(
+            self._processors.scheduling_history.bulk_get_deployment_histories,
+            BulkGetDeploymentHistoriesAction(ids=history_ids),
+            history_ids,
+            self._deployment_data_to_dto,
         )
-        action_result = await self._processors.scheduling_history.search_deployment_history.run(
-            SearchDeploymentHistoryAction(querier=querier)
-        )
-        history_map = {h.id: self._deployment_data_to_dto(h) for h in action_result.histories}
-        return [history_map.get(history_id) for history_id in ids]
 
     async def batch_load_route_histories_by_ids(
         self, ids: Sequence[UUID]
-    ) -> list[RouteHistoryNode | None]:
-        """Batch load route histories by their IDs for DataLoader use.
-
-        Returns RouteHistoryNode DTOs in the same order as the input ids list.
-        """
+    ) -> list[RouteHistoryNode | Exception | None]:
+        """Batch load route histories for DataLoader use, checked per deployment."""
         if not ids:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[RouteHistoryConditions.by_ids(ids)],
+        history_ids = [RouteHistoryID(history_id) for history_id in ids]
+        return await self.batch_load_fields(
+            self._processors.scheduling_history.bulk_get_route_histories,
+            BulkGetRouteHistoriesAction(ids=history_ids),
+            history_ids,
+            self._route_data_to_dto,
         )
-        action_result = await self._processors.scheduling_history.search_route_history.run(
-            SearchRouteHistoryAction(querier=querier)
-        )
-        history_map = {h.id: self._route_data_to_dto(h) for h in action_result.histories}
-        return [history_map.get(history_id) for history_id in ids]
 
     # ========== Session History ==========
 

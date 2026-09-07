@@ -91,9 +91,15 @@ from ai.backend.manager.models.resource_group.creators import ResourceGroupCreat
 from ai.backend.manager.models.resource_group.orders import ResourceGroupOrders
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.resource_group.actions.bulk_get import (
+    BulkGetResourceGroupsAction,
+)
+from ai.backend.manager.services.resource_group.actions.bulk_lookup import (
+    BulkLookupResourceGroupsAction,
+)
 from ai.backend.manager.services.resource_group.actions.create import CreateResourceGroupAction
 from ai.backend.manager.services.resource_group.actions.get_allowed_domains_for_rg import (
     GetAllowedDomainsForResourceGroupAction,
@@ -235,43 +241,52 @@ class ResourceGroupAdapter(BaseAdapter):
 
     async def batch_load_by_names(
         self, names: Sequence[str]
-    ) -> list[ResourceGroupDetailNode | None]:
+    ) -> list[ResourceGroupDetailNode | Exception | None]:
         """Batch load resource groups by name for DataLoader use.
 
-        Returns ResourceGroupDetailNode items in the same order as the input names list.
+        One answer per name in the given order: the node, ``None`` for a name matching
+        no resource group, and the denial for one the caller may not read.
         """
         if not names:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(names)),
-            conditions=[ResourceGroupConditions.by_names(names)],
+        keys = [ResourceGroupName(name) for name in names]
+        lookup = await self._processors.resource_group.bulk_lookup.run(
+            BulkLookupResourceGroupsAction(names=keys)
         )
-        action_result = await self._processors.resource_group.search_resource_groups.run(
-            SearchResourceGroupsAction(querier=querier)
+        ids = [lookup.resolved[key] for key in keys if key in lookup.resolved]
+        got = await self._processors.resource_group.bulk_get.run(
+            BulkGetResourceGroupsAction(ids=ids)
         )
-        rg_map = {sg.name: sg for sg in action_result.resource_groups}
-        return [
-            self._data_to_detail_node(rg_map[name]) if name in rg_map else None for name in names
-        ]
+        groups = got.values()
+        errors = got.errors()
+        nodes: list[ResourceGroupDetailNode | Exception | None] = []
+        for key in keys:
+            resource_group_id = lookup.resolved.get(key)
+            if resource_group_id is None:
+                nodes.append(None)
+                continue
+            data = groups.get(resource_group_id)
+            if data is None:
+                nodes.append(self.batch_load_failure(errors.get(resource_group_id)))
+                continue
+            nodes.append(self._data_to_detail_node(data))
+        return nodes
 
     async def batch_load_by_ids(
         self, ids: Sequence[ResourceGroupID]
-    ) -> list[ResourceGroupDetailNode | None]:
-        """Batch load resource groups by UUID for DataLoader use.
-
-        Returns ResourceGroupDetailNode items in the same order as the input ids list.
-        """
+    ) -> list[ResourceGroupDetailNode | Exception | None]:
+        """Batch load resource groups by UUID for DataLoader use, checked per resource group."""
         if not ids:
             return []
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=len(ids)),
-            conditions=[ResourceGroupConditions.by_ids(ids)],
+        result = await self._processors.resource_group.bulk_get.run(
+            BulkGetResourceGroupsAction(ids=list(ids))
         )
-        action_result = await self._processors.resource_group.search_resource_groups.run(
-            SearchResourceGroupsAction(querier=querier)
-        )
-        rg_map = {sg.id: sg for sg in action_result.resource_groups}
-        return [self._data_to_detail_node(rg_map[id_]) if id_ in rg_map else None for id_ in ids]
+        return [
+            self._data_to_detail_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def search(self, input: AdminSearchResourceGroupsInput) -> ResourceGroupSearchPayload:
         """Search resource groups with filters, ordering, and pagination."""
@@ -364,9 +379,13 @@ class ResourceGroupAdapter(BaseAdapter):
     async def get(self, name: str) -> ResourceGroupDetailNode:
         """Retrieve a single resource group by name."""
         results = await self.batch_load_by_names([name])
-        if results[0] is None:
-            raise ResourceGroupNotFound(f"Resource group '{name}' not found.")
-        return results[0]
+        match results[0]:
+            case None:
+                raise ResourceGroupNotFound(f"Resource group '{name}' not found.")
+            case Exception() as denial:
+                raise denial
+            case node:
+                return node
 
     async def create(
         self,

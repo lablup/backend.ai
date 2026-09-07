@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_policy import DEPLOYMENT_POLICY_FIELD_TYPE
 from ai.backend.common.data.entity.deployment_revision import DEPLOYMENT_REVISION_FIELD_TYPE
 from ai.backend.common.data.entity.deployment_token import DEPLOYMENT_TOKEN_FIELD_TYPE
 from ai.backend.common.data.entity.replica import REPLICA_FIELD_TYPE
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
 from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
@@ -17,19 +21,25 @@ from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     EntityOpsResult,
     FieldOwnerLookupOpsResult,
+    OwnedFieldsOpsResult,
     ScopedFieldsOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.deployment.types import (
+    DeploymentPolicyData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelReplicaData,
     ModelRevisionData,
+    RouteInfo,
 )
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
     BulkDeleteAccessTokensActionResult,
+)
+from ai.backend.manager.services.deployment.actions.access_token.bulk_get_access_tokens import (
+    BulkGetAccessTokensAction,
 )
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
@@ -88,6 +98,9 @@ from ai.backend.manager.services.deployment.actions.deployment_policy import (
     UpsertDeploymentPolicyAction,
     UpsertDeploymentPolicyActionResult,
 )
+from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
+    BulkGetDeploymentPoliciesAction,
+)
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
@@ -109,15 +122,20 @@ from ai.backend.manager.services.deployment.actions.global_search_replicas impor
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
     LookupAutoScalingRuleDeploymentAction,
     LookupBulkDeploymentAccessTokenOwnerAction,
+    LookupBulkDeploymentPolicyOwnerAction,
     LookupBulkDeploymentRevisionOwnerAction,
     LookupBulkReplicaOwnerAction,
     LookupDeploymentAccessTokenOwnerAction,
+    LookupDeploymentPolicyOwnerAction,
     LookupDeploymentRevisionOwnerAction,
     LookupReplicaOwnerAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
     AddModelRevisionActionResult,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.bulk_get_revisions import (
+    BulkGetRevisionsAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
@@ -140,6 +158,9 @@ from ai.backend.manager.services.deployment.actions.replace_deployment_options i
     ReplaceDeploymentOptionsAction,
     ReplaceDeploymentOptionsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.replica.bulk_get_replicas import (
+    BulkGetReplicasAction,
+)
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
@@ -149,6 +170,9 @@ from ai.backend.manager.services.deployment.actions.route import (
     SearchRoutesActionResult,
     UpdateRouteTrafficStatusAction,
     UpdateRouteTrafficStatusActionResult,
+)
+from ai.backend.manager.services.deployment.actions.route.bulk_get_routes import (
+    BulkGetRoutesAction,
 )
 from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsAction,
@@ -297,6 +321,17 @@ class DeploymentProcessors:
         SearchAccessTokensAction, ScopedFieldsOpsResult[ModelDeploymentAccessTokenData]
     ]
 
+    # What the DataLoaders read: checked per owning deployment.
+    bulk_get_revisions: PartialBulkFieldActionProcessor[BulkGetRevisionsAction, ModelRevisionData]
+    bulk_get_replicas: PartialBulkFieldActionProcessor[BulkGetReplicasAction, ModelReplicaData]
+    bulk_get_routes: PartialBulkFieldActionProcessor[BulkGetRoutesAction, RouteInfo]
+    bulk_get_access_tokens: PartialBulkFieldActionProcessor[
+        BulkGetAccessTokensAction, ModelDeploymentAccessTokenData
+    ]
+    bulk_get_deployment_policies: BulkActionProcessor[
+        BulkGetDeploymentPoliciesAction, OwnedFieldsOpsResult[DeploymentID, DeploymentPolicyData]
+    ]
+
     global_search_replicas: GlobalActionProcessor[
         GlobalSearchReplicasAction, BatchOpsResult[ModelReplicaData]
     ]
@@ -327,6 +362,25 @@ class DeploymentProcessors:
             ModelDeploymentAccessTokenData,
             LookupDeploymentAccessTokenOwnerAction,
             LookupBulkDeploymentAccessTokenOwnerAction,
+        )
+        policies: LookupFieldGroup[DeploymentPolicyData] = group.field_group(
+            FieldGroupMeta(DEPLOYMENT_POLICY_FIELD_TYPE),
+            DeploymentPolicyData,
+            LookupDeploymentPolicyOwnerAction,
+            LookupBulkDeploymentPolicyOwnerAction,
+        )
+        self.bulk_get_revisions = revisions.partial_bulk_get_ops(BulkGetRevisionsAction)
+        self.bulk_get_replicas = replicas.partial_bulk_get_ops(BulkGetReplicasAction)
+        routes: LookupFieldGroup[RouteInfo] = group.field_group(
+            FieldGroupMeta(REPLICA_FIELD_TYPE),
+            RouteInfo,
+            LookupReplicaOwnerAction,
+            LookupBulkReplicaOwnerAction,
+        )
+        self.bulk_get_routes = routes.partial_bulk_get_ops(BulkGetRoutesAction)
+        self.bulk_get_access_tokens = access_tokens.partial_bulk_get_ops(BulkGetAccessTokensAction)
+        self.bulk_get_deployment_policies = policies.atomic_bulk_get_ops(
+            BulkGetDeploymentPoliciesAction
         )
         self.lookup_auto_scaling_rule_deployment = group.key_owner_lookup_ops(
             LookupAutoScalingRuleDeploymentAction

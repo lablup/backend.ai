@@ -1,11 +1,17 @@
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
-from ai.backend.manager.actions.v2.ops.result import LookupOpsResult, ScopedBatchOpsResult
+from ai.backend.manager.actions.v2.ops.result import (
+    BulkLookupOpsResult,
+    LookupOpsResult,
+    ScopedBatchOpsResult,
+)
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
@@ -20,6 +26,12 @@ from ai.backend.manager.services.resource_group.actions.associate_with_keypair i
 from ai.backend.manager.services.resource_group.actions.associate_with_user_group import (
     AssociateResourceGroupWithUserGroupsAction,
     AssociateResourceGroupWithUserGroupsActionResult,
+)
+from ai.backend.manager.services.resource_group.actions.bulk_get import (
+    BulkGetResourceGroupsAction,
+)
+from ai.backend.manager.services.resource_group.actions.bulk_lookup import (
+    BulkLookupResourceGroupsAction,
 )
 from ai.backend.manager.services.resource_group.actions.create import (
     CreateResourceGroupAction,
@@ -106,6 +118,11 @@ from ai.backend.manager.services.resource_group.service import ResourceGroupServ
 
 class ResourceGroupProcessors:
     lookup: LookupActionProcessor[LookupResourceGroupAction, LookupOpsResult[ResourceGroupID]]
+    bulk_lookup: BulkLookupActionProcessor[
+        BulkLookupResourceGroupsAction, BulkLookupOpsResult[ResourceGroupName, ResourceGroupID]
+    ]
+    # What the DataLoaders read: checked per resource group.
+    bulk_get: PartialBulkActionProcessor[BulkGetResourceGroupsAction, ResourceGroupData]
     create_resource_group: GlobalActionProcessor[
         CreateResourceGroupAction, CreateResourceGroupActionResult
     ]
@@ -191,6 +208,8 @@ class ResourceGroupProcessors:
         self, group: ProcessorGroup[ResourceGroupData], service: ResourceGroupService
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupResourceGroupAction)
+        self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupResourceGroupsAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetResourceGroupsAction)
         self.create_resource_group = group.global_scope(
             CreateResourceGroupAction, service.create_resource_group
         )

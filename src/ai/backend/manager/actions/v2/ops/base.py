@@ -29,6 +29,7 @@ from ai.backend.manager.models.specs.purger import (
 )
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
+    BulkFieldQuerier,
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
@@ -447,6 +448,16 @@ class FieldPartialBulkPurgeOpsAction[TFieldID: FieldIdentifier, TRow: Base, TDat
     @abstractmethod
     def to_purgers(self) -> Mapping[TFieldID, GuardedFieldPurger[TRow, TData]]:
         """Return the delete spec for each row this action names."""
+        raise NotImplementedError
+
+
+class FieldPartialBulkGetOpsAction[TRow: Base, TData: FieldData](OpsBackendAction):
+    """A read of the field rows the caller named, each answered for separately;
+    authorized through the entities owning them."""
+
+    @abstractmethod
+    def to_querier(self) -> BulkFieldQuerier[TRow, TData]:
+        """Return the read spec this action executes."""
         raise NotImplementedError
 
 

@@ -44,6 +44,7 @@ from ai.backend.manager.models.specs.purger import (
 )
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
+    BulkFieldQuerier,
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
@@ -125,6 +126,13 @@ class OpsRepository[TData]:
         """Resolve several keys into the ids they name; a key naming nothing is absent."""
         async with self._ops.read_ops() as r:
             return await r.lookup_entity_ids(lookup, keys)
+
+    async def bulk_get_fields[TFieldData: FieldData](
+        self, querier: BulkFieldQuerier[Any, TFieldData], field_ids: Sequence[FieldIdentifier]
+    ) -> Mapping[FieldIdentifier, TFieldData]:
+        """Read the named field rows; one that is gone is absent instead of raising."""
+        async with self._ops.read_ops() as r:
+            return await r.query_bulk_field_data(querier, field_ids)
 
     async def owned_fields[TOwnerID: EntityIdentifier, TFieldData: FieldData](
         self,

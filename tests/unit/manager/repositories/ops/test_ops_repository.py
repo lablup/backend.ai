@@ -28,6 +28,9 @@ from ai.backend.common.data.entity.types import (
     EntityData,
     EntityIdentifier,
     EntityType,
+    FieldData,
+    FieldIdentifier,
+    FieldType,
     ScopeRef,
     ScopeType,
 )
@@ -57,7 +60,11 @@ from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.purger import EntityBatchPurger
-from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
+from ai.backend.manager.models.specs.querier import (
+    BulkEntityQuerier,
+    BulkFieldQuerier,
+    DataQuerier,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
@@ -182,6 +189,35 @@ class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
         return row.to_data()
+
+
+class _PresetFieldID(FieldIdentifier):
+    @override
+    @classmethod
+    def field_type(cls) -> FieldType:
+        return FieldType("test_preset_field")
+
+
+@dataclass(frozen=True)
+class _PresetFieldData(FieldData):
+    id: _PresetFieldID
+    name: str
+
+
+class _PresetBulkFieldQuerier(BulkFieldQuerier[RolePresetRow, _PresetFieldData]):
+    """The preset rows read as field rows, keyed by their own id."""
+
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetFieldData:
+        return _PresetFieldData(id=_PresetFieldID(row.id), name=row.name)
 
 
 class _PresetsByName(BulkDataLookup[str, EntityIdentifier]):
@@ -396,6 +432,39 @@ class TestBulkGet:
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
         assert await repository.bulk_get(_PresetBulkQuerier(), []) == {}
+
+
+class TestBulkGetFields:
+    async def test_every_named_row_comes_back_keyed_by_its_id(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        other = await repository.create_global_entity(
+            _PresetCreator(name="analysts", scope_type=RBACScopeType.PROJECT)
+        )
+        first, second = _PresetFieldID(preset.id), _PresetFieldID(other.id)
+
+        found = await repository.bulk_get_fields(_PresetBulkFieldQuerier(), [second, first])
+
+        assert [(key, value.name) for key, value in found.items()] == [
+            (second, "analysts"),
+            (first, "default"),
+        ]
+
+    async def test_a_missing_id_is_absent_rather_than_raising(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        absent = _PresetFieldID(uuid.uuid4())
+
+        found = await repository.bulk_get_fields(
+            _PresetBulkFieldQuerier(), [_PresetFieldID(preset.id), absent]
+        )
+
+        assert list(found) == [_PresetFieldID(preset.id)]
+
+    async def test_no_ids_reads_nothing(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        assert await repository.bulk_get_fields(_PresetBulkFieldQuerier(), []) == {}
 
 
 class TestLookup:

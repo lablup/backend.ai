@@ -19,7 +19,7 @@ from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
 @dataclass
@@ -60,6 +60,40 @@ class NotificationRuleQuerier(DataQuerier[NotificationRuleRow, NotificationRuleD
     @override
     def entity_id_value(self) -> NotificationRuleID:
         return self.rule_id
+
+    @override
+    def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:
+        return row.to_data()
+
+
+class BulkNotificationChannelQuerier(
+    BulkEntityQuerier[NotificationChannelRow, NotificationChannelData]
+):
+    """The notification channels the caller named."""
+
+    @override
+    def row_class(self) -> type[NotificationChannelRow]:
+        return NotificationChannelRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return NotificationChannelRow.id
+
+    @override
+    def to_data(self, row: NotificationChannelRow) -> NotificationChannelData:
+        return row.to_data()
+
+
+class BulkNotificationRuleQuerier(BulkEntityQuerier[NotificationRuleRow, NotificationRuleData]):
+    """The notification rules the caller named."""
+
+    @override
+    def row_class(self) -> type[NotificationRuleRow]:
+        return NotificationRuleRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return NotificationRuleRow.id
 
     @override
     def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:

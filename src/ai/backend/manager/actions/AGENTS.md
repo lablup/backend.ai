@@ -139,6 +139,10 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 - A field row is denied through its owner: the check is per owner, so a denied one
   takes every row it owns out of the run. Which rows those are is known only after the
   owner lookup, so that narrowing happens in the processor.
+- A read of several named field rows is the same shape: wire it through
+  `LookupFieldGroup.partial_bulk_get_ops`. The answer is keyed by the row, the check
+  and the record by the owner. The owner lookup a partial field shape runs first is
+  wired public, for the reason the entity bulk lookup under Gates is.
 - A partial run answers with `PartialBulkResult`, one item per entity the caller named
   and in that order. Fixed rather than per domain: completing and ordering the answer
   is the processor's job, and it cannot do that for a shape only the domain knows.

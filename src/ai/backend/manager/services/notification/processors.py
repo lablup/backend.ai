@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -14,6 +15,10 @@ from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
 )
+from ai.backend.manager.services.notification.actions.bulk_get_channels import (
+    BulkGetChannelsAction,
+)
+from ai.backend.manager.services.notification.actions.bulk_get_rules import BulkGetRulesAction
 from ai.backend.manager.services.notification.actions.create_channel import CreateChannelAction
 from ai.backend.manager.services.notification.actions.create_rule import CreateRuleAction
 from ai.backend.manager.services.notification.actions.get_channel import GetChannelAction
@@ -41,6 +46,10 @@ from ai.backend.manager.services.notification.service import NotificationService
 
 class NotificationProcessors:
     """Both catalogs run against ops; only dispatch and the two validations keep a service."""
+
+    # What the DataLoaders read: checked per channel or rule.
+    bulk_get_channels: PartialBulkActionProcessor[BulkGetChannelsAction, NotificationChannelData]
+    bulk_get_rules: PartialBulkActionProcessor[BulkGetRulesAction, NotificationRuleData]
 
     create_channel: GlobalActionProcessor[
         CreateChannelAction, CreatedEntityOpsResult[NotificationChannelData]
@@ -80,6 +89,8 @@ class NotificationProcessors:
         rule_group: ProcessorGroup[NotificationRuleData],
         service: NotificationService,
     ) -> None:
+        self.bulk_get_channels = channel_group.partial_bulk_get_ops(BulkGetChannelsAction)
+        self.bulk_get_rules = rule_group.partial_bulk_get_ops(BulkGetRulesAction)
         self.create_channel = channel_group.global_create_ops(CreateChannelAction)
         self.update_channel = channel_group.single_update_ops(UpdateChannelAction)
         self.purge_channel = channel_group.entity_purge_ops(PurgeChannelAction)
