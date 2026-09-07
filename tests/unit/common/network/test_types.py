@@ -58,7 +58,12 @@ class TestMember:
         # single-sourced on-wire schema shared by agent self-publish and manager pre-seed
         member = Member(agent_id="a1", host_ip="1.2.3.4", vtep_ip="1.2.3.4", joined=True)
         payload = member.to_etcd_payload()
-        assert payload == {"host_ip": "1.2.3.4", "vtep_ip": "1.2.3.4", "joined": True}
+        assert payload == {
+            "host_ip": "1.2.3.4",
+            "vtep_ip": "1.2.3.4",
+            "joined": True,
+            "generation": None,
+        }
         assert "agent_id" not in payload  # agent_id is the key, not the value
         assert Member.from_etcd_payload("a1", payload) == member
 
