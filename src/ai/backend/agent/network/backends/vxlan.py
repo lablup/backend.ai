@@ -111,6 +111,14 @@ def bridge_dev(vni: int) -> str:
     return f"baibr{vni}"
 
 
+def vni_of_dev(dev: str) -> int | None:
+    """The VNI a ``baivx*`` device name carries, or None if the name is not one of ours."""
+    if not dev.startswith(VXLAN_DEV_PREFIX):
+        return None
+    suffix = dev[len(VXLAN_DEV_PREFIX) :]
+    return int(suffix) if suffix.isdigit() else None
+
+
 # --- pure command builders ---
 
 
@@ -224,6 +232,10 @@ _VXLAN_LINE: Final = re.compile(r"^\d+:\s+(?P<name>[^:@\s]+)")
 #: Stands in `unclosed_devices` for "the fail-close preflight has not run". Not a device name --
 #: the point is that this backend does not yet know what the device names ARE.
 _PREFLIGHT_PENDING: Final = "(the fail-close preflight has not run)"
+#: Stands in `unclosed_devices` for "this node's firewall could not be listed". Also not a device
+#: name: an unread listing is exactly the state in which the leftovers of a previous life cannot be
+#: named, and reporting the host clean on it is what carries them into the next session.
+_RULES_UNREAD: Final = "(this host's firewall rules could not be read)"
 
 
 async def _list_vxlan_devices() -> frozenset[str]:
@@ -1385,6 +1397,28 @@ async def _read_command(argv: Sequence[str]) -> str:
     return stdout.decode(errors="replace") if rc == 0 else ""
 
 
+async def _read_inventory(argv: Sequence[str]) -> str:
+    """Run a rule listing for RECOVERY and return its stdout, raising if it did not run.
+
+    The difference from `_read_command` is the whole point: a drift pass re-asserts what it wants
+    and an unreadable listing costs it nothing, but recovery is asking what a previous life left
+    behind, and there "" and "the command failed" are opposite answers. A host with no iptables at
+    all is the one genuine empty: nothing there filters, so nothing there was left.
+    """
+    try:
+        rc, stdout, stderr = await command.run(argv)
+    except OSError as e:
+        log.debug("no firewall to list on this host ({}): {}", " ".join(argv), e)
+        return ""
+    except command.CommandTimeout as e:
+        raise OverlayEncryptionUnavailable(f"`{' '.join(argv)}` timed out: {e}") from e
+    if rc != 0:
+        raise OverlayEncryptionUnavailable(
+            f"`{' '.join(argv)}` exited {rc}: {stderr.decode(errors='replace').strip()}"
+        )
+    return stdout.decode(errors="replace")
+
+
 def _redacted(argv: Sequence[str]) -> str:
     """The command as it may be logged: the derived pair key never leaves this process."""
     shown = list(argv)
@@ -1538,6 +1572,20 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     #: teardown will look for it -- and left standing they drop the traffic of whatever plaintext
     #: session the manager next gives that VNI to.
     _rule_debt: dict[tuple[int, int], str]
+    #: The strict half of the `reader` seam, used only by the recovery inventory -- see
+    #: `_read_inventory` for why recovery cannot take "" for an answer.
+    _rule_inventory: Reader
+    #: Leftover rules the sweep found for a VNI whose device would NOT go down, by vni -> dstport.
+    #: They are that tunnel's protection, so they stay until it is closed; `retry_fail_close`
+    #: sweeps them once it is. See `_sweep_orphan_rules`.
+    _held_rules: dict[int, int]
+    #: The VNIs the preflight was told to spare, kept so a retried sweep spares the same ones --
+    #: `retry_fail_close` has no caller to ask, and sweeping without them disarms a co-located
+    #: agent's live session.
+    _sweep_spare: frozenset[int]
+    #: True while this host's rule listing could not be read at all, so what a previous life left
+    #: is unknown rather than absent.
+    _rule_inventory_owed: bool
 
     def __init__(
         self,
@@ -1547,6 +1595,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         uplink: str = "eth0",
         runner: Runner | None = None,
         reader: Reader | None = None,
+        rule_inventory: Reader | None = None,
         local_subnets: LocalSubnetAllocator | None = None,
         pair_journal: PairJournal | None = None,
         journal_owner: str | None = None,
@@ -1559,8 +1608,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._uplink = uplink
         self._runner = runner or _run_command
         self._reader = reader or _read_command
+        # A caller that replaced the reader replaced this too: both answer the same commands, and
+        # a test that swaps one out must not be left shelling out to the host for the other.
+        self._rule_inventory = rule_inventory or reader or _read_inventory
         self._unclosed_devices = set()
         self._rule_debt = {}
+        self._held_rules = {}
+        self._sweep_spare = frozenset()
+        self._rule_inventory_owed = False
         self._protection_task = None
         self._session_guards = {}
         self._pair_journal = pair_journal or PairJournal()
@@ -2695,7 +2750,12 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._preflight_done = False
 
     def _preflight_debt(self) -> frozenset[str]:
-        return frozenset() if self._preflight_done else frozenset({_PREFLIGHT_PENDING})
+        owed: set[str] = set()
+        if not self._preflight_done:
+            owed.add(_PREFLIGHT_PENDING)
+        if self._rule_inventory_owed:
+            owed.add(_RULES_UNREAD)
+        return frozenset(owed)
 
     @override
     async def prepare_recovery(self, spare: Collection[int] = ()) -> None:
@@ -2743,7 +2803,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 self._unclosed_devices.discard(device)
             else:
                 failed.append(device)
-        await self._sweep_orphan_rules(spare)
+        # The devices that would NOT go down are passed on, because their rules are the only thing
+        # standing between what they are still carrying and the wire -- see `_sweep_orphan_rules`.
+        self._sweep_spare = frozenset(spare)
+        await self._sweep_orphan_rules(self._sweep_spare, still_up=failed)
         self._preflight_done = True
         if failed:
             # Do NOT prune. A claim is what stops another agent removing the SAs of a pair still
@@ -2762,31 +2825,60 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         if pruned:
             log.info("dropped {} stale ESP pair claim(s) left by a previous life", pruned)
 
-    async def _sweep_orphan_rules(self, spare: Collection[int]) -> None:
+    async def _sweep_orphan_rules(
+        self, spare: Collection[int], *, still_up: Collection[str] = ()
+    ) -> None:
         """Remove the per-VNI rules a previous life left in our chains, and owe what will not go.
 
         The debt a failed setup records is memory, and rules are not: without this a restart
         forgets them, and the next session given that VNI runs into a stranger's plaintext-drop.
+
+        ``still_up`` is the set of tunnels the fail-close could not bring down, and their rules are
+        NOT swept. The three rules this removes for a VNI -- the plaintext-drop, the output mark
+        and the egress guard -- are that tunnel's protection, not litter: taking them off a device
+        that is still UP leaves it forwarding, unmarked, matching no XFRM policy, which is a live
+        session's traffic going out in clear text. They are held instead, and swept by
+        `retry_fail_close` once the device is actually closed.
         """
         try:
             listings = [
-                await self._reader(["iptables-save", "-t", "filter"]),
-                await self._reader(["iptables-save", "-t", "mangle"]),
+                await self._rule_inventory(["iptables-save", "-t", "filter"]),
+                await self._rule_inventory(["iptables-save", "-t", "mangle"]),
             ]
         except Exception:
+            # Owed, not shrugged off. A listing this node could not read is not a host with no
+            # leftovers on it, and completing the preflight on one reports a node ready over rules
+            # nothing has looked at. `unclosed_devices` carries this until a listing succeeds.
             log.exception("could not read this host's firewall rules before recovery")
+            self._rule_inventory_owed = True
             return
+        self._rule_inventory_owed = False
         found: set[tuple[int, int]] = set()
         for listing in listings:
             found |= parse_owned_vni_rules(listing)
         spared = set(spare)
+        held_up = {vni for vni in map(vni_of_dev, still_up) if vni is not None}
+        # Rebuilt from this pass rather than updated: the listing is the whole answer, so a VNI it
+        # no longer shows has no rules left to hold and must not keep the retry coming back.
+        held: dict[int, int] = {}
         for vni, dstport in sorted(found):
             if vni in spared:
                 continue  # another agent's live session on this node; not ours to disarm
+            if vni in held_up:
+                held[vni] = dstport
+                log.warning(
+                    "leaving the rules for vni {} on udp/{} in place: {} would not go down, and"
+                    " they are what keeps its traffic off the wire in clear text",
+                    vni,
+                    dstport,
+                    vxlan_dev(vni),
+                )
+                continue
             log.warning(
                 "removing the rules a previous life left for vni {} on udp/{}", vni, dstport
             )
             self._owe_cleanup(vni, dstport, await self._remove_partial_rules(vni, dstport))
+        self._held_rules = held
 
     async def _require_no_conflict(self, vni: int, dstport: int) -> None:
         """Refuse a VNI another VXLAN on this host already carries on the same port.
@@ -2827,9 +2919,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         Tunnels a previous life left behind, and anything a failed setup could not take back off
         this host.
 
-        Includes a standing entry while the preflight has not run at all: an empty set means "this
-        backend looked and everything is down", and a startup that never reached the preflight
-        must not be able to say that.
+        Includes a standing entry while the preflight has not run at all, and another while this
+        host's rule listing could not be read: an empty set means "this backend looked and
+        everything is down", and neither a startup that never reached the preflight nor one that
+        could not see the host's rules may say that.
         """
         return frozenset(self._unclosed_devices) | self._preflight_debt()
 
@@ -2855,6 +2948,12 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             if await self._hold_vxlan_down_or_absent(dev):
                 self._unclosed_devices.discard(dev)
                 log.info("surviving tunnel {} is finally down", dev)
+        # Two debts the preflight can leave behind and only this comes back for: rules held off a
+        # tunnel that would not close (now that one of them may have closed), and a listing that
+        # could not be read at all. Both are re-derived from a fresh inventory, sparing the same
+        # VNIs the preflight was told to spare.
+        if self._rule_inventory_owed or self._held_rules:
+            await self._sweep_orphan_rules(self._sweep_spare, still_up=self._unclosed_devices)
         for vni, dstport in list(self._rule_debt):
             self._owe_cleanup(vni, dstport, await self._remove_partial_rules(vni, dstport))
         return self.unclosed_devices() | frozenset(self.cleanup_debt())

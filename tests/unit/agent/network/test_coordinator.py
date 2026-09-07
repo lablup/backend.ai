@@ -4,11 +4,25 @@ from collections.abc import AsyncIterator, Sequence
 from typing import Any, cast, override
 from unittest import mock
 
+import pytest
+
 import ai.backend.agent.network.coordinator as coordinator_mod
+from ai.backend.agent.errors.network import SessionNetworkGone
 from ai.backend.agent.network.coordinator import SessionClusterNames, SessionNetworkCoordinator
 from ai.backend.common.etcd import AbstractKVStore
-from ai.backend.common.network.keys import endpoints_prefix, member_key, members_prefix
-from ai.backend.common.network.types import Member, NetworkBackendKind, SessionNetMeta
+from ai.backend.common.network.keys import (
+    endpoints_prefix,
+    member_key,
+    members_prefix,
+    session_meta_key,
+)
+from ai.backend.common.network.types import (
+    SESSION_META_READY,
+    SESSION_META_STATE,
+    Member,
+    NetworkBackendKind,
+    SessionNetMeta,
+)
 
 _META = SessionNetMeta(
     session_id="s1",
@@ -29,8 +43,24 @@ class FakeEtcd:
     async def put(self, key: str, val: str, **kwargs: Any) -> None:
         self.store[key] = val
 
+    async def get(self, key: str, **kwargs: Any) -> str | None:
+        return self.store.get(key)
+
     async def delete(self, key: str, **kwargs: Any) -> None:
         self.store.pop(key, None)
+
+    def seed_session_meta(self, session_id: str = "s1", **fields: Any) -> str:
+        """The manager's READY record for the session -- what a joining node is fenced on."""
+        record = json.dumps({
+            "subnet": "10.128.0.0/24",
+            "vni": 4097,
+            "backend": "vxlan",
+            "mtu": 1450,
+            SESSION_META_STATE: SESSION_META_READY,
+            **fields,
+        })
+        self.store[session_meta_key(session_id)] = record
+        return record
 
     async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
         out: dict[str, str] = {}
@@ -253,6 +283,7 @@ class TestReconcilePeers:
 class TestStartStop:
     async def test_start_sets_up_writes_member_and_applies_peers(self) -> None:
         etcd = FakeEtcd()
+        etcd.seed_session_meta()
         etcd.seed_member(_PEER2)  # a peer already present
         backend = RecordingBackend()
         coord = _coordinator(etcd, backend)
@@ -266,6 +297,7 @@ class TestStartStop:
 
     async def test_stop_tears_down_and_removes_membership(self) -> None:
         etcd = FakeEtcd()
+        etcd.seed_session_meta()
         backend = RecordingBackend()
         coord = _coordinator(etcd, backend)
         await coord.start(_META, _SELF)
@@ -278,6 +310,7 @@ class TestStartStop:
         # With a live (blocked) watch, stop() must cancel AND await it, so no trailing reconcile
         # runs after teardown and the CancelledError is retrieved.
         etcd = _BlockingWatchEtcd()
+        etcd.seed_session_meta()
         backend = RecordingBackend()
         coord = _coordinator(etcd, backend)
         await coord.start(_META, _SELF)
@@ -285,6 +318,64 @@ class TestStartStop:
         assert not task.done()  # watch is live, blocked on events
         await coord.stop("s1")
         assert task.done()  # cancelled and awaited to completion
+
+
+class TestALateJoin:
+    """The member record IS this node's claim on the session: the manager reads the membership
+    table to decide whether the VNI may go back to the pool, and holds it back while any record
+    stands. A join in flight across a teardown publishes one AFTER that read -- for a session that
+    no longer exists, on a VNI already handed to somebody else, with nothing coming back for it."""
+
+    async def test_a_session_with_no_record_is_refused(self) -> None:
+        etcd = FakeEtcd()  # the manager cleaned it up before this node got here
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        with pytest.raises(SessionNetworkGone):
+            await coord.start(_META, _SELF)
+        assert member_key("s1", "a1") not in etcd.store
+
+    async def test_a_tombstoned_session_is_refused(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_session_meta(**{SESSION_META_STATE: "deleting"})
+        coord = _coordinator(etcd, RecordingBackend())
+        with pytest.raises(SessionNetworkGone):
+            await coord.start(_META, _SELF)
+        assert member_key("s1", "a1") not in etcd.store
+
+    async def test_a_record_that_changes_under_the_join_takes_the_membership_back(self) -> None:
+        class _TornDownMidJoin(FakeEtcd):
+            """The manager tombstones the session the moment this node publishes its member."""
+
+            @override
+            async def put(self, key: str, val: str, **kwargs: Any) -> None:
+                await super().put(key, val)
+                if key == member_key("s1", "a1"):
+                    self.seed_session_meta(**{SESSION_META_STATE: "deleting"})
+
+        etcd = _TornDownMidJoin()
+        etcd.seed_session_meta()
+        coord = _coordinator(etcd, RecordingBackend())
+
+        with pytest.raises(SessionNetworkGone):
+            await coord.start(_META, _SELF)
+
+        assert member_key("s1", "a1") not in etcd.store, (
+            "it left a record standing for a node the manager has already released the VNI for"
+        )
+
+    async def test_a_node_local_session_has_no_record_to_be_fenced_on(self) -> None:
+        # A BRIDGE session is this agent's own and its meta is written AFTER the data plane is up,
+        # so there is nothing here to check and nothing to be fenced out of.
+        etcd = FakeEtcd()
+        coord = _coordinator(etcd, RecordingBackend())
+        local = SessionNetMeta(
+            session_id="s1", subnet="10.128.0.0/24", backend=NetworkBackendKind.BRIDGE, mtu=1500
+        )
+        await coord.start(local, _SELF)
+        try:
+            assert member_key("s1", "a1") in etcd.store
+        finally:
+            await coord.stop("s1")
 
 
 class TestReconcileEndpoints:

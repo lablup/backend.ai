@@ -26,7 +26,6 @@ from ai.backend.common.network.keys import (
     members_prefix,
     session_ipam_prefix,
     session_meta_key,
-    session_prefix,
 )
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
@@ -90,6 +89,9 @@ _CREATING: Final = "creating"
 #: A create that is undoing itself. The record stays under this state until its keys are deleted
 #: and its subnet and VNI are back in the pool, because it is the only thing that names them.
 _DELETING: Final = "deleting"
+#: Which cleanup is working from this tombstone. Fresh on every take, so two managers that read
+#: the same DELETING record do not both run the cleanup from it -- see `_tombstone`.
+_CLEANER: Final = "_cleaner"
 
 #: How long a second manager waits for the one that claimed a session to finish before taking it
 #: over. Long enough to cover a slow create, short enough that a manager killed mid-create does
@@ -101,6 +103,24 @@ _CREATE_POLL_SEC: Final = 0.5
 def _published(meta: Mapping[str, Any]) -> dict[str, Any]:
     """The session meta as its callers see it, without the create's own bookkeeping."""
     return {key: value for key, value in meta.items() if key not in (_OWNER, _STATE, _CLAIMED_AT)}
+
+
+def _tombstone(subnet: str | None, vni: Any, owner: str | None) -> str:
+    """A DELETING record naming what is still allocated, and which cleanup is clearing it.
+
+    ``_cleaner`` is a fresh value on every take. Without it two managers that read the same
+    DELETING record both run the cleanup from those same bytes, and the slower one carries on
+    deleting after the faster one finished and a new session was built under the same id -- taking
+    the new session's endpoint and member keys and giving its subnet and VNI back to the pool. With
+    it, only one of the two can hold the record, and the other finds out at its next check.
+    """
+    return json.dumps({
+        "subnet": subnet,
+        "vni": vni,
+        _OWNER: owner,
+        _STATE: _DELETING,
+        _CLEANER: uuid.uuid4().hex,
+    })
 
 
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
@@ -374,14 +394,20 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     # A cleanup that did not get to the end. Never taken over as a create: the
                     # tombstone names a subnet and a VNI that are still allocated, and building
                     # over it would run a session on keys somebody else is still deleting. Finish
-                    # it instead -- it is idempotent, and whoever finishes it frees the id.
-                    if not await self._finish_cleanup(etcd, session_id, raw):
-                        raise SessionCleanupPending(
-                            f"session {session_id}'s previous network could not be cleaned up;"
-                            " retrying rather than building over what it still holds"
-                        )
-                    if await etcd.put_if_absent(key, ours):
-                        return ours, None
+                    # it instead -- and take it first, into bytes only this call holds, so two
+                    # managers that read this same record do not both delete from it. Losing that
+                    # take is not an error: fall through to the poll and come back to whatever is
+                    # there now.
+                    record = json.loads(raw)
+                    mine = _tombstone(record.get("subnet"), record.get("vni"), record.get(_OWNER))
+                    if await etcd.replace(key, raw, mine):
+                        if not await self._finish_cleanup(etcd, session_id, mine):
+                            raise SessionCleanupPending(
+                                f"session {session_id}'s previous network could not be cleaned"
+                                " up; retrying rather than building over what it still holds"
+                            )
+                        if await etcd.put_if_absent(key, ours):
+                            return ours, None
                 if state == _READY:
                     published = await self._existing_allocation(etcd, session_id, endpoints)
                     if published is not None:
@@ -487,7 +513,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             owner = json.loads(held).get(_OWNER) if held else None
         except ValueError:
             owner = None
-        tombstone = json.dumps({"subnet": subnet, "vni": vni, _OWNER: owner, _STATE: _DELETING})
+        tombstone = _tombstone(subnet, vni, owner)
         if not held or not await etcd.replace(session_meta_key(session_id), held, tombstone):
             log.info(
                 "not rolling back session {}: its record is no longer this create's", session_id
@@ -499,12 +525,34 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         """Carry a session under a DELETING tombstone through to nothing left, and say whether it
         got there.
 
-        Idempotent and safe to run twice: every step deletes only what carries this session's
-        claim, so whoever reaches the last line first ends it and the other finds it done.
+        Every destructive step is fenced on the record still being these exact tombstone bytes,
+        because this call can be resumed late -- a slow etcd, a manager that swapped out -- and by
+        then another cleanup may have finished the job and a new session may have been built under
+        the same id. Its endpoints, its members and its pool claim are indistinguishable from the
+        ones this call came to delete: the claim names the session, not the attempt that made it
+        (`ipam._claim`). The tombstone is the only thing that tells them apart, so nothing is
+        deleted without checking it first, and losing it ends this cleanup rather than continuing
+        into somebody else's session.
+
+        Returns False when the record is no longer this call's; the caller retries and re-reads.
         """
+
+        async def still_ours() -> bool:
+            held = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
+            if held == tombstone:
+                return True
+            log.info(
+                "stopping the cleanup of session {}: its record is no longer the tombstone this"
+                " call was working from",
+                session_id,
+            )
+            return False
+
         # Everything under the session except the tombstone. Nobody acts on a session whose
         # record is not READY, and what is left is named by the tombstone until the last line.
         for prefix in (endpoints_prefix, members_prefix, session_ipam_prefix):
+            if not await still_ours():
+                return False
             try:
                 await etcd.delete_prefix(prefix(session_id).rstrip("/"), scope=ConfigScopes.GLOBAL)
             except Exception:
@@ -517,7 +565,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 return False
         # Everything the POOL says is this session's, not only what the tombstone names. A create
         # cancelled between claiming a block and publishing the record that would have named it
-        # leaves one no meta mentions, and this is the only thing that reaches it.
+        # leaves one no meta mentions, and this is the only thing that reaches it. Which is also
+        # why it is the step that most needs the fence above: it reaches a NEW create's claim just
+        # as readily.
+        if not await still_ours():
+            return False
         try:
             stuck_vnis = await self._vni_allocator.release_all(session_id)
             stuck_blocks = await self._subnet_allocator.release_all(session_id)
@@ -573,13 +625,23 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             )
         raw = await etcd.get(session_meta_key(network_id), scope=ConfigScopes.GLOBAL)
         if raw is None:
-            # No record to fence against, so nothing can be building on it either. Sweep whatever
-            # keys and pool claims are left under this id and be done.
-            await etcd.delete_prefix(
-                session_prefix(network_id).rstrip("/"), scope=ConfigScopes.GLOBAL
-            )
-            await self._vni_allocator.release_all(network_id)
-            await self._subnet_allocator.release_all(network_id)
+            # No record -- but reading that is not the same as holding it. A create can claim this
+            # id (`_claim_session`'s put_if_absent) between the read above and any delete below,
+            # and the sweep would then take the keys it is publishing and give back the subnet and
+            # VNI it is already handing to its agents; its own rollback, finding no record of its,
+            # would not take them back either. So put a tombstone in through the same
+            # compare-and-swap the create races for: whoever wins it goes first.
+            tombstone = _tombstone(None, None, None)
+            if not await etcd.put_if_absent(session_meta_key(network_id), tombstone):
+                raise OverlayTeardownPending(
+                    f"session {network_id}'s network record appeared while this teardown was"
+                    " reading it; retrying against what is there now"
+                )
+            if not await self._finish_cleanup(etcd, network_id, tombstone):
+                raise OverlayTeardownPending(
+                    f"session {network_id}'s network could not be given back in full; its record"
+                    " stays as a tombstone naming what is left, and this retries"
+                )
             return
         meta = json.loads(raw)
         if meta.get(_STATE) == _CREATING and not self._create_gave_up(meta):
@@ -594,12 +656,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # From READY (or from a create nobody is coming back for) into a tombstone, in one step.
         # A create still running finds out at its next write, and an agent that reads the record
         # to resume this session sees one it must not act on.
-        tombstone = json.dumps({
-            "subnet": meta.get("subnet"),
-            "vni": meta.get("vni"),
-            _OWNER: meta.get(_OWNER),
-            _STATE: _DELETING,
-        })
+        tombstone = _tombstone(meta.get("subnet"), meta.get("vni"), meta.get(_OWNER))
         if not await etcd.replace(session_meta_key(network_id), raw, tombstone):
             raise OverlayTeardownPending(
                 f"session {network_id}'s network record changed while this teardown was reading"

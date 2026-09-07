@@ -16,13 +16,22 @@ from collections.abc import Awaitable, Mapping
 from contextlib import aclosing
 from typing import TYPE_CHECKING, Any
 
+from ai.backend.agent.errors.network import SessionNetworkGone
 from ai.backend.common.network.keys import (
     endpoints_prefix,
     member_key,
     members_prefix,
+    session_meta_key,
     session_prefix,
 )
-from ai.backend.common.network.types import EndpointAddr, Member, SessionNetMeta
+from ai.backend.common.network.types import (
+    SESSION_META_READY,
+    SESSION_META_STATE,
+    EndpointAddr,
+    Member,
+    NetworkBackendKind,
+    SessionNetMeta,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
@@ -105,7 +114,16 @@ class SessionNetworkCoordinator:
 
     async def _begin(self, meta: SessionNetMeta, self_member: Member) -> None:
         """Publish membership, apply what is already published, and start watching."""
+        # Read the record BEFORE publishing, and check it again after. The manager decides whether
+        # a session's nodes have let go of it by reading the membership table, and this node's
+        # record can land after that read: a join that was in flight while the session was torn
+        # down would then stand for a node holding a VNI the manager has already given back, and
+        # nothing would ever come for it. Publish-then-verify closes that -- see
+        # `_require_session_current`.
+        fence = await self._session_fence(meta)
         await self._write_member(meta.session_id, self_member)
+        if fence is not None:
+            await self._require_session_current(meta.session_id, fence, self_member.agent_id)
         self._applied[meta.session_id] = {}
         self._applied_endpoints[meta.session_id] = {}
         self._names[meta.session_id] = {}
@@ -364,6 +382,51 @@ class SessionNetworkCoordinator:
             if isinstance(value, str):
                 endpoints[str(container_id)] = _decode_endpoint(str(container_id), value)
         return endpoints
+
+    async def _session_fence(self, meta: SessionNetMeta) -> str | None:
+        """The manager's record for this session, as the bytes this node is joining.
+
+        None where there is no manager record to be fenced against: a node-local BRIDGE session is
+        this agent's own, and its meta is written by us AFTER the data plane is up.
+
+        Raises:
+            SessionNetworkGone: the record is not one this node may act on.
+        """
+        if meta.backend is not NetworkBackendKind.VXLAN:
+            return None
+        raw = await self._etcd.get(session_meta_key(meta.session_id))
+        if raw is None or json.loads(raw).get(SESSION_META_STATE) != SESSION_META_READY:
+            raise SessionNetworkGone(
+                f"session {meta.session_id}'s network record is gone or no longer one this node"
+                " may act on; not joining a session the manager has stopped standing behind"
+            )
+        return raw
+
+    async def _require_session_current(self, session_id: str, fence: str, agent_id: str) -> None:
+        """Refuse the session, and take this node's membership back, if the record has moved on.
+
+        Compared byte for byte against what was read before the publish: a takeover, a tombstone
+        and a deletion all change it, and any of the three means the manager is no longer treating
+        this node as part of the session. The member record goes first, because while it stands the
+        manager holds the session's VNI back from reuse for a node that is not in the session.
+
+        Raises:
+            SessionNetworkGone: the record is no longer the one this node joined.
+        """
+        if await self._etcd.get(session_meta_key(session_id)) == fence:
+            return
+        try:
+            await self._etcd.delete(member_key(session_id, agent_id))
+        except Exception:
+            log.exception(
+                "could not take back this node's membership of session {} after its record"
+                " changed under the join",
+                session_id,
+            )
+        raise SessionNetworkGone(
+            f"session {session_id}'s network record changed while this node was joining it; the"
+            " manager owns what happens to the session now"
+        )
 
     async def _write_member(self, session_id: str, member: Member) -> None:
         await self._etcd.put(
