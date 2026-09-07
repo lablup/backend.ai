@@ -98,16 +98,18 @@ def artifact_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
+    artifact_revisions = processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
+        FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
+        ArtifactRevisionData,
+        LookupArtifactRevisionOwnerAction,
+        LookupBulkArtifactRevisionOwnerAction,
+    )
     return ArtifactProcessors(
         processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+        artifact_revisions,
         ArtifactRevisionProcessors(
             processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
-            processor_registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)).field_group(
-                FieldGroupMeta(ARTIFACT_REVISION_FIELD_TYPE),
-                ArtifactRevisionData,
-                LookupArtifactRevisionOwnerAction,
-                LookupBulkArtifactRevisionOwnerAction,
-            ),
+            artifact_revisions,
             MagicMock(),
         ),
         service,

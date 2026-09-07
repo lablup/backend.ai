@@ -1,15 +1,26 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.manager.actions.v2.field.ops import GetFieldOpsAction
 from ai.backend.manager.data.deployment.types import ModelReplicaData
-from ai.backend.manager.services.deployment.actions.replica.base import DeploymentReplicaBaseAction
+from ai.backend.manager.models.routing.queriers import ModelReplicaQuerier
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.services.deployment.actions.lookup_owner import (
+    LookupReplicaOwnerAction,
+)
 
 
 @dataclass
-class GetReplicaByIdAction(DeploymentReplicaBaseAction):
-    replica_id: UUID
+class GetReplicaByIdAction(
+    GetFieldOpsAction[ReplicaID, DeploymentID, RoutingRow, ModelReplicaData]
+):
+    """Read one replica, authorized against the deployment it serves."""
+
+    replica_id: ReplicaID
 
     @override
     @classmethod
@@ -17,11 +28,9 @@ class GetReplicaByIdAction(DeploymentReplicaBaseAction):
         return "get_replica_by_id"
 
     @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
+    def to_owner_lookup_action(self) -> LookupReplicaOwnerAction:
+        return LookupReplicaOwnerAction(replica_id=self.replica_id)
 
-
-@dataclass
-class GetReplicaByIdActionResult:
-    data: ModelReplicaData | None
+    @override
+    def to_querier(self) -> ModelReplicaQuerier:
+        return ModelReplicaQuerier(replica_id=self.replica_id)

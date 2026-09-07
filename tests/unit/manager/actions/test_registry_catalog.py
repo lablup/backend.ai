@@ -347,6 +347,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     ResourceGroupProcessors(registry.group(GroupMeta(RESOURCE_GROUP_ENTITY_TYPE)), MagicMock())
     ArtifactProcessors(
         registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+        artifact_revisions,
         ArtifactRevisionProcessors(
             registry.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
             artifact_revisions,

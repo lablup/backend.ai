@@ -79,6 +79,7 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
 from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
+from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
 from ai.backend.manager.models.endpoint.orders import DeploymentOrders
 from ai.backend.manager.models.routing.conditions import RouteConditions
@@ -283,21 +284,13 @@ class RevisionAdapter(BaseFilterAdapter):
             image_id=data.image_id,
         )
 
-    def build_querier(self, request: SearchRevisionsRequest) -> BatchQuerier:
-        """
-        Build a BatchQuerier for revisions from search request.
-
-        Args:
-            request: Search request containing filter, order, and pagination
-
-        Returns:
-            BatchQuerier object with converted conditions, orders, and pagination
-        """
+    def build_searcher(self, request: SearchRevisionsRequest) -> ModelRevisionSearcher:
+        """The filters and page of a revision search whose deployment the action scopes."""
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(request.order)] if request.order else []
         pagination = self._build_pagination(request.limit, request.offset)
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return ModelRevisionSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_filter(self, filter: RevisionFilter) -> list[QueryCondition]:
         """Convert revision filter to list of query conditions."""

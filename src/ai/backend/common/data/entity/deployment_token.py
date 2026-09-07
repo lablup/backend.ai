@@ -4,7 +4,7 @@ from typing import override
 
 from ai.backend.common.data.entity.types import FieldIdentifier, FieldType
 
-__all__ = ("DeploymentTokenID",)
+__all__ = ("DEPLOYMENT_TOKEN_FIELD_TYPE", "DeploymentTokenID")
 
 
 DEPLOYMENT_TOKEN_FIELD_TYPE = FieldType("deployment_token")

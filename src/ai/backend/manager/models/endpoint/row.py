@@ -64,6 +64,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentState,
     DeploymentSummaryData,
+    ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     ReplicaData,
@@ -906,8 +907,11 @@ class EndpointTokenRow(Base):
         server_default=sa.text("uuid_generate_v7()"),
     )
     token: Mapped[str] = mapped_column("token", sa.String(), nullable=False)
-    endpoint: Mapped[DeploymentID | None] = mapped_column(
-        "endpoint", GUID(DeploymentID), nullable=True
+    endpoint: Mapped[DeploymentID] = mapped_column(
+        "endpoint",
+        GUID(DeploymentID),
+        sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
+        nullable=False,
     )
     session_owner: Mapped[UserID] = mapped_column("session_owner", GUID(UserID), nullable=False)
     domain: Mapped[str] = mapped_column(
@@ -1014,10 +1018,18 @@ class EndpointTokenRow(Base):
         return EndpointTokenData(
             id=self.id,
             token=self.token,
-            endpoint=self.endpoint or uuid.UUID(int=0),
+            endpoint=self.endpoint,
             domain=self.domain,
             project=self.project,
             session_owner=self.session_owner,
+            created_at=self.created_at,
+        )
+
+    def to_access_token_data(self) -> ModelDeploymentAccessTokenData:
+        return ModelDeploymentAccessTokenData(
+            id=self.id,
+            token=self.token,
+            expires_at=self.expires_at,
             created_at=self.created_at,
         )
 

@@ -46,10 +46,7 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
-    LookupAccessTokenDeploymentAction,
     LookupAutoScalingRuleDeploymentAction,
-    LookupRevisionDeploymentAction,
-    LookupRouteDeploymentAction,
 )
 from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
     LookupKernelOwnerAction,
@@ -263,12 +260,6 @@ _KEY_OWNER_LOOKUP_ACTIONS: list[tuple[LookupFieldOwnerByKeyOpsAction[Any], Entit
         LookupAutoScalingRuleDeploymentAction(rule_id=uuid.uuid4()),
         DeploymentID(uuid.uuid4()),
     ),
-    (
-        LookupAccessTokenDeploymentAction(access_token_id=uuid.uuid4()),
-        DeploymentID(uuid.uuid4()),
-    ),
-    (LookupRouteDeploymentAction(route_id=uuid.uuid4()), DeploymentID(uuid.uuid4())),
-    (LookupRevisionDeploymentAction(revision_id=uuid.uuid4()), DeploymentID(uuid.uuid4())),
 ]
 
 

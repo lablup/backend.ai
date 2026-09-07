@@ -996,7 +996,7 @@ class ModelDeploymentAccessTokenData(FieldData):
 
 
 @dataclass
-class ModelReplicaData:
+class ModelReplicaData(FieldData):
     id: UUID
     deployment_id: UUID
     revision_id: UUID

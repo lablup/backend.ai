@@ -3,17 +3,24 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.deployment.types import ModelRevisionData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment.actions.base import DeploymentGlobalAction
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 
 
 @dataclass
-class GlobalSearchRevisionsAction(DeploymentGlobalAction):
+class GlobalSearchRevisionsAction(SearchGlobalOpsAction[DeploymentRevisionRow, ModelRevisionData]):
     """Page through model revisions across every deployment."""
 
-    querier: BatchQuerier
+    searcher: ModelRevisionSearcher
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DEPLOYMENT_ENTITY_TYPE
 
     @override
     @classmethod
@@ -21,14 +28,5 @@ class GlobalSearchRevisionsAction(DeploymentGlobalAction):
         return "global_search_revisions"
 
     @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class GlobalSearchRevisionsActionResult:
-    data: list[ModelRevisionData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def to_searcher(self) -> ModelRevisionSearcher:
+        return self.searcher

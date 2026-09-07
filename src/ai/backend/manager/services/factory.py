@@ -734,6 +734,7 @@ def create_processors(
         ),
         artifact=ArtifactProcessors(
             artifact_groups.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
+            artifact_revisions,
             ArtifactRevisionProcessors(
                 artifact_groups.group(GroupMeta(ARTIFACT_ENTITY_TYPE)),
                 artifact_revisions,

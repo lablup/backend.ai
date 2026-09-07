@@ -1,8 +1,7 @@
 """
 Mock-based unit tests for DeploymentService CRUD and replica/revision actions.
 
-Tests cover: CreateLegacyDeployment, DestroyDeployment, GetReplicaById,
-SearchReplicas, SearchAccessTokens, SyncReplica, GetRevisionById.
+Tests cover: CreateLegacyDeployment, DestroyDeployment, SyncReplica.
 """
 
 from __future__ import annotations
@@ -22,15 +21,9 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.model_deployment.types import (
-    ActivenessStatus,
-    LivenessStatus,
-    ReadinessStatus,
-)
-from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot, SessionId
+from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.types import (
-    AccessTokenSearchResult,
     ClusterConfigData,
     DeploymentInfo,
     DeploymentMetadata,
@@ -38,39 +31,21 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentOptions,
     DeploymentState,
     ExecutionData,
-    ModelDeploymentAccessTokenData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
     PresetAttributionData,
     ReplicaData,
     ResourceConfigData,
-    RouteHealthStatus,
-    RouteInfo,
-    RouteSearchResult,
-    RouteStatus,
-    RouteTrafficStatus,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
-    SearchAccessTokensAction,
-)
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
-)
-from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
-    GetReplicaByIdAction,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
-    GetRevisionByIdAction,
-)
-from ai.backend.manager.services.deployment.actions.search_replicas import (
-    SearchReplicasAction,
 )
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
@@ -352,280 +327,6 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.destroy_deployment.assert_called_once_with(endpoint_id)
 
 
-class TestGetReplicaById(DeploymentCRUDBaseFixtures):
-    """Tests for DeploymentService.get_replica_by_id"""
-
-    @pytest.fixture
-    def route_info(self, endpoint_id: uuid.UUID) -> RouteInfo:
-        return RouteInfo(
-            route_id=uuid.uuid4(),
-            deployment_id=DeploymentID(endpoint_id),
-            session_id=SessionId(uuid.uuid4()),
-            status=RouteStatus.RUNNING,
-            health_status=RouteHealthStatus.HEALTHY,
-            traffic_ratio=0.5,
-            created_at=datetime(2024, 1, 1, tzinfo=UTC),
-            revision_id=uuid.uuid4(),
-            traffic_status=RouteTrafficStatus.ACTIVE,
-            health_check=None,
-        )
-
-    async def test_existing_replica_returns_data(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        route_info: RouteInfo,
-    ) -> None:
-        """Existing replica_id returns ModelReplicaData with readiness/liveness/activeness."""
-        mock_deployment_repository.get_route = AsyncMock(return_value=route_info)
-
-        action = GetReplicaByIdAction(
-            deployment_id=DeploymentID(uuid.uuid4()), replica_id=route_info.route_id
-        )
-        result = await deployment_service.get_replica_by_id(action)
-
-        assert result.data is not None
-        assert result.data.id == route_info.route_id
-        assert result.data.deployment_id == route_info.deployment_id
-        assert result.data.readiness_status == ReadinessStatus.HEALTHY
-        assert result.data.liveness_status == LivenessStatus.HEALTHY
-        assert result.data.activeness_status == ActivenessStatus.ACTIVE
-
-    async def test_non_existent_replica_returns_none(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-    ) -> None:
-        """Non-existent ID returns data=None."""
-        mock_deployment_repository.get_route = AsyncMock(return_value=None)
-
-        action = GetReplicaByIdAction(
-            deployment_id=DeploymentID(uuid.uuid4()), replica_id=uuid.uuid4()
-        )
-        result = await deployment_service.get_replica_by_id(action)
-
-        assert result.data is None
-
-    async def test_zero_weight_traffic_inactive(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        endpoint_id: uuid.UUID,
-    ) -> None:
-        """traffic_status=INACTIVE returned correctly."""
-        inactive_route = RouteInfo(
-            route_id=uuid.uuid4(),
-            deployment_id=DeploymentID(endpoint_id),
-            session_id=SessionId(uuid.uuid4()),
-            status=RouteStatus.RUNNING,
-            health_status=RouteHealthStatus.HEALTHY,
-            traffic_ratio=0.0,
-            created_at=datetime(2024, 1, 1, tzinfo=UTC),
-            revision_id=uuid.uuid4(),
-            traffic_status=RouteTrafficStatus.INACTIVE,
-            health_check=None,
-        )
-        mock_deployment_repository.get_route = AsyncMock(return_value=inactive_route)
-
-        action = GetReplicaByIdAction(
-            deployment_id=DeploymentID(uuid.uuid4()), replica_id=inactive_route.route_id
-        )
-        result = await deployment_service.get_replica_by_id(action)
-
-        assert result.data is not None
-        assert result.data.activeness_status == ActivenessStatus.INACTIVE
-
-    async def test_unassigned_session_id_is_none(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        endpoint_id: uuid.UUID,
-    ) -> None:
-        """Regression for BA-5838: a route without a compute session must yield
-        ``session_id=None``, not a fallback to ``route_id``."""
-        route = RouteInfo(
-            route_id=uuid.uuid4(),
-            deployment_id=DeploymentID(endpoint_id),
-            session_id=None,
-            status=RouteStatus.PROVISIONING,
-            health_status=RouteHealthStatus.NOT_CHECKED,
-            traffic_ratio=1.0,
-            created_at=datetime(2024, 1, 1, tzinfo=UTC),
-            revision_id=uuid.uuid4(),
-            traffic_status=RouteTrafficStatus.ACTIVE,
-            health_check=None,
-        )
-        mock_deployment_repository.get_route = AsyncMock(return_value=route)
-
-        action = GetReplicaByIdAction(
-            deployment_id=DeploymentID(uuid.uuid4()), replica_id=route.route_id
-        )
-        result = await deployment_service.get_replica_by_id(action)
-
-        assert result.data is not None
-        assert result.data.session_id is None
-
-
-class TestSearchReplicas(DeploymentCRUDBaseFixtures):
-    """Tests for DeploymentService.search_replicas"""
-
-    @pytest.fixture
-    def route_info(self, endpoint_id: uuid.UUID) -> RouteInfo:
-        return RouteInfo(
-            route_id=uuid.uuid4(),
-            deployment_id=DeploymentID(endpoint_id),
-            session_id=SessionId(uuid.uuid4()),
-            status=RouteStatus.RUNNING,
-            health_status=RouteHealthStatus.HEALTHY,
-            traffic_ratio=1.0,
-            created_at=datetime(2024, 1, 1, tzinfo=UTC),
-            revision_id=uuid.uuid4(),
-            traffic_status=RouteTrafficStatus.ACTIVE,
-            health_check=None,
-        )
-
-    async def test_default_pagination(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        route_info: RouteInfo,
-        default_querier: BatchQuerier,
-    ) -> None:
-        """Default pagination returns list/total_count/has_next_page/has_previous_page."""
-        mock_deployment_repository.search_routes = AsyncMock(
-            return_value=RouteSearchResult(
-                items=[route_info],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        action = SearchReplicasAction(
-            deployment_id=DeploymentID(uuid.uuid4()), querier=default_querier
-        )
-        result = await deployment_service.search_replicas(action)
-
-        assert len(result.data) == 1
-        assert result.total_count == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-
-    async def test_empty_result(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        default_querier: BatchQuerier,
-    ) -> None:
-        """Empty result returns data=[]/total_count=0."""
-        mock_deployment_repository.search_routes = AsyncMock(
-            return_value=RouteSearchResult(
-                items=[],
-                total_count=0,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        action = SearchReplicasAction(
-            deployment_id=DeploymentID(uuid.uuid4()), querier=default_querier
-        )
-        result = await deployment_service.search_replicas(action)
-
-        assert result.data == []
-        assert result.total_count == 0
-
-    async def test_pagination_with_next_page(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        route_info: RouteInfo,
-    ) -> None:
-        """Pagination with has_next_page returns correctly."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        mock_deployment_repository.search_routes = AsyncMock(
-            return_value=RouteSearchResult(
-                items=[route_info],
-                total_count=5,
-                has_next_page=True,
-                has_previous_page=False,
-            )
-        )
-
-        action = SearchReplicasAction(deployment_id=DeploymentID(uuid.uuid4()), querier=querier)
-        result = await deployment_service.search_replicas(action)
-
-        assert result.total_count == 5
-        assert result.has_next_page is True
-
-
-class TestSearchAccessTokens(DeploymentCRUDBaseFixtures):
-    """Tests for DeploymentService.search_access_tokens"""
-
-    @pytest.fixture
-    def token_data(self) -> ModelDeploymentAccessTokenData:
-        return ModelDeploymentAccessTokenData(
-            id=uuid.uuid4(),
-            token="test-token-abc123",
-            expires_at=datetime(2025, 12, 31, tzinfo=UTC),
-            created_at=datetime(2024, 1, 1, tzinfo=UTC),
-        )
-
-    async def test_pagination_returns_tokens(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        token_data: ModelDeploymentAccessTokenData,
-        default_querier: BatchQuerier,
-    ) -> None:
-        """Pagination returns ModelDeploymentAccessTokenData list."""
-        mock_deployment_repository.search_access_tokens = AsyncMock(
-            return_value=AccessTokenSearchResult(
-                items=[token_data],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        action = SearchAccessTokensAction(
-            deployment_id=DeploymentID(uuid.uuid4()), querier=default_querier
-        )
-        result = await deployment_service.search_access_tokens(action)
-
-        assert len(result.data) == 1
-        assert result.data[0] == token_data
-        assert result.total_count == 1
-
-    async def test_no_tokens_returns_empty(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        default_querier: BatchQuerier,
-    ) -> None:
-        """No tokens returns empty list/total_count=0."""
-        mock_deployment_repository.search_access_tokens = AsyncMock(
-            return_value=AccessTokenSearchResult(
-                items=[],
-                total_count=0,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        action = SearchAccessTokensAction(
-            deployment_id=DeploymentID(uuid.uuid4()), querier=default_querier
-        )
-        result = await deployment_service.search_access_tokens(action)
-
-        assert result.data == []
-        assert result.total_count == 0
-
-
 class TestSyncReplica(DeploymentCRUDBaseFixtures):
     """Tests for DeploymentService.sync_replicas"""
 
@@ -662,78 +363,3 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
             DeploymentLifecycleType.CHECK_REPLICA
         )
-
-
-class TestGetRevisionById(DeploymentCRUDBaseFixtures):
-    """Tests for DeploymentService.get_revision_by_id"""
-
-    @pytest.fixture
-    def revision_data(self) -> ModelRevisionData:
-        return ModelRevisionData(
-            id=DeploymentRevisionID(uuid.uuid4()),
-            deployment_id=DeploymentID(uuid.uuid4()),
-            revision_number=1,
-            cluster_config=ClusterConfigData(
-                mode=ClusterMode.SINGLE_NODE,
-                size=1,
-            ),
-            resource_config=ResourceConfigData(
-                resource_group_name="default",
-                resource_slot=ResourceSlot({"cpu": "4", "mem": "8g"}),
-            ),
-            model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
-            ),
-            model_mount_config=ModelMountConfigData(
-                vfolder_id=VFolderUUID(uuid.uuid4()),
-                mount_destination="/models",
-                definition_path="model-definition.yaml",
-                extra_mounts=[],
-                model_mount_perm=MountPermission.READ_ONLY,
-            ),
-            image_id=ImageID(uuid.uuid4()),
-            created_at=datetime(2024, 1, 1, tzinfo=UTC),
-            execution=ExecutionData(
-                startup_command=None,
-                bootstrap_script=None,
-                callback_url=None,
-            ),
-            revision_preset=PresetAttributionData(preset_id=None, values=[]),
-        )
-
-    async def test_existing_revision_returns_data(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-        revision_data: ModelRevisionData,
-    ) -> None:
-        """Existing revision returns ModelRevisionData with cluster_config/resource_config/image_id/extra_mounts."""
-        mock_deployment_repository.get_revision = AsyncMock(return_value=revision_data)
-
-        action = GetRevisionByIdAction(
-            deployment_id=DeploymentID(uuid.uuid4()), revision_id=revision_data.id
-        )
-        result = await deployment_service.get_revision_by_id(action)
-
-        assert result.data == revision_data
-        assert result.data.cluster_config.mode == ClusterMode.SINGLE_NODE
-        assert result.data.resource_config.resource_group_name == "default"
-        assert result.data.image_id == revision_data.image_id
-        assert result.data.model_mount_config.extra_mounts == []
-        mock_deployment_repository.get_revision.assert_called_once_with(revision_data.id)
-
-    async def test_non_existent_revision_raises(
-        self,
-        deployment_service: DeploymentService,
-        mock_deployment_repository: MagicMock,
-    ) -> None:
-        """Non-existent revision raises DeploymentRevisionNotFound."""
-        mock_deployment_repository.get_revision = AsyncMock(
-            side_effect=Exception("DeploymentRevisionNotFound")
-        )
-
-        action = GetRevisionByIdAction(
-            deployment_id=DeploymentID(uuid.uuid4()), revision_id=DeploymentRevisionID(uuid.uuid4())
-        )
-        with pytest.raises(Exception, match="DeploymentRevisionNotFound"):
-            await deployment_service.get_revision_by_id(action)
