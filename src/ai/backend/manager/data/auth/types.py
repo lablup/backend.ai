@@ -84,6 +84,8 @@ class AuthenticatedUser:
     domain_id: DomainID
     sudo_session_enabled: bool
     allowed_client_ip: list[ReadableCIDR[IPv4Network | IPv6Network]] | None
+    # Read off the keypair the user marked default, since the rate limit window is per user.
+    rate_limit: int
     resource_policy: UserResourcePolicyData
 
 
@@ -121,5 +123,4 @@ class AuthenticatedKeypair:
     access_key: AccessKey
     secret_key: SecretKey
     is_admin: bool
-    rate_limit: int | None
     resource_policy: KeyPairResourcePolicyData
