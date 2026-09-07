@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import AgentWatcherResponseError
@@ -20,9 +21,13 @@ from ai.backend.manager.errors.agent import (
     AgentHasConflictingSessions,
     ConflictingSessionRescheduleNotSupported,
 )
+from ai.backend.manager.errors.resource import AgentNotFound
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
+    BulkLoadContainerCountsAction,
+)
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
 )
@@ -405,3 +410,23 @@ class TestUpdateResourceGroup:
 
         mock_agent_repository.update_resource_group.assert_not_called()
         mock_scheduling_controller.mark_sessions_for_termination.assert_not_called()
+
+
+class TestBulkLoadContainerCounts:
+    async def test_each_named_agent_is_answered_for(
+        self, agent_service: AgentService, mock_agent_repository: AsyncMock
+    ) -> None:
+        known = AgentUUID(uuid4())
+        unknown = AgentUUID(uuid4())
+        mock_agent_repository.load_container_counts_by_uuid.return_value = {known: 2}
+
+        result = await agent_service.bulk_load_container_counts(
+            BulkLoadContainerCountsAction(agent_uuids=[known, unknown])
+        )
+
+        assert result.values() == {known: 2}
+        assert isinstance(result.errors()[unknown], AgentNotFound)
+        mock_agent_repository.load_container_counts_by_uuid.assert_awaited_once_with([
+            known,
+            unknown,
+        ])

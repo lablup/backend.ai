@@ -563,7 +563,7 @@ class DataLoaders:
     ) -> DataLoader[AgentId, int]:
         adapter = self._adapters.agent
 
-        async def load_fn(agent_ids: list[AgentId]) -> list[int]:
+        async def load_fn(agent_ids: list[AgentId]) -> list[int | Exception]:
             return await adapter.batch_load_container_counts(agent_ids)
 
         return DataLoader(load_fn=load_fn)
@@ -735,13 +735,16 @@ class DataLoaders:
     ) -> DataLoader[AgentId, AgentV2GQL | None]:
         adapter = self._adapters.agent
 
-        async def load_fn(agent_ids: list[AgentId]) -> list[AgentV2GQL | None]:
+        async def load_fn(agent_ids: list[AgentId]) -> list[AgentV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.agent.types import (  # pants: no-infer-dep
                 AgentV2GQL as AG,
             )
 
             dtos = await adapter.batch_load_by_ids(agent_ids)
-            return [AG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else AG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 

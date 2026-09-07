@@ -19,11 +19,16 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.agent import ConflictingSessionRescheduleNotSupported
+from ai.backend.manager.errors.resource import AgentNotFound
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
+    BulkLoadContainerCountsAction,
+)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -264,6 +269,21 @@ class AgentService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+        )
+
+    async def bulk_load_container_counts(
+        self, action: BulkLoadContainerCountsAction
+    ) -> PartialBulkResult[int]:
+        counts = await self._agent_repository.load_container_counts_by_uuid(action.agent_uuids)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[int].succeeded(uuid, counts[uuid], description="counted")
+                if uuid in counts
+                else PartialBulkEntityResult[int].failed(
+                    uuid, AgentNotFound(f"Agent {uuid} not found")
+                )
+                for uuid in action.agent_uuids
+            ]
         )
 
     async def load_container_counts(
