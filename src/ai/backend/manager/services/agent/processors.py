@@ -1,15 +1,24 @@
 from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.agent_resource import AGENT_RESOURCE_FIELD_TYPE
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
-from ai.backend.manager.actions.v2.ops.result import BulkLookupOpsResult, LookupOpsResult
+from ai.backend.manager.actions.v2.ops.result import (
+    BulkLookupOpsResult,
+    LookupOpsResult,
+    ScopedFieldsOpsResult,
+)
 from ai.backend.manager.data.agent.types import AgentData
+from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.services.agent.actions.bulk_lookup import BulkLookupAgentsAction
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
@@ -24,9 +33,16 @@ from ai.backend.manager.services.agent.actions.load_container_counts import (
     LoadContainerCountsActionResult,
 )
 from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
+from ai.backend.manager.services.agent.actions.lookup_resource_owner import (
+    LookupAgentResourceOwnerAction,
+    LookupBulkAgentResourceOwnerAction,
+)
 from ai.backend.manager.services.agent.actions.recalculate_usage import (
     RecalculateUsageAction,
     RecalculateUsageActionResult,
+)
+from ai.backend.manager.services.agent.actions.scoped_search_resources import (
+    ScopedSearchAgentResourcesAction,
 )
 from ai.backend.manager.services.agent.actions.search_agents import (
     SearchAgentsAction,
@@ -60,6 +76,9 @@ class AgentProcessors:
     bulk_lookup: BulkLookupActionProcessor[
         BulkLookupAgentsAction, BulkLookupOpsResult[AgentId, AgentUUID]
     ]
+    scoped_search_resources: BulkActionProcessor[
+        ScopedSearchAgentResourcesAction, ScopedFieldsOpsResult[AgentResourceData]
+    ]
     sync_agent_registry: GlobalActionProcessor[
         SyncAgentRegistryAction, SyncAgentRegistryActionResult
     ]
@@ -91,6 +110,15 @@ class AgentProcessors:
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupAgentAction)
         self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupAgentsAction)
+        resources: LookupFieldGroup[AgentResourceData] = group.field_group(
+            FieldGroupMeta(AGENT_RESOURCE_FIELD_TYPE),
+            AgentResourceData,
+            LookupAgentResourceOwnerAction,
+            LookupBulkAgentResourceOwnerAction,
+        )
+        self.scoped_search_resources = resources.atomic_bulk_scoped_search_ops(
+            ScopedSearchAgentResourcesAction
+        )
         self.sync_agent_registry = group.global_scope(
             SyncAgentRegistryAction, service.sync_agent_registry
         )

@@ -5,11 +5,17 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
+import sqlalchemy as sa
+
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.agent_resource import AgentResourceID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
-from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.specs.lookup import DataLookup, FieldOwnerLookup
 
 
 @dataclass
@@ -29,3 +35,21 @@ class ResourceSlotTypeLookup(DataLookup[ResourceSlotTypeRow, ResourceSlotTypeUUI
     @override
     def to_entity_id(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeUUID:
         return row.uuid
+
+
+class AgentResourceOwnerLookup(FieldOwnerLookup[AgentResourceID, AgentUUID]):
+    """The agent a slot row belongs to; the row names the agent by ``agents.id``."""
+
+    @override
+    def build_query(
+        self, field_ids: Sequence[AgentResourceID]
+    ) -> sa.sql.Select[tuple[AgentResourceID, AgentUUID]]:
+        return (
+            sa.select(AgentResourceRow.id, AgentRow.uuid)
+            .join(AgentRow, AgentRow.id == AgentResourceRow.agent_id)
+            .where(AgentResourceRow.id.in_(field_ids))
+        )
+
+    @override
+    def to_entity_id(self, value: UUID) -> AgentUUID:
+        return AgentUUID(value)

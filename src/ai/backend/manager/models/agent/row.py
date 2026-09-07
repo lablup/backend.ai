@@ -32,6 +32,7 @@ from ai.backend.manager.data.permission.permission_defs import (
     AgentPermission,
     ResourceGroupPermission,
 )
+from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -126,6 +127,9 @@ class AgentRow(Base):
     def _resource_rows_by_rank(self) -> list[AgentResourceRow]:
         return sorted(self.agent_resource_rows, key=lambda r: r.slot_type_row.rank)
 
+    def resources_by_rank(self) -> list[AgentResourceData]:
+        return [resource_row.to_data() for resource_row in self._resource_rows_by_rank()]
+
     def actual_available_slots(self) -> ResourceSlot:
         available = ResourceSlot()
         for resource_row in self._resource_rows_by_rank():
@@ -147,8 +151,6 @@ class AgentRow(Base):
             region=self.region,
             resource_group=self.scaling_group,
             schedulable=self.schedulable,
-            available_slots=self.actual_available_slots(),
-            occupied_slots=self.actual_occupied_slots(),
             addr=self.addr,
             public_host=self.public_host,
             first_contact=self.first_contact,

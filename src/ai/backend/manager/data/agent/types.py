@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Self, override
@@ -18,6 +18,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.manager.data.resource_slot.types import AgentResourceData
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.permission.permission_defs import AgentPermission
@@ -80,8 +81,6 @@ class AgentData(EntityData):
     region: str
     resource_group: str
     schedulable: bool
-    available_slots: ResourceSlot
-    occupied_slots: ResourceSlot
     addr: str
     public_host: str | None
     first_contact: datetime | None
@@ -245,12 +244,24 @@ class AgentListResult:
 
 @dataclass
 class AgentDetailData:
-    """
-    Agent data with associated permissions.
+    """An agent with its slot rows and the caller's permissions on it.
 
-    This encapsulates an agent's data together with the permissions
-    the current user has on that agent.
+    The slot rows are field rows of the agent, read beside it rather than folded
+    into :class:`AgentData`; ``resources`` is in slot catalog rank order.
     """
 
     agent: AgentData
+    resources: Sequence[AgentResourceData]
     permissions: list[AgentPermission]
+
+    def available_slots(self) -> ResourceSlot:
+        available = ResourceSlot()
+        for resource in self.resources:
+            available[SlotName(resource.slot_name)] = resource.capacity
+        return available
+
+    def occupied_slots(self) -> ResourceSlot:
+        occupied = ResourceSlot()
+        for resource in self.resources:
+            occupied[SlotName(resource.slot_name)] = resource.used
+        return occupied

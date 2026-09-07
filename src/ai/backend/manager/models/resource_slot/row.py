@@ -30,6 +30,7 @@ from ai.backend.common.data.entity.resource_allocation import ResourceAllocation
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.manager.data.model_card.types import ModelCardResourceRequirementData
 from ai.backend.manager.data.resource_slot.types import (
+    AgentResourceData,
     NumberFormatData,
     ResourceSlotTypeData,
 )
@@ -176,6 +177,16 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):
     slot_type_row: Mapped[ResourceSlotTypeRow] = relationship(
         "ResourceSlotTypeRow", foreign_keys=[slot_name], lazy="raise"
     )
+
+    def to_data(self) -> AgentResourceData:
+        return AgentResourceData(
+            id=self.id,
+            agent_id=self.agent_id,
+            slot_name=self.slot_name,
+            capacity=self.capacity,
+            reserved=self.reserved,
+            used=self.used,
+        )
 
     __table_args__ = (
         sa.ForeignKeyConstraint(
