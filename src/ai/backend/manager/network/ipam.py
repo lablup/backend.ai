@@ -34,6 +34,7 @@ from ai.backend.manager.errors.network import (
     NetworkPoolExhausted,
     RequestedSubnetInvalid,
     RequestedSubnetUnavailable,
+    SessionRecordContested,
     SubnetClaimStranded,
     VNIPoolExhausted,
 )
@@ -80,8 +81,11 @@ def _flat(listing: Mapping[str, Any]) -> dict[str, str]:
     return {key: value for key, value in listing.items() if isinstance(value, str)}
 
 
-def _own_vni(allocated: Mapping[str, str], session_id: str, generation: str | None) -> int | None:
-    """The VNI this session already holds, out of a listing of every claim.
+def _own_vni(
+    allocated: Mapping[str, str], session_id: str, generation: str | None
+) -> tuple[int, str] | None:
+    """The VNI this session already holds and the bytes it holds it with, out of a listing of
+    every claim.
 
     Matched on the owner and the incarnation rather than the exact payload: a claim a previous
     attempt stranded carries no generation (or this one), and taking a SECOND VNI beside it leaves
@@ -97,7 +101,7 @@ def _own_vni(allocated: Mapping[str, str], session_id: str, generation: str | No
         except ValueError:
             continue
         if of_generation(raw, generation):
-            return int(key)
+            return int(key), raw
     return None
 
 
@@ -125,6 +129,14 @@ def _vni_claim(session_id: str, generation: str | None = None) -> str:
     if generation is not None:
         claim[SESSION_META_GENERATION] = generation
     return json.dumps(claim)
+
+
+async def _guards_still_hold(etcd: AsyncEtcd, guards: Mapping[str, str]) -> bool:
+    """Whether every key a claim was to be written under still holds the bytes given for it."""
+    for key, expected in guards.items():
+        if await etcd.get(key) != expected:
+            return False
+    return True
 
 
 def _endpoint_claim(container_id: str, generation: str | None = None) -> str:
@@ -244,7 +256,7 @@ class SubnetAllocator:
             # An unstamped claim is adoptable by ANY incarnation, so adopting one without taking
             # it leaves it shared: a cleanup of some other incarnation reads it as its own and
             # gives away a block this session is running on. Take it or leave it.
-            if not await self._claim_as_ours(taken, held, session_id, generation):
+            if not await self._claim_as_ours(taken, held, session_id, generation, guards):
                 log.warning(
                     "could not take session {}'s unstamped claim on {} for incarnation {};"
                     " allocating a block of this incarnation's own instead",
@@ -279,16 +291,32 @@ class SubnetAllocator:
                 candidate, _claim(session_id, str(candidate), generation), guards
             ):
                 return str(candidate)
+            # Same reasoning as the VNI allocator: a lost claim is the next candidate, an expired
+            # guard is every candidate in turn. Told apart here rather than at the end of the pool.
+            await self._require_guards(session_id, dict(guards or {}))
             # Lost the compare-and-swap. The winner can be this very session -- a second manager
             # creating it at the same time -- and moving to the next block would then leave one
             # of the two claimed by nobody's meta, for the cluster's lifetime. Ask again who
             # holds what before deciding this candidate is somebody else's.
             taken = _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
             if held := self._already_held(taken, session_id, generation):
-                if await self._claim_as_ours(taken, held, session_id, generation):
+                if await self._claim_as_ours(taken, held, session_id, generation, guards):
                     return held
             owned = {unquote(key) for key in taken} | set(units)
         raise NetworkPoolExhausted()
+
+    async def _require_guards(self, session_id: str, guards: Mapping[str, str]) -> None:
+        """Stop the scan when what makes the claim legitimate is no longer there.
+
+        Raises:
+            SessionRecordContested: a guard key no longer holds the bytes it was given for.
+        """
+        if guards and not await _guards_still_hold(self._etcd, guards):
+            raise SessionRecordContested(
+                f"session {session_id}'s network record moved on while a subnet was being claimed"
+                " for it; stopping rather than walking the whole pool on behalf of a session that"
+                " no longer exists"
+            )
 
     async def _claim_as_ours(
         self,
@@ -296,6 +324,7 @@ class SubnetAllocator:
         subnet: str,
         session_id: str,
         generation: str | None,
+        guards: Mapping[str, str] | None = None,
     ) -> bool:
         """Rewrite the units of ``subnet`` that carry no incarnation so they carry this one.
 
@@ -306,24 +335,53 @@ class SubnetAllocator:
 
         Each unit is rewritten in place by compare-and-swap over the exact bytes read -- never
         released and re-taken, which would put the unit back in the pool for as long as the two
-        writes take and hand this session's block to whoever asked in between. A concurrent
-        promotion loses the swap rather than double-writing. Nothing to do when there is no
-        incarnation to promote to, or when the units already carry one.
+        writes take and hand this session's block to whoever asked in between -- and under the
+        same guards the claim itself would be made with, so a promotion on behalf of a session
+        that has moved on does not land at all.
+
+        ALL OR NOTHING. A block half promoted is worse than one not promoted: its first unit
+        answers to a stale cleanup and its second to this session's, so the pool hands the first
+        half to somebody else while this session is running on the whole block. Units this call
+        rewrote are put back as they were if a later one will not go.
 
         :return: ``True`` if every unit of the block is now this incarnation's.
         """
         if generation is None:
             return True
         payload = _claim(session_id, subnet, generation)
+        guard_keys = dict(guards or {})
+        promoted: list[tuple[str, str]] = []
         for unit in self._units_of(subnet):
             raw = allocated.get(quote(unit, safe=""))
             if raw is None:
+                await self._undo_promotion(promoted, payload)
                 return False
             if raw == payload:
                 continue
-            if not await self._etcd.replace(_allocated_key(unit), raw, payload):
+            if not await self._etcd.compare_and_put(
+                _allocated_key(unit), payload, expected=raw, guards=guard_keys
+            ):
+                await self._undo_promotion(promoted, payload)
                 return False
+            promoted.append((unit, raw))
         return True
+
+    async def _undo_promotion(self, promoted: Sequence[tuple[str, str]], payload: str) -> None:
+        """Put back the units a failed promotion had already rewritten.
+
+        Over the bytes this call wrote, so a unit somebody else has taken since is left alone.
+        Best effort per unit and reported: what it cannot put back is a unit stamped with an
+        incarnation whose block was never completed, which the orphan sweep reaches by generation.
+        """
+        for unit, was in reversed(promoted):
+            if not await self._etcd.compare_and_put(
+                _allocated_key(unit), was, expected=payload, guards={}
+            ):
+                log.warning(
+                    "could not put unit block {} back as it was after a partial promotion; it"
+                    " stays stamped with the incarnation that could not complete the block",
+                    unit,
+                )
 
     def _already_held(
         self, allocated: Mapping[str, str], session_id: str, generation: str | None
@@ -390,6 +448,12 @@ class SubnetAllocator:
         A wide block is claimed a unit at a time, so an acquire that died partway leaves one.
         Finishing it is what the retry wants; if somebody else has taken a unit in the meantime
         the block can never be this session's, and holding the rest of it helps nobody.
+
+        The units that were already there may carry no incarnation while the ones written here
+        carry this one, which leaves the block answering to two cleanups at once -- the older one
+        takes the legacy half and the pool hands it to a tenant whose addresses then overlap this
+        session's. So the whole block is brought onto one incarnation before it is handed back,
+        and a block that cannot be is given back rather than returned half-promoted.
         """
         for block in self._claims_of(allocated, session_id, generation):
             units = self._units_of(block)
@@ -398,12 +462,17 @@ class SubnetAllocator:
                 continue  # whole; `_already_held` deals with it
             payload = _claim(session_id, block, generation)
             missing = [unit for unit in units if unit not in ours]
-            won = list(ours)
+            # Every unit this session holds of the block, each with the bytes it actually holds.
+            # The ones already here may carry a claim from before the incarnation field, whose
+            # bytes are not `payload`: releasing them all by one payload reports them stuck and
+            # turns an ordinary skip into a stranded pool, while not releasing them at all leaves
+            # the dead half of a block nobody can complete.
+            won: dict[str, str] = {unit: allocated[quote(unit, safe="")] for unit in ours}
             for unit in missing:
                 if await self._etcd.compare_and_put(
                     _allocated_key(unit), payload, expected=None, guards=dict(guards or {})
                 ):
-                    won.append(unit)
+                    won[unit] = payload
                     continue
                 # Somebody else holds a piece of it. This block is not this session's to have.
                 log.warning(
@@ -412,9 +481,26 @@ class SubnetAllocator:
                     block,
                     unit,
                 )
-                if stuck := await self._give_back(won, payload):
+                if stuck := await self._give_back_each(won):
                     raise SubnetClaimStranded(
                         f"could not give back session {session_id}'s partial claim on {block}"
+                        f" ({', '.join(stuck)}); the pool cannot be accounted for"
+                    )
+                return None
+            # Every unit is this session's now; make every unit this INCARNATION's too, reading
+            # the pool again because the writes above changed it.
+            current = _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
+            if not await self._claim_as_ours(current, block, session_id, generation, guards):
+                log.warning(
+                    "giving back session {}'s claim on {}: it could not be brought onto one"
+                    " incarnation, and a block that answers to two is one the pool can hand out"
+                    " from under it",
+                    session_id,
+                    block,
+                )
+                if stuck := await self._give_back_each(won):
+                    raise SubnetClaimStranded(
+                        f"could not give back session {session_id}'s claim on {block}"
                         f" ({', '.join(stuck)}); the pool cannot be accounted for"
                     )
                 return None
@@ -464,7 +550,7 @@ class SubnetAllocator:
             # As in auto mode: the winner may be this same session, and that is not a conflict.
             taken = _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
             if (held := self._already_held(taken, session_id, generation)) == str(requested):
-                if await self._claim_as_ours(taken, held, session_id, generation):
+                if await self._claim_as_ours(taken, held, session_id, generation, guards):
                     return held
             raise RequestedSubnetUnavailable(
                 f"'{requested}' overlaps a subnet already allocated to another session."
@@ -509,6 +595,28 @@ class SubnetAllocator:
             await asyncio.shield(asyncio.ensure_future(self._give_back(units, payload)))
             raise
         return True
+
+    async def _give_back_each(self, held: Mapping[str, str]) -> list[str]:
+        """Release each unit over the bytes it actually holds; return the ones that would not go.
+
+        The counterpart of `_give_back` for a block whose units were not all claimed by one write
+        -- a partial claim finished across an upgrade holds some units with an incarnation and
+        some without, and one payload cannot name both.
+        """
+        stuck: list[str] = []
+        for unit, payload in held.items():
+            try:
+                await self._etcd.delete_if_value(_allocated_key(unit), payload)
+            except Exception:
+                stuck.append(unit)
+        if stuck:
+            log.error(
+                "could not give back {} unit block(s): {}. They stay claimed and no later release"
+                " names them.",
+                len(stuck),
+                ", ".join(sorted(stuck)),
+            )
+        return stuck
 
     async def _give_back(self, units: Sequence[str], payload: str) -> list[str]:
         """Release every unit of a block this claim owns; return the ones that would not go back.
@@ -565,6 +673,33 @@ class SubnetAllocator:
                 ", ".join(sorted(stuck)),
             )
         return stuck
+
+    async def claims(self) -> dict[str, tuple[str, str | None]]:
+        """Every unit block claimed in the pool, as ``unit -> (session_id, generation)``.
+
+        For the reconciler: the pool is the only place a claim is certain to appear, so a sweep
+        that starts here reaches what no meta, tombstone or debt note ever named.
+        """
+        found: dict[str, tuple[str, str | None]] = {}
+        for key, raw in _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX)).items():
+            try:
+                claim = json.loads(raw)
+            except ValueError:
+                continue
+            session_id = claim.get("session_id")
+            if not session_id:
+                continue
+            found[unquote(key)] = (str(session_id), claim.get(SESSION_META_GENERATION))
+        return found
+
+    async def release_unit(self, unit: str, expected: str) -> bool:
+        """Give one unit block back, over the exact bytes it was read with."""
+        return await self._etcd.delete_if_value(_allocated_key(unit), expected)
+
+    async def raw_claim(self, unit: str) -> str | None:
+        """The bytes a unit block is claimed with, or None if it is free."""
+        raw = await self._etcd.get(_allocated_key(unit))
+        return raw if isinstance(raw, str) else None
 
     async def holder(self, subnet: str) -> str | None:
         """The session every unit block of ``subnet`` is claimed by, or None if they disagree or
@@ -821,9 +956,23 @@ class VNIAllocator:
         """
         low, high = self._vni_range
         payload = _vni_claim(session_id, generation)
+        guard_keys = dict(guards or {})
         allocated = _flat(await self._etcd.get_prefix(_VNI_PREFIX))
         if (mine := _own_vni(allocated, session_id, generation)) is not None:
-            return mine
+            held, raw = mine
+            if await self._claim_as_ours(held, raw, payload, guard_keys):
+                return held
+            # Could not be made this incarnation's: an unstamped claim left shared is one a
+            # cleanup of some OTHER incarnation reads as its own and deletes, handing a running
+            # session's VNI to the next. Take one of this incarnation's own instead.
+            log.warning(
+                "could not take session {}'s unstamped claim on vni {} for incarnation {};"
+                " claiming a vni of this incarnation's own instead",
+                session_id,
+                held,
+                generation,
+            )
+            await self._require_guards(session_id, guard_keys)
         # The listing only rules VNIs out -- it is a snapshot, so a VNI it shows as free still
         # has to be won by CAS. It saves a round trip per VNI already taken, which is what the
         # plain low-to-high scan costs once the pool has any depth of live sessions.
@@ -832,16 +981,53 @@ class VNIAllocator:
             if vni in taken:
                 continue
             if await self._etcd.compare_and_put(
-                f"{_VNI_PREFIX}/{vni}", payload, expected=None, guards=dict(guards or {})
+                f"{_VNI_PREFIX}/{vni}", payload, expected=None, guards=guard_keys
             ):
                 return vni
-            # Same reasoning as the subnet allocator: a lost CAS whose winner is this session is
-            # this session's VNI, not a reason to take a second one.
+            # A lost compare-and-swap has two causes that mean opposite things. The VNI was taken
+            # under this call -- try the next one -- or the session's record moved on, in which
+            # case EVERY candidate will lose in turn: 16 million of them, each costing a
+            # compare-and-swap and a prefix read, before the pool is declared exhausted. One stale
+            # create would hold this manager and its etcd for as long as that takes. Told apart
+            # here, once, rather than discovered at the end.
+            await self._require_guards(session_id, guard_keys)
             allocated = _flat(await self._etcd.get_prefix(_VNI_PREFIX))
             if (mine := _own_vni(allocated, session_id, generation)) is not None:
-                return mine
+                return mine[0]
             taken = {int(key) for key in allocated if key.isdigit()}
         raise VNIPoolExhausted()
+
+    async def _claim_as_ours(
+        self, vni: int, raw: str, payload: str, guards: Mapping[str, str]
+    ) -> bool:
+        """Rewrite a claim that carries no incarnation so it carries this one.
+
+        A claim from before the field belongs to whoever asks (`of_generation`), which is right
+        for finding it and wrong for keeping it: a cleanup of another incarnation of this same
+        session id reads it as its own and gives the VNI back while this session's devices are
+        carrying traffic. One compare-and-swap over the exact bytes read, under the same guards
+        the claim would have been made under.
+
+        :return: ``True`` if the claim is now this incarnation's (or already was).
+        """
+        if raw == payload:
+            return True
+        return await self._etcd.compare_and_put(
+            f"{_VNI_PREFIX}/{vni}", payload, expected=raw, guards=dict(guards)
+        )
+
+    async def _require_guards(self, session_id: str, guards: Mapping[str, str]) -> None:
+        """Stop the scan when what makes the claim legitimate is no longer there.
+
+        Raises:
+            SessionRecordContested: a guard key no longer holds the bytes it was given for.
+        """
+        if guards and not await _guards_still_hold(self._etcd, guards):
+            raise SessionRecordContested(
+                f"session {session_id}'s network record moved on while a VNI was being claimed"
+                " for it; stopping rather than walking the whole pool on behalf of a session that"
+                " no longer exists"
+            )
 
     async def release_all(self, session_id: str, generation: str | None = None) -> list[int]:
         """Give back every VNI this INCARNATION of the session claimed, whatever any meta says.
@@ -878,6 +1064,32 @@ class VNIAllocator:
                 ", ".join(str(vni) for vni in sorted(stuck)),
             )
         return stuck
+
+    async def claims(self) -> dict[int, tuple[str, str | None]]:
+        """Every allocated VNI, as ``vni -> (session_id, generation)``. See
+        `SubnetAllocator.claims`."""
+        found: dict[int, tuple[str, str | None]] = {}
+        for key, raw in _flat(await self._etcd.get_prefix(_VNI_PREFIX)).items():
+            if not key.isdigit():
+                continue
+            try:
+                claim = json.loads(raw)
+            except ValueError:
+                continue
+            session_id = claim.get("session_id")
+            if not session_id:
+                continue
+            found[int(key)] = (str(session_id), claim.get(SESSION_META_GENERATION))
+        return found
+
+    async def release_one(self, vni: int, expected: str) -> bool:
+        """Give one VNI back, over the exact bytes it was read with."""
+        return await self._etcd.delete_if_value(f"{_VNI_PREFIX}/{vni}", expected)
+
+    async def raw_claim(self, vni: int) -> str | None:
+        """The bytes a VNI is claimed with, or None if it is free."""
+        raw = await self._etcd.get(f"{_VNI_PREFIX}/{vni}")
+        return raw if isinstance(raw, str) else None
 
     async def holder(self, vni: int) -> str | None:
         """The session ``vni`` is claimed by, or None if it is free."""

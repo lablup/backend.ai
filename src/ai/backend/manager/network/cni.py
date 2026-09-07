@@ -178,11 +178,16 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
     _vni_allocator: VNIAllocator
     _endpoint_allocator: EndpointAllocator
     _forced_backend: NetworkBackendKind | None
+    #: ``session_id -> generation`` this manager could neither give back nor record a debt for.
+    #: Read by health reporting: it is the one leak no retry finds on its own, and the pool
+    #: reconciler is what eventually reaches it.
+    _unrecoverable: dict[str, str]
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
         self._etcd = None
         self._forced_backend = None
+        self._unrecoverable = {}
 
     @override
     async def init(self, context: Any = None) -> None:
@@ -204,6 +209,15 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         )
         self._vni_allocator = VNIAllocator(self._etcd)
         self._endpoint_allocator = EndpointAllocator(self._etcd)
+        # What a previous manager life could neither release nor write down. Started from the
+        # POOL rather than from a list of what is owed, because the case this exists for is the
+        # one where nothing was written down. Best-effort: a manager that cannot reconcile still
+        # serves sessions, and says so through `unrecoverable_leaks`.
+        try:
+            if reclaimed := await self.reconcile_pool():
+                log.warning("reclaimed {} pool claim(s) no live session names", reclaimed)
+        except Exception:
+            log.exception("could not reconcile the overlay pool at startup")
 
     @override
     async def cleanup(self) -> None:
@@ -691,10 +705,14 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # the level it deserves, because no retry will find this on its own -- the record
             # already belongs to the incarnation that replaced this one, and the debt that would
             # have pointed at it was never written.
+            # Nothing names this any more: not the record (it belongs to the successor), not a
+            # tombstone, not a debt note. The pool reconciler is what reaches it -- at the next
+            # manager start, or whenever health reporting acts on this.
+            self._unrecoverable[session_id] = generation
             log.error(
                 "session {}'s incarnation {} could not be given back AND its debt could not be"
-                " recorded; its subnet, VNI and keys are now held by nothing that names them and"
-                " will not be reclaimed without operator action",
+                " recorded; nothing names its subnet and VNI now, and only the pool reconciler"
+                " will reach them",
                 session_id,
                 generation,
             )
@@ -754,6 +772,79 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         if complete:
             await etcd.delete(_debt_key(session_id, generation), scope=ConfigScopes.GLOBAL)
         return complete
+
+    def unrecoverable_leaks(self) -> Mapping[str, str]:
+        """Incarnations this manager could neither release nor write a debt for, as
+        ``session_id -> generation``.
+
+        Empty is the healthy answer. Anything here is pool space that no retry will find on its
+        own; `reconcile_pool` is what gives it back.
+        """
+        return dict(self._unrecoverable)
+
+    async def reconcile_pool(self) -> int:
+        """Give back every pool claim whose session no longer names its incarnation.
+
+        The safety net under the debt note, and the only one that does not depend on a note
+        surviving. A sweep whose debt could not be written AND whose release failed leaves a
+        subnet and a VNI that no session record, tombstone or debt key mentions -- the pool is
+        then the sole remaining evidence that they exist, so a reconciler has to start there and
+        ask the session, rather than start from a list of what is owed.
+
+        A claim is orphaned when the session's record is gone, or names a DIFFERENT incarnation.
+        A claim of the incarnation the record names is live, whatever state that record is in: a
+        create still building its session holds its claims legitimately, and its own record is
+        what says so.
+
+        Released over the exact bytes read, so a claim rewritten under the sweep is left alone.
+
+        :return: how many claims were given back.
+        """
+        etcd = self._require_etcd()
+        released = 0
+
+        async def is_orphan(session_id: str, generation: str | None) -> bool:
+            live = _generation_of(
+                await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
+            )
+            if live is None:
+                # No record at all, or one from before the field. Only the first is an orphan, and
+                # a record that exists is not this sweep's to judge -- it may be a legacy session
+                # still running.
+                return (
+                    await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
+                ) is None
+            return live != generation
+
+        for unit, (session_id, generation) in (await self._subnet_allocator.claims()).items():
+            if not await is_orphan(session_id, generation):
+                continue
+            raw = await self._subnet_allocator.raw_claim(unit)
+            if raw is None:
+                continue
+            if await self._subnet_allocator.release_unit(unit, raw):
+                released += 1
+                log.warning(
+                    "reclaimed unit block {}: session {} does not name incarnation {}",
+                    unit,
+                    session_id,
+                    generation,
+                )
+        for vni, (session_id, generation) in (await self._vni_allocator.claims()).items():
+            if not await is_orphan(session_id, generation):
+                continue
+            raw = await self._vni_allocator.raw_claim(vni)
+            if raw is None:
+                continue
+            if await self._vni_allocator.release_one(vni, raw):
+                released += 1
+                log.warning(
+                    "reclaimed vni {}: session {} does not name incarnation {}",
+                    vni,
+                    session_id,
+                    generation,
+                )
+        return released
 
     async def drain_cleanup_debt(self, session_id: str) -> None:
         """Retry every unfinished sweep recorded for this session id.
