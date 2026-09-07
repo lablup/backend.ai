@@ -20,8 +20,10 @@ from ai.backend.common.network.keys import member_key, session_ipam_key, session
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
     OVERLAY_ENCRYPTION_PROFILE,
+    GenerationMatch,
     Member,
     NetworkBackendKind,
+    generation_match,
     mac_for_ip,
     of_generation,
 )
@@ -905,11 +907,14 @@ class TestEncryptingOnlyWhereEveryNodeCan:
             )
 
     async def test_required_refuses_an_unreadable_record(self) -> None:
+        # Refused before encryption is even considered now: an unreadable capability record is not
+        # an advert that the node can serve this session at all. `test_required_refuses_an_unknown
+        # _profile` is what still covers the encryption-specific answer.
         etcd = FakeEtcd()
         _encryption_capable(etcd, "a1")
         etcd.store["network/agent/a2/caps"] = "{not json"
         plugin = self._with_policy(etcd, "required")
-        with pytest.raises(NetworkBackendMismatch, match="cannot read"):
+        with pytest.raises(NetworkBackendMismatch, match="cannot be read"):
             await plugin.create_network(
                 identifier="s1",
                 options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
@@ -3376,6 +3381,133 @@ class TestUnreadableIsNotStale:
         await plugin._sweep_incarnation(cast(AsyncEtcd, etcd), "s1", generation)
 
         assert member_key("s1", "a1") not in etcd.store
+
+
+class TestAStampThatIsNotAStamp:
+    """C40. Ownership everywhere here is a comparison of one opaque token. A value that is not
+    one must stop the comparison, not lose it: read loosely, a live record carrying
+    `generation: []` became the live generation `"[]"`, and every correctly stamped key under it
+    then compared as ANOTHER incarnation's -- and was deleted, teardown barrier included."""
+
+    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+
+    @pytest.mark.parametrize("bogus", [[], 0, {}, "", True, "x" * 65, "has spaces"])
+    async def test_a_live_record_with_a_bogus_stamp_costs_nothing(self, bogus: Any) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        subnet, vni = str(info.options["subnet"]), int(cast(int, info.options["vni"]))
+        generation = str(info.options["generation"])
+        # Correctly stamped child keys, of the incarnation that is actually live.
+        etcd.store[member_key("s1", "a1")] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": True,
+            "generation": generation,
+        })
+        etcd.store[session_ipam_key("s1", "10.128.0.5")] = json.dumps({
+            "container_id": "k1",
+            "generation": generation,
+        })
+        record = json.loads(etcd.store[session_meta_key("s1")])
+        etcd.store[session_meta_key("s1")] = json.dumps({**record, "generation": bogus})
+
+        await plugin.reconcile_pool()
+
+        assert member_key("s1", "a1") in etcd.store, f"generation={bogus!r} deleted a live member"
+        assert session_ipam_key("s1", "10.128.0.5") in etcd.store
+        assert f"network/ipam/vni/{vni}" in etcd.store
+        assert _allocated_key(subnet) in etcd.store
+
+    @pytest.mark.parametrize("bogus", [[], 0, {}, ""])
+    def test_a_child_key_with_a_bogus_stamp_is_unreadable_not_different(self, bogus: Any) -> None:
+        assert generation_match(json.dumps({"generation": bogus}), "g1") is (
+            GenerationMatch.UNREADABLE
+        )
+
+
+class TestJoinedIsAnAnswerNotATruthValue:
+    """C41. `joined` is what the manager reads before it hands a VNI back to the pool. `bool()`
+    turned `0`, `null`, `[]` and `""` into "this node has finished its teardown", so one corrupt
+    live member record let the VNI be reused over a node that still holds the devices."""
+
+    _OPTIONS: dict[str, Any] = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    @pytest.mark.parametrize("bogus", [0, None, [], "", "false", 1])
+    async def test_a_corrupt_joined_still_holds_the_allocation(self, bogus: Any) -> None:
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={**self._OPTIONS, "member_agents": ["a1"]}
+        )
+        vni = int(cast(int, info.options["vni"]))
+        etcd.store[member_key("s1", "a1")] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": bogus,
+        })
+
+        with pytest.raises(OverlayTeardownPending):
+            await plugin.destroy_network("s1")
+
+        assert f"network/ipam/vni/{vni}" in etcd.store, "the vni went back while a node held it"
+
+    async def test_a_real_false_still_releases(self) -> None:
+        # The one value that means what it says must keep meaning it.
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={**self._OPTIONS, "member_agents": ["a1"]}
+        )
+        vni = int(cast(int, info.options["vni"]))
+        etcd.store[member_key("s1", "a1")] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": False,
+        })
+
+        await plugin.destroy_network("s1")
+
+        assert f"network/ipam/vni/{vni}" not in etcd.store
+
+
+class TestTheCniPathIsFailClosed:
+    """C42. The BEP-1078 path has no deployments older than the capability probe, so there is
+    nothing for a fail-open to protect -- and only the docker agent publishes capabilities at all.
+    Letting an agent that has said nothing into a session hands a descriptor to a node that has
+    not wired the seam."""
+
+    async def test_an_agent_that_has_published_nothing_is_refused(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch, match="published no network capabilities"):
+            await plugin.create_network(
+                identifier="s1",
+                options={"forced_backend": "vxlan", "member_agents": ["a-silent"]},
+            )
+
+    async def test_an_agent_whose_capabilities_cannot_be_read_is_refused(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/caps"] = "[]"
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch, match="cannot be read"):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
+
+    async def test_an_agent_that_advertises_the_backend_is_allowed(self) -> None:
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+        )
+        assert info.options["subnet"]
 
 
 class TestTheReconcileTicketAndTheClock:

@@ -202,19 +202,21 @@ class BasePluginContext[P: AbstractPlugin]:
             f"config/plugins/{self._group_key}/{plugin_name}",
             wait_timeout=0.2,
         ):
-            new_config = await self.etcd.get_prefix(
-                f"config/plugins/{self._group_key}/{plugin_name}/",
-            )
             try:
+                new_config = await self.etcd.get_prefix(
+                    f"config/plugins/{self._group_key}/{plugin_name}/",
+                )
                 await self.plugins[plugin_name].update_plugin_config(new_config)
             except Exception:
-                # One config an operator got wrong must not end the watcher. Without this the
-                # task died on the first rejected update and every LATER change -- including the
-                # correction -- was never delivered, so the mistake outlived itself until somebody
-                # restarted the process.
+                # Neither a config an operator got wrong nor a momentary etcd failure may end
+                # the watcher. Without this the task died on the first of either, and every LATER
+                # change -- including the correction -- was never delivered, so the mistake
+                # outlived itself until somebody restarted the process. The read is inside the
+                # guard for the same reason as the update: one failed poll is not a reason to
+                # stop polling.
                 log.exception(
-                    "plugin {} rejected a configuration update; keeping the one it has and"
-                    " continuing to watch",
+                    "could not apply a configuration update to plugin {}; keeping the one it has"
+                    " and continuing to watch",
                     plugin_name,
                 )
 

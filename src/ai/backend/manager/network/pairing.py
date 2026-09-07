@@ -112,6 +112,43 @@ async def require_members_can_serve_driver(
             )
 
 
+async def require_members_cni_ready(etcd: AsyncEtcd, member_agents: Iterable[str]) -> None:
+    """Raise unless every member agent has SAID it can serve this session's data plane.
+
+    Fail-closed, unlike `require_members_overlay_ready`, and the difference is the point. That one
+    guards the Swarm overlay, which has deployments older than the capability probe: refusing an
+    agent that has published nothing would strand them, and the worst case of letting one through
+    is a driver that already worked. This guards the BEP-1078 path, which has no such history --
+    an agent that has published nothing has not wired the seam this needs, and today only the
+    docker agent publishes at all. Letting it through hands a session descriptor to a node that
+    cannot act on it, and the failure surfaces as a session stuck at create.
+
+    An unreadable capability record is refused for the same reason: it is not an advert.
+    """
+    for agent_id in member_agents:
+        raw = await etcd.get(agent_caps_key(agent_id), scope=ConfigScopes.GLOBAL)
+        if raw is None:
+            raise NetworkBackendMismatch(
+                f"agent '{agent_id}' has published no network capabilities, so it has not said it"
+                " can serve a cluster-network session. The agent publishes these at startup once"
+                " its data plane is wired; until it does, this session cannot be placed on it."
+            )
+        try:
+            caps = AgentNetworkCaps(**json.loads(raw))
+        except (ValueError, TypeError) as e:
+            CommonMetricRegistry.instance().network_pool.observe_invalid_record()
+            raise NetworkBackendMismatch(
+                f"agent '{agent_id}'s published network capabilities cannot be read ({e}), so"
+                " they are not an advert that it can serve this session"
+            ) from e
+        if "vxlan" not in caps.backends:
+            reasons = "; ".join(caps.readiness) or "no reason published"
+            raise NetworkBackendMismatch(
+                f"agent '{agent_id}' does not advertise the 'vxlan' data-plane backend, so a "
+                f"multi-node overlay session placed on it cannot come up: {reasons}"
+            )
+
+
 async def require_members_overlay_ready(etcd: AsyncEtcd, member_agents: Iterable[str]) -> None:
     """Raise if a member agent has published that it cannot serve an overlay session.
 

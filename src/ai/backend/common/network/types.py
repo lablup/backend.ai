@@ -10,6 +10,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import logging
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -127,6 +128,26 @@ create can tell its own incarnation from the one that replaced it. See
 `CNINetworkPlugin._finish_cleanup` and `SessionNetworkCoordinator._session_fence`."""
 
 
+#: What an incarnation stamp may look like. Minted as `uuid4().hex`, but not required to be one:
+#: the point is that it is a short, opaque, comparable token, so anything that is not is a value
+#: nothing should be judged against.
+_GENERATION_SHAPE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+
+
+def reads_as_generation(value: Any) -> str | None:
+    """``value`` as an incarnation stamp, or None if it is not one.
+
+    Ownership everywhere in this control plane is decided by comparing this token, so a value that
+    is not one must not be compared -- it must stop the comparison. Read loosely, a live record
+    carrying ``generation: []`` became the live generation ``"[]"``, and every correctly stamped
+    member, endpoint and address reservation under it then compared as ANOTHER incarnation's and
+    was deleted: the teardown barrier included.
+    """
+    if not isinstance(value, str):
+        return None
+    return value if _GENERATION_SHAPE.match(value) else None
+
+
 class GenerationMatch(StrEnum):
     """How a stored record's incarnation stamp relates to the one a caller is working for.
 
@@ -143,7 +164,8 @@ class GenerationMatch(StrEnum):
     UNSTAMPED = "unstamped"
     #: Stamped with another incarnation. The only state a destructive caller may act on.
     DIFFERENT = "different"
-    #: Not a record this can read. Not evidence of anything, least of all of being garbage.
+    #: Not a record this can read, or one whose stamp is not a stamp. Not evidence of anything,
+    #: least of all of being garbage.
     UNREADABLE = "unreadable"
 
 
@@ -156,10 +178,36 @@ def generation_match(raw: str, generation: str | None) -> GenerationMatch:
         return GenerationMatch.UNREADABLE
     if not isinstance(record, Mapping):
         return GenerationMatch.UNREADABLE
-    stamped = record.get(SESSION_META_GENERATION)
-    if stamped is None:
+    raw_stamp = record.get(SESSION_META_GENERATION)
+    if raw_stamp is None:
         return GenerationMatch.UNSTAMPED
+    stamped = reads_as_generation(raw_stamp)
+    if stamped is None:
+        # Present, and not a stamp. Comparing it would make every correctly stamped record under
+        # this session look like another incarnation's.
+        return GenerationMatch.UNREADABLE
     return GenerationMatch.SAME if stamped == generation else GenerationMatch.DIFFERENT
+
+
+def _joined(payload: Mapping[str, Any]) -> bool:
+    """Whether this member says its node has joined the session.
+
+    Absent means yes: a record written before the field came from an agent, and the manager's
+    pre-seed is newer than the field. PRESENT means it must be a real boolean -- ``0``, ``null``,
+    ``[]`` and ``""`` are all falsey, and `bool()` turned every one of them into "this node has
+    finished its teardown". That is the answer the manager reads before it hands a VNI back to the
+    pool, so a corrupt live member record let the VNI be reused over a node that still holds the
+    devices.
+
+    Raises:
+        ValueError: the field is present and is not a boolean.
+    """
+    if "joined" not in payload:
+        return True
+    value = payload["joined"]
+    if not isinstance(value, bool):
+        raise ValueError("joined is not a boolean")
+    return value
 
 
 def _required_str(payload: Mapping[str, Any], field: str) -> str:
@@ -344,7 +392,7 @@ class Member:
             vtep_ip=_optional_str(payload, "vtep_ip"),
             # A record written before this field existed came from an agent: the manager's
             # pre-seed is newer than the field, so the older shape can only be a self-publish.
-            joined=bool(payload.get("joined", True)),
+            joined=_joined(payload),
             generation=_optional_str(payload, "generation"),
         )
 
