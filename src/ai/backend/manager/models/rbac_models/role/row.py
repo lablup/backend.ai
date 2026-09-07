@@ -30,11 +30,15 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
-    from .permission.object_permission import ObjectPermissionRow
+    from ai.backend.manager.models.rbac_models.permission.object_permission import (
+        ObjectPermissionRow,
+    )
 
 
 def _get_object_permission_rows_join_condition() -> sa.ColumnElement[bool]:
-    from .permission.object_permission import ObjectPermissionRow
+    from ai.backend.manager.models.rbac_models.permission.object_permission import (
+        ObjectPermissionRow,
+    )
 
     return RoleRow.id == foreign(ObjectPermissionRow.role_id)
 

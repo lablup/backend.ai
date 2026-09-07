@@ -5,9 +5,9 @@ from typing import Self
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.id import PermissionID
 from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
 from ai.backend.manager.data.permission.types import Permission

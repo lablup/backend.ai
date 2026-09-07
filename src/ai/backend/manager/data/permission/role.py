@@ -3,8 +3,15 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import override
 
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import (
+    EntityData,
+    EntityIdentifier,
+    EntityType,
+    ScopeType,
+)
 from ai.backend.manager.data.common.types import SearchResult
 
 from .id import ObjectId, ScopeId
@@ -25,13 +32,13 @@ from .types import (
 
 
 @dataclass(frozen=True)
-class RoleData:
+class RoleData(EntityData):
     """
     Information about a role.
     If detailed information is needed, use RoleDetailData.
     """
 
-    id: uuid.UUID
+    id: RoleID
     name: str
     source: RoleSource
     status: RoleStatus
@@ -40,6 +47,10 @@ class RoleData:
     deleted_at: datetime | None
     auto_assign: bool = False
     description: str | None = None
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id
 
 
 @dataclass(frozen=True)

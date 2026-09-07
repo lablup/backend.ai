@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
@@ -21,7 +21,7 @@ from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 class PermissionOperationScope(OperationScope):
     """Scope for searching scoped permissions by role."""
 
-    role_id: uuid.UUID
+    role_id: RoleID
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -48,7 +48,7 @@ class PermissionOperationScope(OperationScope):
 class ObjectPermissionOperationScope(OperationScope):
     """Scope for searching object permissions by role."""
 
-    role_id: uuid.UUID
+    role_id: RoleID
 
     @override
     def to_condition(self) -> QueryCondition:

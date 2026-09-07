@@ -12,6 +12,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.permission import PermissionID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.common.data.permission.types import (
     EntityType as LegacyEntityType,
@@ -96,7 +98,7 @@ if TYPE_CHECKING:
 
 def _make_role_data(
     *,
-    role_id: uuid.UUID | None = None,
+    role_id: RoleID | None = None,
     name: str = "test-role",
     source: RoleSource = RoleSource.CUSTOM,
     status: RoleStatus = RoleStatus.ACTIVE,
@@ -105,7 +107,7 @@ def _make_role_data(
 ) -> RoleData:
     now = datetime.now(tz=UTC)
     return RoleData(
-        id=role_id or uuid.uuid4(),
+        id=role_id or RoleID(uuid.uuid4()),
         name=name,
         source=source,
         status=status,
@@ -118,13 +120,13 @@ def _make_role_data(
 
 def _make_role_detail_data(
     *,
-    role_id: uuid.UUID | None = None,
+    role_id: RoleID | None = None,
     name: str = "test-role",
     object_permissions: list[ObjectPermissionData] | None = None,
 ) -> RoleDetailData:
     now = datetime.now(tz=UTC)
     return RoleDetailData(
-        id=role_id or uuid.uuid4(),
+        id=role_id or RoleID(uuid.uuid4()),
         name=name,
         source=RoleSource.CUSTOM,
         status=RoleStatus.ACTIVE,
@@ -276,7 +278,7 @@ class TestGetRoleDetail:
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
-        role_id = uuid.uuid4()
+        role_id = RoleID(uuid.uuid4())
         obj_perm = ObjectPermissionData(
             id=uuid.uuid4(),
             role_id=role_id,
@@ -298,7 +300,7 @@ class TestGetRoleDetail:
         service: PermissionControllerService,
         mock_repository: MagicMock,
     ) -> None:
-        role_id = uuid.uuid4()
+        role_id = RoleID(uuid.uuid4())
         detail = _make_role_detail_data(role_id=role_id, object_permissions=[])
         mock_repository.get_role_with_permissions.return_value = detail
 
@@ -683,8 +685,8 @@ class TestCreatePermission:
         mock_repository: MagicMock,
     ) -> None:
         perm_data = PermissionData(
-            id=uuid.uuid4(),
-            role_id=uuid.uuid4(),
+            id=PermissionID(uuid.uuid4()),
+            role_id=RoleID(uuid.uuid4()),
             scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
             scope_id="test-domain",
             entity_type=EntityType(LegacyEntityType.USER),
@@ -706,8 +708,8 @@ class TestCreatePermission:
         mock_repository: MagicMock,
     ) -> None:
         perm_data = PermissionData(
-            id=uuid.uuid4(),
-            role_id=uuid.uuid4(),
+            id=PermissionID(uuid.uuid4()),
+            role_id=RoleID(uuid.uuid4()),
             scope_type=ScopeType(EntityType(LegacyScopeType.GLOBAL)),
             scope_id="global",
             entity_type=EntityType(LegacyEntityType.USER),
@@ -745,8 +747,8 @@ class TestDeletePermission:
         mock_repository: MagicMock,
     ) -> None:
         perm_data = PermissionData(
-            id=uuid.uuid4(),
-            role_id=uuid.uuid4(),
+            id=PermissionID(uuid.uuid4()),
+            role_id=RoleID(uuid.uuid4()),
             scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
             scope_id="test-domain",
             entity_type=EntityType(LegacyEntityType.USER),
@@ -786,8 +788,8 @@ class TestSearchPermissions:
         mock_repository: MagicMock,
     ) -> None:
         perm = PermissionData(
-            id=uuid.uuid4(),
-            role_id=uuid.uuid4(),
+            id=PermissionID(uuid.uuid4()),
+            role_id=RoleID(uuid.uuid4()),
             scope_type=ScopeType(EntityType(LegacyScopeType.DOMAIN)),
             scope_id="test-domain",
             entity_type=EntityType(LegacyEntityType.USER),

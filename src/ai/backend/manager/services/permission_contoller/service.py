@@ -2,7 +2,7 @@ import logging
 from collections.abc import Sequence
 from typing import cast
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType, ScopeType
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac import (
     BaseRBACAction,
@@ -281,8 +281,8 @@ class PermissionControllerService:
         result = await self._repository.search_roles_in_scope(action.querier, action.scope)
         return SearchRolesInScopeActionResult(
             result=result,
-            _scope_type=action.scope.element_type.to_scope_type(),
-            _scope_id=action.scope.scope_id,
+            _scope_type=ScopeType(action.scope.scope.entity_type()),
+            _scope_id=str(action.scope.scope),
         )
 
     async def search_permissions(

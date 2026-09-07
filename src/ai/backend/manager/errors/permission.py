@@ -17,6 +17,7 @@ __all__ = (
     "InvalidPermissionOperation",
     "NotEnoughPermission",
     "ObjectPermissionNotFound",
+    "PermissionAlreadyGranted",
     "PermissionNotFound",
     "ReplaceRolePermissionRoleIdMismatch",
     "RoleAlreadyAssigned",
@@ -83,6 +84,19 @@ class RoleNotAssigned(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.ROLE,
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class PermissionAlreadyGranted(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/permission-already-granted"
+    error_title = "The role already holds the permission."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
         )
 
 

@@ -7,7 +7,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BaseRootResponseModel, BodyParam, PathParam
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
@@ -37,7 +37,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, RoleIdPathParam
-from ai.backend.manager.models.rbac_models.scopes import ScopedRoleOperationScope
+from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
@@ -88,9 +88,7 @@ class V2RBACHandler:
     ) -> APIResponse:
         """Search roles registered in a project scope."""
         result = await self._adapter.search_roles_in_scope(
-            ScopedRoleOperationScope(
-                element_type=RBACElementType.PROJECT, scope_id=str(path.parsed.project_id)
-            ),
+            ScopedRoleOperationScope(scope=ProjectID(path.parsed.project_id)),
             body.parsed,
         )
         payload = AdminSearchRolesPayload(

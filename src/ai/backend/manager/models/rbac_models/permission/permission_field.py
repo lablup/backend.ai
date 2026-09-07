@@ -3,7 +3,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.permission.id import FieldPath, PermissionID
+from ai.backend.common.data.entity.permission import PermissionID
+from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.manager.models.base import GUID, Base
 
 

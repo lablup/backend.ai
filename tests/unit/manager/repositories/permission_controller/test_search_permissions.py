@@ -11,11 +11,11 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
     Permission,
-    RBACElementType,
     ScopeType,
 )
 from ai.backend.manager.models.agent import AgentRow
@@ -28,13 +28,13 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.conditions import (
+from ai.backend.manager.models.rbac_models.permission.conditions import (
     ScopedPermissionConditions,
 )
-from ai.backend.manager.models.rbac_models.orders import (
+from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.permission.orders import (
     ScopedPermissionOrders,
 )
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
@@ -139,7 +139,7 @@ class TestSearchPermissions:
     ) -> None:
         querier = BatchQuerier(
             conditions=[
-                ScopedPermissionConditions.by_entity_type(RBACElementType.VFOLDER),
+                ScopedPermissionConditions.by_entity_type(VFOLDER_ENTITY_TYPE),
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
