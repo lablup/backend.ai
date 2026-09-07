@@ -1,4 +1,6 @@
 import logging
+from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from typing import Any, Literal, cast
 from uuid import UUID
 
@@ -6,6 +8,8 @@ import aiohttp
 import yarl
 from async_timeout import timeout as _timeout
 
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import (
     AgentWatcherResponseError,
@@ -20,7 +24,9 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.errors.agent import ConflictingSessionRescheduleNotSupported
 from ai.backend.manager.errors.resource import AgentNotFound
 from ai.backend.manager.registry import AgentRegistry
@@ -28,6 +34,9 @@ from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
     BulkLoadContainerCountsAction,
+)
+from ai.backend.manager.services.agent.actions.bulk_load_permissions import (
+    BulkLoadAgentPermissionsAction,
 )
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
@@ -93,6 +102,7 @@ class AgentService:
         agent_repository: AgentRepository,
         scheduler_repository: SchedulerRepository,
         scheduling_controller: SchedulingController,
+        own_check: BulkOwnCheck,
     ) -> None:
         self._etcd = etcd
         self._agent_registry = agent_registry
@@ -100,6 +110,7 @@ class AgentService:
         self._agent_repository = agent_repository
         self._scheduler_repository = scheduler_repository
         self._scheduling_controller = scheduling_controller
+        self._own_check = own_check
 
     async def _get_watcher_info(self, agent_id: AgentId) -> dict[str, Any]:
         """
@@ -258,14 +269,41 @@ class AgentService:
         total_resources = await self._scheduler_repository.get_total_resource_slots()
         return GetTotalResourcesActionResult(total_resources=total_resources)
 
+    async def _permissions_on(
+        self, agent_uuids: Sequence[AgentUUID]
+    ) -> Mapping[AgentUUID, list[AgentPermission]]:
+        """What the caller holds on each named agent, as the RBAC own check sees it,
+        mapped through :meth:`AgentPermission.from_rbac`."""
+        held = await self._own_check.held(agent_uuids)
+        return {
+            uuid: AgentPermission.from_rbac(held.get(uuid, Permission.NONE)) for uuid in agent_uuids
+        }
+
+    async def bulk_load_permissions(
+        self, action: BulkLoadAgentPermissionsAction
+    ) -> PartialBulkResult[list[AgentPermission]]:
+        permissions = await self._permissions_on(action.agent_uuids)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[list[AgentPermission]].succeeded(
+                    uuid, permissions.get(uuid, []), description="resolved"
+                )
+                for uuid in action.agent_uuids
+            ]
+        )
+
     async def search_agents(self, action: SearchAgentsAction) -> SearchAgentsActionResult:
-        """Searches agents."""
+        """Searches agents, with what the caller holds on each."""
         result = await self._agent_repository.search_agents(
             querier=action.querier,
         )
+        permissions = await self._permissions_on([item.agent.uuid for item in result.items])
 
         return SearchAgentsActionResult(
-            agents=result.items,
+            agents=[
+                replace(item, permissions=permissions.get(item.agent.uuid, []))
+                for item in result.items
+            ],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,

@@ -111,6 +111,9 @@ from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsActi
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
     BulkLoadContainerCountsAction,
 )
+from ai.backend.manager.services.agent.actions.bulk_load_permissions import (
+    BulkLoadAgentPermissionsAction,
+)
 from ai.backend.manager.services.agent.actions.bulk_lookup import BulkLookupAgentsAction
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
@@ -549,6 +552,11 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
         # What the DataLoaders read: checked per agent.
         BulkGetAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.BULK, ActionGate.PERMISSION),
         BulkLoadContainerCountsAction: (
+            AGENT_ENTITY_TYPE,
+            ActionKind.BULK,
+            ActionGate.PERMISSION,
+        ),
+        BulkLoadAgentPermissionsAction: (
             AGENT_ENTITY_TYPE,
             ActionKind.BULK,
             ActionGate.PERMISSION,

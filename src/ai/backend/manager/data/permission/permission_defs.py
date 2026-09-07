@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import enum
+
+from ai.backend.common.data.permission.types import Permission
 
 
 class BasePermission(enum.StrEnum):
@@ -77,6 +81,23 @@ class AgentPermission(BasePermission):
 
     CREATE_COMPUTE_SESSION = enum.auto()
     CREATE_SERVICE = enum.auto()
+
+    @classmethod
+    def from_rbac(cls, mask: Permission) -> list[AgentPermission]:
+        """The agent permissions an RBAC mask stands for.
+
+        READ -> READ_ATTRIBUTE, UPDATE -> UPDATE_ATTRIBUTE, CREATE -> both
+        CREATE_COMPUTE_SESSION and CREATE_SERVICE; SOFT_DELETE and HARD_DELETE have
+        no counterpart.
+        """
+        permissions: list[AgentPermission] = []
+        if mask & Permission.READ:
+            permissions.append(cls.READ_ATTRIBUTE)
+        if mask & Permission.UPDATE:
+            permissions.append(cls.UPDATE_ATTRIBUTE)
+        if mask & Permission.CREATE:
+            permissions.extend((cls.CREATE_COMPUTE_SESSION, cls.CREATE_SERVICE))
+        return permissions
 
 
 class DomainPermission(BasePermission):

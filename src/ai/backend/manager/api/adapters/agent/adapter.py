@@ -36,6 +36,7 @@ from ai.backend.common.types import AgentId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
+from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.orders import (
@@ -51,6 +52,9 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
     BulkLoadContainerCountsAction,
+)
+from ai.backend.manager.services.agent.actions.bulk_load_permissions import (
+    BulkLoadAgentPermissionsAction,
 )
 from ai.backend.manager.services.agent.actions.bulk_lookup import BulkLookupAgentsAction
 from ai.backend.manager.services.agent.actions.get_total_resources import (
@@ -88,7 +92,7 @@ class AgentAdapter(BaseAdapter):
         One answer per name in the given order: the node, ``None`` for a name matching
         no agent, and the denial for one the caller may not read. The names resolve
         into uuids first, since that is what each agent is checked by; the slot rows
-        are a field read of the agents that passed.
+        and the caller's permissions are read for the agents that passed.
         """
         if not agent_ids:
             return []
@@ -99,7 +103,9 @@ class AgentAdapter(BaseAdapter):
         got = await self._processors.agent.bulk_get.run(BulkGetAgentsAction(ids=uuids))
         agents = got.values()
         errors = got.errors()
-        resources = await self._load_resources([agent.uuid for agent in agents.values()])
+        permitted = [agent.uuid for agent in agents.values()]
+        resources = await self._load_resources(permitted)
+        permissions = await self._load_permissions(permitted)
         nodes: list[AgentNode | Exception | None] = []
         for agent_id in agent_ids:
             uuid = lookup.resolved.get(agent_id)
@@ -113,11 +119,24 @@ class AgentAdapter(BaseAdapter):
             nodes.append(
                 self._data_to_dto(
                     AgentDetailData(
-                        agent=agent, resources=resources.get(agent.id, []), permissions=[]
+                        agent=agent,
+                        resources=resources.get(agent.id, []),
+                        permissions=permissions.get(uuid, []),
                     )
                 )
             )
         return nodes
+
+    async def _load_permissions(
+        self, agent_uuids: Sequence[AgentUUID]
+    ) -> Mapping[EntityIdentifier, list[AgentPermission]]:
+        """What the caller holds on each named agent."""
+        if not agent_uuids:
+            return {}
+        result = await self._processors.agent.bulk_load_permissions.run(
+            BulkLoadAgentPermissionsAction(agent_uuids=agent_uuids)
+        )
+        return result.values()
 
     async def _load_resources(
         self, agent_uuids: Sequence[AgentUUID]

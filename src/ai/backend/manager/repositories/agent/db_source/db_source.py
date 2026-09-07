@@ -25,7 +25,6 @@ from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdent
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
-from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -261,12 +260,12 @@ class AgentDBSource:
                 querier,
             )
             agent_rows: list[AgentRow] = [row.AgentRow for row in result.rows]
-            admin_permissions = list(ADMIN_AGENT_PERMISSIONS)
+            # The caller's permissions are the service's to resolve.
             agents_with_permissions = [
                 AgentDetailData(
                     agent=agent_row.to_data(),
                     resources=agent_row.resources_by_rank(),
-                    permissions=admin_permissions,
+                    permissions=[],
                 )
                 for agent_row in agent_rows
             ]

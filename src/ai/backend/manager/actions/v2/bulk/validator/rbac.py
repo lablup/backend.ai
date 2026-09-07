@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
@@ -38,26 +38,38 @@ class BulkOwnCheck:
         self._repository = repository
         self._config_provider = config_provider
 
-    async def check(self, meta: BulkActionTriggerMeta) -> Mapping[EntityIdentifier, bool]:
+    async def held(
+        self, entity_ids: Sequence[EntityIdentifier]
+    ) -> Mapping[EntityIdentifier, Permission]:
+        """The bits the caller holds on each entity, as this check sees them.
+
+        Enforcement off or a superadmin holds everything; anyone else holds what the
+        own check answers. What a domain shows as the caller's permissions is read
+        from here, so it cannot disagree with what the check would allow.
+        """
         if not self._config_provider.config.manager.rbac.enforcement_enabled:
-            return dict.fromkeys(meta.entity_ids, True)
+            return dict.fromkeys(entity_ids, Permission.full())
 
         user = current_user()
         if user is None:
             raise UnreachableError("User context is not available")
         if user.is_superadmin:
-            return dict.fromkeys(meta.entity_ids, True)
+            return dict.fromkeys(entity_ids, Permission.full())
 
         keys = [
             OwnCheckKey(
                 user_id=UserID(user.user_id),
                 entity=entity_id,
             )
-            for entity_id in meta.entity_ids
+            for entity_id in entity_ids
         ]
-        permission = meta.operation_type.to_permission()
         owned = await self._repository.owned_permissions(keys)
-        return {key.entity: owned.get(key, Permission.NONE).covers(permission) for key in keys}
+        return {key.entity: owned.get(key, Permission.NONE) for key in keys}
+
+    async def check(self, meta: BulkActionTriggerMeta) -> Mapping[EntityIdentifier, bool]:
+        permission = meta.operation_type.to_permission()
+        held = await self.held(meta.entity_ids)
+        return {entity_id: mask.covers(permission) for entity_id, mask in held.items()}
 
 
 class VirtualEntityAtomicBulkActionRBACValidator(AtomicBulkActionValidator):

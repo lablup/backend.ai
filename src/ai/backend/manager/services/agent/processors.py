@@ -16,10 +16,14 @@ from ai.backend.manager.actions.v2.ops.result import (
     ScopedFieldsOpsResult,
 )
 from ai.backend.manager.data.agent.types import AgentData
+from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
     BulkLoadContainerCountsAction,
+)
+from ai.backend.manager.services.agent.actions.bulk_load_permissions import (
+    BulkLoadAgentPermissionsAction,
 )
 from ai.backend.manager.services.agent.actions.bulk_lookup import BulkLookupAgentsAction
 from ai.backend.manager.services.agent.actions.get_total_resources import (
@@ -80,6 +84,9 @@ class AgentProcessors:
     ]
     bulk_get: PartialBulkActionProcessor[BulkGetAgentsAction, AgentData]
     bulk_load_container_counts: PartialBulkActionProcessor[BulkLoadContainerCountsAction, int]
+    bulk_load_permissions: PartialBulkActionProcessor[
+        BulkLoadAgentPermissionsAction, list[AgentPermission]
+    ]
     scoped_search_resources: BulkActionProcessor[
         ScopedSearchAgentResourcesAction, ScopedFieldsOpsResult[AgentResourceData]
     ]
@@ -117,6 +124,9 @@ class AgentProcessors:
         self.bulk_get = group.partial_bulk_get_ops(BulkGetAgentsAction)
         self.bulk_load_container_counts = group.partial_bulk(
             BulkLoadContainerCountsAction, service.bulk_load_container_counts
+        )
+        self.bulk_load_permissions = group.partial_bulk(
+            BulkLoadAgentPermissionsAction, service.bulk_load_permissions
         )
         resources: LookupFieldGroup[AgentResourceData] = group.field_group(
             FieldGroupMeta(AGENT_RESOURCE_FIELD_TYPE),

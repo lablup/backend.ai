@@ -27,7 +27,6 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.lookups import AgentNameLookup
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
@@ -259,12 +258,13 @@ class AgentRepository:
         async with self._db_source._db.begin_readonly_session() as db_session:
             result = await db_session.scalars(stmt)
             agent_rows = cast(list[AgentRow], result.unique().all())
-            admin_permissions = list(ADMIN_AGENT_PERMISSIONS)
+            # Legacy GQL reads; the one caller showing permissions is superadmin-only
+            # and fills them itself.
             return [
                 AgentDetailData(
                     agent=agent_row.to_data(),
                     resources=agent_row.resources_by_rank(),
-                    permissions=admin_permissions,
+                    permissions=[],
                 )
                 for agent_row in agent_rows
             ]

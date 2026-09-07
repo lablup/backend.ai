@@ -15,6 +15,7 @@ from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, P
 from ai.backend.manager.actions.v2.ops.result import BulkLookupOpsResult, ScopedFieldsOpsResult
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
 from ai.backend.manager.data.agent.types import AgentData, AgentStatus
+from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.errors.common import GenericForbidden
 
@@ -97,6 +98,15 @@ def processors(readable: AgentData, denied: AgentData, denial: GenericForbidden)
             items=[PartialBulkEntityResult[int].succeeded(readable.uuid, 3)]
         )
     )
+    processors.agent.bulk_load_permissions.run = AsyncMock(
+        return_value=PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[list[AgentPermission]].succeeded(
+                    readable.uuid, [AgentPermission.READ_ATTRIBUTE]
+                )
+            ]
+        )
+    )
     return processors
 
 
@@ -118,13 +128,15 @@ async def test_batch_load_answers_per_name(
     assert node.id == READABLE
     assert node.resource_info.capacity == {"cpu": "4"}
     assert node.resource_info.used == {"cpu": "1"}
-    assert node.permissions == []
+    assert node.permissions == [AgentPermission.READ_ATTRIBUTE.value]
     # A denial reaches the resolver; a name matching nothing stays None.
     assert refused is denial
     assert missing is None
-    # The slot rows are read for the agents that passed, and no other.
+    # The slot rows and the permissions are read for the agents that passed, and no other.
     search_action = processors.agent.scoped_search_resources.run.await_args.args[0]
     assert list(search_action.agent_uuids) == [readable.uuid]
+    permission_action = processors.agent.bulk_load_permissions.run.await_args.args[0]
+    assert list(permission_action.agent_uuids) == [readable.uuid]
 
 
 async def test_container_counts_answer_per_name(
