@@ -148,3 +148,27 @@ class FieldQuerier[TRow: Base, TData: FieldData](ABC):
     def to_data(self, row: TRow) -> TData:
         """Convert the fetched row into its ``data/`` type."""
         raise NotImplementedError
+
+
+class BulkFieldQuerier[TRow: Base, TData: FieldData](ABC):
+    """Reads the field rows the caller named, keyed by their own ids.
+
+    Plural :class:`FieldQuerier`. The ids are the whole query, so the spec owns it and
+    ops adds no clause of its own; each row is authorized through the owner the
+    lookup reads, the way the single read is.
+    """
+
+    @abstractmethod
+    def row_class(self) -> type[TRow]:
+        """Return the ORM class the rows are read from."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column carrying the field id, which the read keys on."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert one fetched row into its ``data/`` type."""
+        raise NotImplementedError

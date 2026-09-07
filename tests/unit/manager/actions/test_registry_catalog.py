@@ -145,6 +145,25 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.deployment.actions.access_token.bulk_get_access_tokens import (
+    BulkGetAccessTokensAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
+    BulkGetDeploymentPoliciesAction,
+)
+from ai.backend.manager.services.deployment.actions.lookup_owner import (
+    LookupBulkDeploymentAccessTokenOwnerAction,
+    LookupBulkReplicaOwnerAction,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.bulk_get_revisions import (
+    BulkGetRevisionsAction,
+)
+from ai.backend.manager.services.deployment.actions.replica.bulk_get_replicas import (
+    BulkGetReplicasAction,
+)
+from ai.backend.manager.services.deployment.actions.route.bulk_get_routes import (
+    BulkGetRoutesAction,
+)
 from ai.backend.manager.services.deployment.actions.scoped_search import (
     ScopedSearchDeploymentsAction,
 )
@@ -213,6 +232,22 @@ from ai.backend.manager.services.role_preset.processors import RolePresetProcess
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 from ai.backend.manager.services.runtime_variant_preset.processors import (
     RuntimeVariantPresetProcessors,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_histories import (
+    BulkGetDeploymentHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_kernel_histories import (
+    BulkGetKernelHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_route_histories import (
+    BulkGetRouteHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_session_histories import (
+    BulkGetSessionHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.lookup_owner import (
+    LookupBulkKernelSchedulingHistoryOwnerAction,
+    LookupBulkSessionSchedulingHistoryOwnerAction,
 )
 from ai.backend.manager.services.scheduling_history.processors import (
     SchedulingHistoryProcessors,
@@ -641,3 +676,57 @@ def test_scoped_deployment_read_is_a_scoped_permission_read() -> None:
         ActionKind.SCOPE,
         ActionGate.PERMISSION,
     )
+
+
+def test_field_data_loader_reads_are_partial_permission_reads() -> None:
+    """The DataLoaders over field rows read per named row, checked per owning entity.
+
+    The owner lookup a partial field read runs first is recorded public beside its
+    permission-gated record: it refuses nothing, the read that follows answers per owner.
+    """
+    registry = _ops_registry()
+    DeploymentProcessors(registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock())
+    SchedulingHistoryProcessors(
+        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+        registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)),
+        MagicMock(),
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.BULK
+    }
+    partial = (DEPLOYMENT_ENTITY_TYPE, ActionKind.BULK, ActionGate.PERMISSION)
+    assert recorded[BulkGetRevisionsAction] == partial
+    assert recorded[BulkGetReplicasAction] == partial
+    assert recorded[BulkGetRoutesAction] == partial
+    assert recorded[BulkGetAccessTokensAction] == partial
+    assert recorded[BulkGetDeploymentPoliciesAction] == partial
+    assert recorded[BulkGetDeploymentHistoriesAction] == partial
+    assert recorded[BulkGetRouteHistoriesAction] == partial
+    assert recorded[BulkGetSessionHistoriesAction] == (
+        SESSION_ENTITY_TYPE,
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetKernelHistoriesAction] == (
+        SESSION_ENTITY_TYPE,
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+
+    lookup_gates = {
+        (record.action_cls, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.LOOKUP
+    }
+    for owner_lookup in (
+        LookupBulkReplicaOwnerAction,
+        LookupBulkDeploymentAccessTokenOwnerAction,
+        LookupBulkSessionSchedulingHistoryOwnerAction,
+        LookupBulkKernelSchedulingHistoryOwnerAction,
+    ):
+        assert (owner_lookup, ActionGate.PUBLIC) in lookup_gates
+        assert (owner_lookup, ActionGate.PERMISSION) in lookup_gates

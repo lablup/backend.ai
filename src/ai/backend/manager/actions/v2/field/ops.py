@@ -13,6 +13,7 @@ from ai.backend.manager.actions.v2.field.base import (
 from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAction
 from ai.backend.manager.actions.v2.ops.base import (
     FieldGetOpsAction,
+    FieldPartialBulkGetOpsAction,
     FieldPartialBulkPurgeOpsAction,
     FieldPurgeOpsAction,
     UpdateOpsAction,
@@ -25,6 +26,7 @@ __all__ = (
     "DeleteFieldOpsAction",
     "RestoreFieldOpsAction",
     "PurgeFieldOpsAction",
+    "PartialBulkGetFieldOpsAction",
     "PartialBulkPurgeFieldOpsAction",
 )
 
@@ -126,3 +128,26 @@ class PartialBulkPurgeFieldOpsAction[
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
+
+
+class PartialBulkGetFieldOpsAction[
+    TFieldID: FieldIdentifier,
+    TOwnerID: EntityIdentifier,
+    TRow: Base,
+    TData: FieldData,
+](
+    BasePartialBulkFieldAction[TFieldID, TOwnerID],
+    FieldPartialBulkGetOpsAction[TRow, TData],
+    ABC,
+):
+    """A read over the field rows the caller named, each answered for on its own.
+
+    Partial rather than atomic, like :class:`PartialBulkGetEntityOpsAction`: a row
+    whose owner the caller may not read and a row matching nothing are both one failed
+    item, told apart by the error each carries.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET

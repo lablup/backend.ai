@@ -599,6 +599,12 @@ class ProcessorGroup[TData: EntityData]:
             monitors=self._deps.monitors.bulk_lookup,
             post_validators=self._deps.validators.atomic_bulk,
         )
+        # The lookup a partial shape runs first: the read that follows answers per owner,
+        # so this one refuses nothing past authentication.
+        partial_bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
+            BulkFieldOwnerLookupService(self._deps.repository).execute,
+            monitors=self._deps.monitors.bulk_lookup,
+        )
         return LookupFieldGroup(
             self._deps,
             self._records,
@@ -607,6 +613,8 @@ class ProcessorGroup[TData: EntityData]:
             self._meta.entity_type,
             owner_lookup,
             bulk_owner_lookup,
+            partial_bulk_owner_lookup,
+            bulk_owner_lookup_action_cls,
         )
 
     def single_get_ops[TAction: GetSingleEntityOpsAction[Any, Any]](

@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection, Mapping, Sequence
-from dataclasses import dataclass, field
-from typing import Any, override
+from dataclasses import dataclass, field, replace
+from typing import Any, Self, override
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -39,6 +39,7 @@ from ai.backend.common.data.entity.types import (
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.field.ops import PartialBulkGetFieldOpsAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, LookupKey
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
@@ -79,6 +80,7 @@ from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
+from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
@@ -97,7 +99,7 @@ from ai.backend.manager.models.specs.purger import (
     GuardedEntityPurger,
     GuardedFieldPurger,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import BulkFieldQuerier, DataQuerier
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.models.specs.types import (
     BulkResultWithFailures,
@@ -126,6 +128,7 @@ from ai.backend.manager.services.ops.service import (
     EntityPurgeService,
     EntityUpsertService,
     FieldAtomicCreateService,
+    FieldPartialBulkGetService,
     FieldPartialBulkPurgeService,
     FieldUpsertService,
     GetService,
@@ -1032,6 +1035,49 @@ class _BulkPurgeFieldAction(
         return self.purgers
 
 
+class _PresetBulkFieldQuerier(BulkFieldQuerier[RolePresetRow, _PresetFieldData]):
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return RolePresetRow.id
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetFieldData:
+        return _PresetFieldData(id=_FieldID(row.id), owner=_EntityID(row.id))
+
+
+@dataclass
+class _BulkGetFieldAction(
+    PartialBulkGetFieldOpsAction[_FieldID, _EntityID, RolePresetRow, _PresetFieldData]
+):
+    ids: list[_FieldID]
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "bulk_get_field_role_presets"
+
+    @override
+    def field_ids(self) -> Sequence[_FieldID]:
+        return self.ids
+
+    @override
+    def to_owner_lookup_action(self) -> Any:
+        raise NotImplementedError
+
+    @override
+    def to_querier(self) -> _PresetBulkFieldQuerier:
+        return _PresetBulkFieldQuerier()
+
+    @override
+    def narrowed_to(self, field_ids: Sequence[_FieldID]) -> Self:
+        allowed = frozenset(field_ids)
+        return replace(self, ids=[field_id for field_id in self.ids if field_id in allowed])
+
+
 @dataclass
 class _FieldUpsertAction(
     BaseSingleEntityAction, FieldUpsertOpsAction[_EntityID, RolePresetRow, _PresetFieldData]
@@ -1617,6 +1663,20 @@ async def test_field_partial_bulk_purge_answers_for_every_named_entity(
 
     assert list(result.successes) == [field_id]
     repository.partial_bulk_purge_field_entities.assert_awaited_once_with(purgers)
+
+
+async def test_field_partial_bulk_get_answers_for_every_named_row(
+    repository: MagicMock, field_stored: _PresetFieldData
+) -> None:
+    service: FieldPartialBulkGetService[_PresetFieldData] = FieldPartialBulkGetService(repository)
+    absent = _FieldID(uuid.uuid4())
+    repository.bulk_get_fields.return_value = {field_stored.id: field_stored}
+
+    result = await service.execute(_BulkGetFieldAction(ids=[field_stored.id, absent]))
+
+    assert result.successes == {field_stored.id: field_stored}
+    assert list(result.errors) == [absent]
+    assert isinstance(result.errors[absent], EntityNotFoundError)
 
 
 async def test_field_upsert_forwards_owner_and_upserter(

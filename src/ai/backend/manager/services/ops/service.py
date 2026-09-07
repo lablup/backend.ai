@@ -32,6 +32,7 @@ from ai.backend.manager.actions.v2.field.lookup import (
     FieldOwnerLookupOpsAction,
     RuntimeFieldOwnerLookupOpsAction,
 )
+from ai.backend.manager.actions.v2.field.ops import PartialBulkGetFieldOpsAction
 from ai.backend.manager.actions.v2.lookup.bulk_base import BulkLookupKeyResult
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
@@ -117,6 +118,7 @@ __all__ = (
     "FieldPurgeService",
     "GlobalPartialBulkPurgeService",
     "EntityPartialBulkPurgeService",
+    "FieldPartialBulkGetService",
     "FieldPartialBulkPurgeService",
     "GlobalUpsertService",
     "EntityUpsertService",
@@ -706,6 +708,36 @@ class EntityPartialBulkPurgeService[TData]:
     ) -> PartialBulkResult[TData]:
         result = await self._repository.partial_bulk_purge_entities(action.to_purgers())
         return PartialBulkResult(items=_partial_bulk_items(result))
+
+
+class FieldPartialBulkGetService[TData: FieldData]:
+    """Reads the field rows the action names, answering for each one.
+
+    The rows whose owner the caller may not read are gone from the action by the time
+    this runs; a row matching nothing is one failed item.
+    """
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: PartialBulkGetFieldOpsAction[Any, Any, Any, TData]
+    ) -> BulkFieldOpsResult[TData]:
+        field_ids = action.field_ids()
+        querier = action.to_querier()
+        found = await self._repository.bulk_get_fields(querier, field_ids)
+        return BulkFieldOpsResult(
+            successes={field_id: found[field_id] for field_id in field_ids if field_id in found},
+            errors={
+                field_id: EntityNotFoundError(
+                    f"{querier.row_class().__name__} {field_id} not found"
+                )
+                for field_id in field_ids
+                if field_id not in found
+            },
+        )
 
 
 class FieldPartialBulkPurgeService[TData: FieldData]:

@@ -118,6 +118,10 @@ class ProcessorRegistry[TData: EntityData]:
             monitors=self._deps.monitors.bulk_lookup,
             post_validators=self._deps.validators.atomic_bulk,
         )
+        partial_bulk_owner_lookup: OwnerBulkLookupProcessor = BulkLookupActionProcessor(
+            BulkRuntimeFieldOwnerLookupService(self._deps.repository).execute,
+            monitors=self._deps.monitors.bulk_lookup,
+        )
         return LookupFieldGroup(
             self._deps,
             self._records,
@@ -126,6 +130,8 @@ class ProcessorRegistry[TData: EntityData]:
             GLOBAL_ENTITY_TYPE,
             owner_lookup,
             bulk_owner_lookup,
+            partial_bulk_owner_lookup,
+            bulk_owner_lookup_action_cls,
         )
 
     def _record_lookup(self, meta: FieldGroupMeta, action_cls: type[Any]) -> None:

@@ -33,6 +33,7 @@ from ai.backend.manager.actions.v2.field.bulk_processor import (
 from ai.backend.manager.actions.v2.field.ops import (
     DeleteFieldOpsAction,
     GetFieldOpsAction,
+    PartialBulkGetFieldOpsAction,
     PartialBulkPurgeFieldOpsAction,
     PurgeFieldOpsAction,
     RestoreFieldOpsAction,
@@ -79,6 +80,7 @@ from ai.backend.manager.services.ops.service import (
     FieldAtomicCreateService,
     FieldCreateService,
     FieldGetService,
+    FieldPartialBulkGetService,
     FieldPartialBulkPurgeService,
     FieldPurgeService,
     FieldUpsertService,
@@ -269,6 +271,8 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
 
     _owner_lookup: OwnerLookupProcessor
     _bulk_owner_lookup: OwnerBulkLookupProcessor
+    _partial_bulk_owner_lookup: OwnerBulkLookupProcessor
+    _bulk_owner_lookup_action_cls: type[Any]
 
     def __init__(
         self,
@@ -279,10 +283,23 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         owner_entity_type: EntityType,
         owner_lookup: OwnerLookupProcessor,
         bulk_owner_lookup: OwnerBulkLookupProcessor,
+        partial_bulk_owner_lookup: OwnerBulkLookupProcessor,
+        bulk_owner_lookup_action_cls: type[Any],
     ) -> None:
         super().__init__(deps, records, concern, meta, owner_entity_type)
         self._owner_lookup = owner_lookup
         self._bulk_owner_lookup = bulk_owner_lookup
+        self._partial_bulk_owner_lookup = partial_bulk_owner_lookup
+        self._bulk_owner_lookup_action_cls = bulk_owner_lookup_action_cls
+
+    def _record_partial_owner_lookup(self) -> None:
+        """The owner lookup a partial shape runs is gated by authentication alone."""
+        self._record(
+            self._bulk_owner_lookup_action_cls,
+            ActionKind.LOOKUP,
+            ActionGate.PUBLIC,
+            ActionBacking.GENERIC,
+        )
 
     def get_ops[TAction: GetFieldOpsAction[Any, Any, Any, Any]](
         self,
@@ -409,6 +426,28 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
             validators=(*self._deps.validators.single_entity, *validators),
         )
 
+    def partial_bulk_get_ops[TAction: PartialBulkGetFieldOpsAction[Any, Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[PartialBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> PartialBulkFieldActionProcessor[TAction, TFieldData]:
+        """Read the rows the caller named, one permission check per owning entity.
+
+        The field counterpart of ``ProcessorGroup.partial_bulk_get_ops``: an owner the
+        caller may not read takes its rows out of the run and puts them back into the
+        answer as denied items, beside the rows that matched nothing.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        self._record_partial_owner_lookup()
+        return PartialBulkFieldActionProcessor(
+            FieldPartialBulkGetService(self._deps.repository).execute,
+            self._partial_bulk_owner_lookup,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
+        )
+
     def partial_bulk_purge_ops[TAction: PartialBulkPurgeFieldOpsAction[Any, Any, Any, Any]](
         self,
         action_cls: type[TAction],
@@ -422,9 +461,10 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         back into the answer as denied items.
         """
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        self._record_partial_owner_lookup()
         return PartialBulkFieldActionProcessor(
             FieldPartialBulkPurgeService(self._deps.repository).execute,
-            self._bulk_owner_lookup,
+            self._partial_bulk_owner_lookup,
             monitors=(*self._deps.monitors.bulk, *monitors),
             partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )

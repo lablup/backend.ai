@@ -31,6 +31,7 @@ from ai.backend.manager.models.specs.lookup import (
 )
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
+    BulkFieldQuerier,
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
@@ -213,6 +214,25 @@ class V2ReadOps(V2GraphReadOpsBase):
         if row is None:
             return None
         return querier.to_data(row)
+
+    async def query_bulk_field_data[TRow: Base, TData: FieldData](
+        self,
+        querier: BulkFieldQuerier[TRow, TData],
+        field_ids: Sequence[FieldIdentifier],
+    ) -> Mapping[FieldIdentifier, TData]:
+        """Read the named field rows, keyed by the ids the caller passed.
+
+        An id matching no row is absent rather than an error, as in
+        :meth:`query_bulk_data`.
+        """
+        if not field_ids:
+            return {}
+        id_column = querier.target_id_column()
+        rows = (
+            await self._sess.scalars(sa.select(querier.row_class()).where(id_column.in_(field_ids)))
+        ).all()
+        found = {getattr(row, id_column.key): querier.to_data(row) for row in rows}
+        return {field_id: found[field_id] for field_id in field_ids if field_id in found}
 
     async def search_with_scopes[TRow: Base, TData](
         self,

@@ -937,7 +937,7 @@ class ScaleOutDecision:
 
 
 @dataclass
-class RouteInfo:
+class RouteInfo(FieldData):
     """Route information for deployment."""
 
     route_id: UUID
