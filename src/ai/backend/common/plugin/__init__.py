@@ -195,11 +195,10 @@ class BasePluginContext[P: AbstractPlugin]:
         for plugin_instance in self.plugins.values():
             await plugin_instance.cleanup()
 
-    #: How many times a configuration that could not be READ is fetched again before the watcher
-    #: goes back to waiting. Bounded: the next change wakes it anyway, and a plugin that never
-    #: gets its update is visible in the log either way.
-    _CONFIG_APPLY_ATTEMPTS = 4
+    #: How long to wait before fetching again a configuration that could not be READ, doubling
+    #: to the ceiling. Unbounded in count, because the alternative is losing the change.
     _CONFIG_RETRY_BACKOFF_SEC = 0.5
+    _CONFIG_RETRY_CEILING_SEC = 30.0
 
     async def _watcher(self, plugin_name: str) -> None:
         # As wait_timeout applies to the waiting for an internal async queue,
@@ -212,10 +211,20 @@ class BasePluginContext[P: AbstractPlugin]:
             # either way, so a failure that is only logged leaves the change unapplied until some
             # LATER edit happens to arrive -- which, for a configuration an operator has finished
             # editing, is never.
-            for attempt in range(self._CONFIG_APPLY_ATTEMPTS):
-                if await self._apply_config(plugin_name):
-                    break
-                await asyncio.sleep(self._CONFIG_RETRY_BACKOFF_SEC * (2**attempt))
+            attempt = 0
+            while not await self._apply_config(plugin_name):
+                # Until it is read, not a fixed number of tries. The watch event that carried this
+                # change is consumed either way, so giving up leaves the change unapplied until
+                # some LATER edit arrives -- and for a configuration an operator has finished
+                # editing, that is never. An etcd outage longer than a handful of seconds is
+                # ordinary; the backoff is capped and this is cancelled with the task.
+                await asyncio.sleep(
+                    min(
+                        self._CONFIG_RETRY_BACKOFF_SEC * (2**attempt),
+                        self._CONFIG_RETRY_CEILING_SEC,
+                    )
+                )
+                attempt += 1
 
     async def _apply_config(self, plugin_name: str) -> bool:
         """Read the plugin's configuration and hand it over. False if that could not be done.
