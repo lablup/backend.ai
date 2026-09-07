@@ -147,6 +147,15 @@ def _endpoint_claim(container_id: str, generation: str | None = None) -> str:
     return json.dumps(claim)
 
 
+def _generation_stamp(raw: str) -> str | None:
+    """The incarnation a claim carries, or None where it carries none."""
+    try:
+        stamped = json.loads(raw).get(SESSION_META_GENERATION)
+    except ValueError:
+        return None
+    return str(stamped) if stamped is not None else None
+
+
 def _claimed_subnet(raw: str, session_id: str, generation: str | None) -> str | None:
     """The block ``raw`` records, if it is this INCARNATION of this session's claim.
 
@@ -642,7 +651,12 @@ class SubnetAllocator:
             )
         return stuck
 
-    async def release_all(self, session_id: str, generation: str | None = None) -> list[str]:
+    async def release_all(
+        self,
+        session_id: str,
+        generation: str | None = None,
+        live_generation: str | None = None,
+    ) -> list[str]:
         """Give back every unit block this INCARNATION of the session claimed, whatever any meta
         says.
 
@@ -654,11 +668,28 @@ class SubnetAllocator:
         the pool records, and a cleanup that could not tell the two apart handed it back to the
         pool while its containers were running on it. A claim stamped with another generation is
         left where it is (see `of_generation`).
+
+        ``live_generation`` is what the session's record names NOW. It matters for one case that
+        the stamp alone cannot decide: a claim carrying no incarnation is compatible with every
+        one of them, so a cleanup for g1 would take a block that the live g2 session is running
+        on -- and a session carried over an upgrade holds exactly such a claim. Where the record
+        names a different incarnation than this cleanup is for, unstamped claims are not this
+        cleanup's to take.
         """
+        keep_unstamped = live_generation is not None and live_generation != generation
         payload_of = {}
         for key, raw in _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX)).items():
-            if _claimed_subnet(raw, session_id, generation) is not None:
-                payload_of[unquote(key)] = raw
+            if _claimed_subnet(raw, session_id, generation) is None:
+                continue
+            if keep_unstamped and _generation_stamp(raw) is None:
+                log.info(
+                    "leaving {} claimed: it carries no incarnation, and session {} now names {}",
+                    unquote(key),
+                    session_id,
+                    live_generation,
+                )
+                continue
+            payload_of[unquote(key)] = raw
         stuck: list[str] = []
         for unit, payload in payload_of.items():
             try:
@@ -708,6 +739,21 @@ class SubnetAllocator:
         return await self._etcd.compare_and_delete(
             _allocated_key(unit), expected, guards=dict(guards)
         )
+
+    async def promote(
+        self, subnet: str, session_id: str, generation: str | None, guards: Mapping[str, str]
+    ) -> bool:
+        """Make every unit of ``subnet`` carry ``generation``, under ``guards``.
+
+        The public form of `_claim_as_ours`, for the callers that hold a block by RECORD rather
+        than by asking the pool for one: a session already READY, and the startup sweep. Leaving
+        such a block unstamped is not neutral -- an unstamped claim is compatible with every
+        incarnation, so a cleanup for any earlier one takes it while the session runs on it.
+
+        :return: ``True`` if the block is now this incarnation's.
+        """
+        allocated = _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
+        return await self._claim_as_ours(allocated, subnet, session_id, generation, guards)
 
     async def holder(self, subnet: str) -> str | None:
         """The session every unit block of ``subnet`` is claimed by, or None if they disagree or
@@ -1066,13 +1112,19 @@ class VNIAllocator:
                 " no longer exists"
             )
 
-    async def release_all(self, session_id: str, generation: str | None = None) -> list[int]:
+    async def release_all(
+        self,
+        session_id: str,
+        generation: str | None = None,
+        live_generation: str | None = None,
+    ) -> list[int]:
         """Give back every VNI this INCARNATION of the session claimed, whatever any meta says.
 
-        The counterpart of `SubnetAllocator.release_all`, and there for the same two cases: a claim
-        the record that should have named it never reached, and a live session that happens to
-        share this one's id.
+        The counterpart of `SubnetAllocator.release_all`, and there for the same cases --
+        ``live_generation`` included: an unstamped claim is compatible with every incarnation, so
+        without it a cleanup for g1 takes the VNI a live g2 session is running on.
         """
+        keep_unstamped = live_generation is not None and live_generation != generation
         stuck: list[int] = []
         for key, raw in _flat(await self._etcd.get_prefix(_VNI_PREFIX)).items():
             if not key.isdigit():
@@ -1087,6 +1139,15 @@ class VNIAllocator:
                     "leaving vni {} claimed: it is held by another incarnation of session {}",
                     key,
                     session_id,
+                )
+                continue
+            if keep_unstamped and _generation_stamp(raw) is None:
+                log.info(
+                    "leaving vni {} claimed: it carries no incarnation, and session {} now names"
+                    " {}",
+                    key,
+                    session_id,
+                    live_generation,
                 )
                 continue
             try:
@@ -1125,6 +1186,23 @@ class VNIAllocator:
         return await self._etcd.compare_and_delete(
             f"{_VNI_PREFIX}/{vni}", expected, guards=dict(guards)
         )
+
+    async def promote(
+        self, vni: int, session_id: str, generation: str | None, guards: Mapping[str, str]
+    ) -> bool:
+        """Make ``vni``'s claim carry ``generation``, under ``guards``. See
+        `SubnetAllocator.promote`."""
+        raw = await self._etcd.get(f"{_VNI_PREFIX}/{vni}")
+        if not isinstance(raw, str):
+            return False
+        try:
+            if json.loads(raw).get("session_id") != session_id:
+                return False
+        except ValueError:
+            return False
+        if not of_generation(raw, generation):
+            return False
+        return await self._claim_as_ours(vni, raw, _vni_claim(session_id, generation), dict(guards))
 
     async def holder(self, vni: int) -> str | None:
         """The session ``vni`` is claimed by, or None if it is free."""

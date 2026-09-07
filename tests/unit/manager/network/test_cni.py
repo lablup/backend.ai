@@ -2435,6 +2435,93 @@ class TestAPoolClaimNothingNames:
         assert again == vni
         assert json.loads(etcd.store[f"network/ipam/vni/{vni}"])["generation"] == generation
 
+    async def test_the_sweep_takes_a_preserved_legacy_claim_rather_than_leaving_it(self) -> None:
+        """Preserving is not enough. An unstamped claim is compatible with EVERY incarnation, so
+        while it stays unstamped a cleanup for any earlier one takes it -- the session is running
+        and its subnet goes back to the pool. The sweep has to stamp it, not just skip it."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        generation = str(info.options["generation"])
+        subnet = str(info.options["subnet"])
+        vni = int(cast(int, info.options["vni"]))
+        for unit_key in list(_flat_claims(etcd)):
+            etcd.store[f"network/ipam/allocated/{unit_key}"] = json.dumps({
+                "session_id": "s1",
+                "subnet": subnet,
+            })
+        etcd.store[f"network/ipam/vni/{vni}"] = json.dumps({"session_id": "s1"})
+
+        await plugin.reconcile_pool()
+
+        assert all(
+            json.loads(raw).get("generation") == generation for raw in _flat_claims(etcd).values()
+        ), "the subnet was left unstamped and any earlier cleanup can still take it"
+        assert json.loads(etcd.store[f"network/ipam/vni/{vni}"])["generation"] == generation
+
+    async def test_the_reuse_path_takes_it_too(self) -> None:
+        # Through create_network, not through the allocator: the reuse path is what a running
+        # session actually goes through, and it is where the previous round's test did not look.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        generation = str(info.options["generation"])
+        vni = int(cast(int, info.options["vni"]))
+        etcd.store[f"network/ipam/vni/{vni}"] = json.dumps({"session_id": "s1"})
+        for unit_key in list(_flat_claims(etcd)):
+            etcd.store[f"network/ipam/allocated/{unit_key}"] = json.dumps({
+                "session_id": "s1",
+                "subnet": str(info.options["subnet"]),
+            })
+
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        assert json.loads(etcd.store[f"network/ipam/vni/{vni}"])["generation"] == generation
+        assert all(
+            json.loads(raw).get("generation") == generation for raw in _flat_claims(etcd).values()
+        )
+
+    async def test_an_earlier_cleanup_does_not_take_a_live_unstamped_claim(self) -> None:
+        """The window itself, closed from the other side. Even while a claim is still unstamped,
+        a cleanup for an incarnation the record has moved on from must not take it."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        subnet = str(info.options["subnet"])
+        vni = int(cast(int, info.options["vni"]))
+        for unit_key in list(_flat_claims(etcd)):
+            etcd.store[f"network/ipam/allocated/{unit_key}"] = json.dumps({
+                "session_id": "s1",
+                "subnet": subnet,
+            })
+        etcd.store[f"network/ipam/vni/{vni}"] = json.dumps({"session_id": "s1"})
+
+        # A cleanup for an earlier incarnation of this same id.
+        await plugin._sweep_incarnation(cast(AsyncEtcd, etcd), "s1", "g-earlier")
+
+        assert await plugin._subnet_allocator.holder(subnet) == "s1", (
+            "an earlier incarnation's cleanup took the live session's subnet"
+        )
+        assert await plugin._vni_allocator.holder(vni) == "s1"
+
+    async def test_the_session_own_cleanup_still_takes_its_unstamped_claim(self) -> None:
+        # The fence must not strand it: the tombstone IS the live record, so the claim is its.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        for unit_key in list(_flat_claims(etcd)):
+            etcd.store[f"network/ipam/allocated/{unit_key}"] = json.dumps({
+                "session_id": "s1",
+                "subnet": str(info.options["subnet"]),
+            })
+        etcd.store[f"network/ipam/vni/{int(cast(int, info.options['vni']))}"] = json.dumps({
+            "session_id": "s1"
+        })
+
+        await plugin.destroy_network("s1")
+
+        assert _pool_claims(etcd) == [], "the session's own teardown could not give its pool back"
+
     async def test_a_legacy_child_key_of_a_gone_session_is_reclaimed(self) -> None:
         """The mirror of the rule above. An unstamped key is compatible with every incarnation,
         so where a record EXISTS it is live and stays -- but where there is no record at all,
