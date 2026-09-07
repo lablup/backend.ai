@@ -19,6 +19,7 @@ from sqlalchemy.engine.row import Row
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
@@ -38,33 +39,22 @@ from ai.backend.manager.models.resource_group import (
 from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupCreator,
     ResourceGroupForDomainRelationCreator,
+    ResourceGroupForKeypairRelationCreator,
     ResourceGroupForProjectRelationCreator,
 )
 from ai.backend.manager.models.resource_group.purgers import (
     ResourceGroupForDomainRelationPurger,
+    ResourceGroupForKeypairRelationPurger,
     ResourceGroupForProjectRelationPurger,
 )
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupForKeypairsCreatorSpec,
-)
-from ai.backend.manager.repositories.resource_group.purgers import (
-    create_resource_group_for_keypairs_purger,
-)
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
 from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
 from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
-from ai.backend.manager.services.resource_group.actions.associate_with_keypair import (
-    AssociateResourceGroupWithKeypairsAction,
-)
 from ai.backend.manager.services.resource_group.actions.create import (
     CreateResourceGroupAction,
-)
-from ai.backend.manager.services.resource_group.actions.disassociate_with_keypair import (
-    DisassociateResourceGroupWithKeypairsAction,
 )
 from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_domain import (
     GetAllowedResourceGroupsForDomainAction,
@@ -78,6 +68,9 @@ from ai.backend.manager.services.resource_group.actions.purge_resource_group imp
 )
 from ai.backend.manager.services.resource_group.actions.update import (
     UpdateResourceGroupAction,
+)
+from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
+    LookupKeypairOwnerByAccessKeyAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -207,6 +200,60 @@ async def _unlink_resource_groups_from_project(
                 for resource_group_id in resource_group_ids
             ],
             purger=ResourceGroupForProjectRelationPurger(),
+        )
+    )
+
+
+async def _resolve_keypair_owner(
+    graph_ctx: GraphQueryContext,
+    access_key: str,
+) -> UserID:
+    result = await graph_ctx.processors.user.lookup_keypair_owner.run(
+        LookupKeypairOwnerByAccessKeyAction(access_key=AccessKey(access_key))
+    )
+    return UserID(result.owner_entity_id)
+
+
+async def _link_resource_groups_to_keypair(
+    graph_ctx: GraphQueryContext,
+    access_key: str,
+    resource_group_ids: Sequence[ResourceGroupID],
+) -> None:
+    """Link the keypair's owner to every named resource group in one run."""
+    if not resource_group_ids:
+        return
+    user_id = await _resolve_keypair_owner(graph_ctx, access_key)
+    await graph_ctx.processors.rbac.create_relation.run(
+        CreateRelationAction(
+            pairs=[
+                RelationPair(scope=user_id, target=resource_group_id)
+                for resource_group_id in resource_group_ids
+            ],
+            creator=ResourceGroupForKeypairRelationCreator(access_key=AccessKey(access_key)),
+        )
+    )
+
+
+async def _unlink_resource_groups_from_keypair(
+    graph_ctx: GraphQueryContext,
+    access_key: str,
+    resource_group_ids: Sequence[ResourceGroupID],
+) -> None:
+    """Unlink the keypair's owner from every named resource group.
+
+    Every key the owner holds for the resource group goes, not the named one alone:
+    the row is per keypair while the graph edge is per user.
+    """
+    if not resource_group_ids:
+        return
+    user_id = await _resolve_keypair_owner(graph_ctx, access_key)
+    await graph_ctx.processors.rbac.purge_relation.run(
+        PurgeRelationAction(
+            pairs=[
+                RelationPair(scope=user_id, target=resource_group_id)
+                for resource_group_id in resource_group_ids
+            ],
+            purger=ResourceGroupForKeypairRelationPurger(),
         )
     )
 
@@ -1185,18 +1232,7 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):  # type: ignore[misc]
     ) -> AssociateScalingGroupWithKeyPair:
         graph_ctx: GraphQueryContext = info.context
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = AssociateResourceGroupWithKeypairsAction(
-            resource_group_id=resource_group_id,
-            bulk_creator=BulkCreator(
-                specs=[
-                    ResourceGroupForKeypairsCreatorSpec(
-                        resource_group_id=resource_group_id,
-                        access_key=AccessKey(access_key),
-                    )
-                ]
-            ),
-        )
-        await graph_ctx.processors.resource_group.associate_resource_group_with_keypairs.run(action)
+        await _link_resource_groups_to_keypair(graph_ctx, access_key, [resource_group_id])
         return cls(ok=True, msg="success")
 
 
@@ -1222,19 +1258,7 @@ class AssociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[misc
     ) -> AssociateScalingGroupsWithKeyPair:
         graph_ctx: GraphQueryContext = info.context
         resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
-        action = AssociateResourceGroupWithKeypairsAction(
-            resource_group_id=resource_group_ids[0],
-            bulk_creator=BulkCreator(
-                specs=[
-                    ResourceGroupForKeypairsCreatorSpec(
-                        resource_group_id=resource_group_id,
-                        access_key=AccessKey(access_key),
-                    )
-                    for resource_group_id in resource_group_ids
-                ]
-            ),
-        )
-        await graph_ctx.processors.resource_group.associate_resource_group_with_keypairs.run(action)
+        await _link_resource_groups_to_keypair(graph_ctx, access_key, resource_group_ids)
         return cls(ok=True, msg="success")
 
 
@@ -1258,16 +1282,7 @@ class DisassociateScalingGroupWithKeyPair(graphene.Mutation):  # type: ignore[mi
     ) -> DisassociateScalingGroupWithKeyPair:
         graph_ctx: GraphQueryContext = info.context
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = DisassociateResourceGroupWithKeypairsAction(
-            resource_group_id=resource_group_id,
-            purger=create_resource_group_for_keypairs_purger(
-                resource_group_id=resource_group_id,
-                access_key=AccessKey(access_key),
-            ),
-        )
-        await graph_ctx.processors.resource_group.disassociate_resource_group_with_keypairs.run(
-            action
-        )
+        await _unlink_resource_groups_from_keypair(graph_ctx, access_key, [resource_group_id])
         return cls(ok=True, msg="success")
 
 
@@ -1292,15 +1307,6 @@ class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[m
         access_key: str,
     ) -> DisassociateScalingGroupsWithKeyPair:
         graph_ctx: GraphQueryContext = info.context
-        resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_groups[0])
-        action = DisassociateResourceGroupWithKeypairsAction(
-            resource_group_id=resource_group_id,
-            purger=create_resource_group_for_keypairs_purger(
-                resource_group_id=resource_group_id,
-                access_key=AccessKey(access_key),
-            ),
-        )
-        await graph_ctx.processors.resource_group.disassociate_resource_group_with_keypairs.run(
-            action
-        )
+        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
+        await _unlink_resource_groups_from_keypair(graph_ctx, access_key, resource_group_ids)
         return cls(ok=True, msg="success")

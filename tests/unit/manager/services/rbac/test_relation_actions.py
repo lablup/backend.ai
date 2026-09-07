@@ -27,6 +27,8 @@ from ai.backend.common.data.entity.resource_group import (
     RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
 )
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
@@ -41,10 +43,12 @@ from ai.backend.manager.models.container_registry.creators import ContainerRegis
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryProjectPurger
 from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupForDomainRelationCreator,
+    ResourceGroupForKeypairRelationCreator,
     ResourceGroupForProjectRelationCreator,
 )
 from ai.backend.manager.models.resource_group.purgers import (
     ResourceGroupForDomainRelationPurger,
+    ResourceGroupForKeypairRelationPurger,
     ResourceGroupForProjectRelationPurger,
 )
 from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
@@ -55,6 +59,8 @@ _PROJECT_ID = ProjectID(uuid.uuid4())
 _DOMAIN_ID = DomainID(uuid.uuid4())
 _REGISTRY_ID = ContainerRegistryID(uuid.uuid4())
 _RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
+_USER_ID = UserID(uuid.uuid4())
+_ACCESS_KEY = AccessKey("AKTESTRELATION0001")
 
 
 class TestEveryPairBecomesTheRunsScopes:
@@ -126,6 +132,28 @@ class TestEveryPairBecomesTheRunsScopes:
                 ActionOperationType.DELETE,
                 [
                     (DOMAIN_SCOPE_TYPE, _DOMAIN_ID),
+                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                ],
+            ),
+            (
+                CreateRelationAction(
+                    pairs=[RelationPair(scope=_USER_ID, target=_RESOURCE_GROUP_ID)],
+                    creator=ResourceGroupForKeypairRelationCreator(access_key=_ACCESS_KEY),
+                ),
+                ActionOperationType.CREATE,
+                [
+                    (USER_SCOPE_TYPE, _USER_ID),
+                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                ],
+            ),
+            (
+                PurgeRelationAction(
+                    pairs=[RelationPair(scope=_USER_ID, target=_RESOURCE_GROUP_ID)],
+                    purger=ResourceGroupForKeypairRelationPurger(),
+                ),
+                ActionOperationType.DELETE,
+                [
+                    (USER_SCOPE_TYPE, _USER_ID),
                     (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
                 ],
             ),

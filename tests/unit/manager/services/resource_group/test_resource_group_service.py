@@ -32,31 +32,14 @@ from ai.backend.manager.errors.resource import (
     ResourceGroupNotFound,
     ResourceGroupSessionTypeNotAllowed,
 )
-from ai.backend.manager.models.resource_group import (
-    ResourceGroupForKeypairsRow,
-    ResourceGroupOpts,
-)
+from ai.backend.manager.models.resource_group import ResourceGroupOpts
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.registry import check_resource_group
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
-from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupForKeypairsCreatorSpec,
-)
-from ai.backend.manager.repositories.resource_group.purgers import (
-    create_resource_group_for_keypairs_purger,
-)
-from ai.backend.manager.services.resource_group.actions.associate_with_keypair import (
-    AssociateResourceGroupWithKeypairsAction,
-)
 from ai.backend.manager.services.resource_group.actions.create import CreateResourceGroupAction
-from ai.backend.manager.services.resource_group.actions.disassociate_with_keypair import (
-    DisassociateResourceGroupWithKeypairsAction,
-)
 from ai.backend.manager.services.resource_group.actions.get_wsproxy_version import (
     GetWsproxyVersionAction,
 )
@@ -396,60 +379,6 @@ class TestScalingGroupService:
 
         with pytest.raises(ResourceGroupNotFound):
             await resource_group_service.update_resource_group(action)
-
-    # Associate/Disassociate with Keypair Tests
-
-    async def test_associate_scaling_group_with_keypairs_success(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test associating a scaling group with keypairs"""
-        mock_repository.associate_resource_group_with_keypairs = AsyncMock(return_value=None)
-
-        resource_group_id = ResourceGroupID(uuid.uuid4())
-        access_key = AccessKey("AKTEST1234567890")
-
-        bulk_creator: BulkCreator[ResourceGroupForKeypairsRow] = BulkCreator(
-            specs=[
-                ResourceGroupForKeypairsCreatorSpec(
-                    resource_group_id=resource_group_id,
-                    access_key=access_key,
-                )
-            ]
-        )
-        action = AssociateResourceGroupWithKeypairsAction(
-            resource_group_id=ResourceGroupID(uuid.uuid4()), bulk_creator=bulk_creator
-        )
-        result = await resource_group_service.associate_resource_group_with_keypairs(action)
-
-        assert result is not None
-        mock_repository.associate_resource_group_with_keypairs.assert_called_once_with(bulk_creator)
-
-    async def test_disassociate_scaling_group_with_keypairs_success(
-        self,
-        resource_group_service: ResourceGroupService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test disassociating a scaling group from keypairs"""
-        mock_repository.disassociate_resource_group_with_keypairs = AsyncMock(return_value=None)
-
-        resource_group_id = ResourceGroupID(uuid.uuid4())
-        access_key = AccessKey("AKTEST1234567890")
-
-        purger: BatchPurger[ResourceGroupForKeypairsRow] = (
-            create_resource_group_for_keypairs_purger(
-                resource_group_id=resource_group_id,
-                access_key=access_key,
-            )
-        )
-        action = DisassociateResourceGroupWithKeypairsAction(
-            resource_group_id=ResourceGroupID(uuid.uuid4()), purger=purger
-        )
-        result = await resource_group_service.disassociate_resource_group_with_keypairs(action)
-
-        assert result is not None
-        mock_repository.disassociate_resource_group_with_keypairs.assert_called_once_with(purger)
 
 
 class TestCheckScalingGroup:

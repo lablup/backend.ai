@@ -34,11 +34,6 @@ from ai.backend.manager.models.resource_group import (
 )
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import BulkCreator, execute_bulk_creator
-from ai.backend.manager.repositories.base.purger import (
-    BatchPurger,
-    execute_batch_purger,
-)
 from ai.backend.manager.repositories.resource_slot.types import subtract_quantities
 
 if TYPE_CHECKING:
@@ -209,22 +204,6 @@ class ResourceGroupDBSource:
             )
             result = await session.scalar(query)
             return (result or 0) > 0
-
-    async def associate_resource_group_with_keypairs(
-        self,
-        bulk_creator: BulkCreator[ResourceGroupForKeypairsRow],
-    ) -> None:
-        """Associates a resource group with multiple keypairs."""
-        async with self._db.begin_session() as session:
-            await execute_bulk_creator(session, bulk_creator)
-
-    async def disassociate_resource_group_with_keypairs(
-        self,
-        purger: BatchPurger[ResourceGroupForKeypairsRow],
-    ) -> None:
-        """Disassociates a resource group from multiple keypairs."""
-        async with self._db.begin_session() as session:
-            await execute_batch_purger(session, purger)
 
     async def check_resource_group_keypair_association_exists(
         self,

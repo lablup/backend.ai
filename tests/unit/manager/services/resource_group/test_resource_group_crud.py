@@ -21,33 +21,23 @@ from typing import Any
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupCreator,
     ResourceGroupForDomainRelationCreator,
+    ResourceGroupForKeypairRelationCreator,
 )
 from ai.backend.manager.models.resource_group.purgers import (
     ResourceGroupForDomainRelationPurger,
+    ResourceGroupForKeypairRelationPurger,
 )
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
-from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
-from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupForKeypairsCreatorSpec,
-)
-from ai.backend.manager.repositories.resource_group.purgers import (
-    create_resource_group_for_keypairs_purger,
-)
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
-from ai.backend.manager.services.resource_group.actions.associate_with_keypair import (
-    AssociateResourceGroupWithKeypairsAction,
-)
 from ai.backend.manager.services.resource_group.actions.create import CreateResourceGroupAction
-from ai.backend.manager.services.resource_group.actions.disassociate_with_keypair import (
-    DisassociateResourceGroupWithKeypairsAction,
-)
 from ai.backend.manager.services.resource_group.actions.purge_resource_group import (
     PurgeResourceGroupAction,
 )
@@ -382,7 +372,11 @@ class TestScalingGroupDomainAssociation:
 
 
 class TestScalingGroupKeypairAssociation:
-    """Keypair association add/remove/check via the processor layer."""
+    """Keypair association add/remove/check through the relation operations.
+
+    The relation names the keypair's owner, not the key: the row keeps the access key
+    while the graph edge is per user.
+    """
 
     # ------------------------------------------------------------------
     # S-1: Associate single keypair
@@ -392,26 +386,19 @@ class TestScalingGroupKeypairAssociation:
         self,
         resource_group_service: ResourceGroupService,
         resource_group_repository: ResourceGroupRepository,
+        rbac_relation_repository: RbacRelationRepository,
         admin_user_fixture: Any,
         database_fixture: None,
     ) -> None:
-        """S-1: Associate a scaling group with a single keypair; association exists in DB."""
+        """S-1: Link a scaling group to a single keypair; the association exists in DB."""
         name = f"kp-assoc-{uuid.uuid4().hex[:8]}"
         sg = await _create_sgroup(resource_group_service, name)
         access_key = AccessKey(admin_user_fixture.keypair.access_key)
+        user_id = UserID(admin_user_fixture.user_uuid)
         try:
-            bulk_creator = BulkCreator(
-                specs=[
-                    ResourceGroupForKeypairsCreatorSpec(
-                        resource_group_id=sg.id,
-                        access_key=access_key,
-                    )
-                ]
-            )
-            await resource_group_service.associate_resource_group_with_keypairs(
-                AssociateResourceGroupWithKeypairsAction(
-                    resource_group_id=ResourceGroupID(uuid.uuid4()), bulk_creator=bulk_creator
-                )
+            await rbac_relation_repository.create(
+                [(user_id, sg.id)],
+                ResourceGroupForKeypairRelationCreator(access_key=access_key),
             )
 
             exists = (
@@ -432,30 +419,20 @@ class TestScalingGroupKeypairAssociation:
         self,
         resource_group_service: ResourceGroupService,
         resource_group_repository: ResourceGroupRepository,
+        rbac_relation_repository: RbacRelationRepository,
         admin_user_fixture: Any,
         database_fixture: None,
     ) -> None:
-        """S-3: Disassociate keypair; check_exists returns False afterwards."""
+        """S-3: Unlink the keypair; check_exists returns False afterwards."""
         name = f"kp-disassoc-{uuid.uuid4().hex[:8]}"
         sg = await _create_sgroup(resource_group_service, name)
         access_key = AccessKey(admin_user_fixture.keypair.access_key)
+        user_id = UserID(admin_user_fixture.user_uuid)
         try:
-            # First associate
-            bulk_creator = BulkCreator(
-                specs=[
-                    ResourceGroupForKeypairsCreatorSpec(
-                        resource_group_id=sg.id,
-                        access_key=access_key,
-                    )
-                ]
+            await rbac_relation_repository.create(
+                [(user_id, sg.id)],
+                ResourceGroupForKeypairRelationCreator(access_key=access_key),
             )
-            await resource_group_service.associate_resource_group_with_keypairs(
-                AssociateResourceGroupWithKeypairsAction(
-                    resource_group_id=ResourceGroupID(uuid.uuid4()), bulk_creator=bulk_creator
-                )
-            )
-
-            # Verify association exists
             assert (
                 await resource_group_repository.check_resource_group_keypair_association_exists(
                     resource_group_id=sg.id,
@@ -463,18 +440,11 @@ class TestScalingGroupKeypairAssociation:
                 )
             ) is True
 
-            # Now disassociate
-            purger = create_resource_group_for_keypairs_purger(
-                resource_group_id=sg.id,
-                access_key=access_key,
+            unlinked = await rbac_relation_repository.purge(
+                [(user_id, sg.id)], ResourceGroupForKeypairRelationPurger()
             )
-            await resource_group_service.disassociate_resource_group_with_keypairs(
-                DisassociateResourceGroupWithKeypairsAction(
-                    resource_group_id=ResourceGroupID(uuid.uuid4()), purger=purger
-                )
-            )
+            assert unlinked == [True]
 
-            # Association should be gone
             exists = (
                 await resource_group_repository.check_resource_group_keypair_association_exists(
                     resource_group_id=sg.id,
@@ -486,39 +456,31 @@ class TestScalingGroupKeypairAssociation:
             await _purge_sgroup(resource_group_service, sg.id)
 
     # ------------------------------------------------------------------
-    # S-2: Associate multiple keypairs
+    # S-2: Associate keypairs of two owners
     # ------------------------------------------------------------------
 
     async def test_s2_associate_multiple_keypairs(
         self,
         resource_group_service: ResourceGroupService,
         resource_group_repository: ResourceGroupRepository,
+        rbac_relation_repository: RbacRelationRepository,
         admin_user_fixture: Any,
         regular_user_fixture: Any,
         database_fixture: None,
     ) -> None:
-        """S-2: Associate a scaling group with multiple keypairs via BulkCreator."""
+        """S-2: Link a scaling group to the keypairs of two owners."""
         name = f"kp-multi-{uuid.uuid4().hex[:8]}"
         sg = await _create_sgroup(resource_group_service, name)
         admin_key = AccessKey(admin_user_fixture.keypair.access_key)
         user_key = AccessKey(regular_user_fixture.keypair.access_key)
         try:
-            bulk_creator = BulkCreator(
-                specs=[
-                    ResourceGroupForKeypairsCreatorSpec(
-                        resource_group_id=sg.id,
-                        access_key=admin_key,
-                    ),
-                    ResourceGroupForKeypairsCreatorSpec(
-                        resource_group_id=sg.id,
-                        access_key=user_key,
-                    ),
-                ]
+            await rbac_relation_repository.create(
+                [(UserID(admin_user_fixture.user_uuid), sg.id)],
+                ResourceGroupForKeypairRelationCreator(access_key=admin_key),
             )
-            await resource_group_service.associate_resource_group_with_keypairs(
-                AssociateResourceGroupWithKeypairsAction(
-                    resource_group_id=ResourceGroupID(uuid.uuid4()), bulk_creator=bulk_creator
-                )
+            await rbac_relation_repository.create(
+                [(UserID(regular_user_fixture.user_uuid), sg.id)],
+                ResourceGroupForKeypairRelationCreator(access_key=user_key),
             )
 
             assert (
@@ -544,15 +506,16 @@ class TestScalingGroupKeypairAssociation:
         self,
         resource_group_service: ResourceGroupService,
         resource_group_repository: ResourceGroupRepository,
+        rbac_relation_repository: RbacRelationRepository,
         admin_user_fixture: Any,
         database_fixture: None,
     ) -> None:
-        """S-5: check_scaling_group_keypair_association_exists returns True/False correctly."""
+        """S-5: check_resource_group_keypair_association_exists answers True and False."""
         name = f"kp-check-{uuid.uuid4().hex[:8]}"
         sg = await _create_sgroup(resource_group_service, name)
         access_key = AccessKey(admin_user_fixture.keypair.access_key)
+        user_id = UserID(admin_user_fixture.user_uuid)
         try:
-            # Before association: False
             assert (
                 await resource_group_repository.check_resource_group_keypair_association_exists(
                     resource_group_id=sg.id,
@@ -560,19 +523,9 @@ class TestScalingGroupKeypairAssociation:
                 )
             ) is False
 
-            # After association: True
-            bulk_creator = BulkCreator(
-                specs=[
-                    ResourceGroupForKeypairsCreatorSpec(
-                        resource_group_id=sg.id,
-                        access_key=access_key,
-                    )
-                ]
-            )
-            await resource_group_service.associate_resource_group_with_keypairs(
-                AssociateResourceGroupWithKeypairsAction(
-                    resource_group_id=ResourceGroupID(uuid.uuid4()), bulk_creator=bulk_creator
-                )
+            await rbac_relation_repository.create(
+                [(user_id, sg.id)],
+                ResourceGroupForKeypairRelationCreator(access_key=access_key),
             )
             assert (
                 await resource_group_repository.check_resource_group_keypair_association_exists(

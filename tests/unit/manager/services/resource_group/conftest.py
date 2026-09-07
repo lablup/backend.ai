@@ -20,6 +20,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import text
 
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
@@ -295,6 +296,12 @@ async def admin_user_fixture(
             )
         )
         await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                entity_type=USER_ENTITY_TYPE,
+                entity_id=str(user_uuid),
+            )
+        )
+        await conn.execute(
             sa.insert(KeyPairRow.__table__).values(
                 access_key=access_key,
                 secret_key=SecretValue(secret_key),
@@ -341,6 +348,12 @@ async def regular_user_fixture(
                 domain_id=sa.select(DomainRow.id)
                 .where(DomainRow.name == domain_fixture.domain_name)
                 .scalar_subquery(),
+            )
+        )
+        await conn.execute(
+            sa.insert(VirtualEntityRow.__table__).values(
+                entity_type=USER_ENTITY_TYPE,
+                entity_id=str(user_uuid),
             )
         )
         await conn.execute(

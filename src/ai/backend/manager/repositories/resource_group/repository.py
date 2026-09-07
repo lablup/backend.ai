@@ -23,13 +23,10 @@ from ai.backend.manager.data.resource_group.types import (
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
-from ai.backend.manager.models.resource_group import ResourceGroupForKeypairsRow
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 from .db_source import ResourceGroupDBSource
@@ -199,20 +196,6 @@ class ResourceGroupRepository:
             resource_group_id=resource_group_id,
             domain_id=domain_id,
         )
-
-    async def associate_resource_group_with_keypairs(
-        self,
-        bulk_creator: BulkCreator[ResourceGroupForKeypairsRow],
-    ) -> None:
-        """Associates a resource group with multiple keypairs."""
-        await self._db_source.associate_resource_group_with_keypairs(bulk_creator)
-
-    async def disassociate_resource_group_with_keypairs(
-        self,
-        purger: BatchPurger[ResourceGroupForKeypairsRow],
-    ) -> None:
-        """Disassociates a resource group from multiple keypairs."""
-        await self._db_source.disassociate_resource_group_with_keypairs(purger)
 
     async def check_resource_group_keypair_association_exists(
         self,

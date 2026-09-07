@@ -14,17 +14,9 @@ from ai.backend.manager.repositories.resource_group import ResourceGroupReposito
 
 if TYPE_CHECKING:
     from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
-from ai.backend.manager.services.resource_group.actions.associate_with_keypair import (
-    AssociateResourceGroupWithKeypairsAction,
-    AssociateResourceGroupWithKeypairsActionResult,
-)
 from ai.backend.manager.services.resource_group.actions.create import (
     CreateResourceGroupAction,
     CreateResourceGroupActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.disassociate_with_keypair import (
-    DisassociateResourceGroupWithKeypairsAction,
-    DisassociateResourceGroupWithKeypairsActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.get_allowed_domains_for_rg import (
     GetAllowedDomainsForResourceGroupAction,
@@ -198,20 +190,6 @@ class ResourceGroupService:
             resource_group=action.resource_group,
             options=options,
         )
-
-    async def associate_resource_group_with_keypairs(
-        self, action: AssociateResourceGroupWithKeypairsAction
-    ) -> AssociateResourceGroupWithKeypairsActionResult:
-        """Associates a resource group with multiple keypairs."""
-        await self._repository.associate_resource_group_with_keypairs(action.bulk_creator)
-        return AssociateResourceGroupWithKeypairsActionResult()
-
-    async def disassociate_resource_group_with_keypairs(
-        self, action: DisassociateResourceGroupWithKeypairsAction
-    ) -> DisassociateResourceGroupWithKeypairsActionResult:
-        """Disassociates a resource group from multiple keypairs."""
-        await self._repository.disassociate_resource_group_with_keypairs(action.purger)
-        return DisassociateResourceGroupWithKeypairsActionResult()
 
     async def get_resource_info(self, action: GetResourceInfoAction) -> GetResourceInfoActionResult:
         """Get aggregated resource information for a resource group.

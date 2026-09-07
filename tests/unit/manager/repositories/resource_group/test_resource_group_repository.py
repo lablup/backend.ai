@@ -76,15 +76,8 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
-from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupForKeypairsCreatorSpec,
-)
-from ai.backend.manager.repositories.resource_group.purgers import (
-    create_resource_group_for_keypairs_purger,
-)
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
@@ -881,100 +874,6 @@ class TestScalingGroupRepositoryDB:
             await db_sess.flush()
 
         yield access_key
-
-    async def test_associate_scaling_group_with_keypairs_success(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_group_for_purge: tuple[ResourceGroupID, str],
-        sample_keypair: AccessKey,
-    ) -> None:
-        """Test associating a scaling group with keypairs."""
-        # Given: A scaling group and a keypair
-        sgroup_id, _ = sample_scaling_group_for_purge
-        access_key = sample_keypair
-
-        # When: Associate the scaling group with the keypair
-        bulk_creator = BulkCreator(
-            specs=[
-                ResourceGroupForKeypairsCreatorSpec(
-                    resource_group_id=sgroup_id,
-                    access_key=access_key,
-                )
-            ]
-        )
-        await resource_group_repository.associate_resource_group_with_keypairs(bulk_creator)
-
-        # Then: Association should exist
-        association_exists = (
-            await resource_group_repository.check_resource_group_keypair_association_exists(
-                sgroup_id, access_key
-            )
-        )
-        assert association_exists is True
-
-    async def test_disassociate_scaling_group_with_keypairs_success(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_group_for_purge: tuple[ResourceGroupID, str],
-        sample_keypair: AccessKey,
-    ) -> None:
-        """Test disassociating a scaling group from keypairs."""
-        # Given: A scaling group associated with a keypair
-        sgroup_id, _ = sample_scaling_group_for_purge
-        access_key = sample_keypair
-
-        # First, associate the scaling group with the keypair using repository
-        bulk_creator = BulkCreator(
-            specs=[
-                ResourceGroupForKeypairsCreatorSpec(
-                    resource_group_id=sgroup_id,
-                    access_key=access_key,
-                )
-            ]
-        )
-        await resource_group_repository.associate_resource_group_with_keypairs(bulk_creator)
-
-        # Verify association exists
-        association_exists = (
-            await resource_group_repository.check_resource_group_keypair_association_exists(
-                sgroup_id, access_key
-            )
-        )
-        assert association_exists is True
-
-        # When: Disassociate the scaling group from the keypair
-        purger = create_resource_group_for_keypairs_purger(
-            resource_group_id=sgroup_id,
-            access_key=access_key,
-        )
-        await resource_group_repository.disassociate_resource_group_with_keypairs(purger)
-
-        # Then: Association should no longer exist
-        association_exists = (
-            await resource_group_repository.check_resource_group_keypair_association_exists(
-                sgroup_id, access_key
-            )
-        )
-        assert association_exists is False
-
-    async def test_disassociate_nonexistent_scaling_group_with_keypairs(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_group_for_purge: tuple[ResourceGroupID, str],
-        sample_keypair: AccessKey,
-    ) -> None:
-        """Test disassociating a non-existent association does not raise error."""
-        # Given: A scaling group that is NOT associated with a keypair
-        sgroup_id, _ = sample_scaling_group_for_purge
-        access_key = sample_keypair
-
-        # When: Disassociate (even though no association exists)
-        purger = create_resource_group_for_keypairs_purger(
-            resource_group_id=sgroup_id,
-            access_key=access_key,
-        )
-        # Then: Should not raise any error (BatchPurger deletes 0 rows silently)
-        await resource_group_repository.disassociate_resource_group_with_keypairs(purger)
 
     # Associate/Disassociate with User Group (Project) Tests
 

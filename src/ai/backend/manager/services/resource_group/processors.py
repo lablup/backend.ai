@@ -15,10 +15,6 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
-from ai.backend.manager.services.resource_group.actions.associate_with_keypair import (
-    AssociateResourceGroupWithKeypairsAction,
-    AssociateResourceGroupWithKeypairsActionResult,
-)
 from ai.backend.manager.services.resource_group.actions.bulk_get import (
     BulkGetResourceGroupsAction,
 )
@@ -28,10 +24,6 @@ from ai.backend.manager.services.resource_group.actions.bulk_lookup import (
 from ai.backend.manager.services.resource_group.actions.create import (
     CreateResourceGroupAction,
     CreateResourceGroupActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.disassociate_with_keypair import (
-    DisassociateResourceGroupWithKeypairsAction,
-    DisassociateResourceGroupWithKeypairsActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.get_allowed_domains_for_rg import (
     GetAllowedDomainsForResourceGroupAction,
@@ -131,13 +123,6 @@ class ResourceGroupProcessors:
         ReplaceDefaultSessionOptionsAction,
         ReplaceDefaultSessionOptionsActionResult,
     ]
-    associate_resource_group_with_keypairs: SingleEntityActionProcessor[
-        AssociateResourceGroupWithKeypairsAction, AssociateResourceGroupWithKeypairsActionResult
-    ]
-    disassociate_resource_group_with_keypairs: SingleEntityActionProcessor[
-        DisassociateResourceGroupWithKeypairsAction,
-        DisassociateResourceGroupWithKeypairsActionResult,
-    ]
     get_allowed_rgs_for_domain: SingleEntityActionProcessor[
         GetAllowedResourceGroupsForDomainAction,
         GetAllowedResourceGroupsForDomainActionResult,
@@ -194,13 +179,6 @@ class ResourceGroupProcessors:
         )
         self.replace_default_session_options = group.single_entity(
             ReplaceDefaultSessionOptionsAction, service.replace_default_session_options
-        )
-        self.associate_resource_group_with_keypairs = group.single_entity(
-            AssociateResourceGroupWithKeypairsAction, service.associate_resource_group_with_keypairs
-        )
-        self.disassociate_resource_group_with_keypairs = group.single_entity(
-            DisassociateResourceGroupWithKeypairsAction,
-            service.disassociate_resource_group_with_keypairs,
         )
         self.get_allowed_rgs_for_domain = group.single_entity(
             GetAllowedResourceGroupsForDomainAction,
