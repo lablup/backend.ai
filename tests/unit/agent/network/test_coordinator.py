@@ -1,6 +1,6 @@
 import asyncio
 import json
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import Any, cast, override
 from unittest import mock
 
@@ -74,6 +74,32 @@ class FakeEtcd:
         if self.store.get(key) != initial_val:
             return False
         self.store[key] = new_val
+        return True
+
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: Mapping[str, str],
+        **kwargs: Any,
+    ) -> bool:
+        """One store operation over the target AND the keys that make writing it legitimate.
+
+        Modelled because it is the whole point of the join: a compare-and-swap on the member key
+        alone still CREATES it when it is absent, and absent is what the manager's cleanup just
+        made it.
+        """
+        if expected is None:
+            if key in self.store:
+                return False
+        elif self.store.get(key) != expected:
+            return False
+        for guard_key, guard_val in guards.items():
+            if self.store.get(guard_key) != guard_val:
+                return False
+        self.store[key] = val
         return True
 
     def seed_session_meta(self, session_id: str = "s1", **fields: Any) -> str:
@@ -379,11 +405,11 @@ class TestALateJoin:
             """The manager tombstones the session the moment this node publishes its member."""
 
             @override
-            async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
-                created = await super().put_if_absent(key, val, **kwargs)
-                if created and key == member_key("s1", "a1"):
+            async def compare_and_put(self, key: str, val: str, **kwargs: Any) -> bool:
+                written = await super().compare_and_put(key, val, **kwargs)
+                if written and key == member_key("s1", "a1"):
                     self.seed_session_meta(**{SESSION_META_STATE: "deleting"})
-                return created
+                return written
 
         etcd = _TornDownMidJoin()
         etcd.seed_session_meta()
@@ -539,12 +565,12 @@ class TestARequestThatArrivedTooLate:
             this join publishes."""
 
             @override
-            async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
-                created = await super().put_if_absent(key, val, **kwargs)
-                if created and key == member_key("s1", "a1"):
+            async def compare_and_put(self, key: str, val: str, **kwargs: Any) -> bool:
+                written = await super().compare_and_put(key, val, **kwargs)
+                if written and key == member_key("s1", "a1"):
                     self.seed_session_meta(**{SESSION_META_GENERATION: "g2"})
                     self.store[member_key("s1", "a1")] = newer
-                return created
+                return written
 
         etcd = _RebuiltMidJoin()
         etcd.seed_session_meta()
@@ -609,20 +635,20 @@ class TestAnEarlierInstanceStillRunning:
         )
 
         class _NewerJoinLandsFirst(FakeEtcd):
-            """A later incarnation publishes this node's membership the moment the stale join
-            finds the key absent and is about to claim it."""
+            """A later incarnation publishes this node's membership in the very instant the stale
+            join's write is applied -- so that write must lose, not overwrite it."""
 
             def __init__(self) -> None:
                 super().__init__()
                 self.armed = True
 
             @override
-            async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
+            async def compare_and_put(self, key: str, val: str, **kwargs: Any) -> bool:
                 if key == member_key("s1", "a1") and self.armed:
                     self.armed = False
                     self.store[key] = newer
                     return False
-                return await super().put_if_absent(key, val, **kwargs)
+                return await super().compare_and_put(key, val, **kwargs)
 
         etcd = _NewerJoinLandsFirst()
         etcd.seed_session_meta()

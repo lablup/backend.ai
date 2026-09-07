@@ -1583,12 +1583,16 @@ class PrivNetServer:
         -- and the same goes for DETACH_CONTAINER, DEL_PEER and the DNS redirect. The generation
         the agent stamps on each request is the only thing that tells them apart.
 
-        Applied once, here, so a verb added later is fenced without being remembered. A request
-        that names no incarnation is not fenced: that is an agent older than the field, and every
-        node-wide op (the recovery probe, the port listing) uses the session field as a lock key.
+        Applied once, here, so a verb added later is fenced without being remembered.
+
+        What is fenced is decided by what this node HOLDS, not by what the request carries. A
+        session whose incarnation this node knows accepts requests for that incarnation and no
+        other -- including a request naming none, which is what an agent from before the fence
+        sends and what a caller that built its own client sends by mistake. Both are exactly the
+        shape a stale request has, and neither can be told from one. A session this node holds no
+        incarnation for is not fenced: that is a node-local session, one set up before the field,
+        or a node-wide op using the session field as a lock key.
         """
-        if req.generation is None:
-            return None
         live = await self._live_generation(session_id)
         if live is None or live == req.generation:
             return None
@@ -1596,15 +1600,15 @@ class PrivNetServer:
             "refusing {} for session {}: it names incarnation {}, and this node holds {}",
             req.op,
             session_id,
-            req.generation,
+            req.generation or "none",
             live,
         )
         return PrivNetResponse(
             ok=False,
             error=(
                 f"session {session_id} on this node is incarnation {live}, and this request was"
-                f" issued for {req.generation}; refusing rather than acting on the data plane of a"
-                " session the request was not meant for"
+                f" issued for {req.generation or 'no incarnation'}; refusing rather than acting on"
+                " the data plane of a session the request was not meant for"
             ),
         )
 
