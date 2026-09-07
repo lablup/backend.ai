@@ -370,7 +370,9 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.resource_preset.repository,
         ),
         resource_slot=ResourceSlotService(repositories.resource_slot.repository),
-        role_preset=RolePresetService(OpsRepository(repositories.v2_ops_provider)),
+        role_preset=RolePresetService(
+            OpsRepository(repositories.v2_ops_provider), repositories.role_preset.repository
+        ),
         entity_share=EntityShareService(
             repositories.entity_share.repository,
         ),

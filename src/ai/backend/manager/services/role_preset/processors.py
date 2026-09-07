@@ -106,9 +106,9 @@ class RolePresetProcessors:
             LookupBulkRolePermissionPresetOwnerAction,
         )
         self.search_permission_presets = permissions.search_ops(SearchRolePermissionPresetsAction)
-        self.bulk_add_permissions = permissions.atomic_create_ops(
-            BulkAddRolePermissionPresetsAction
+        self.bulk_add_permissions = preset_group.single_entity(
+            BulkAddRolePermissionPresetsAction, service.bulk_add_permissions
         )
-        self.bulk_remove_permissions = permissions.partial_bulk_purge_ops(
-            BulkRemoveRolePermissionPresetsAction
+        self.bulk_remove_permissions = permissions.partial_bulk_field(
+            BulkRemoveRolePermissionPresetsAction, service.bulk_remove_permissions
         )

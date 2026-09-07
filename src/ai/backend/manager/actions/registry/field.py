@@ -26,6 +26,7 @@ from ai.backend.manager.actions.v2.bulk.validator import (
     PartialBulkActionValidator,
 )
 from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAction
 from ai.backend.manager.actions.v2.field.bulk_processor import (
     OwnerBulkLookupProcessor,
     PartialBulkFieldActionProcessor,
@@ -60,6 +61,7 @@ from ai.backend.manager.actions.v2.ops.base import (
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkFieldOpsResult,
     CreatedFieldOpsResult,
     EntityOpsResult,
     FieldsOpsResult,
@@ -443,6 +445,25 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         self._record_partial_owner_lookup()
         return PartialBulkFieldActionProcessor(
             FieldPartialBulkGetService(self._deps.repository).execute,
+            self._partial_bulk_owner_lookup,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
+        )
+
+    def partial_bulk_field[TAction: BasePartialBulkFieldAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[BulkFieldOpsResult[TFieldData]]],
+        *,
+        validators: Sequence[PartialBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> PartialBulkFieldActionProcessor[TAction, TFieldData]:
+        """Several field rows written by a service, each answered for by the entity
+        owning it — the service-backed counterpart of :meth:`partial_bulk_purge_ops`."""
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.CUSTOM)
+        self._record_partial_owner_lookup()
+        return PartialBulkFieldActionProcessor(
+            func,
             self._partial_bulk_owner_lookup,
             monitors=(*self._deps.monitors.bulk, *monitors),
             partial_validators=(*self._deps.validators.partial_bulk, *validators),
