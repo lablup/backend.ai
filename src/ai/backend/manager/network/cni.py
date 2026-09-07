@@ -803,9 +803,19 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         etcd = self._require_etcd()
         released = 0
 
-        async def orphan_guard(
-            session_id: str, generation: str | None
-        ) -> Mapping[str, str | None] | None:
+        # One read of each session's record per sweep, not one per claim. Safe to cache only
+        # because the guard is re-checked inside every delete: a record that changed after it was
+        # cached makes the delete fail, never succeed wrongly.
+        seen: dict[str, str | None] = {}
+
+        async def live_meta(session_id: str) -> str | None:
+            if session_id not in seen:
+                seen[session_id] = await etcd.get(
+                    session_meta_key(session_id), scope=ConfigScopes.GLOBAL
+                )
+            return seen[session_id]
+
+        async def orphan_guard(session_id: str, raw: str) -> Mapping[str, str | None] | None:
             """The condition under which this claim is garbage, or None if it is live.
 
             Returned as a CONDITION rather than a yes/no, because the answer stops being true the
@@ -813,9 +823,16 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             taken by the session it then names. The delete carries this back and the store checks
             it again as one operation with the delete -- so a sweep that judged on a record that
             has since moved on takes nothing.
+
+            Judged by `of_generation`, the same rule everything else uses, and NOT by comparing
+            the two generations directly. A claim carrying none is compatible with any incarnation
+            by that rule -- it is what a manager from before the field wrote, and what an
+            allocator will promote when it next adopts it. Read as a mismatch instead, this sweep
+            deleted the live subnet and VNI of every session carried over an upgrade, at the first
+            start of the manager that upgraded them.
             """
             key = session_meta_key(session_id)
-            meta_raw = await etcd.get(key, scope=ConfigScopes.GLOBAL)
+            meta_raw = await live_meta(session_id)
             if meta_raw is None:
                 # No record: garbage only while there is still none.
                 return {key: None}
@@ -824,13 +841,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 # A record from before the incarnation field. It exists, so something made it,
                 # and this sweep cannot tell a legacy session still running from a leftover.
                 return None
-            if live == generation:
+            if of_generation(raw, live):
                 return None
             # Names another incarnation: garbage while it still says so.
             return {key: meta_raw}
 
         for unit, (session_id, generation, raw) in (await self._subnet_allocator.claims()).items():
-            guard = await orphan_guard(session_id, generation)
+            guard = await orphan_guard(session_id, raw)
             if guard is None:
                 continue
             if await self._subnet_allocator.release_unit(unit, raw, guard):
@@ -842,7 +859,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     generation,
                 )
         for vni, (session_id, generation, raw) in (await self._vni_allocator.claims()).items():
-            guard = await orphan_guard(session_id, generation)
+            guard = await orphan_guard(session_id, raw)
             if guard is None:
                 continue
             if await self._vni_allocator.release_one(vni, raw, guard):
@@ -861,7 +878,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 del self._unrecoverable[session_id]
         return released
 
-    async def _reclaim_session_keys(self, etcd: AsyncEtcd) -> int:
+    async def _reclaim_session_keys(self, etcd: AsyncEtcd, only: str | None = None) -> int:
         """Delete the endpoint, member and address keys of incarnations no session names.
 
         The pool is not the whole of what a cleanup owes. A sweep that could neither release nor
@@ -870,17 +887,28 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
 
         Judged and deleted as one operation, the same as the pool claims: the record the key is
         garbage by is named as the guard.
+
+        Two different questions, depending on what the record says. Where a record EXISTS and
+        names an incarnation, a key compatible with it (`of_generation`, so its own or unstamped)
+        is live and stays. Where there is no record at all, nothing under the id is live and every
+        key goes -- INCLUDING the unstamped ones, which are otherwise compatible with everything
+        and so would be skipped forever: an endpoint or member key written before the incarnation
+        field, whose session is long gone, is exactly what nothing else reaches.
         """
         reclaimed = 0
-        try:
-            listing = await etcd.get_prefix("network/session", scope=ConfigScopes.GLOBAL)
-        except Exception:
-            log.exception("could not list the session subtree while reconciling")
-            return 0
-        # The first path segment of whatever the listing returns. `get_prefix` gives a nested
-        # mapping whose top level is already the session id, but taking the segment works on a
-        # flat listing too, and this sweep must not depend on which shape it is handed.
-        for session_id in sorted({str(key).split("/", 1)[0] for key in dict(listing) if key}):
+        if only is not None:
+            session_ids = [only]
+        else:
+            try:
+                listing = await etcd.get_prefix("network/session", scope=ConfigScopes.GLOBAL)
+            except Exception:
+                log.exception("could not list the session subtree while reconciling")
+                return 0
+            # The first path segment of whatever the listing returns. `get_prefix` gives a nested
+            # mapping whose top level is already the session id, but taking the segment works on a
+            # flat listing too, and this sweep must not depend on which shape it is handed.
+            session_ids = sorted({str(key).split("/", 1)[0] for key in dict(listing) if key})
+        for session_id in session_ids:
             if not session_id:
                 continue
             meta_key = session_meta_key(str(session_id))
@@ -900,8 +928,8 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 for name, payload in dict(found).items():
                     if not name or not isinstance(payload, str):
                         continue
-                    if of_generation(payload, live):
-                        continue  # this incarnation's, or from before the field
+                    if meta_raw is not None and of_generation(payload, live):
+                        continue  # this incarnation's, or unstamped and so compatible with it
                     if await etcd.compare_and_delete(
                         key_of(str(session_id), str(name)), payload, guards=dict(guard)
                     ):
@@ -961,6 +989,19 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 generation,
             )
             await self._sweep_incarnation(etcd, session_id, str(generation))
+        # And what no debt names: a sweep whose note could not be written leaves keys under this
+        # id that nothing else will look for. Scoped to this session -- three prefix reads, not a
+        # walk of the pool -- because the id is about to be used again either way, and a member
+        # key that outlived its incarnation is what holds this session's VNI back from reuse.
+        try:
+            if reclaimed := await self._reclaim_session_keys(etcd, only=session_id):
+                log.warning(
+                    "reclaimed {} key(s) of session {} that no incarnation of it names",
+                    reclaimed,
+                    session_id,
+                )
+        except Exception:
+            log.exception("could not reconcile session {}'s keys", session_id)
 
     async def _finish_cleanup(self, etcd: AsyncEtcd, session_id: str, tombstone: str) -> bool:
         """Carry a session under a DELETING tombstone through to nothing left, and say whether it

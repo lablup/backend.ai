@@ -2074,14 +2074,24 @@ class TestTheGuardIsWiredIntoTheRealPath:
         the endpoint keys that follow must not be written under it."""
 
         class _TakenMidCreate(_RecordsGuards):
+            """Takes the session over at the address assignment.
+
+            The create reads this session's ipam prefix twice: once on the way in, where it
+            reconciles anything an earlier incarnation of the id left, and once inside the
+            assignment. It is the second that this test is about, so the first is let through.
+            """
+
             def __init__(self) -> None:
                 super().__init__()
                 self.armed = False
+                self.ipam_reads = 0
 
             @override
             async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
                 found: dict[str, str] = await super().get_prefix(prefix, **kwargs)
-                if self.armed and prefix.rstrip("/").endswith("/ipam"):
+                if prefix.rstrip("/").endswith("/ipam"):
+                    self.ipam_reads += 1
+                if self.armed and self.ipam_reads > 1 and prefix.rstrip("/").endswith("/ipam"):
                     self.armed = False
                     # Somebody else takes the session while this create is assigning addresses.
                     self.store[_META_KEY] = json.dumps({
@@ -2376,6 +2386,110 @@ class TestAPoolClaimNothingNames:
 
         assert member_key("s1", "a9") not in etcd.store
         assert _META_KEY in etcd.store, "it took the live session's record"
+
+    async def test_a_live_sessions_legacy_subnet_survives_the_sweep(self) -> None:
+        """The upgrade path, and the reason this is not hypothetical: the version before last
+        could hand back an unstamped subnet claim to a session whose meta DOES carry a
+        generation. Those sessions are running when the manager that upgraded them starts, and
+        the sweep runs at that start."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        subnet = str(info.options["subnet"])
+        # Its claim carries no incarnation, as one written before the field does.
+        for unit_key in list(_flat_claims(etcd)):
+            etcd.store[f"network/ipam/allocated/{unit_key}"] = json.dumps({
+                "session_id": "s1",
+                "subnet": subnet,
+            })
+
+        assert await plugin.reconcile_pool() == 0
+
+        assert await plugin._subnet_allocator.holder(subnet) == "s1", (
+            "it took a running session's subnet because the claim predates the field"
+        )
+
+    async def test_a_live_sessions_legacy_vni_survives_too(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        vni = int(cast(int, info.options["vni"]))
+        etcd.store[f"network/ipam/vni/{vni}"] = json.dumps({"session_id": "s1"})
+
+        await plugin.reconcile_pool()
+
+        assert await plugin._vni_allocator.holder(vni) == "s1"
+
+    async def test_the_allocator_still_promotes_it_afterwards(self) -> None:
+        # Preserved, then taken: the sweep leaves it, and the next adoption stamps it.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        vni = int(cast(int, info.options["vni"]))
+        generation = str(info.options["generation"])
+        etcd.store[f"network/ipam/vni/{vni}"] = json.dumps({"session_id": "s1"})
+        await plugin.reconcile_pool()
+
+        again = await plugin._vni_allocator.acquire("s1", generation)
+
+        assert again == vni
+        assert json.loads(etcd.store[f"network/ipam/vni/{vni}"])["generation"] == generation
+
+    async def test_a_legacy_child_key_of_a_gone_session_is_reclaimed(self) -> None:
+        """The mirror of the rule above. An unstamped key is compatible with every incarnation,
+        so where a record EXISTS it is live and stays -- but where there is no record at all,
+        nothing under the id is live, and skipping it leaves it forever."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        # Written before the field, by a session whose record is long gone.
+        etcd.store[member_key("s-old", "a1")] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": True,
+        })
+
+        await plugin.reconcile_pool()
+
+        assert member_key("s-old", "a1") not in etcd.store
+
+    async def test_a_legacy_child_key_of_a_live_session_is_kept(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        etcd.store[member_key("s1", "a1")] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": True,
+        })
+
+        await plugin.reconcile_pool()
+
+        assert member_key("s1", "a1") in etcd.store
+
+    async def test_it_reads_each_sessions_record_once(self) -> None:
+        # One read per session, not one per claim: a wide block is many units, and a startup
+        # sweep on a large pool is a lot of round trips to make twice.
+        class _CountingReads(FakeEtcd):
+            def __init__(self) -> None:
+                super().__init__()
+                self.meta_reads = 0
+
+            @override
+            async def get(self, key: str, **kwargs: Any) -> str | None:
+                if key == _META_KEY:
+                    self.meta_reads += 1
+                return await super().get(key, **kwargs)
+
+        etcd = _CountingReads()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "endpoints": []}
+        )
+        etcd.meta_reads = 0
+
+        await plugin.reconcile_pool()
+
+        assert etcd.meta_reads <= 2, f"it read one session's record {etcd.meta_reads} times"
 
     async def test_what_it_could_not_record_is_reported(self) -> None:
         etcd = FakeEtcd()
