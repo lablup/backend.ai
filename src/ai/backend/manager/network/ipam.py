@@ -156,6 +156,26 @@ def _generation_stamp(raw: str) -> str | None:
     return str(stamped) if stamped is not None else None
 
 
+def _claim_block(raw: str, session_id: str) -> str | None:
+    """The block ``raw`` records, if it is this SESSION's claim -- whatever incarnation it names.
+
+    The counterpart of `_claimed_subnet` for the one caller that has something better than a
+    stamp to go on: a promotion driven from the session's record, made in the same store
+    operation that checks that record. Only one incarnation of a session id is live at a time and
+    the record is what says which, so a claim of this id on the block that record names is this
+    session's however it is stamped. Everywhere else the stamp is all there is, and
+    `_claimed_subnet` is the right question.
+    """
+    try:
+        claim = json.loads(raw)
+    except ValueError:
+        return None
+    if claim.get("session_id") != session_id:
+        return None
+    subnet = claim.get("subnet")
+    return str(subnet) if subnet else None
+
+
 def _claimed_subnet(raw: str, session_id: str, generation: str | None) -> str | None:
     """The block ``raw`` records, if it is this INCARNATION of this session's claim.
 
@@ -334,6 +354,7 @@ class SubnetAllocator:
         session_id: str,
         generation: str | None,
         guards: Mapping[str, str] | None = None,
+        take_stale: bool = False,
     ) -> bool:
         """Rewrite the units of ``subnet`` that carry no incarnation so they carry this one.
 
@@ -360,6 +381,15 @@ class SubnetAllocator:
         promotion driven from a record rather than from a claim the pool just handed out (see
         `promote`) has no other check in front of it.
 
+        ``take_stale`` widens what may be rewritten from "this incarnation's or unstamped" to
+        "this session's", and is for the record-driven caller only (`promote`). A unit stamped
+        with an incarnation the record has moved on from is not a leftover when the record names
+        the block it is part of -- it is half of what a live session is running on, and refusing
+        it leaves the block answering to two cleanups for as long as the session lives. The pool-
+        driven caller keeps the narrow rule: there the block came from the pool, not from a record
+        checked in the same operation, and widening it is how a promotion reached another
+        session's claim.
+
         :return: ``True`` if every unit of the block is now this incarnation's.
         """
         if generation is None:
@@ -374,7 +404,12 @@ class SubnetAllocator:
                 return False
             if raw == payload:
                 continue
-            if _claimed_subnet(raw, session_id, generation) != subnet:
+            claimed = (
+                _claim_block(raw, session_id)
+                if take_stale
+                else _claimed_subnet(raw, session_id, generation)
+            )
+            if claimed != subnet:
                 # Not this session's claim on this block any more. Whoever holds it now holds it.
                 log.warning(
                     "not promoting {}: it is no longer session {}'s claim on {}",
@@ -761,6 +796,14 @@ class SubnetAllocator:
             found[unquote(key)] = (str(session_id), claim.get(SESSION_META_GENERATION), raw)
         return found
 
+    async def pool_listing(self) -> dict[str, str]:
+        """Every claim in the pool, keyed as `promote` expects to be handed it.
+
+        For a caller that promotes several blocks in a row and would otherwise make each one read
+        the pool again. The encoding of the keys stays in here, where the claims are written.
+        """
+        return _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
+
     async def release_unit(
         self, unit: str, expected: str, guards: Mapping[str, str | None]
     ) -> bool:
@@ -777,19 +820,35 @@ class SubnetAllocator:
         )
 
     async def promote(
-        self, subnet: str, session_id: str, generation: str | None, guards: Mapping[str, str]
+        self,
+        subnet: str,
+        session_id: str,
+        generation: str | None,
+        guards: Mapping[str, str],
+        allocated: Mapping[str, str] | None = None,
     ) -> bool:
         """Make every unit of ``subnet`` carry ``generation``, under ``guards``.
 
         The public form of `_claim_as_ours`, for the callers that hold a block by RECORD rather
         than by asking the pool for one: a session already READY, and the startup sweep. Leaving
-        such a block unstamped is not neutral -- an unstamped claim is compatible with every
-        incarnation, so a cleanup for any earlier one takes it while the session runs on it.
+        such a block on any other incarnation is not neutral -- an unstamped claim is compatible
+        with every one of them, so a cleanup for any earlier incarnation takes it while the
+        session runs on it, and a stale-stamped unit is taken by that incarnation's own cleanup.
+
+        ``allocated`` is a pool listing the caller has already read. A sweep promotes one block
+        per session and re-reading the pool for each is quadratic in the number of sessions that
+        need one -- which is every session, the first time a cluster starts after the incarnation
+        field. Passing a stale listing is safe by construction: each unit is rewritten by
+        compare-and-swap over the exact bytes the listing gave, so a unit that has changed since
+        fails the swap and the promotion is undone, rather than landing on bytes nobody read.
 
         :return: ``True`` if the block is now this incarnation's.
         """
-        allocated = _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
-        return await self._claim_as_ours(allocated, subnet, session_id, generation, guards)
+        if allocated is None:
+            allocated = _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
+        return await self._claim_as_ours(
+            allocated, subnet, session_id, generation, guards, take_stale=True
+        )
 
     async def holder(self, subnet: str) -> str | None:
         """The session every unit block of ``subnet`` is claimed by, or None if they disagree or
@@ -1245,8 +1304,11 @@ class VNIAllocator:
                 return False
         except ValueError:
             return False
-        if not of_generation(raw, generation):
-            return False
+        # No `of_generation` gate here, unlike everywhere the stamp is all there is. This is the
+        # record-driven form: the caller passes the VNI its record NAMES and guards the rewrite on
+        # that record, and only one incarnation of a session id is live at a time. A claim of this
+        # id on that VNI is the live session's whatever it is stamped with, and refusing a stale
+        # stamp leaves it answering to the cleanup of an incarnation that has moved on.
         return await self._claim_as_ours(vni, raw, _vni_claim(session_id, generation), dict(guards))
 
     async def holder(self, vni: int) -> str | None:

@@ -16,7 +16,7 @@ from typing import Any, TypeVar, cast, override
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.network.keys import member_key
+from ai.backend.common.network.keys import member_key, session_meta_key
 from ai.backend.common.network.types import (
     OVERLAY_ENCRYPTION_PROFILE,
     Member,
@@ -396,6 +396,11 @@ def _rebuilt_as(generation: str) -> str:
         "_claimed_at": time.time(),
         "generation": generation,
     })
+
+
+def _owed(plugin: CNINetworkPlugin) -> bool:
+    """Read through a call so the checker does not narrow the attribute across a whole test."""
+    return plugin._reconciliation_owed
 
 
 def _plugin_with(etcd: FakeEtcd) -> CNINetworkPlugin:
@@ -2769,6 +2774,148 @@ class TestWhatSaysAClaimIsInUse:
 
         assert _allocated_key(subnet) in etcd.store, "a live session's block was given back"
         assert f"network/ipam/vni/{vni}" in etcd.store, "a live session's vni was given back"
+
+
+class TestAStrayClaimOfTheLiveIncarnation:
+    """C28. The stamp answered for a claim the record does not name. A create that could not take
+    the block it already held allocates a second one -- stamped with the live incarnation, named
+    by nothing, and so read as live for as long as the session ran. Identity is what the record
+    can answer with; the stamp is only for the window before it names anything."""
+
+    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+
+    async def test_a_stray_claim_carrying_the_live_incarnation_is_reclaimed(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        generation = str(info.options["generation"])
+        stray = "10.128.77.0/24"
+        etcd.store[_allocated_key(stray)] = _claim("s1", stray, generation)
+        etcd.store["network/ipam/vni/8888"] = json.dumps({
+            "session_id": "s1",
+            "generation": generation,
+        })
+
+        await plugin.reconcile_pool()
+
+        assert _allocated_key(stray) not in etcd.store
+        assert "network/ipam/vni/8888" not in etcd.store
+        assert _allocated_key(str(info.options["subnet"])) in etcd.store, "it took the live one"
+
+    async def test_a_create_that_has_not_published_still_keeps_its_claims(self) -> None:
+        # The window the stamp is for: the record names nothing until publish, so identity cannot
+        # answer, and a sweep that asked it anyway reclaimed the claims of every create in flight.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        held, _ = await plugin._claim_session(cast(AsyncEtcd, etcd), "s1", "tok", [])
+        generation = json.loads(held)["generation"]
+        await plugin._subnet_allocator.acquire("s1", generation=generation)
+        await plugin._vni_allocator.acquire("s1", generation)
+
+        assert await plugin.reconcile_pool() == 0
+
+    async def test_a_stale_stamped_unit_of_a_named_block_is_taken_not_just_kept(self) -> None:
+        """Keeping it stops the block being handed to another tenant, and leaves it answering to
+        two cleanups for as long as the session lives. The record names the block and the guard
+        pins the record, so the promotion has something better than a stamp to go on."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        generation = str(info.options["generation"])
+        subnet = str(info.options["subnet"])
+        vni = int(cast(int, info.options["vni"]))
+        etcd.store[_allocated_key(subnet)] = _claim("s1", subnet, "an-older-one")
+        etcd.store[f"network/ipam/vni/{vni}"] = json.dumps({
+            "session_id": "s1",
+            "generation": "an-older-one",
+        })
+
+        await plugin.reconcile_pool()
+
+        assert json.loads(etcd.store[_allocated_key(subnet)])["generation"] == generation
+        assert json.loads(etcd.store[f"network/ipam/vni/{vni}"])["generation"] == generation
+
+    async def test_it_reads_the_pool_once_however_many_sessions_need_taking(self) -> None:
+        # Each promotion used to read the whole pool, so the first start after the incarnation
+        # field -- where every session needs one -- cost a full scan per session.
+        class _CountingPoolReads(FakeEtcd):
+            def __init__(self) -> None:
+                super().__init__()
+                self.pool_reads = 0
+
+            @override
+            async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
+                if prefix == "network/ipam/allocated":
+                    self.pool_reads += 1
+                return await super().get_prefix(prefix, **kwargs)
+
+        etcd = _CountingPoolReads()
+        plugin = _plugin_with(etcd)
+        sessions = [f"s{i}" for i in range(6)]
+        for session_id in sessions:
+            info = await plugin.create_network(identifier=session_id, options=dict(self._OPTIONS))
+            subnet = str(info.options["subnet"])
+            # Carried over an upgrade: every one of them needs promoting.
+            etcd.store[_allocated_key(subnet)] = _claim(session_id, subnet)
+        etcd.pool_reads = 0
+
+        await plugin.reconcile_pool()
+
+        assert etcd.pool_reads <= 3, (
+            f"it read the whole pool {etcd.pool_reads} times for {len(sessions)} sessions"
+        )
+        for session_id in sessions:
+            meta = json.loads(etcd.store[session_meta_key(session_id)])
+            claim = json.loads(etcd.store[_allocated_key(str(meta["subnet"]))])
+            assert claim.get("generation") == meta["generation"]
+
+
+class TestAReconciliationPassThatCouldNotRun:
+    """C29. The startup sweep was fail-open: a pass that raised was a log line, so one etcd blip
+    left orphan claims until the next restart while every health surface read clean."""
+
+    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+
+    class _PoolUnreadable(FakeEtcd):
+        def __init__(self) -> None:
+            super().__init__()
+            self.refusing = True
+
+        @override
+        async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
+            if self.refusing and prefix == "network/ipam/allocated":
+                raise RuntimeError("etcd is unreachable")
+            return await super().get_prefix(prefix, **kwargs)
+
+    async def test_a_failed_pass_stays_owed(self) -> None:
+        etcd = self._PoolUnreadable()
+        plugin = _plugin_with(etcd)
+        assert _owed(plugin) is False
+
+        await plugin._reconcile_pool_reporting()
+
+        assert _owed(plugin) is True
+
+    async def test_the_next_use_of_a_session_id_pays_it(self) -> None:
+        etcd = self._PoolUnreadable()
+        plugin = _plugin_with(etcd)
+        await plugin._reconcile_pool_reporting()
+        assert _owed(plugin) is True
+        # An orphan claim from a manager life nothing wrote down.
+        etcd.refusing = False
+        stray = "10.128.55.0/24"
+        etcd.store[_allocated_key(stray)] = _claim("s-gone", stray, "g-gone")
+
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        assert _owed(plugin) is False
+        assert _allocated_key(stray) not in etcd.store, "the orphan waited for a restart"
+
+    async def test_a_pass_that_went_through_is_not_owed(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin._reconcile_pool_reporting()
+        assert _owed(plugin) is False
 
 
 class TestADestroyThatFindsNoRecordAtAll:

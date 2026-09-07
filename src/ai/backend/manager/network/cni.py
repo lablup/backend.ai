@@ -20,6 +20,7 @@ from typing import Any, Final, override
 
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.network.keys import (
     agent_vtep_key,
     endpoint_key,
@@ -200,6 +201,22 @@ def _record_names(meta_raw: str, raw: str, is_vni: bool, key: str | int) -> bool
     )
 
 
+def _names_an_allocation(meta_raw: str, is_vni: bool) -> bool:
+    """Whether the record has got as far as naming an allocation of this kind.
+
+    A record claims the session id before anything is allocated for it, so it carries no
+    ``subnet`` and no ``vni`` key at all until the create publishes. From that point on it names
+    exactly one of each -- ``vni`` as null for a backend that uses none -- and it goes on naming
+    them under a DELETING tombstone. So the presence of the key, not its value, is what says
+    whether the record can answer for a claim of this kind.
+    """
+    try:
+        meta = json.loads(meta_raw)
+    except ValueError:
+        return False
+    return ("vni" if is_vni else "subnet") in meta
+
+
 def _claim_is_live(meta_raw: str | None, raw: str, is_vni: bool, key: str | int) -> bool:
     """Whether a pool claim is one the session is using.
 
@@ -225,9 +242,17 @@ def _claim_is_live(meta_raw: str | None, raw: str, is_vni: bool, key: str | int)
     live = _generation_of(meta_raw)
     if live is None:
         return True
-    if _generation_stamp_of(raw) == live:
-        return True
-    return _record_names(meta_raw, raw, is_vni, key)
+    if _names_an_allocation(meta_raw, is_vni):
+        # The record names one allocation of this kind, so identity settles it and the stamp adds
+        # nothing. Asking the stamp as well kept a stray claim that happens to carry the live
+        # incarnation -- a block a create walked away from when it could not take the one it
+        # already held, say -- for as long as the session lived: promotion follows the record, so
+        # nothing ever moved it, and it looked live, so nothing reclaimed it.
+        return _record_names(meta_raw, raw, is_vni, key)
+    # Still building: it names nothing yet, and the stamp is the only thing that can say. This is
+    # what a create in flight holds, and a sweep that asked identity here reclaimed the pool
+    # claims of every create running at the time.
+    return _generation_stamp_of(raw) == live
 
 
 def _tombstone(subnet: str | None, vni: Any, owner: str | None, generation: str | None) -> str:
@@ -267,12 +292,17 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
     #: Read by health reporting: it is the one leak no retry finds on its own, and the pool
     #: reconciler is what eventually reaches it.
     _unrecoverable: dict[str, str]
+    #: Whether a reconciliation pass this manager owes has not yet succeeded. The pool is the only
+    #: evidence an orphan claim exists, so a pass that could not run leaves nothing else to find
+    #: it: it is retried where a session id comes round, and reported until it goes through.
+    _reconciliation_owed: bool
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
         self._etcd = None
         self._forced_backend = None
         self._unrecoverable = {}
+        self._reconciliation_owed = False
 
     @override
     async def init(self, context: Any = None) -> None:
@@ -296,13 +326,36 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         self._endpoint_allocator = EndpointAllocator(self._etcd)
         # What a previous manager life could neither release nor write down. Started from the
         # POOL rather than from a list of what is owed, because the case this exists for is the
-        # one where nothing was written down. Best-effort: a manager that cannot reconcile still
-        # serves sessions, and says so through `unrecoverable_leaks`.
+        # one where nothing was written down. A manager that cannot reconcile still serves
+        # sessions -- refusing to start over a transient etcd error would be worse -- but it does
+        # not carry on as if it had: the pass stays owed, it is retried the next time a session id
+        # comes round, and `backendai_network_pool_reconcile_pending` says so until it succeeds.
+        await self._reconcile_pool_reporting()
+
+    async def _reconcile_pool_reporting(self) -> None:
+        """Run a reconciliation pass, and leave behind what its outcome means.
+
+        Not fail-open: a pass that raises used to be a log line and nothing else, so a single
+        etcd blip left orphan claims until the next restart while every health surface read
+        clean. What it reclaims and what it could not reach are both numbers now.
+        """
+        metrics = CommonMetricRegistry.instance().network_pool
         try:
-            if reclaimed := await self.reconcile_pool():
-                log.warning("reclaimed {} pool claim(s) no live session names", reclaimed)
+            reclaimed = await self.reconcile_pool()
         except Exception:
-            log.exception("could not reconcile the overlay pool at startup")
+            self._reconciliation_owed = True
+            metrics.observe_reconcile_failed()
+            log.exception(
+                "could not reconcile the overlay pool; the pass stays owed and is retried the"
+                " next time one of this cluster's session ids is used"
+            )
+            return
+        self._reconciliation_owed = False
+        metrics.observe_reconcile_succeeded(
+            reclaimed=reclaimed, unrecoverable=len(self._unrecoverable)
+        )
+        if reclaimed:
+            log.warning("reclaimed {} pool claim(s) no live session names", reclaimed)
 
     @override
     async def cleanup(self) -> None:
@@ -584,7 +637,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             network_id=session_id, options={**_published(meta), "endpoint_ips": endpoint_ips}
         )
 
-    async def _take_allocation(self, session_id: str, meta: Mapping[str, Any], held: str) -> bool:
+    async def _take_allocation(
+        self,
+        session_id: str,
+        meta: Mapping[str, Any],
+        held: str,
+        allocated: Mapping[str, str] | None = None,
+    ) -> bool:
         """Stamp the subnet and VNI this record names with the incarnation it names.
 
         Idempotent: a claim already carrying this incarnation is left alone, and one that is not
@@ -605,7 +664,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         taken = True
         subnet = meta.get("subnet")
         if subnet and not await self._subnet_allocator.promote(
-            str(subnet), session_id, str(generation), guards
+            str(subnet), session_id, str(generation), guards, allocated
         ):
             log.warning(
                 "session {}'s record names subnet {}, which this incarnation could not take",
@@ -1062,8 +1121,17 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 )
         # Everything the sweep found live but not stamped with the incarnation its record names,
         # taken onto it. Done after the walk so the pool is not being read and rewritten at once.
+        #
+        # One read of the pool for all of them. Each promotion used to read it again, so the first
+        # start of a cluster after the incarnation field -- where EVERY session needs promoting --
+        # cost one full scan per session. The listing goes stale as the promotions land, and that
+        # is safe: every rewrite is a compare-and-swap over the bytes the listing gave, so a unit
+        # that moved fails the swap instead of being written over blind.
+        allocated = await self._subnet_allocator.pool_listing() if to_take else {}
         for session_id, (_live, meta_raw) in to_take.items():
-            if not await self._take_allocation(session_id, json.loads(meta_raw), meta_raw):
+            if not await self._take_allocation(
+                session_id, json.loads(meta_raw), meta_raw, allocated
+            ):
                 log.warning(
                     "session {}'s allocation could not be taken onto the incarnation its record"
                     " names; an earlier cleanup of this id can still give it away",
@@ -1208,6 +1276,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 f"could not reconcile what earlier incarnations of session {session_id} left"
                 f" ({e}); retrying rather than reusing the id over keys nothing has looked at"
             ) from e
+        # A reconciliation pass this manager owes -- one that raised at startup -- retried here.
+        # Not on a timer, which would need a leader lock this plugin does not hold and would have
+        # every manager in an HA set scanning at once; here it is paid once, by whoever is next to
+        # use a session id, and stops being owed as soon as it goes through.
+        if self._reconciliation_owed:
+            await self._reconcile_pool_reporting()
         # The pool half of the same debt, and only where something is actually owed: a claim whose
         # note could not be written is named by nothing, so the id coming back round is the one
         # chance to reach it before a manager restart does. Reading the whole pool is not a cost
