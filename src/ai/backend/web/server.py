@@ -1058,9 +1058,7 @@ async def webapp_ctx(
     )
     manager_web_plugin_handler = partial(web_plugin_handler, endpoint_pool=manager_pool)
 
-    anon_web_handler = manager_proxy_rate_limited(
-        partial(manager_proxy_handler, is_anonymous=True)
-    )
+    anon_web_handler = manager_proxy_rate_limited(partial(manager_proxy_handler, is_anonymous=True))
     anon_web_plugin_handler = manager_proxy_rate_limited(
         partial(manager_web_plugin_handler, is_anonymous=True)
     )
