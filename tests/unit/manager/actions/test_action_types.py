@@ -6,7 +6,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 
 # Import representative concrete action classes across different entity types
 # and operation types to verify enum usage at runtime.
-from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
+from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
@@ -22,7 +22,7 @@ from ai.backend.manager.services.permission_contoller.actions.search_entities im
 # ``ai.backend.common.data.entity.types.EntityType``, a distinct NewType, so mixing
 # them in would conflate two type systems rather than test either one.
 _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
-    CreateRoleAction,
+    AssignRoleAction,
     GetRoleDetailAction,
     ReplaceRolePermissionsAction,
     RevokeRoleAction,

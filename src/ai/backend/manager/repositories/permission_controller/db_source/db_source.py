@@ -2,7 +2,7 @@ import logging
 import uuid
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import sqlalchemy as sa
@@ -21,9 +21,6 @@ from ai.backend.manager.data.permission.entity import (
     EntityListResult,
 )
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.object_permission import (
-    ObjectPermissionCreateInputBeforeRoleCreation,
-)
 from ai.backend.manager.data.permission.permission import (
     PermissionListResult,
 )
@@ -52,7 +49,6 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     OperationType,
     Permission,
-    RBACElementRef,
     ScopeData,
     ScopeListResult,
 )
@@ -92,10 +88,6 @@ from ai.backend.manager.repositories.base.purger import (
     execute_purger,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creator,
-)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.permission_controller.creators import (
@@ -103,15 +95,6 @@ from ai.backend.manager.repositories.permission_controller.creators import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class CreateRoleInput:
-    """Input for creating a role with object permissions."""
-
-    creator: Creator[RoleRow]
-    object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation]
-    scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -137,35 +120,6 @@ class PermissionDBSource:
         self._ops = PermissionOpsProvider(db)
 
     # ------------------------------------------------------------------ role CRUD
-
-    async def create_role(self, input_data: CreateRoleInput) -> RoleRow:
-        """
-        Create a new role with object permissions.
-
-        All related entities are created in a single transaction.
-        When scope_refs is non-empty, the role is also registered in
-        association_scopes_entities via RBACEntityCreator.
-
-        Args:
-            input_data: Input containing creator and object permissions
-
-        Returns:
-            Created role row
-        """
-        async with self._db.begin_session() as db_session:
-            if input_data.scope_refs:
-                rbac_creator = RBACEntityCreator(
-                    spec=input_data.creator.spec,
-                    element_type=RBACElementType.ROLE,
-                    scope_ref=input_data.scope_refs[0],
-                    additional_scope_refs=input_data.scope_refs[1:],
-                )
-                role_row = (await execute_rbac_entity_creator(db_session, rbac_creator)).row
-            else:
-                role_row = (await execute_creator(db_session, input_data.creator)).row
-
-            await db_session.refresh(role_row)
-            return role_row
 
     async def create_permission(
         self,

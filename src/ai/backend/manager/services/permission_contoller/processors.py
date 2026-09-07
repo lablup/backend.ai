@@ -2,7 +2,11 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-from ai.backend.manager.actions.v2.ops.result import EntityOpsResult
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult, EntityOpsResult
+from ai.backend.manager.actions.v2.scope.processor import (
+    ScopeActionProcessor as V2ScopeActionProcessor,
+)
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.permission.role import RoleData
@@ -18,8 +22,8 @@ from .actions import (
     BulkRemoveRolePermissionsActionResult,
     BulkRevokeRoleAction,
     BulkRevokeRoleActionResult,
+    CreateGlobalRoleAction,
     CreateRoleAction,
-    CreateRoleActionResult,
     DeleteRoleAction,
     GetRoleDetailAction,
     GetRoleDetailActionResult,
@@ -80,7 +84,10 @@ from .service import PermissionControllerService
 class PermissionControllerProcessors:
     """Processor package for RBAC permission controller operations."""
 
-    create_role: ActionProcessor[CreateRoleAction, CreateRoleActionResult]
+    create_role: V2ScopeActionProcessor[CreateRoleAction, CreatedEntityOpsResult[RoleData]]
+    create_global_role: GlobalActionProcessor[
+        CreateGlobalRoleAction, CreatedEntityOpsResult[RoleData]
+    ]
     update_role: SingleEntityActionProcessor[UpdateRoleAction, EntityOpsResult[RoleData]]
     delete_role: SingleEntityActionProcessor[DeleteRoleAction, EntityOpsResult[RoleData]]
     purge_role: SingleEntityActionProcessor[PurgeRoleAction, EntityOpsResult[RoleData]]
@@ -127,7 +134,8 @@ class PermissionControllerProcessors:
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.create_role = ActionProcessor(service.create_role, action_monitors)
+        self.create_role = role_group.entity_create_ops(CreateRoleAction)
+        self.create_global_role = role_group.global_create_ops(CreateGlobalRoleAction)
         self.update_role = role_group.single_guarded_update_ops(UpdateRoleAction)
         self.delete_role = role_group.single_guarded_delete_ops(DeleteRoleAction)
         self.purge_role = role_group.entity_purge_ops(PurgeRoleAction)

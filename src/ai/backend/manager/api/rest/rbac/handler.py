@@ -53,12 +53,11 @@ from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.rbac_models.role.creators import GlobalRoleCreator
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater
-from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
 from ai.backend.manager.services.permission_contoller.actions import (
     AssignRoleAction,
-    CreateRoleAction,
+    CreateGlobalRoleAction,
     DeleteRoleAction,
     GetRoleDetailAction,
     RevokeRoleAction,
@@ -110,18 +109,17 @@ class RBACHandler:
         if not ctx.is_superadmin:
             raise NotEnoughPermission("Only superadmin can create roles.")
 
-        creator = Creator(
-            spec=RoleCreatorSpec(
-                name=body.parsed.name,
-                source=body.parsed.source,
-                status=body.parsed.status,
-                description=body.parsed.description,
+        result = await self._permission_controller.create_global_role.run(
+            CreateGlobalRoleAction(
+                creator=GlobalRoleCreator(
+                    name=body.parsed.name,
+                    source=body.parsed.source,
+                    status=body.parsed.status,
+                    description=body.parsed.description,
+                )
             )
         )
-        action_result = await self._permission_controller.create_role.wait_for_complete(
-            CreateRoleAction(creator=creator)
-        )
-        resp = CreateRoleResponse(role=self._role_adapter.convert_to_dto(action_result.data))
+        resp = CreateRoleResponse(role=self._role_adapter.convert_to_dto(result.data))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     async def search_roles(

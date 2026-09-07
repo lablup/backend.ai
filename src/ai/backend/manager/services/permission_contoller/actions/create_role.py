@@ -1,41 +1,38 @@
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.object_permission import (
-    ObjectPermissionCreateInputBeforeRoleCreation,
-)
+from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.manager.actions.v2.ops.base import CreateEntityOpsAction
 from ai.backend.manager.data.permission.role import RoleData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
+from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 
 
-@dataclass
-class CreateRoleAction(RoleAction):
-    creator: Creator[RoleRow]
-    object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation] = field(
-        default_factory=tuple
-    )
-    scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
+@dataclass(frozen=True)
+class CreateRoleAction(CreateEntityOpsAction[RoleRow, RoleData]):
+    """Create a role registered in the scopes the creator names."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: RoleCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreateRoleActionResult(BaseActionResult):
-    data: RoleData
+    def entity_type(cls) -> EntityType:
+        return ROLE_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return tuple(
+            ScopeRef(scope_type=ScopeType(scope.entity_type()), scope_id=scope)
+            for scope in self.creator.scopes
+        )
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_role"
+
+    @override
+    def to_creator(self) -> RoleCreator:
+        return self.creator

@@ -11,8 +11,16 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.entity.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    EntityType,
+    RuntimeEntityID,
+    ScopeType,
+)
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
 from ai.backend.common.data.permission.types import Permission, RBACElementType
@@ -165,7 +173,6 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
 from ai.backend.manager.errors.permission import ReplaceRolePermissionRoleIdMismatch
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -189,6 +196,7 @@ from ai.backend.manager.models.rbac_models.permission.orders import ScopedPermis
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
+from ai.backend.manager.models.rbac_models.role.creators import GlobalRoleCreator, RoleCreator
 from ai.backend.manager.models.rbac_models.role.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
@@ -200,7 +208,6 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
-    RoleCreatorSpec,
     UserRoleCreatorSpec,
 )
 from ai.backend.manager.repositories.permission_controller.purgers import PermissionPurgerSpec
@@ -217,6 +224,9 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_p
 )
 from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
     BulkRevokeRoleAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.create_global_role import (
+    CreateGlobalRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
@@ -324,15 +334,30 @@ class RBACAdapter(BaseAdapter):
         """Raise InvalidScope if scope_id is not a valid UUID for scope types that require one."""
         match scope_type:
             case RBACElementType.USER | RBACElementType.PROJECT | RBACElementType.DOMAIN:
-                try:
-                    uuid.UUID(scope_id)
-                except ValueError:
-                    raise InvalidScope(
-                        f"scope_id must be a valid UUID for scope_type '{scope_type.value}', "
-                        f"got '{scope_id}'"
-                    ) from None
+                self._scope_uuid(scope_type, scope_id)
             case _:
                 pass
+
+    def _scope_uuid(self, scope_type: RBACElementType, scope_id: str) -> UUID:
+        try:
+            return UUID(scope_id)
+        except ValueError:
+            raise InvalidScope(
+                f"scope_id must be a valid UUID for scope_type '{scope_type.value}', "
+                f"got '{scope_id}'"
+            ) from None
+
+    def _scope_identifier(self, scope_type: RBACElementType, scope_id: str) -> EntityIdentifier:
+        value = self._scope_uuid(scope_type, scope_id)
+        match scope_type:
+            case RBACElementType.DOMAIN:
+                return DomainID(value)
+            case RBACElementType.PROJECT:
+                return ProjectID(value)
+            case RBACElementType.USER:
+                return UserID(value)
+            case _:
+                return RuntimeEntityID(EntityType(scope_type.value), value)
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
@@ -576,28 +601,35 @@ class RBACAdapter(BaseAdapter):
 
     async def create(self, input: CreateRoleInput) -> CreateRolePayload:
         """Create a new role."""
-        for s in input.scopes or []:
-            self._validate_scope_id(RBACElementType(s.scope_type), s.scope_id)
-        scope_refs = [
-            RBACElementRef(
-                element_type=RBACElementType(s.scope_type),
-                element_id=s.scope_id,
-            )
+        scopes = [
+            self._scope_identifier(RBACElementType(s.scope_type), s.scope_id)
             for s in (input.scopes or [])
         ]
-        creator = Creator(
-            spec=RoleCreatorSpec(
-                name=input.name,
-                source=InternalRoleSource(input.source.value),
-                status=InternalRoleStatus.ACTIVE,
-                description=input.description,
-                auto_assign=input.auto_assign,
+        source = InternalRoleSource(input.source.value)
+        if scopes:
+            result = await self._processors.permission_controller.create_role.run(
+                CreateRoleAction(
+                    creator=RoleCreator(
+                        name=input.name,
+                        scopes=scopes,
+                        source=source,
+                        description=input.description,
+                        auto_assign=input.auto_assign,
+                    )
+                )
             )
-        )
-        action_result = await self._processors.permission_controller.create_role.wait_for_complete(
-            CreateRoleAction(creator=creator, scope_refs=scope_refs)
-        )
-        return CreateRolePayload(role=self._role_data_to_node(action_result.data))
+        else:
+            result = await self._processors.permission_controller.create_global_role.run(
+                CreateGlobalRoleAction(
+                    creator=GlobalRoleCreator(
+                        name=input.name,
+                        source=source,
+                        description=input.description,
+                        auto_assign=input.auto_assign,
+                    )
+                )
+            )
+        return CreateRolePayload(role=self._role_data_to_node(result.data))
 
     # ------------------------------------------------------------------ search
 

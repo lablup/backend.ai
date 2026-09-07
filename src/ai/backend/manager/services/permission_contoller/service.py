@@ -13,9 +13,6 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationData,
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
-    CreateRoleInput,
-)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -39,10 +36,6 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_p
 from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
     BulkRevokeRoleAction,
     BulkRevokeRoleActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.create_role import (
-    CreateRoleAction,
-    CreateRoleActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
     GetEntityTypesAction,
@@ -136,20 +129,6 @@ class PermissionControllerService:
         self._repository = repository
         self._group_repository = group_repository
         self._rbac_action_registry = rbac_action_registry
-
-    async def create_role(self, action: CreateRoleAction) -> CreateRoleActionResult:
-        """
-        Creates a new role in the repository.
-        """
-        input_data = CreateRoleInput(
-            creator=action.creator,
-            object_permissions=action.object_permissions,
-            scope_refs=action.scope_refs,
-        )
-        result = await self._repository.create_role(input_data)
-        return CreateRoleActionResult(
-            data=result,
-        )
 
     async def create_permission(
         self, action: CreatePermissionAction
