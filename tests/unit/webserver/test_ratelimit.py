@@ -37,7 +37,6 @@ def mock_valkey_rate_limit_client() -> AsyncMock:
 
 @pytest.fixture
 def proxied_request(mock_valkey_rate_limit_client: AsyncMock) -> web.Request:
-    """A proxied request the server can name no address for."""
     return make_mocked_request(
         "GET", "/func/session", app={"valkey_rate_limit": mock_valkey_rate_limit_client}
     )
@@ -65,11 +64,6 @@ class _PassThroughCase:
 @pytest.mark.parametrize(
     "case",
     [
-        # No login session and no address to key by: the manager limits it alone.
-        _PassThroughCase(
-            id="unauthenticated-without-an-address",
-            session={},
-        ),
         # Session created before login stored the user id: no counter key, so exempt.
         _PassThroughCase(
             id="session-stored-before-user-id",

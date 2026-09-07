@@ -99,9 +99,7 @@ async def get_anonymous_session(
 def get_client_ip(request: web.Request) -> str | None:
     client_ip = request.headers.get("X-Forwarded-For")
     if not client_ip and request.transport:
-        peername = request.transport.get_extra_info("peername")
-        if peername:
-            client_ip = peername[0]
+        client_ip = request.transport.get_extra_info("peername")[0]
     if not client_ip:
         client_ip = request.remote
     return client_ip
