@@ -1333,6 +1333,7 @@ class ScheduleCoordinator:
                 to_status=transition.session,
                 status_changed_at=status_changed_at,
                 reason="" if transition.session == SessionStatus.RUNNING else None,
+                except_statuses=SessionStatus.terminal_statuses(),
             )
             histories = [
                 SessionHistoryToCreate(
