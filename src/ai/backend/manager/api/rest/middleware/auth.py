@@ -566,17 +566,15 @@ def _resolve_client_ip_via_trusted_proxies(
 def extract_client_ip(request: web.Request) -> str | None:
     """Extract the client IP from the request.
 
-    With trusted proxies configured, the address is resolved from the forwarding
-    chain.  Otherwise, fall back to manual X-Forwarded-For parsing (first IP in
-    the comma-separated list).
+    With trusted proxies configured, the address is resolved from the forwarding chain.
+    Otherwise it is the peer of the connection: ``X-Forwarded-For`` is written by the
+    caller, so with no proxy vouching for it there is nothing separating a forwarded
+    address from a claimed one.
     """
     networks = _trusted_proxy_networks(request)
     if networks:
         return _resolve_client_ip_via_trusted_proxies(request, networks)
-    raw: str | None = request.headers.get("X-Forwarded-For") or request.remote
-    if raw:
-        return raw.split(",")[0].strip()
-    return None
+    return _peer_address(request)
 
 
 def validate_ip(

@@ -19,6 +19,7 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
     ValkeyRateLimitClient,
 )
 from ai.backend.common.contexts.client_ip import current_client_ip
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.web.reserved_response_headers import reserve_response_headers
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import WebRequestHandler
@@ -68,9 +69,7 @@ def make_rlim_middleware(
         else:
             client_ip = current_client_ip()
             if client_ip is None:
-                # Nothing identifies the caller, so there is no window to count them in.
-                log.warning("rate limiting an unauthenticated request without a client address")
-                return await handler(request)
+                raise UnreachableError("a request over a socket always has a peer address")
             state = await valkey_client.consume_ip_rate_limit(
                 client_ip=client_ip,
                 window_seconds=_RATELIMIT_WINDOW_SECONDS,

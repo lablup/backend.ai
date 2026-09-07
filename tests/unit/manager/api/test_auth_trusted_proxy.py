@@ -321,16 +321,17 @@ class TestExtractClientIP:
 
         assert extract_client_ip(request) == "10.0.0.9"
 
-    def test_without_trusted_proxies_takes_the_first_entry(self) -> None:
+    def test_without_trusted_proxies_the_header_is_ignored(self) -> None:
+        """With no proxy vouching for it, the header is a claim the caller wrote."""
         request = _make_request(
             forwarded_for="203.0.113.9, 10.0.0.5",
             peer="10.0.0.1",
             trusted_proxies=[],
         )
 
-        assert extract_client_ip(request) == "203.0.113.9"
+        assert extract_client_ip(request) == "10.0.0.1"
 
-    def test_without_trusted_proxies_falls_back_to_remote(self) -> None:
+    def test_without_trusted_proxies_the_peer_is_taken(self) -> None:
         request = _make_request(peer="10.0.0.1", trusted_proxies=[])
 
         assert extract_client_ip(request) == "10.0.0.1"
