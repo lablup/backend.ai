@@ -112,6 +112,12 @@ class UnknownNetworkBackend(RuntimeError):
     pass
 
 
+def _cleanup_debt_of(backend: Any) -> Mapping[str, str]:
+    """What a backend says it could not take back off this host, if it tracks that at all."""
+    owed = getattr(backend, "cleanup_debt", None)
+    return {} if owed is None else owed()
+
+
 class SessionNetwork:
     _etcd: AbstractKVStore
     _agent_id: str
@@ -333,9 +339,7 @@ class SessionNetwork:
         """
         debt: dict[str, str] = {}
         for backend in self._backends.values():
-            owed = getattr(backend, "cleanup_debt", None)
-            if owed is not None:
-                debt.update(owed())
+            debt.update(_cleanup_debt_of(backend))
         return debt
 
     async def retry_recovery_fail_close(self) -> dict[str, str]:
@@ -347,7 +351,11 @@ class SessionNetwork:
         successfully in between, drop their claims, and not reopen them: a capability refresh
         would become the thing that kills the node's live traffic.
         """
-        for name in list(self._recovery_incomplete):
+        # Every backend that owes anything, not only the ones whose preflight failed: a setup
+        # that failed mid-way leaves rules behind long after recovery is over, and nothing else
+        # comes back for them.
+        owing = {name for name, backend in self._backends.items() if _cleanup_debt_of(backend)}
+        for name in dict.fromkeys([*self._recovery_incomplete, *sorted(owing)]):
             backend = self._backends.get(name)
             retry = getattr(backend, "retry_fail_close", None)
             if backend is None or retry is None:
@@ -358,8 +366,12 @@ class SessionNetwork:
             except Exception as e:
                 self._recovery_incomplete[name] = str(e)
                 continue
-            if remaining:
-                self._recovery_incomplete[name] = f"still up: {', '.join(sorted(remaining))}"
+            # Minus what the backend reports as cleanup debt: that goes out on its own below, and
+            # this dict is only for what recovery could not close. Conflating them would hold up
+            # the stale-claim prune over rules that have nothing to do with a surviving tunnel.
+            still_up = sorted(set(remaining) - set(_cleanup_debt_of(backend)))
+            if still_up:
+                self._recovery_incomplete[name] = f"still up: {', '.join(still_up)}"
             else:
                 self._recovery_incomplete.pop(name, None)
         if not self._recovery_incomplete:
@@ -368,7 +380,13 @@ class SessionNetwork:
             # tunnel was still UP would drop the claim of a pair that may still be carrying.
             await self._prune_stale_claims()
         await self._retry_unresumed()
-        return {**self._recovery_incomplete, **self._unrecovered_sessions()}
+        # The debt goes out with it: this return value IS what the agent publishes as its
+        # readiness, and a node whose backend refuses every new session must not look ready.
+        return {
+            **self._recovery_incomplete,
+            **self._unrecovered_sessions(),
+            **self._backend_cleanup_debt(),
+        }
 
     async def _prune_stale_claims(self) -> None:
         """Drop this node's pair claims for sessions it no longer holds."""
@@ -1130,6 +1148,11 @@ class SessionNetwork:
         backend = self._session_backends.get(session_id)
         if coordinator is None or backend is None:
             return  # session not set up on this node; nothing to serve
+        if session_id in self._tearing_down:
+            # A teardown has already stopped this session's resolver and is on its way to the
+            # coordinator. An attach arriving in between would put a live resolver and a :53
+            # redirect back on a session nothing is left to take them down for.
+            return
         if await self.local_subnet_of(session_id) is None:
             # After an attach the LOCAL block exists; its absence means the gateway is unknown and
             # the :53 redirect would be a silent no-op (resolver up but unreachable). Fail loudly.
