@@ -111,53 +111,51 @@ class TestRlimMiddleware:
         request["user"] = None
         return request
 
-    async def test_an_authorized_query_opens_the_user_window(
+    async def test_an_authorized_query_is_judged_by_the_user_window(
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
         authorized_caller: Caller,
         mock_handler: AsyncMock,
     ) -> None:
-        """The user and the limit the auth middleware put on the request open the window."""
+        """The two windows stand apart, so the limit reported says which one governed."""
         # Arrange
-        authorized_caller.consumer.return_value = RateLimitState(
+        mock_valkey_client.consume_user_rate_limit.return_value = RateLimitState(
             count=1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
+        )
+        mock_valkey_client.consume_ip_rate_limit.return_value = RateLimitState(
+            count=1, limit=_ANONYMOUS_RATELIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
         )
 
         # Act
-        await middleware(authorized_caller.request, mock_handler)
+        response = await middleware(authorized_caller.request, mock_handler)
+        await apply_reserved_response_headers(authorized_caller.request, response)
 
         # Assert
-        mock_valkey_client.consume_user_rate_limit.assert_called_once_with(
-            user_id=_USER_ID,
-            window_seconds=_RATELIMIT_WINDOW_SECONDS,
-            limit=_RATE_LIMIT,
-        )
-        mock_valkey_client.consume_ip_rate_limit.assert_not_called()
+        assert response.headers["X-RateLimit-Limit"] == str(_RATE_LIMIT)
 
-    async def test_an_anonymous_query_opens_the_client_address_window(
+    async def test_an_anonymous_query_is_judged_by_the_client_address_window(
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
         anonymous_caller: Caller,
         mock_handler: AsyncMock,
     ) -> None:
-        """An unauthenticated request names no keypair, so its address opens the window."""
+        """A request that names no keypair is held to the anonymous window, not a user's."""
         # Arrange
-        anonymous_caller.consumer.return_value = RateLimitState(
+        mock_valkey_client.consume_user_rate_limit.return_value = RateLimitState(
+            count=1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
+        )
+        mock_valkey_client.consume_ip_rate_limit.return_value = RateLimitState(
             count=1, limit=_ANONYMOUS_RATELIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
         )
 
         # Act
-        await middleware(anonymous_caller.request, mock_handler)
+        response = await middleware(anonymous_caller.request, mock_handler)
+        await apply_reserved_response_headers(anonymous_caller.request, response)
 
         # Assert
-        mock_valkey_client.consume_ip_rate_limit.assert_called_once_with(
-            client_ip=_CLIENT_IP,
-            window_seconds=_RATELIMIT_WINDOW_SECONDS,
-            limit=_ANONYMOUS_RATELIMIT,
-        )
-        mock_valkey_client.consume_user_rate_limit.assert_not_called()
+        assert response.headers["X-RateLimit-Limit"] == str(_ANONYMOUS_RATELIMIT)
 
     async def test_an_anonymous_query_without_a_client_address_is_refused(
         self,
@@ -170,7 +168,6 @@ class TestRlimMiddleware:
         # Act & Assert
         with pytest.raises(UnreachableError):
             await middleware(request_without_a_client_address, mock_handler)
-        mock_valkey_client.consume_ip_rate_limit.assert_not_called()
         mock_handler.assert_not_called()
 
     @pytest.mark.parametrize("caller", ["anonymous_caller", "authorized_caller"], indirect=True)
