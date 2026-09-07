@@ -82,13 +82,10 @@ def upgrade() -> None:
         mapper_registry.metadata,
         sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")),
         sa.Column("session_id", GUID),
-        # `role` is already varchar(64) by this point (converted above, its
-        # `kernelrole` enum type dropped) — declare it as such rather than the
-        # now-nonexistent enum, or comparisons below cast to a dropped type.
         sa.Column(
             "role",
-            sa.VARCHAR,
-            default=KernelRole.COMPUTE.name,
+            postgresql.ENUM("INFERENCE", "COMPUTE", "SYSTEM", name="kernelrole"),
+            default=KernelRole.COMPUTE,
             server_default=KernelRole.COMPUTE.name,
         ),
         sa.Column(
