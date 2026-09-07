@@ -4039,6 +4039,27 @@ class TestACommandThatNeverReturns:
         with pytest.raises(OverlayEncryptionUnavailable):
             await vx._read_inventory(["iptables-save", "-t", "filter"])
 
+    async def test_the_recovery_inventory_refuses_a_listing_that_would_not_run(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A missing binary, a denied exec, an exhausted process table: none of them says the
+        # KERNEL holds no rules, and that is where a previous life's plaintext-drop lives.
+        async def _refuses(*argv: str, **kwargs: object) -> object:
+            raise OSError(13, "Permission denied")
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _refuses)
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await vx._read_inventory(["iptables-save", "-t", "filter"])
+
+    async def test_the_drift_reader_still_shrugs_that_off(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def _refuses(*argv: str, **kwargs: object) -> object:
+            raise OSError(13, "Permission denied")
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _refuses)
+        assert await vx._read_command(["iptables-save", "-t", "filter"]) == ""
+
     async def test_the_device_listing_refuses_rather_than_reporting_an_empty_host(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

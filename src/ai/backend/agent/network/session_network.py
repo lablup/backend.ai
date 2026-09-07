@@ -62,6 +62,7 @@ from ai.backend.agent.network.vni_registry import VniRegistry
 from ai.backend.common.network.keys import endpoint_key, session_meta_key
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
+    SESSION_META_GENERATION,
     SESSION_META_READY,
     SESSION_META_STATE,
     EndpointPlan,
@@ -97,6 +98,7 @@ def session_net_meta_from_network_config(
     # the shipped default keeps such a session (and a rolling upgrade) on the port it is already
     # using, instead of silently rebuilding its tunnel on a different one.
     port_raw = network_config.get("vxlan_port")
+    generation_raw = network_config.get(SESSION_META_GENERATION)
     return SessionNetMeta(
         session_id=session_id,
         subnet=network_config["subnet"],
@@ -105,6 +107,9 @@ def session_net_meta_from_network_config(
         vni=int(vni_raw) if vni_raw is not None else None,
         vxlan_port=int(port_raw) if port_raw else DEFAULT_VXLAN_PORT,
         encryption_key=str(key_raw) if key_raw else None,
+        # Which incarnation of the session id this request was issued for. The coordinator refuses
+        # to join on a descriptor the manager's record no longer matches -- see `_session_fence`.
+        generation=str(generation_raw) if generation_raw else None,
     )
 
 

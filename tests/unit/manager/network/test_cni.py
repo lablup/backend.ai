@@ -285,6 +285,7 @@ class TestEndpointAllocator:
             "agent_id": "a1",
             "container_id": "c1",
             "cluster_hostname": "main1",
+            "generation": None,
         }
 
     async def test_endpoint_record_without_hostname_is_null(self) -> None:
@@ -522,7 +523,7 @@ class TestCreateNetwork:
         etcd.store["network/agent/a2/vtep"] = "192.168.105.8"
         _encryption_capable(etcd, "a1", "a2")
         plugin = _plugin_with(etcd)
-        await plugin.create_network(
+        info = await plugin.create_network(
             identifier="s1",
             options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
         )
@@ -535,6 +536,9 @@ class TestCreateNetwork:
             # Not an acknowledgement: nothing on that node has been touched yet, so this record
             # must not hold the session's VNI back at teardown.
             "joined": False,
+            # Which incarnation of the session id it stands for, so a cleanup of an earlier one
+            # cannot take it.
+            "generation": info.options["generation"],
         }
         assert m2["vtep_ip"] == "192.168.105.8"
         assert m2["joined"] is False
@@ -975,7 +979,7 @@ class TestACreateThatNeverFinished:
 
         class NeverReturns(VNIAllocator):
             @override
-            async def acquire(self, session_id: str) -> int:
+            async def acquire(self, session_id: str, generation: str | None = None) -> int:
                 started.set()
                 await asyncio.sleep(60)
                 raise AssertionError("unreachable")
@@ -1251,19 +1255,21 @@ class TestARollbackThatCouldNotFinish:
         "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
     }
 
-    class _RefusesPrefixDeletes(FakeEtcd):
+    class _RefusesSessionDeletes(FakeEtcd):
+        """An etcd the cleanup cannot delete this session's keys through."""
+
         def __init__(self) -> None:
             super().__init__()
             self.refusing = True
 
         @override
-        async def delete_prefix(self, prefix: str, **kwargs: Any) -> None:
-            if self.refusing:
+        async def delete_if_value(self, key: str, expected: str, **kwargs: Any) -> bool:
+            if self.refusing and key.startswith("network/session/"):
                 raise RuntimeError("etcd is unreachable")
-            await super().delete_prefix(prefix, **kwargs)
+            return await super().delete_if_value(key, expected, **kwargs)
 
-    async def _rolled_back(self) -> tuple[_RefusesPrefixDeletes, CNINetworkPlugin, Any]:
-        etcd = self._RefusesPrefixDeletes()
+    async def _rolled_back(self) -> tuple[_RefusesSessionDeletes, CNINetworkPlugin, Any]:
+        etcd = self._RefusesSessionDeletes()
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
         await plugin._rollback_create(
@@ -1306,19 +1312,21 @@ class TestATombstoneIsNotSomethingToBuildOn:
         "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
     }
 
-    class _RefusesPrefixDeletes(FakeEtcd):
+    class _RefusesSessionDeletes(FakeEtcd):
+        """An etcd the cleanup cannot delete this session's keys through."""
+
         def __init__(self) -> None:
             super().__init__()
             self.refusing = True
 
         @override
-        async def delete_prefix(self, prefix: str, **kwargs: Any) -> None:
-            if self.refusing:
+        async def delete_if_value(self, key: str, expected: str, **kwargs: Any) -> bool:
+            if self.refusing and key.startswith("network/session/"):
                 raise RuntimeError("etcd is unreachable")
-            await super().delete_prefix(prefix, **kwargs)
+            return await super().delete_if_value(key, expected, **kwargs)
 
-    async def _tombstoned(self) -> tuple[_RefusesPrefixDeletes, CNINetworkPlugin]:
-        etcd = self._RefusesPrefixDeletes()
+    async def _tombstoned(self) -> tuple[_RefusesSessionDeletes, CNINetworkPlugin]:
+        etcd = self._RefusesSessionDeletes()
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
         await plugin._rollback_create(
@@ -1418,7 +1426,9 @@ class TestACleanupThatComesBackTooLate:
         etcd = FakeEtcd()
         plugin = _plugin_with(etcd)
         await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
-        stale = cni._tombstone("10.128.0.0/24", 4096, "tok1")
+        stale = cni._tombstone(
+            "10.128.0.0/24", 4096, "tok1", json.loads(etcd.store[_META_KEY])["generation"]
+        )
         etcd.store[_META_KEY] = stale
         assert await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", stale)
         await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
@@ -1451,7 +1461,9 @@ class TestACleanupThatComesBackTooLate:
         etcd = FakeEtcd()
         plugin = _plugin_with(etcd)
         await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
-        first = cni._tombstone("10.128.0.0/24", 4096, "tok1")
+        first = cni._tombstone(
+            "10.128.0.0/24", 4096, "tok1", json.loads(etcd.store[_META_KEY])["generation"]
+        )
         etcd.store[_META_KEY] = first
 
         held, published = await plugin._claim_session(cast(AsyncEtcd, etcd), "s1", "tok2", [])
@@ -1460,6 +1472,189 @@ class TestACleanupThatComesBackTooLate:
         assert json.loads(held)["_state"] == "creating"
         # The cleanup ran from bytes only it held, not from the record both managers had read.
         assert not await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", first)
+
+
+class TestACleanupPausedBetweenItsCheckAndItsDelete:
+    """C4e. Holding the tombstone is a check followed by a separate delete, and the gap between
+    them is a window: another manager can take the record, finish the cleanup and let a whole new
+    session be built under the same id while this call sits between its own two lines. Everything
+    the new session writes is named after the SESSION, so by key alone it is indistinguishable from
+    what this cleanup came to delete -- only the generation tells them apart."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    class _RebuildsAfterTheCheck(FakeEtcd):
+        """Runs a hook the first time the meta is read, AFTER handing back what was there.
+
+        That is exactly where a cleanup's tombstone check sits: it reads the record, is satisfied,
+        and the world moves on before its next line executes.
+        """
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.after_meta_read: Any = None
+
+        @override
+        async def get(self, key: str, **kwargs: Any) -> str | None:
+            found = await super().get(key, **kwargs)
+            if key == _META_KEY and self.after_meta_read is not None:
+                hook, self.after_meta_read = self.after_meta_read, None
+                await hook()
+            return found
+
+    async def _paused_cleanup(self) -> tuple[_RebuildsAfterTheCheck, CNINetworkPlugin, str]:
+        """A cleanup working from a tombstone whose session is rebuilt the moment it looks away."""
+        etcd = self._RebuildsAfterTheCheck()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        record = json.loads(etcd.store[_META_KEY])
+        stale = cni._tombstone(
+            str(record["subnet"]), record["vni"], record["_owner"], record["generation"]
+        )
+        etcd.store[_META_KEY] = stale
+
+        async def rebuild() -> None:
+            # Another manager finishes this very cleanup and builds the session again.
+            assert await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", stale)
+            await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        etcd.after_meta_read = rebuild
+        return etcd, plugin, stale
+
+    async def test_the_new_sessions_pool_claim_is_not_given_back(self) -> None:
+        etcd, plugin, stale = await self._paused_cleanup()
+
+        await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", stale)
+
+        rebuilt = json.loads(etcd.store[_META_KEY])
+        assert await plugin._subnet_allocator.holder(str(rebuilt["subnet"])) == "s1"
+        assert await plugin._vni_allocator.holder(int(rebuilt["vni"])) == "s1"
+
+    async def test_the_new_sessions_keys_are_not_deleted(self) -> None:
+        etcd, plugin, stale = await self._paused_cleanup()
+
+        await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", stale)
+
+        assert "network/session/s1/endpoints/k1" in etcd.store
+        assert [key for key in etcd.store if key.startswith("network/session/s1/ipam/")]
+
+    async def test_the_new_sessions_record_survives(self) -> None:
+        etcd, plugin, stale = await self._paused_cleanup()
+
+        await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", stale)
+
+        assert json.loads(etcd.store[_META_KEY])["_state"] == "ready"
+
+    async def test_it_still_clears_its_own_incarnation(self) -> None:
+        # The fence must not turn the cleanup into a no-op: with nobody rebuilding underneath it,
+        # everything the tombstone's incarnation owns still goes.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        record = json.loads(etcd.store[_META_KEY])
+        tombstone = cni._tombstone(
+            str(record["subnet"]), record["vni"], record["_owner"], record["generation"]
+        )
+        etcd.store[_META_KEY] = tombstone
+
+        assert await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", tombstone)
+
+        assert _pool_claims(etcd) == []
+        assert not [key for key in etcd.store if key.startswith("network/session/s1/")]
+
+
+class TestAnAllocationReusedWhileItIsBeingDestroyed:
+    """C4f. A retried create that finds a READY record checks the pool still calls the allocation
+    this session's, then writes the endpoints and hands it back. A destroy can run in between: it
+    fences the record and gives the subnet and the VNI to the pool, and what the retry returns is
+    then an allocation somebody else is about to be handed."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    class _DestroysDuringTheAssign(FakeEtcd):
+        """Tears the session down at the first endpoint write -- after the pool has been asked."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.at_endpoint_write: Any = None
+
+        @override
+        async def put(self, key: str, val: str, **kwargs: Any) -> None:
+            await super().put(key, val, **kwargs)
+            if key.startswith("network/session/s1/endpoints/") and self.at_endpoint_write:
+                hook, self.at_endpoint_write = self.at_endpoint_write, None
+                await hook()
+
+    async def test_it_does_not_hand_back_an_allocation_that_went_back_to_the_pool(self) -> None:
+        etcd = self._DestroysDuringTheAssign()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        async def destroy() -> None:
+            await plugin.destroy_network("s1")
+
+        etcd.at_endpoint_write = destroy
+
+        assert (
+            await plugin._existing_allocation(
+                cast(AsyncEtcd, etcd), "s1", list(self._OPTIONS["endpoints"])
+            )
+            is None
+        )
+        assert _pool_claims(etcd) == []
+
+
+class TestANodeThatJoinsAsTheRecordIsFenced:
+    """C9. The manager decides a session's nodes have let go by reading the membership table, and
+    a node publishes its membership before it builds anything. One read, taken before the record
+    was fenced, could see neither: the node publishes after it, the fence lands after that, and the
+    node goes on to build a tunnel on a VNI already back in the pool."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    class _AgentJoinsAfterTheFirstRead(FakeEtcd):
+        """A node whose member key lands after the teardown's first membership read."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.member: str | None = None
+
+        @override
+        async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
+            found = await super().get_prefix(prefix, **kwargs)
+            if prefix.rstrip("/").endswith("/members") and self.member is not None:
+                self.store["network/session/s1/members/a1"] = self.member
+                self.member = None
+            return found
+
+    async def test_the_teardown_refuses_rather_than_reusing_the_vni(self) -> None:
+        etcd = self._AgentJoinsAfterTheFirstRead()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        etcd.member = json.dumps(
+            Member(
+                agent_id="a1",
+                host_ip="10.0.0.1",
+                vtep_ip="10.0.0.1",
+                joined=True,
+                generation=str(info.options["generation"]),
+            ).to_etcd_payload()
+        )
+
+        with pytest.raises(OverlayTeardownPending):
+            await plugin.destroy_network("s1")
+
+        assert await plugin._vni_allocator.holder(int(cast(int, info.options["vni"]))) == "s1"
+        assert await plugin._subnet_allocator.holder(str(info.options["subnet"])) == "s1"
 
 
 class TestADestroyThatFindsNoRecordAtAll:
@@ -1594,7 +1789,7 @@ class TestAMetaThatOutlivedItsAllocation:
     async def test_a_rollback_that_cannot_clear_the_record_keeps_the_allocation(self) -> None:
         class NoDeletes(FakeEtcd):
             @override
-            async def delete_prefix(self, prefix: str, **kwargs: Any) -> None:
+            async def delete_if_value(self, key: str, expected: str, **kwargs: Any) -> bool:
                 raise RuntimeError("etcd is unreachable")
 
         etcd = NoDeletes()
@@ -1683,7 +1878,12 @@ class TestACreateThatFailedBesideOneThatDidNot:
 
         class FailsAtTheLastStep(CNINetworkPlugin):
             @override
-            async def _preseed_members(self, session_id: str, member_agents: list[str]) -> None:
+            async def _preseed_members(
+                self,
+                session_id: str,
+                member_agents: list[str],
+                generation: str | None = None,
+            ) -> None:
                 reached.set()
                 await asyncio.sleep(0.05)
                 raise RuntimeError("this create was cancelled")

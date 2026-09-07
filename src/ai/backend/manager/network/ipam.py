@@ -21,7 +21,13 @@ from ai.backend.common.network.keys import (
     session_ipam_key,
     session_ipam_prefix,
 )
-from ai.backend.common.network.types import DEFAULT_VNI_RANGE, EndpointAddr, mac_for_ip
+from ai.backend.common.network.types import (
+    DEFAULT_VNI_RANGE,
+    SESSION_META_GENERATION,
+    EndpointAddr,
+    mac_for_ip,
+    of_generation,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import (
     NetworkPoolExhausted,
@@ -67,21 +73,59 @@ def _flat(listing: Mapping[str, Any]) -> dict[str, str]:
     return {key: value for key, value in listing.items() if isinstance(value, str)}
 
 
-def _own_vni(allocated: Mapping[str, str], payload: str) -> int | None:
-    """The VNI this session already holds, out of a listing of every claim."""
+def _own_vni(allocated: Mapping[str, str], session_id: str, generation: str | None) -> int | None:
+    """The VNI this session already holds, out of a listing of every claim.
+
+    Matched on the owner and the incarnation rather than the exact payload: a claim a previous
+    attempt stranded carries no generation (or this one), and taking a SECOND VNI beside it leaves
+    the first held by an attempt nothing will come back for. A claim stamped with a different
+    incarnation is not this session's to adopt.
+    """
     for key, raw in allocated.items():
-        if raw == payload and key.isdigit():
+        if not key.isdigit():
+            continue
+        try:
+            if json.loads(raw).get("session_id") != session_id:
+                continue
+        except ValueError:
+            continue
+        if of_generation(raw, generation):
             return int(key)
     return None
 
 
-def _claim(session_id: str, subnet: str) -> str:
+def _claim(session_id: str, subnet: str, generation: str | None = None) -> str:
     """The value stored on every unit block of ``subnet``.
 
     It carries the whole block, not just the owner, so the session's existing allocation can be
-    recovered from any one of its units -- which is what makes ``acquire`` idempotent.
+    recovered from any one of its units -- which is what makes ``acquire`` idempotent. It carries
+    the generation for the opposite reason: the session id is reused, so the owner alone does not
+    say WHICH incarnation of it holds the block, and a release that could not tell them apart gave
+    a live session's block back to the pool (see `of_generation`).
+
+    The generation is left out of the payload when there is none, so a claim written by a manager
+    from before the field and one written without it are the same bytes.
     """
-    return json.dumps({"session_id": session_id, "subnet": subnet})
+    claim: dict[str, str] = {"session_id": session_id, "subnet": subnet}
+    if generation is not None:
+        claim[SESSION_META_GENERATION] = generation
+    return json.dumps(claim)
+
+
+def _vni_claim(session_id: str, generation: str | None = None) -> str:
+    """The value stored on an allocated VNI key. Shaped like `_claim`, and for the same reasons."""
+    claim: dict[str, str] = {"session_id": session_id}
+    if generation is not None:
+        claim[SESSION_META_GENERATION] = generation
+    return json.dumps(claim)
+
+
+def _endpoint_claim(container_id: str, generation: str | None = None) -> str:
+    """The value stored on a per-session address reservation. Shaped like `_claim`."""
+    claim: dict[str, str] = {"container_id": container_id}
+    if generation is not None:
+        claim[SESSION_META_GENERATION] = generation
+    return json.dumps(claim)
 
 
 def _claimed_subnet(raw: str, session_id: str) -> str | None:
@@ -132,7 +176,12 @@ class SubnetAllocator:
         self._block_prefixlen = block_prefixlen
 
     async def acquire(
-        self, session_id: str, *, host_count: int = 1, subnet: str | None = None
+        self,
+        session_id: str,
+        *,
+        host_count: int = 1,
+        subnet: str | None = None,
+        generation: str | None = None,
     ) -> str:
         """Claim a session subnet via CAS and return its CIDR.
 
@@ -152,6 +201,10 @@ class SubnetAllocator:
         unit was already taken) is fully released before the mode's failure/skip, so it is never
         split between two sessions.
 
+        ``generation`` stamps the claim with the incarnation of ``session_id`` making it, so a
+        later cleanup can tell this allocation from the one a session started again under the same
+        id holds (see `_claim`).
+
         Raises:
             NetworkPoolExhausted: auto mode, no free block of the required size remains.
             RequestedSubnetInvalid: explicit mode, the subnet is malformed, unaligned, outside the
@@ -164,10 +217,12 @@ class SubnetAllocator:
             return held
         # A block this session holds only part of: an acquire that died between its units. Finish
         # it, or give the part back so the pool is not carrying a claim nobody can use.
-        if (finished := await self._finish_partial_claim(taken, session_id)) is not None:
+        if (
+            finished := await self._finish_partial_claim(taken, session_id, generation)
+        ) is not None:
             return finished
         if subnet is not None:
-            return await self._acquire_requested(subnet, pool, session_id)
+            return await self._acquire_requested(subnet, pool, session_id, generation)
         prefixlen = _prefix_for_hosts(
             host_count,
             default_prefixlen=self._block_prefixlen,
@@ -181,7 +236,9 @@ class SubnetAllocator:
             # pool with many live sessions from paying one round trip per taken block.
             if any(unit in owned for unit in units):
                 continue
-            if await self._try_claim_units(candidate, _claim(session_id, str(candidate))):
+            if await self._try_claim_units(
+                candidate, _claim(session_id, str(candidate), generation)
+            ):
                 return str(candidate)
             # Lost the compare-and-swap. The winner can be this very session -- a second manager
             # creating it at the same time -- and moving to the next block would then leave one
@@ -234,7 +291,7 @@ class SubnetAllocator:
         ]
 
     async def _finish_partial_claim(
-        self, allocated: Mapping[str, str], session_id: str
+        self, allocated: Mapping[str, str], session_id: str, generation: str | None = None
     ) -> str | None:
         """Complete a block this session holds only part of, or give the part back.
 
@@ -247,7 +304,7 @@ class SubnetAllocator:
             ours = self._ours_among(allocated, units, session_id)
             if len(ours) == len(units):
                 continue  # whole; `_already_held` deals with it
-            payload = _claim(session_id, block)
+            payload = _claim(session_id, block, generation)
             missing = [unit for unit in units if unit not in ours]
             won = list(ours)
             for unit in missing:
@@ -276,6 +333,7 @@ class SubnetAllocator:
         subnet: str,
         pool: ipaddress.IPv4Network | ipaddress.IPv6Network,
         session_id: str,
+        generation: str | None = None,
     ) -> str:
         """Claim an explicitly requested block, validating it against the pool first."""
         try:
@@ -305,7 +363,9 @@ class SubnetAllocator:
                 f"'{requested}' is narrower than one unit block (/{self._block_prefixlen}); the pool"
                 " is accounted at that granularity. Lower ipam-block-size to request a smaller block."
             )
-        if not await self._try_claim_units(requested, _claim(session_id, str(requested))):
+        if not await self._try_claim_units(
+            requested, _claim(session_id, str(requested), generation)
+        ):
             # As in auto mode: the winner may be this same session, and that is not a conflict.
             taken = _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX))
             if (held := self._already_held(taken, session_id)) == str(requested):
@@ -374,16 +434,31 @@ class SubnetAllocator:
             )
         return stuck
 
-    async def release_all(self, session_id: str) -> list[str]:
-        """Give back every unit block claimed by this session, whatever any meta says.
+    async def release_all(self, session_id: str, generation: str | None = None) -> list[str]:
+        """Give back every unit block this INCARNATION of the session claimed, whatever any meta
+        says.
 
         The claim names the session, so this reaches what a record never got to name: a create
         cancelled between the claim and its publish, and a partial claim that would not go back.
+
+        It names the incarnation too, and that is what keeps a slow cleanup out of a live session:
+        the block a session started again under the same id holds is this session's by every name
+        the pool records, and a cleanup that could not tell the two apart handed it back to the
+        pool while its containers were running on it. A claim stamped with another generation is
+        left where it is (see `of_generation`).
         """
         payload_of = {}
         for key, raw in _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX)).items():
-            if _claimed_subnet(raw, session_id) is not None:
-                payload_of[unquote(key)] = raw
+            if _claimed_subnet(raw, session_id) is None:
+                continue
+            if not of_generation(raw, generation):
+                log.info(
+                    "leaving {} claimed: it is held by another incarnation of session {}",
+                    unquote(key),
+                    session_id,
+                )
+                continue
+            payload_of[unquote(key)] = raw
         stuck: list[str] = []
         for unit, payload in payload_of.items():
             try:
@@ -413,19 +488,29 @@ class SubnetAllocator:
                 return None
         return owners.pop() if len(owners) == 1 else None
 
-    async def release(self, subnet: str, session_id: str) -> bool:
+    async def release(self, subnet: str, session_id: str, generation: str | None = None) -> bool:
         """Give the subnet back, but only the unit blocks this session still owns.
 
         Same reasoning as `VniAllocator.release`: the pool is shared, so releasing a block that
         now belongs to somebody else is what lets two sessions be handed overlapping overlay
         address space.
 
+        ``generation`` narrows it further to one incarnation of the session; without one, any
+        claim this session holds on the block is released. Either way the delete names the exact
+        bytes read, so a claim rewritten under this call is left where it is.
+
         :return: ``True`` if every unit block was still this session's.
         """
-        payload = _claim(session_id, subnet)
         released = True
         for unit in _unit_blocks(ipaddress.ip_network(subnet), self._block_prefixlen):
-            if not await self._etcd.delete_if_value(_allocated_key(unit), payload):
+            raw = await self._etcd.get(_allocated_key(unit))
+            if not isinstance(raw, str) or _claimed_subnet(raw, session_id) != subnet:
+                released = False
+                continue
+            if generation is not None and not of_generation(raw, generation):
+                released = False
+                continue
+            if not await self._etcd.delete_if_value(_allocated_key(unit), raw):
                 released = False
         return released
 
@@ -452,6 +537,7 @@ class EndpointAllocator:
         *,
         agent_id: str,
         cluster_hostname: str | None = None,
+        generation: str | None = None,
     ) -> tuple[str, str]:
         """Claim the first free host IP in ``subnet`` for ``container_id`` (placed on
         ``agent_id``) and record the endpoint. Returns ``(ip, mac)``.
@@ -464,10 +550,14 @@ class EndpointAllocator:
         An address this container already holds is returned as it stands: a retried session
         start must not hand the same container a second address and strand the first.
 
+        ``generation`` stamps both the address reservation and the endpoint record with the
+        incarnation of ``session_id`` they belong to, so a cleanup of the previous one cannot
+        delete them (see `_claim`).
+
         Raises:
             NetworkPoolExhausted: the session subnet has no free host address.
         """
-        claim = json.dumps({"container_id": container_id})
+        claim = _endpoint_claim(container_id, generation)
 
         async def settle(ip: str) -> tuple[str, str]:
             """Make the endpoint record say what the address claim already says.
@@ -488,6 +578,7 @@ class EndpointAllocator:
                         mac=mac,
                         agent_id=agent_id,
                         cluster_hostname=cluster_hostname,
+                        generation=generation,
                     ).to_etcd_payload()
                 ),
             )
@@ -566,7 +657,7 @@ class VNIAllocator:
         self._etcd = etcd
         self._vni_range = vni_range
 
-    async def acquire(self, session_id: str) -> int:
+    async def acquire(self, session_id: str, generation: str | None = None) -> int:
         """Claim the first free VNI via CAS, or return the one this session already holds.
 
         A retried session start must land on the same VNI: claiming a second one strands the
@@ -576,9 +667,9 @@ class VNIAllocator:
             VNIPoolExhausted: every VNI in the range is already allocated.
         """
         low, high = self._vni_range
-        payload = json.dumps({"session_id": session_id})
+        payload = _vni_claim(session_id, generation)
         allocated = _flat(await self._etcd.get_prefix(_VNI_PREFIX))
-        if (mine := _own_vni(allocated, payload)) is not None:
+        if (mine := _own_vni(allocated, session_id, generation)) is not None:
             return mine
         # The listing only rules VNIs out -- it is a snapshot, so a VNI it shows as free still
         # has to be won by CAS. It saves a round trip per VNI already taken, which is what the
@@ -592,24 +683,36 @@ class VNIAllocator:
             # Same reasoning as the subnet allocator: a lost CAS whose winner is this session is
             # this session's VNI, not a reason to take a second one.
             allocated = _flat(await self._etcd.get_prefix(_VNI_PREFIX))
-            if (mine := _own_vni(allocated, payload)) is not None:
+            if (mine := _own_vni(allocated, session_id, generation)) is not None:
                 return mine
             taken = {int(key) for key in allocated if key.isdigit()}
         raise VNIPoolExhausted()
 
-    async def release_all(self, session_id: str) -> list[int]:
-        """Give back every VNI claimed by this session, whatever any meta says.
+    async def release_all(self, session_id: str, generation: str | None = None) -> list[int]:
+        """Give back every VNI this INCARNATION of the session claimed, whatever any meta says.
 
-        The counterpart of `SubnetAllocator.release_all`, and there for the same case: a claim
-        the record that should have named it never reached.
+        The counterpart of `SubnetAllocator.release_all`, and there for the same two cases: a claim
+        the record that should have named it never reached, and a live session that happens to
+        share this one's id.
         """
-        payload = json.dumps({"session_id": session_id})
         stuck: list[int] = []
         for key, raw in _flat(await self._etcd.get_prefix(_VNI_PREFIX)).items():
-            if raw != payload or not key.isdigit():
+            if not key.isdigit():
                 continue
             try:
-                await self._etcd.delete_if_value(f"{_VNI_PREFIX}/{key}", payload)
+                if json.loads(raw).get("session_id") != session_id:
+                    continue
+            except ValueError:
+                continue
+            if not of_generation(raw, generation):
+                log.info(
+                    "leaving vni {} claimed: it is held by another incarnation of session {}",
+                    key,
+                    session_id,
+                )
+                continue
+            try:
+                await self._etcd.delete_if_value(f"{_VNI_PREFIX}/{key}", raw)
             except Exception:
                 stuck.append(int(key))
         if stuck:
@@ -631,7 +734,7 @@ class VNIAllocator:
         except (ValueError, KeyError):
             return None
 
-    async def release(self, vni: int, session_id: str) -> bool:
+    async def release(self, vni: int, session_id: str, generation: str | None = None) -> bool:
         """Give the VNI back, but only while it is still this session's.
 
         An unconditional delete releases whatever holds the key NOW. After a reuse that is the
@@ -639,8 +742,20 @@ class VNIAllocator:
         then share one VNI, and either one's teardown removes the other's rules and devices.
         The claim records its owner, so the release can check it.
 
+        ``generation`` narrows it further to one incarnation of the session; without one, any
+        claim this session holds is released. Either way the delete names the exact bytes read, so
+        a claim rewritten under this call is left where it is.
+
         :return: ``True`` if this session still held it and it was released.
         """
-        return await self._etcd.delete_if_value(
-            f"{_VNI_PREFIX}/{vni}", json.dumps({"session_id": session_id})
-        )
+        raw = await self._etcd.get(f"{_VNI_PREFIX}/{vni}")
+        if not isinstance(raw, str):
+            return False
+        try:
+            if json.loads(raw).get("session_id") != session_id:
+                return False
+        except ValueError:
+            return False
+        if generation is not None and not of_generation(raw, generation):
+            return False
+        return await self._etcd.delete_if_value(f"{_VNI_PREFIX}/{vni}", raw)

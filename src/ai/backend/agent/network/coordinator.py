@@ -25,12 +25,15 @@ from ai.backend.common.network.keys import (
     session_prefix,
 )
 from ai.backend.common.network.types import (
+    DEFAULT_VXLAN_PORT,
+    SESSION_META_GENERATION,
     SESSION_META_READY,
     SESSION_META_STATE,
     EndpointAddr,
     Member,
     NetworkBackendKind,
     SessionNetMeta,
+    of_generation,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -56,6 +59,38 @@ def _decode_member(agent_id: str, raw: str) -> Member:
     return Member.from_etcd_payload(agent_id, json.loads(raw))
 
 
+def _identity_of(record: Mapping[str, Any]) -> tuple[Any, ...]:
+    """What a session network record says it IS -- the incarnation, and what that incarnation
+    allocated. Everything a late request could be carrying a stale copy of.
+
+    The encryption key is part of the identity and never part of what is said about it: see
+    `_describe`.
+    """
+    vni = record.get("vni")
+    return (
+        record.get(SESSION_META_GENERATION),
+        record.get("subnet"),
+        int(vni) if vni is not None else None,
+        int(record.get("vxlan_port") or DEFAULT_VXLAN_PORT),
+        record.get("encryption_key"),
+    )
+
+
+def _asked_identity(meta: SessionNetMeta) -> tuple[Any, ...]:
+    """The same tuple, as the descriptor this request was issued with names it."""
+    return (meta.generation, meta.subnet, meta.vni, meta.vxlan_port, meta.encryption_key)
+
+
+def _describe(identity: tuple[Any, ...]) -> str:
+    """An identity as it may be reported. The cluster overlay key is one of its members and is
+    named, never printed -- an exception message crosses into logs and telemetry."""
+    generation, subnet, vni, port, key = identity
+    return (
+        f"generation {generation}, subnet {subnet}, vni {vni}, udp/{port},"
+        f" {'encrypted' if key else 'plaintext'}"
+    )
+
+
 def _decode_endpoint(container_id: str, raw: str) -> EndpointAddr:
     return EndpointAddr.from_etcd_payload(container_id, json.loads(raw))
 
@@ -78,6 +113,9 @@ class SessionNetworkCoordinator:
     # have no central endpoints/ table (the agent lays peers out locally with cluster_host_ips), so
     # their names are registered here instead. Consulted as a fallback after the etcd-backed _names.
     _static_names: dict[str, dict[str, str]]
+    # session_id -> the incarnation this node joined, so the withdrawal at teardown can tell its
+    # own membership from one a later join published under the same session id (see `stop`).
+    _joined: dict[str, str | None]
 
     def __init__(
         self,
@@ -95,12 +133,22 @@ class SessionNetworkCoordinator:
         self._reconcile_locks = {}
         self._names = {}
         self._static_names = {}
+        self._joined = {}
 
     async def start(self, meta: SessionNetMeta, self_member: Member) -> None:
-        """Bring up this node's data plane for the session, publish membership, apply
-        existing peers, and begin watching for membership changes."""
+        """Join the session, bring up this node's data plane for it, apply existing peers, and
+        begin watching for membership changes.
+
+        The join comes FIRST, before a single device exists. The manager decides whether a
+        session's nodes have let go of its VNI by reading the membership table, and it re-reads
+        that table after fencing the record (`CNINetworkPlugin.destroy_network`): publishing
+        before building is what leaves no order in which this node both escapes that read and goes
+        on to build. Building first and publishing after -- which is what this did -- left the
+        manager free to see an empty table, hand the VNI to the next session, and only then have
+        this node create a tunnel on it."""
+        await self._join(meta, self_member)
         await self._backend.setup_session_network(meta, self_member)
-        await self._begin(meta, self_member)
+        await self._begin(meta.session_id)
 
     async def resume(self, meta: SessionNetMeta, self_member: Member) -> None:
         """Re-attach to a session whose data plane survived an agent restart.
@@ -109,28 +157,46 @@ class SessionNetworkCoordinator:
         them. The membership republish and the reconciles are what make this necessary rather than
         optional: without them the restarted node stops reacting to peers joining or leaving, and
         cross-node overlay traffic silently stops following the cluster."""
+        await self._join(meta, self_member)
         await self._backend.adopt_session_network(meta, self_member)
-        await self._begin(meta, self_member)
+        await self._begin(meta.session_id)
 
-    async def _begin(self, meta: SessionNetMeta, self_member: Member) -> None:
-        """Publish membership, apply what is already published, and start watching."""
-        # Read the record BEFORE publishing, and check it again after. The manager decides whether
-        # a session's nodes have let go of it by reading the membership table, and this node's
-        # record can land after that read: a join that was in flight while the session was torn
-        # down would then stand for a node holding a VNI the manager has already given back, and
-        # nothing would ever come for it. Publish-then-verify closes that -- see
-        # `_require_session_current`.
+    async def _join(self, meta: SessionNetMeta, self_member: Member) -> None:
+        """Take this node into the session's membership, or refuse the session.
+
+        Read the record BEFORE publishing, and check it again after. A join that was in flight
+        while the session was torn down would otherwise stand for a node holding a VNI the manager
+        has already given back, and nothing would ever come for it. Publish-then-verify closes
+        that -- see `_require_session_current`.
+
+        Raises:
+            SessionNetworkGone: the record is not one this node may act on, or it moved on under
+                the join.
+        """
         fence = await self._session_fence(meta)
-        await self._write_member(meta.session_id, self_member)
+        published = Member(
+            agent_id=self_member.agent_id,
+            host_ip=self_member.host_ip,
+            vtep_ip=self_member.vtep_ip,
+            joined=self_member.joined,
+            # The membership says which incarnation of the session id this node joined, so a
+            # cleanup of an earlier one cannot take it back and a later one is not mistaken for it.
+            generation=meta.generation,
+        )
+        await self._write_member(meta.session_id, published)
         if fence is not None:
-            await self._require_session_current(meta.session_id, fence, self_member.agent_id)
-        self._applied[meta.session_id] = {}
-        self._applied_endpoints[meta.session_id] = {}
-        self._names[meta.session_id] = {}
-        await self._reconcile_all(meta.session_id)
-        self._watch_tasks[meta.session_id] = asyncio.create_task(self._watch(meta.session_id))
-        self._sweep_tasks[meta.session_id] = asyncio.create_task(
-            self._reconcile_periodically(meta.session_id)
+            await self._require_session_current(meta.session_id, fence, published)
+        self._joined[meta.session_id] = meta.generation
+
+    async def _begin(self, session_id: str) -> None:
+        """Apply what is already published, and start watching."""
+        self._applied[session_id] = {}
+        self._applied_endpoints[session_id] = {}
+        self._names[session_id] = {}
+        await self._reconcile_all(session_id)
+        self._watch_tasks[session_id] = asyncio.create_task(self._watch(session_id))
+        self._sweep_tasks[session_id] = asyncio.create_task(
+            self._reconcile_periodically(session_id)
         )
 
     async def _reconcile_periodically(self, session_id: str) -> None:
@@ -182,12 +248,34 @@ class SessionNetworkCoordinator:
         # goes only once teardown has returned without leaving state behind.
         if teardown_data_plane:
             await self._backend.teardown_session_network(session_id)
-        await self._etcd.delete(member_key(session_id, self._agent_id))
+        await self._withdraw_member(session_id)
         self._applied.pop(session_id, None)
         self._applied_endpoints.pop(session_id, None)
         self._names.pop(session_id, None)
         self._static_names.pop(session_id, None)
         self._reconcile_locks.pop(session_id, None)
+        self._joined.pop(session_id, None)
+
+    async def _withdraw_member(self, session_id: str) -> None:
+        """Take this node's membership back, now that its data plane is gone.
+
+        Left alone if the record names a DIFFERENT incarnation of the session id: that is a later
+        join's acknowledgement, and removing it tells the manager a node that is in the session is
+        not -- which is what lets the session's VNI be handed out over live devices.
+        """
+        key = member_key(session_id, self._agent_id)
+        joined = self._joined.pop(session_id, None)
+        raw = await self._etcd.get(key)
+        if raw is None:
+            return
+        if joined is not None and not of_generation(raw, joined):
+            log.info(
+                "leaving this node's membership of session {} in place: it was published for a"
+                " later incarnation than the one being torn down",
+                session_id,
+            )
+            return
+        await self._etcd.delete(key)
 
     async def _reconcile_all(self, session_id: str) -> None:
         """Converge forwarding in fail-closed order under one per-session lock.
@@ -389,6 +477,15 @@ class SessionNetworkCoordinator:
         None where there is no manager record to be fenced against: a node-local BRIDGE session is
         this agent's own, and its meta is written by us AFTER the data plane is up.
 
+        The record must be READY *and* describe the session this request was issued for. A session
+        id is reused, and a launch RPC that was delayed -- a slow link, a retried dispatch --
+        arrives naming an incarnation that has since been torn down and rebuilt. READY on its own
+        says nothing about which of the two it is: acting on it builds a data plane on the old
+        VNI and subnet and publishes this node as an ordinary member of the NEW session, whose
+        peers then program a tunnel that carries nothing. So the descriptor is compared against the
+        record, generation first and the identity the generation stands for as well, since a
+        manager from before the field publishes no generation at all.
+
         Raises:
             SessionNetworkGone: the record is not one this node may act on.
         """
@@ -400,9 +497,18 @@ class SessionNetworkCoordinator:
                 f"session {meta.session_id}'s network record is gone or no longer one this node"
                 " may act on; not joining a session the manager has stopped standing behind"
             )
+        record = json.loads(raw)
+        if (current := _identity_of(record)) != (asked := _asked_identity(meta)):
+            raise SessionNetworkGone(
+                f"session {meta.session_id}'s network record describes {_describe(current)}, and"
+                f" this request was issued for {_describe(asked)}; not joining a session under a"
+                " descriptor the manager no longer stands behind"
+            )
         return raw
 
-    async def _require_session_current(self, session_id: str, fence: str, agent_id: str) -> None:
+    async def _require_session_current(
+        self, session_id: str, fence: str, published: Member
+    ) -> None:
         """Refuse the session, and take this node's membership back, if the record has moved on.
 
         Compared byte for byte against what was read before the publish: a takeover, a tombstone
@@ -410,13 +516,21 @@ class SessionNetworkCoordinator:
         this node as part of the session. The member record goes first, because while it stands the
         manager holds the session's VNI back from reuse for a node that is not in the session.
 
+        Taken back over the exact bytes this join wrote, and no others. An unconditional delete
+        here removes whatever holds the key NOW, which after a rebuild under the same session id is
+        the record a LATER join published for the session that replaced this one -- the manager
+        would then read an empty table for a node that is in the session and hand its VNI away.
+
         Raises:
             SessionNetworkGone: the record is no longer the one this node joined.
         """
         if await self._etcd.get(session_meta_key(session_id)) == fence:
             return
         try:
-            await self._etcd.delete(member_key(session_id, agent_id))
+            await self._etcd.delete_if_value(
+                member_key(session_id, published.agent_id),
+                json.dumps(published.to_etcd_payload()),
+            )
         except Exception:
             log.exception(
                 "could not take back this node's membership of session {} after its record"
