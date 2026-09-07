@@ -2,12 +2,26 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from dataclasses import dataclass
+from typing import Any
+
+import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
     RateLimitState,
     ValkeyRateLimitClient,
 )
 from ai.backend.common.data.entity.user import UserID
+
+
+@dataclass(frozen=True)
+class _WindowSubject:
+    """What a window is keyed by, and the call that counts a request against it."""
+
+    description: str
+    consumer: str
+    first: Any
+    second: Any
 
 
 async def test_first_request_opens_the_window(
@@ -35,19 +49,6 @@ async def test_later_requests_keep_the_window(
 
     assert state.count == 2
     assert 0 < state.reset_after_seconds < 60
-
-
-async def test_the_limit_of_the_open_window_stands(
-    test_valkey_rate_limit: ValkeyRateLimitClient,
-) -> None:
-    user_id = UserID(uuid.uuid4())
-    await test_valkey_rate_limit.consume_user_rate_limit(user_id, window_seconds=60, limit=30000)
-
-    state = await test_valkey_rate_limit.consume_user_rate_limit(
-        user_id, window_seconds=60, limit=10
-    )
-
-    assert state.limit == 30000
 
 
 async def test_count_keeps_growing_past_the_limit(
@@ -79,19 +80,67 @@ async def test_a_new_window_takes_the_limit_it_opens_with(
     assert state == RateLimitState(count=1, limit=10, reset_after_seconds=60)
 
 
-async def test_windows_are_keyed_by_user(
+@pytest.mark.parametrize(
+    "subject",
+    [
+        _WindowSubject(
+            description="user",
+            consumer="consume_user_rate_limit",
+            first=UserID(uuid.uuid4()),
+            second=UserID(uuid.uuid4()),
+        ),
+        _WindowSubject(
+            description="ip",
+            consumer="consume_ip_rate_limit",
+            first="10.0.0.1",
+            second="10.0.0.2",
+        ),
+    ],
+    ids=lambda subject: subject.description,
+)
+async def test_the_limit_of_the_open_window_stands(
     test_valkey_rate_limit: ValkeyRateLimitClient,
+    subject: _WindowSubject,
 ) -> None:
-    counted_user = UserID(uuid.uuid4())
-    other_user = UserID(uuid.uuid4())
-    await test_valkey_rate_limit.consume_user_rate_limit(
-        counted_user, window_seconds=60, limit=30000
-    )
+    consume = getattr(test_valkey_rate_limit, subject.consumer)
+    await consume(subject.first, window_seconds=60, limit=30000)
 
-    assert await test_valkey_rate_limit.get_state(other_user) is None
+    state = await consume(subject.first, window_seconds=60, limit=10)
+
+    assert state.limit == 30000
 
 
-async def test_ip_windows_are_keyed_apart_from_user_windows(
+@pytest.mark.parametrize(
+    "subject",
+    [
+        _WindowSubject(
+            description="user",
+            consumer="consume_user_rate_limit",
+            first=UserID(uuid.uuid4()),
+            second=UserID(uuid.uuid4()),
+        ),
+        _WindowSubject(
+            description="ip",
+            consumer="consume_ip_rate_limit",
+            first="10.0.1.1",
+            second="10.0.1.2",
+        ),
+    ],
+    ids=lambda subject: subject.description,
+)
+async def test_windows_do_not_leak_between_subjects(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
+    subject: _WindowSubject,
+) -> None:
+    consume = getattr(test_valkey_rate_limit, subject.consumer)
+    await consume(subject.first, window_seconds=60, limit=30000)
+
+    state = await consume(subject.second, window_seconds=60, limit=30000)
+
+    assert state.count == 1
+
+
+async def test_a_user_and_an_address_of_the_same_id_hold_separate_windows(
     test_valkey_rate_limit: ValkeyRateLimitClient,
 ) -> None:
     shared_id = uuid.uuid4()
@@ -104,27 +153,3 @@ async def test_ip_windows_are_keyed_apart_from_user_windows(
     )
 
     assert state == RateLimitState(count=1, limit=1000, reset_after_seconds=60)
-
-
-async def test_ip_windows_are_keyed_by_address(
-    test_valkey_rate_limit: ValkeyRateLimitClient,
-) -> None:
-    await test_valkey_rate_limit.consume_ip_rate_limit("10.0.0.1", window_seconds=60, limit=1000)
-
-    state = await test_valkey_rate_limit.consume_ip_rate_limit(
-        "10.0.0.2", window_seconds=60, limit=1000
-    )
-
-    assert state.count == 1
-
-
-async def test_the_ip_limit_of_the_open_window_stands(
-    test_valkey_rate_limit: ValkeyRateLimitClient,
-) -> None:
-    await test_valkey_rate_limit.consume_ip_rate_limit("10.0.0.3", window_seconds=60, limit=1000)
-
-    state = await test_valkey_rate_limit.consume_ip_rate_limit(
-        "10.0.0.3", window_seconds=60, limit=10
-    )
-
-    assert state.limit == 1000
