@@ -16,12 +16,13 @@ from ai.backend.common.data.entity.user import UserID
 
 @dataclass(frozen=True)
 class _WindowSubject:
-    """What a window is keyed by, and the call that counts a request against it."""
+    """A kind of thing a window is keyed by: the call that counts a request for one,
+    the subject to count, and another of the same kind whose window must stay its own."""
 
     description: str
     consumer: str
-    first: Any
-    second: Any
+    counted: Any
+    unrelated: Any
 
 
 async def test_first_request_opens_the_window(
@@ -86,14 +87,14 @@ async def test_a_new_window_takes_the_limit_it_opens_with(
         _WindowSubject(
             description="user",
             consumer="consume_user_rate_limit",
-            first=UserID(uuid.uuid4()),
-            second=UserID(uuid.uuid4()),
+            counted=UserID(uuid.uuid4()),
+            unrelated=UserID(uuid.uuid4()),
         ),
         _WindowSubject(
             description="ip",
             consumer="consume_ip_rate_limit",
-            first="10.0.0.1",
-            second="10.0.0.2",
+            counted="10.0.0.1",
+            unrelated="10.0.0.2",
         ),
     ],
     ids=lambda subject: subject.description,
@@ -103,9 +104,9 @@ async def test_the_limit_of_the_open_window_stands(
     subject: _WindowSubject,
 ) -> None:
     consume = getattr(test_valkey_rate_limit, subject.consumer)
-    await consume(subject.first, window_seconds=60, limit=30000)
+    await consume(subject.counted, window_seconds=60, limit=30000)
 
-    state = await consume(subject.first, window_seconds=60, limit=10)
+    state = await consume(subject.counted, window_seconds=60, limit=10)
 
     assert state.limit == 30000
 
@@ -116,14 +117,14 @@ async def test_the_limit_of_the_open_window_stands(
         _WindowSubject(
             description="user",
             consumer="consume_user_rate_limit",
-            first=UserID(uuid.uuid4()),
-            second=UserID(uuid.uuid4()),
+            counted=UserID(uuid.uuid4()),
+            unrelated=UserID(uuid.uuid4()),
         ),
         _WindowSubject(
             description="ip",
             consumer="consume_ip_rate_limit",
-            first="10.0.1.1",
-            second="10.0.1.2",
+            counted="10.0.1.1",
+            unrelated="10.0.1.2",
         ),
     ],
     ids=lambda subject: subject.description,
@@ -133,9 +134,9 @@ async def test_windows_do_not_leak_between_subjects(
     subject: _WindowSubject,
 ) -> None:
     consume = getattr(test_valkey_rate_limit, subject.consumer)
-    await consume(subject.first, window_seconds=60, limit=30000)
+    await consume(subject.counted, window_seconds=60, limit=30000)
 
-    state = await consume(subject.second, window_seconds=60, limit=30000)
+    state = await consume(subject.unrelated, window_seconds=60, limit=30000)
 
     assert state.count == 1
 
