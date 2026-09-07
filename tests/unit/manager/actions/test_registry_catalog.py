@@ -128,6 +128,7 @@ from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
 )
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
+from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupBulkEntityLabelOwnerAction,
@@ -483,3 +484,19 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
         if record.action_cls in judged
     }
     assert recorded == judged
+
+
+def test_rg_domain_read_is_a_scoped_permission_read() -> None:
+    """The domains a resource group serves are read within the resource-group scope."""
+    registry = _ops_registry()
+    DomainProcessors(registry.group(GroupMeta(DOMAIN_ENTITY_TYPE)), MagicMock(), [])
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[ScopedSearchDomainsAction] == (
+        DOMAIN_ENTITY_TYPE,
+        ActionKind.SCOPE,
+        ActionGate.PERMISSION,
+    )

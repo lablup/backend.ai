@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
@@ -51,9 +52,13 @@ from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
+from ai.backend.manager.services.domain.actions.scoped_search import (
+    ResourceGroupDomainScopeItem,
+    ScopedSearchDomainsAction,
+)
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
-from ai.backend.manager.services.domain.actions.search_rg_domains import SearchRGDomainsAction
 from ai.backend.manager.services.domain.actions.update_domain_node import UpdateDomainNodeAction
+from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.types import OptionalState, TriState
 
 _DOMAIN_PAGINATION_SPEC = PaginationSpec(
@@ -149,8 +154,10 @@ class DomainAdapter(BaseAdapter):
         input: AdminSearchDomainsInput,
     ) -> AdminSearchDomainsPayload:
         """Search the domains a resource group serves."""
+        resource_group = await self._processors.resource_group.lookup.run(
+            LookupResourceGroupAction(name=ResourceGroupName(resource_group_name))
+        )
         conditions = self._convert_domain_filter(input.filter) if input.filter else []
-        conditions.append(DomainConditions.by_resource_group_name(resource_group_name))
         orders = self._convert_orders(input.order) if input.order else []
         searcher = self._build_searcher(
             DomainSearcher,
@@ -165,8 +172,11 @@ class DomainAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        result = await self._processors.domain.public_search_rg_domains.run(
-            SearchRGDomainsAction(searcher=searcher)
+        result = await self._processors.domain.scoped_search.run(
+            ScopedSearchDomainsAction(
+                items=[ResourceGroupDomainScopeItem(resource_group_id=resource_group.entity_id())],
+                searcher=searcher,
+            )
         )
 
         return AdminSearchDomainsPayload(
