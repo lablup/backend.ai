@@ -94,10 +94,10 @@ class ValkeyRateLimitClient:
         self._closed = True
         await self._client.disconnect()
 
-    def _user_window_key(self, user_id: UserID) -> str:
+    def _user_rate_limit_key(self, user_id: UserID) -> str:
         return f"user.{user_id}.rate_limit_window"
 
-    def _ip_window_key(self, client_ip: str) -> str:
+    def _ip_rate_limit_key(self, client_ip: str) -> str:
         return f"ip.{client_ip}.rate_limit_window"
 
     @valkey_rate_limit_resilience.apply()
@@ -112,7 +112,9 @@ class ValkeyRateLimitClient:
         :param limit: The limit to fix for the window, taken only when the request opens one.
         :return: The count, the limit fixed for the window, and the seconds until it ends.
         """
-        return await self._consume_window(self._user_window_key(user_id), window_seconds, limit)
+        return await self._consume_rate_limit(
+            self._user_rate_limit_key(user_id), window_seconds, limit
+        )
 
     @valkey_rate_limit_resilience.apply()
     async def consume_ip_rate_limit(
@@ -126,9 +128,13 @@ class ValkeyRateLimitClient:
         :param limit: The limit to fix for the window, taken only when the request opens one.
         :return: The count, the limit fixed for the window, and the seconds until it ends.
         """
-        return await self._consume_window(self._ip_window_key(client_ip), window_seconds, limit)
+        return await self._consume_rate_limit(
+            self._ip_rate_limit_key(client_ip), window_seconds, limit
+        )
 
-    async def _consume_window(self, key: str, window_seconds: int, limit: int) -> RateLimitState:
+    async def _consume_rate_limit(
+        self, key: str, window_seconds: int, limit: int
+    ) -> RateLimitState:
         """
         ``HSETNX`` and ``EXPIRE NX`` take their argument only from the request that opens
         the window, so a later one leaves the limit and the deadline as they stand.
@@ -158,7 +164,7 @@ class ValkeyRateLimitClient:
         :param user_id: The user the counter is keyed by.
         :return: The window state, or None when no window is open for the user.
         """
-        return await self._read_window_state(self._user_window_key(user_id))
+        return await self._read_rate_limit(self._user_rate_limit_key(user_id))
 
     @valkey_rate_limit_resilience.apply()
     async def get_ip_rate_limit(self, client_ip: str) -> RateLimitState | None:
@@ -168,9 +174,9 @@ class ValkeyRateLimitClient:
         :param client_ip: The address the counter is keyed by.
         :return: The window state, or None when no window is open for the address.
         """
-        return await self._read_window_state(self._ip_window_key(client_ip))
+        return await self._read_rate_limit(self._ip_rate_limit_key(client_ip))
 
-    async def _read_window_state(self, key: str) -> RateLimitState | None:
+    async def _read_rate_limit(self, key: str) -> RateLimitState | None:
         """
         ``consume_*`` fixes the limit in the same atomic batch that opens a window,
         so an open window always carries one.
