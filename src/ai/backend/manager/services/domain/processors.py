@@ -1,17 +1,16 @@
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
     EntityOpsResult,
     LookupOpsResult,
+    ScopedBatchOpsResult,
 )
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
@@ -37,8 +36,8 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainActionResult,
 )
 from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
+from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
-from ai.backend.manager.services.domain.actions.search_rg_domains import SearchRGDomainsAction
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
 from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
     UpdateDomainDotfileAction,
@@ -55,9 +54,7 @@ class DomainProcessors:
     get: SingleEntityActionProcessor[GetDomainAction, EntityOpsResult[DomainData]]
     lookup: LookupActionProcessor[LookupDomainAction, LookupOpsResult[DomainID]]
     global_search: GlobalActionProcessor[GlobalSearchDomainsAction, BatchOpsResult[DomainData]]
-    public_search_rg_domains: PublicActionProcessor[
-        SearchRGDomainsAction, BatchOpsResult[DomainData]
-    ]
+    scoped_search: ScopeActionProcessor[ScopedSearchDomainsAction, ScopedBatchOpsResult[DomainData]]
     update_domain: SingleEntityActionProcessor[UpdateDomainAction, EntityOpsResult[DomainData]]
     delete_domain: SingleEntityActionProcessor[DeleteDomainAction, EntityOpsResult[DomainData]]
     restore_domain: SingleEntityActionProcessor[RestoreDomainAction, EntityOpsResult[DomainData]]
@@ -86,7 +83,7 @@ class DomainProcessors:
         self.get = group.single_get_ops(GetDomainAction)
         self.lookup = group.public_lookup_ops(LookupDomainAction)
         self.global_search = group.global_search_ops(GlobalSearchDomainsAction)
-        self.public_search_rg_domains = group.public_search_ops(SearchRGDomainsAction)
+        self.scoped_search = group.scope_search_ops(ScopedSearchDomainsAction)
         self.update_domain = group.single_guarded_update_ops(UpdateDomainAction)
         self.delete_domain = group.single_guarded_delete_ops(DeleteDomainAction)
         self.restore_domain = group.single_guarded_restore_ops(RestoreDomainAction)
