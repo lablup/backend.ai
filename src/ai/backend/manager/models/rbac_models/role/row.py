@@ -14,6 +14,7 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.data.permission.role import (
     RoleData,
     RoleDetailData,
@@ -76,6 +77,21 @@ class RoleRow(LifecycleTimestampsMixin, Base):
     deleted_at: Mapped[datetime | None] = mapped_column(
         "deleted_at", sa.DateTime(timezone=True), nullable=True
     )
+    # The preset this role was instantiated from; NULL for roles made by hand or
+    # before presets were recorded. `use_alter` keeps the FK out of the CREATE TABLE
+    # so table subsets that omit ``role_presets`` still build.
+    role_preset_id: Mapped[RolePresetID | None] = mapped_column(
+        "role_preset_id",
+        GUID(RolePresetID),
+        sa.ForeignKey(
+            "role_presets.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_roles_role_preset_id_role_presets",
+        ),
+        index=True,
+        nullable=True,
+    )
 
     object_permission_rows: Mapped[list[ObjectPermissionRow]] = relationship(
         "ObjectPermissionRow",
@@ -94,6 +110,7 @@ class RoleRow(LifecycleTimestampsMixin, Base):
             deleted_at=self.deleted_at,
             auto_assign=self.auto_assign,
             description=self.description,
+            role_preset_id=self.role_preset_id,
         )
 
     def to_detail_data_without_users(self) -> RoleDetailData:
@@ -108,5 +125,6 @@ class RoleRow(LifecycleTimestampsMixin, Base):
             deleted_at=self.deleted_at,
             auto_assign=self.auto_assign,
             description=self.description,
+            role_preset_id=self.role_preset_id,
             object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
         )

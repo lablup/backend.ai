@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import override
 
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import (
     EntityData,
     EntityIdentifier,
@@ -47,6 +48,7 @@ class RoleData(EntityData):
     deleted_at: datetime | None
     auto_assign: bool = False
     description: str | None = None
+    role_preset_id: RolePresetID | None = None
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -83,6 +85,7 @@ class RoleDetailData:
     deleted_at: datetime | None
     auto_assign: bool = False
     description: str | None = None
+    role_preset_id: RolePresetID | None = None
 
 
 @dataclass(frozen=True)

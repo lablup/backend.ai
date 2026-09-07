@@ -77,6 +77,7 @@ class _PresetRoleSpec:
     """One role a preset calls for on one scope, as plain values ready to write."""
 
     entity: EntityIdentifier
+    role_preset_id: RolePresetID
     name: str
     auto_assign: bool
     entity_operations: Mapping[RBACElementType, Sequence[OperationType]]
@@ -338,6 +339,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
                 source=RoleSource.SYSTEM,
                 status=RoleStatus.ACTIVE,
                 auto_assign=spec.auto_assign,
+                role_preset_id=spec.role_preset_id,
             )
             for spec in specs
         ]
@@ -407,6 +409,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         return [
             _PresetRoleSpec(
                 entity=entity,
+                role_preset_id=preset.id,
                 name=self._preset_role_name(preset, entity, entity_values[entity]),
                 auto_assign=preset.auto_assign,
                 entity_operations={
