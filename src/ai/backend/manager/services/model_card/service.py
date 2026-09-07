@@ -4,11 +4,18 @@ from uuid import UUID
 from ruamel.yaml import YAML
 
 from ai.backend.common.config import ModelDefinition
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.types import VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.v2.bulk.result import (
+    PartialBulkEntityResult,
+    PartialBulkResult,
+)
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry, VFolderScanData
+from ai.backend.manager.errors.resource import ModelCardNotFound
 from ai.backend.manager.errors.storage import ModelCardParseError
+from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.upserters import ModelCardScanUpserter
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
 from ai.backend.manager.services.model_card.actions.available_presets import (
@@ -17,7 +24,6 @@ from ai.backend.manager.services.model_card.actions.available_presets import (
 )
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
-    BulkDeleteModelCardActionResult,
 )
 from ai.backend.manager.services.model_card.actions.delete import (
     DeleteModelCardAction,
@@ -61,9 +67,21 @@ class ModelCardService:
 
     async def bulk_delete(
         self, action: BulkDeleteModelCardAction
-    ) -> BulkDeleteModelCardActionResult:
-        data = await self._repository.bulk_delete(action.purgers, action.options)
-        return BulkDeleteModelCardActionResult(data=data)
+    ) -> PartialBulkResult[ModelCardID]:
+        purgers = [ModelCardPurger(card_id=card_id) for card_id in action.ids]
+        data = await self._repository.bulk_delete(purgers, action.options)
+        deleted = {ModelCardID(card_id) for card_id in data.successes}
+        errors = {ModelCardID(failure.card_id): failure.error for failure in data.failures}
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[ModelCardID].succeeded(card_id, card_id)
+                if card_id in deleted
+                else PartialBulkEntityResult[ModelCardID].failed(
+                    card_id, errors.get(card_id, ModelCardNotFound())
+                )
+                for card_id in action.ids
+            ]
+        )
 
     async def available_presets(
         self, action: AvailablePresetsAction

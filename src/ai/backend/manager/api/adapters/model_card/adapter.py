@@ -89,7 +89,6 @@ from ai.backend.manager.services.model_card.actions.available_presets import (
 )
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
-    BulkDeleteModelCardActionResult,
 )
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
@@ -427,25 +426,18 @@ class ModelCardAdapter(BaseAdapter):
         options: DeleteModelCardOptions,
     ) -> BulkDeleteModelCardsPayload:
         """Bulk-delete model cards and surface per-card success/failure breakdown."""
-        result = await self._run_bulk_delete(input.ids, options)
-        return BulkDeleteModelCardsPayload(
-            successes=list(result.data.successes),
-            failed=[
-                BulkDeleteModelCardV2Error(card_id=failure.card_id, message=failure.message)
-                for failure in result.data.failures
-            ],
-        )
-
-    async def _run_bulk_delete(
-        self,
-        card_ids: list[UUID],
-        options: DeleteModelCardOptions,
-    ) -> BulkDeleteModelCardActionResult:
-        return await self._processors.model_card.bulk_delete.run(
+        result = await self._processors.model_card.bulk_delete.run(
             BulkDeleteModelCardAction(
-                purgers=[ModelCardPurger(card_id=ModelCardID(card_id)) for card_id in card_ids],
+                ids=[ModelCardID(card_id) for card_id in input.ids],
                 options=options,
             )
+        )
+        return BulkDeleteModelCardsPayload(
+            successes=[UUID(str(card_id)) for card_id in result.values()],
+            failed=[
+                BulkDeleteModelCardV2Error(card_id=UUID(str(card_id)), message=str(error))
+                for card_id, error in result.errors().items()
+            ],
         )
 
     async def scan_project(self, project_id: UUID) -> ScanProjectModelCardsPayload:

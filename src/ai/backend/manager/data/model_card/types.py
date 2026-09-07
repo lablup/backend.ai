@@ -62,10 +62,10 @@ class ModelCardData(EntityData):
 
 @dataclass(frozen=True)
 class BulkModelCardDeleteFailure:
-    """Error info for a single failed model card delete inside a bulk operation."""
+    """The error one model card's delete raised inside a bulk operation."""
 
     card_id: UUID
-    message: str
+    error: Exception
 
 
 @dataclass(frozen=True)
