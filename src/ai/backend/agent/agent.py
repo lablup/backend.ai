@@ -135,6 +135,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
 )
 from ai.backend.common.events.event_types.kernel.anycast import (
     DoSyncKernelLogsEvent,
+    KernelCancelledAnycastEvent,
     KernelCreatingAnycastEvent,
     KernelPreparingAnycastEvent,
     KernelPullingAnycastEvent,
@@ -142,6 +143,7 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelTerminatedAnycastEvent,
 )
 from ai.backend.common.events.event_types.kernel.broadcast import (
+    KernelCancelledBroadcastEvent,
     KernelCreatingBroadcastEvent,
     KernelPreparingBroadcastEvent,
     KernelPullingBroadcastEvent,
@@ -1217,6 +1219,25 @@ class AbstractAgent[
     ) -> None:
         await self._pre_anycast_event(anycast_event)
         await self.event_producer.anycast_and_broadcast_event(anycast_event, broadcast_event)
+
+    async def _anycast_and_broadcast_kernel_cancelled(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        reason: str,
+    ) -> None:
+        await self.anycast_and_broadcast_event(
+            KernelCancelledAnycastEvent(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                reason=reason,
+            ),
+            KernelCancelledBroadcastEvent(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                reason=reason,
+            ),
+        )
 
     async def report_all_kernel_commit_status_map(self) -> None:
         """
@@ -2748,7 +2769,7 @@ class AbstractAgent[
                                 self.local_config.resource.affinity_policy,
                                 allow_fractional_resource_fragmentation=allow_fractional_resource_fragmentation,
                             )
-                        except ResourceError:
+                        except ResourceError as e:
                             log.exception(
                                 "create_kernel(kernel:{}, session:{}) resource allocation failed",
                                 kernel_id,
@@ -2756,6 +2777,11 @@ class AbstractAgent[
                             )
                             await self.anycast_event(
                                 DoAgentResourceCheckEvent(agent_id=ctx.agent_id)
+                            )
+                            await self._anycast_and_broadcast_kernel_cancelled(
+                                kernel_id,
+                                session_id,
+                                f"Resource allocation failed: {e}",
                             )
                             raise
                     log.info(

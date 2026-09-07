@@ -3053,6 +3053,7 @@ class ScheduleDBSource:
                             KernelStatus.SCHEDULED,
                             KernelStatus.PREPARING,
                             KernelStatus.PULLING,
+                            KernelStatus.PREPARED,
                             KernelStatus.CREATING,
                         ]),
                     )
