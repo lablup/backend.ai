@@ -17,6 +17,7 @@ from ai.backend.common.network.keys import (
     session_meta_key,
 )
 from ai.backend.common.network.types import (
+    SESSION_META_GENERATION,
     SESSION_META_READY,
     SESSION_META_STATE,
     Member,
@@ -24,12 +25,14 @@ from ai.backend.common.network.types import (
     SessionNetMeta,
 )
 
+_GENERATION = "gen-1"
 _META = SessionNetMeta(
     session_id="s1",
     subnet="10.128.5.0/24",
     backend=NetworkBackendKind.VXLAN,
     mtu=1450,
     vni=4097,
+    generation=_GENERATION,
 )
 _SELF = Member(agent_id="a1", host_ip="10.0.0.1", vtep_ip="10.0.0.1")
 _PEER2 = Member(agent_id="a2", host_ip="10.0.0.2", vtep_ip="10.0.0.2")
@@ -49,13 +52,24 @@ class FakeEtcd:
     async def delete(self, key: str, **kwargs: Any) -> None:
         self.store.pop(key, None)
 
+    async def delete_if_value(self, key: str, expected: str, **kwargs: Any) -> bool:
+        if self.store.get(key) != expected:
+            return False
+        del self.store[key]
+        return True
+
     def seed_session_meta(self, session_id: str = "s1", **fields: Any) -> str:
-        """The manager's READY record for the session -- what a joining node is fenced on."""
+        """The manager's READY record for the session -- what a joining node is fenced on.
+
+        Describes the same allocation `_META` names: a node refuses to join a record that
+        describes some OTHER incarnation of the session id (see `_session_fence`).
+        """
         record = json.dumps({
-            "subnet": "10.128.0.0/24",
+            "subnet": "10.128.5.0/24",
             "vni": 4097,
             "backend": "vxlan",
             "mtu": 1450,
+            SESSION_META_GENERATION: _GENERATION,
             SESSION_META_STATE: SESSION_META_READY,
             **fields,
         })
@@ -376,6 +390,166 @@ class TestALateJoin:
             assert member_key("s1", "a1") in etcd.store
         finally:
             await coord.stop("s1")
+
+
+class TestJoiningBeforeBuilding:
+    """C10. The manager reads the membership table again after fencing the record, so a node that
+    publishes before it builds is either seen there or finds the fence on its own re-read. A node
+    that built first and published after could be missed by both: the manager saw an empty table,
+    gave the VNI away, and only then did this node create a tunnel on it."""
+
+    class _OrderRecordingBackend(RecordingBackend):
+        """Records whether this node's member key was already published at setup/adopt time."""
+
+        def __init__(self, etcd: FakeEtcd) -> None:
+            super().__init__()
+            self._etcd = etcd
+            self.published_at_setup: list[bool] = []
+
+        @override
+        async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+            self.published_at_setup.append(member_key("s1", "a1") in self._etcd.store)
+            await super().setup_session_network(meta, self_member)
+
+        async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+            self.published_at_setup.append(member_key("s1", "a1") in self._etcd.store)
+            self.setup.append(meta.session_id)
+
+    async def test_start_publishes_the_membership_before_the_data_plane(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_session_meta()
+        backend = self._OrderRecordingBackend(etcd)
+        coord = _coordinator(etcd, cast(Any, backend))
+        await coord.start(_META, _SELF)
+        try:
+            assert backend.published_at_setup == [True]
+        finally:
+            await coord.stop("s1")
+
+    async def test_resume_does_too(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_session_meta()
+        backend = self._OrderRecordingBackend(etcd)
+        coord = _coordinator(etcd, cast(Any, backend))
+        await coord.resume(_META, _SELF)
+        try:
+            assert backend.published_at_setup == [True]
+        finally:
+            await coord.stop("s1")
+
+    async def test_a_refused_join_never_reaches_the_data_plane(self) -> None:
+        etcd = FakeEtcd()  # no record at all
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        with pytest.raises(SessionNetworkGone):
+            await coord.start(_META, _SELF)
+        assert backend.setup == []
+
+    async def test_the_published_membership_names_the_incarnation(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_session_meta()
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.start(_META, _SELF)
+        try:
+            published = json.loads(etcd.store[member_key("s1", "a1")])
+            assert published[SESSION_META_GENERATION] == _GENERATION
+        finally:
+            await coord.stop("s1")
+
+
+class TestARequestThatArrivedTooLate:
+    """C11. A session id is reused. A launch RPC delayed across a teardown and a rebuild arrives
+    naming the OLD incarnation's subnet, VNI and port -- and READY says nothing about which of the
+    two the record is. Acted on, it builds the old data plane and publishes this node as an
+    ordinary member of the NEW session, whose peers then program a tunnel that carries nothing."""
+
+    async def test_a_stale_generation_is_refused(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_session_meta()  # the record is the CURRENT incarnation
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        stale = SessionNetMeta(
+            session_id="s1",
+            subnet="10.128.5.0/24",
+            backend=NetworkBackendKind.VXLAN,
+            mtu=1450,
+            vni=4097,
+            generation="gen-0",
+        )
+
+        with pytest.raises(SessionNetworkGone):
+            await coord.start(stale, _SELF)
+
+        assert backend.setup == []
+        assert member_key("s1", "a1") not in etcd.store
+
+    async def test_a_stale_allocation_is_refused_even_without_a_generation(self) -> None:
+        # A manager from before the generation publishes none, so the identity it stands for is
+        # compared as well: an old subnet and VNI are just as wrong.
+        etcd = FakeEtcd()
+        no_generation: dict[str, Any] = {SESSION_META_GENERATION: None}
+        etcd.seed_session_meta(**no_generation)
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        stale = SessionNetMeta(
+            session_id="s1",
+            subnet="10.128.9.0/24",
+            backend=NetworkBackendKind.VXLAN,
+            mtu=1450,
+            vni=4096,
+        )
+
+        with pytest.raises(SessionNetworkGone):
+            await coord.start(stale, _SELF)
+
+        assert backend.setup == []
+
+    async def test_a_refused_join_does_not_take_back_a_newer_membership(self) -> None:
+        """The withdrawal is over the bytes THIS join wrote. An unconditional delete removes
+        whatever holds the key now -- after a rebuild that is a later join's acknowledgement, and
+        removing it tells the manager a node that is in the session is not."""
+
+        newer = json.dumps(
+            Member(
+                agent_id="a1", host_ip="10.0.0.1", vtep_ip="10.0.0.1", joined=True, generation="g2"
+            ).to_etcd_payload()
+        )
+
+        class _RebuiltMidJoin(FakeEtcd):
+            """The session is torn down and rebuilt -- with this node already in it -- the moment
+            this join publishes."""
+
+            @override
+            async def put(self, key: str, val: str, **kwargs: Any) -> None:
+                await super().put(key, val)
+                if key == member_key("s1", "a1"):
+                    self.seed_session_meta(**{SESSION_META_GENERATION: "g2"})
+                    self.store[member_key("s1", "a1")] = newer
+
+        etcd = _RebuiltMidJoin()
+        etcd.seed_session_meta()
+        coord = _coordinator(etcd, RecordingBackend())
+
+        with pytest.raises(SessionNetworkGone):
+            await coord.start(_META, _SELF)
+
+        assert etcd.store[member_key("s1", "a1")] == newer
+
+    async def test_a_teardown_does_not_withdraw_a_later_incarnations_membership(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_session_meta()
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.start(_META, _SELF)
+        newer = json.dumps(
+            Member(
+                agent_id="a1", host_ip="10.0.0.1", vtep_ip="10.0.0.1", joined=True, generation="g2"
+            ).to_etcd_payload()
+        )
+        etcd.store[member_key("s1", "a1")] = newer
+
+        await coord.stop("s1")
+
+        assert etcd.store[member_key("s1", "a1")] == newer
 
 
 class TestReconcileEndpoints:
