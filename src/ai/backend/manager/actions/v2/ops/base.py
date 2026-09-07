@@ -98,10 +98,6 @@ __all__ = (
     "UpdateSingleEntityOpsAction",
     "DeleteSingleEntityOpsAction",
     "RestoreSingleEntityOpsAction",
-    "GuardedUpdateOpsAction",
-    "UpdateSingleEntityGuardedOpsAction",
-    "DeleteSingleEntityGuardedOpsAction",
-    "RestoreSingleEntityGuardedOpsAction",
     "UpdatePartialBulkOpsAction",
     "DeletePartialBulkOpsAction",
     "RestorePartialBulkOpsAction",
@@ -515,19 +511,6 @@ class UpdateOpsAction[TRow: Base, TData](OpsBackendAction):
         knowledge, so a delete action declares ``operation_type() == DELETE`` and hands
         over the updater that performs the transition.
         """
-        raise NotImplementedError
-
-
-class GuardedUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
-    """An update that declines to write unless the named row's guard holds.
-
-    Every updater carries its guard now, so this answers as :class:`UpdateOpsAction`
-    does; kept until the guarded action surfaces are retired.
-    """
-
-    @abstractmethod
-    def to_updater(self) -> GuardedDataUpdater[TRow, TData]:
-        """Return the update spec this action executes."""
         raise NotImplementedError
 
 
@@ -1007,40 +990,6 @@ class RestoreSingleEntityOpsAction[TRow: Base, TData](
     """A single-entity restore: the soft delete run backwards, so it carries an
     updater too. Recorded as ``RESTORE`` while checking the soft-delete permission —
     undoing a delete reaches nothing the deleter could not already reach."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.RESTORE
-
-
-class UpdateSingleEntityGuardedOpsAction[TRow: Base, TData](
-    BaseSingleEntityAction, GuardedUpdateOpsAction[TRow, TData], ABC
-):
-    """A single-entity write the row's own state can refuse."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-class DeleteSingleEntityGuardedOpsAction[TRow: Base, TData](
-    BaseSingleEntityAction, GuardedUpdateOpsAction[TRow, TData], ABC
-):
-    """A single-entity soft delete the row's own state can refuse."""
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
-
-
-class RestoreSingleEntityGuardedOpsAction[TRow: Base, TData](
-    BaseSingleEntityAction, GuardedUpdateOpsAction[TRow, TData], ABC
-):
-    """A single-entity restore the row's own state can refuse. Recorded as ``RESTORE``
-    while checking the soft-delete permission, as the unguarded restore is."""
 
     @override
     @classmethod

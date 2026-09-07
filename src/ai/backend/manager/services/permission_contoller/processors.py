@@ -136,8 +136,8 @@ class PermissionControllerProcessors:
     ) -> None:
         self.create_role = role_group.entity_create_ops(CreateRoleAction)
         self.create_global_role = role_group.global_create_ops(CreateGlobalRoleAction)
-        self.update_role = role_group.single_guarded_update_ops(UpdateRoleAction)
-        self.delete_role = role_group.single_guarded_delete_ops(DeleteRoleAction)
+        self.update_role = role_group.single_update_ops(UpdateRoleAction)
+        self.delete_role = role_group.single_delete_ops(DeleteRoleAction)
         self.purge_role = role_group.entity_purge_ops(PurgeRoleAction)
         self.assign_role = ActionProcessor(service.assign_role, action_monitors)
         self.revoke_role = ActionProcessor(service.revoke_role, action_monitors)
