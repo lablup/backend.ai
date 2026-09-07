@@ -49,6 +49,7 @@ from ai.backend.common.network.types import (
     NetworkBackendKind,
     OverlayEncryptionPolicy,
     generation_match,
+    reads_as_generation,
     reads_as_overlay_subnet,
     reads_as_vni,
 )
@@ -73,7 +74,7 @@ from ai.backend.manager.network.ipam import (
 from ai.backend.manager.network.pairing import (
     members_can_encrypt,
     require_members_can_serve_driver,
-    require_members_overlay_ready,
+    require_members_cni_ready,
 )
 from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
 
@@ -192,8 +193,11 @@ def _generation_of(raw: str | None) -> str | None:
     record = _record(raw)
     if record is None:
         return None
-    generation = record.get(_GENERATION)
-    return str(generation) if generation is not None else None
+    # Never `str()` of whatever is there. A record carrying `generation: []` became the live
+    # generation "[]", and every correctly stamped key under that session then compared as another
+    # incarnation's -- and was deleted. A stamp that is not a stamp is no stamp at all, and None
+    # is the state every caller here already treats as "cannot judge this".
+    return reads_as_generation(record.get(_GENERATION))
 
 
 class _AllocationState(StrEnum):
@@ -246,6 +250,14 @@ def _parse_allocation(meta_raw: str) -> _Allocation:
     """
     meta = _record(meta_raw)
     if meta is None:
+        return _Allocation(_AllocationState.CORRUPT)
+    if _GENERATION in meta and reads_as_generation(meta.get(_GENERATION)) is None:
+        CommonMetricRegistry.instance().network_pool.observe_invalid_record()
+        log.warning(
+            "a session record's incarnation cannot be read ({!r}); nothing of that session is"
+            " judged from it",
+            meta.get(_GENERATION),
+        )
         return _Allocation(_AllocationState.CORRUPT)
     if "subnet" not in meta and "vni" not in meta:
         return _Allocation(_AllocationState.PENDING)
@@ -2034,7 +2046,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         """
         etcd = self._require_etcd()
         await require_members_can_serve_driver(etcd, "cni", member_agents)
-        await require_members_overlay_ready(etcd, member_agents)
+        await require_members_cni_ready(etcd, member_agents)
 
     def _select_backend(self, forced_backend: NetworkBackendKind | None) -> NetworkBackendKind:
         """The operator's forced backend wins; otherwise every multi-node cluster session uses
