@@ -284,3 +284,35 @@ R3 unchanged. This is the third consecutive round in which the defect found was 
 previous round added rather than in the original design, and every one of them was in the
 reconciliation path. That path is reasoned about only against a model of etcd; it has never run
 against a real one, let alone a rolling restart.
+
+Twelfth pass -- not a review this time. Asked to check whether the last patch had itself broken
+anything, I wrote the checklist first (what the patch changed, what else reads that code, could
+it break the other reader) and probed each row. Two rows failed, and a third failed the fix.
+
+| # | Was | Now |
+|---|-----|-----|
+| C27 | C26 taught `reconcile_pool` that an unstamped claim is live only where the record names it, and left `_reconcile_claims_of` -- the sweep a CREATE runs when a debt is outstanding -- asking `of_generation` alone. The two sweeps disagreed, and the scoped one kept every stray claim under a live id forever | one `_claim_is_live`, called by both. Two implementations of one judgement is how they came to disagree |
+| C27 | judged unit by unit, a unit of a live block stamped with a superseded incarnation is an orphan -- so the sweep gave back half the block a running session was on. `_undo_promotion` documents leaving exactly that state behind | a claim is in use if it carries the incarnation the record names OR the record names it. Neither half alone: the first gives away a live session's block, the second (my first attempt) gives away the claims of every create still in flight, whose record names no subnet until publish |
+| C27 | `release_all` for a superseded incarnation took a claim by its stamp alone, so the same block was given back at the release rather than at the judgement | it is told what the live record names, and leaves that alone. A destroy of the incarnation the record names is unaffected -- it is releasing exactly what the record names, and is meant to |
+| — | three tests modelled a rebuilt session by rewriting the generation of a PUBLISHED record, leaving it naming an allocation a different incarnation holds. No path writes that: a rebuild claims the id with a fresh record naming no subnet and no VNI. The tests passed on a state that cannot occur and failed on the rule that is right | `_rebuilt_as()` |
+| — | `_await_ready` had had no caller since `9561de9b8` and still consumed `_existing_allocation`, whose contract two rounds have changed | removed |
+| — | a session-scoped autouse fixture in the manager suite sets `BACKEND_NAMESPACE` for the whole pytest process, so an agent config test asserting what the FILE says failed whenever the manager tests ran first (pre-existing at `1223b60eb`) | the test clears the override it is not about |
+
+What this pass says about the previous four. Every one of those defects was found by reading the
+diff for what it broke; this one was found by asking, per changed function, who else reads it.
+The two questions have different yields, and only the second reaches the sibling call site nobody
+edited.
+
+Still NOT done, unchanged: no leader-only periodic reconciliation; no health surface for
+`unrecoverable_leaks()`; the startup sweep is unpaginated; `compare_and_delete` is exercised only
+against the in-memory fake.
+
+Known and left: a unit whose stamp names an incarnation the record has moved on from is now kept
+and queued for promotion, and `promote` refuses it (it will not overwrite a claim that is not
+`of_generation` with the target). So it is kept, not resolved, and logged on every sweep. Keeping
+is the safe direction -- the alternative gives a live session's addresses to another tenant --
+but the state is not repaired, and repairing it means letting a promotion take a same-id claim
+whose stamp is stale, which is a widening of exactly what C24 was about. Not done in the same
+pass that narrowed it.
+
+R3 unchanged.

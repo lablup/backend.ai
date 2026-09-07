@@ -10,6 +10,7 @@ The data plane itself is realized by the agent-side v2 plugins (see BEP-1078, ag
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import logging
 import time
@@ -152,6 +153,81 @@ def _generation_of(raw: str | None) -> str | None:
     except ValueError:
         return None
     return str(generation) if generation is not None else None
+
+
+def _record_names(meta_raw: str, raw: str, is_vni: bool, key: str | int) -> bool:
+    """Whether the session's record names THIS claim.
+
+    Identity, not compatibility. Compatibility (`of_generation`) says whether a claim COULD belong
+    to an incarnation, and that is a different question from whether the session is using it --
+    wrong in both directions. A claim carrying no incarnation is compatible with every one of
+    them, so a second, older claim under a live id looks live and is kept for the life of the
+    cluster. A claim carrying a superseded one is compatible with none, so a unit of the very
+    block the record names looks dead and is handed to another tenant while the session runs on
+    it. The record is what settles both: it names one subnet and one VNI.
+
+    A unit block must also lie inside the block the record names. The payload is what identifies
+    the claim, and a payload naming a block the unit is not part of identifies nothing.
+    """
+    try:
+        meta = json.loads(meta_raw)
+    except ValueError:
+        return False
+    if is_vni:
+        named_vni = meta.get("vni")
+        return named_vni is not None and int(named_vni) == int(key)
+    named_subnet = meta.get("subnet")
+    if named_subnet is None:
+        return False
+    try:
+        if json.loads(raw).get("subnet") != named_subnet:
+            return False
+        unit = ipaddress.ip_network(str(key))
+        block = ipaddress.ip_network(str(named_subnet))
+    except ValueError:
+        return False
+    # `subnet_of` is typed per address family and refuses a mixed pair, so the families are
+    # narrowed rather than the comparison asserted -- the same shape `ipam._acquire_requested`
+    # uses.
+    return (
+        isinstance(unit, ipaddress.IPv4Network)
+        and isinstance(block, ipaddress.IPv4Network)
+        and unit.subnet_of(block)
+    ) or (
+        isinstance(unit, ipaddress.IPv6Network)
+        and isinstance(block, ipaddress.IPv6Network)
+        and unit.subnet_of(block)
+    )
+
+
+def _claim_is_live(meta_raw: str | None, raw: str, is_vni: bool, key: str | int) -> bool:
+    """Whether a pool claim is one the session is using.
+
+    Two ways to be live, and a sweep that knows only one of them is wrong in one direction:
+
+    - Stamped with the incarnation the record names. This is what a create still building holds:
+      its record names no subnet or VNI yet -- it gets them at publish -- so identity cannot
+      answer for it, and a sweep that asked only that reclaimed the pool claims of every create
+      in flight.
+    - Named by the record, whatever it is stamped with. This is what a session carried over an
+      upgrade holds (no stamp at all), and what a block whose units ended up on two incarnations
+      holds (a stale stamp). A sweep that asked only about stamps kept every stray unstamped
+      claim under a live id forever, and gave away half of a live session's block.
+
+    Neither is `of_generation`, which asks whether a claim COULD belong to an incarnation. A
+    claim carrying no incarnation could belong to any, and that says nothing about use.
+
+    A record from before the incarnation field cannot be judged either way: it exists, so
+    something made it, and nothing under it is called garbage.
+    """
+    if meta_raw is None:
+        return False  # no record: nothing under this id is in use
+    live = _generation_of(meta_raw)
+    if live is None:
+        return True
+    if _generation_stamp_of(raw) == live:
+        return True
+    return _record_names(meta_raw, raw, is_vni, key)
 
 
 def _tombstone(subnet: str | None, vni: Any, owner: str | None, generation: str | None) -> str:
@@ -680,26 +756,6 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             )
         return raw
 
-    async def _await_ready(
-        self, etcd: AsyncEtcd, session_id: str, endpoints: list[Any]
-    ) -> NetworkInfo | None:
-        """What the manager that claimed this session built, once it says it is finished.
-
-        None when it has not finished within `_CREATE_HANDOVER_SEC` -- it died, or it is so slow
-        that waiting longer is worse than taking over.
-        """
-        deadline = time.monotonic() + _CREATE_HANDOVER_SEC
-        while True:
-            raw = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
-            if raw is None:
-                return None  # they rolled back; nothing to wait for
-            meta = json.loads(raw)
-            if meta.get(_STATE) == _READY:
-                return await self._existing_allocation(etcd, session_id, endpoints)
-            if time.monotonic() >= deadline:
-                return None
-            await asyncio.sleep(_CREATE_POLL_SEC)
-
     async def _still_ours(self, session_id: str, subnet: str, vni: Any) -> bool:
         """Whether the pool still records this session as the holder of both."""
         if await self._subnet_allocator.holder(subnet) != session_id:
@@ -836,15 +892,27 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         ):
             if not await self._delete_incarnation(etcd, session_id, prefix, key_of, generation):
                 complete = False
-        # What the record names NOW. This sweep is for an incarnation the record has moved on
-        # from, so an unstamped claim under this id may belong to the one it names instead --
-        # which is what a session carried over an upgrade holds.
-        live = _generation_of(
-            await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
-        )
+        # What the record names NOW, and what it names it WITH. This sweep is for an incarnation
+        # the record has moved on from, so a claim under this id may be the live session's: one
+        # carrying no incarnation (compatible with the one the record names) or one the record
+        # names outright. Neither is this sweep's to give back.
+        live_raw = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
+        live = _generation_of(live_raw)
+        live_meta: Mapping[str, Any] = {}
+        if live_raw is not None:
+            try:
+                live_meta = json.loads(live_raw)
+            except ValueError:
+                live_meta = {}
+        live_vni = live_meta.get("vni")
+        live_subnet = live_meta.get("subnet")
         try:
-            stuck_vnis = await self._vni_allocator.release_all(session_id, generation, live)
-            stuck_blocks = await self._subnet_allocator.release_all(session_id, generation, live)
+            stuck_vnis = await self._vni_allocator.release_all(
+                session_id, generation, live, int(live_vni) if live_vni is not None else None
+            )
+            stuck_blocks = await self._subnet_allocator.release_all(
+                session_id, generation, live, str(live_subnet) if live_subnet else None
+            )
         except Exception:
             log.exception(
                 "could not give back what session {}'s superseded create held", session_id
@@ -871,6 +939,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         The scoped form of `reconcile_pool`, for the moment a session id comes back round. It
         still reads the pool -- a claim nothing names cannot be found any other way -- so it is
         called only where a debt says something is owed under this id.
+
+        It judges a claim by the same rule `reconcile_pool` does, through the same helper. Two
+        judgements of one question is how the two paths came to disagree: this one asked
+        `of_generation` alone and so kept every stray unstamped claim under a live id forever,
+        while the sweep that runs at manager start reclaimed them.
         """
         released = 0
         meta_raw = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
@@ -878,13 +951,14 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         if meta_raw is not None and live is None:
             return 0  # a record from before the field; not this sweep's to judge
         guard: Mapping[str, str | None] = {session_meta_key(session_id): meta_raw}
+
         for unit, (owner, _stamp, raw) in (await self._subnet_allocator.claims()).items():
-            if owner != session_id or (meta_raw is not None and of_generation(raw, live)):
+            if owner != session_id or _claim_is_live(meta_raw, raw, False, unit):
                 continue
             if await self._subnet_allocator.release_unit(unit, raw, guard):
                 released += 1
         for vni, (owner, _stamp, raw) in (await self._vni_allocator.claims()).items():
-            if owner != session_id or (meta_raw is not None and of_generation(raw, live)):
+            if owner != session_id or _claim_is_live(meta_raw, raw, True, vni):
                 continue
             if await self._vni_allocator.release_one(vni, raw, guard):
                 released += 1
@@ -910,10 +984,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         """
         etcd = self._require_etcd()
         released = 0
-        #: Sessions holding a live but unstamped allocation, with the record that says so. Keyed
-        #: by session, not by claim: a wide block is many units and each would otherwise queue a
-        #: promotion of its own, and every promotion re-reads the whole pool.
-        unstamped: dict[str, tuple[str, str]] = {}
+        #: Sessions whose live allocation is not stamped with the incarnation their record names,
+        #: with the record that says so. Keyed by session, not by claim: a wide block is many
+        #: units and each would otherwise queue a promotion of its own, and every promotion
+        #: re-reads the whole pool.
+        to_take: dict[str, tuple[str, str]] = {}
 
         # One read of each session's record per sweep, not one per claim. Safe to cache only
         # because the guard is re-checked inside every delete: a record that changed after it was
@@ -926,29 +1001,6 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     session_meta_key(session_id), scope=ConfigScopes.GLOBAL
                 )
             return seen[session_id]
-
-        def names_this(meta_raw: str, raw: str, is_vni: bool, key: str | int) -> bool:
-            """Whether the record actually names THIS claim.
-
-            Asked only of a claim carrying no incarnation. Such a claim is compatible with every
-            one of them, so compatibility alone says nothing about whether the session is using
-            it: a session whose record names subnet A can have a second, older claim on B left
-            under the same id, and reading B as live keeps it forever -- nothing promotes it,
-            because promotion follows the record, and nothing reclaims it, because it looks live.
-            Identity is what tells the two apart.
-            """
-            try:
-                meta = json.loads(meta_raw)
-            except ValueError:
-                return False
-            if is_vni:
-                named = meta.get("vni")
-                return named is not None and int(named) == int(key)
-            try:
-                claimed = json.loads(raw).get("subnet")
-            except ValueError:
-                return False
-            return bool(claimed is not None and claimed == meta.get("subnet"))
 
         async def orphan_guard(
             session_id: str, raw: str, *, is_vni: bool, key: str | int
@@ -973,25 +1025,16 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             if meta_raw is None:
                 # No record: garbage only while there is still none.
                 return {key_of_meta: None}
+            if not _claim_is_live(meta_raw, raw, is_vni, key):
+                # Garbage while the record still says so.
+                return {key_of_meta: meta_raw}
             live = _generation_of(meta_raw)
-            if live is None:
-                # A record from before the incarnation field. It exists, so something made it,
-                # and this sweep cannot tell a legacy session still running from a leftover.
-                return None
-            if of_generation(raw, live):
-                if _generation_stamp_of(raw) is not None:
-                    return None  # stamped with the live incarnation: live, and already taken
-                # Unstamped, so compatible with every incarnation -- which is not the same as
-                # being in use. Live only if the record names this very claim; anything else
-                # under the id is a leftover no promotion will ever reach.
-                if not names_this(meta_raw, raw, is_vni, key):
-                    return {key_of_meta: meta_raw}
-                # Live and unstamped: taken here rather than merely left alone, because while it
-                # stays unstamped an earlier cleanup of this id can give it away.
-                unstamped[session_id] = (str(live), meta_raw)
-                return None
-            # Names another incarnation: garbage while it still says so.
-            return {key_of_meta: meta_raw}
+            if live is not None and _generation_stamp_of(raw) != live:
+                # In use, but not on the face of it this incarnation's -- unstamped, or stamped
+                # with one the record has moved on from. Taken onto the one the record names,
+                # because while the two disagree a cleanup of the other reads it as its own.
+                to_take[session_id] = (str(live), meta_raw)
+            return None
 
         for unit, (session_id, generation, raw) in (await self._subnet_allocator.claims()).items():
             guard = await orphan_guard(session_id, raw, is_vni=False, key=unit)
@@ -1017,9 +1060,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     session_id,
                     generation,
                 )
-        # Everything the sweep found live but unstamped, taken onto the incarnation its record
-        # names. Done after the walk so the pool is not being read and rewritten at once.
-        for session_id, (_live, meta_raw) in unstamped.items():
+        # Everything the sweep found live but not stamped with the incarnation its record names,
+        # taken onto it. Done after the walk so the pool is not being read and rewritten at once.
+        for session_id, (_live, meta_raw) in to_take.items():
             if not await self._take_allocation(session_id, json.loads(meta_raw), meta_raw):
                 log.warning(
                     "session {}'s allocation could not be taken onto the incarnation its record"
