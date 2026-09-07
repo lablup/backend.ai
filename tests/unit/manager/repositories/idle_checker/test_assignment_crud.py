@@ -48,13 +48,11 @@ from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    Creator,
     Updater,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.idle_checker.creators import (
     IdleCheckerAssignmentCreatorSpec,
-    IdleCheckerCreatorSpec,
 )
 from ai.backend.manager.repositories.idle_checker.purgers import IdleCheckerAssignmentPurgerSpec
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
@@ -199,21 +197,27 @@ class TestIdleCheckerAssignmentRepository:
         return user_id
 
     @pytest.fixture
-    async def checker(self, repository: IdleCheckerRepository) -> IdleCheckerData:
-        return await repository.create(
-            Creator(
-                spec=IdleCheckerCreatorSpec(
-                    name="session lifetime",
-                    description=None,
-                    target_session_types=[SessionTypes.INTERACTIVE],
-                    initial_grace_period_seconds=30,
-                    spec=IdleCheckerSpec(
-                        type=CheckerType.SESSION_LIFETIME,
-                        session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
-                    ),
-                )
+    async def checker(self, database: ExtendedAsyncSAEngine) -> IdleCheckerData:
+        """The FK parent every binding needs, seeded directly.
+
+        The catalog's own create provisions a virtual entity, whose tables this
+        assignment fixture does not carry.
+        """
+        async with database.begin_session() as db_sess:
+            row = IdleCheckerRow(
+                name="session lifetime",
+                description=None,
+                target_session_types=[SessionTypes.INTERACTIVE],
+                initial_grace_period_seconds=30,
+                spec=IdleCheckerSpec(
+                    type=CheckerType.SESSION_LIFETIME,
+                    session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
+                ),
             )
-        )
+            db_sess.add(row)
+            await db_sess.flush()
+            await db_sess.refresh(row)
+            return row.to_data()
 
     @pytest.fixture
     async def domain_assignment(

@@ -21,18 +21,18 @@ from ai.backend.common.data.idle_checker.types import (
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
-from ai.backend.manager.repositories.base import Creator, Updater
-from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerCreatorSpec
+from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
+from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckBatchResult,
     SessionIdleCheckPair,
 )
-from ai.backend.manager.repositories.idle_checker.updaters import IdleCheckerUpdaterSpec
 from ai.backend.manager.repositories.idle_checker.upserters import (
     SessionIdleCheckExcludeUpserterSpec,
     SessionIdleCheckIncludeUpserterSpec,
 )
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
@@ -73,14 +73,12 @@ def _utilization_spec(
 
 def _create_action(spec: IdleCheckerSpec) -> CreateIdleCheckerAction:
     return CreateIdleCheckerAction(
-        creator=Creator(
-            spec=IdleCheckerCreatorSpec(
-                name="test-checker",
-                description=None,
-                target_session_types=[SessionTypes.INTERACTIVE],
-                initial_grace_period_seconds=0,
-                spec=spec,
-            )
+        creator=IdleCheckerCreator(
+            name="test-checker",
+            description=None,
+            target_session_types=[SessionTypes.INTERACTIVE],
+            initial_grace_period_seconds=0,
+            spec=spec,
         )
     )
 
@@ -105,11 +103,11 @@ class TestIdleCheckerSpecLabelValidation:
         )
 
     @pytest.fixture()
-    def repository(self) -> MagicMock:
-        repository = MagicMock(spec=IdleCheckerRepository)
-        repository.create = AsyncMock()
-        repository.update = AsyncMock()
-        return repository
+    def ops_repository(self) -> MagicMock:
+        ops_repository = MagicMock(spec=OpsRepository)
+        ops_repository.create_global_entity = AsyncMock()
+        ops_repository.update = AsyncMock()
+        return ops_repository
 
     @pytest.fixture()
     def preset_repository(self, preset: PrometheusQueryPresetData) -> MagicMock:
@@ -120,15 +118,17 @@ class TestIdleCheckerSpecLabelValidation:
     @pytest.fixture()
     def service(
         self,
-        repository: MagicMock,
+        ops_repository: MagicMock,
         preset_repository: MagicMock,
     ) -> IdleCheckerService:
-        return IdleCheckerService(repository, preset_repository)
+        return IdleCheckerService(
+            MagicMock(spec=IdleCheckerRepository), preset_repository, ops_repository
+        )
 
     async def test_create_with_allowed_labels_passes(
         self,
         service: IdleCheckerService,
-        repository: MagicMock,
+        ops_repository: MagicMock,
     ) -> None:
         spec = _utilization_spec(
             filter_labels={"container_metric_name": "cpu_util"},
@@ -137,7 +137,7 @@ class TestIdleCheckerSpecLabelValidation:
 
         await service.create(_create_action(spec))
 
-        repository.create.assert_awaited_once()
+        ops_repository.create_global_entity.assert_awaited_once()
 
     @pytest.mark.parametrize(
         "spec",
@@ -149,12 +149,12 @@ class TestIdleCheckerSpecLabelValidation:
     async def test_create_with_unsupported_labels_rejected(
         self,
         service: IdleCheckerService,
-        repository: MagicMock,
+        ops_repository: MagicMock,
         spec: IdleCheckerSpec,
     ) -> None:
         with pytest.raises(PrometheusQueryPresetInvalidLabel):
             await service.create(_create_action(spec))
-        repository.create.assert_not_awaited()
+        ops_repository.create_global_entity.assert_not_awaited()
 
     async def test_non_utilization_spec_skips_preset_lookup(
         self,
@@ -173,40 +173,36 @@ class TestIdleCheckerSpecLabelValidation:
     async def test_update_validates_replacement_spec(
         self,
         service: IdleCheckerService,
-        repository: MagicMock,
+        ops_repository: MagicMock,
     ) -> None:
         action = UpdateIdleCheckerAction(
-            updater=Updater(
-                spec=IdleCheckerUpdaterSpec(
-                    spec=OptionalState.update(
-                        _utilization_spec(filter_labels={"unknown_label": "x"})
-                    ),
-                ),
-                pk_value=uuid4(),
+            updater=IdleCheckerUpdater(
+                checker_id=IdleCheckerID(uuid4()),
+                spec=OptionalState.update(_utilization_spec(filter_labels={"unknown_label": "x"})),
             )
         )
 
         with pytest.raises(PrometheusQueryPresetInvalidLabel):
             await service.update(action)
-        repository.update.assert_not_awaited()
+        ops_repository.update.assert_not_awaited()
 
     async def test_update_without_spec_skips_validation(
         self,
         service: IdleCheckerService,
-        repository: MagicMock,
+        ops_repository: MagicMock,
         preset_repository: MagicMock,
     ) -> None:
         action = UpdateIdleCheckerAction(
-            updater=Updater(
-                spec=IdleCheckerUpdaterSpec(name=OptionalState.update("renamed")),
-                pk_value=uuid4(),
+            updater=IdleCheckerUpdater(
+                checker_id=IdleCheckerID(uuid4()),
+                name=OptionalState.update("renamed"),
             )
         )
 
         await service.update(action)
 
         preset_repository.get_by_id.assert_not_awaited()
-        repository.update.assert_awaited_once()
+        ops_repository.update.assert_awaited_once()
 
 
 class TestSessionIdleCheckUpserterAssembly:
@@ -220,7 +216,11 @@ class TestSessionIdleCheckUpserterAssembly:
 
     @pytest.fixture()
     def service(self, repository: MagicMock) -> IdleCheckerService:
-        return IdleCheckerService(repository, MagicMock(spec=PrometheusQueryPresetRepository))
+        return IdleCheckerService(
+            repository,
+            MagicMock(spec=PrometheusQueryPresetRepository),
+            MagicMock(spec=OpsRepository),
+        )
 
     async def test_exclude_assembles_deduplicated_manual_specs(
         self,

@@ -1,32 +1,32 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
-from ai.backend.manager.repositories.base import Updater
-from ai.backend.manager.services.idle_checker.actions.base import IdleCheckerGlobalAction
+from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
 
 
 @dataclass(frozen=True)
-class UpdateIdleCheckerAction(IdleCheckerGlobalAction):
-    updater: Updater[IdleCheckerRow]
+class UpdateIdleCheckerAction(UpdateGlobalOpsAction[IdleCheckerRow, IdleCheckerData]):
+    """Retune one stored idle checker definition."""
 
-    @override
-    def entity_id(self) -> str:
-        return str(self.updater.pk_value)
+    updater: IdleCheckerUpdater
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass(frozen=True)
-class UpdateIdleCheckerActionResult(BaseActionResult):
-    idle_checker: IdleCheckerData
+    def entity_type(cls) -> EntityType:
+        return IDLE_CHECKER_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str:
-        return str(self.idle_checker.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_idle_checker"
+
+    @override
+    def to_updater(self) -> IdleCheckerUpdater:
+        return self.updater

@@ -1,34 +1,32 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.idle_checker.actions.base import IdleCheckerGlobalAction
+from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.idle_checker.searchers import IdleCheckerSearcher
 
 
 @dataclass(frozen=True)
-class AdminSearchIdleCheckersAction(IdleCheckerGlobalAction):
-    querier: BatchQuerier
+class AdminSearchIdleCheckersAction(SearchGlobalOpsAction[IdleCheckerRow, IdleCheckerData]):
+    """Page through the idle checker catalog."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    searcher: IdleCheckerSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass(frozen=True)
-class SearchIdleCheckersActionResult(BaseActionResult):
-    items: list[IdleCheckerData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return IDLE_CHECKER_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "admin_search_idle_checkers"
+
+    @override
+    def to_searcher(self) -> IdleCheckerSearcher:
+        return self.searcher

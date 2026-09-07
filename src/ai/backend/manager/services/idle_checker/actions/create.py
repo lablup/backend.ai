@@ -1,32 +1,32 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
+from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
-from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.services.idle_checker.actions.base import IdleCheckerGlobalAction
 
 
 @dataclass(frozen=True)
-class CreateIdleCheckerAction(IdleCheckerGlobalAction):
-    creator: Creator[IdleCheckerRow]
+class CreateIdleCheckerAction(CreateGlobalOpsAction[IdleCheckerRow, IdleCheckerData]):
+    """Add an idle checker definition to the global catalog."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: IdleCheckerCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass(frozen=True)
-class CreateIdleCheckerActionResult(BaseActionResult):
-    idle_checker: IdleCheckerData
+    def entity_type(cls) -> EntityType:
+        return IDLE_CHECKER_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str:
-        return str(self.idle_checker.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_idle_checker"
+
+    @override
+    def to_creator(self) -> IdleCheckerCreator:
+        return self.creator

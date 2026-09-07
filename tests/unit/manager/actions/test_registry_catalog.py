@@ -43,6 +43,7 @@ from ai.backend.common.data.entity.fair_share import (
     PROJECT_FAIR_SHARE_ENTITY_TYPE,
     USER_FAIR_SHARE_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE
 from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
 from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
 from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
@@ -275,7 +276,11 @@ def test_every_defined_v2_action_is_wired() -> None:
         resource_slot_groups.group(GroupMeta(AGENT_ENTITY_TYPE)),
         MagicMock(),
     )
-    IdleCheckerProcessors(registry.group(GroupMeta(SESSION_ENTITY_TYPE)), MagicMock(), [])
+    IdleCheckerProcessors(
+        registry.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
+        registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        MagicMock(),
+    )
     RetentionPolicyProcessors(registry.group(GroupMeta(RETENTION_POLICY_ENTITY_TYPE)))
     LoginClientTypeProcessors(registry.group(GroupMeta(LOGIN_CLIENT_TYPE_ENTITY_TYPE)))
     ServiceCatalogProcessors(registry.group(GroupMeta(SERVICE_CATALOG_ENTITY_TYPE)))

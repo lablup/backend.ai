@@ -6,9 +6,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
-from ai.backend.common.data.idle_checker.types import IdleCheckerSpec, IdleCheckPhase
+from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.types import SessionTypes
 from ai.backend.manager.errors.idle_checker import (
     IdleCheckerAssignmentAlreadyExists,
     IdleCheckerNotFound,
@@ -19,31 +18,11 @@ from ai.backend.manager.errors.repository import (
 )
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
-    IdleCheckerRow,
     SessionIdleCheckRow,
 )
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base import CreatorSpec
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
-
-
-@dataclass
-class IdleCheckerCreatorSpec(CreatorSpec[IdleCheckerRow]):
-    name: str
-    description: str | None
-    target_session_types: list[SessionTypes]
-    initial_grace_period_seconds: int
-    spec: IdleCheckerSpec
-
-    @override
-    def build_row(self) -> IdleCheckerRow:
-        return IdleCheckerRow(
-            name=self.name,
-            description=self.description,
-            target_session_types=self.target_session_types,
-            initial_grace_period_seconds=self.initial_grace_period_seconds,
-            spec=self.spec,
-        )
 
 
 @dataclass

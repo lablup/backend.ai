@@ -3,10 +3,11 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Self
+from typing import Self, override
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -57,7 +58,7 @@ class IdleCheckerAssignmentData:
 
 
 @dataclass(frozen=True)
-class IdleCheckerData:
+class IdleCheckerData(EntityData):
     id: IdleCheckerID
     name: str
     description: str | None
@@ -67,3 +68,7 @@ class IdleCheckerData:
     spec: IdleCheckerSpec
     created_at: datetime
     updated_at: datetime
+
+    @override
+    def entity_id(self) -> EntityIdentifier:
+        return self.id

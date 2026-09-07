@@ -4,19 +4,16 @@ from collections.abc import Collection, Sequence
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
+from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
-    IdleCheckerRow,
     SessionIdleCheckRow,
 )
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,
-    Creator,
-    Purger,
     Updater,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
@@ -43,18 +40,6 @@ class IdleCheckerRepository:
 
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._db_source = IdleCheckerDBSource(ops_provider)
-
-    async def create(self, creator: Creator[IdleCheckerRow]) -> IdleCheckerData:
-        return await self._db_source.create(creator)
-
-    async def update(self, updater: Updater[IdleCheckerRow]) -> IdleCheckerData:
-        return await self._db_source.update(updater)
-
-    async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
-        return await self._db_source.purge(purger)
-
-    async def admin_search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
-        return await self._db_source.admin_search(querier)
 
     async def create_assignment(
         self, spec: IdleCheckerAssignmentCreatorSpec
