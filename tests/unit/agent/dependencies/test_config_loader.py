@@ -14,8 +14,14 @@ from ai.backend.logging.types import LogLevel
 
 
 class TestAgentConfigLoaderDependency:
-    async def test_config_loader_loads_valid_config(self, tmp_path: Path) -> None:
+    async def test_config_loader_loads_valid_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that config loader can load a valid config file."""
+        # The loader lets the environment override the file, and a session-scoped fixture in the
+        # manager suite sets BACKEND_NAMESPACE for the whole pytest process. This test is about
+        # what the FILE says, so the override is taken out of the way.
+        monkeypatch.delenv("BACKEND_NAMESPACE", raising=False)
         config_path = tmp_path / "agent.toml"
         config_path.write_text("""
 [agent]

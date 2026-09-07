@@ -673,6 +673,7 @@ class SubnetAllocator:
         session_id: str,
         generation: str | None = None,
         live_generation: str | None = None,
+        live_subnet: str | None = None,
     ) -> list[str]:
         """Give back every unit block this INCARNATION of the session claimed, whatever any meta
         says.
@@ -692,13 +693,31 @@ class SubnetAllocator:
         on -- and a session carried over an upgrade holds exactly such a claim. Where the record
         names a different incarnation than this cleanup is for, unstamped claims are not this
         cleanup's to take.
+
+        ``live_subnet`` is the block that record names, and it settles the case the stamp gets
+        wrong in the other direction: a unit stamped with THIS superseded incarnation, sitting in
+        the block the live session is running on. By its own bytes it is this cleanup's; by the
+        record it is in use. A block that answers to two incarnations is a state the pool can
+        reach (see `_undo_promotion`), and giving half of it back puts another tenant at a live
+        session's addresses -- the one outcome worse than a leak. Only when this cleanup is for a
+        superseded incarnation; a destroy of the incarnation the record names is releasing exactly
+        what the record names, and is meant to.
         """
-        keep_unstamped = live_generation is not None and live_generation != generation
+        superseded = live_generation is not None and live_generation != generation
         payload_of = {}
         for key, raw in _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX)).items():
-            if _claimed_subnet(raw, session_id, generation) is None:
+            claimed = _claimed_subnet(raw, session_id, generation)
+            if claimed is None:
                 continue
-            if keep_unstamped and _generation_stamp(raw) is None:
+            if superseded and live_subnet is not None and claimed == live_subnet:
+                log.info(
+                    "leaving {} claimed: it is part of {}, which session {}'s record names now",
+                    unquote(key),
+                    live_subnet,
+                    session_id,
+                )
+                continue
+            if superseded and _generation_stamp(raw) is None:
                 log.info(
                     "leaving {} claimed: it carries no incarnation, and session {} now names {}",
                     unquote(key),
@@ -1134,14 +1153,16 @@ class VNIAllocator:
         session_id: str,
         generation: str | None = None,
         live_generation: str | None = None,
+        live_vni: int | None = None,
     ) -> list[int]:
         """Give back every VNI this INCARNATION of the session claimed, whatever any meta says.
 
         The counterpart of `SubnetAllocator.release_all`, and there for the same cases --
-        ``live_generation`` included: an unstamped claim is compatible with every incarnation, so
-        without it a cleanup for g1 takes the VNI a live g2 session is running on.
+        ``live_generation`` and ``live_vni`` included: a claim is not this cleanup's to take
+        either when it carries no incarnation (compatible with every one, so it may be the live
+        session's) or when the live record names it outright, whatever it carries.
         """
-        keep_unstamped = live_generation is not None and live_generation != generation
+        superseded = live_generation is not None and live_generation != generation
         stuck: list[int] = []
         for key, raw in _flat(await self._etcd.get_prefix(_VNI_PREFIX)).items():
             if not key.isdigit():
@@ -1158,7 +1179,14 @@ class VNIAllocator:
                     session_id,
                 )
                 continue
-            if keep_unstamped and _generation_stamp(raw) is None:
+            if superseded and live_vni is not None and int(key) == live_vni:
+                log.info(
+                    "leaving vni {} claimed: session {}'s record names it now",
+                    key,
+                    session_id,
+                )
+                continue
+            if superseded and _generation_stamp(raw) is None:
                 log.info(
                     "leaving vni {} claimed: it carries no incarnation, and session {} now names"
                     " {}",
