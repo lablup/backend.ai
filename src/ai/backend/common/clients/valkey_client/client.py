@@ -3,13 +3,13 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Final, Self, override
 
 from aiotools import cancel_and_wait
 from glide import (
     AdvancedGlideClientConfiguration,
+    ClosingError,
     GlideClient,
     GlideClientConfiguration,
     Logger,
@@ -18,7 +18,6 @@ from glide import (
     ServerCredentials,
     TlsAdvancedConfiguration,
 )
-from glide.exceptions import ClosingError  # type: ignore[import-not-found]
 from redis.asyncio.sentinel import Sentinel
 
 from ai.backend.common.exception import (
@@ -52,56 +51,6 @@ _VALKEY_CONNECTION_ERRORS: tuple[type[Exception], ...] = (
 )
 
 Logger.init(LogLevel.OFF)  # Disable Glide logging by default
-
-
-_pending_glide_clients: ContextVar[list[GlideClient] | None] = ContextVar(
-    "_pending_glide_clients", default=None
-)
-
-
-class _TrackedGlideClient(GlideClient):
-    """
-    Register the instance that `GlideClient.create()` builds into the pending list, so
-    that `_create_glide_client()` can close it when creation fails partway through.
-    """
-
-    def __init__(self, config: GlideClientConfiguration) -> None:
-        super().__init__(config)
-        pending = _pending_glide_clients.get()
-        if pending is not None:
-            pending.append(self)
-
-
-async def _close_partial_glide_client(client: GlideClient) -> None:
-    """Release the UDS stream and reader task of a client that failed to be created."""
-    try:
-        await client.close(err_message="Valkey client creation failed.")
-    except Exception as e:
-        # The UDS stream may not exist yet when the failure happened early enough.
-        log.debug("Error while closing a partially created Valkey client: {}", e)
-    reader_task = getattr(client, "_reader_task", None)
-    if isinstance(reader_task, asyncio.Task) and not reader_task.done():
-        await cancel_and_wait(reader_task)
-
-
-async def _create_glide_client(config: GlideClientConfiguration) -> GlideClient:
-    """
-    Create a glide client, closing the partially built one when creation fails.
-
-    `GlideClient.create()` returns the instance only on success, leaking the UDS stream
-    and reader task on failure. Drop this and `_TrackedGlideClient` when valkey-glide
-    is upgraded to 2.5.2 or later, which replaces the UDS transport with FFI.
-    """
-    pending: list[GlideClient] = []
-    token = _pending_glide_clients.set(pending)
-    try:
-        return await _TrackedGlideClient.create(config)
-    except BaseException:
-        for partial_client in pending:
-            await _close_partial_glide_client(partial_client)
-        raise
-    finally:
-        _pending_glide_clients.reset(token)
 
 
 SSL_CERT_NONE = "none"
@@ -286,7 +235,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             ),
         )
 
-        glide_client = await _create_glide_client(config)
+        glide_client = await GlideClient.create(config)
         self._valkey_client = glide_client
 
         log.debug(
@@ -426,7 +375,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
             ),
         )
 
-        glide_client = await _create_glide_client(config)
+        glide_client = await GlideClient.create(config)
         self._valkey_client = glide_client
 
         log.info(
