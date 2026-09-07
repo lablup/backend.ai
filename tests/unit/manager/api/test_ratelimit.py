@@ -41,21 +41,21 @@ class Caller:
 
 @dataclass(frozen=True)
 class RateLimitSuccessCase:
-    """A window state the request is served under, and the quota headers it reports."""
+    """A window the request stays within, and the quota headers it reports."""
 
-    description: str
     limit: int
     count: int
     expected_remaining: str
+    description: str
 
 
 @dataclass(frozen=True)
 class RateLimitExceedCase:
-    """A window state the request is refused under, and the limit the 429 reports."""
+    """A window the request runs past, and the limit the 429 reports."""
 
-    description: str
     limit: int
     count: int
+    description: str
 
 
 class TestRlimMiddleware:
@@ -139,28 +139,28 @@ class TestRlimMiddleware:
         "case",
         [
             RateLimitSuccessCase(
-                description="within limit",
                 limit=_RATE_LIMIT,
                 count=10,
                 expected_remaining="29990",
+                description="within limit",
             ),
             RateLimitSuccessCase(
-                description="exactly at limit",
                 limit=_RATE_LIMIT,
                 count=_RATE_LIMIT,
                 expected_remaining="0",
+                description="exactly at limit",
             ),
             RateLimitSuccessCase(
-                description="zero limit before any request lands",
                 limit=0,
                 count=0,
                 expected_remaining="0",
+                description="zero limit before any request lands",
             ),
             RateLimitSuccessCase(
-                description="the limit the window holds, not the one asked for",
                 limit=100,
                 count=10,
                 expected_remaining="90",
+                description="the limit the window holds, not the one asked for",
             ),
         ],
         ids=lambda case: case.description,
@@ -194,10 +194,20 @@ class TestRlimMiddleware:
         "case",
         [
             RateLimitExceedCase(
-                description="exceeds by 1", limit=_RATE_LIMIT, count=_RATE_LIMIT + 1
+                limit=_RATE_LIMIT,
+                count=_RATE_LIMIT + 1,
+                description="exceeds by 1",
             ),
-            RateLimitExceedCase(description="far exceeds limit", limit=_RATE_LIMIT, count=50000),
-            RateLimitExceedCase(description="zero limit always exceeds", limit=0, count=1),
+            RateLimitExceedCase(
+                limit=_RATE_LIMIT,
+                count=50000,
+                description="far exceeds limit",
+            ),
+            RateLimitExceedCase(
+                limit=0,
+                count=1,
+                description="zero limit always exceeds",
+            ),
         ],
         ids=lambda case: case.description,
     )
