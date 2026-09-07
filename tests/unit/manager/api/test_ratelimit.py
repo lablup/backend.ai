@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -32,19 +31,7 @@ _RESET_AFTER_SECONDS = 500
 
 
 @dataclass(frozen=True)
-class _Caller:
-    """A caller the middleware can meet, and the window its identity opens."""
-
-    description: str
-    request_state: Mapping[str, Any]
-    limit: int
-    consumer: str
-    other_consumer: str
-    expected_kwargs: Mapping[str, Any]
-
-
-@dataclass(frozen=True)
-class _WithinWindowCase:
+class WithinWindowCase:
     """A window the request stays within, and the quota headers it reports."""
 
     description: str
@@ -54,41 +41,12 @@ class _WithinWindowCase:
 
 
 @dataclass(frozen=True)
-class _PastWindowCase:
+class PastWindowCase:
     """A window the request runs past, and the limit the 429 reports."""
 
     description: str
     limit: int
     count: int
-
-
-_ANONYMOUS = _Caller(
-    description="anonymous",
-    request_state={"is_authorized": False, "user": None},
-    limit=_ANONYMOUS_RATELIMIT,
-    consumer="consume_ip_rate_limit",
-    other_consumer="consume_user_rate_limit",
-    expected_kwargs={
-        "client_ip": _CLIENT_IP,
-        "window_seconds": _RATELIMIT_WINDOW_SECONDS,
-        "limit": _ANONYMOUS_RATELIMIT,
-    },
-)
-_AUTHORIZED = _Caller(
-    description="authorized",
-    request_state={
-        "is_authorized": True,
-        "user": {"uuid": _USER_ID, "rate_limit": _RATE_LIMIT},
-    },
-    limit=_RATE_LIMIT,
-    consumer="consume_user_rate_limit",
-    other_consumer="consume_ip_rate_limit",
-    expected_kwargs={
-        "user_id": _USER_ID,
-        "window_seconds": _RATELIMIT_WINDOW_SECONDS,
-        "limit": _RATE_LIMIT,
-    },
-)
 
 
 class TestRlimMiddleware:
@@ -113,71 +71,134 @@ class TestRlimMiddleware:
         return handler
 
     @pytest.fixture
-    def caller_request(self, caller: _Caller) -> web.Request:
-        """A request carrying what the auth middleware left about its caller."""
+    def mock_request_anonymous(self) -> web.Request:
+        """Mock request for an unauthenticated caller."""
         request = make_mocked_request("GET", "/")
-        request.update(caller.request_state)
+        request["is_authorized"] = False
+        request["user"] = None
         return request
 
     @pytest.fixture
-    def authorized_request(self) -> web.Request:
-        """A request whose caller is known, for the rules that hold for any caller."""
+    def mock_request_authorized(self) -> web.Request:
+        """Mock request carrying the rate limit the auth middleware injected."""
         request = make_mocked_request("GET", "/")
-        request.update(_AUTHORIZED.request_state)
+        request["is_authorized"] = True
+        request["user"] = {"uuid": _USER_ID, "rate_limit": _RATE_LIMIT}
         return request
 
-    @pytest.mark.parametrize("caller", [_ANONYMOUS, _AUTHORIZED], ids=lambda c: c.description)
-    async def test_the_window_a_caller_opens(
+    async def test_an_authorized_query_counts_against_the_user_window(
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
-        caller: _Caller,
-        caller_request: web.Request,
+        mock_request_authorized: web.Request,
         mock_handler: AsyncMock,
     ) -> None:
-        """Which identity keys the window: the user when there is one, the address otherwise."""
+        """The user and the limit the auth middleware put on the request open the window."""
         # Arrange
-        state = RateLimitState(
-            count=1, limit=caller.limit, reset_after_seconds=_RESET_AFTER_SECONDS
+        mock_valkey_client.consume_user_rate_limit.return_value = RateLimitState(
+            count=1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
         )
-        getattr(mock_valkey_client, caller.consumer).return_value = state
+
+        # Act
+        await middleware(mock_request_authorized, mock_handler)
+
+        # Assert
+        mock_valkey_client.consume_user_rate_limit.assert_called_once_with(
+            user_id=_USER_ID,
+            window_seconds=_RATELIMIT_WINDOW_SECONDS,
+            limit=_RATE_LIMIT,
+        )
+        mock_valkey_client.consume_ip_rate_limit.assert_not_called()
+
+    async def test_an_anonymous_query_counts_against_the_client_address_window(
+        self,
+        middleware: Any,
+        mock_valkey_client: MagicMock,
+        mock_request_anonymous: web.Request,
+        mock_handler: AsyncMock,
+    ) -> None:
+        """An unauthenticated request names no keypair, so its address opens the window."""
+        # Arrange
+        mock_valkey_client.consume_ip_rate_limit.return_value = RateLimitState(
+            count=1, limit=_ANONYMOUS_RATELIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
+        )
 
         # Act
         with with_client_ip(_CLIENT_IP):
-            response = await middleware(caller_request, mock_handler)
-        await apply_reserved_response_headers(caller_request, response)
+            response = await middleware(mock_request_anonymous, mock_handler)
+        await apply_reserved_response_headers(mock_request_anonymous, response)
 
         # Assert
-        getattr(mock_valkey_client, caller.consumer).assert_called_once_with(
-            **caller.expected_kwargs
+        mock_valkey_client.consume_ip_rate_limit.assert_called_once_with(
+            client_ip=_CLIENT_IP,
+            window_seconds=_RATELIMIT_WINDOW_SECONDS,
+            limit=_ANONYMOUS_RATELIMIT,
         )
-        getattr(mock_valkey_client, caller.other_consumer).assert_not_called()
-        assert response.headers["X-RateLimit-Limit"] == str(caller.limit)
-        assert response.headers["X-RateLimit-Remaining"] == str(caller.limit - 1)
-        mock_handler.assert_called_once_with(caller_request)
+        mock_valkey_client.consume_user_rate_limit.assert_not_called()
+        assert response.headers["X-RateLimit-Limit"] == str(_ANONYMOUS_RATELIMIT)
+        assert response.headers["X-RateLimit-Remaining"] == str(_ANONYMOUS_RATELIMIT - 1)
+        mock_handler.assert_called_once_with(mock_request_anonymous)
+
+    async def test_an_anonymous_query_without_a_client_address_is_refused(
+        self,
+        middleware: Any,
+        mock_valkey_client: MagicMock,
+        mock_request_anonymous: web.Request,
+        mock_handler: AsyncMock,
+    ) -> None:
+        """No address means no window to count in, and serving uncounted is not the answer."""
+        # Act & Assert
+        with pytest.raises(UnreachableError):
+            await middleware(mock_request_anonymous, mock_handler)
+        mock_valkey_client.consume_ip_rate_limit.assert_not_called()
+        mock_handler.assert_not_called()
+
+    async def test_an_anonymous_query_past_its_window_is_refused(
+        self,
+        middleware: Any,
+        mock_valkey_client: MagicMock,
+        mock_request_anonymous: web.Request,
+        mock_handler: AsyncMock,
+    ) -> None:
+        """The anonymous window is enforced, not merely reported."""
+        # Arrange
+        mock_valkey_client.consume_ip_rate_limit.return_value = RateLimitState(
+            count=_ANONYMOUS_RATELIMIT + 1,
+            limit=_ANONYMOUS_RATELIMIT,
+            reset_after_seconds=_RESET_AFTER_SECONDS,
+        )
+
+        # Act & Assert
+        with pytest.raises(RateLimitExceeded), with_client_ip(_CLIENT_IP):
+            await middleware(mock_request_anonymous, mock_handler)
+        response = web.Response(status=429)
+        await apply_reserved_response_headers(mock_request_anonymous, response)
+        assert response.headers["X-RateLimit-Limit"] == str(_ANONYMOUS_RATELIMIT)
+        assert response.headers["X-RateLimit-Remaining"] == "0"
+        mock_handler.assert_not_called()
 
     @pytest.mark.parametrize(
         "case",
         [
-            _WithinWindowCase(
+            WithinWindowCase(
                 description="within limit",
                 limit=_RATE_LIMIT,
                 count=10,
                 expected_remaining="29990",
             ),
-            _WithinWindowCase(
+            WithinWindowCase(
                 description="exactly at limit",
                 limit=_RATE_LIMIT,
                 count=_RATE_LIMIT,
                 expected_remaining="0",
             ),
-            _WithinWindowCase(
+            WithinWindowCase(
                 description="zero limit before any request lands",
                 limit=0,
                 count=0,
                 expected_remaining="0",
             ),
-            _WithinWindowCase(
+            WithinWindowCase(
                 description="the limit fixed for the window outranks the injected one",
                 limit=100,
                 count=10,
@@ -190,9 +211,9 @@ class TestRlimMiddleware:
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
-        authorized_request: web.Request,
+        mock_request_authorized: web.Request,
         mock_handler: AsyncMock,
-        case: _WithinWindowCase,
+        case: WithinWindowCase,
     ) -> None:
         """The headers report the window that stands, not the limit the request carried."""
         # Arrange
@@ -201,65 +222,46 @@ class TestRlimMiddleware:
         )
 
         # Act
-        response = await middleware(authorized_request, mock_handler)
-        await apply_reserved_response_headers(authorized_request, response)
+        response = await middleware(mock_request_authorized, mock_handler)
+        await apply_reserved_response_headers(mock_request_authorized, response)
 
         # Assert
         assert response.headers["X-RateLimit-Limit"] == str(case.limit)
         assert response.headers["X-RateLimit-Remaining"] == case.expected_remaining
         assert response.headers["X-RateLimit-Reset"] == str(_RESET_AFTER_SECONDS)
         assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW_SECONDS)
-        mock_handler.assert_called_once_with(authorized_request)
+        mock_handler.assert_called_once_with(mock_request_authorized)
 
-    @pytest.mark.parametrize("caller", [_ANONYMOUS, _AUTHORIZED], ids=lambda c: c.description)
     @pytest.mark.parametrize(
         "case",
         [
-            _PastWindowCase(description="exceeds by 1", limit=_RATE_LIMIT, count=_RATE_LIMIT + 1),
-            _PastWindowCase(description="far exceeds limit", limit=_RATE_LIMIT, count=50000),
-            _PastWindowCase(description="zero limit always exceeds", limit=0, count=1),
+            PastWindowCase(description="exceeds by 1", limit=_RATE_LIMIT, count=_RATE_LIMIT + 1),
+            PastWindowCase(description="far exceeds limit", limit=_RATE_LIMIT, count=50000),
+            PastWindowCase(description="zero limit always exceeds", limit=0, count=1),
         ],
         ids=lambda case: case.description,
     )
-    async def test_a_request_past_its_window_is_refused(
+    async def test_an_authorized_query_past_its_window_is_refused(
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
-        caller: _Caller,
-        caller_request: web.Request,
+        mock_request_authorized: web.Request,
         mock_handler: AsyncMock,
-        case: _PastWindowCase,
+        case: PastWindowCase,
     ) -> None:
-        """Every caller is judged by the window it was counted in, and refused past it."""
+        """A request past the window it was counted in gets 429 and never reaches the handler."""
         # Arrange
-        getattr(mock_valkey_client, caller.consumer).return_value = RateLimitState(
+        mock_valkey_client.consume_user_rate_limit.return_value = RateLimitState(
             count=case.count, limit=case.limit, reset_after_seconds=_RESET_AFTER_SECONDS
         )
 
         # Act & Assert
-        with pytest.raises(RateLimitExceeded), with_client_ip(_CLIENT_IP):
-            await middleware(caller_request, mock_handler)
+        with pytest.raises(RateLimitExceeded):
+            await middleware(mock_request_authorized, mock_handler)
         response = web.Response(status=429)
-        await apply_reserved_response_headers(caller_request, response)
+        await apply_reserved_response_headers(mock_request_authorized, response)
         assert response.headers["X-RateLimit-Limit"] == str(case.limit)
         assert response.headers["X-RateLimit-Remaining"] == "0"
         assert response.headers["X-RateLimit-Reset"] == str(_RESET_AFTER_SECONDS)
         assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW_SECONDS)
-        mock_handler.assert_not_called()
-
-    async def test_an_anonymous_query_without_a_client_address_is_refused(
-        self,
-        middleware: Any,
-        mock_valkey_client: MagicMock,
-        mock_handler: AsyncMock,
-    ) -> None:
-        """No address means no window to count in, and serving uncounted is not the answer."""
-        # Arrange
-        request = make_mocked_request("GET", "/")
-        request.update(_ANONYMOUS.request_state)
-
-        # Act & Assert
-        with pytest.raises(UnreachableError):
-            await middleware(request, mock_handler)
-        mock_valkey_client.consume_ip_rate_limit.assert_not_called()
         mock_handler.assert_not_called()
