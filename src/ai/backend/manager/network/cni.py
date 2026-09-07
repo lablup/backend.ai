@@ -43,6 +43,7 @@ from ai.backend.common.network.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import (
+    EndpointSuperseded,
     ForcedBackendUnsupported,
     NetworkBackendMismatch,
     OverlayTeardownPending,
@@ -266,11 +267,16 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         try:
             backend = self._select_backend(forced_backend)
             # Size the session subnet to hold every endpoint (removes the fixed-/24 254 cap).
+            # Guarded on the record this create holds, exactly as the endpoint writes below are.
+            # A pool claim made on behalf of a session that has moved on is named by no meta and
+            # released by no cleanup -- it is the one leak nothing can find afterwards.
+            pool_guards = {session_meta_key(session_id): held}
             subnet = await self._subnet_allocator.acquire(
                 session_id,
                 host_count=max(len(endpoints), 1),
                 subnet=str(requested_subnet) if requested_subnet else None,
                 generation=generation,
+                guards=pool_guards,
             )
             # Encrypt the overlay for the encapsulating (VXLAN) backend unless something opted
             # OUT -- see `_encryption_enabled`. The key is the CLUSTER's, not this session's: ESP
@@ -287,7 +293,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 encrypt = await self._nodes_can_encrypt(etcd, member_agents, policy=policy)
             encryption_key = await overlay_encryption_key(etcd) if encrypt else None
             if backend is NetworkBackendKind.VXLAN:
-                vni = await self._vni_allocator.acquire(session_id, generation)
+                vni = await self._vni_allocator.acquire(session_id, generation, pool_guards)
             # `mtu` in plugin_config is the UNDERLAY MTU; the overlay MTU (what the kernel's NIC
             # gets) is that minus the tunnel overhead. Only the VXLAN backend encapsulates, so only
             # it pays the overhead; a non-encapsulating backend would keep the underlay MTU. When
@@ -338,6 +344,10 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     agent_id=str(endpoint["agent_id"]),
                     cluster_hostname=str(hostname) if hostname is not None else None,
                     generation=generation,
+                    # Every address and endpoint key is written in the same store operation that
+                    # checks this create still holds the session's record. The stamp says whose a
+                    # key is; the guard is what stops one being made at all.
+                    guards={session_meta_key(session_id): held},
                 )
                 endpoint_ips[container_id] = ip
             # Pre-seed the membership table so each agent's reconcile-at-start finds every
@@ -347,7 +357,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # whose VTEP is not yet published are skipped — they fall back to self-publish +
             # watch convergence (no regression).
             if backend is NetworkBackendKind.VXLAN:
-                await self._preseed_members(session_id, member_agents, generation)
+                await self._preseed_members(session_id, member_agents, generation, held)
             # Ready only now: everything the session needs is on record. A waiter returns at
             # this point, and not before -- a create that fails after publishing undoes itself,
             # and anyone who had already been handed the half-built record would be holding a
@@ -404,18 +414,30 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             )
             return None
         endpoint_ips: dict[str, str] = {}
-        for endpoint in endpoints:
-            container_id = str(endpoint["container_id"])
-            hostname = endpoint.get("cluster_hostname")
-            ip, _mac = await self._endpoint_allocator.assign(
+        try:
+            for endpoint in endpoints:
+                container_id = str(endpoint["container_id"])
+                hostname = endpoint.get("cluster_hostname")
+                ip, _mac = await self._endpoint_allocator.assign(
+                    session_id,
+                    container_id,
+                    subnet,
+                    agent_id=str(endpoint["agent_id"]),
+                    cluster_hostname=str(hostname) if hostname is not None else None,
+                    generation=meta.get(_GENERATION),
+                    guards={session_meta_key(session_id): raw},
+                )
+                endpoint_ips[container_id] = ip
+        except EndpointSuperseded:
+            # The record moved on under the reuse. To this caller that is not an error but an
+            # answer: there is no allocation here to hand back, and the caller re-reads and takes
+            # the session again. Reported as such rather than raised out of a converge path.
+            log.warning(
+                "session {}'s record moved on while its existing allocation was being reused;"
+                " treating it as no allocation at all",
                 session_id,
-                container_id,
-                subnet,
-                agent_id=str(endpoint["agent_id"]),
-                cluster_hostname=str(hostname) if hostname is not None else None,
-                generation=meta.get(_GENERATION),
             )
-            endpoint_ips[container_id] = ip
+            return None
         # The last word, over the exact record the pool was checked against. A destroy that ran
         # while the endpoints above were being written has replaced it, and what this holds is an
         # allocation that has already gone back to the pool.
@@ -663,11 +685,26 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # sweep has no tombstone to work from -- the record already names the incarnation that
         # replaced this one -- so without a note of its own, a single failed delete leaks a VNI, a
         # subnet and their keys with nothing left anywhere that names them.
-        await self._owe_cleanup(etcd, session_id, generation)
-        await self._sweep_incarnation(etcd, session_id, generation)
+        owed = await self._owe_cleanup(etcd, session_id, generation)
+        if not await self._sweep_incarnation(etcd, session_id, generation) and not owed:
+            # Both halves failed: the state is still there and nothing anywhere names it. Said at
+            # the level it deserves, because no retry will find this on its own -- the record
+            # already belongs to the incarnation that replaced this one, and the debt that would
+            # have pointed at it was never written.
+            log.error(
+                "session {}'s incarnation {} could not be given back AND its debt could not be"
+                " recorded; its subnet, VNI and keys are now held by nothing that names them and"
+                " will not be reclaimed without operator action",
+                session_id,
+                generation,
+            )
 
-    async def _owe_cleanup(self, etcd: AsyncEtcd, session_id: str, generation: str) -> None:
-        """Record that an incarnation still has state to give back."""
+    async def _owe_cleanup(self, etcd: AsyncEtcd, session_id: str, generation: str) -> bool:
+        """Record that an incarnation still has state to give back.
+
+        :return: ``True`` if the note landed; the caller needs to know, because a sweep that fails
+            with no note behind it is a leak nothing can find.
+        """
         try:
             await etcd.put(
                 _debt_key(session_id, generation),
@@ -679,14 +716,15 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 scope=ConfigScopes.GLOBAL,
             )
         except Exception:
-            # Not fatal to the sweep that follows -- it may well succeed. Fatal to the RETRY, so
-            # it is said plainly rather than swallowed.
+            # Not fatal to the sweep that follows -- it may well succeed. Fatal to the RETRY.
             log.exception(
                 "could not record what session {}'s incarnation {} still owes; if the sweep below"
                 " does not finish, nothing will come back for it",
                 session_id,
                 generation,
             )
+            return False
+        return True
 
     async def _sweep_incarnation(self, etcd: AsyncEtcd, session_id: str, generation: str) -> bool:
         """Give back everything one incarnation of a session still holds, and say whether it all
@@ -722,16 +760,25 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
 
         Called where a session id is about to be used again -- a create, a teardown -- because
         that is both the moment the leak matters and the moment somebody is already here to pay
-        it. Best-effort: a debt that will not clear stays written down for the next one.
+        it. A debt that will not clear stays written down for the next one.
+
+        A failure to READ the debt is not "nothing is owed": what is owed may be the very subnet
+        or VNI the caller is about to claim. It is raised, so the create or teardown retries
+        rather than building over state it could not ask about.
+
+        Raises:
+            SessionCleanupPending: this session's outstanding debt could not be read.
         """
         etcd = self._require_etcd()
         try:
             owed = await etcd.get_prefix(
                 f"{_CLEANUP_DEBT_PREFIX}/{session_id}", scope=ConfigScopes.GLOBAL
             )
-        except Exception:
-            log.exception("could not read what session {} still owes", session_id)
-            return
+        except Exception as e:
+            raise SessionCleanupPending(
+                f"could not read what session {session_id}'s earlier incarnations still owe"
+                f" ({e}); retrying rather than reusing the id over state nothing has looked at"
+            ) from e
         for generation, payload in dict(owed).items():
             if not generation or not isinstance(payload, str):
                 continue
