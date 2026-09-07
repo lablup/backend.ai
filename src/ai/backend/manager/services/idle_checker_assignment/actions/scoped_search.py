@@ -1,58 +1,37 @@
-"""Scoped idle-checker-assignment search action and its searchable targets."""
+"""Scoped idle-checker-assignment search."""
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
-from ai.backend.manager.actions.action.bulk import BaseBulkAction, BasePartialBulkActionResult
-from ai.backend.manager.actions.action.types import SearchableActionTarget
+from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentOperationScope
+from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.repositories.base import BatchQuerier
 
 
 @dataclass(frozen=True)
-class IdleCheckerAssignmentScopeTarget(SearchableActionTarget):
-    """Scope item keyed by a bound scope ``(scope_type, scope_id)``."""
+class ScopedSearchIdleCheckerAssignmentsAction(BaseScopeAction):
+    """Page through the bindings hanging on the named scopes, combined with OR.
 
-    scope_type: ScopeType
-    scope_id: uuid.UUID
+    Every scope is authorized before the read runs, so a caller reaching for one they
+    cannot see is refused rather than served the rest.
+    """
 
-    @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType(self.scope_type.value),
-            element_id=str(self.scope_id),
-        )
-
-    @override
-    def to_search_scope(self) -> OperationScope:
-        return IdleCheckerAssignmentOperationScope(
-            scope_type=self.scope_type,
-            scope_id=self.scope_id,
-        )
-
-
-@dataclass
-class ScopedSearchIdleCheckerAssignmentsAction(BaseBulkAction[SearchableActionTarget]):
-    items: list[SearchableActionTarget]
-    querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    scopes: Sequence[EntityIdentifier]
+    searcher: IdleCheckerAssignmentSearcher
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.IDLE_CHECKER_ASSIGNMENT
+        return IDLE_CHECKER_ENTITY_TYPE
 
     @override
     @classmethod
@@ -60,18 +39,30 @@ class ScopedSearchIdleCheckerAssignmentsAction(BaseBulkAction[SearchableActionTa
         return ActionOperationType.SEARCH
 
     @override
-    def targets(self) -> Sequence[SearchableActionTarget]:
-        return list(self.items)
+    @classmethod
+    def action_name(cls) -> str:
+        return "scoped_search_idle_checker_assignments"
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return [
+            ScopeRef(scope_type=ScopeType(scope.entity_type()), scope_id=scope)
+            for scope in self.scopes
+        ]
+
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return [IdleCheckerAssignmentOperationScope(scope=scope) for scope in self.scopes]
 
 
-@dataclass
-class ScopedSearchIdleCheckerAssignmentsActionResult(BasePartialBulkActionResult):
-    data: list[IdleCheckerAssignmentData]
+@dataclass(frozen=True)
+class ScopedSearchIdleCheckerAssignmentsActionResult(BaseScopeActionResult):
+    """A page of bindings. What the read reached is the checkers the bindings link."""
+
+    items: list[IdleCheckerAssignmentData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-    queried_refs: list[RBACElementRef]
 
     @override
-    def element_refs(self) -> list[RBACElementRef]:
-        return list(self.queried_refs)
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return [item.idle_checker_id for item in self.items]

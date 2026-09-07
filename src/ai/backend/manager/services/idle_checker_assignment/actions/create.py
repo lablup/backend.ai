@@ -3,33 +3,25 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
-from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerAssignmentCreatorSpec
+from ai.backend.manager.models.idle_checker.creators import IdleCheckerAssignmentCreator
 from ai.backend.manager.services.idle_checker_assignment.actions.base import (
-    IdleCheckerAssignmentAction,
+    IdleCheckerAssignmentRelationAction,
 )
 
 
-@dataclass
-class CreateIdleCheckerAssignmentAction(IdleCheckerAssignmentAction):
-    creator_spec: IdleCheckerAssignmentCreatorSpec
+@dataclass(frozen=True)
+class CreateIdleCheckerAssignmentAction(IdleCheckerAssignmentRelationAction):
+    """Bind an idle checker definition to one scope."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: IdleCheckerAssignmentCreator
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-
-@dataclass
-class CreateIdleCheckerAssignmentActionResult(BaseActionResult):
-    data: IdleCheckerAssignmentData
-
     @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_idle_checker_assignment"

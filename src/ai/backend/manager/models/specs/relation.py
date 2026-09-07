@@ -17,7 +17,11 @@ from typing import Any
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import (
+    ConflictCheck,
+    IntegrityErrorCheck,
+    PreconditionCheck,
+)
 
 
 class RelationCreator[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow: Base](ABC):
@@ -32,7 +36,15 @@ class RelationCreator[TScope: EntityIdentifier, TTarget: EntityIdentifier, TRow:
 
     A pair already linked, switched off or not, is a unique violation the spec maps to a
     domain error; switching it back on is the restore updater's, not the create's.
+
+    A side the database cannot vouch for (a polymorphic reference carries no foreign
+    key) is declared as a precondition, which the write runs before the insert.
     """
+
+    @abstractmethod
+    def precondition_checks(self, scope: TScope, target: TTarget) -> Sequence[PreconditionCheck]:
+        """What must not be there for this link to stand."""
+        raise NotImplementedError
 
     @abstractmethod
     def row_class(self) -> type[TRow]:

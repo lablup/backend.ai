@@ -19,7 +19,7 @@ from ai.backend.manager.models.association_container_registries_groups import (
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.relation import RelationCreator
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 
 
 @dataclass
@@ -77,6 +77,12 @@ class ContainerRegistryProjectCreator(
     RelationCreator[ProjectID, ContainerRegistryID, AssociationContainerRegistriesGroupsRow]
 ):
     """Links a project (the scope) to a registry (the target)."""
+
+    @override
+    def precondition_checks(
+        self, scope: ProjectID, target: ContainerRegistryID
+    ) -> Sequence[PreconditionCheck]:
+        return ()
 
     @override
     def row_class(self) -> type[AssociationContainerRegistriesGroupsRow]:

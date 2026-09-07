@@ -6,7 +6,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
@@ -173,6 +173,13 @@ class IdleCheckerAssignmentConditions:
     def enabled() -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return IdleCheckerBindingRow.enabled == sa.true()
+
+        return inner
+
+    @staticmethod
+    def by_id(assignment_id: IdleCheckerAssignmentID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return IdleCheckerBindingRow.id == assignment_id
 
         return inner
 

@@ -5,16 +5,25 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from typing import TYPE_CHECKING, Any
+from unittest.mock import MagicMock
 
 import pytest
+import sqlalchemy as sa
 import yarl
 
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.idle_checker import (
+    IDLE_CHECKER_ENTITY_TYPE,
+    IdleCheckerAssignmentID,
+    IdleCheckerID,
+)
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -24,16 +33,31 @@ from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
     Permission,
-    RelationType,
     ScopeType,
 )
 from ai.backend.common.types import ResourceSlot, SessionTypes
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    GroupMeta,
+    ProcessorDependencies,
 )
+from ai.backend.manager.actions.v2.bulk.validator.rbac import (
+    VirtualEntityAtomicBulkActionRBACValidator,
+    VirtualEntityPartialBulkActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.relation.validator.rbac import (
+    VirtualEntityRelationActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.scope.validator.rbac import (
+    VirtualEntityScopeActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
+    VirtualEntitySingleEntityActionRBACValidator,
+)
+from ai.backend.manager.actions.validators.rbac import VirtualEntityRBACValidators
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
     IdleCheckerAssignmentAdapter,
 )
@@ -45,19 +69,28 @@ from ai.backend.manager.api.rest.v2.idle_checker_assignment.handler import (
 from ai.backend.manager.api.rest.v2.idle_checker_assignment.registry import (
     register_v2_idle_checker_assignment_routes,
 )
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
-from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
+from ai.backend.manager.models.idle_checker.creators import (
+    IdleCheckerAssignmentCreator,
+    IdleCheckerCreator,
 )
+from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -66,41 +99,83 @@ from ai.backend.manager.services.idle_checker_assignment.processors import (
 )
 from ai.backend.manager.services.idle_checker_assignment.service import IdleCheckerAssignmentService
 from ai.backend.manager.services.processors import Processors
-from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 
 if TYPE_CHECKING:
-    from tests.component.conftest import ServerInfo, UserFixtureData
+    from tests.component.conftest import ServerInfo, UserFixtureData, VirtualEntitySeeder
 
 
 @dataclass
 class AssignmentSeedData:
+    checker_id: IdleCheckerID
     domain_id: DomainID
-    project_id: uuid.UUID
-    other_project_id: uuid.UUID
-    domain_assignment_id: uuid.UUID
-    project_assignment_id: uuid.UUID
-    other_project_assignment_id: uuid.UUID
-    user_assignment_id: uuid.UUID
+    project_id: ProjectID
+    other_project_id: ProjectID
+    domain_assignment_id: IdleCheckerAssignmentID
+    project_assignment_id: IdleCheckerAssignmentID
+    other_project_assignment_id: IdleCheckerAssignmentID
+    user_assignment_id: IdleCheckerAssignmentID
+
+
+async def _provision(conn: sa.ext.asyncio.AsyncConnection, scope: EntityIdentifier) -> None:
+    """The node a create writes for a scope: it owns and governs itself."""
+    node_id = uuid.uuid4()
+    await conn.execute(
+        sa.insert(VirtualEntityRow.__table__).values(
+            id=node_id, entity_type=scope.entity_type(), entity_id=scope
+        )
+    )
+    await conn.execute(
+        sa.insert(EntityMembershipRow.__table__).values(
+            virtual_entity_id=node_id, member_entity_id=node_id, capped=False
+        )
+    )
+    await conn.execute(
+        sa.insert(ScopeBindingRow.__table__).values(
+            virtual_entity_id=node_id, scope_entity_id=node_id, permission_cap=None
+        )
+    )
+
+
+async def _teardown(conn: sa.ext.asyncio.AsyncConnection, scope: EntityIdentifier) -> None:
+    await conn.execute(
+        VirtualEntityRow.__table__.delete().where(
+            VirtualEntityRow.__table__.c.entity_type == scope.entity_type(),
+            VirtualEntityRow.__table__.c.entity_id == scope,
+        )
+    )
 
 
 @pytest.fixture()
 def idle_checker_assignment_processors(
     database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
 ) -> IdleCheckerAssignmentProcessors:
     """Assignment processors with real RBAC validators against the real DB."""
-    service = IdleCheckerAssignmentService(IdleCheckerRepository(DBOpsProvider(database_engine)))
     permission_repo = PermissionControllerRepository(database_engine)
-    return IdleCheckerAssignmentProcessors(
-        service=service,
-        action_monitors=[],
-        validators=ActionValidators(
-            rbac=RBACValidators(
-                scope=AsyncMock(),
-                single_entity=SingleEntityActionRBACValidator(permission_repo, MagicMock()),
-                bulk=BulkActionRBACValidator(permission_repo, MagicMock()),
-            ),
-            virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
+    validators = VirtualEntityRBACValidators(
+        scope=VirtualEntityScopeActionRBACValidator(permission_repo, config_provider),
+        single_entity=VirtualEntitySingleEntityActionRBACValidator(
+            permission_repo, config_provider
         ),
+        partial_bulk=VirtualEntityPartialBulkActionRBACValidator(permission_repo, config_provider),
+        atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(permission_repo, config_provider),
+        relation=VirtualEntityRelationActionRBACValidator(permission_repo, config_provider),
+    )
+    registry: ProcessorRegistry[Any] = ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=validators.to_action_validators(),
+            repository=OpsRepository(V2DBOpsProvider(database_engine)),
+        )
+    )
+    service = IdleCheckerAssignmentService(
+        IdleCheckerRepository(DBOpsProvider(database_engine), RelationOpsProvider(database_engine))
+    )
+    groups = registry.concern(ConcernMeta(Concern.SESSION))
+    return IdleCheckerAssignmentProcessors(
+        groups.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
+        groups.relation_group(),
+        service,
     )
 
 
@@ -164,13 +239,12 @@ async def assignment_seed(
 ) -> AsyncIterator[AssignmentSeedData]:
     """Seed a domain and two projects, one checker, and one assignment per scope.
 
-    The assignments model super-admin-created rows; each also gets its RBAC scope
-    association row so that single-entity scope-chain checks can resolve the
-    assignment back to its scope.
+    Each scope gets the node a create would have written; the checker is created the
+    way the catalog creates it; each assignment is linked through the repository.
     """
     domain_id = DomainID(uuid.uuid4())
-    project_id = uuid.uuid4()
-    other_project_id = uuid.uuid4()
+    project_id = ProjectID(uuid.uuid4())
+    other_project_id = ProjectID(uuid.uuid4())
     domain_name = f"icb-domain-{domain_id.hex[:8]}"
     policy_name = f"icb-prp-{project_id.hex[:8]}"
     async with database_engine.begin_session() as db_sess:
@@ -202,7 +276,13 @@ async def assignment_seed(
                 resource_policy=policy_name,
             )
         )
-        checker = IdleCheckerRow(
+    provisioned: list[EntityIdentifier] = [domain_id, project_id, other_project_id]
+    async with database_engine.begin() as conn:
+        for scope in provisioned:
+            await _provision(conn, scope)
+    catalog: OpsRepository[IdleCheckerData] = OpsRepository(V2DBOpsProvider(database_engine))
+    checker = await catalog.create_global_entity(
+        IdleCheckerCreator(
             name=f"icb-checker-{domain_id.hex[:8]}",
             description=None,
             target_session_types=[SessionTypes.INTERACTIVE],
@@ -212,77 +292,34 @@ async def assignment_seed(
                 session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
             ),
         )
-        db_sess.add(checker)
-        await db_sess.flush()
-        checker_id = checker.id
-        domain_assignment = IdleCheckerBindingRow(
-            scope_type=ScopeType.DOMAIN,
-            scope_id=domain_id,
-            idle_checker_id=checker_id,
-            enabled=True,
-        )
-        project_assignment = IdleCheckerBindingRow(
-            scope_type=ScopeType.PROJECT,
-            scope_id=project_id,
-            idle_checker_id=checker_id,
-            enabled=True,
-        )
-        other_project_assignment = IdleCheckerBindingRow(
-            scope_type=ScopeType.PROJECT,
-            scope_id=other_project_id,
-            idle_checker_id=checker_id,
-            enabled=True,
-        )
-        user_assignment = IdleCheckerBindingRow(
-            scope_type=ScopeType.USER,
-            scope_id=regular_user_fixture.user_uuid,
-            idle_checker_id=checker_id,
-            enabled=True,
-        )
-        db_sess.add(domain_assignment)
-        db_sess.add(project_assignment)
-        db_sess.add(other_project_assignment)
-        db_sess.add(user_assignment)
-        await db_sess.flush()
-        assignment_scopes = [
-            (domain_assignment.id, ScopeType.DOMAIN, str(domain_id)),
-            (project_assignment.id, ScopeType.PROJECT, str(project_id)),
-            (other_project_assignment.id, ScopeType.PROJECT, str(other_project_id)),
-            (user_assignment.id, ScopeType.USER, str(regular_user_fixture.user_uuid)),
-        ]
-        for assignment_id, scope_type, scope_id in assignment_scopes:
-            db_sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=scope_type,
-                    scope_id=scope_id,
-                    entity_type=EntityType.IDLE_CHECKER_ASSIGNMENT,
-                    entity_id=str(assignment_id),
-                    relation_type=RelationType.AUTO,
-                )
+    )
+    checker_id = checker.id
+    repository = IdleCheckerRepository(
+        DBOpsProvider(database_engine), RelationOpsProvider(database_engine)
+    )
+    assignments: list[IdleCheckerAssignmentData] = []
+    for scope in [*provisioned, regular_user_fixture.user_uuid]:
+        assignments.append(
+            await repository.create_assignment(
+                IdleCheckerAssignmentCreator(enabled=True), scope, checker_id
             )
-        await db_sess.flush()
-        seed = AssignmentSeedData(
-            domain_id=domain_id,
-            project_id=project_id,
-            other_project_id=other_project_id,
-            domain_assignment_id=domain_assignment.id,
-            project_assignment_id=project_assignment.id,
-            other_project_assignment_id=other_project_assignment.id,
-            user_assignment_id=user_assignment.id,
         )
+    seed = AssignmentSeedData(
+        checker_id=checker_id,
+        domain_id=domain_id,
+        project_id=project_id,
+        other_project_id=other_project_id,
+        domain_assignment_id=assignments[0].id,
+        project_assignment_id=assignments[1].id,
+        other_project_assignment_id=assignments[2].id,
+        user_assignment_id=assignments[3].id,
+    )
     yield seed
     async with database_engine.begin() as conn:
+        await _teardown(conn, checker_id)
+        for scope in provisioned:
+            await _teardown(conn, scope)
         # Assignments are removed by the checker FK cascade.
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_id.in_([
-                    str(seed.domain_assignment_id),
-                    str(seed.project_assignment_id),
-                    str(seed.other_project_assignment_id),
-                    str(seed.user_assignment_id),
-                ])
-            )
-        )
         await conn.execute(
             IdleCheckerRow.__table__.delete().where(IdleCheckerRow.__table__.c.id == checker_id)
         )
@@ -301,13 +338,14 @@ async def assignment_seed(
         )
 
 
-@pytest.fixture()
-async def project_read_permission(
+async def _grant(
     database_engine: ExtendedAsyncSAEngine,
-    regular_user_fixture: UserFixtureData,
-    assignment_seed: AssignmentSeedData,
+    user_id: UserID,
+    scope_type: str,
+    scope_id: uuid.UUID,
+    entity_type: str,
+    operations: tuple[OperationType, ...],
 ) -> AsyncIterator[None]:
-    """Grant the regular user PROJECT:READ on the seeded project (self-scope)."""
     role_id = uuid.uuid4()
     async with database_engine.begin_session() as db_sess:
         db_sess.add(
@@ -318,16 +356,17 @@ async def project_read_permission(
             )
         )
         await db_sess.flush()
-        db_sess.add(UserRoleRow(user_id=regular_user_fixture.user_uuid, role_id=role_id))
-        db_sess.add(
-            PermissionRow(
-                role_id=role_id,
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(assignment_seed.project_id),
-                entity_type=EntityType.PROJECT,
-                permission=Permission.from_operation(OperationType.READ),
+        db_sess.add(UserRoleRow(user_id=user_id, role_id=role_id))
+        for operation in operations:
+            db_sess.add(
+                PermissionRow(
+                    role_id=role_id,
+                    scope_type=scope_type,
+                    scope_id=str(scope_id),
+                    entity_type=entity_type,
+                    permission=Permission.from_operation(operation),
+                )
             )
-        )
         await db_sess.flush()
     yield
     async with database_engine.begin() as conn:
@@ -338,6 +377,25 @@ async def project_read_permission(
             UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
         )
         await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+
+
+@pytest.fixture()
+async def project_assignment_read_permission(
+    database_engine: ExtendedAsyncSAEngine,
+    regular_user_fixture: UserFixtureData,
+    assignment_seed: AssignmentSeedData,
+) -> AsyncIterator[None]:
+    """Grant the regular user READ on idle checkers within the seeded project: what
+    the project's bindings reach, and what resolving one of them costs."""
+    async for _ in _grant(
+        database_engine,
+        regular_user_fixture.user_uuid,
+        ScopeType.PROJECT,
+        assignment_seed.project_id,
+        IDLE_CHECKER_ENTITY_TYPE,
+        (OperationType.READ,),
+    ):
+        yield
 
 
 @pytest.fixture()
@@ -346,43 +404,36 @@ async def project_assignment_manage_permission(
     regular_user_fixture: UserFixtureData,
     assignment_seed: AssignmentSeedData,
 ) -> AsyncIterator[None]:
-    """Grant the regular user UPDATE/PURGE on idle checker assignments of the seeded project.
-
-    Permissions are attached at the PROJECT scope with subject entity type
-    ``IDLE_CHECKER_ASSIGNMENT``, so they apply to assignments resolved to that project
-    via the scope chain — not to assignments of any other scope.
+    """Grant the regular user what switching or unlinking the seeded project's binding
+    costs: the relation is answered for by both sides, so the grant names the project
+    and the checker, each as itself. READ on idle checkers within the project pays for
+    the id resolution.
     """
-    role_id = uuid.uuid4()
-    async with database_engine.begin_session() as db_sess:
-        db_sess.add(
-            RoleRow(
-                id=role_id,
-                name=f"icb-manage-role-{role_id.hex[:8]}",
-                description="idle checker assignment manage test role",
-            )
-        )
-        await db_sess.flush()
-        db_sess.add(UserRoleRow(user_id=regular_user_fixture.user_uuid, role_id=role_id))
-        for operation in (OperationType.UPDATE, OperationType.HARD_DELETE):
-            db_sess.add(
-                PermissionRow(
-                    role_id=role_id,
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(assignment_seed.project_id),
-                    entity_type=EntityType.IDLE_CHECKER_ASSIGNMENT,
-                    permission=Permission.from_operation(operation),
-                )
-            )
-        await db_sess.flush()
-    yield
-    async with database_engine.begin() as conn:
-        await conn.execute(
-            PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
-        )
-        await conn.execute(
-            UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
-        )
-        await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+    async for _ in _grant(
+        database_engine,
+        regular_user_fixture.user_uuid,
+        ScopeType.PROJECT,
+        assignment_seed.project_id,
+        EntityType.PROJECT,
+        (OperationType.SOFT_DELETE, OperationType.HARD_DELETE),
+    ):
+        async for _ in _grant(
+            database_engine,
+            regular_user_fixture.user_uuid,
+            ScopeType.PROJECT,
+            assignment_seed.project_id,
+            IDLE_CHECKER_ENTITY_TYPE,
+            (OperationType.READ,),
+        ):
+            async for _ in _grant(
+                database_engine,
+                regular_user_fixture.user_uuid,
+                IDLE_CHECKER_ENTITY_TYPE,
+                assignment_seed.checker_id,
+                IDLE_CHECKER_ENTITY_TYPE,
+                (OperationType.SOFT_DELETE, OperationType.HARD_DELETE),
+            ):
+                yield
 
 
 @pytest.fixture()
@@ -390,42 +441,34 @@ async def user_self_scope_permission(
     database_engine: ExtendedAsyncSAEngine,
     regular_user_fixture: UserFixtureData,
 ) -> AsyncIterator[None]:
-    """Grant the regular user UPDATE/PURGE on entity type USER at their own user scope.
+    """Grant the regular user everything on entity type USER at their own user scope,
+    and READ on the idle checkers bound to them.
 
-    This mirrors what a user's system self-role carries. It must not reach idle checker
-    assignments bound to that same user scope.
+    This mirrors what a user's system self-role carries. Owning one side of the
+    relation is not enough: the checker answers for it too.
     """
-    role_id = uuid.uuid4()
-    async with database_engine.begin_session() as db_sess:
-        db_sess.add(
-            RoleRow(
-                id=role_id,
-                name=f"icb-self-role-{role_id.hex[:8]}",
-                description="idle checker assignment self scope test role",
-            )
-        )
-        await db_sess.flush()
-        db_sess.add(UserRoleRow(user_id=regular_user_fixture.user_uuid, role_id=role_id))
-        for operation in (OperationType.UPDATE, OperationType.HARD_DELETE):
-            db_sess.add(
-                PermissionRow(
-                    role_id=role_id,
-                    scope_type=ScopeType.USER,
-                    scope_id=str(regular_user_fixture.user_uuid),
-                    entity_type=EntityType.USER,
-                    permission=Permission.from_operation(operation),
-                )
-            )
-        await db_sess.flush()
-    yield
-    async with database_engine.begin() as conn:
-        await conn.execute(
-            PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
-        )
-        await conn.execute(
-            UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
-        )
-        await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+    async for _ in _grant(
+        database_engine,
+        regular_user_fixture.user_uuid,
+        ScopeType.USER,
+        regular_user_fixture.user_uuid,
+        EntityType.USER,
+        (
+            OperationType.READ,
+            OperationType.UPDATE,
+            OperationType.SOFT_DELETE,
+            OperationType.HARD_DELETE,
+        ),
+    ):
+        async for _ in _grant(
+            database_engine,
+            regular_user_fixture.user_uuid,
+            ScopeType.USER,
+            regular_user_fixture.user_uuid,
+            IDLE_CHECKER_ENTITY_TYPE,
+            (OperationType.READ,),
+        ):
+            yield
 
 
 @pytest.fixture()
@@ -433,27 +476,26 @@ async def user_in_seeded_project(
     database_engine: ExtendedAsyncSAEngine,
     regular_user_fixture: UserFixtureData,
     assignment_seed: AssignmentSeedData,
+    virtual_entity_seeder: VirtualEntitySeeder,
 ) -> AsyncIterator[None]:
-    """Place the regular user under the seeded project via an AUTO scope edge."""
-    async with database_engine.begin_session() as db_sess:
-        db_sess.add(
-            AssociationScopesEntitiesRow(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(assignment_seed.project_id),
-                entity_type=EntityType.USER,
-                entity_id=str(regular_user_fixture.user_uuid),
-                relation_type=RelationType.AUTO,
-            )
+    """Enroll the regular user in the seeded project."""
+    async with database_engine.begin() as conn:
+        await virtual_entity_seeder.enroll_user_in_project(
+            conn, assignment_seed.project_id, regular_user_fixture.user_uuid
         )
-        await db_sess.flush()
     yield
     async with database_engine.begin() as conn:
+        project_node = sa.select(VirtualEntityRow.__table__.c.id).where(
+            VirtualEntityRow.__table__.c.entity_type == ScopeType.PROJECT,
+            VirtualEntityRow.__table__.c.entity_id == assignment_seed.project_id,
+        )
+        user_node = sa.select(VirtualEntityRow.__table__.c.id).where(
+            VirtualEntityRow.__table__.c.entity_type == ScopeType.USER,
+            VirtualEntityRow.__table__.c.entity_id == regular_user_fixture.user_uuid,
+        )
         await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.USER,
-                AssociationScopesEntitiesRow.__table__.c.entity_id
-                == str(regular_user_fixture.user_uuid),
-                AssociationScopesEntitiesRow.__table__.c.scope_id
-                == str(assignment_seed.project_id),
+            EntityMembershipRow.__table__.delete().where(
+                EntityMembershipRow.__table__.c.virtual_entity_id == project_node.scalar_subquery(),
+                EntityMembershipRow.__table__.c.member_entity_id == user_node.scalar_subquery(),
             )
         )

@@ -9,58 +9,33 @@ from typing import cast
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
-from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     IdleCheckPhase,
 )
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.idle_checker.types import (
-    IdleCheckerAssignmentData,
-    IdleCheckSession,
-)
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.idle_checker import (
-    IdleCheckerAssignmentNotFound,
-    IdleCheckerAssignmentScopeNotFound,
-)
-from ai.backend.manager.models.domain.conditions import DomainConditions
-from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
-from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.resource_group.conditions import ResourceGroupConditions
-from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
-from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
     BatchUpdater,
     BulkCreator,
     BulkUpserter,
-    Querier,
-    Updater,
 )
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
-from ai.backend.manager.repositories.idle_checker.creators import (
-    IdleCheckerAssignmentCreatorSpec,
-    SessionIdleCheckCreatorSpec,
-)
+from ai.backend.manager.repositories.idle_checker.creators import SessionIdleCheckCreatorSpec
 from ai.backend.manager.repositories.idle_checker.purgers import (
     SessionIdleCheckSyncPurgerSpec,
 )
@@ -98,96 +73,6 @@ class IdleCheckerDBSource:
 
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._ops = ops_provider
-
-    async def create_assignment(
-        self, spec: IdleCheckerAssignmentCreatorSpec
-    ) -> IdleCheckerAssignmentData:
-        async with self._ops.write_ops() as w:
-            # Validate on the write path that the referenced scope row exists (BEP-1054).
-            match spec.scope_type:
-                case ScopeType.DOMAIN:
-                    querier = BatchQuerier(
-                        pagination=OffsetPagination(limit=1),
-                        conditions=[DomainConditions.by_ids([DomainID(spec.scope_id)])],
-                    )
-                    result = await w.batch_query_in_global(sa.select(DomainRow), querier)
-                    scope_exists = bool(result.rows)
-                case ScopeType.PROJECT:
-                    row = await w.query(Querier(row_class=ProjectRow, pk_value=spec.scope_id))
-                    scope_exists = row is not None
-                case ScopeType.RESOURCE_GROUP:
-                    querier = BatchQuerier(
-                        pagination=OffsetPagination(limit=1),
-                        conditions=[
-                            ResourceGroupConditions.by_ids([ResourceGroupID(spec.scope_id)])
-                        ],
-                    )
-                    result = await w.batch_query_in_global(sa.select(ResourceGroupRow), querier)
-                    scope_exists = bool(result.rows)
-                case ScopeType.USER:
-                    user_row = await w.query(Querier(row_class=UserRow, pk_value=spec.scope_id))
-                    scope_exists = user_row is not None
-                case _:
-                    scope_exists = False
-            if not scope_exists:
-                raise IdleCheckerAssignmentScopeNotFound(f"{spec.scope_type.value}:{spec.scope_id}")
-            creator = RBACEntityCreator(
-                spec=spec,
-                element_type=RBACElementType.IDLE_CHECKER_ASSIGNMENT,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType(spec.scope_type.value),
-                    element_id=str(spec.scope_id),
-                ),
-            )
-            binding = (await w.create_rbac_entity(creator)).row
-            return binding.to_data()
-
-    async def update_assignment(
-        self, updater: Updater[IdleCheckerBindingRow]
-    ) -> IdleCheckerAssignmentData:
-        async with self._ops.write_ops() as w:
-            result = await w.update(updater)
-            if result is None:
-                raise IdleCheckerAssignmentNotFound(str(updater.pk_value))
-            return result.row.to_data()
-
-    async def purge_assignment(
-        self, purger: RBACEntityPurger[IdleCheckerBindingRow]
-    ) -> IdleCheckerAssignmentData:
-        async with self._ops.write_ops() as w:
-            result = await w.purge_rbac_entity(purger)
-            if result is None:
-                raise IdleCheckerAssignmentNotFound(str(purger.spec.pk_value()))
-            return result.row.to_data()
-
-    async def admin_search_assignments(
-        self, querier: BatchQuerier
-    ) -> SearchResult[IdleCheckerAssignmentData]:
-        async with self._ops.read_ops() as r:
-            result = await r.batch_query_in_global(sa.select(IdleCheckerBindingRow), querier)
-        return SearchResult(
-            items=[row.IdleCheckerBindingRow.to_data() for row in result.rows],
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def scoped_search_assignments(
-        self,
-        querier: BatchQuerier,
-        scopes: Sequence[OperationScope],
-    ) -> SearchResult[IdleCheckerAssignmentData]:
-        """Search bindings whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
-        async with self._ops.read_ops() as r:
-            result = await r.batch_query_with_scopes(
-                sa.select(IdleCheckerBindingRow), querier, scopes
-            )
-        return SearchResult(
-            items=[row.IdleCheckerBindingRow.to_data() for row in result.rows],
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def fetch_judgment_batch(
         self,

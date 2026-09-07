@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import uuid
 from functools import lru_cache
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
@@ -27,36 +29,34 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
     IdleCheckerAssignmentOrderField,
     IdleCheckerScopeTypeDTO,
 )
-from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
+from ai.backend.manager.models.idle_checker.creators import IdleCheckerAssignmentCreator
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerAssignmentOrders
-from ai.backend.manager.repositories.base import Updater
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
-from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerAssignmentCreatorSpec
-from ai.backend.manager.repositories.idle_checker.purgers import IdleCheckerAssignmentPurgerSpec
-from ai.backend.manager.repositories.idle_checker.updaters import IdleCheckerAssignmentUpdaterSpec
+from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.services.idle_checker_assignment.actions.admin_search import (
     AdminSearchIdleCheckerAssignmentsAction,
 )
 from ai.backend.manager.services.idle_checker_assignment.actions.create import (
     CreateIdleCheckerAssignmentAction,
 )
+from ai.backend.manager.services.idle_checker_assignment.actions.lookup import (
+    LookupIdleCheckerAssignmentAction,
+)
 from ai.backend.manager.services.idle_checker_assignment.actions.purge import (
     PurgeIdleCheckerAssignmentAction,
 )
 from ai.backend.manager.services.idle_checker_assignment.actions.scoped_search import (
-    IdleCheckerAssignmentScopeTarget,
     ScopedSearchIdleCheckerAssignmentsAction,
 )
 from ai.backend.manager.services.idle_checker_assignment.actions.update import (
-    UpdateIdleCheckerAssignmentAction,
+    DisableIdleCheckerAssignmentAction,
+    EnableIdleCheckerAssignmentAction,
 )
-from ai.backend.manager.types import OptionalState
 
 
 @lru_cache(maxsize=1)
@@ -76,50 +76,52 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
     async def admin_create(
         self, input: CreateIdleCheckerAssignmentInput
     ) -> CreateIdleCheckerAssignmentPayload:
-        spec = IdleCheckerAssignmentCreatorSpec(
-            scope_type=ScopeType(input.scope.scope_type.value),
-            scope_id=input.scope.scope_id,
-            idle_checker_id=input.idle_checker_id,
-            enabled=input.enabled,
+        data = await self._processors.idle_checker_assignment.create.run(
+            CreateIdleCheckerAssignmentAction(
+                scope=self._scope_entity(input.scope.scope_type, input.scope.scope_id),
+                idle_checker_id=input.idle_checker_id,
+                creator=IdleCheckerAssignmentCreator(enabled=input.enabled),
+            )
         )
-        action_result = await self._processors.idle_checker_assignment.create.wait_for_complete(
-            CreateIdleCheckerAssignmentAction(creator_spec=spec)
-        )
-        return CreateIdleCheckerAssignmentPayload(
-            idle_checker_assignment=self._data_to_node(action_result.data)
-        )
+        return CreateIdleCheckerAssignmentPayload(idle_checker_assignment=self._data_to_node(data))
 
     async def update(
         self, input: UpdateIdleCheckerAssignmentInput
     ) -> UpdateIdleCheckerAssignmentPayload:
-        updater = Updater(
-            spec=IdleCheckerAssignmentUpdaterSpec(
-                enabled=OptionalState[bool].update(input.enabled),
-            ),
-            pk_value=input.id,
-        )
-        action_result = await self._processors.idle_checker_assignment.update.wait_for_complete(
-            UpdateIdleCheckerAssignmentAction(updater=updater)
-        )
-        return UpdateIdleCheckerAssignmentPayload(
-            idle_checker_assignment=self._data_to_node(action_result.data)
-        )
+        """Switch the binding the id names on or off."""
+        current = await self._resolve(input.id)
+        if input.enabled:
+            data = await self._processors.idle_checker_assignment.enable.run(
+                EnableIdleCheckerAssignmentAction(
+                    scope=current.scope_entity(), idle_checker_id=current.idle_checker_id
+                )
+            )
+        else:
+            data = await self._processors.idle_checker_assignment.disable.run(
+                DisableIdleCheckerAssignmentAction(
+                    scope=current.scope_entity(), idle_checker_id=current.idle_checker_id
+                )
+            )
+        return UpdateIdleCheckerAssignmentPayload(idle_checker_assignment=self._data_to_node(data))
 
     async def purge(
         self, input: PurgeIdleCheckerAssignmentInput
     ) -> PurgeIdleCheckerAssignmentPayload:
-        purger = RBACEntityPurger(spec=IdleCheckerAssignmentPurgerSpec(assignment_id=input.id))
-        action_result = await self._processors.idle_checker_assignment.purge.wait_for_complete(
-            PurgeIdleCheckerAssignmentAction(purger=purger)
+        current = await self._resolve(input.id)
+        await self._processors.idle_checker_assignment.purge.run(
+            PurgeIdleCheckerAssignmentAction(
+                scope=current.scope_entity(), idle_checker_id=current.idle_checker_id
+            )
         )
-        return PurgeIdleCheckerAssignmentPayload(id=action_result.data.id)
+        return PurgeIdleCheckerAssignmentPayload(id=current.id)
 
     async def admin_search(
         self, input: SearchIdleCheckerAssignmentsInput
     ) -> SearchIdleCheckerAssignmentPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            IdleCheckerAssignmentSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_get_idle_checker_assignment_pagination_spec(),
@@ -130,13 +132,11 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = (
-            await self._processors.idle_checker_assignment.admin_search.wait_for_complete(
-                AdminSearchIdleCheckerAssignmentsAction(querier=querier)
-            )
+        action_result = await self._processors.idle_checker_assignment.admin_search.run(
+            AdminSearchIdleCheckerAssignmentsAction(searcher=searcher)
         )
         return SearchIdleCheckerAssignmentPayload(
-            items=[self._data_to_node(item) for item in action_result.data],
+            items=[self._data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -149,7 +149,8 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
         RBAC-validated against the caller before the query runs."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            IdleCheckerAssignmentSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_get_idle_checker_assignment_pagination_spec(),
@@ -160,21 +161,12 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        targets: list[SearchableActionTarget] = []
-        for ref in input.scope.items:
-            targets.append(
-                IdleCheckerAssignmentScopeTarget(
-                    scope_type=ScopeType(ref.scope_type.value),
-                    scope_id=ref.scope_id,
-                )
-            )
-        action_result = (
-            await self._processors.idle_checker_assignment.scoped_search.wait_for_complete(
-                ScopedSearchIdleCheckerAssignmentsAction(items=targets, querier=querier)
-            )
+        scopes = [self._scope_entity(ref.scope_type, ref.scope_id) for ref in input.scope.items]
+        action_result = await self._processors.idle_checker_assignment.scoped_search.run(
+            ScopedSearchIdleCheckerAssignmentsAction(scopes=scopes, searcher=searcher)
         )
         return SearchIdleCheckerAssignmentPayload(
-            items=[self._data_to_node(item) for item in action_result.data],
+            items=[self._data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -260,6 +252,18 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
                 case IdleCheckerAssignmentOrderField.UPDATED_AT:
                     result.append(IdleCheckerAssignmentOrders.updated_at(ascending))
         return result
+
+    async def _resolve(self, assignment_id: IdleCheckerAssignmentID) -> IdleCheckerAssignmentData:
+        """The pair the id names. Costs READ on the binding's scope."""
+        result = await self._processors.idle_checker_assignment.lookup.run(
+            LookupIdleCheckerAssignmentAction(assignment_id=assignment_id)
+        )
+        return result.data
+
+    def _scope_entity(
+        self, scope_type: IdleCheckerScopeTypeDTO, scope_id: uuid.UUID
+    ) -> EntityIdentifier:
+        return RuntimeEntityID(EntityType(scope_type.value), scope_id)
 
     @staticmethod
     def _data_to_node(data: IdleCheckerAssignmentData) -> IdleCheckerAssignmentNode:
