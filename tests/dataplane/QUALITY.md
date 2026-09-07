@@ -17,6 +17,9 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | C5 | **A claim is released only by its owner.** Including between two creates of the *same* session: they share the allocation, so only the one that owns the session record may undo. | One session's teardown frees the block a later session is using; or a create that failed beside one that succeeded releases what the successful one already handed to its agents. | `TestAllocationOwnership`, `TestACreateThatFailedBesideOneThatDidNot` |
 | C7 | **A block counts as held only when every unit of it is.** | A `/23` whose second half nothing holds is handed back as complete, and the pool gives that half to the next session. | `TestABlockClaimedOnlyInPart` |
 | C6 | **Allocation cost does not grow with the pool.** Claiming the Nth session is O(1) round trips, not O(N). | A cluster with a few hundred sessions spends minutes in etcd per launch. | `TestAllocationRoundTrips` |
+| C8 | **One incarnation's cleanup never reaches another's.** A session id is reused; every key and claim carries the incarnation that wrote it, and each delete names one. | A cleanup paused between its tombstone check and its delete resumes into the session that replaced the one it came for, and gives that session's VNI back to the pool. | `TestACleanupPausedBetweenItsCheckAndItsDelete`, `TestAnAllocationReusedWhileItIsBeingDestroyed` |
+| C9 | **A node is in the session, or it never builds.** Membership is published before any device exists, and the teardown reads the table again after fencing the record. | The manager sees an empty table, hands the VNI to the next session, and only then does a joining node create a tunnel on it. | `TestANodeThatJoinsAsTheRecordIsFenced`, `TestJoiningBeforeBuilding` |
+| C10 | **A request acts only on the session it was issued for.** The descriptor an agent is handed is compared against the manager's record, incarnation first. | A launch RPC delayed across a teardown and a rebuild builds the old data plane and publishes the node as a member of the new session. | `TestARequestThatArrivedTooLate` |
 
 ## D — Data plane (agent)
 
@@ -28,6 +31,7 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | D4 | **An agent touches only what it owns.** On a host running two agents, one's recovery does not disturb the other's devices. | Restarting agent A drops agent B's session traffic. | G24, A7 |
 | D6 | **What reaches the manager names the failure.** A node whose privileged helper is down says so, with the socket and what it means. | An operator sees errno 111 and cannot tell which node, or that its whole data plane is down. | `TestWhatReachesTheManagerWhenThePrivnetIsDown` |
 | D5 | **The overlay is encrypted, or the session does not start.** Under the default policy a node that cannot do the profile is refused, not silently downgraded. | Cluster traffic crosses the wire in clear text. | G20, G21 |
+| D7 | **Recovery's rule listing is an answer or an error, never an empty host.** Only `rc == 0` says what a previous life left. | A missing binary or a denied exec reads as "no rules", and the node is reported ready over a plaintext-drop the next session given that VNI runs into. | `TestACommandThatNeverReturns` |
 
 ## R — Release quality
 
@@ -90,3 +94,18 @@ Two things this run did NOT establish, and neither should be read as met:
 - **A1/A2/A3/A9/A10 (agent restart) still have not run.** They were failing on a misconfigured RPC
   port, and with that corrected the node does not come back from the harness stop/start cycle.
   Rig plumbing, but unproven either way, so D2 and D4 rest on unit evidence across a restart.
+
+Third round, against the same bar:
+
+| # | Was | Now |
+|---|-----|-----|
+| C4 | the cleanup checked it still held the tombstone and then deleted a whole prefix; between the two the record could be taken, the cleanup finished by somebody else and a new session built, and the deletes landed on that session | every key and pool claim carries the incarnation that wrote it, and each delete names its own -- the check is an early-out, not the fence |
+| C4 | a create that found a READY record checked the pool and then handed the allocation back with no last word on the record | the record is compared again, byte for byte, before anything is returned |
+| C9 | the node built its data plane and published its membership after; the manager read the table once, before fencing the record, so neither saw the other | membership goes first, and the teardown reads the table again with the tombstone already in -- there is no order in which a node is missed by both |
+| C10 | `READY` was the whole fence, and it says nothing about WHICH incarnation of a reused session id the record is | the descriptor's generation, subnet, VNI, port and key are compared against the record; a withdrawal names the bytes the join wrote |
+| D7 | the recovery inventory read every `OSError` as a host with no firewall | only `rc == 0` is an answer; anything else is owed, and `_sweep_orphan_rules` records the debt |
+
+R3 has NOT been re-run for this round: the hardware evidence above is still at `992faf053`, which
+predates it. C8-C10 and D7 rest on unit evidence alone, and the agent-restart scenarios
+(A1/A2/A3/A9/A10) that would exercise the join/teardown ordering on real nodes remain unrun. Read
+the round as unverified against hardware until that log is replaced.

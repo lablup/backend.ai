@@ -1398,18 +1398,23 @@ async def _read_command(argv: Sequence[str]) -> str:
 
 
 async def _read_inventory(argv: Sequence[str]) -> str:
-    """Run a rule listing for RECOVERY and return its stdout, raising if it did not run.
+    """Run a rule listing for RECOVERY and return its stdout, raising unless it actually ran.
 
     The difference from `_read_command` is the whole point: a drift pass re-asserts what it wants
     and an unreadable listing costs it nothing, but recovery is asking what a previous life left
-    behind, and there "" and "the command failed" are opposite answers. A host with no iptables at
-    all is the one genuine empty: nothing there filters, so nothing there was left.
+    behind, and there "" and "the command failed" are opposite answers. Only ``rc == 0`` is an
+    answer.
+
+    That includes the errors raised before the command runs at all. A missing binary, a denied
+    exec, an exhausted file-descriptor or process table -- none of them says the KERNEL holds no
+    rules, and the rules a previous life installed live there, not in the tool. Reading them as an
+    empty host reported a node ready over a plaintext-drop nothing had looked at, and the next
+    session given that VNI ran into it.
     """
     try:
         rc, stdout, stderr = await command.run(argv)
     except OSError as e:
-        log.debug("no firewall to list on this host ({}): {}", " ".join(argv), e)
-        return ""
+        raise OverlayEncryptionUnavailable(f"`{' '.join(argv)}` could not be run: {e}") from e
     except command.CommandTimeout as e:
         raise OverlayEncryptionUnavailable(f"`{' '.join(argv)}` timed out: {e}") from e
     if rc != 0:

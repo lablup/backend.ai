@@ -214,6 +214,17 @@ class AbstractKVStore(ABC):
         pass
 
     @abstractmethod
+    async def delete_if_value(
+        self,
+        key: str,
+        expected: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
     async def delete(
         self,
         key: str,
@@ -740,6 +751,7 @@ class AsyncEtcd(AbstractKVStore):
 
             return cast(bool, result.succeeded())
 
+    @override
     async def delete_if_value(
         self,
         key: str,
