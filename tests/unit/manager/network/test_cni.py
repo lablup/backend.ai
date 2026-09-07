@@ -3289,6 +3289,94 @@ class TestConfigurationTheAgentsWouldRefuse:
         with pytest.raises(ManagerNetworkMisconfigured):
             await plugin.update_plugin_config({"mtu": 100})
 
+    async def test_a_refused_update_does_not_replace_what_is_working(self) -> None:
+        # Adopting first and validating after left the rejected values in place, so the plugin
+        # went on serving from the very configuration it had just refused.
+        plugin = CNINetworkPlugin({"mtu": 9000}, {})
+        with pytest.raises(ManagerNetworkMisconfigured):
+            await plugin.update_plugin_config({"mtu": 100})
+
+        assert plugin.plugin_config["mtu"] == 9000
+        assert plugin._validated_config()[0] == 9000
+
+
+class TestUnreadableIsNotStale:
+    """C39. Two paths judged the same key by opposite rules. The teardown reads an unreadable
+    member as a node that still holds the data plane; the reclaim read it as garbage and deleted
+    it -- so the ten-minute sweep removed a live session's teardown barrier, and the VNI could
+    then be handed to the next session while the VXLAN device was still up."""
+
+    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+
+    @pytest.mark.parametrize("poison", ["[]", "null", "not json at all", "12345"])
+    async def test_the_reclaim_leaves_an_unreadable_member_alone(self, poison: str) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        etcd.store[member_key("s1", "a1")] = poison
+
+        await plugin.reconcile_pool()
+
+        assert member_key("s1", "a1") in etcd.store, "the teardown barrier was deleted"
+
+    async def test_a_key_of_another_incarnation_is_still_reclaimed(self) -> None:
+        # The one state a destructive path may act on, so the fix above must not disarm it.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        etcd.store[member_key("s1", "a1")] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": True,
+            "generation": "an-older-one",
+        })
+
+        await plugin.reconcile_pool()
+
+        assert member_key("s1", "a1") not in etcd.store
+
+    async def test_a_debt_sweep_leaves_the_live_sessions_unstamped_child_alone(self) -> None:
+        """The pool claims have been protected from this since `release_all` learned what the
+        record names NOW. The child keys were not: an unstamped member is compatible with every
+        incarnation, so a debt sweep for g1 took the member a live g2 session's agent wrote in the
+        legacy shape."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        gone = str(info.options["generation"])
+        etcd.store[member_key("s1", "a1")] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": True,
+        })
+        etcd.store[session_ipam_key("s1", "10.128.0.5")] = json.dumps({"container_id": "k1"})
+        # The session was rebuilt: the record names a later incarnation and a fresh allocation.
+        etcd.store[session_meta_key("s1")] = json.dumps({
+            **json.loads(etcd.store[session_meta_key("s1")]),
+            "generation": "later",
+        })
+
+        await plugin._sweep_incarnation(cast(AsyncEtcd, etcd), "s1", gone)
+
+        assert member_key("s1", "a1") in etcd.store, "a live session's member was swept"
+        assert session_ipam_key("s1", "10.128.0.5") in etcd.store
+
+    async def test_its_own_teardown_still_takes_the_unstamped_child(self) -> None:
+        # Where the cleanup IS for the incarnation the record names, an unstamped key is its own.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        generation = str(info.options["generation"])
+        etcd.store[member_key("s1", "a1")] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": True,
+        })
+
+        await plugin._sweep_incarnation(cast(AsyncEtcd, etcd), "s1", generation)
+
+        assert member_key("s1", "a1") not in etcd.store
+
 
 class TestTheReconcileTicketAndTheClock:
     """C33. Managers compare wall clocks on the ticket, so one running ahead could park the whole

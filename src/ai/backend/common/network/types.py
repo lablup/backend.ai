@@ -127,6 +127,68 @@ create can tell its own incarnation from the one that replaced it. See
 `CNINetworkPlugin._finish_cleanup` and `SessionNetworkCoordinator._session_fence`."""
 
 
+class GenerationMatch(StrEnum):
+    """How a stored record's incarnation stamp relates to the one a caller is working for.
+
+    Four states, because two of them mean opposite things to a DESTRUCTIVE caller and the same
+    thing to a reading one. `of_generation` collapses them to the reader's question -- may I act
+    on this? -- and a delete that asked only that treated a record it could not read as one
+    belonging to somebody else, which is exactly the record it must not touch.
+    """
+
+    #: Stamped with this very incarnation.
+    SAME = "same"
+    #: Carries no stamp at all: what a component from before the field wrote. Compatible with
+    #: every incarnation, so live to a reader and ambiguous to a deleter.
+    UNSTAMPED = "unstamped"
+    #: Stamped with another incarnation. The only state a destructive caller may act on.
+    DIFFERENT = "different"
+    #: Not a record this can read. Not evidence of anything, least of all of being garbage.
+    UNREADABLE = "unreadable"
+
+
+def generation_match(raw: str, generation: str | None) -> GenerationMatch:
+    """Which of the four `GenerationMatch` states ``raw`` is in, for a caller working for
+    ``generation``."""
+    try:
+        record = json.loads(raw)
+    except ValueError:
+        return GenerationMatch.UNREADABLE
+    if not isinstance(record, Mapping):
+        return GenerationMatch.UNREADABLE
+    stamped = record.get(SESSION_META_GENERATION)
+    if stamped is None:
+        return GenerationMatch.UNSTAMPED
+    return GenerationMatch.SAME if stamped == generation else GenerationMatch.DIFFERENT
+
+
+def _required_str(payload: Mapping[str, Any], field: str) -> str:
+    """One string field a record must carry.
+
+    Raises:
+        ValueError: it is absent, or not a string.
+    """
+    value = payload.get(field)
+    if not isinstance(value, str):
+        raise ValueError(f"{field} is missing or not a string")
+    return value
+
+
+def _optional_str(payload: Mapping[str, Any], field: str) -> str | None:
+    """One string field a record may carry.
+
+    Raises:
+        ValueError: it is present and not a string. Absent is fine; a list where a hostname
+            belongs is not, and it is the value that reaches `str.lower` two layers away.
+    """
+    value = payload.get(field)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{field} is not a string")
+    return value
+
+
 def of_generation(raw: str, generation: str | None) -> bool:
     """Whether a record carrying ``raw`` may be acted on by a call working for ``generation``.
 
@@ -138,18 +200,13 @@ def of_generation(raw: str, generation: str | None) -> bool:
 
     See ``SESSION_META_GENERATION``.
     """
-    try:
-        record = json.loads(raw)
-    except ValueError:
-        return False
-    if not isinstance(record, Mapping):
-        # Valid JSON that is not an object -- ``null``, ``[]``, a bare number. ``.get`` on it
-        # raises AttributeError, which is not what any caller here catches, so one such key under
-        # a session stopped every reconciliation that reached it: on the agent, the session's
-        # whole membership pass, every fifteen seconds, for as long as the key stood.
-        return False
-    stamped = record.get(SESSION_META_GENERATION)
-    return stamped is None or stamped == generation
+    # The READER's question. A destructive caller must not ask it: this is False both for a
+    # record of another incarnation and for one that cannot be read at all, and only the first of
+    # those is garbage. See `generation_match`.
+    return generation_match(raw, generation) in (
+        GenerationMatch.SAME,
+        GenerationMatch.UNSTAMPED,
+    )
 
 
 def mac_for_ip(ip: str) -> str:
@@ -276,14 +333,19 @@ class Member:
 
     @classmethod
     def from_etcd_payload(cls, agent_id: str, payload: Mapping[str, Any]) -> Member:
+        """Decode one member record. See `EndpointAddr.from_etcd_payload`.
+
+        Raises:
+            ValueError: the payload is not a member record.
+        """
         return cls(
             agent_id=agent_id,
-            host_ip=payload["host_ip"],
-            vtep_ip=payload.get("vtep_ip"),
+            host_ip=_required_str(payload, "host_ip"),
+            vtep_ip=_optional_str(payload, "vtep_ip"),
             # A record written before this field existed came from an agent: the manager's
             # pre-seed is newer than the field, so the older shape can only be a self-publish.
             joined=bool(payload.get("joined", True)),
-            generation=payload.get("generation"),
+            generation=_optional_str(payload, "generation"),
         )
 
 
@@ -329,13 +391,24 @@ class EndpointAddr:
 
     @classmethod
     def from_etcd_payload(cls, container_id: str, payload: Mapping[str, Any]) -> EndpointAddr:
+        """Decode one endpoint record, refusing anything that is not the shape it must be.
+
+        Every field is checked, not only the ones that must be present. A value of the wrong TYPE
+        gets past a presence check and fails later, somewhere with no idea it is holding a decoded
+        record -- ``cluster_hostname: ["x"]`` decoded fine and then raised on ``.lower()`` in the
+        agent's name resolver, which is the same session-wide stall that isolating a bad record
+        was meant to end.
+
+        Raises:
+            ValueError: the payload is not an endpoint record.
+        """
         return cls(
             container_id=container_id,
-            ip=payload["ip"],
-            mac=payload["mac"],
-            agent_id=payload["agent_id"],
-            cluster_hostname=payload.get("cluster_hostname"),
-            generation=payload.get("generation"),
+            ip=_required_str(payload, "ip"),
+            mac=_required_str(payload, "mac"),
+            agent_id=_required_str(payload, "agent_id"),
+            cluster_hostname=_optional_str(payload, "cluster_hostname"),
+            generation=_optional_str(payload, "generation"),
         )
 
 

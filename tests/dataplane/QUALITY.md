@@ -443,3 +443,23 @@ still let a second sweep start; the deletes are guarded so the risk is load, not
 
 R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
 real nodes.
+
+Nineteenth round. The first P1 is one I created last round: I made `of_generation` return False
+for an unreadable value, which is right for a reader and wrong for a deleter, and a deleter was
+asking it.
+
+| # | Was | Now |
+|---|-----|-----|
+| C39 | `of_generation` is False both for a record of another incarnation and for one that cannot be read, and only the first is garbage. `_reclaim_session_keys` deleted on either -- while the teardown path reads an unreadable member as a node that STILL HOLDS the data plane. Two paths, opposite policies, same key: the ten-minute sweep removed a live session's teardown barrier and the VNI could then be reused over a VXLAN device that was still up | `generation_match` returns four states -- same, unstamped, different, unreadable -- and destructive paths act on `different` alone. `of_generation` is now defined in terms of it and stays the reader's question |
+| C39 | a debt sweep for a superseded incarnation deleted child keys by its own generation alone, and `_delete_incarnation` reads an unstamped key as its own. The pool claims have been protected from exactly this since `release_all` learned what the record names NOW; the child keys never were, so a live agent's legacy member key was swept | `_delete_incarnation` is told the live generation too, and leaves an unstamped key alone when this cleanup is for an incarnation the record has moved on from. Its own teardown -- where the two match -- still takes them |
+| C38 | `update_plugin_config` replaced the configuration and validated afterwards, so a rejected update left its own bad values in place. And the common plugin watcher has no recovery, so the raise ended the task and every LATER change, including the correction, was never delivered | the candidate is validated before it is adopted, and the watcher logs a rejected update and keeps watching |
+| C36 | isolating an unreadable record was only half of it: `EndpointAddr`/`Member` put values into the dataclass without checking their type, so `cluster_hostname: ["bad"]` decoded and then raised two layers away on `.lower()` -- the same session-wide stall | every field is checked in the shared decoder |
+| — | `pairing.py` allowed an agent whose published capabilities cannot be read, silently. Still allowed -- failing closed would strand an agent from every overlay session over one corrupt key -- but counted and logged now | |
+| — | the BEP said Docker was the only runtime wired, which the review read as the code over-reaching. It is the doc that is stale: `enroot` and `singularity` ship provisioners in this repository and `containerd` is named by the same enum | the BEP says what the seam actually requires |
+
+Still not done, and unchanged. `AsyncEtcd.get_prefix` has no paginated form, so the sweep loads
+whole prefixes and reads each session's three subtrees in turn; that fix belongs in the shared
+etcd client. The heartbeat is a lease emulated on a timestamp.
+
+R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
+real nodes.

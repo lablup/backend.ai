@@ -294,7 +294,20 @@ class TestOnePoisonRecordDoesNotStopTheSession:
 
         assert backend.added == ["a2"], "one unreadable member cost the session its peers"
 
-    @pytest.mark.parametrize("poison", ["[]", "null", '{"ip": "10.128.0.9"}'])
+    @pytest.mark.parametrize(
+        "poison",
+        [
+            "[]",
+            "null",
+            '{"ip": "10.128.0.9"}',  # missing mac and agent_id
+            # Present but the wrong TYPE. It decoded fine and then raised two layers away, on
+            # `.lower()` in the name resolver -- the same session-wide stall isolating a bad
+            # record was meant to end.
+            '{"ip": "10.128.0.9", "mac": "02:00:00:00:00:09", "agent_id": "a2",'
+            ' "cluster_hostname": ["bad"]}',
+            '{"ip": ["10.128.0.9"], "mac": "02:00:00:00:00:09", "agent_id": "a2"}',
+        ],
+    )
     async def test_an_endpoint_beside_a_poison_one_is_still_read(self, poison: str) -> None:
         etcd = FakeEtcd()
         etcd.seed_endpoint("k1", ip="10.128.0.2", mac=mac_for_ip("10.128.0.2"), agent_id="a2")

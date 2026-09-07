@@ -205,7 +205,18 @@ class BasePluginContext[P: AbstractPlugin]:
             new_config = await self.etcd.get_prefix(
                 f"config/plugins/{self._group_key}/{plugin_name}/",
             )
-            await self.plugins[plugin_name].update_plugin_config(new_config)
+            try:
+                await self.plugins[plugin_name].update_plugin_config(new_config)
+            except Exception:
+                # One config an operator got wrong must not end the watcher. Without this the
+                # task died on the first rejected update and every LATER change -- including the
+                # correction -- was never delivered, so the mistake outlived itself until somebody
+                # restarted the process.
+                log.exception(
+                    "plugin {} rejected a configuration update; keeping the one it has and"
+                    " continuing to watch",
+                    plugin_name,
+                )
 
     async def watch_config_changes(self, plugin_name: str) -> None:
         wtask = asyncio.create_task(self._watcher(plugin_name))

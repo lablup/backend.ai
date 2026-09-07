@@ -44,10 +44,11 @@ from ai.backend.common.network.types import (
     VXLAN_OVERHEAD,
     VXLAN_PORT_MAX,
     VXLAN_PORT_MIN,
+    GenerationMatch,
     Member,
     NetworkBackendKind,
     OverlayEncryptionPolicy,
-    of_generation,
+    generation_match,
     reads_as_overlay_subnet,
     reads_as_vni,
 )
@@ -496,9 +497,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
 
     @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        # Validated BEFORE it is adopted. Replacing first and checking after left the rejected
+        # values in place: the update raised, and the plugin went on serving from the very
+        # configuration it had just refused.
+        candidate = CNINetworkPlugin(plugin_config, self.local_config)
+        candidate._validated_config()
         await super().update_plugin_config(plugin_config)
-        # Refused here as at startup: an update that cannot serve is not one to carry on from.
-        self._validated_config()
 
     @override
     async def init(self, context: Any = None) -> None:
@@ -1347,7 +1351,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             (members_prefix, member_key),
             (session_ipam_prefix, session_ipam_key),
         ):
-            if not await self._delete_incarnation(etcd, session_id, prefix, key_of, generation):
+            if not await self._delete_incarnation(
+                etcd, session_id, prefix, key_of, generation, live
+            ):
                 complete = False
         try:
             stuck_vnis = await self._vni_allocator.release_all(
@@ -1579,7 +1585,19 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 for name, payload in dict(found).items():
                     if not name or not isinstance(payload, str):
                         continue
-                    if meta_raw is not None and of_generation(payload, live):
+                    match = generation_match(payload, live)
+                    if match is GenerationMatch.UNREADABLE:
+                        # Not evidence of anything, least of all of being garbage. The teardown
+                        # path already reads an unreadable member as a node that still holds the
+                        # data plane; this one deleted it, so the two disagreed about the same key
+                        # and the sweep removed a live session's teardown barrier.
+                        CommonMetricRegistry.instance().network_pool.observe_invalid_record()
+                        log.warning(
+                            "leaving {} alone: it cannot be read, and unreadable is not stale",
+                            key_of(str(session_id), str(name)),
+                        )
+                        continue
+                    if meta_raw is not None and match is not GenerationMatch.DIFFERENT:
                         continue  # this incarnation's, or unstamped and so compatible with it
                     if await etcd.compare_and_delete(
                         key_of(str(session_id), str(name)), payload, guards=dict(guard)
@@ -1750,6 +1768,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         prefix: Callable[[str], str],
         key_of: Callable[[str, str], str],
         generation: str | None,
+        live_generation: str | None = None,
     ) -> bool:
         """Delete one of the session's key subtrees, a key at a time and never another
         incarnation's.
@@ -1772,15 +1791,36 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 prefix(session_id),
             )
             return False
+        # This cleanup is for an incarnation the session's record has moved on from when these
+        # differ, and an unstamped key is compatible with EVERY incarnation -- so it may well be
+        # the live one's. The pool claims have been protected from exactly this since the
+        # `live_generation` argument was added to `release_all`; the child keys were not, and a
+        # member key is the barrier that says a node still holds the VNI's data plane.
+        superseded = live_generation is not None and live_generation != generation
         complete = True
         for name, payload in found.items():
             if not name or not isinstance(payload, str):
                 continue  # these keys hold one JSON value each and have no children
-            if not of_generation(payload, generation):
+            match = generation_match(payload, generation)
+            if match is GenerationMatch.UNREADABLE:
+                log.warning(
+                    "leaving {} alone: it cannot be read, and unreadable is not stale",
+                    key_of(session_id, str(name)),
+                )
+                continue
+            if match is GenerationMatch.DIFFERENT:
                 log.info(
                     "leaving {} alone: it belongs to another incarnation of session {}",
                     key_of(session_id, str(name)),
                     session_id,
+                )
+                continue
+            if superseded and match is GenerationMatch.UNSTAMPED:
+                log.info(
+                    "leaving {} alone: it carries no incarnation, and session {} now names {}",
+                    key_of(session_id, str(name)),
+                    session_id,
+                    live_generation,
                 )
                 continue
             try:

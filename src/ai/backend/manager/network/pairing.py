@@ -13,20 +13,24 @@ unknown-but-allowed. Refusing on absence would take out working deployments the 
 """
 
 import json
+import logging
 from collections.abc import Iterable
 
 from ai.backend.common.etcd import AbstractKVStore, AsyncEtcd, ConfigScopes
+from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.network.keys import agent_backend_key, agent_caps_key
 from ai.backend.common.network.types import OVERLAY_ENCRYPTION_PROFILE, AgentNetworkCaps
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import NetworkBackendMismatch
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # Which agent backend can serve which inter-container network driver.
 #
-# 'docker' is the one wired today. The others are agent backends this repository names but does
-# not yet ship a package for; they are listed because what a backend has to provide for 'cni' is
-# a container's netns by PID -- the data plane is a device moved into that netns, and a netns
-# does not care which daemon made it. A backend that arrives without that seam is rejected at
-# `_require_members_cni_capable` on its published caps, not here.
+# What a backend has to provide for 'cni' is a container's netns by PID: the data plane is a
+# device moved into that netns, and a netns does not care which daemon made it. So the list is
+# the backends that offer that seam, not the ones anyone has measured. A backend that arrives
+# without it is rejected at `_require_members_cni_capable` on its published caps, not here.
 DRIVER_COMPATIBLE_BACKENDS: dict[str, frozenset[str]] = {
     "cni": frozenset({"containerd", "docker", "enroot", "singularity"}),
     "overlay": frozenset({"docker"}),
@@ -124,7 +128,17 @@ async def require_members_overlay_ready(etcd: AsyncEtcd, member_agents: Iterable
         try:
             caps = AgentNetworkCaps(**json.loads(raw))
         except (ValueError, TypeError):
-            continue  # an unreadable capability record is not evidence of anything
+            # Still allowed: failing closed here would strand an agent from every overlay session
+            # over one corrupt key, which is worse than a session that fails at create with a
+            # named reason. But it is not the same as "not published yet" and must not be silent
+            # -- something wrote this, and nobody was told.
+            CommonMetricRegistry.instance().network_pool.observe_invalid_record()
+            log.warning(
+                "agent {}'s published network capabilities cannot be read; allowing it into"
+                " overlay sessions on the assumption it is capable, but this key needs looking at",
+                agent_id,
+            )
+            continue
         if "vxlan" in caps.backends:
             continue
         reasons = "; ".join(caps.readiness) or "no reason published"
