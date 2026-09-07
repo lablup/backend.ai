@@ -10,10 +10,6 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_meta impor
     GetArtifactRegistryMetaAction,
     GetArtifactRegistryMetaActionResult,
 )
-from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
-    GetArtifactRegistryMetasAction,
-    GetArtifactRegistryMetasActionResult,
-)
 from ai.backend.manager.services.artifact_registry.actions.common.search import (
     SearchArtifactRegistriesAction,
     SearchArtifactRegistriesActionResult,
@@ -262,15 +258,6 @@ class ArtifactRegistryService:
             action.registry_id
         )
         return GetArtifactRegistryMetaActionResult(result=registry_meta)
-
-    async def get_registry_metas(
-        self, action: GetArtifactRegistryMetasAction
-    ) -> GetArtifactRegistryMetasActionResult:
-        log.info("Getting {} artifact registry metas", len(action.registry_ids))
-        registry_metas = await self._artifact_registry_repository.get_artifact_registry_datas(
-            action.registry_ids
-        )
-        return GetArtifactRegistryMetasActionResult(result=registry_metas)
 
     async def search_artifact_registries(
         self, action: SearchArtifactRegistriesAction

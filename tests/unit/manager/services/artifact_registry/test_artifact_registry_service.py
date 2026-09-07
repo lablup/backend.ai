@@ -883,80 +883,17 @@ class TestGetArtifactRegistryMetaAction:
 
 
 class TestGetArtifactRegistryMetasAction:
-    @pytest.fixture
-    def mock_artifact_registry_repository(self) -> MagicMock:
-        return MagicMock(spec=ArtifactRegistryRepository)
-
-    @pytest.fixture
-    def service(self, mock_artifact_registry_repository: MagicMock) -> ArtifactRegistryService:
-        return ArtifactRegistryService(
-            huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
-            reservoir_repository=MagicMock(spec=ReservoirRegistryRepository),
-            artifact_registry_repository=mock_artifact_registry_repository,
-        )
-
-    async def test_get_registry_metas_multiple(
-        self,
-        service: ArtifactRegistryService,
-        mock_artifact_registry_repository: MagicMock,
-    ) -> None:
-        id1, id2 = uuid4(), uuid4()
-        items = [
-            ArtifactRegistryData(
-                id=ArtifactRegistryID(uuid4()),
-                registry_id=id1,
-                name="reg-1",
-                type=ArtifactRegistryType.HUGGINGFACE,
-            ),
-            ArtifactRegistryData(
-                id=ArtifactRegistryID(uuid4()),
-                registry_id=id2,
-                name="reg-2",
-                type=ArtifactRegistryType.RESERVOIR,
-            ),
-        ]
-        mock_artifact_registry_repository.get_artifact_registry_datas = AsyncMock(
-            return_value=items
-        )
-
+    def test_entity_ids_are_the_named_registries(self) -> None:
+        id1, id2 = ArtifactRegistryID(uuid4()), ArtifactRegistryID(uuid4())
         action = GetArtifactRegistryMetasAction(registry_ids=[id1, id2])
-        result = await service.get_registry_metas(action)
 
-        assert result.result == items
-        assert len(result.result) == 2
+        assert action.entity_ids() == (id1, id2)
 
-    async def test_get_registry_metas_partially_missing_skipped(
-        self,
-        service: ArtifactRegistryService,
-        mock_artifact_registry_repository: MagicMock,
-    ) -> None:
-        id1 = uuid4()
-        id_missing = uuid4()
-        items = [
-            ArtifactRegistryData(
-                id=ArtifactRegistryID(uuid4()),
-                registry_id=id1,
-                name="reg-1",
-                type=ArtifactRegistryType.HUGGINGFACE,
-            ),
-        ]
-        mock_artifact_registry_repository.get_artifact_registry_datas = AsyncMock(
-            return_value=items
-        )
+    def test_narrowed_to_keeps_only_the_allowed_ids_in_order(self) -> None:
+        id1, id2, id3 = (ArtifactRegistryID(uuid4()) for _ in range(3))
+        action = GetArtifactRegistryMetasAction(registry_ids=[id1, id2, id3])
 
-        action = GetArtifactRegistryMetasAction(registry_ids=[id1, id_missing])
-        result = await service.get_registry_metas(action)
+        narrowed = action.narrowed_to([id3, id1])
 
-        assert len(result.result) == 1
-
-    async def test_get_registry_metas_empty_list(
-        self,
-        service: ArtifactRegistryService,
-        mock_artifact_registry_repository: MagicMock,
-    ) -> None:
-        mock_artifact_registry_repository.get_artifact_registry_datas = AsyncMock(return_value=[])
-
-        action = GetArtifactRegistryMetasAction(registry_ids=[])
-        result = await service.get_registry_metas(action)
-
-        assert result.result == []
+        assert narrowed.entity_ids() == (id1, id3)
+        assert action.entity_ids() == (id1, id2, id3)

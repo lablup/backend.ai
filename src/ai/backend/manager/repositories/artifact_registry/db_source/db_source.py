@@ -39,21 +39,6 @@ class ArtifactRegistryDBSource:
                 raise ArtifactRegistryNotFoundError(f"Registry with name {registry_name} not found")
             return row.to_dataclass()
 
-    async def get_artifact_registry_datas(
-        self, registry_ids: list[uuid.UUID]
-    ) -> list[ArtifactRegistryData]:
-        """
-        Get multiple artifact registry entries by their IDs in a single query.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            result = await session.execute(
-                sa.select(ArtifactRegistryRow).where(
-                    ArtifactRegistryRow.registry_id.in_(registry_ids)
-                )
-            )
-            rows = result.scalars().all()
-            return [row.to_dataclass() for row in rows]
-
     async def get_artifact_registry_type(self, registry_id: uuid.UUID) -> ArtifactRegistryType:
         async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(

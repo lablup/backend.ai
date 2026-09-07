@@ -121,6 +121,9 @@ from ai.backend.manager.services.artifact.revision.actions.lookup_owner import (
     LookupBulkArtifactRevisionOwnerAction,
 )
 from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
+from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
+    GetArtifactRegistryMetasAction,
+)
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
@@ -493,6 +496,24 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
         if record.action_cls in judged
     }
     assert recorded == judged
+
+
+def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> None:
+    """The named registries are read one permission check per registry, not superadmin-only."""
+    registry = _ops_registry()
+    ArtifactRegistryProcessors(
+        registry.group(GroupMeta(ARTIFACT_REGISTRY_ENTITY_TYPE)), MagicMock()
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[GetArtifactRegistryMetasAction] == (
+        ARTIFACT_REGISTRY_ENTITY_TYPE,
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
 
 
 def test_rg_domain_read_is_a_scoped_permission_read() -> None:

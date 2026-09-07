@@ -53,11 +53,6 @@ class ArtifactRegistryRepository:
         return await self._db_source.get_artifact_registry_data_by_name(registry_name)
 
     @artifact_registry_repository_resilience.apply()
-    async def get_artifact_registry_datas(
-        self, registry_ids: list[uuid.UUID]
-    ) -> list[ArtifactRegistryData]:
-        return await self._db_source.get_artifact_registry_datas(registry_ids)
-
     @artifact_registry_repository_resilience.apply()
     async def get_artifact_registry_type(self, registry_id: uuid.UUID) -> ArtifactRegistryType:
         return await self._db_source.get_artifact_registry_type(registry_id)
