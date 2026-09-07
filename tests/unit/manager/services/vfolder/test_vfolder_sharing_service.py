@@ -5,13 +5,18 @@ Tests for VFolderSharingService and VFolderInviteService functionality.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_invitation import VFolderInvitationID
+from ai.backend.common.data.user.types import UserData as ContextUserData
+from ai.backend.common.data.user.types import UserRole as ContextUserRole
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -46,7 +51,9 @@ from ai.backend.manager.services.vfolder.actions.invite import (
     UpdateInvitedVFolderMountPermissionAction,
 )
 from ai.backend.manager.services.vfolder.actions.sharing import (
+    GlobalListSharedVFoldersAction,
     ListSharedVFoldersAction,
+    PublicListSharedVFoldersAction,
     ShareVFolderAction,
     UnshareVFolderAction,
     UpdateVFolderSharingStatusAction,
@@ -58,6 +65,22 @@ from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingS
 @pytest.fixture
 def user_uuid() -> uuid.UUID:
     return uuid.uuid4()
+
+
+@pytest.fixture(autouse=True)
+def requester_context(user_uuid: uuid.UUID) -> Iterator[None]:
+    """The sharing service reads its requester from the user context."""
+    user = ContextUserData(
+        user_id=user_uuid,
+        is_authorized=True,
+        is_admin=False,
+        is_superadmin=False,
+        role=ContextUserRole.USER,
+        domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
+    )
+    with with_user(user):
+        yield
 
 
 @pytest.fixture
@@ -164,7 +187,6 @@ class TestShareVFolderAction:
         mock_vfolder_repo.share_vfolder_with_users = AsyncMock(return_value=emails)
 
         action = ShareVFolderAction(
-            user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
@@ -189,7 +211,6 @@ class TestShareVFolderAction:
         )
 
         action = ShareVFolderAction(
-            user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
@@ -211,7 +232,6 @@ class TestShareVFolderAction:
         )
 
         action = ShareVFolderAction(
-            user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
@@ -233,7 +253,6 @@ class TestShareVFolderAction:
         mock_vfolder_repo.get_by_id_validated = AsyncMock(side_effect=VFolderNotFound())
 
         action = ShareVFolderAction(
-            user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             permission=VFolderMountPermission.READ_WRITE,
@@ -266,7 +285,6 @@ class TestUnshareVFolderAction:
         mock_vfolder_repo.unshare_vfolder_from_users = AsyncMock(return_value=emails)
 
         action = UnshareVFolderAction(
-            user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             emails=emails,
@@ -289,7 +307,6 @@ class TestUnshareVFolderAction:
         )
 
         action = UnshareVFolderAction(
-            user_uuid=user_uuid,
             vfolder_uuid=VFolderUUID(vfolder_uuid),
             resource_policy={},
             emails=["a@test.com"],
@@ -349,7 +366,9 @@ class TestListSharedVFoldersAction:
         action = ListSharedVFoldersAction(vfolder_uuid=VFolderUUID(vfolder_uuid))
         await sharing_service.list_shared_vfolders(action)
 
-        mock_vfolder_repo.list_shared_vfolder_permissions.assert_called_once_with(vfolder_uuid)
+        mock_vfolder_repo.list_shared_vfolder_permissions.assert_called_once_with(
+            vfolder_id=vfolder_uuid
+        )
 
     async def test_no_permissions_returns_empty_list(
         self,
@@ -362,6 +381,60 @@ class TestListSharedVFoldersAction:
         result = await sharing_service.list_shared_vfolders(action)
 
         assert result.shared == []
+
+
+# ============================================================
+# PublicListSharedVFoldersAction / GlobalListSharedVFoldersAction tests
+# ============================================================
+
+
+class TestListSharedVFoldersWithoutTarget:
+    async def test_public_listing_is_bound_to_the_user_in_context(
+        self,
+        sharing_service: VFolderSharingService,
+        mock_vfolder_repo: MagicMock,
+        user_uuid: uuid.UUID,
+    ) -> None:
+        mock_vfolder_repo.list_shared_vfolder_permissions = AsyncMock(return_value=[])
+
+        result = await sharing_service.public_list_shared_vfolders(PublicListSharedVFoldersAction())
+
+        assert result.shared == []
+        mock_vfolder_repo.list_shared_vfolder_permissions.assert_called_once_with(
+            requester_id=user_uuid
+        )
+
+    async def test_global_listing_names_no_requester(
+        self,
+        sharing_service: VFolderSharingService,
+        mock_vfolder_repo: MagicMock,
+        vfolder_uuid: uuid.UUID,
+    ) -> None:
+        shared_user_uuid = uuid.uuid4()
+        owner_uuid = uuid.uuid4()
+        mock_vfolder_repo.list_shared_vfolder_permissions = AsyncMock(
+            return_value=[
+                {
+                    "vfolder_id": vfolder_uuid,
+                    "name": "shared-folder",
+                    "status": VFolderOperationStatus.READY,
+                    "group": None,
+                    "ownership_type": VFolderOwnershipType.USER,
+                    "vfolder_user": owner_uuid,
+                    "user": shared_user_uuid,
+                    "email": "shared@test.com",
+                    "permission": VFolderMountPermission.READ_ONLY,
+                }
+            ]
+        )
+
+        result = await sharing_service.global_list_shared_vfolders(GlobalListSharedVFoldersAction())
+
+        assert len(result.shared) == 1
+        info = result.shared[0]
+        assert info.owner == str(owner_uuid)
+        assert info.folder_type == "user"
+        mock_vfolder_repo.list_shared_vfolder_permissions.assert_called_once_with()
 
 
 # ============================================================

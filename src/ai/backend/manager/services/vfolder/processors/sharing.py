@@ -1,8 +1,13 @@
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import PublicActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.services.vfolder.actions.sharing import (
+    GlobalListSharedVFoldersAction,
+    GlobalListSharedVFoldersActionResult,
     ListSharedVFoldersAction,
     ListSharedVFoldersActionResult,
     PublicListSharedVFoldersAction,
@@ -26,6 +31,9 @@ class VFolderSharingProcessors:
     public_list_shared: PublicActionProcessor[
         PublicListSharedVFoldersAction, PublicListSharedVFoldersActionResult
     ]
+    global_list_shared: GlobalActionProcessor[
+        GlobalListSharedVFoldersAction, GlobalListSharedVFoldersActionResult
+    ]
     update_sharing_status: SingleEntityActionProcessor[
         UpdateVFolderSharingStatusAction, UpdateVFolderSharingStatusActionResult
     ]
@@ -38,6 +46,9 @@ class VFolderSharingProcessors:
         )
         self.public_list_shared = group.public(
             PublicListSharedVFoldersAction, service.public_list_shared_vfolders
+        )
+        self.global_list_shared = group.global_scope(
+            GlobalListSharedVFoldersAction, service.global_list_shared_vfolders
         )
         self.update_sharing_status = group.single_entity(
             UpdateVFolderSharingStatusAction, service.update_sharing_status
