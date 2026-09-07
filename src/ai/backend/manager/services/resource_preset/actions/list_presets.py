@@ -7,6 +7,13 @@ from ai.backend.manager.services.resource_preset.actions.base import ResourcePre
 
 @dataclass
 class ListResourcePresetsAction(ResourcePresetAction):
+    """List the presets a resource group offers.
+
+    Public: a session launcher shows these for the user to pick from, so every
+    authenticated caller reads them. The catalog holds no owner and no secret --
+    a name, its resource slots and its shared memory.
+    """
+
     access_key: str
     resource_group: str | None
 
