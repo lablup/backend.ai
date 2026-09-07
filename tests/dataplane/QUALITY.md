@@ -28,6 +28,7 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | C17 | **One agent id, one agent process.** The pid file is held under an exclusive lock. | Two agents under one id are one identity to the manager, the VNI registry and the privnet journal; no session-level fence separates them, so a restart's outgoing process can withdraw the incoming one's membership. | `_hold_pid_file` |
 | C18 | **A lost claim is one candidate; an expired guard is all of them.** Both allocators tell the two apart at the first miss. | Read as a conflict, an expired guard walks the whole VNI range -- ~16.7M swaps and prefix reads -- holding the manager and its etcd for as long as that takes. | `TestAGuardThatExpiredMidScan` |
 | C19 | **A claim from before the field is taken, not shared.** A legacy subnet or VNI is promoted to the adopting incarnation before it is used, all units or none. | Two incarnations read one claim as theirs: the newer runs on it, the older's cleanup gives it back, and the pool hands a live session's VNI or half its subnet to another tenant. | `TestALegacyClaimTwoIncarnationsCanRead`, `TestAWideBlockOnTwoIncarnations` |
+| C22 | **An unstamped claim is compatible, not garbage.** The reconciler judges by `of_generation`, the same rule the allocators use. | Comparing the two generations directly makes every claim carried over an upgrade a mismatch -- so the first start of the manager that upgraded them deletes the live subnet and VNI of every such session. | `test_a_live_sessions_legacy_subnet_survives_the_sweep` |
 | C21 | **A judgement and the delete it justifies are one operation.** The reconciler carries the record state it judged on into the delete as a guard. | It reads a claim, finds no session, and deletes -- while in between the session is rebuilt over that very unit. A re-read before the delete conditions it on the claim the sweep never judged, and takes a live tenant's subnet. | `test_a_claim_retaken_between_the_judgement_and_the_delete_survives` |
 | C20 | **The pool itself is reconcilable.** A sweep starts from the claims and asks each session, so it reaches what no record, tombstone or debt note names. | The one leak nothing can find: a cleanup whose debt write AND release both failed. | `TestAPoolClaimNothingNames` |
 | C15 | **A cleanup that cannot finish is written down and retried.** The orphan sweep records what it owes per incarnation and clears it only when nothing is left. | The sweep has no tombstone to work from -- the record already names its successor -- so one transient etcd error leaks a VNI, a subnet and their keys for the cluster's life. | `TestACleanupThatCouldNotFinishIsRetried` |
@@ -210,3 +211,29 @@ R3 is unchanged and this round does not narrow it. The reconciler is still the m
 thing here: correct by the ownership model, and a release of live tenant state anywhere the model
 is wrong. The race above is now covered by a unit test; a rolling restart of two managers against
 real nodes is not.
+
+
+Ninth round, against the same bar:
+
+| # | Was | Now |
+|---|-----|-----|
+| C22 | the reconciler asked `live == generation`, so a claim carrying NO incarnation was a mismatch against any stamped record -- and that is precisely what the previous version could hand a session whose meta does carry one. The first start of the upgraded manager would have deleted those sessions' live subnet and VNI | judged by `of_generation`, so an unstamped claim under a live record is preserved and the next adoption promotes it |
+| C20 | an unstamped child key under a session with NO record was skipped forever, for the same compatibility reason read the other way | where a record exists, a compatible key stays; where there is none, nothing under the id is live and every key goes, stamped or not |
+| C20 | pool reconciliation ran only at manager start, so a debt-write-plus-sweep failure went unretried until a restart | the session's own keys are also reconciled whenever its id is used again (three prefix reads on the create/teardown path, not a walk of the pool) |
+| — | the sweep read each session's record once per CLAIM | once per session, cached within the sweep; safe only because every delete re-checks the guard, so a stale read can lose a delete but never win one wrongly |
+
+Still NOT done, and carried forward:
+
+- No periodic, leader-only reconciliation. `GlobalTimer` with a distributed lock is the mechanism
+  this project already uses (`idle.py`), but wiring it needs a `LockID`, an event type and a
+  dispatcher registration, and the plugin holds neither the event producer nor the lock factory.
+  An in-plugin timer WITHOUT the lock would be worse than none: every HA manager would scan at
+  once. A session id that is never used again therefore still waits for a manager restart.
+- `unrecoverable_leaks()` has no production caller and reaches no health surface or metric.
+- The startup sweep is unpaginated and unbounded in concurrency.
+- `compare_and_delete` is exercised only through the manager's in-memory fake. The transaction it
+  builds -- value compares plus `create_revision == 0` for an absent guard -- has no test against
+  a real etcd, and that is the primitive the whole reconciler now rests on.
+
+R3 unchanged: no run against this HEAD, and none of C18-C22 or D7-D10 has been exercised on real
+nodes.
