@@ -325,8 +325,8 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         self, entity_values: Mapping[EntityIdentifier, ScopeTemplateValue]
     ) -> None:
         """Create the roles the active presets matching the scopes' types call for —
-        presets are the only source of a scope's roles. Each role is enrolled in
-        its scope's virtual entity (the scope owns its roles)."""
+        presets are the only source of a scope's roles. Each role is created in its
+        scope, which owns and governs it as it does every other entity created there."""
         specs = await self._preset_role_specs(entity_values)
         if not specs:
             return
@@ -343,7 +343,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         await self._sess.flush()
         await self._provision([RoleID(row.id) for row in role_rows])
         for spec, row in zip(specs, role_rows, strict=True):
-            await self._own([spec.entity], RoleID(row.id))
+            await self._created_in([spec.entity], RoleID(row.id))
         permission_rows = [
             PermissionRow(
                 role_id=row.id,

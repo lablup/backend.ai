@@ -11,32 +11,8 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import (
     ObjectPermissionRow,
 )
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
-
-
-class RoleOrders:
-    """Query orders for roles."""
-
-    @staticmethod
-    def name(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return RoleRow.name.asc()
-        return RoleRow.name.desc()
-
-    @staticmethod
-    def created_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return RoleRow.created_at.asc()
-        return RoleRow.created_at.desc()
-
-    @staticmethod
-    def updated_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return RoleRow.updated_at.asc()
-        return RoleRow.updated_at.desc()
 
 
 class AssignedUserOrders:
@@ -130,28 +106,6 @@ class EntityScopeOrders:
         if ascending:
             return AssociationScopesEntitiesRow.registered_at.asc()
         return AssociationScopesEntitiesRow.registered_at.desc()
-
-
-class ScopedPermissionOrders:
-    """Query orders for scoped permissions."""
-
-    @staticmethod
-    def id(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return PermissionRow.id.asc()
-        return PermissionRow.id.desc()
-
-    @staticmethod
-    def entity_type(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return PermissionRow.entity_type.asc()
-        return PermissionRow.entity_type.desc()
-
-    @staticmethod
-    def created_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return PermissionRow.created_at.asc()
-        return PermissionRow.created_at.desc()
 
 
 class ObjectPermissionOrders:

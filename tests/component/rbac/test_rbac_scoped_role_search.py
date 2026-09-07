@@ -15,6 +15,8 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
 from ai.backend.common.dto.manager.v2.rbac.request import SearchRolesInput
 from ai.backend.common.dto.manager.v2.rbac.response import AdminSearchRolesPayload
 from ai.backend.manager.actions.validators import ActionValidators
@@ -28,11 +30,9 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.rbac.handler import V2RBACHandler
 from ai.backend.manager.api.rest.v2.rbac.registry import register_v2_rbac_routes
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -125,29 +125,42 @@ async def role_registered_in_project(
     group_fixture: uuid.UUID,
     db_engine: SAEngine,
 ) -> AsyncIterator[uuid.UUID]:
-    """Create a role and register it in the project scope. Yields the role ID."""
+    """Create a role the project owns in the graph. Yields the role ID."""
     created = await role_factory(name=f"proj-role-{uuid.uuid4().hex[:8]}")
     role_id = created.role.id
+    nodes = VirtualEntityRow.__table__
+    edges = EntityMembershipRow.__table__
 
     async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(AssociationScopesEntitiesRow.__table__).values(
-                id=uuid.uuid4(),
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_fixture),
-                entity_type=EntityType.ROLE,
-                entity_id=str(role_id),
+        scope_node = await conn.scalar(
+            sa.select(nodes.c.id).where(
+                nodes.c.entity_type == PROJECT_ENTITY_TYPE,
+                nodes.c.entity_id == group_fixture,
             )
+        )
+        if scope_node is None:
+            scope_node = await conn.scalar(
+                sa.insert(nodes)
+                .values(entity_type=PROJECT_ENTITY_TYPE, entity_id=group_fixture)
+                .returning(nodes.c.id)
+            )
+        role_node = await conn.scalar(
+            sa.insert(nodes)
+            .values(entity_type=ROLE_ENTITY_TYPE, entity_id=role_id)
+            .returning(nodes.c.id)
+        )
+        await conn.execute(
+            sa.insert(edges).values([
+                {"virtual_entity_id": role_node, "member_entity_id": role_node},
+                {"virtual_entity_id": scope_node, "member_entity_id": role_node},
+            ])
         )
 
     yield role_id
 
     async with db_engine.begin() as conn:
-        await conn.execute(
-            AssociationScopesEntitiesRow.__table__.delete().where(
-                AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id),
-            )
-        )
+        # The edges go with the node by FK cascade.
+        await conn.execute(sa.delete(nodes).where(nodes.c.id == role_node))
 
 
 class TestScopedRoleSearch:

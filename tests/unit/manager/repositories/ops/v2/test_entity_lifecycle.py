@@ -534,6 +534,21 @@ async def _scope_roles(database: ExtendedAsyncSAEngine, scope_id: UUID) -> dict[
         }
 
 
+async def _scope_governs_role(
+    database: ExtendedAsyncSAEngine, scope_id: UUID, role_id: UUID
+) -> bool:
+    """Whether the scope governs the role it provisioned."""
+    async with database.begin_readonly_session() as sess:
+        row = await sess.scalar(
+            sa.select(ScopeBindingRow.scope_entity_id).where(
+                ScopeBindingRow.virtual_entity_id
+                == _node_id(ScopeType(EntityType("role")), role_id),
+                ScopeBindingRow.scope_entity_id == _node_id(_SCOPE_TYPE, scope_id),
+            )
+        )
+        return row is not None
+
+
 async def _role_permissions(database: ExtendedAsyncSAEngine, role_id: UUID) -> set[OperationType]:
     async with database.begin_readonly_session() as sess:
         rows = await sess.scalars(
@@ -669,6 +684,19 @@ class TestRoleManagedGlobalEntityCreate:
         assert role.status == RoleStatus.ACTIVE
         assert role.auto_assign is True
         assert await _role_permissions(database, role.id) == {OperationType.READ}
+
+    async def test_a_preset_role_is_governed_by_the_scope_that_provisioned_it(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: OpsRepository[_EntityData],
+        presets: None,
+    ) -> None:
+        data = await repository.create_role_managed_global_entity(
+            _RoleManagedGlobalCreator(name="a")
+        )
+
+        role = (await _scope_roles(database, data.id))[_expected_preset_role_name(data.id)]
+        assert await _scope_governs_role(database, data.id, role.id)
 
     async def test_create_renders_templated_preset_role_names(
         self,

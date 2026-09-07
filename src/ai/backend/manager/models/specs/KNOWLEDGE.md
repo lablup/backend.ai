@@ -248,9 +248,9 @@ updater's fields rather than about a column name.
 | Relation | Write | Reverse | Written by |
 |---|---|---|---|
 | node | `_provision(entities)` — node + self own + self govern | `_teardown(entity)` — the rest goes by FK cascade | create / purge |
-| own | `_own(owners, entity)` — a share in its place becomes own | `_disown(owners, entity)` | preset role |
+| own | written only as part of `_created_in` | `_disown(owners, entity)` | a user leaving a project |
 | govern | `_govern(scopes, entity, cap)` | `_ungovern(scopes, entity)` | relation (cap READ) |
-| own + govern | `_created_in(scopes, entity)` — one node lookup | `_removed_from(scopes, entity)` | create, transfer |
+| own + govern | `_created_in(scopes, entity)` — one node lookup | `_removed_from(scopes, entity)` | create (preset roles included), transfer |
 | share (capped own) | `_reset_share(scope, entity)` / `_widen_share(scope, entity, {bit: paths})` / `_narrow_share` | `_unshare(scope, entities)` | relation, share write |
 
 | Pair | provider / ops | Methods |

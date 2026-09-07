@@ -79,7 +79,6 @@ is created in no scope.
 | Hook | own | govern | Meaning |
 |---|---|---|---|
 | `EntityCreator.created_in(row)` / `EntityUpserter.created_in(row)` / `RoleManagedEntityCreator.created_in(row)` | yes | yes | A session is created in its project and user, a project and a user in their domain. Where it is created owns and governs it. A missing target fails the write. `GlobalEntityCreator` / `RoleManagedGlobalEntityCreator` have no such hook |
-| (no hook) preset role | yes | no | A role is owned by its scope and governed by nothing |
 | share write: `replace_share` / `replace_share_fields` … | yes, capped | no | A share is own under a cap, lent to the receiving scope |
 | share write: `transfer(from_scopes, to_scopes, entity)` | yes | yes | Ownership moves: as if removed from the old scopes and created in the new. A share in the new scope's place becomes own |
 | relation write: `create_relation(creator, scope, target)` / `purge_relation` | the target holds the scope under cap READ | the scope governs the target under cap READ | A project reads a resource group and what it owns (agents); the resource group reads the project itself only |

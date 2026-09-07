@@ -93,34 +93,6 @@ class V2GraphWriteOpsBase(V2WriteOpsBase):
             )
         )
 
-    async def _own(self, owners: Collection[EntityIdentifier], entity: EntityIdentifier) -> None:
-        """Each owner's virtual entity owns the entity, uncapped. A share already there
-        becomes own, its cap rows dropped."""
-        if not owners:
-            return
-        node_ids = await self._node_ids([entity, *owners])
-        entity_node = node_ids[self._node_key(entity)]
-        owner_nodes = [node_ids[self._node_key(owner)] for owner in owners]
-        membership_ids = (
-            await self._sess.scalars(
-                pg_insert(EntityMembershipRow)
-                .values([
-                    {"virtual_entity_id": owner, "member_entity_id": entity_node, "capped": False}
-                    for owner in owner_nodes
-                ])
-                .on_conflict_do_update(
-                    index_elements=["virtual_entity_id", "member_entity_id"],
-                    set_={"capped": False},
-                )
-                .returning(EntityMembershipRow.id)
-            )
-        ).all()
-        await self._sess.execute(
-            sa.delete(EntityMembershipCapRow).where(
-                EntityMembershipCapRow.membership_id.in_(membership_ids)
-            )
-        )
-
     async def _disown(self, owners: Collection[EntityIdentifier], entity: EntityIdentifier) -> None:
         """Each owner's virtual entity stops owning the entity. Silent where it never
         did, or where either side has no virtual entity."""

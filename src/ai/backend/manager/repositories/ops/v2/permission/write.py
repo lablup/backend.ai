@@ -15,8 +15,9 @@ from dataclasses import dataclass
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
-from ai.backend.common.data.permission.id import FieldPath, PermissionID
+from ai.backend.common.data.permission.id import FieldPath
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.errors.permission import InvalidFieldPermission
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
