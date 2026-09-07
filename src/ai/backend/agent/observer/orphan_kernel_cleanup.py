@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.agent.types import LifecycleEvent
@@ -24,16 +25,37 @@ class OrphanKernelCleanupObserver(AbstractObserver):
     Observer that periodically detects and cleans up orphan kernels.
 
     Orphan kernels are containers that exist in Agent but have been
-    terminated from Manager's DB. Detection is based on comparing
-    kernel.last_check with agent_last_check timestamps.
+    terminated from Manager's DB. Until they are reaped they hold their
+    allocation, so the agent and the manager disagree about this node's free
+    capacity and the next session scheduled here fails with InsufficientResource.
 
-    Cleanup condition (strict):
-        (agent_last_check exists) AND
-        (kernel status exists in Redis) AND
-        (kernel.last_check < agent_last_check - THRESHOLD)
+    A kernel is an orphan when the manager is checking this agent but is not
+    checking that kernel. Two shapes of that, and both have to be covered:
 
-    All other cases (no Redis entry, no agent_last_check, etc.) are skipped.
+    - The manager checked it once and has stopped:
+      ``kernel.last_check < agent_last_check - THRESHOLD``.
+    - The manager has never checked it at all -- no presence entry, or one with
+      no ``last_check``. This is what an agent restart leaves behind: the
+      presence key's TTL passes while the agent is down, and the agent's own
+      presence observer then recreates it with a presence and no ``last_check``.
+      Read as "not enough information" it was skipped forever, which is why a
+      session terminated during a node outage kept its resources for good.
+
+    "Never checked" is only meaningful after the manager has had the chance, so
+    it is debounced: a kernel has to stay unknown across THRESHOLD seconds of
+    this agent's uptime before it is reaped, which leaves a newly created kernel
+    well clear of the manager's next sweep.
+
+    Nothing is reaped unless ``agent_last_check`` is FRESH. A manager that has
+    stopped checking this agent altogether says nothing about any one kernel,
+    and reaping on its silence would empty a healthy node.
     """
+
+    _agent: AbstractAgent[Any, Any]
+    _valkey_schedule_client: ValkeyScheduleClient
+    #: ``kernel_id -> monotonic time`` this agent first saw a kernel of its own that the manager
+    #: has never checked. The debounce above is measured from here.
+    _unknown_since: dict[KernelId, float]
 
     def __init__(
         self,
@@ -42,6 +64,7 @@ class OrphanKernelCleanupObserver(AbstractObserver):
     ) -> None:
         self._agent = agent
         self._valkey_schedule_client = valkey_schedule_client
+        self._unknown_since = {}
 
     @property
     @override
@@ -57,43 +80,69 @@ class OrphanKernelCleanupObserver(AbstractObserver):
             log.debug(
                 "No agent_last_check found for agent {}, skipping orphan cleanup", self._agent.id
             )
+            self._unknown_since.clear()
             return
 
-        # 2. Get kernels from registry
+        # 2. Only act while the manager is actually checking this agent. Its silence is about the
+        #    manager, not about any kernel, and reaping on it would empty a healthy node.
+        #    Redis' clock on both sides of the comparison, not this host's.
+        now = await self._valkey_schedule_client.get_redis_time()
+        if now - agent_last_check > ORPHAN_KERNEL_THRESHOLD_SEC:
+            log.debug(
+                "Manager last checked agent {} {}s ago, skipping orphan cleanup",
+                self._agent.id,
+                now - agent_last_check,
+            )
+            self._unknown_since.clear()
+            return
+
+        # 3. Get kernels from registry
         kernel_registry = self._agent.kernel_registry
         if not kernel_registry:
+            self._unknown_since.clear()
             return
 
-        # 3. Get kernel presence statuses (read-only)
+        # 4. Get kernel presence statuses (read-only)
         kernel_ids = list(kernel_registry.keys())
         statuses = await self._valkey_schedule_client.get_kernel_presence_batch(kernel_ids)
 
-        # 4. Find orphan kernels
+        # 5. Find orphan kernels
         orphan_kernels: list[tuple[KernelId, SessionId]] = []
+        unknown: dict[KernelId, float] = {}
+        since_now = time.monotonic()
         for kernel_id, kernel in kernel_registry.items():
             status = statuses.get(kernel_id)
-            if status is None:
-                # No Redis entry - skip (not enough info to decide)
+            if status is not None and status.last_check is not None:
+                # The manager has checked this kernel at some point. It is an orphan once it has
+                # stopped, while the agent as a whole is still being checked.
+                if status.last_check < agent_last_check - ORPHAN_KERNEL_THRESHOLD_SEC:
+                    orphan_kernels.append((kernel_id, kernel.session_id))
+                    log.info(
+                        "Detected orphan kernel: {} (last_check={}, agent_last_check={},"
+                        " threshold={})",
+                        kernel_id,
+                        status.last_check,
+                        agent_last_check,
+                        ORPHAN_KERNEL_THRESHOLD_SEC,
+                    )
                 continue
-
-            # Skip if last_check is None (not enough info to decide)
-            if status.last_check is None:
-                log.debug(
-                    "Kernel {} has no last_check timestamp, skipping orphan check",
-                    kernel_id,
-                )
-                continue
-
-            # Strict condition: kernel.last_check < agent_last_check - THRESHOLD
-            if status.last_check < agent_last_check - ORPHAN_KERNEL_THRESHOLD_SEC:
+            # The manager has never checked this kernel, while it is checking this agent. Either
+            # it does not know the kernel (terminated while the agent was down, and the agent
+            # re-adopted it on recovery) or it has not got to it yet. Debounced rather than
+            # decided now, because only the second one resolves itself.
+            first_seen = self._unknown_since.get(kernel_id, since_now)
+            unknown[kernel_id] = first_seen
+            if since_now - first_seen >= ORPHAN_KERNEL_THRESHOLD_SEC:
                 orphan_kernels.append((kernel_id, kernel.session_id))
                 log.info(
-                    "Detected orphan kernel: {} (last_check={}, agent_last_check={}, threshold={})",
+                    "Detected orphan kernel: {} (manager has never checked it in the {}s since"
+                    " this agent first saw it, and is checking this agent)",
                     kernel_id,
-                    status.last_check,
-                    agent_last_check,
                     ORPHAN_KERNEL_THRESHOLD_SEC,
                 )
+        # Only what is still unknown: a kernel the manager has since checked starts over if it
+        # ever goes unknown again, and one that has gone is not tracked at all.
+        self._unknown_since = unknown
 
         # 5. Cleanup orphan kernels via lifecycle event
         for kernel_id, session_id in orphan_kernels:

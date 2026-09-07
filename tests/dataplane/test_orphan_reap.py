@@ -10,8 +10,18 @@ This was observed live on this branch: a kernel from a session terminated during
 its cpu after the agent came back, and a later multi-node session hung PREPARED on that node because
 the agent could not allocate what the manager thought was free.
 
-xfail: recovery re-adopts the container but does not reconcile it against the manager's session
-state, so the orphan (and its allocation) survives. Remove the xfail when recovery reaps it.
+The reap is the orphan-kernel observer's, not recovery's. Recovery cannot safely decide this: the
+only signal it has is the session's network meta, and that reads as absent both when the session is
+gone and when etcd is briefly unreadable or the manager is rebuilding the session -- destroying live
+kernels on either would be worse than the leak. So the observer decides instead, on a signal that
+cannot be transient: the manager is checking this agent and has never checked this kernel, and that
+has stayed true for ORPHAN_KERNEL_THRESHOLD_SEC.
+
+That puts the reap one debounce plus one observe interval after recovery, which is what this test
+waits for. Before, no path reaped it at all: after a restart the presence key's TTL had passed and
+the agent's own presence observer recreated it with no last_check, so every kernel hit a `continue`.
+
+xfail(strict=False): the wait above has never been run on real nodes.
 """
 
 from __future__ import annotations
@@ -22,19 +32,26 @@ from dataclasses import replace
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
+    ORPHAN_KERNEL_THRESHOLD_SEC,
+)
 from ai.backend.testutils.dataplane import probe
 from ai.backend.testutils.dataplane.agent_control import AgentController
 from ai.backend.testutils.dataplane.nodes import Node
 from ai.backend.testutils.dataplane.session import SessionDriver, SessionSpec
 
+#: How long the reap can take: the observer has to see the kernel unknown for a whole threshold,
+#: and it only looks once per `observe_interval`. Plus one interval of slack for where in the cycle
+#: recovery happened to land.
+_REAP_BOUND_SEC = ORPHAN_KERNEL_THRESHOLD_SEC + 300.0 * 2
+
 
 class TestOrphanReap:
     @pytest.mark.xfail(
         reason=(
-            "agent recovery re-adopts a container whose session was terminated while the agent was "
-            "down, holding its resources (observed live: a later session hung PREPARED with "
-            "InsufficientResource). Recovery should reconcile recovered kernels against the "
-            "manager's session state and reap the orphans."
+            "the orphan-kernel observer now reaps this, but on a debounce that has never been "
+            "waited out on real nodes: the manager must be checking this agent throughout, and "
+            "the reap lands one threshold plus one observe interval after recovery."
         ),
         strict=False,
     )
@@ -56,10 +73,11 @@ class TestOrphanReap:
             await session_driver.destroy(handle.session_id, forced=True)
             await agent_control.start()
 
-            assert await _container_gone(node, container_id), (
+            assert await _container_gone(node, container_id, timeout=_REAP_BOUND_SEC), (
                 f"the container {container_id} of a session terminated during the outage survived "
-                "recovery -- the agent re-adopted an orphan and is still holding its resources, so "
-                "the node's advertised capacity is a lie the next session will trip over"
+                f"{_REAP_BOUND_SEC}s after recovery -- the agent re-adopted an orphan and is still "
+                "holding its resources, so the node's advertised capacity is a lie the next "
+                "session will trip over"
             )
         finally:
             # The session is gone from the manager, so nothing else will reap this container; kill

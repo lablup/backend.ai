@@ -24,6 +24,22 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AgentId, KernelId, SessionId
 
+#: The observer's own clock, patched by path so the debounce can be measured in test time.
+_MONOTONIC = "ai.backend.agent.observer.orphan_kernel_cleanup.time.monotonic"
+
+
+class _Clock:
+    """A monotonic clock the test moves, so a debounce measured in minutes runs in no time."""
+
+    def __init__(self) -> None:
+        self._now = 0.0
+
+    def __call__(self) -> float:
+        return self._now
+
+    def advance(self, seconds: float) -> None:
+        self._now += seconds
+
 
 @dataclass
 class MockKernel:
@@ -58,10 +74,12 @@ class AgentProtocol(Protocol):
 class TestOrphanKernelCleanupObserver:
     """Test cases for OrphanKernelCleanupObserver.
 
-    These tests verify the strict cleanup conditions:
-    - agent_last_check must exist
-    - kernel status must exist in Redis
-    - kernel.last_check < agent_last_check - THRESHOLD
+    These tests verify the cleanup conditions:
+    - agent_last_check must exist, and be fresh
+    - a kernel the manager checked and stopped checking is an orphan:
+      kernel.last_check < agent_last_check - THRESHOLD
+    - a kernel the manager has NEVER checked is an orphan too, but only after it has stayed
+      unknown for THRESHOLD seconds -- it is also what a kernel just created looks like
     """
 
     @pytest.fixture
@@ -80,6 +98,9 @@ class TestOrphanKernelCleanupObserver:
         client = AsyncMock()
         client.get_agent_last_check = AsyncMock(return_value=None)
         client.get_kernel_presence_batch = AsyncMock(return_value={})
+        # Redis' clock, which the freshness check reads. The tests place agent_last_check at
+        # 1000, so "now" is 1000: the manager is checking this agent right now.
+        client.get_redis_time = AsyncMock(return_value=1000)
         return client
 
     @pytest.fixture
@@ -139,7 +160,7 @@ class TestOrphanKernelCleanupObserver:
         kernel_id: KernelId,
         session_id: SessionId,
     ) -> None:
-        """Test that observe() skips kernel when status is None (no Redis entry)."""
+        """Test that observe() does not reap on the first pass when status is None."""
         mock_valkey_client.get_agent_last_check.return_value = 1000
         type(mock_agent).kernel_registry = PropertyMock(
             return_value={kernel_id: MockKernel(session_id=session_id)}
@@ -160,7 +181,7 @@ class TestOrphanKernelCleanupObserver:
         kernel_id: KernelId,
         session_id: SessionId,
     ) -> None:
-        """Test that observe() skips kernel when last_check is None."""
+        """Test that observe() does not reap on the first pass when last_check is None."""
         mock_valkey_client.get_agent_last_check.return_value = 1000
         type(mock_agent).kernel_registry = PropertyMock(
             return_value={kernel_id: MockKernel(session_id=session_id)}
@@ -439,6 +460,139 @@ class TestOrphanKernelCleanupObserver:
             KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
             suppress_events=True,
         )
+
+    # ===== A kernel the manager has never checked =====
+
+    async def test_an_unknown_kernel_is_reaped_once_it_stays_unknown(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """What an agent restart leaves behind: the presence key's TTL passed while the agent was
+        down, the agent's own presence observer recreated it with no last_check, and the manager
+        has no such kernel to check. Read as "not enough information" this survived forever, and
+        held its allocation -- a later session on this node hung PREPARED with
+        InsufficientResource."""
+        clock = _Clock()
+        monkeypatch.setattr(_MONOTONIC, clock)
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: KernelStatus(
+                presence=HealthCheckStatus.HEALTHY,
+                last_presence=1000,
+                last_check=None,
+                created_at=1000,
+            ),
+        }
+
+        await observer.observe()
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC)
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_called_once_with(
+            kernel_id,
+            session_id,
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+            suppress_events=True,
+        )
+
+    async def test_an_unknown_kernel_the_manager_then_checks_is_kept(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # The other thing an unknown kernel can be: one just created, which the manager has not
+        # got to yet. The debounce is what tells the two apart.
+        clock = _Clock()
+        monkeypatch.setattr(_MONOTONIC, clock)
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {kernel_id: None}
+
+        await observer.observe()
+        mock_valkey_client.get_kernel_presence_batch.return_value = {
+            kernel_id: KernelStatus(
+                presence=HealthCheckStatus.HEALTHY,
+                last_presence=1000,
+                last_check=1000,
+                created_at=900,
+            ),
+        }
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC * 10)
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    async def test_nothing_is_reaped_when_the_manager_stopped_checking_this_agent(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A stale agent_last_check says the MANAGER is not checking, which says nothing about any
+        one kernel. Reaping on it would empty a healthy node the moment the manager restarts."""
+        clock = _Clock()
+        monkeypatch.setattr(_MONOTONIC, clock)
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        mock_valkey_client.get_redis_time.return_value = 1000 + ORPHAN_KERNEL_THRESHOLD_SEC + 1
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {kernel_id: None}
+
+        await observer.observe()
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC * 10)
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    async def test_the_debounce_restarts_after_the_manager_goes_quiet(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Time spent while the manager was not checking is not time the kernel was "unknown to a
+        # manager that was looking"; counting it would reap on the first pass after a restart.
+        clock = _Clock()
+        monkeypatch.setattr(_MONOTONIC, clock)
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {kernel_id: None}
+        await observer.observe()
+
+        mock_valkey_client.get_redis_time.return_value = 1000 + ORPHAN_KERNEL_THRESHOLD_SEC + 1
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC)
+        await observer.observe()  # manager quiet: the debounce is dropped
+
+        mock_valkey_client.get_redis_time.return_value = 1000
+        await observer.observe()  # manager back: this is the first pass again
+
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
 
     def test_observe_interval(self, observer: OrphanKernelCleanupObserver) -> None:
         """Test that observe_interval returns correct value (5 minutes)."""
