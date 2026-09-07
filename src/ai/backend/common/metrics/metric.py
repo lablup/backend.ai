@@ -772,6 +772,7 @@ class NetworkPoolMetricObserver:
     _reconcile_pending: Gauge
     _reclaimed_claims: Counter
     _unrecoverable_incarnations: Gauge
+    _invalid_records: Counter
 
     def __init__(self) -> None:
         self._reconcile_failures = Counter(
@@ -796,11 +797,22 @@ class NetworkPoolMetricObserver:
             multiprocess_mode="livemax",
         )
 
+        self._invalid_records = Counter(
+            name="backendai_network_pool_invalid_record_count",
+            documentation=(
+                "Overlay records or claims that could not be read as what they must be, and were"
+                " stepped over"
+            ),
+        )
+
     @classmethod
     def instance(cls) -> Self:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+
+    def observe_invalid_record(self) -> None:
+        self._invalid_records.inc()
 
     def observe_reconcile_succeeded(self, *, reclaimed: int, unrecoverable: int) -> None:
         self._reconcile_pending.set(0)

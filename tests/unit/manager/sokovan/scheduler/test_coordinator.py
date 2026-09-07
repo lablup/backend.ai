@@ -12,14 +12,17 @@ Test Scenarios:
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, override
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.options import HandlerOptions
@@ -36,6 +39,9 @@ from ai.backend.manager.sokovan.scheduler.coordinator import (
     HookExecutionResult,
     ScheduleCoordinator,
 )
+from ai.backend.manager.sokovan.scheduler.handlers.kernel.base import (
+    KernelLifecycleHandler,
+)
 from ai.backend.manager.sokovan.scheduler.post_processors import PostProcessorContext
 from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.results import (
@@ -44,6 +50,7 @@ from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.views.sokovan.lifecycle import LastPhase
 
 # =============================================================================
@@ -1375,3 +1382,84 @@ class TestScheduleCoordinatorPromotionRecordOrdering:
         (finalize,) = records[session_id].phases
         assert finalize.name == "finalize_start"
         assert [step.name for step in finalize.steps] == ["trigger_batch_execution"]
+
+
+class _CoordinatorWithFailingGroups(ScheduleCoordinator):
+    """A coordinator whose per-resource-group pass fails for the groups named.
+
+    Constructed without ``__init__`` and given only the attributes
+    ``_process_kernel_schedule`` touches: the point under test is which of its outcomes publishes
+    the sweep mark, not how a coordinator is wired.
+    """
+
+    _failing: frozenset[str]
+
+    @override
+    async def _process_kernel_resource_group(
+        self,
+        handler: KernelLifecycleHandler,
+        schedule_type: ScheduleType,
+        resource_group_id: ResourceGroupID,
+    ) -> None:
+        if str(resource_group_id) in self._failing:
+            raise RuntimeError("the database was unreachable")
+
+
+class TestTheManagerSweepMark:
+    """The mark an agent reads to tell "the manager is not looking" from "the manager is looking
+    and does not know this kernel". Resource groups are gathered with return_exceptions=True, so a
+    mark written per group published a pass that had never looked at the groups that failed -- and
+    an agent in one of those would read its own live kernels as ones the manager does not know."""
+
+    def _coordinator(
+        self, resource_groups: list[str], failing: set[str]
+    ) -> tuple[_CoordinatorWithFailingGroups, AsyncMock]:
+        coordinator = object.__new__(_CoordinatorWithFailingGroups)
+        coordinator._failing = frozenset(failing)
+        metrics = MagicMock()
+
+        @contextmanager
+        def _measure(operation: str) -> Iterator[None]:
+            yield
+
+        metrics.measure_operation = _measure
+        coordinator._operation_metrics = metrics
+        repository = MagicMock()
+        repository.get_all_resource_groups = AsyncMock(return_value=resource_groups)
+        coordinator._repository = repository
+        mark = AsyncMock()
+        coordinator._valkey_schedule = MagicMock(mark_manager_sweep=mark)
+
+        # No lock factory and no config provider: the handler below declares no lock_id, so the
+        # branch that would use them is not taken. Leaving them unset keeps this stub to exactly
+        # what the path under test touches.
+        return coordinator, mark
+
+    async def _run(self, coordinator: _CoordinatorWithFailingGroups) -> None:
+        handler = MagicMock()
+        handler.name.return_value = "sweep-stale-kernels"
+        handler.lock_id = None
+        await coordinator._process_kernel_schedule(MagicMock(value="sweep"), handler)
+
+    async def test_it_is_marked_when_every_resource_group_came_back(self) -> None:
+        coordinator, mark = self._coordinator(["rg1", "rg2"], failing=set())
+
+        await self._run(coordinator)
+
+        mark.assert_awaited_once()
+
+    async def test_it_is_marked_when_there_was_nothing_to_do(self) -> None:
+        # An empty resource group is not a failure, and the mark has to keep advancing for it --
+        # that is the case the orphan reap exists for.
+        coordinator, mark = self._coordinator([], failing=set())
+
+        await self._run(coordinator)
+
+        mark.assert_awaited_once()
+
+    async def test_it_is_not_marked_when_a_resource_group_failed(self) -> None:
+        coordinator, mark = self._coordinator(["rg1", "rg2"], failing={"rg2"})
+
+        await self._run(coordinator)
+
+        mark.assert_not_awaited()

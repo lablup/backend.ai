@@ -131,7 +131,7 @@ class TestOrphanKernelCleanupObserver:
         mock_agent: AsyncMock,
         mock_valkey_client: AsyncMock,
     ) -> None:
-        """Test that observe() skips when agent_last_check is None."""
+        """Test that observe() does not reap on the first pass when agent_last_check is None."""
         mock_valkey_client.get_agent_last_check.return_value = None
 
         await observer.observe()
@@ -669,6 +669,41 @@ class TestOrphanKernelCleanupObserver:
         await observer.observe()  # manager back: this is the first pass again
 
         mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    async def test_an_outage_that_outlives_the_agent_timestamp_still_reaps(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """agent:last_check has a 20-minute TTL. An outage longer than that leaves it gone, and
+        the manager rewrites it only for agents that still have a kernel it knows about -- so on
+        the node whose only kernel is the orphan it never comes back. Stopping on its absence left
+        exactly that node uncleaned for good."""
+        clock = _Clock()
+        monkeypatch.setattr(_MONOTONIC, clock)
+        mock_valkey_client.get_agent_last_check.return_value = None  # expired during the outage
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {kernel_id: None}
+
+        await observer.observe()
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC)
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_called_once_with(
+            kernel_id,
+            session_id,
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+            suppress_events=True,
+        )
 
     def test_observe_interval(self, observer: OrphanKernelCleanupObserver) -> None:
         """Test that observe_interval returns correct value (5 minutes)."""

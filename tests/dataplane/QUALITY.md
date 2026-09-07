@@ -359,3 +359,24 @@ Waiting is the safe side.
 R3 unchanged: `compare_and_delete` and the new reconciliation ticket are both exercised only
 against the in-memory fake; no real etcd, no two-manager rolling restart, and A11 has never been
 waited out on real nodes.
+
+Fifteenth round. Both P1s are in the generic lifecycle code, and both are mine from the round
+before -- the same mistake twice: a per-thing signal used to answer a whole-system question.
+
+| # | Was | Now |
+|---|-----|-----|
+| A11 | `agent:last_check` has a 20-minute TTL, and the observer stopped dead when it was absent. An outage longer than that leaves it expired, and the manager only rewrites it for agents that still have a kernel it knows about -- so on the node whose only kernel IS the orphan it never comes back, and that node was never cleaned | the absence of that timestamp disables only the rule that needs it (checked once, then stopped). The rule that answers this case -- never checked, while the manager is sweeping, for a whole threshold -- does not need it |
+| A11 | the sweep mark was written per resource group, and groups are gathered with `return_exceptions=True`. One group succeeding published a pass that had never looked at the groups that failed, and an agent in a failed group would read its own LIVE kernels as ones the manager does not know -- and reap them | written once per pass, and only when every resource group came back. Still written when there was nothing to do, which is the case the reap exists for |
+| C33 | the reconcile ticket compares wall clocks across managers, so one running ahead parks the cluster's reconciliation for as long as its clock is ahead | a ticket dated in the future is not trusted, which bounds the damage of skew to the skew. A TTL lease is the right answer and this etcd client does not expose one |
+| C33 | the ticket was dated from when a sweep STARTED, so a sweep that outlasts the interval lets the next manager start a second one | re-dated when it finishes. Two concurrent passes were always safe -- every delete is guarded and named by exact bytes -- but they are two full scans for one pass of work |
+| C32 | being a JSON object is not being a usable record. `{"vni": []}` is an object, and `int([])` raises TypeError, which no parse site caught | `_named_vni` / `_named_subnet` read the fields as what they must be, report through `backendai_network_pool_invalid_record_count`, and treat what they cannot read as absent -- a state every caller already handles, and one that never causes a delete |
+
+Still not done. The sweep is still an unpaginated full scan; `get_prefix` in this client loads the
+whole result, and the per-session pass still reads each session's prefix in turn. Once per cluster
+per interval is the load fixed, not the memory.
+
+The generic orphan work (A11, the sweep mark, the observer) is not VXLAN and should be split into
+its own Manager-Agent lifecycle PR before this branch is proposed.
+
+R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
+real nodes.

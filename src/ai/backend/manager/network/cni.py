@@ -182,6 +182,44 @@ def _generation_of(raw: str | None) -> str | None:
     return str(generation) if generation is not None else None
 
 
+def _named_vni(meta: Mapping[str, Any]) -> int | None:
+    """The VNI this record names, or None if it names none it can be read as.
+
+    Being a JSON object is not being a usable record. ``{"vni": []}`` and ``{"vni": "x"}`` are
+    objects, and ``int()`` over them raises TypeError and ValueError respectively -- neither of
+    which the parse site was catching, so such a key stopped whatever pass reached it. A field
+    that cannot be read as what it must be is reported and treated as absent: absent is a state
+    the callers already handle, and it never causes a delete.
+    """
+    named = meta.get("vni")
+    if named is None:
+        return None
+    try:
+        return int(named)
+    except (TypeError, ValueError):
+        CommonMetricRegistry.instance().network_pool.observe_invalid_record()
+        log.warning("ignoring a session record whose vni cannot be read: {!r}", named)
+        return None
+
+
+def _named_subnet(meta: Mapping[str, Any]) -> str | None:
+    """The subnet this record names, or None if it names none it can be read as. See `_named_vni`."""
+    named = meta.get("subnet")
+    if named is None:
+        return None
+    if not isinstance(named, str):
+        CommonMetricRegistry.instance().network_pool.observe_invalid_record()
+        log.warning("ignoring a session record whose subnet cannot be read: {!r}", named)
+        return None
+    try:
+        ipaddress.ip_network(named)
+    except ValueError:
+        CommonMetricRegistry.instance().network_pool.observe_invalid_record()
+        log.warning("ignoring a session record whose subnet is not a network: {!r}", named)
+        return None
+    return named
+
+
 def _record_names(meta_raw: str, raw: str, is_vni: bool, key: str | int) -> bool:
     """Whether the session's record names THIS claim.
 
@@ -200,9 +238,12 @@ def _record_names(meta_raw: str, raw: str, is_vni: bool, key: str | int) -> bool
     if meta is None:
         return False
     if is_vni:
-        named_vni = meta.get("vni")
-        return named_vni is not None and int(named_vni) == int(key)
-    named_subnet = meta.get("subnet")
+        named_vni = _named_vni(meta)
+        try:
+            return named_vni is not None and named_vni == int(key)
+        except (TypeError, ValueError):
+            return False
+    named_subnet = _named_subnet(meta)
     if named_subnet is None:
         return False
     claim = _record(raw)
@@ -378,6 +419,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 await asyncio.sleep(_RECONCILE_INTERVAL_SEC)
                 if await self._claim_reconcile_turn():
                     await self._reconcile_pool_reporting()
+                    # Dated from when the pass FINISHED, not when it started: on a pool big enough
+                    # for the sweep to outlast the interval, the start time would let the next
+                    # manager take a turn while this one is still walking. Two concurrent passes
+                    # are safe -- every delete is guarded and named by exact bytes -- but they are
+                    # two full scans for one pass's worth of work.
+                    await self._stamp_reconcile_done()
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -393,7 +440,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         rolling restart would then run the sweep once per manager in turn instead of once.
 
         Fails OPEN -- an unreadable ticket means this manager sweeps. A pass too many costs a pool
-        read; a pass too few is a claim nobody reclaims.
+        read; a pass too few is a claim nobody reclaims. A ticket dated in the FUTURE is unreadable
+        by that rule: managers compare wall clocks here, and one running ahead would otherwise
+        park the whole cluster's reconciliation for as long as its clock is ahead. Trusting only
+        tickets in the past bounds the damage of skew to the skew itself. The proper fix is a TTL
+        lease, which this etcd client does not expose.
         """
         etcd = self._require_etcd()
         now = time.time()
@@ -408,11 +459,23 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         swept_at = (_record(standing) or {}).get("at")
         if isinstance(swept_at, (int, float, str)):
             try:
-                if now - float(swept_at) < _RECONCILE_INTERVAL_SEC:
-                    return False  # somebody swept recently
+                age = now - float(swept_at)
             except ValueError:
-                pass  # unreadable ticket: take the turn and write a readable one
+                age = None  # unreadable ticket: take the turn and write a readable one
+            if age is not None and 0.0 <= age < _RECONCILE_INTERVAL_SEC:
+                return False  # somebody swept recently
         return await etcd.compare_and_put(_RECONCILE_TICKET, ticket, expected=standing, guards={})
+
+    async def _stamp_reconcile_done(self) -> None:
+        """Re-date this manager's ticket to now, so the interval runs from the end of the sweep."""
+        try:
+            await self._require_etcd().put(
+                _RECONCILE_TICKET,
+                json.dumps({"at": time.time(), "by": self._reconcile_token}),
+                scope=ConfigScopes.GLOBAL,
+            )
+        except Exception:
+            log.warning("could not re-date the reconciliation ticket", exc_info=True)
 
     async def _reconcile_pool_reporting(self) -> None:
         """Run a reconciliation pass, and leave behind what its outcome means.
@@ -646,12 +709,18 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # to hand back: the subnet and VNI it names are not committed until whoever owns it
             # says so, and a create that fails after this point takes them away again.
             return None
-        subnet = str(meta["subnet"])
+        subnet = _named_subnet(meta)
+        if subnet is None:
+            log.warning(
+                "session {}'s network record names no subnet this can read; allocating again",
+                session_id,
+            )
+            return None
         # A meta is only worth reusing while the pool still agrees it is ours. A rollback that
         # freed the allocation but could not delete the record leaves one that names a block and
         # a VNI the next session may already hold; returning it would hand this session their
         # data plane. Treat that as no allocation at all and build a fresh one.
-        if not await self._still_ours(session_id, subnet, meta.get("vni")):
+        if not await self._still_ours(session_id, subnet, _named_vni(meta)):
             log.warning(
                 "session {}'s recorded overlay allocation (subnet {}, vni {}) is no longer held"
                 " by it; allocating again",
@@ -708,7 +777,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # allocation that has already gone back to the pool.
         # The pool as well as the record. A claim can move between the promotion above and here,
         # and the record alone does not say who holds the block.
-        if not await self._still_ours(session_id, subnet, meta.get("vni")):
+        if not await self._still_ours(session_id, subnet, _named_vni(meta)):
             log.warning(
                 "session {}'s allocation stopped being its own while its endpoints were being"
                 " written; not handing it back",
@@ -757,9 +826,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             return True  # nothing to promote to
         guards = {session_meta_key(session_id): held}
         taken = True
-        subnet = meta.get("subnet")
+        subnet = _named_subnet(meta)
         if subnet and not await self._subnet_allocator.promote(
-            str(subnet), session_id, str(generation), guards, allocated
+            subnet, session_id, str(generation), guards, allocated
         ):
             log.warning(
                 "session {}'s record names subnet {}, which this incarnation could not take",
@@ -767,9 +836,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 subnet,
             )
             taken = False
-        vni = meta.get("vni")
+        vni = _named_vni(meta)
         if vni is not None and not await self._vni_allocator.promote(
-            int(vni), session_id, str(generation), guards
+            vni, session_id, str(generation), guards
         ):
             log.warning(
                 "session {}'s record names vni {}, which this incarnation could not take",
@@ -926,13 +995,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             )
         return raw
 
-    async def _still_ours(self, session_id: str, subnet: str, vni: Any) -> bool:
+    async def _still_ours(self, session_id: str, subnet: str, vni: int | None) -> bool:
         """Whether the pool still records this session as the holder of both."""
         if await self._subnet_allocator.holder(subnet) != session_id:
             return False
         if vni is None:
             return True
-        return await self._vni_allocator.holder(int(vni)) == session_id
+        return await self._vni_allocator.holder(vni) == session_id
 
     async def _rollback_create(
         self, session_id: str, subnet: str | None, vni: int | None, held: str
@@ -1069,14 +1138,14 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         live_meta: Mapping[str, Any] = {}
         if live_raw is not None:
             live_meta = _record(live_raw) or {}
-        live_vni = live_meta.get("vni")
-        live_subnet = live_meta.get("subnet")
+        live_vni = _named_vni(live_meta)
+        live_subnet = _named_subnet(live_meta)
         try:
             stuck_vnis = await self._vni_allocator.release_all(
-                session_id, generation, live, int(live_vni) if live_vni is not None else None
+                session_id, generation, live, live_vni
             )
             stuck_blocks = await self._subnet_allocator.release_all(
-                session_id, generation, live, str(live_subnet) if live_subnet else None
+                session_id, generation, live, live_subnet
             )
         except Exception:
             log.exception(
