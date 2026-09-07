@@ -1,36 +1,27 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, cast, override
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
-    joinedload,
-    load_only,
     mapped_column,
     relationship,
-    selectinload,
 )
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.types import AgentId, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentDataForHeartbeatUpdate,
     AgentStatus,
-)
-from ai.backend.manager.data.permission.permission_defs import (
-    AgentPermission,
-    ResourceGroupPermission,
 )
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.base import (
@@ -39,17 +30,6 @@ from ai.backend.manager.models.base import (
     CurvePublicKeyColumn,
     EnumType,
 )
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac import (
-    AbstractPermissionContext,
-    AbstractPermissionContextBuilder,
-    DomainScope,
-    ProjectScope,
-    ScopeType,
-    UserScope,
-    get_predefined_roles_in_scope,
-)
-from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -210,277 +190,3 @@ async def list_schedulable_agents_by_sgroup(
 
     result = await db_sess.execute(query)
     return result.scalars().all()
-
-
-type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
-# TypeAlias is deprecated since 3.12 but mypy does not follow up yet
-
-OWNER_PERMISSIONS: frozenset[AgentPermission] = frozenset([perm for perm in AgentPermission])
-ADMIN_PERMISSIONS: frozenset[AgentPermission] = frozenset([perm for perm in AgentPermission])
-MONITOR_PERMISSIONS: frozenset[AgentPermission] = frozenset([
-    AgentPermission.READ_ATTRIBUTE,
-    AgentPermission.UPDATE_ATTRIBUTE,
-])
-PRIVILEGED_MEMBER_PERMISSIONS: frozenset[AgentPermission] = frozenset([
-    AgentPermission.CREATE_COMPUTE_SESSION,
-    AgentPermission.CREATE_SERVICE,
-])
-MEMBER_PERMISSIONS: frozenset[AgentPermission] = frozenset([
-    AgentPermission.CREATE_COMPUTE_SESSION,
-    AgentPermission.CREATE_SERVICE,
-])
-
-
-@dataclass
-class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow, AgentId]):
-    from ai.backend.manager.models.resource_group import ResourceGroupPermissionContext
-
-    sgroup_permission_ctx: ResourceGroupPermissionContext | None = None
-
-    @property
-    def query_condition(self) -> WhereClauseType | None:
-        cond: WhereClauseType | None = None
-
-        def _OR_coalesce(
-            base_cond: WhereClauseType | None,
-            _cond: sa.sql.expression.BinaryExpression[Any],
-        ) -> WhereClauseType:
-            return base_cond | _cond if base_cond is not None else _cond
-
-        if self.object_id_to_additional_permission_map:
-            cond = _OR_coalesce(
-                cond, AgentRow.id.in_(self.object_id_to_additional_permission_map.keys())
-            )
-        if self.object_id_to_overriding_permission_map:
-            cond = _OR_coalesce(
-                cond, AgentRow.id.in_(self.object_id_to_overriding_permission_map.keys())
-            )
-
-        if self.sgroup_permission_ctx is not None:
-            if cond is not None:
-                sgroup_names = self.sgroup_permission_ctx.sgroup_to_permissions_map.keys()
-                cond = cond & AgentRow.scaling_group.in_(sgroup_names)
-        return cond
-
-    def apply_sgroup_permission_ctx(
-        self, sgroup_permission_ctx: ResourceGroupPermissionContext
-    ) -> None:
-        self.sgroup_permission_ctx = sgroup_permission_ctx
-
-    @override
-    async def build_query(self) -> sa.sql.Select[Any] | None:
-        cond = self.query_condition
-        if cond is None:
-            return None
-        return sa.select(AgentRow).where(cond)
-
-    @override
-    async def calculate_final_permission(self, rbac_obj: AgentRow) -> frozenset[AgentPermission]:
-        agent_row = rbac_obj
-        agent_id = agent_row.id
-        permissions: set[AgentPermission] = set()
-
-        if (
-            overriding_perm := self.object_id_to_overriding_permission_map.get(agent_id)
-        ) is not None:
-            permissions = set(overriding_perm)
-        else:
-            permissions |= self.object_id_to_additional_permission_map.get(agent_id, set())
-
-        if self.sgroup_permission_ctx is not None:
-            sgroup_permission_map = self.sgroup_permission_ctx.sgroup_to_permissions_map
-            sgroup_perms = sgroup_permission_map.get(agent_row.scaling_group)
-            if (
-                sgroup_perms is None
-                or ResourceGroupPermission.AGENT_PERMISSIONS not in sgroup_perms
-            ):
-                permissions = set()
-
-        return frozenset(permissions)
-
-
-class AgentPermissionContextBuilder(
-    AbstractPermissionContextBuilder[AgentPermission, AgentPermissionContext]
-):
-    db_session: SASession
-
-    def __init__(self, db_session: SASession) -> None:
-        self.db_session = db_session
-
-    @override
-    async def calculate_permission(
-        self,
-        ctx: ClientContext,
-        target_scope: ScopeType,
-    ) -> frozenset[AgentPermission]:
-        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
-        return await self._calculate_permission_by_predefined_roles(roles)
-
-    @override
-    async def build_ctx_in_system_scope(
-        self,
-        ctx: ClientContext,
-    ) -> AgentPermissionContext:
-        from ai.backend.manager.models.domain import DomainRow
-
-        perm_ctx = AgentPermissionContext()
-        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
-        for row in await self.db_session.scalars(_domain_query_stmt):
-            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
-            perm_ctx.merge(to_be_merged)
-        return perm_ctx
-
-    @override
-    async def build_ctx_in_domain_scope(
-        self,
-        ctx: ClientContext,
-        scope: DomainScope,
-    ) -> AgentPermissionContext:
-        from ai.backend.manager.models.domain import DomainRow
-        from ai.backend.manager.models.resource_group import (
-            ResourceGroupForDomainRow,
-            ResourceGroupRow,
-        )
-
-        permissions = await self.calculate_permission(ctx, scope)
-        aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
-
-        _stmt = (
-            sa.select(ResourceGroupForDomainRow)
-            .where(
-                ResourceGroupForDomainRow.domain_id
-                == sa.select(DomainRow.id)
-                .where(DomainRow.name == scope.domain_name)
-                .scalar_subquery()
-            )
-            .options(
-                joinedload(ResourceGroupForDomainRow.sgroup_row).options(
-                    selectinload(ResourceGroupRow.agents)
-                )
-            )
-        )
-        for row in await self.db_session.scalars(_stmt):
-            sg_row = row.sgroup_row
-            for ag in sg_row.agents:
-                aid_permission_map[AgentId(ag.id)] = permissions
-        return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
-
-    @override
-    async def build_ctx_in_project_scope(
-        self,
-        ctx: ClientContext,
-        scope: ProjectScope,
-    ) -> AgentPermissionContext:
-        from ai.backend.manager.models.resource_group import (
-            ResourceGroupForProjectRow,
-            ResourceGroupRow,
-        )
-
-        permissions = await self.calculate_permission(ctx, scope)
-        aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
-
-        _stmt = (
-            sa.select(ResourceGroupForProjectRow)
-            .where(ResourceGroupForProjectRow.group == scope.project_id)
-            .options(
-                joinedload(ResourceGroupForProjectRow.sgroup_row).options(
-                    selectinload(ResourceGroupRow.agents)
-                )
-            )
-        )
-        for row in await self.db_session.scalars(_stmt):
-            sg_row = row.sgroup_row
-            for ag in sg_row.agents:
-                aid_permission_map[AgentId(ag.id)] = permissions
-        return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
-
-    @override
-    async def build_ctx_in_user_scope(
-        self,
-        ctx: ClientContext,
-        scope: UserScope,
-    ) -> AgentPermissionContext:
-        from ai.backend.manager.models.resource_group import (
-            ResourceGroupForKeypairsRow,
-            ResourceGroupRow,
-        )
-
-        permissions = await self.calculate_permission(ctx, scope)
-        aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
-
-        _kp_stmt = (
-            sa.select(KeyPairRow)
-            .where(KeyPairRow.user == scope.user_id)
-            .options(load_only(KeyPairRow.access_key))
-        )
-        kp_rows = (await self.db_session.scalars(_kp_stmt)).all()
-        access_keys = cast(list[AccessKey], [r.access_key for r in kp_rows])
-
-        _stmt = (
-            sa.select(ResourceGroupForKeypairsRow)
-            .where(ResourceGroupForKeypairsRow.access_key.in_(access_keys))
-            .options(
-                joinedload(ResourceGroupForKeypairsRow.sgroup_row).options(
-                    selectinload(ResourceGroupRow.agents)
-                )
-            )
-        )
-        for row in await self.db_session.scalars(_stmt):
-            sg_row = row.sgroup_row
-            for ag in sg_row.agents:
-                aid_permission_map[AgentId(ag.id)] = permissions
-        return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
-
-    @override
-    @classmethod
-    async def _permission_for_owner(
-        cls,
-    ) -> frozenset[AgentPermission]:
-        return OWNER_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_admin(
-        cls,
-    ) -> frozenset[AgentPermission]:
-        return ADMIN_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_monitor(
-        cls,
-    ) -> frozenset[AgentPermission]:
-        return MONITOR_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_privileged_member(
-        cls,
-    ) -> frozenset[AgentPermission]:
-        return PRIVILEGED_MEMBER_PERMISSIONS
-
-    @override
-    @classmethod
-    async def _permission_for_member(
-        cls,
-    ) -> frozenset[AgentPermission]:
-        return MEMBER_PERMISSIONS
-
-
-async def get_permission_ctx(
-    db_conn: SAConnection,
-    ctx: ClientContext,
-    target_scope: ScopeType,
-    requested_permission: AgentPermission,
-) -> AgentPermissionContext:
-    from ai.backend.manager.models.resource_group import ResourceGroupPermissionContextBuilder
-
-    async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        sgroup_perm_ctx = await ResourceGroupPermissionContextBuilder(db_session).build(
-            ctx, target_scope, ResourceGroupPermission.AGENT_PERMISSIONS
-        )
-
-        builder = AgentPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-        permission_ctx.apply_sgroup_permission_ctx(sgroup_perm_ctx)
-    return permission_ctx
