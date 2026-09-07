@@ -1397,6 +1397,125 @@ class TestADestroyThatCrossesACreate:
             await plugin._publish(cast(AsyncEtcd, etcd), "s1", held, {"subnet": "10.128.0.0/24"})
 
 
+class TestACleanupThatComesBackTooLate:
+    """C4d. A cleanup can be paused between its steps -- a slow etcd, a manager that swapped out.
+    By the time it resumes, another cleanup may have finished the job and a new session may hold
+    the same id. Its endpoint keys, its member keys and its pool claim all name the SESSION, not
+    the attempt that made them (`ipam._claim`), so nothing but the tombstone tells the new
+    session's state apart from the state this cleanup came to delete."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    async def _cleaned_up_then_rebuilt(self) -> tuple[FakeEtcd, CNINetworkPlugin, str]:
+        """A session cleaned up under one tombstone and built again under the same id.
+
+        Returns the tombstone the first cleanup was working from -- the one a late resumer still
+        holds in its own stack.
+        """
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        stale = cni._tombstone("10.128.0.0/24", 4096, "tok1")
+        etcd.store[_META_KEY] = stale
+        assert await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", stale)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        return etcd, plugin, stale
+
+    async def test_it_stops_instead_of_finishing(self) -> None:
+        etcd, plugin, stale = await self._cleaned_up_then_rebuilt()
+        assert not await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", stale)
+
+    async def test_the_new_sessions_allocation_is_left_alone(self) -> None:
+        etcd, plugin, stale = await self._cleaned_up_then_rebuilt()
+        meta = json.loads(etcd.store[_META_KEY])
+
+        await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", stale)
+
+        assert await plugin._subnet_allocator.holder(str(meta["subnet"])) == "s1"
+        assert await plugin._vni_allocator.holder(int(meta["vni"])) == "s1"
+
+    async def test_the_new_sessions_keys_are_left_alone(self) -> None:
+        etcd, plugin, stale = await self._cleaned_up_then_rebuilt()
+
+        await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", stale)
+
+        assert "network/session/s1/endpoints/k1" in etcd.store
+        assert etcd.store[_META_KEY] != stale, "it deleted the new session's record"
+
+    async def test_two_cleanups_cannot_hold_one_tombstone(self) -> None:
+        # The take, not just the check: two managers reading one DELETING record must not both
+        # come away working from those same bytes.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        first = cni._tombstone("10.128.0.0/24", 4096, "tok1")
+        etcd.store[_META_KEY] = first
+
+        held, published = await plugin._claim_session(cast(AsyncEtcd, etcd), "s1", "tok2", [])
+
+        assert published is None
+        assert json.loads(held)["_state"] == "creating"
+        # The cleanup ran from bytes only it held, not from the record both managers had read.
+        assert not await plugin._finish_cleanup(cast(AsyncEtcd, etcd), "s1", first)
+
+
+class TestADestroyThatFindsNoRecordAtAll:
+    """C7b. "No record" is what the destroy READ, not something it holds. A create claims the id
+    with a compare-and-swap on that same key, so between the read and any delete it can publish a
+    whole session -- whose keys the sweep then takes and whose subnet and VNI it gives back while
+    the create is still handing them to its agents."""
+
+    class _CreateLandsOnTheRead(FakeEtcd):
+        """A store that lets a create claim the id while the destroy is reading it."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.claim: str | None = None
+
+        @override
+        async def get(self, key: str, **kwargs: Any) -> str | None:
+            found = await super().get(key, **kwargs)
+            if key == _META_KEY and self.claim is not None:
+                # The create wins the moment the destroy has read "absent" and not before.
+                self.store[key] = self.claim
+                self.claim = None
+            return found
+
+    async def test_it_does_not_sweep_a_create_that_landed_first(self) -> None:
+        etcd = self._CreateLandsOnTheRead()
+        plugin = _plugin_with(etcd)
+        etcd.claim = json.dumps({
+            "_owner": "tok1",
+            "_state": "creating",
+            "_claimed_at": time.time(),
+        })
+        # What that create has already claimed but not yet published.
+        await plugin._subnet_allocator.acquire("s1")
+        await plugin._vni_allocator.acquire("s1")
+
+        with pytest.raises(OverlayTeardownPending):
+            await plugin.destroy_network("s1")
+
+        assert await plugin._subnet_allocator.holder("10.128.0.0/24") == "s1"
+        assert json.loads(etcd.store[_META_KEY])["_state"] == "creating", (
+            "it wrote over the record the create rolls back from"
+        )
+
+    async def test_it_still_sweeps_what_nothing_is_building_on(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin._subnet_allocator.acquire("s1")
+        await plugin._vni_allocator.acquire("s1")
+
+        await plugin.destroy_network("s1")
+
+        assert _pool_claims(etcd) == []
+        assert _META_KEY not in etcd.store
+
+
 class TestAClaimNoRecordEverNamed:
     """C8. A create cancelled between claiming a block and publishing the record that would have
     named it leaves the pool holding something no meta mentions. Releasing what the record names
