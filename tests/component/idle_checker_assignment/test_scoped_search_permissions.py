@@ -1,9 +1,9 @@
-"""Component tests for scoped idle-checker-assignment search RBAC.
+"""Component tests for idle-checker-assignment RBAC.
 
-POST /v2/idle-checker-assignments/scoped/search runs through
-``BulkActionProcessor`` + ``BulkActionRBACValidator``: every scope item is
-RBAC-checked against the caller, items are OR'd, and one denied item fails
-the whole request.
+POST /v2/idle-checker-assignments/scoped/search runs through the scope processor:
+every scope item is checked against the caller for READ on idle checkers within it,
+items are OR'd, and one denied item fails the whole request. Update and purge are relation
+writes: the caller must hold the operation on the scope and on the checker.
 """
 
 from __future__ import annotations
@@ -57,9 +57,9 @@ class TestScopedIdleCheckerAssignmentSearchPermissions:
         self,
         user_v2_registry: V2ClientRegistry,
         assignment_seed: AssignmentSeedData,
-        project_read_permission: None,
+        project_assignment_read_permission: None,
     ) -> None:
-        """A user with PROJECT:READ on the project sees that project's assignments."""
+        """A user with READ on idle checkers in the project sees that project's assignments."""
         result = await user_v2_registry.idle_checker_assignment.scoped_search(
             ScopedSearchIdleCheckerAssignmentsInput(
                 scope=IdleCheckerAssignmentScopeDTO(
@@ -79,7 +79,7 @@ class TestScopedIdleCheckerAssignmentSearchPermissions:
         self,
         user_v2_registry: V2ClientRegistry,
         assignment_seed: AssignmentSeedData,
-        project_read_permission: None,
+        project_assignment_read_permission: None,
     ) -> None:
         """One denied scope item fails the whole request, even with a permitted one."""
         with pytest.raises(PermissionDeniedError):
@@ -124,9 +124,9 @@ class TestScopedIdleCheckerAssignmentSearchPermissions:
         self,
         user_v2_registry: V2ClientRegistry,
         assignment_seed: AssignmentSeedData,
-        project_read_permission: None,
+        project_assignment_read_permission: None,
     ) -> None:
-        """PROJECT:READ on one project grants nothing on another project."""
+        """READ within one project grants nothing on another project's bindings."""
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.idle_checker_assignment.scoped_search(
                 ScopedSearchIdleCheckerAssignmentsInput(
@@ -151,7 +151,7 @@ class TestIdleCheckerAssignmentMutationPermissions:
         assignment_seed: AssignmentSeedData,
         project_assignment_manage_permission: None,
     ) -> None:
-        """A user with UPDATE at the project scope can update that project's assignment."""
+        """A user holding the switch on the project and on the checker can toggle the binding."""
         result = await user_v2_registry.idle_checker_assignment.update(
             assignment_seed.project_assignment_id,
             UpdateIdleCheckerAssignmentInput(
@@ -169,7 +169,7 @@ class TestIdleCheckerAssignmentMutationPermissions:
         assignment_seed: AssignmentSeedData,
         project_assignment_manage_permission: None,
     ) -> None:
-        """A user with PURGE at the project scope can purge that project's assignment."""
+        """A user holding the unlink on the project and on the checker can purge the binding."""
         result = await user_v2_registry.idle_checker_assignment.purge(
             assignment_seed.project_assignment_id
         )
@@ -182,7 +182,11 @@ class TestIdleCheckerAssignmentMutationPermissions:
         assignment_seed: AssignmentSeedData,
         project_assignment_manage_permission: None,
     ) -> None:
-        """Manage permission on one project does not reach another project's assignment."""
+        """Manage permission on one project does not reach another project's assignment.
+
+        The id resolves, since the caller reads the checker through their own project,
+        but the switch is answered for by the other project too.
+        """
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.idle_checker_assignment.update(
                 assignment_seed.other_project_assignment_id,
@@ -234,21 +238,20 @@ class TestIdleCheckerAssignmentMutationPermissions:
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.idle_checker_assignment.purge(assignment_seed.user_assignment_id)
 
-    async def test_project_manager_updates_user_scope_assignment_of_project_member(
+    async def test_project_manager_cannot_reach_user_scope_assignment_of_project_member(
         self,
         user_v2_registry: V2ClientRegistry,
         assignment_seed: AssignmentSeedData,
         user_in_seeded_project: None,
         project_assignment_manage_permission: None,
     ) -> None:
-        """The scope chain walks user -> project, so project-scope manage rights reach a
-        member's user-scope assignment. Domain-scope grants reach it the same way."""
-        result = await user_v2_registry.idle_checker_assignment.update(
-            assignment_seed.user_assignment_id,
-            UpdateIdleCheckerAssignmentInput(
-                id=IdleCheckerAssignmentID(assignment_seed.user_assignment_id),
-                enabled=False,
-            ),
-        )
-
-        assert result.idle_checker_assignment.enabled is False
+        """A binding on the user's own scope names the user, not the project a user
+        belongs to, so project-side rights do not reach it."""
+        with pytest.raises(PermissionDeniedError):
+            await user_v2_registry.idle_checker_assignment.update(
+                assignment_seed.user_assignment_id,
+                UpdateIdleCheckerAssignmentInput(
+                    id=IdleCheckerAssignmentID(assignment_seed.user_assignment_id),
+                    enabled=False,
+                ),
+            )

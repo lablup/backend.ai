@@ -1,35 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
-from ai.backend.manager.models.idle_checker.row import (
-    IdleCheckerBindingRow,
-    SessionIdleCheckRow,
-)
-from ai.backend.manager.repositories.base import BatchUpdaterSpec, UpdaterSpec
+from ai.backend.manager.models.idle_checker.row import SessionIdleCheckRow
+from ai.backend.manager.repositories.base import BatchUpdaterSpec
 from ai.backend.manager.repositories.idle_checker.types import IdleJudgmentData
-from ai.backend.manager.types import OptionalState
-
-
-@dataclass
-class IdleCheckerAssignmentUpdaterSpec(UpdaterSpec[IdleCheckerBindingRow]):
-    enabled: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
-
-    @property
-    @override
-    def row_class(self) -> type[IdleCheckerBindingRow]:
-        return IdleCheckerBindingRow
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        to_update: dict[str, Any] = {}
-        self.enabled.update_dict(to_update, "enabled")
-        return to_update
 
 
 @dataclass

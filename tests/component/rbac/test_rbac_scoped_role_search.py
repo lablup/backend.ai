@@ -65,7 +65,7 @@ def permission_controller_processors(
     )
     validators = ActionValidators(
         virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
-        rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
+        rbac=RBACValidators(scope=AsyncMock()),
     )
     return PermissionControllerProcessors(
         processor_registry.group(GroupMeta(ROLE_ENTITY_TYPE)),

@@ -36,7 +36,10 @@ class V2RelationWriteOps(V2WriteOps):
         """Link the scope to the target: the relation row, the scope governing the
         target under READ, and READ on the scope added to what the target holds of
         it. A pair already linked, switched off or not, is a unique violation the spec
-        maps."""
+        maps. What the spec refuses runs first, each with its own error."""
+        for check in creator.precondition_checks(scope, target):
+            if (await self._sess.execute(check.finder)).first() is not None:
+                raise check.error
         await self._insert_row(creator.build_row(scope, target), creator.integrity_error_checks())
         await self._govern([scope], target, cap=Permission.READ)
         await self._widen_share(target, scope, {Permission.READ: None})

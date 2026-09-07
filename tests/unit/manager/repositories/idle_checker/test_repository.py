@@ -55,6 +55,7 @@ from ai.backend.manager.repositories.idle_checker.upserters import (
     SessionIdleCheckIncludeUpserterSpec,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -216,7 +217,7 @@ class TestFetchJudgmentBatch:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database))
+        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
 
     @pytest.fixture
     async def judgment_rows(
@@ -868,7 +869,7 @@ class TestFetchExpiredIdleChecks:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database))
+        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
 
     @pytest.fixture
     async def expired_check_session(
@@ -1055,7 +1056,7 @@ class TestSessionIdleCheckExclusion:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database))
+        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
 
     @pytest.fixture
     async def exclusion_rows(
@@ -1548,7 +1549,7 @@ class TestUserScopeAssignments:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(DBOpsProvider(database))
+        return IdleCheckerRepository(DBOpsProvider(database), RelationOpsProvider(database))
 
     @pytest.fixture
     async def user_scope_rows(

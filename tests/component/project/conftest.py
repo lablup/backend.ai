@@ -35,9 +35,7 @@ from ai.backend.manager.actions.registry.types import (
 )
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import SingleEntityActionRBACValidator
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -114,8 +112,6 @@ def _build_validators(
         virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
         rbac=RBACValidators(
             scope=ScopeActionRBACValidator(permission_repo, config_provider),
-            single_entity=SingleEntityActionRBACValidator(permission_repo, config_provider),
-            bulk=BulkActionRBACValidator(permission_repo, config_provider),
         ),
     )
 

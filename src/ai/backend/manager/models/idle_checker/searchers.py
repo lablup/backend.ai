@@ -7,8 +7,8 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.idle_checker.types import IdleCheckerData
-from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
+from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -20,4 +20,15 @@ class IdleCheckerSearcher(Searcher[IdleCheckerRow, IdleCheckerData]):
 
     @override
     def to_data(self, row: IdleCheckerRow) -> IdleCheckerData:
+        return row.to_data()
+
+
+@dataclass
+class IdleCheckerAssignmentSearcher(Searcher[IdleCheckerBindingRow, IdleCheckerAssignmentData]):
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(IdleCheckerBindingRow)
+
+    @override
+    def to_data(self, row: IdleCheckerBindingRow) -> IdleCheckerAssignmentData:
         return row.to_data()

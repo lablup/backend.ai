@@ -774,7 +774,9 @@ def create_processors(
             )
         ),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
-            services.idle_checker_assignment, action_monitors, validators
+            session_groups.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
+            session_groups.relation_group(),
+            services.idle_checker_assignment,
         ),
         scheduling_history=SchedulingHistoryProcessors(
             session_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),

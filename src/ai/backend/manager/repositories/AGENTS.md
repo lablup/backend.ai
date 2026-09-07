@@ -31,7 +31,7 @@
   - read/update: `DataQuerier`, `DataLookup`, `Searcher`, `DataUpdater`
 - No new use of the legacy specs — transition-only maintenance of existing code:
   - `repositories/base/`: `CreatorSpec`, `DataCreator`, `UpserterSpec`, `PurgerSpec`
-  - `repositories/base/rbac/`: the `RBACEntityCreator` / `RBACEntityUpserter` / `RBACEntityPurger` set
+  - `repositories/base/rbac/`: the scope binder and unbinder
   - Judge by import path (`models.specs.*` is v2) — `repositories.base` re-exports some
     v2 types and bridge classes like `DataBatchPurger` share names, so never judge by
     the class name alone.

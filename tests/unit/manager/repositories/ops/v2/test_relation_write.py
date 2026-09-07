@@ -32,7 +32,11 @@ from ai.backend.manager.models.specs.relation import (
     RelationLifecycleUpdater,
     RelationPurger,
 )
-from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import (
+    ConflictCheck,
+    IntegrityErrorCheck,
+    PreconditionCheck,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -76,6 +80,12 @@ class RelationTestRow(Base):
 
 
 class _Creator(RelationCreator[_ScopeID, _TargetID, RelationTestRow]):
+    @override
+    def precondition_checks(
+        self, scope: _ScopeID, target: _TargetID
+    ) -> Sequence[PreconditionCheck]:
+        return ()
+
     @override
     def row_class(self) -> type[RelationTestRow]:
         return RelationTestRow

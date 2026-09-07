@@ -7,7 +7,12 @@ from typing import Self, override
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
-from ai.backend.common.data.entity.types import EntityData, EntityIdentifier
+from ai.backend.common.data.entity.types import (
+    EntityData,
+    EntityIdentifier,
+    EntityType,
+    RuntimeEntityID,
+)
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -55,6 +60,10 @@ class IdleCheckerAssignmentData:
     enabled: bool
     created_at: datetime
     updated_at: datetime
+
+    def scope_entity(self) -> EntityIdentifier:
+        """The scope the checker is bound to, as the entity it is."""
+        return RuntimeEntityID(EntityType(self.scope_type.value), self.scope_id)
 
 
 @dataclass(frozen=True)

@@ -166,6 +166,9 @@ from ai.backend.manager.services.entity_share.processors import (
 from ai.backend.manager.services.export.processors import ExportProcessors
 from ai.backend.manager.services.fair_share.processors import FairShareProcessors
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
+from ai.backend.manager.services.idle_checker_assignment.processors import (
+    IdleCheckerAssignmentProcessors,
+)
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
@@ -317,6 +320,11 @@ def test_every_defined_v2_action_is_wired() -> None:
     IdleCheckerProcessors(
         registry.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
         registry.group(GroupMeta(SESSION_ENTITY_TYPE)),
+        MagicMock(),
+    )
+    IdleCheckerAssignmentProcessors(
+        scheduling_history_groups.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
+        scheduling_history_groups.relation_group(),
         MagicMock(),
     )
     RetentionPolicyProcessors(registry.group(GroupMeta(RETENTION_POLICY_ENTITY_TYPE)))

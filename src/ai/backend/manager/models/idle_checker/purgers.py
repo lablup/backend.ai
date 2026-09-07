@@ -7,9 +7,12 @@ from typing import Any, override
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
-from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
 from ai.backend.manager.models.specs.purger import EntityPurger
+from ai.backend.manager.models.specs.relation import RelationPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
@@ -43,3 +46,28 @@ class IdleCheckerPurger(EntityPurger[IdleCheckerRow, IdleCheckerData]):
     @override
     def to_data(self, row: IdleCheckerRow) -> IdleCheckerData:
         return row.to_data()
+
+
+@dataclass
+class IdleCheckerAssignmentPurger(
+    RelationPurger[EntityIdentifier, IdleCheckerID, IdleCheckerBindingRow]
+):
+    """Unlinks a scope from an idle checker."""
+
+    @override
+    def row_class(self) -> type[IdleCheckerBindingRow]:
+        return IdleCheckerBindingRow
+
+    @override
+    def conditions(
+        self, scope: EntityIdentifier, target: IdleCheckerID
+    ) -> Sequence[QueryCondition]:
+        return (
+            lambda: IdleCheckerBindingRow.scope_type == scope.entity_type(),
+            lambda: IdleCheckerBindingRow.scope_id == scope,
+            lambda: IdleCheckerBindingRow.idle_checker_id == target,
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()

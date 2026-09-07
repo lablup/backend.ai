@@ -3,36 +3,39 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.idle_checker_assignment.actions.base import (
-    IdleCheckerAssignmentAction,
-)
+from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 
 
-@dataclass
-class AdminSearchIdleCheckerAssignmentsAction(IdleCheckerAssignmentAction):
-    querier: BatchQuerier
+@dataclass(frozen=True)
+class AdminSearchIdleCheckerAssignmentsAction(BaseGlobalAction):
+    """Page through every binding, whichever scope it hangs on."""
+
+    searcher: IdleCheckerAssignmentSearcher
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return IDLE_CHECKER_ENTITY_TYPE
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "admin_search_idle_checker_assignments"
 
-@dataclass
-class AdminSearchIdleCheckerAssignmentsActionResult(BaseActionResult):
-    data: list[IdleCheckerAssignmentData]
+
+@dataclass(frozen=True)
+class SearchIdleCheckerAssignmentsActionResult:
+    items: list[IdleCheckerAssignmentData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None

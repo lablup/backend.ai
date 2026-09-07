@@ -84,16 +84,6 @@ from ai.backend.manager.repositories.base.integrity import (
     parse_integrity_error,
 )
 from ai.backend.manager.repositories.base.purger import validate_conflict_checks
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    RBACEntityCreatorResult,
-    execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.base.rbac.entity_purger import (
-    RBACEntityPurger,
-    RBACEntityPurgerResult,
-    execute_rbac_entity_purger,
-)
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 if TYPE_CHECKING:
@@ -502,18 +492,6 @@ class WriteOps(ReadOps):
         beside this one reaches the v2 field write here.
         """
         return await V2WriteOps(self._sess).create_field(owner_id, creator)
-
-    async def create_rbac_entity[TRow: Base](
-        self, creator: RBACEntityCreator[TRow]
-    ) -> RBACEntityCreatorResult[TRow]:
-        """Insert an entity row together with its RBAC scope association rows."""
-        return await execute_rbac_entity_creator(self._sess, creator)
-
-    async def purge_rbac_entity[TRow: Base](
-        self, purger: RBACEntityPurger[TRow]
-    ) -> RBACEntityPurgerResult[TRow] | None:
-        """Delete an entity row along with its RBAC associations and permissions."""
-        return await execute_rbac_entity_purger(self._sess, purger)
 
     async def purge[TRow: Base](self, purger: Purger[TRow]) -> PurgerResult[TRow] | None:
         """Delete a single row by primary key."""
