@@ -316,3 +316,26 @@ whose stamp is stale, which is a widening of exactly what C24 was about. Not don
 pass that narrowed it.
 
 R3 unchanged.
+
+Thirteenth round. Four of the five findings verified as stated; the fifth (verification gaps) is
+unchanged and unclosable here.
+
+| # | Was | Now |
+|---|-----|-----|
+| C28 | `_claim_is_live` asked the stamp FIRST, so a claim carrying the live incarnation was live whether or not the record named it. A create that could not take the block it already held allocates a second one, stamped and named by nothing, and it stayed for as long as the session ran | the record answers where it can: once it names an allocation of that kind, identity decides and the stamp adds nothing. The stamp is only for the window before publish, where the record names nothing and a create in flight has no other defence |
+| C28 | the C27 fix kept a stale-stamped unit of a live block and then could not take it -- `promote` refused a stamp that was not `of_generation`, so every sweep logged the same warning and the block stayed on two incarnations | the record-driven `promote` takes any claim of this session on the block the record names. That is not the widening C24 was about: there the block came from the pool, here it comes from a record checked in the same store operation, and only one incarnation of a session id is live at a time. The pool-driven path keeps the narrow rule |
+| C29 | each promotion re-read the whole pool, so the first start after the incarnation field -- where every session needs one -- cost one full scan per session | the sweep reads the pool once and hands the listing down. A stale listing is safe by construction: every rewrite is a compare-and-swap over the bytes the listing gave |
+| C29 | a startup reconciliation that raised was a log line and nothing else, so one etcd blip left orphan claims until the next restart while every health surface read clean | the pass stays owed, is retried the next time a session id comes round, and is reported: `backendai_network_pool_reconcile_pending`, `_reconcile_failure_count`, `_reclaimed_claim_count`, `_unrecoverable_incarnation_count`. `unrecoverable_leaks()` feeds the last of those, so it has a production caller |
+| A11 | the orphan-kernel observer could never reap anything. After an agent restart the presence key's TTL has passed and the agent's own presence observer recreates it with a presence and no `last_check`, so every kernel hit `continue` -- and the case it was written for is exactly an agent restart | a kernel the manager has never checked, while the manager IS checking this agent, is an orphan after it has stayed unknown for one threshold. Debounced, because a kernel just created looks the same; and gated on a FRESH `agent_last_check`, because a manager that has stopped checking says nothing about any one kernel and reaping on its silence would empty a healthy node |
+
+Not done, and why. A leader-only periodic reconciler still needs a `LockID`, an event type and a
+dispatcher registration the plugin does not hold; the retry above is what stands in for it, paid by
+whoever next uses a session id rather than by every manager at once. The startup sweep is still
+unpaginated. And recovery still does not reap: its only signal is the session's network meta, which
+reads as absent when etcd is briefly unreadable and when the manager is rebuilding the session, so
+acting on it would destroy live kernels. The reap is therefore the observer's, one threshold plus
+one interval after recovery -- `tests/dataplane/test_orphan_reap.py` now waits that long and has
+never been run.
+
+R3 unchanged: `compare_and_delete` is still exercised only against the in-memory fake, and there is
+still no two-manager rolling restart.
