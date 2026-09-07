@@ -44,10 +44,6 @@ from ai.backend.manager.services.permission_contoller.actions.create_role import
     CreateRoleAction,
     CreateRoleActionResult,
 )
-from ai.backend.manager.services.permission_contoller.actions.delete_role import (
-    DeleteRoleAction,
-    DeleteRoleActionResult,
-)
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
     GetEntityTypesAction,
     GetEntityTypesActionResult,
@@ -69,10 +65,6 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
     CreatePermissionActionResult,
     DeletePermissionAction,
     DeletePermissionActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.purge_role import (
-    PurgeRoleAction,
-    PurgeRoleActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
@@ -113,10 +105,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_users_assig
 from ai.backend.manager.services.permission_contoller.actions.update_permission import (
     UpdatePermissionAction,
     UpdatePermissionActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.update_role import (
-    UpdateRoleAction,
-    UpdateRoleActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -189,29 +177,6 @@ class PermissionControllerService:
         """
         result = await self._repository.update_permission(action.updater)
         return UpdatePermissionActionResult(data=result)
-
-    async def update_role(self, action: UpdateRoleAction) -> UpdateRoleActionResult:
-        """
-        Updates an existing role in the repository.
-        """
-        result = await self._repository.update_role(action.updater)
-        return UpdateRoleActionResult(data=result)
-
-    async def delete_role(self, action: DeleteRoleAction) -> DeleteRoleActionResult:
-        """
-        Deletes a role from the repository. It marks the role as deleted (soft delete).
-        Raises ObjectNotFound if the role does not exist.
-        """
-        result = await self._repository.delete_role(action.updater)
-        return DeleteRoleActionResult(data=result)
-
-    async def purge_role(self, action: PurgeRoleAction) -> PurgeRoleActionResult:
-        """
-        Purges a role from the repository. It permanently removes the role (hard delete).
-        Raises ObjectNotFound if the role does not exist.
-        """
-        result = await self._repository.purge_role(action.purger)
-        return PurgeRoleActionResult(data=result)
 
     async def assign_role(self, action: AssignRoleAction) -> AssignRoleActionResult:
         """Assigns a role to a user.

@@ -4,9 +4,7 @@ from .actions import (
     CreateRoleAction,
     CreateRoleActionResult,
     DeleteRoleAction,
-    DeleteRoleActionResult,
     UpdateRoleAction,
-    UpdateRoleActionResult,
 )
 
 __all__ = [
@@ -15,7 +13,5 @@ __all__ = [
     "CreateRoleAction",
     "CreateRoleActionResult",
     "DeleteRoleAction",
-    "DeleteRoleActionResult",
     "UpdateRoleAction",
-    "UpdateRoleActionResult",
 ]

@@ -1,7 +1,11 @@
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.ops.result import EntityOpsResult
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.data.permission.role import RoleData
 
 from .actions import (
     AssignRoleAction,
@@ -17,7 +21,6 @@ from .actions import (
     CreateRoleAction,
     CreateRoleActionResult,
     DeleteRoleAction,
-    DeleteRoleActionResult,
     GetRoleDetailAction,
     GetRoleDetailActionResult,
     ReplaceRolePermissionsAction,
@@ -31,7 +34,6 @@ from .actions import (
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
     UpdateRoleAction,
-    UpdateRoleActionResult,
 )
 from .actions.get_entity_types import (
     GetEntityTypesAction,
@@ -51,6 +53,7 @@ from .actions.permission import (
     DeletePermissionAction,
     DeletePermissionActionResult,
 )
+from .actions.purge_role import PurgeRoleAction
 from .actions.search_element_associations import (
     SearchElementAssociationsAction,
     SearchElementAssociationsActionResult,
@@ -78,8 +81,9 @@ class PermissionControllerProcessors:
     """Processor package for RBAC permission controller operations."""
 
     create_role: ActionProcessor[CreateRoleAction, CreateRoleActionResult]
-    update_role: ActionProcessor[UpdateRoleAction, UpdateRoleActionResult]
-    delete_role: ActionProcessor[DeleteRoleAction, DeleteRoleActionResult]
+    update_role: SingleEntityActionProcessor[UpdateRoleAction, EntityOpsResult[RoleData]]
+    delete_role: SingleEntityActionProcessor[DeleteRoleAction, EntityOpsResult[RoleData]]
+    purge_role: SingleEntityActionProcessor[PurgeRoleAction, EntityOpsResult[RoleData]]
     assign_role: ActionProcessor[AssignRoleAction, AssignRoleActionResult]
     revoke_role: ActionProcessor[RevokeRoleAction, RevokeRoleActionResult]
     bulk_assign_role: ActionProcessor[BulkAssignRoleAction, BulkAssignRoleActionResult]
@@ -118,14 +122,15 @@ class PermissionControllerProcessors:
 
     def __init__(
         self,
+        role_group: ProcessorGroup[RoleData],
         service: PermissionControllerService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
         self.create_role = ActionProcessor(service.create_role, action_monitors)
-        self.update_role = ActionProcessor(service.update_role, action_monitors)
-        self.delete_role = ActionProcessor(service.delete_role, action_monitors)
-        self.purge_role = ActionProcessor(service.purge_role, action_monitors)
+        self.update_role = role_group.single_guarded_update_ops(UpdateRoleAction)
+        self.delete_role = role_group.single_guarded_delete_ops(DeleteRoleAction)
+        self.purge_role = role_group.entity_purge_ops(PurgeRoleAction)
         self.assign_role = ActionProcessor(service.assign_role, action_monitors)
         self.revoke_role = ActionProcessor(service.revoke_role, action_monitors)
         self.bulk_assign_role = ActionProcessor(service.bulk_assign_role, action_monitors)

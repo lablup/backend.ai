@@ -56,7 +56,6 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
-from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
     GetEntityTypesAction,
 )
@@ -70,7 +69,6 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
     CreatePermissionAction,
     DeletePermissionAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
     SearchElementAssociationsAction,
@@ -85,7 +83,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_roles impor
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.update_role import UpdateRoleAction
 from ai.backend.manager.services.permission_contoller.service import (
     PermissionControllerService,
 )
@@ -308,110 +305,6 @@ class TestGetRoleDetail:
         result = await service.get_role_detail(action)
 
         assert result.role.object_permissions == []
-
-
-class TestUpdateRole:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.update_role = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            group_repository=MagicMock(),
-            rbac_action_registry=[],
-        )
-
-    async def test_update_role_delegates_to_repository(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        role_data = _make_role_data(name="updated-role", description="new desc")
-        mock_repository.update_role.return_value = role_data
-
-        updater = MagicMock()
-        action = UpdateRoleAction(updater=updater)
-        result = await service.update_role(action)
-
-        mock_repository.update_role.assert_called_once_with(updater)
-        assert result.data.name == "updated-role"
-        assert result.data.description == "new desc"
-
-
-class TestDeleteRole:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.delete_role = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            group_repository=MagicMock(),
-            rbac_action_registry=[],
-        )
-
-    async def test_soft_delete_sets_deleted_at(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        deleted_at = datetime.now(tz=UTC)
-        role_data = _make_role_data(
-            status=RoleStatus.INACTIVE,
-            deleted_at=deleted_at,
-        )
-        mock_repository.delete_role.return_value = role_data
-
-        updater = MagicMock()
-        action = DeleteRoleAction(updater=updater)
-        result = await service.delete_role(action)
-
-        mock_repository.delete_role.assert_called_once_with(updater)
-        assert result.data.deleted_at == deleted_at
-
-
-class TestPurgeRole:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.purge_role = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            group_repository=MagicMock(),
-            rbac_action_registry=[],
-        )
-
-    async def test_purge_role_hard_deletes(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        role_data = _make_role_data()
-        mock_repository.purge_role.return_value = role_data
-
-        purger = MagicMock()
-        action = PurgeRoleAction(purger=purger)
-        result = await service.purge_role(action)
-
-        mock_repository.purge_role.assert_called_once_with(purger)
-        assert result.data.id == role_data.id
 
 
 class TestAssignRole:

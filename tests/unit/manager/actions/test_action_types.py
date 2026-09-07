@@ -7,14 +7,13 @@ from ai.backend.manager.actions.types import ActionOperationType
 # Import representative concrete action classes across different entity types
 # and operation types to verify enum usage at runtime.
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
-from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
 )
+from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_entities import (
     SearchEntitiesAction,
 )
@@ -24,10 +23,9 @@ from ai.backend.manager.services.permission_contoller.actions.search_entities im
 # them in would conflate two type systems rather than test either one.
 _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
     CreateRoleAction,
-    DeleteRoleAction,
     GetRoleDetailAction,
-    PurgeRoleAction,
     ReplaceRolePermissionsAction,
+    RevokeRoleAction,
     SearchEntitiesAction,
 ]
 
@@ -130,8 +128,8 @@ class TestEntityType:
 class TestAllActionClassesUseEnums:
     """Verify that representative concrete action classes return proper enum types.
 
-    These tests cover the operations concrete actions declare today (GET, SEARCH,
-    CREATE, UPDATE, DELETE, PURGE) via representative concrete action classes.
+    These tests cover the operations concrete legacy actions declare today (GET,
+    SEARCH, CREATE, UPDATE, DELETE) via representative concrete action classes.
     """
 
     def test_entity_type_returns_enum(self) -> None:
@@ -154,12 +152,13 @@ class TestAllActionClassesUseEnums:
         """Ensure the representative classes cover every declarable operation.
 
         ``UPSERT`` is excluded: the upsert actions declare ``CREATE`` today, so
-        nothing can stand for it. ``LOOKUP`` and ``RESTORE`` are excluded because no
-        legacy action declares them, and every class here is a legacy one.
+        nothing can stand for it. ``LOOKUP``, ``PURGE`` and ``RESTORE`` are excluded
+        because no legacy action declares them, and every class here is a legacy one.
         """
         expected = set(ActionOperationType) - {
             ActionOperationType.UPSERT,
             ActionOperationType.LOOKUP,
+            ActionOperationType.PURGE,
             ActionOperationType.RESTORE,
         }
         covered = {cls.operation_type() for cls in _REPRESENTATIVE_ACTION_CLASSES}

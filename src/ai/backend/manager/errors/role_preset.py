@@ -42,6 +42,19 @@ class InvalidRoleNameTemplate(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class SystemRoleNotEditable(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/system-role-not-editable"
+    error_title = "A SYSTEM role cannot be purged; edit the role preset instead."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class RolePermissionPresetConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-role-permission-preset"
     error_title = "Duplicate role permission preset entry."

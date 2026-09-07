@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -19,6 +19,8 @@ from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
 from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
 from ai.backend.common.dto.manager.v2.rbac.request import SearchRolesInput
 from ai.backend.common.dto.manager.v2.rbac.response import AdminSearchRolesPayload
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
@@ -53,6 +55,7 @@ from .conftest import RoleFactory
 @pytest.fixture()
 def permission_controller_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> PermissionControllerProcessors:
     repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(
@@ -65,7 +68,10 @@ def permission_controller_processors(
         rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
     )
     return PermissionControllerProcessors(
-        service=service, action_monitors=[], validators=validators
+        processor_registry.group(GroupMeta(ROLE_ENTITY_TYPE)),
+        service=service,
+        action_monitors=[],
+        validators=validators,
     )
 
 

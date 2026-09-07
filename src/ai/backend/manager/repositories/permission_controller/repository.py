@@ -50,7 +50,6 @@ from ai.backend.manager.data.permission.virtual_entity import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
-from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -149,11 +148,6 @@ class PermissionControllerRepository:
         return row.to_data()
 
     @permission_controller_repository_resilience.apply()
-    async def update_role(self, updater: Updater[RoleRow]) -> RoleData:
-        result = await self._db_source.update_role(updater)
-        return result.to_data()
-
-    @permission_controller_repository_resilience.apply()
     async def bulk_add_role_permissions(
         self,
         creator: BulkCreator[PermissionRow],
@@ -216,16 +210,6 @@ class PermissionControllerRepository:
             successes=[row.to_data() for row in result.successes],
             failures=failures,
         )
-
-    @permission_controller_repository_resilience.apply()
-    async def delete_role(self, updater: Updater[RoleRow]) -> RoleData:
-        result = await self._db_source.delete_role(updater)
-        return result.to_data()
-
-    @permission_controller_repository_resilience.apply()
-    async def purge_role(self, purger: Purger[RoleRow]) -> RoleData:
-        result = await self._db_source.purge_role(purger)
-        return result.to_data()
 
     @permission_controller_repository_resilience.apply()
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleAssignmentData:

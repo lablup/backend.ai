@@ -17,15 +17,21 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.permission.types import RoleSource
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class RoleUpdater(DataUpdater[RoleRow, RoleData]):
-    """Edits a role's declaration. Carries no ``status`` field."""
+class RoleUpdater(GuardedDataUpdater[RoleRow, RoleData]):
+    """Edits a role's declaration. Carries no ``status`` field.
+
+    Declines a SYSTEM role: its declaration belongs to the role preset.
+    """
 
     role_id: RoleID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
@@ -44,6 +50,10 @@ class RoleUpdater(DataUpdater[RoleRow, RoleData]):
     @override
     def target_id_value(self) -> UUID:
         return self.role_id
+
+    @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        return [RoleConditions.by_source_equals(RoleSource.CUSTOM)]
 
     @property
     @override
@@ -64,8 +74,11 @@ class RoleUpdater(DataUpdater[RoleRow, RoleData]):
 
 
 @dataclass
-class RoleSoftDeleteUpdater(DataUpdater[RoleRow, RoleData]):
-    """Marks a role deleted; the values are constants so they cannot be passed wrong."""
+class RoleSoftDeleteUpdater(GuardedDataUpdater[RoleRow, RoleData]):
+    """Marks a role deleted; the values are constants so they cannot be passed wrong.
+
+    Declines a SYSTEM role, as :class:`RoleUpdater` does.
+    """
 
     role_id: RoleID
 
@@ -81,6 +94,10 @@ class RoleSoftDeleteUpdater(DataUpdater[RoleRow, RoleData]):
     @override
     def target_id_value(self) -> UUID:
         return self.role_id
+
+    @override
+    def guard_conditions(self) -> list[QueryCondition]:
+        return [RoleConditions.by_source_equals(RoleSource.CUSTOM)]
 
     @property
     @override

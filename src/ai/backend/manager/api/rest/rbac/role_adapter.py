@@ -9,31 +9,24 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.dto.manager.rbac import (
     OrderDirection,
     RoleDTO,
     RoleFilter,
     RoleOrder,
     RoleOrderField,
-    RoleSource,
-    RoleStatus,
     SearchRolesRequest,
     UpdateRoleRequest,
 )
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.role.orders import RoleOrders
+from ai.backend.manager.models.rbac_models.role.updaters import RoleUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Purger,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.purgers import RolePurgerSpec
-from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
 __all__ = ("RoleAdapter",)
@@ -55,43 +48,20 @@ class RoleAdapter(BaseFilterAdapter):
             description=data.description,
         )
 
-    def build_deleter(self, role_id: UUID) -> Updater[RoleRow]:
-        """Build a deleter updater for the given role ID."""
-        spec = RoleUpdaterSpec(
-            status=OptionalState.update(RoleStatus.DELETED),
-        )
-        return Updater(spec=spec, pk_value=role_id)
-
-    def build_purger(self, role_id: UUID) -> Purger[RoleRow]:
-        """Build a purger for the given role ID."""
-        return Purger(spec=RolePurgerSpec(role_id=role_id))
-
-    def build_updater(self, request: UpdateRoleRequest, role_id: UUID) -> Updater[RoleRow]:
+    def build_updater(self, request: UpdateRoleRequest, role_id: UUID) -> RoleUpdater:
         """Convert update request to updater."""
         name = OptionalState[str].nop()
-        source = OptionalState[RoleSource].nop()
-        status = OptionalState[RoleStatus].nop()
         description = TriState[str].nop()
 
         if request.name is not None:
             name = OptionalState.update(request.name)
-        if request.source is not None:
-            source = OptionalState.update(request.source)
-        if request.status is not None:
-            status = OptionalState.update(request.status)
         if request.description is not SENTINEL:
             if request.description is None:
                 description = TriState.nullify()
             else:
                 description = TriState.update(request.description)
 
-        spec = RoleUpdaterSpec(
-            name=name,
-            source=source,
-            status=status,
-            description=description,
-        )
-        return Updater(spec=spec, pk_value=role_id)
+        return RoleUpdater(role_id=RoleID(role_id), name=name, description=description)
 
     def build_querier(self, request: SearchRolesRequest) -> BatchQuerier:
         """

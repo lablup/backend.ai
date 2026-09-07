@@ -52,6 +52,7 @@ from ai.backend.common.data.entity.resource_policy import (
 from ai.backend.common.data.entity.resource_preset import RESOURCE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.resource_slot import RESOURCE_SLOT_TYPE_ENTITY_TYPE
 from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTITY_TYPE
+from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
 from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE
 from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
 from ai.backend.common.data.entity.runtime_variant_preset import RUNTIME_VARIANT_PRESET_ENTITY_TYPE
@@ -729,7 +730,10 @@ def create_processors(
             services.object_storage,
         ),
         permission_controller=PermissionControllerProcessors(
-            services.permission_controller, action_monitors, validators
+            rbac_groups.group(GroupMeta(ROLE_ENTITY_TYPE)),
+            services.permission_controller,
+            action_monitors,
+            validators,
         ),
         vfs_storage=VFSStorageProcessors(
             artifact_groups.group(GroupMeta(VFS_STORAGE_ENTITY_TYPE)), services.vfs_storage

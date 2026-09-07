@@ -25,6 +25,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.data.user.types import UserRole
@@ -181,6 +182,7 @@ def user_processors(
 @pytest.fixture()
 def permission_controller_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
     valkey_clients: ValkeyClients,
     config_provider: ManagerConfigProvider,
 ) -> PermissionControllerProcessors:
@@ -198,6 +200,7 @@ def permission_controller_processors(
         perm_repo, group_repository=group_repo, rbac_action_registry=[]
     )
     return PermissionControllerProcessors(
+        processor_registry.group(GroupMeta(ROLE_ENTITY_TYPE)),
         service=service,
         action_monitors=[],
         validators=_build_validators(database_engine, config_provider),

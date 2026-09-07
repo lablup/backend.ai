@@ -9,12 +9,15 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
 from ai.backend.common.dto.manager.rbac.request import (
     CreateRoleRequest,
     PurgeRoleRequest,
 )
 from ai.backend.common.dto.manager.rbac.response import CreateRoleResponse
 from ai.backend.common.dto.manager.rbac.types import RoleSource, RoleStatus
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
@@ -39,6 +42,7 @@ RoleFactory = Callable[..., Coroutine[Any, Any, CreateRoleResponse]]
 @pytest.fixture()
 def permission_controller_processors(
     database_engine: ExtendedAsyncSAEngine,
+    processor_registry: ProcessorRegistry[Any],
 ) -> PermissionControllerProcessors:
     repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(
@@ -51,7 +55,10 @@ def permission_controller_processors(
         rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
     )
     return PermissionControllerProcessors(
-        service=service, action_monitors=[], validators=validators
+        processor_registry.group(GroupMeta(ROLE_ENTITY_TYPE)),
+        service=service,
+        action_monitors=[],
+        validators=validators,
     )
 
 
