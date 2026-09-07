@@ -28,6 +28,7 @@ _USER_ID = UserID(uuid.UUID("12345678-1234-5678-1234-567812345678"))
 _CLIENT_IP = "10.0.0.1"
 _RATE_LIMIT = 30000
 _RESET_AFTER_SECONDS = 500
+_LIMIT_OF_ANY_OTHER_ADDRESS = 7
 
 
 @dataclass(frozen=True)
@@ -85,10 +86,16 @@ class TestRlimMiddleware:
         mock_request_anonymous: web.Request,
         mock_handler: AsyncMock,
     ) -> None:
-        """The two windows stand apart, so the limit reported says which one governed."""
+        """Every window stands apart, so the limit reported says which one governed."""
         # Arrange
-        mock_valkey_client.consume_ip_rate_limit.return_value = RateLimitState(
-            count=1, limit=_ANONYMOUS_RATELIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
+        mock_valkey_client.consume_ip_rate_limit.side_effect = (
+            lambda client_ip, window_seconds, limit: RateLimitState(
+                count=1,
+                limit=_ANONYMOUS_RATELIMIT
+                if client_ip == _CLIENT_IP
+                else _LIMIT_OF_ANY_OTHER_ADDRESS,
+                reset_after_seconds=_RESET_AFTER_SECONDS,
+            )
         )
         mock_valkey_client.consume_user_rate_limit.return_value = RateLimitState(
             count=1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS

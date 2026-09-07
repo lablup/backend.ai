@@ -121,9 +121,6 @@ class ValkeyRateLimitClient:
         """
         Consume one request of the address's current window and return its state.
 
-        Unauthenticated requests are counted here: they name no keypair, so the address
-        the server sees is the only caller identity there is.
-
         :param client_ip: The address the counter is keyed by.
         :param window_seconds: The window length, applied when the request opens a window.
         :param limit: The limit to fix for the window, taken only when the request opens one.
