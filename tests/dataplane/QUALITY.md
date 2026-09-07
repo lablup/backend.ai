@@ -26,6 +26,9 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | C14 | **A child key is created under the record that makes it legitimate, in one store operation.** Endpoint, address and member writes name the session record as a guard. | A stamp says whose a key is but cannot stop one being MADE: a stale create finds the address free (because the session was torn down) and attaches its state to a session that no longer exists. | `TestAChildKeyWrittenUnderNoRecord` |
 | C16 | **A guard is wired into the path that needs it.** The create, the reuse and the pre-seed pass the session record; the pool claims do too. | A guard that exists on the allocator and is not passed by its caller protects nothing, and a test that supplies its own guard passes over the gap. | `TestTheGuardIsWiredIntoTheRealPath` |
 | C17 | **One agent id, one agent process.** The pid file is held under an exclusive lock. | Two agents under one id are one identity to the manager, the VNI registry and the privnet journal; no session-level fence separates them, so a restart's outgoing process can withdraw the incoming one's membership. | `_hold_pid_file` |
+| C18 | **A lost claim is one candidate; an expired guard is all of them.** Both allocators tell the two apart at the first miss. | Read as a conflict, an expired guard walks the whole VNI range -- ~16.7M swaps and prefix reads -- holding the manager and its etcd for as long as that takes. | `TestAGuardThatExpiredMidScan` |
+| C19 | **A claim from before the field is taken, not shared.** A legacy subnet or VNI is promoted to the adopting incarnation before it is used, all units or none. | Two incarnations read one claim as theirs: the newer runs on it, the older's cleanup gives it back, and the pool hands a live session's VNI or half its subnet to another tenant. | `TestALegacyClaimTwoIncarnationsCanRead`, `TestAWideBlockOnTwoIncarnations` |
+| C20 | **The pool itself is reconcilable.** A sweep starts from the claims and asks each session, so it reaches what no record, tombstone or debt note names. | The one leak nothing can find: a cleanup whose debt write AND release both failed. | `TestAPoolClaimNothingNames` |
 | C15 | **A cleanup that cannot finish is written down and retried.** The orphan sweep records what it owes per incarnation and clears it only when nothing is left. | The sweep has no tombstone to work from -- the record already names its successor -- so one transient etcd error leaks a VNI, a subnet and their keys for the cluster's life. | `TestACleanupThatCouldNotFinishIsRetried` |
 
 ## D — Data plane (agent)
@@ -171,3 +174,19 @@ nodes, and A1/A2/A3/A9/A10 are still unrun -- which matters more this round than
 changes agent STARTUP: a node whose pid file is held by a stale process now refuses to start where
 it previously started and raced. That is the intended behaviour and it is exactly the kind of
 change only a real restart shows.
+
+
+Seventh round, against the same bar:
+
+| # | Was | Now |
+|---|-----|-----|
+| C18 | a lost compare-and-swap was always read as "that candidate was taken", so an expired session guard made every candidate lose in turn -- the VNI range is 4096..16,777,215 | the guard is re-read at the first miss and the scan stops with `SessionRecordContested`; an ordinary conflict still moves to the next candidate |
+| C19 | `_own_vni` returned a legacy claim as this incarnation's without promoting it, so the claim still answered to any incarnation that asked | promoted by a guarded value-CAS before it is returned; a promotion that cannot land does not hand the claim back |
+| C19 | `_claim_as_ours` rewrote a wide block unit by unit with no guard and no rollback, and `_finish_partial_claim` completed a block leaving its older units unstamped | promotion is guarded and all-or-nothing (units already rewritten are put back), and a completed partial claim is brought onto one incarnation or given back |
+| C20 | a sweep whose debt note and release both failed left claims nothing named, and nothing would ever look for them | `reconcile_pool` walks the pool and asks each session's record; it runs at manager start, and what could not be recorded is reported through `unrecoverable_leaks` |
+
+R3 is STILL not run against the current HEAD, and this round widens what that leaves unverified
+rather than narrowing it. `reconcile_pool` runs at every manager start and releases pool claims
+whose session does not name their incarnation -- correct by the model, and a release of live
+tenant state if the model is wrong anywhere. Nothing but a real multi-node run with restarts shows
+that. Read C18-C20 as reasoned and unit-tested, not as verified.
