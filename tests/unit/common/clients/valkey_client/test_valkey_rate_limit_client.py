@@ -14,16 +14,14 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
 )
 from ai.backend.common.data.entity.user import UserID
 
-type ConsumeWindow = Callable[..., Awaitable[RateLimitState]]
-
 
 @dataclass(frozen=True)
 class Window:
     """The calls that count a request for two subjects of one kind: the one a test
     counts against, and another whose window must stay its own."""
 
-    counted: ConsumeWindow
-    unrelated: ConsumeWindow
+    counted: Callable[..., Awaitable[RateLimitState]]
+    unrelated: Callable[..., Awaitable[RateLimitState]]
 
 
 @pytest.fixture
