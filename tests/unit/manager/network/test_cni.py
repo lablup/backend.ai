@@ -9,6 +9,7 @@ create/destroy remain contract guards until P2 fills them in.
 import asyncio
 import ipaddress
 import json
+import time
 from typing import Any, TypeVar, cast, override
 
 import pytest
@@ -27,6 +28,7 @@ from ai.backend.manager.errors.network import (
     OverlayTeardownPending,
     RequestedSubnetInvalid,
     RequestedSubnetUnavailable,
+    SessionCleanupPending,
     SessionRecordContested,
     SubnetClaimStranded,
     VNIPoolExhausted,
@@ -1291,6 +1293,127 @@ class TestARollbackThatCouldNotFinish:
         await plugin.destroy_network("s1")
 
         assert _pool_claims(etcd) == [], "the subnet and VNI outlived the session"
+        assert _META_KEY not in etcd.store
+
+
+class TestATombstoneIsNotSomethingToBuildOn:
+    """C4c. A cleanup that did not reach the end leaves a record naming a subnet and a VNI that
+    are still allocated. A create must not take that over the way it takes over a stalled one:
+    it would run the session on keys and an allocation something else is still deleting."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    class _RefusesPrefixDeletes(FakeEtcd):
+        def __init__(self) -> None:
+            super().__init__()
+            self.refusing = True
+
+        @override
+        async def delete_prefix(self, prefix: str, **kwargs: Any) -> None:
+            if self.refusing:
+                raise RuntimeError("etcd is unreachable")
+            await super().delete_prefix(prefix, **kwargs)
+
+    async def _tombstoned(self) -> tuple[_RefusesPrefixDeletes, CNINetworkPlugin]:
+        etcd = self._RefusesPrefixDeletes()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        await plugin._rollback_create(
+            "s1",
+            str(info.options["subnet"]),
+            int(cast(int, info.options["vni"])),
+            etcd.store[_META_KEY],
+        )
+        assert json.loads(etcd.store[_META_KEY])["_state"] == "deleting"
+        return etcd, plugin
+
+    async def test_a_create_finishes_the_cleanup_instead_of_taking_it_over(self) -> None:
+        etcd, plugin = await self._tombstoned()
+        etcd.refusing = False  # etcd is back by the time the next create arrives
+
+        held, published = await plugin._claim_session(cast(AsyncEtcd, etcd), "s1", "tok2", [])
+
+        assert published is None
+        assert json.loads(held)["_state"] == "creating"
+        assert _pool_claims(etcd) == [], "the tombstoned allocation was never given back"
+        assert "network/session/s1/endpoints/k1" not in etcd.store
+
+    async def test_a_create_refuses_while_the_cleanup_cannot_finish(self) -> None:
+        etcd, plugin = await self._tombstoned()
+        with pytest.raises(SessionCleanupPending):
+            await plugin._claim_session(cast(AsyncEtcd, etcd), "s1", "tok2", [])
+        assert json.loads(etcd.store[_META_KEY])["_state"] == "deleting"
+
+
+class TestADestroyThatCrossesACreate:
+    """C7. Destroy used to read the member table and the meta, then delete the prefix, all as
+    separate steps. A create that had claimed a subnet but not yet published it lost the record
+    its own rollback works from -- and what it held was then allocated to a session no key
+    mentions."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    @staticmethod
+    def _being_created(etcd: FakeEtcd, *, claimed_at: float) -> str:
+        record = json.dumps({"_owner": "tok1", "_state": "creating", "_claimed_at": claimed_at})
+        etcd.store[_META_KEY] = record
+        return record
+
+    async def test_it_waits_for_a_create_that_is_still_running(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        record = self._being_created(etcd, claimed_at=time.time())
+
+        with pytest.raises(OverlayTeardownPending):
+            await plugin.destroy_network("s1")
+
+        assert etcd.store[_META_KEY] == record, "it deleted the record the create rolls back from"
+
+    async def test_it_takes_over_a_create_nobody_is_coming_back_for(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        # What the dead create had claimed, and had not yet published.
+        await plugin._subnet_allocator.acquire("s1")
+        await plugin._vni_allocator.acquire("s1")
+        self._being_created(etcd, claimed_at=time.time() - 3600)
+
+        await plugin.destroy_network("s1")
+
+        assert _pool_claims(etcd) == [], "the dead create's claims outlived its session"
+        assert _META_KEY not in etcd.store
+
+    async def test_a_create_that_was_overtaken_cannot_publish_afterwards(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        held = self._being_created(etcd, claimed_at=time.time() - 3600)
+        await plugin.destroy_network("s1")
+        with pytest.raises(SessionRecordContested):
+            await plugin._publish(cast(AsyncEtcd, etcd), "s1", held, {"subnet": "10.128.0.0/24"})
+
+
+class TestAClaimNoRecordEverNamed:
+    """C8. A create cancelled between claiming a block and publishing the record that would have
+    named it leaves the pool holding something no meta mentions. Releasing what the record names
+    cannot reach it; releasing what the POOL says is this session's can."""
+
+    async def test_the_rollback_gives_it_back(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin._subnet_allocator.acquire("s1")
+        await plugin._vni_allocator.acquire("s1")
+        held = json.dumps({"_owner": "tok1", "_state": "creating", "_claimed_at": time.time()})
+        etcd.store[_META_KEY] = held
+
+        # The create knows of neither: it was cancelled before either reached its local variables.
+        await plugin._rollback_create("s1", None, None, held)
+
+        assert _pool_claims(etcd) == []
         assert _META_KEY not in etcd.store
 
 

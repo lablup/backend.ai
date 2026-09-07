@@ -163,6 +163,24 @@ class SubnetClaimStranded(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class SessionCleanupPending(BackendAIError, web.HTTPConflict):
+    """A previous network for this session is still being cleaned up.
+
+    Retryable: building over keys and an allocation something else is still deleting is not.
+    """
+
+    error_type = "https://api.backend.ai/probs/manager/session-network-cleanup-pending"
+    error_title = "The session's previous network has not finished being removed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class SessionRecordContested(BackendAIError, web.HTTPConflict):
     """Another manager took this session's network record while a create was running.
 

@@ -43,6 +43,7 @@ from ai.backend.manager.errors.network import (
     ForcedBackendUnsupported,
     NetworkBackendMismatch,
     OverlayTeardownPending,
+    SessionCleanupPending,
     SessionRecordContested,
 )
 from ai.backend.manager.network.ipam import (
@@ -77,6 +78,11 @@ _ESP_OVERHEAD = ESP_OVERHEAD
 
 #: Bookkeeping the session meta carries for the create itself, stripped from what callers see.
 _OWNER: Final = "_owner"
+#: When the record was claimed, as wall-clock seconds -- the one clock two managers share. Read
+#: only to tell a create that is still running from one nobody is coming back for, at the same
+#: coarse bound `_claim_session` hands the session over at, so clock skew of a few seconds is
+#: not a factor.
+_CLAIMED_AT: Final = "_claimed_at"
 #: Both halves of the contract an agent reads too -- see `SESSION_META_STATE`.
 _STATE: Final = SESSION_META_STATE
 _READY: Final = SESSION_META_READY
@@ -94,7 +100,7 @@ _CREATE_POLL_SEC: Final = 0.5
 
 def _published(meta: Mapping[str, Any]) -> dict[str, Any]:
     """The session meta as its callers see it, without the create's own bookkeeping."""
-    return {key: value for key, value in meta.items() if key not in (_OWNER, _STATE)}
+    return {key: value for key, value in meta.items() if key not in (_OWNER, _STATE, _CLAIMED_AT)}
 
 
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
@@ -233,6 +239,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 # "undo what I did" is only meaningful against a record that says whose it is.
                 _OWNER: token,
                 _STATE: _CREATING,
+                _CLAIMED_AT: time.time(),
             }
             held = await self._publish(etcd, session_id, held, meta)
             # Assign each endpoint a disjoint overlay IP and record it under endpoints/ (the
@@ -349,7 +356,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 a stream of managers taking the session from each other. Retryable, and reported
                 rather than looped on forever.
         """
-        ours = json.dumps({_OWNER: token, _STATE: _CREATING})
+        ours = json.dumps({_OWNER: token, _STATE: _CREATING, _CLAIMED_AT: time.time()})
         key = session_meta_key(session_id)
         handover = time.monotonic() + _CREATE_HANDOVER_SEC
         give_up = handover + _CREATE_HANDOVER_SEC
@@ -362,7 +369,20 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 return ours, None
             raw = await etcd.get(key, scope=ConfigScopes.GLOBAL)
             if raw is not None:
-                if json.loads(raw).get(_STATE) == _READY:
+                state = json.loads(raw).get(_STATE)
+                if state == _DELETING:
+                    # A cleanup that did not get to the end. Never taken over as a create: the
+                    # tombstone names a subnet and a VNI that are still allocated, and building
+                    # over it would run a session on keys somebody else is still deleting. Finish
+                    # it instead -- it is idempotent, and whoever finishes it frees the id.
+                    if not await self._finish_cleanup(etcd, session_id, raw):
+                        raise SessionCleanupPending(
+                            f"session {session_id}'s previous network could not be cleaned up;"
+                            " retrying rather than building over what it still holds"
+                        )
+                    if await etcd.put_if_absent(key, ours):
+                        return ours, None
+                if state == _READY:
                     published = await self._existing_allocation(etcd, session_id, endpoints)
                     if published is not None:
                         return "", published
@@ -473,33 +493,42 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 "not rolling back session {}: its record is no longer this create's", session_id
             )
             return
-        # Everything under the session except the tombstone. Nobody reads a session whose record
-        # is not READY, and what is left is named by the tombstone until the last line.
+        await self._finish_cleanup(etcd, session_id, tombstone)
+
+    async def _finish_cleanup(self, etcd: AsyncEtcd, session_id: str, tombstone: str) -> bool:
+        """Carry a session under a DELETING tombstone through to nothing left, and say whether it
+        got there.
+
+        Idempotent and safe to run twice: every step deletes only what carries this session's
+        claim, so whoever reaches the last line first ends it and the other finds it done.
+        """
+        # Everything under the session except the tombstone. Nobody acts on a session whose
+        # record is not READY, and what is left is named by the tombstone until the last line.
         for prefix in (endpoints_prefix, members_prefix, session_ipam_prefix):
             try:
                 await etcd.delete_prefix(prefix(session_id).rstrip("/"), scope=ConfigScopes.GLOBAL)
             except Exception:
                 log.exception(
-                    "rollback: could not delete the {} keys of session {}; its record stays as a"
-                    " tombstone so a later destroy can finish from it",
-                    prefix(session_id),
+                    "cleanup of session {} could not delete its {} keys; its record stays as a"
+                    " tombstone so this can be finished later",
                     session_id,
+                    prefix(session_id),
                 )
-                return
-        if vni is not None:
-            try:
-                await self._vni_allocator.release(vni, session_id)
-            except Exception:
-                log.exception("rollback: failed to release VNI {} for {}", vni, session_id)
-                return
-        if subnet is not None:
-            try:
-                await self._subnet_allocator.release(subnet, session_id)
-            except Exception:
-                log.exception("rollback: failed to release subnet {} for {}", subnet, session_id)
-                return
-        # Last, and only over the tombstone this call wrote: nothing it names is outstanding now.
+                return False
+        # Everything the POOL says is this session's, not only what the tombstone names. A create
+        # cancelled between claiming a block and publishing the record that would have named it
+        # leaves one no meta mentions, and this is the only thing that reaches it.
+        try:
+            stuck_vnis = await self._vni_allocator.release_all(session_id)
+            stuck_blocks = await self._subnet_allocator.release_all(session_id)
+        except Exception:
+            log.exception("cleanup of session {} could not reach the pool", session_id)
+            return False
+        if stuck_vnis or stuck_blocks:
+            return False
+        # Last, and only over the tombstone this call is working from.
         await etcd.delete_if_value(session_meta_key(session_id), tombstone)
+        return True
 
     async def _preseed_members(self, session_id: str, member_agents: list[str]) -> None:
         """Publish each member agent's VTEP, but only where no record stands already.
@@ -543,13 +572,57 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 " teardown; retrying rather than reusing the VNI over their live state"
             )
         raw = await etcd.get(session_meta_key(network_id), scope=ConfigScopes.GLOBAL)
-        if raw is not None:
-            meta = json.loads(raw)
-            if subnet := meta.get("subnet"):
-                await self._subnet_allocator.release(subnet, network_id)
-            if (vni := meta.get("vni")) is not None:
-                await self._vni_allocator.release(int(vni), network_id)
-        await etcd.delete_prefix(session_prefix(network_id).rstrip("/"), scope=ConfigScopes.GLOBAL)
+        if raw is None:
+            # No record to fence against, so nothing can be building on it either. Sweep whatever
+            # keys and pool claims are left under this id and be done.
+            await etcd.delete_prefix(
+                session_prefix(network_id).rstrip("/"), scope=ConfigScopes.GLOBAL
+            )
+            await self._vni_allocator.release_all(network_id)
+            await self._subnet_allocator.release_all(network_id)
+            return
+        meta = json.loads(raw)
+        if meta.get(_STATE) == _CREATING and not self._create_gave_up(meta):
+            # A create is building this session right now. Deleting its keys from under it takes
+            # away the record its own rollback needs, and what it had already claimed from the
+            # pool is then held by a session nothing mentions. Wait for it: it either publishes
+            # READY or undoes itself, and the teardown retry comes back to whichever happened.
+            raise OverlayTeardownPending(
+                f"session {network_id}'s network is still being created; retrying rather than"
+                " deleting the record its create would undo itself from"
+            )
+        # From READY (or from a create nobody is coming back for) into a tombstone, in one step.
+        # A create still running finds out at its next write, and an agent that reads the record
+        # to resume this session sees one it must not act on.
+        tombstone = json.dumps({
+            "subnet": meta.get("subnet"),
+            "vni": meta.get("vni"),
+            _OWNER: meta.get(_OWNER),
+            _STATE: _DELETING,
+        })
+        if not await etcd.replace(session_meta_key(network_id), raw, tombstone):
+            raise OverlayTeardownPending(
+                f"session {network_id}'s network record changed while this teardown was reading"
+                " it; retrying against what is there now"
+            )
+        if not await self._finish_cleanup(etcd, network_id, tombstone):
+            raise OverlayTeardownPending(
+                f"session {network_id}'s network could not be given back in full; its record"
+                " stays as a tombstone naming what is left, and this retries"
+            )
+
+    @staticmethod
+    def _create_gave_up(meta: Mapping[str, Any]) -> bool:
+        """Whether a CREATING record is old enough that no create is coming back for it.
+
+        The same bound `_claim_session` hands the session over at: past it, the manager that
+        claimed the record is treated as gone by every other manager, so a teardown may take it
+        too rather than keeping the session in TERMINATING for good.
+        """
+        claimed_at = meta.get(_CLAIMED_AT)
+        if not isinstance(claimed_at, (int, float)):
+            return True  # a record from before this field existed; do not wait on it forever
+        return (time.time() - float(claimed_at)) >= _CREATE_HANDOVER_SEC * 2
 
     async def _members_still_holding(self, session_id: str) -> set[str]:
         """The agents whose member record is still published for this session.
