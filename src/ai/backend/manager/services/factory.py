@@ -80,6 +80,7 @@ from ai.backend.manager.actions.registry.types import (
     GroupMeta,
     ProcessorDependencies,
 )
+from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
@@ -265,6 +266,7 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.agent.repository,
             repositories.scheduler.repository,
             args.scheduling_controller,
+            BulkOwnCheck(repositories.permission_controller.repository, args.config_provider),
         ),
         app_config=AppConfigService(OpsRepository(repositories.v2_ops_provider)),
         domain=DomainService(repositories.domain.repository),

@@ -10,13 +10,16 @@ import pytest
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import AgentWatcherResponseError
 from ai.backend.common.types import (
     AgentId,
     SessionId,
 )
+from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.errors.agent import (
     AgentHasConflictingSessions,
     ConflictingSessionRescheduleNotSupported,
@@ -27,6 +30,9 @@ from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
     BulkLoadContainerCountsAction,
+)
+from ai.backend.manager.services.agent.actions.bulk_load_permissions import (
+    BulkLoadAgentPermissionsAction,
 )
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
@@ -82,6 +88,11 @@ def mock_scheduling_controller() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_own_check() -> AsyncMock:
+    return AsyncMock(spec=BulkOwnCheck)
+
+
+@pytest.fixture
 def agent_service(
     mock_etcd: AsyncMock,
     mock_agent_registry: AsyncMock,
@@ -89,6 +100,7 @@ def agent_service(
     mock_agent_repository: AsyncMock,
     mock_scheduler_repository: AsyncMock,
     mock_scheduling_controller: AsyncMock,
+    mock_own_check: AsyncMock,
 ) -> AgentService:
     return AgentService(
         etcd=mock_etcd,
@@ -97,6 +109,7 @@ def agent_service(
         agent_repository=mock_agent_repository,
         scheduler_repository=mock_scheduler_repository,
         scheduling_controller=mock_scheduling_controller,
+        own_check=mock_own_check,
     )
 
 
@@ -430,3 +443,30 @@ class TestBulkLoadContainerCounts:
             known,
             unknown,
         ])
+
+
+class TestBulkLoadPermissions:
+    async def test_each_agent_holds_what_the_own_check_answers(
+        self, agent_service: AgentService, mock_own_check: AsyncMock
+    ) -> None:
+        agent_uuid = AgentUUID(uuid4())
+        unreached = AgentUUID(uuid4())
+        mock_own_check.held.return_value = {
+            agent_uuid: Permission.READ | Permission.CREATE | Permission.HARD_DELETE,
+            unreached: Permission.NONE,
+        }
+
+        result = await agent_service.bulk_load_permissions(
+            BulkLoadAgentPermissionsAction(agent_uuids=[agent_uuid, unreached])
+        )
+
+        # READ and CREATE map; HARD_DELETE has no counterpart; nothing held is empty.
+        assert result.values() == {
+            agent_uuid: [
+                AgentPermission.READ_ATTRIBUTE,
+                AgentPermission.CREATE_COMPUTE_SESSION,
+                AgentPermission.CREATE_SERVICE,
+            ],
+            unreached: [],
+        }
+        mock_own_check.held.assert_awaited_once_with([agent_uuid, unreached])

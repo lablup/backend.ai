@@ -15,6 +15,7 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.api.rest.agent.handler import AgentHandler
 from ai.backend.manager.api.rest.agent.registry import register_agent_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -27,6 +28,9 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
@@ -87,6 +91,7 @@ def agent_processors(
         agent_repository=agent_repository,
         scheduler_repository=scheduler_repository,
         scheduling_controller=AsyncMock(),
+        own_check=BulkOwnCheck(PermissionControllerRepository(database_engine), config_provider),
     )
     return AgentProcessors(
         processor_registry.group(GroupMeta(AGENT_ENTITY_TYPE)),

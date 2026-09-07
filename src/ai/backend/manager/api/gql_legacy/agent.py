@@ -31,11 +31,9 @@ from ai.backend.manager.data.agent.types import AgentDetailData
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.models.agent import (
-    ADMIN_PERMISSIONS,
     AgentRow,
     AgentStatus,
     agents,
-    get_permission_ctx,
 )
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
@@ -45,11 +43,13 @@ from ai.backend.manager.models.project import AssocGroupUserRow
 from ai.backend.manager.models.rbac import (
     ScopeType,
 )
-from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_group import ResourceGroupRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
+from ai.backend.manager.services.agent.actions.bulk_load_permissions import (
+    BulkLoadAgentPermissionsAction,
+)
 from ai.backend.manager.services.agent.actions.update_resource_group import (
     UpdateAgentResourceGroupAction,
 )
@@ -308,35 +308,18 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        async with graph_ctx.db.connect() as db_conn:
-            user = graph_ctx.user
-            if user["role"] != UserRole.SUPERADMIN:
-                client_ctx = ClientContext(
-                    graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-                )
-                permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope, permission)
-                cond = permission_ctx.query_condition
-                if cond is None:
-                    return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
-                permission_getter = permission_ctx.calculate_final_permission
-                query = query.where(cond)
-                cnt_query = cnt_query.where(cond)
-            else:
-
-                async def all_permissions(row: AgentRow) -> frozenset[AgentPermission]:
-                    return ADMIN_PERMISSIONS
-
-                permission_getter = all_permissions  # type: ignore[assignment]
-            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
-                agent_rows = (await db_session.scalars(query)).all()
-                total_cnt = await db_session.scalar(cnt_query)
-        agent_ids: list[AgentId] = []
-
-        agent_permissions: dict[AgentId, list[AgentPermission]] = {}
-        for row in agent_rows:
-            agent_ids.append(row.id)
-            permissions = await permission_getter(row)
-            agent_permissions[row.id] = list(permissions)
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            agent_rows = (await db_session.scalars(query)).all()
+            total_cnt = await db_session.scalar(cnt_query)
+        # What the caller holds on each agent is the service's to answer.
+        resolved = await graph_ctx.processors.agent.bulk_load_permissions.run(
+            BulkLoadAgentPermissionsAction(agent_uuids=[row.uuid for row in agent_rows])
+        )
+        held = resolved.values()
+        agent_ids: list[AgentId] = [row.id for row in agent_rows]
+        agent_permissions: dict[AgentId, list[AgentPermission]] = {
+            row.id: held.get(row.uuid, []) for row in agent_rows
+        }
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
         condition = [QueryConditions.by_ids(agent_ids)]
         agent_list = await graph_ctx.agent_repository.list_data(condition)
@@ -805,7 +788,7 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
                     AgentDetailData(
                         agent=agent.to_data(),
                         resources=agent.resources_by_rank(),
-                        permissions=list(ADMIN_PERMISSIONS),
+                        permissions=[],
                     )
                 )
                 for agent in agent_list
