@@ -228,6 +228,7 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
 )
+from ai.backend.manager.services.rbac.processors import RbacProcessors
 from ai.backend.manager.services.resource_group.actions.bulk_get import (
     BulkGetResourceGroupsAction,
 )
@@ -386,6 +387,13 @@ def test_every_defined_v2_action_is_wired() -> None:
     KeypairResourcePolicyProcessors(registry.group(GroupMeta(KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE)))
     RolePresetProcessors(registry.group(GroupMeta(ROLE_PRESET_ENTITY_TYPE)), MagicMock())
     EntityShareProcessors(registry.group(GroupMeta(ENTITY_SHARE_ENTITY_TYPE)), MagicMock())
+    rbac_groups = registry.concern(ConcernMeta(Concern.RBAC))
+    RbacProcessors(
+        rbac_groups.relation_group(),
+        rbac_groups.group(GroupMeta(USER_ENTITY_TYPE)),
+        MagicMock(),
+        MagicMock(),
+    )
     RuntimeVariantProcessors(registry.group(GroupMeta(RUNTIME_VARIANT_ENTITY_TYPE)))
     ObjectStorageProcessors(
         registry.group(GroupMeta(OBJECT_STORAGE_ENTITY_TYPE)),

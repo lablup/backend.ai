@@ -173,7 +173,7 @@ class AuthDBSource:
                     keypair_rate_limit=keypair_rate_limit,
                 )
             )
-            await w.enroll_in_projects(UserID(result.user.id), user_spec.domain_id, project_ids)
+            await w.join_projects(UserID(result.user.id), user_spec.domain_id, project_ids)
             return UserCreationData(
                 user=result.user,
                 keypair=result.keypair,

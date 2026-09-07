@@ -10,9 +10,15 @@ import sqlalchemy as sa
 from sqlalchemy import Table
 
 from ai.backend.common.data.entity.domain import DOMAIN_ENTITY_TYPE, DomainID, DomainName
-from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, ProjectID
+from ai.backend.common.data.entity.project import (
+    PROJECT_ENTITY_TYPE,
+    PROJECT_SCOPE_TYPE,
+    ProjectID,
+)
+from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE, RoleID
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
+from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
@@ -177,7 +183,7 @@ async def _create_user(
             )
         )
         user_id = UserID(result.user.id)
-        await w.enroll_in_projects(user_id, domain_id, project_ids or [])
+        await w.join_projects(user_id, domain_id, project_ids or [])
     return user_id
 
 
@@ -488,6 +494,50 @@ async def _create_project(db: ExtendedAsyncSAEngine, domain_name: DomainName) ->
     return project_id
 
 
+async def _enrol_auto_assign_role(db: ExtendedAsyncSAEngine, project_id: ProjectID) -> RoleID:
+    """A role the project hands to whoever joins it, enrolled in the project's virtual
+    entity the way the preset-derived ones are."""
+    role_id = RoleID(uuid.uuid4())
+    async with db.begin_session() as session:
+        session.add(
+            RoleRow(
+                id=role_id,
+                name=f"role-{role_id.hex[:8]}",
+                status=RoleStatus.ACTIVE,
+                auto_assign=True,
+            )
+        )
+        role_node = VirtualEntityRow(entity_type=ROLE_ENTITY_TYPE, entity_id=role_id)
+        session.add(role_node)
+        await session.flush()
+        project_node_id = await session.scalar(
+            sa.select(VirtualEntityRow.id).where(
+                VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
+                VirtualEntityRow.entity_id == project_id,
+            )
+        )
+        session.add(
+            EntityMembershipRow(
+                virtual_entity_id=project_node_id,
+                member_entity_id=role_node.id,
+                capped=False,
+            )
+        )
+        await session.commit()
+    return role_id
+
+
+async def _held_role_ids(db: ExtendedAsyncSAEngine, user_id: UserID) -> set[RoleID]:
+    async with db.begin_readonly_session() as session:
+        return set(
+            (
+                await session.scalars(
+                    sa.select(UserRoleRow.role_id).where(UserRoleRow.user_id == user_id)
+                )
+            ).all()
+        )
+
+
 class TestProjectMembershipSync:
     """Setting the user's projects joins and leaves only what changed."""
 
@@ -501,9 +551,8 @@ class TestProjectMembershipSync:
         project_id = await _create_project(db, domain.domain_name)
 
         async with provider.write_ops() as w:
-            left = await w.replace_user_projects(user_id, domain.domain_name, [project_id])
+            await w.replace_user_projects(user_id, domain.domain_name, [project_id])
 
-        assert left == []
         assert await _project_member_ids(db, project_id) == [str(user_id)]
 
     async def test_a_project_dropped_from_the_set_is_left(
@@ -518,9 +567,8 @@ class TestProjectMembershipSync:
             await w.replace_user_projects(user_id, domain.domain_name, [project_id])
 
         async with provider.write_ops() as w:
-            left = await w.replace_user_projects(user_id, domain.domain_name, [])
+            await w.replace_user_projects(user_id, domain.domain_name, [])
 
-        assert left == [project_id]
         assert await _project_member_ids(db, project_id) == []
 
     async def test_the_personal_project_stands_outside_the_sync(
@@ -534,7 +582,31 @@ class TestProjectMembershipSync:
         personal_id = ProjectID((await _personal_projects(db, domain.domain_name))[0].id)
 
         async with provider.write_ops() as w:
-            left = await w.replace_user_projects(user_id, domain.domain_name, [])
+            await w.replace_user_projects(user_id, domain.domain_name, [])
 
-        assert left == []
         assert await _project_member_ids(db, personal_id) == [str(user_id)]
+
+    async def test_leaving_takes_the_projects_roles_back(
+        self,
+        db: ExtendedAsyncSAEngine,
+        provider: UserOpsProvider,
+        domain: DomainFixtureData,
+    ) -> None:
+        """Removal is the relation and the roles together (BEP-1076): a role may only be
+        chosen from the project's own, so holding one after leaving is not a state that
+        arises."""
+        user_id = await _create_user(provider, domain.domain_id, "alice")
+        project_id = await _create_project(db, domain.domain_name)
+        async with provider.write_ops() as w:
+            await w.replace_user_projects(user_id, domain.domain_name, [project_id])
+        role_id = await _enrol_auto_assign_role(db, project_id)
+        async with provider.write_ops() as w:
+            await w.replace_user_projects(user_id, domain.domain_name, [])
+            await w.replace_user_projects(user_id, domain.domain_name, [project_id])
+        assert role_id in await _held_role_ids(db, user_id)
+
+        async with provider.write_ops() as w:
+            await w.replace_user_projects(user_id, domain.domain_name, [])
+
+        assert role_id not in await _held_role_ids(db, user_id)
+        assert await _project_member_ids(db, project_id) == []

@@ -200,6 +200,13 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.prometheus_query_preset_category.processors import (
         PrometheusQueryPresetCategoryProcessors,
     )
+    from ai.backend.manager.services.rbac.processors import (
+        RbacProcessors,
+    )
+    from ai.backend.manager.services.rbac.service import (
+        RbacRelationService,
+        RbacRosterService,
+    )
     from ai.backend.manager.services.resource_group.processors import (
         ResourceGroupProcessors,
     )
@@ -369,6 +376,8 @@ class Services:
     resource_slot: ResourceSlotService
     role_preset: RolePresetService
     entity_share: EntityShareService
+    rbac_relation: RbacRelationService
+    rbac_roster: RbacRosterService
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentPresetService
     model_card: ModelCardService
@@ -435,6 +444,7 @@ class Processors:
     retention_policy: RetentionPolicyProcessors
     role_preset: RolePresetProcessors
     entity_share: EntityShareProcessors
+    rbac: RbacProcessors
     runtime_variant: RuntimeVariantProcessors
     client_ip_masking: ClientIPMaskingProcessors
     runtime_variant_preset: RuntimeVariantPresetProcessors

@@ -54,6 +54,15 @@ from ai.backend.manager.actions.v2.lookup.monitor.audit_log import LookupActionA
 from ai.backend.manager.actions.v2.lookup.monitor.prometheus import (
     LookupActionPrometheusMonitor,
 )
+from ai.backend.manager.actions.v2.relation.monitor.audit_log import (
+    RelationActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.v2.relation.monitor.prometheus import (
+    RelationActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.relation.monitor.reporter import (
+    RelationActionReporterMonitor,
+)
 from ai.backend.manager.actions.v2.relation.validator.rbac import (
     VirtualEntityRelationActionRBACValidator,
 )
@@ -309,6 +318,15 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 ScopeActionReporterMonitor(reporter_hub),
                 ScopeActionPrometheusMonitor(),
                 ScopeActionAuditLogMonitor(
+                    audit_log_repository,
+                    audit_log_policy,
+                    client_ip_masking_repository,
+                ),
+            ],
+            relation=[
+                RelationActionReporterMonitor(reporter_hub),
+                RelationActionPrometheusMonitor(),
+                RelationActionAuditLogMonitor(
                     audit_log_repository,
                     audit_log_policy,
                     client_ip_masking_repository,

@@ -46,6 +46,7 @@ from ai.backend.manager.repositories.project.repositories import ProjectReposito
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepositories,
 )
+from ai.backend.manager.repositories.rbac.repositories import RbacRepositories
 from ai.backend.manager.repositories.replica_group.repositories import ReplicaGroupRepositories
 from ai.backend.manager.repositories.reservoir_registry.repositories import (
     ReservoirRegistryRepositories,
@@ -104,6 +105,7 @@ class Repositories:
     notification: NotificationRepositories
     permission_controller: PermissionControllerRepositories
     entity_share: EntityShareRepositories
+    rbac: RbacRepositories
     prometheus_query_preset: PrometheusQueryPresetRepositories
     replica_group: ReplicaGroupRepositories
     reservoir_registry: ReservoirRegistryRepositories
@@ -156,6 +158,7 @@ class Repositories:
         permission_controller_repositories = PermissionControllerRepositories.create(args)
         prometheus_query_preset_repositories = PrometheusQueryPresetRepositories.create(args)
         entity_share_repositories = EntityShareRepositories.create(args)
+        rbac_repositories = RbacRepositories.create(args)
         replica_group_repositories = ReplicaGroupRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
@@ -209,6 +212,7 @@ class Repositories:
             prometheus_query_preset=prometheus_query_preset_repositories,
             replica_group=replica_group_repositories,
             entity_share=entity_share_repositories,
+            rbac=rbac_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
             resource_slot=resource_slot_repositories,

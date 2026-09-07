@@ -8,12 +8,11 @@ from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.orm import InstrumentedAttribute, aliased
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.error_log import ErrorLogID
 from ai.backend.common.data.entity.keypair import KeyPairID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE, RoleID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
@@ -27,7 +26,6 @@ from ai.backend.manager.models.project.row import AssocGroupUserRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -42,8 +40,6 @@ from ai.backend.manager.models.specs.purger import (
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder.row import VFolderPermissionRow
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 
 @dataclass
@@ -147,42 +143,6 @@ class UserScopeAssociationPurger(FieldBatchPurger[UserID, AssociationScopesEntit
     @override
     def to_data(self, row: AssociationScopesEntitiesRow) -> UUID:
         return row.id
-
-
-@dataclass
-class UserProjectRolePurger(FieldBatchPurger[UserID, UserRoleRow, RoleID]):
-    """Unmaps a user from the roles a project scope owns.
-
-    The project's roles are the role entities enrolled in its virtual entity.
-    """
-
-    project_id: ProjectID
-
-    @override
-    def build_subquery(self, owner_id: UserID) -> sa.sql.Select[Any]:
-        role_node = aliased(VirtualEntityRow, name="role_virtual_entity")
-        project_role_ids = (
-            sa.select(role_node.entity_id)
-            .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == role_node.id)
-            .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
-            .where(
-                VirtualEntityRow.entity_type == PROJECT_SCOPE_TYPE,
-                VirtualEntityRow.entity_id == self.project_id,
-                role_node.entity_type == ROLE_ENTITY_TYPE,
-            )
-        )
-        return sa.select(UserRoleRow).where(
-            UserRoleRow.user_id == owner_id,
-            UserRoleRow.role_id.in_(project_role_ids),
-        )
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: UserRoleRow) -> RoleID:
-        return row.role_id
 
 
 @dataclass

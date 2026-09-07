@@ -173,6 +173,15 @@ async def pair(database: ExtendedAsyncSAEngine) -> tuple[_ScopeID, _TargetID]:
     return scope, target
 
 
+@pytest.fixture
+async def other_target(database: ExtendedAsyncSAEngine) -> _TargetID:
+    """A second target in the graph, for the runs that name several pairs."""
+    target = _TargetID(uuid.uuid4())
+    async with database.begin_session() as sess:
+        sess.add(VirtualEntityRow(entity_type=_TARGET_TYPE, entity_id=target))
+    return target
+
+
 async def _off(database: ExtendedAsyncSAEngine) -> bool:
     async with database.begin_readonly_session() as sess:
         return (await sess.execute(sa.select(RelationTestRow.off))).scalar_one()
@@ -350,4 +359,64 @@ class TestPurgeRelation:
         async with provider.write_ops() as ops:
             assert await ops.purge_relation(_Purger(), scope, target) is False
 
+        assert await _row_count(database) == 0
+
+
+class TestManyPairsInOneRun:
+    """The plural forms, which take every pair a request named."""
+
+    async def test_one_run_links_every_pair_it_names(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+        other_target: _TargetID,
+    ) -> None:
+        """Several pairs go in one run, and the answer is per pair in the order given."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            written = await ops.create_relations(
+                _Creator(), [(scope, target), (scope, other_target)]
+            )
+
+        assert written == [True, True]
+        assert await _row_count(database) == 2
+
+    async def test_a_pair_already_linked_is_skipped(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+        other_target: _TargetID,
+    ) -> None:
+        """A pair already linked is left as it stands and answered False, so naming one
+        twice is not something a caller has to avoid."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.create_relations(_Creator(), [(scope, target)])
+        async with provider.write_ops() as ops:
+            written = await ops.create_relations(
+                _Creator(), [(scope, target), (scope, other_target)]
+            )
+
+        assert written == [False, True]
+        assert await _row_count(database) == 2
+
+    async def test_unlinking_answers_per_pair(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+        other_target: _TargetID,
+    ) -> None:
+        """Unlinking a pair that was never linked is silent and answered False."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.create_relations(_Creator(), [(scope, target)])
+        async with provider.write_ops() as ops:
+            unlinked = await ops.purge_relations(
+                _Purger(), [(scope, target), (scope, other_target)]
+            )
+
+        assert unlinked == [True, False]
         assert await _row_count(database) == 0
