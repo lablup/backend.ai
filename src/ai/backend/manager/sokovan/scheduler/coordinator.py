@@ -644,6 +644,16 @@ class ScheduleCoordinator:
         )
 
         kernel_result = await self._repository.search_kernels_for_handler(querier)
+        # The manager's kernel bookkeeping ran, and it ran whether or not there was anything to
+        # do. Recorded BEFORE the early return below, because an agent uses this to tell "the
+        # manager is not looking" from "the manager is looking and does not know this kernel" --
+        # and the second is exactly the case where there is nothing here to find.
+        try:
+            await self._valkey_schedule.mark_manager_sweep()
+        except Exception:
+            # Not fatal to the pass. An agent that misses the mark waits rather than reaping,
+            # which is the safe way round.
+            log.warning("could not record that the manager's kernel sweep ran", exc_info=True)
 
         if not kernel_result.items:
             return

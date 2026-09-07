@@ -81,6 +81,23 @@ def _flat(listing: Mapping[str, Any]) -> dict[str, str]:
     return {key: value for key, value in listing.items() if isinstance(value, str)}
 
 
+def _record(raw: str) -> dict[str, Any] | None:
+    """``raw`` as the object a claim or a record is, or None if it is not one.
+
+    Every value under these prefixes is written by this module as a JSON object, so anything else
+    was not written by a manager that agrees with this one -- a hand edit, a half-written value, a
+    key some other tool put there. Syntactically valid JSON that is not an object (``null``,
+    ``[]``, a bare number) is the case a bare ``json.loads(...).get(...)`` gets wrong: it does not
+    raise ValueError, it raises AttributeError, and one such key aborted a whole reconciliation
+    pass. Isolated here instead, so the sweep goes on and reaches the rest of the pool.
+    """
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
 def _own_vni(
     allocated: Mapping[str, str], session_id: str, generation: str | None
 ) -> tuple[int, str] | None:
@@ -95,10 +112,8 @@ def _own_vni(
     for key, raw in allocated.items():
         if not key.isdigit():
             continue
-        try:
-            if json.loads(raw).get("session_id") != session_id:
-                continue
-        except ValueError:
+        claim = _record(raw)
+        if claim is None or claim.get("session_id") != session_id:
             continue
         if of_generation(raw, generation):
             return int(key), raw
@@ -149,10 +164,10 @@ def _endpoint_claim(container_id: str, generation: str | None = None) -> str:
 
 def _generation_stamp(raw: str) -> str | None:
     """The incarnation a claim carries, or None where it carries none."""
-    try:
-        stamped = json.loads(raw).get(SESSION_META_GENERATION)
-    except ValueError:
+    claim = _record(raw)
+    if claim is None:
         return None
+    stamped = claim.get(SESSION_META_GENERATION)
     return str(stamped) if stamped is not None else None
 
 
@@ -166,11 +181,8 @@ def _claim_block(raw: str, session_id: str) -> str | None:
     session's however it is stamped. Everywhere else the stamp is all there is, and
     `_claimed_subnet` is the right question.
     """
-    try:
-        claim = json.loads(raw)
-    except ValueError:
-        return None
-    if claim.get("session_id") != session_id:
+    claim = _record(raw)
+    if claim is None or claim.get("session_id") != session_id:
         return None
     subnet = claim.get("subnet")
     return str(subnet) if subnet else None
@@ -187,11 +199,8 @@ def _claimed_subnet(raw: str, session_id: str, generation: str | None) -> str | 
     A claim carrying no generation at all is adopted by any: that is what a manager from before
     the field wrote, and nothing else will come back for it.
     """
-    try:
-        claim = json.loads(raw)
-    except ValueError:
-        return None
-    if claim.get("session_id") != session_id:
+    claim = _record(raw)
+    if claim is None or claim.get("session_id") != session_id:
         return None
     if not of_generation(raw, generation):
         return None
@@ -786,9 +795,9 @@ class SubnetAllocator:
         """
         found: dict[str, tuple[str, str | None, str]] = {}
         for key, raw in _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX)).items():
-            try:
-                claim = json.loads(raw)
-            except ValueError:
+            claim = _record(raw)
+            if claim is None:
+                log.warning("ignoring the unreadable pool claim at {}", unquote(key))
                 continue
             session_id = claim.get("session_id")
             if not session_id:
@@ -858,10 +867,10 @@ class SubnetAllocator:
             raw = await self._etcd.get(_allocated_key(unit))
             if not isinstance(raw, str):
                 return None
-            try:
-                owners.add(str(json.loads(raw)["session_id"]))
-            except (ValueError, KeyError):
+            claim = _record(raw)
+            if claim is None or "session_id" not in claim:
                 return None
+            owners.add(str(claim["session_id"]))
         return owners.pop() if len(owners) == 1 else None
 
     async def release(self, subnet: str, session_id: str, generation: str | None = None) -> bool:
@@ -1226,10 +1235,8 @@ class VNIAllocator:
         for key, raw in _flat(await self._etcd.get_prefix(_VNI_PREFIX)).items():
             if not key.isdigit():
                 continue
-            try:
-                if json.loads(raw).get("session_id") != session_id:
-                    continue
-            except ValueError:
+            claim = _record(raw)
+            if claim is None or claim.get("session_id") != session_id:
                 continue
             if not of_generation(raw, generation):
                 log.info(
@@ -1274,9 +1281,9 @@ class VNIAllocator:
         for key, raw in _flat(await self._etcd.get_prefix(_VNI_PREFIX)).items():
             if not key.isdigit():
                 continue
-            try:
-                claim = json.loads(raw)
-            except ValueError:
+            claim = _record(raw)
+            if claim is None:
+                log.warning("ignoring the unreadable vni claim at {}", key)
                 continue
             session_id = claim.get("session_id")
             if not session_id:
@@ -1299,10 +1306,8 @@ class VNIAllocator:
         raw = await self._etcd.get(f"{_VNI_PREFIX}/{vni}")
         if not isinstance(raw, str):
             return False
-        try:
-            if json.loads(raw).get("session_id") != session_id:
-                return False
-        except ValueError:
+        claim = _record(raw)
+        if claim is None or claim.get("session_id") != session_id:
             return False
         # No `of_generation` gate here, unlike everywhere the stamp is all there is. This is the
         # record-driven form: the caller passes the VNI its record NAMES and guards the rewrite on
@@ -1316,10 +1321,10 @@ class VNIAllocator:
         raw = await self._etcd.get(f"{_VNI_PREFIX}/{vni}")
         if not isinstance(raw, str):
             return None
-        try:
-            return str(json.loads(raw)["session_id"])
-        except (ValueError, KeyError):
+        claim = _record(raw)
+        if claim is None or "session_id" not in claim:
             return None
+        return str(claim["session_id"])
 
     async def release(self, vni: int, session_id: str, generation: str | None = None) -> bool:
         """Give the VNI back, but only while it is still this session's.
@@ -1338,10 +1343,8 @@ class VNIAllocator:
         raw = await self._etcd.get(f"{_VNI_PREFIX}/{vni}")
         if not isinstance(raw, str):
             return False
-        try:
-            if json.loads(raw).get("session_id") != session_id:
-                return False
-        except ValueError:
+        claim = _record(raw)
+        if claim is None or claim.get("session_id") != session_id:
             return False
         if not of_generation(raw, generation):
             return False

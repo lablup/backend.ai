@@ -46,9 +46,15 @@ class OrphanKernelCleanupObserver(AbstractObserver):
     this agent's uptime before it is reaped, which leaves a newly created kernel
     well clear of the manager's next sweep.
 
-    Nothing is reaped unless ``agent_last_check`` is FRESH. A manager that has
-    stopped checking this agent altogether says nothing about any one kernel,
-    and reaping on its silence would empty a healthy node.
+    Nothing is reaped unless the manager is LOOKING -- ``get_manager_sweep_epoch``
+    is fresh. A manager that has stopped says nothing about any one kernel, and
+    reaping on its silence would empty a healthy node.
+
+    That signal is cluster-wide on purpose. ``agent_last_check`` cannot carry it:
+    the manager stamps it only for agents that still have a kernel it knows
+    about, so an agent whose ONLY kernel is the orphan never sees it advance --
+    and a gate that waited for it to be fresh would deadlock against the very
+    debounce it guards, on exactly the node the reap exists for.
     """
 
     _agent: AbstractAgent[Any, Any]
@@ -83,15 +89,22 @@ class OrphanKernelCleanupObserver(AbstractObserver):
             self._unknown_since.clear()
             return
 
-        # 2. Only act while the manager is actually checking this agent. Its silence is about the
-        #    manager, not about any kernel, and reaping on it would empty a healthy node.
+        # 2. Only act while the manager is looking at kernels at all. Its silence is about the
+        #    manager, not about any kernel, and reaping on it would empty a healthy node. Read
+        #    cluster-wide, NOT from this agent's own last_check: the manager stamps that only for
+        #    agents that still have a kernel it knows about, so on the node this reap exists for
+        #    -- the one whose only kernel is the orphan -- it never advances again.
         #    Redis' clock on both sides of the comparison, not this host's.
+        sweep_epoch = await self._valkey_schedule_client.get_manager_sweep_epoch()
+        if sweep_epoch is None:
+            log.debug("Manager is not sweeping kernels, skipping orphan cleanup")
+            self._unknown_since.clear()
+            return
         now = await self._valkey_schedule_client.get_redis_time()
-        if now - agent_last_check > ORPHAN_KERNEL_THRESHOLD_SEC:
+        if now - sweep_epoch > ORPHAN_KERNEL_THRESHOLD_SEC:
             log.debug(
-                "Manager last checked agent {} {}s ago, skipping orphan cleanup",
-                self._agent.id,
-                now - agent_last_check,
+                "Manager last swept kernels {}s ago, skipping orphan cleanup",
+                now - sweep_epoch,
             )
             self._unknown_since.clear()
             return

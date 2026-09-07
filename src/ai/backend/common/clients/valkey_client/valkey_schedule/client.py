@@ -39,6 +39,10 @@ KERNEL_HEALTH_TTL_SEC = 300  # 5 minutes - TTL for kernel health status
 MAX_KERNEL_HEALTH_STALENESS_SEC = 120  # 2 minutes - threshold for kernel health staleness
 AGENT_LAST_CHECK_TTL_SEC = 1200  # 20 minutes - TTL for agent last check timestamp
 ORPHAN_KERNEL_THRESHOLD_SEC = 600  # 10 minutes - threshold for orphan kernel detection
+#: How long the manager's "I am looking at kernels" mark stands without being refreshed. Longer
+#: than the orphan threshold, so a manager that is merely slow does not read as gone; bounded, so
+#: one that has stopped does.
+MANAGER_SWEEP_TTL_SEC = ORPHAN_KERNEL_THRESHOLD_SEC * 3
 FORCE_TERMINATED_CLEANUP_TTL_SEC = 1200  # 20 minutes - TTL for force-terminated cleanup queue
 ROUTE_PROBE_TTL_SEC = 3600  # 1 hour - TTL for route probe targets
 ROUTE_HEALTH_STATUS_TTL_SEC = 120  # 2 minutes - TTL for route health status (expiry = DEGRADED)
@@ -192,6 +196,17 @@ class ValkeyScheduleClient:
 
     def _get_route_health_status_key(self, replica_id: ReplicaID) -> str:
         return f"route_health:{replica_id}"
+
+    def _get_manager_sweep_key(self) -> str:
+        """Key holding when the manager's kernel bookkeeping last ran.
+
+        Cluster-wide, and deliberately not per agent. It answers one question for an agent that is
+        deciding whether a kernel of its own is an orphan: is the manager LOOKING? The per-agent
+        `agent:last_check` cannot answer it -- the manager only stamps that for agents that have a
+        kernel it still knows about, so an agent whose only kernel is the orphan never sees it
+        advance, and an agent-side rule that waited for it to be fresh would wait forever.
+        """
+        return "manager:kernel_sweep_epoch"
 
     def _get_agent_last_check_key(self, agent_id: AgentId) -> str:
         """
@@ -999,6 +1014,30 @@ class ValkeyScheduleClient:
         return result
 
     # ==================== Agent Last Check Methods ====================
+
+    @valkey_schedule_resilience.apply()
+    async def mark_manager_sweep(self) -> None:
+        """Record that the manager's kernel bookkeeping just ran. See `_get_manager_sweep_key`.
+
+        Expires, so a manager that has stopped leaves no stale claim to be looking. An agent that
+        reads nothing here treats it as "not looking" and touches nothing.
+        """
+        current_time = await self._get_redis_time()
+        async with self._client.client() as conn:
+            await conn.set(
+                self._get_manager_sweep_key(),
+                str(current_time),
+                expiry=ExpirySet(ExpiryType.SEC, MANAGER_SWEEP_TTL_SEC),
+            )
+
+    @valkey_schedule_resilience.apply()
+    async def get_manager_sweep_epoch(self) -> int | None:
+        """When the manager's kernel bookkeeping last ran, or None if it has not lately."""
+        async with self._client.client() as conn:
+            result = await conn.get(self._get_manager_sweep_key())
+        if result is None:
+            return None
+        return int(result)
 
     @valkey_schedule_resilience.apply()
     async def get_agent_last_check(self, agent_id: AgentId) -> int | None:

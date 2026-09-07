@@ -98,9 +98,10 @@ class TestOrphanKernelCleanupObserver:
         client = AsyncMock()
         client.get_agent_last_check = AsyncMock(return_value=None)
         client.get_kernel_presence_batch = AsyncMock(return_value={})
-        # Redis' clock, which the freshness check reads. The tests place agent_last_check at
-        # 1000, so "now" is 1000: the manager is checking this agent right now.
+        # Redis' clock, and the manager's cluster-wide "I am looking at kernels" mark that the
+        # gate actually reads. Both at 1000, so the manager is sweeping right now.
         client.get_redis_time = AsyncMock(return_value=1000)
+        client.get_manager_sweep_epoch = AsyncMock(return_value=1000)
         return client
 
     @pytest.fixture
@@ -495,7 +496,11 @@ class TestOrphanKernelCleanupObserver:
         await observer.observe()
         mock_agent.inject_container_lifecycle_event.assert_not_called()
 
+        # Both clocks, not just the debounce: a test that advanced only the monotonic one could
+        # not see a liveness gate that goes stale while the debounce runs.
         clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC)
+        mock_valkey_client.get_redis_time.return_value = 1000 + ORPHAN_KERNEL_THRESHOLD_SEC
+        mock_valkey_client.get_manager_sweep_epoch.return_value = 1000 + ORPHAN_KERNEL_THRESHOLD_SEC
         await observer.observe()
 
         mock_agent.inject_container_lifecycle_event.assert_called_once_with(
@@ -564,6 +569,77 @@ class TestOrphanKernelCleanupObserver:
         await observer.observe()
 
         mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    async def test_nothing_is_reaped_when_the_manager_is_not_sweeping_at_all(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # The mark expires, so a manager that has stopped leaves nothing standing.
+        clock = _Clock()
+        monkeypatch.setattr(_MONOTONIC, clock)
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        mock_valkey_client.get_manager_sweep_epoch.return_value = None
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {kernel_id: None}
+
+        await observer.observe()
+        clock.advance(ORPHAN_KERNEL_THRESHOLD_SEC * 10)
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+    async def test_the_orphan_is_reaped_when_it_is_the_only_kernel_on_the_node(
+        self,
+        observer: OrphanKernelCleanupObserver,
+        mock_agent: AsyncMock,
+        mock_valkey_client: AsyncMock,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The case the reap exists for, and the one a per-agent liveness gate deadlocks on.
+
+        The manager stamps agent_last_check only for agents that still have a kernel it knows
+        about. When the orphan is this node's ONLY kernel there is no such kernel, so that
+        timestamp is frozen at whatever it was before the session was terminated -- and it goes
+        on ageing while the debounce runs. A gate that asked it to be fresh would clear the
+        debounce every pass and never reap the one node that needs it.
+        """
+        clock = _Clock()
+        monkeypatch.setattr(_MONOTONIC, clock)
+        # Frozen: the manager has had nothing on this agent to check since the outage.
+        mock_valkey_client.get_agent_last_check.return_value = 1000
+        type(mock_agent).kernel_registry = PropertyMock(
+            return_value={kernel_id: MockKernel(session_id=session_id)}
+        )
+        mock_valkey_client.get_kernel_presence_batch.return_value = {kernel_id: None}
+
+        await observer.observe()
+        mock_agent.inject_container_lifecycle_event.assert_not_called()
+
+        # Wall-clock and the debounce move together, and past the threshold: that is the point.
+        # agent_last_check is now stale by more than the window, while the manager is still
+        # sweeping -- it just has nothing on THIS agent to sweep.
+        elapsed = ORPHAN_KERNEL_THRESHOLD_SEC + 1
+        clock.advance(elapsed)
+        mock_valkey_client.get_redis_time.return_value = 1000 + elapsed
+        mock_valkey_client.get_manager_sweep_epoch.return_value = 1000 + elapsed
+        await observer.observe()
+
+        mock_agent.inject_container_lifecycle_event.assert_called_once_with(
+            kernel_id,
+            session_id,
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+            suppress_events=True,
+        )
 
     async def test_the_debounce_restarts_after_the_manager_goes_quiet(
         self,

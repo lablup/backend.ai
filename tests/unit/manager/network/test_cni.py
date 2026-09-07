@@ -2918,6 +2918,86 @@ class TestAReconciliationPassThatCouldNotRun:
         assert _owed(plugin) is False
 
 
+class TestWhoSweepsAndWhen:
+    """C30. The sweep was conditional on traffic: it ran at startup and was retried only when a
+    session id came round. On a cluster where nobody is starting sessions, that retry never
+    arrives. And on a rolling restart every manager swept at once."""
+
+    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+
+    async def test_the_first_manager_takes_the_turn_and_the_rest_skip(self) -> None:
+        etcd = FakeEtcd()
+        first = _plugin_with(etcd)
+        second = _plugin_with(etcd)
+
+        assert await first._claim_reconcile_turn() is True
+        assert await second._claim_reconcile_turn() is False, (
+            "every manager in an HA set swept the whole pool at the same moment"
+        )
+
+    async def test_the_turn_comes_round_again_once_the_interval_has_passed(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        assert await plugin._claim_reconcile_turn() is True
+        etcd.store[cni._RECONCILE_TICKET] = json.dumps({
+            "at": time.time() - cni._RECONCILE_INTERVAL_SEC - 1,
+            "by": "someone",
+        })
+
+        assert await plugin._claim_reconcile_turn() is True
+
+    async def test_an_unreadable_ticket_does_not_stop_the_sweep(self) -> None:
+        # Fails open: a pass too many costs a pool read, a pass too few is a claim nobody
+        # reclaims.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        etcd.store[cni._RECONCILE_TICKET] = "null"
+
+        assert await plugin._claim_reconcile_turn() is True
+
+
+class TestOneUnreadableKeyDoesNotStopTheSweep:
+    """C31. Every value under these prefixes is written here as a JSON object, and the code read
+    them back as one without checking. Syntactically valid JSON that is not an object raises
+    AttributeError, not ValueError -- so one hand-edited or half-written key aborted the whole
+    reconciliation pass, for good."""
+
+    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+
+    async def test_a_pool_claim_that_is_not_an_object_is_stepped_over(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        etcd.store[_allocated_key("10.128.90.0/24")] = "null"
+        etcd.store[_allocated_key("10.128.91.0/24")] = "[]"
+        etcd.store["network/ipam/vni/7777"] = "12345"
+        # And a real orphan behind them, which the sweep must still reach.
+        stray = "10.128.92.0/24"
+        etcd.store[_allocated_key(stray)] = _claim("s-gone", stray, "g-gone")
+
+        await plugin.reconcile_pool()
+
+        assert _allocated_key(stray) not in etcd.store, "one bad key stopped the whole sweep"
+
+    async def test_a_session_record_that_is_not_an_object_does_not_wedge_the_id(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        etcd.store[session_meta_key("s1")] = "[]"
+
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        assert info.options["subnet"]
+
+    async def test_a_destroy_removes_a_record_it_cannot_read(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        etcd.store[session_meta_key("s1")] = "null"
+
+        await plugin.destroy_network("s1")
+
+        assert session_meta_key("s1") not in etcd.store
+
+
 class TestADestroyThatFindsNoRecordAtAll:
     """C7b. "No record" is what the destroy READ, not something it holds. A create claims the id
     with a compare-and-swap on that same key, so between the read and any delete it can publish a
