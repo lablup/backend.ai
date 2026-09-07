@@ -380,3 +380,26 @@ its own Manager-Agent lifecycle PR before this branch is proposed.
 
 R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
 real nodes.
+
+Sixteenth round. The P1 is mine from the round before, and it is the fail-open direction of the
+fix I made then.
+
+| # | Was | Now |
+|---|-----|-----|
+| C34 | last round I made an unreadable allocation field read as ABSENT, on the reasoning that absent is a state every caller handles and never causes a delete. Wrong: `_names_an_allocation` asks whether the KEY is there, so `{"generation": "g1", "vni": []}` enters the identity branch, identity then reads no VNI out of it, and the sweep gives a LIVE VXLAN's VNI back to the pool under an exact-record guard -- for the next session to be handed. Not a leak: two tenants at the same addresses | three states, not two. Missing, valid, and present-but-unreadable, and the third is judged by nobody: everything under that session is preserved, counted through `backendai_network_pool_invalid_record_count`, and the offending field named in the log. The same rule at the release site, where an orphan sweep now refuses to give anything back for a session whose live record cannot be read |
+| — | the new tests checked only that a stray claim was still reclaimed, so they could not see the corrupted session losing its own subnet and VNI | the test asserts what the corrupted session keeps |
+| C33 | `_stamp_reconcile_done` re-dated the ticket with an unconditional put, so a manager whose sweep outlasted the interval stamped over the turn another had since taken -- and the two traded it back and forth, both scanning | every rewrite is a compare-and-swap over the bytes this manager itself put there. Losing it means the turn is somebody else's, and this manager stops refreshing. The startup pass re-dates too, which it did not |
+
+Still not done, and the reason is the same each time. `AsyncEtcd.get_prefix` has no pagination: it
+loads the whole result. `_reclaim_session_keys` reads the session subtree, then each session's
+meta, then three prefixes per session in turn. Once per cluster per interval fixed the etcd load,
+not the memory or the round trips. Fixing it properly means adding paginated reads to `AsyncEtcd`
+itself, which every caller of `get_prefix` in the codebase would then be subject to -- a change
+that does not belong inside a network patch.
+
+The reconcile turn is still a timestamp, not a lease. The ownership CAS above stops the two
+managers fighting over it; it does not stop a second sweep starting while a very long first one
+runs. A lease needs an etcd client that exposes one.
+
+R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
+real nodes.
