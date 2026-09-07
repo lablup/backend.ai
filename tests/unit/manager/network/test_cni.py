@@ -22,6 +22,7 @@ from ai.backend.common.network.types import (
     mac_for_ip,
 )
 from ai.backend.manager.errors.network import (
+    EndpointSuperseded,
     ForcedBackendUnsupported,
     NetworkBackendMismatch,
     NetworkPoolExhausted,
@@ -1578,18 +1579,20 @@ class TestAnAllocationReusedWhileItIsBeingDestroyed:
     }
 
     class _DestroysDuringTheAssign(FakeEtcd):
-        """Tears the session down at the first endpoint write -- after the pool has been asked."""
+        """Tears the session down inside the endpoint assignment -- after the pool has been asked
+        whether the allocation is still this session's, and before the caller is handed it."""
 
         def __init__(self) -> None:
             super().__init__()
-            self.at_endpoint_write: Any = None
+            self.at_assign: Any = None
 
         @override
-        async def put(self, key: str, val: str, **kwargs: Any) -> None:
-            await super().put(key, val, **kwargs)
-            if key.startswith("network/session/s1/endpoints/") and self.at_endpoint_write:
-                hook, self.at_endpoint_write = self.at_endpoint_write, None
+        async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
+            found = await super().get_prefix(prefix, **kwargs)
+            if prefix.rstrip("/").endswith("/ipam") and self.at_assign is not None:
+                hook, self.at_assign = self.at_assign, None
                 await hook()
+            return found
 
     async def test_it_does_not_hand_back_an_allocation_that_went_back_to_the_pool(self) -> None:
         etcd = self._DestroysDuringTheAssign()
@@ -1599,7 +1602,7 @@ class TestAnAllocationReusedWhileItIsBeingDestroyed:
         async def destroy() -> None:
             await plugin.destroy_network("s1")
 
-        etcd.at_endpoint_write = destroy
+        etcd.at_assign = destroy
 
         assert (
             await plugin._existing_allocation(
@@ -1655,6 +1658,91 @@ class TestANodeThatJoinsAsTheRecordIsFenced:
 
         assert await plugin._vni_allocator.holder(int(cast(int, info.options["vni"]))) == "s1"
         assert await plugin._subnet_allocator.holder(str(info.options["subnet"])) == "s1"
+
+
+class TestACreateThatWokeUpInAnotherSession:
+    """C14. A create stalled past the handover holds the old subnet, the old VNI and the old
+    generation. If its session was torn down and built again while it slept, everything it goes on
+    to write lands in the LIVE session's table -- and its own rollback, finding the record is not
+    its, used to clean up nothing at all."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    async def _stalled_create(self) -> tuple[FakeEtcd, CNINetworkPlugin, str, str]:
+        """A rebuilt session, plus the record bytes a create of the previous one still holds."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        first = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        held = etcd.store[_META_KEY]
+        await plugin.destroy_network("s1")
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        return etcd, plugin, held, str(first.options["subnet"])
+
+    async def test_its_endpoint_write_is_refused(self) -> None:
+        etcd, plugin, held, stale_subnet = await self._stalled_create()
+        live = json.loads(etcd.store["network/session/s1/endpoints/k1"])
+
+        with pytest.raises(EndpointSuperseded):
+            await plugin._endpoint_allocator.assign(
+                "s1",
+                "k1",
+                stale_subnet,
+                agent_id="a1",
+                generation=json.loads(held)["generation"],
+            )
+
+        assert json.loads(etcd.store["network/session/s1/endpoints/k1"]) == live, (
+            "the live session's peers were pointed at an address nothing holds"
+        )
+
+    async def test_its_rollback_gives_back_what_it_still_holds(self) -> None:
+        etcd, plugin, held, _stale_subnet = await self._stalled_create()
+        stale_generation = json.loads(held)["generation"]
+        # What that create claimed before it stalled, still stamped with its own incarnation.
+        etcd.store["network/ipam/vni/9999"] = json.dumps({
+            "session_id": "s1",
+            "generation": stale_generation,
+        })
+        etcd.store["network/session/s1/ipam/10.99.99.1"] = json.dumps({
+            "container_id": "k1",
+            "generation": stale_generation,
+        })
+        live_meta = etcd.store[_META_KEY]
+
+        await plugin._rollback_create("s1", None, None, held)
+
+        assert "network/ipam/vni/9999" not in etcd.store
+        assert "network/session/s1/ipam/10.99.99.1" not in etcd.store
+        assert etcd.store[_META_KEY] == live_meta, "it wrote over the live session's record"
+
+    async def test_it_leaves_the_live_incarnation_alone(self) -> None:
+        etcd, plugin, held, _stale_subnet = await self._stalled_create()
+        live = json.loads(etcd.store[_META_KEY])
+
+        await plugin._rollback_create("s1", None, None, held)
+
+        assert await plugin._subnet_allocator.holder(str(live["subnet"])) == "s1"
+        assert await plugin._vni_allocator.holder(int(live["vni"])) == "s1"
+        assert "network/session/s1/endpoints/k1" in etcd.store
+
+    async def test_a_takeover_is_not_a_rollback(self) -> None:
+        # The same record bytes, but the session was TAKEN OVER rather than rebuilt: the new owner
+        # inherited this very incarnation, and everything claimed for it is still the session's.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        held = etcd.store[_META_KEY]
+        taken = json.loads(held)
+        taken["_owner"] = "another-manager"
+        etcd.store[_META_KEY] = json.dumps(taken)
+
+        await plugin._rollback_create("s1", str(info.options["subnet"]), None, held)
+
+        assert await plugin._subnet_allocator.holder(str(info.options["subnet"])) == "s1"
+        assert "network/session/s1/endpoints/k1" in etcd.store
 
 
 class TestADestroyThatFindsNoRecordAtAll:

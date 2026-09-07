@@ -54,6 +54,12 @@ _WATCH_RETRY_BACKOFF_MAX = 30.0
 # the watch alone. Two etcd reads per session per tick; device ops only on an actual difference.
 _RECONCILE_INTERVAL = 15.0
 
+# How many times a join re-reads a member record that changed under its compare-and-swap before it
+# gives up. More than one because this node's own earlier record is replaced here and a co-located
+# retry writes the same bytes; bounded because a key that will not settle is a refused join, not a
+# loop to spin in.
+_MEMBER_PUBLISH_ATTEMPTS = 3
+
 
 def _decode_member(agent_id: str, raw: str) -> Member:
     return Member.from_etcd_payload(agent_id, json.loads(raw))
@@ -183,7 +189,7 @@ class SessionNetworkCoordinator:
             # cleanup of an earlier one cannot take it back and a later one is not mistaken for it.
             generation=meta.generation,
         )
-        await self._write_member(meta.session_id, published)
+        await self._publish_member(meta.session_id, published)
         if fence is not None:
             await self._require_session_current(meta.session_id, fence, published)
         self._joined[meta.session_id] = meta.generation
@@ -275,7 +281,16 @@ class SessionNetworkCoordinator:
                 session_id,
             )
             return
-        await self._etcd.delete(key)
+        # Over the exact bytes just read, not the key. Between the read and an unconditional
+        # delete a later join can publish its own membership, and deleting THAT tells the manager
+        # a node which is in the session is not -- the same hole the check above exists to close,
+        # reopened by the delete that follows it.
+        if not await self._etcd.delete_if_value(key, raw):
+            log.info(
+                "not taking back this node's membership of session {}: it changed while this"
+                " teardown was reading it",
+                session_id,
+            )
 
     async def _reconcile_all(self, session_id: str) -> None:
         """Converge forwarding in fail-closed order under one per-session lock.
@@ -464,11 +479,20 @@ class SessionNetworkCoordinator:
         })
 
     async def _read_endpoints(self, session_id: str) -> dict[str, EndpointAddr]:
+        """The session's endpoint table, as far as it belongs to the incarnation this node joined.
+
+        A record of another incarnation is data about a session this node is not in. Programmed,
+        it points this node's FDB and ARP at an address the live session's kernels do not hold --
+        which is silent: the frames leave and nothing answers.
+        """
         raw = await self._etcd.get_prefix(endpoints_prefix(session_id))
         endpoints: dict[str, EndpointAddr] = {}
         for container_id, value in dict(raw).items():
-            if isinstance(value, str):
-                endpoints[str(container_id)] = _decode_endpoint(str(container_id), value)
+            if not isinstance(value, str):
+                continue
+            if not self._is_ours(session_id, value, f"endpoint {container_id}"):
+                continue
+            endpoints[str(container_id)] = _decode_endpoint(str(container_id), value)
         return endpoints
 
     async def _session_fence(self, meta: SessionNetMeta) -> str | None:
@@ -542,18 +566,73 @@ class SessionNetworkCoordinator:
             " manager owns what happens to the session now"
         )
 
-    async def _write_member(self, session_id: str, member: Member) -> None:
-        await self._etcd.put(
-            member_key(session_id, member.agent_id), json.dumps(member.to_etcd_payload())
+    async def _publish_member(self, session_id: str, member: Member) -> None:
+        """Put this node into the session's membership, over nothing but its own incarnation.
+
+        An unconditional write is what let an agent instance still running for an earlier
+        incarnation clobber the membership a later one had published -- and then, on finding the
+        record moved on, delete exactly those bytes again (`_require_session_current`), leaving the
+        live data plane with no membership at all and the manager free to hand its VNI away.
+
+        There is no lock between reading the key and writing it, so the read is not the fence: the
+        write is. A record of another incarnation is refused, and one of ours is replaced by
+        compare-and-swap, which a concurrent newer write loses rather than slips through.
+
+        Raises:
+            SessionNetworkGone: the key belongs to another incarnation of the session.
+        """
+        payload = json.dumps(member.to_etcd_payload())
+        key = member_key(session_id, member.agent_id)
+        for _ in range(_MEMBER_PUBLISH_ATTEMPTS):
+            if await self._etcd.put_if_absent(key, payload):
+                return
+            standing = await self._etcd.get(key)
+            if standing is None:
+                continue  # withdrawn under us; claim it again
+            if standing == payload:
+                return
+            if not of_generation(standing, member.generation):
+                raise SessionNetworkGone(
+                    f"this node's membership of session {session_id} is published for a later"
+                    " incarnation than the one this request was issued for; not joining under a"
+                    " descriptor the manager has moved on from"
+                )
+            if await self._etcd.replace(key, standing, payload):
+                return
+        raise SessionNetworkGone(
+            f"this node's membership of session {session_id} kept changing under this join"
+            f" ({_MEMBER_PUBLISH_ATTEMPTS} attempts); refusing rather than writing over whatever"
+            " is there now"
         )
 
     async def _read_members(self, session_id: str) -> dict[str, Member]:
+        """The session's membership, as far as it belongs to the incarnation this node joined.
+
+        Same reasoning as `_read_endpoints`: a member of another incarnation is a node that is not
+        this session's peer, and programming its VTEP builds a tunnel to somebody else's overlay.
+        """
         raw = await self._etcd.get_prefix(members_prefix(session_id))
         members: dict[str, Member] = {}
         for agent_id, value in dict(raw).items():
-            if isinstance(value, str):
-                members[str(agent_id)] = _decode_member(str(agent_id), value)
+            if not isinstance(value, str):
+                continue
+            if not self._is_ours(session_id, value, f"member {agent_id}"):
+                continue
+            members[str(agent_id)] = _decode_member(str(agent_id), value)
         return members
+
+    def _is_ours(self, session_id: str, payload: str, what: str) -> bool:
+        """Whether a record under this session belongs to the incarnation this node joined.
+
+        Everything is ours where this node joined no incarnation at all -- a node-local BRIDGE
+        session, or a manager from before the field. There is nothing to tell apart there, and
+        filtering on a generation nobody publishes would empty the table.
+        """
+        joined = self._joined.get(session_id)
+        if joined is None or of_generation(payload, joined):
+            return True
+        log.debug("ignoring {} of session {}: it belongs to another incarnation", what, session_id)
+        return False
 
     async def _watch(self, session_id: str) -> None:
         # Watch the whole session subtree so both membership (peers/VTEPs) and endpoint

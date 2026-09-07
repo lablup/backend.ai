@@ -640,15 +640,32 @@ class SessionNetwork:
         )
 
     async def _forget_session_meta_if_local(self, session_id: str) -> None:
-        """Delete the meta only if it is a single-node one this agent owns.
+        """Delete the meta only if it is a single-node one this agent owns, and only if it is
+        still the one that was read.
 
         Read-check-delete rather than unconditional delete: the manager reads a multi-node
         session's meta during its own destroy (`destroy_network`), so removing that one here would
         break it. A single-node meta is the agent's own and must be cleaned up.
+
+        The delete names the bytes the check was made on. A session id is reused, and between the
+        read and an unconditional delete the manager can publish a multi-node record under it --
+        which this would then remove, taking the subnet and VNI of a live session with nothing left
+        to name them.
         """
-        meta = await self._read_session_meta(session_id)
-        if meta is not None and meta.backend is NetworkBackendKind.BRIDGE:
-            await self._etcd.delete(session_meta_key(session_id))
+        raw = await self._etcd.get(session_meta_key(session_id))
+        if not raw:
+            return
+        record = json.loads(raw)
+        if record.get(SESSION_META_STATE, SESSION_META_READY) != SESSION_META_READY:
+            return
+        if record.get("backend") != str(NetworkBackendKind.BRIDGE):
+            return
+        if not await self._etcd.delete_if_value(session_meta_key(session_id), raw):
+            log.info(
+                "not forgetting session {}'s network record: it changed while this teardown was"
+                " reading it",
+                session_id,
+            )
 
     async def _read_overlay_ip(self, session_id: str, container_id: str) -> str | None:
         raw = await self._etcd.get(endpoint_key(session_id, container_id))
