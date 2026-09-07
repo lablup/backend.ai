@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -17,6 +18,7 @@ from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
+from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.models.agent import AgentRow
@@ -55,18 +57,18 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
-from ai.backend.manager.repositories.project.db_source import ProjectDBSource
+from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestRoleAssignment:
     """Tests for PermissionDBSource.revoke_role project remaining count
-    and ProjectDBSource.bind/unbind_user_to_project."""
+    and the project roster ops."""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -292,8 +294,8 @@ class TestRoleAssignment:
         return PermissionDBSource(db=db_with_cleanup)
 
     @pytest.fixture
-    def group_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ProjectDBSource:
-        return ProjectDBSource(db=db_with_cleanup, v2_ops_provider=V2DBOpsProvider(db_with_cleanup))
+    def roster_repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> RbacRosterRepository:
+        return RbacRosterRepository(RosterOpsProvider(db_with_cleanup))
 
     # --- revoke_role remaining count ---
 
@@ -354,19 +356,40 @@ class TestRoleAssignment:
         )
         assert result.project_remaining_roles == []
 
-    # --- ProjectDBSource.bind/unbind_user_to_project ---
+    # --- the project roster ---
 
-    async def test_bind_user_to_project_creates_associations(
+    async def test_enroll_member_puts_the_user_on_the_project_list(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: ProjectDBSource,
+        roster_repository: RbacRosterRepository,
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
-        """bind_user_to_project creates the ASE row (PROJECT/USER)."""
-        await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
+        """Enrolling writes the roster edge and no legacy scope association."""
+        await roster_repository.join_member(ProjectID(test_project), UserID(user_1))
 
         async with db_with_cleanup.begin_readonly_session() as session:
+            edges = (
+                await session.scalars(
+                    sa.select(EntityMembershipRow.id).where(
+                        EntityMembershipRow.virtual_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                            VirtualEntityRow.entity_id == test_project,
+                        )
+                        .scalar_subquery(),
+                        EntityMembershipRow.member_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == ScopeType.USER.value,
+                            VirtualEntityRow.entity_id == user_1,
+                        )
+                        .scalar_subquery(),
+                    )
+                )
+            ).all()
+            assert len(edges) == 1
             assoc = await session.execute(
                 sa.select(AssociationScopesEntitiesRow.entity_id).where(
                     AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
@@ -375,19 +398,19 @@ class TestRoleAssignment:
                     AssociationScopesEntitiesRow.entity_id == str(user_1),
                 )
             )
-            assert len(assoc.fetchall()) == 1
+            assert assoc.fetchall() == []
 
-    async def test_bind_user_to_project_does_not_bind_project_into_user_scope(
+    async def test_enroll_member_does_not_bind_project_into_user_scope(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: ProjectDBSource,
+        roster_repository: RbacRosterRepository,
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
         """Joining a project leaves the user's own virtual entity unbound: the user is a
         ordinary member of the project, not an inheriting one, so project permissions never
         reach the entities the user owns."""
-        await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
+        await roster_repository.join_member(ProjectID(test_project), UserID(user_1))
 
         async with db_with_cleanup.begin_readonly_session() as session:
             user_vs_id = await session.scalar(
@@ -422,45 +445,168 @@ class TestRoleAssignment:
         assert list(bindings_into_user_scope) == []
         assert list(memberships_in_project_scope) == [user_vs_id]
 
-    async def test_bind_user_to_project_skips_if_already_bound(
+    async def test_enroll_member_is_idempotent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: ProjectDBSource,
+        roster_repository: RbacRosterRepository,
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
-        """Calling bind twice does not create duplicate rows."""
-        await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
-        await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
+        """Enrolling twice leaves one roster edge."""
+        await roster_repository.join_member(ProjectID(test_project), UserID(user_1))
+        await roster_repository.join_member(ProjectID(test_project), UserID(user_1))
 
         async with db_with_cleanup.begin_readonly_session() as session:
-            assoc = await session.execute(
-                sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(test_project),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(user_1),
+            edges = (
+                await session.scalars(
+                    sa.select(EntityMembershipRow.id).where(
+                        EntityMembershipRow.virtual_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                            VirtualEntityRow.entity_id == test_project,
+                        )
+                        .scalar_subquery(),
+                        EntityMembershipRow.member_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == ScopeType.USER.value,
+                            VirtualEntityRow.entity_id == user_1,
+                        )
+                        .scalar_subquery(),
+                    )
                 )
-            )
-            assert len(assoc.fetchall()) == 1
+            ).all()
+            assert len(edges) == 1
 
-    async def test_unbind_user_from_project_removes_associations(
+    async def test_withdraw_member_removes_the_roster_edge(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: ProjectDBSource,
+        roster_repository: RbacRosterRepository,
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
-        """unbind_user_from_project removes the ASE row."""
-        await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
-        await group_db_source.unbind_user_from_project(UserID(user_1), ProjectID(test_project))
+        """Withdrawing takes the roster edge away."""
+        await roster_repository.join_member(ProjectID(test_project), UserID(user_1))
+        await roster_repository.leave_member(ProjectID(test_project), UserID(user_1))
 
         async with db_with_cleanup.begin_readonly_session() as session:
-            assoc = await session.execute(
-                sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(test_project),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+            edges = (
+                await session.scalars(
+                    sa.select(EntityMembershipRow.id).where(
+                        EntityMembershipRow.virtual_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                            VirtualEntityRow.entity_id == test_project,
+                        )
+                        .scalar_subquery(),
+                        EntityMembershipRow.member_entity_id
+                        == sa.select(VirtualEntityRow.id)
+                        .where(
+                            VirtualEntityRow.entity_type == ScopeType.USER.value,
+                            VirtualEntityRow.entity_id == user_1,
+                        )
+                        .scalar_subquery(),
+                    )
+                )
+            ).all()
+            assert edges == []
+
+    # --- the roles a join grants ---
+
+    @pytest.fixture
+    def project_id(self, test_project: uuid.UUID) -> ProjectID:
+        return ProjectID(test_project)
+
+    async def _enrol_role_in_project(
+        self,
+        db: ExtendedAsyncSAEngine,
+        project_id: uuid.UUID,
+        *,
+        auto_assign: bool = True,
+        status: RoleStatus = RoleStatus.ACTIVE,
+    ) -> uuid.UUID:
+        """Create a role and enrol its node under the project's, as a scope's roles are."""
+        role_id = uuid.uuid4()
+        async with db.begin_session() as session:
+            session.add(
+                RoleRow(
+                    id=role_id,
+                    name=f"auto-role-{role_id.hex[:8]}",
+                    auto_assign=auto_assign,
+                    status=status,
                 )
             )
-            assert len(assoc.fetchall()) == 0
+            await session.flush()
+            role_node = VirtualEntityRow(entity_type=ROLE_ENTITY_TYPE, entity_id=role_id)
+            session.add(role_node)
+            await session.flush()
+            project_node_id = await session.scalar(
+                sa.select(VirtualEntityRow.id).where(
+                    VirtualEntityRow.entity_type == ScopeType.PROJECT.value,
+                    VirtualEntityRow.entity_id == project_id,
+                )
+            )
+            session.add(
+                EntityMembershipRow(
+                    virtual_entity_id=project_node_id,
+                    member_entity_id=role_node.id,
+                )
+            )
+            await session.commit()
+        return role_id
+
+    async def _role_ids_of(self, db: ExtendedAsyncSAEngine, user_id: uuid.UUID) -> list[uuid.UUID]:
+        async with db.begin_readonly_session() as session:
+            return list(
+                await session.scalars(
+                    sa.select(UserRoleRow.role_id).where(UserRoleRow.user_id == user_id)
+                )
+            )
+
+    async def test_join_member_grants_the_projects_auto_assign_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        project_id: ProjectID,
+        user_1: uuid.UUID,
+    ) -> None:
+        """Joining grants every active auto_assign role the project holds."""
+        role_id = await self._enrol_role_in_project(db_with_cleanup, project_id)
+
+        await roster_repository.join_member(project_id, UserID(user_1))
+
+        assert await self._role_ids_of(db_with_cleanup, user_1) == [role_id]
+
+    async def test_joining_twice_grants_the_role_once(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        project_id: ProjectID,
+        user_1: uuid.UUID,
+    ) -> None:
+        """A pair already granted is left as it stands, so a repeated join adds nothing."""
+        role_id = await self._enrol_role_in_project(db_with_cleanup, project_id)
+
+        await roster_repository.join_member(project_id, UserID(user_1))
+        await roster_repository.join_member(project_id, UserID(user_1))
+
+        assert await self._role_ids_of(db_with_cleanup, user_1) == [role_id]
+
+    async def test_join_member_skips_the_roles_it_must_not_grant(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        project_id: ProjectID,
+        user_1: uuid.UUID,
+    ) -> None:
+        """A role that is not auto_assign, is inactive, or belongs to another project is
+        left alone."""
+        granted = await self._enrol_role_in_project(db_with_cleanup, project_id)
+        await self._enrol_role_in_project(db_with_cleanup, project_id, auto_assign=False)
+        await self._enrol_role_in_project(db_with_cleanup, project_id, status=RoleStatus.INACTIVE)
+
+        await roster_repository.join_member(project_id, UserID(user_1))
+
+        assert await self._role_ids_of(db_with_cleanup, user_1) == [granted]

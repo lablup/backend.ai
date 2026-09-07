@@ -12,10 +12,6 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.manager.services.project.actions.assign_users_to_project import (
-    AssignUsersToProjectAction,
-    AssignUsersToProjectActionResult,
-)
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.create_project_dotfile import (
     CreateProjectDotfileAction,
@@ -38,10 +34,6 @@ from ai.backend.manager.services.project.actions.scoped_search import (
 from ai.backend.manager.services.project.actions.search_projects import (
     GetProjectAction,
     GlobalSearchProjectsAction,
-)
-from ai.backend.manager.services.project.actions.unassign_users import (
-    UnassignUsersFromProjectAction,
-    UnassignUsersFromProjectActionResult,
 )
 from ai.backend.manager.services.project.actions.update_project import (
     UpdateProjectAction,
@@ -76,12 +68,6 @@ class ProjectProcessors:
     purge_project: SingleEntityActionProcessor[PurgeProjectAction, PurgeProjectActionResult]
     usage_per_month: GlobalActionProcessor[UsagePerMonthAction, UsagePerMonthActionResult]
     usage_per_period: GlobalActionProcessor[UsagePerPeriodAction, UsagePerPeriodActionResult]
-    assign_users_to_project: SingleEntityActionProcessor[
-        AssignUsersToProjectAction, AssignUsersToProjectActionResult
-    ]
-    unassign_users_from_project: SingleEntityActionProcessor[
-        UnassignUsersFromProjectAction, UnassignUsersFromProjectActionResult
-    ]
     create_dotfile: SingleEntityActionProcessor[
         CreateProjectDotfileAction, CreateProjectDotfileActionResult
     ]
@@ -111,12 +97,6 @@ class ProjectProcessors:
         )
         self.usage_per_period = group.global_scope(
             UsagePerPeriodAction, group_service.usage_per_period
-        )
-        self.assign_users_to_project = group.single_entity(
-            AssignUsersToProjectAction, group_service.assign_users_to_project
-        )
-        self.unassign_users_from_project = group.single_entity(
-            UnassignUsersFromProjectAction, group_service.unassign_users_from_project
         )
         self.create_dotfile = group.single_entity(
             CreateProjectDotfileAction, group_service.create_dotfile

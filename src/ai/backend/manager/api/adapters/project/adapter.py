@@ -8,6 +8,7 @@ from uuid import UUID
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
@@ -69,11 +70,7 @@ from ai.backend.manager.models.project.updaters import (
     ProjectUpdater,
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
-from ai.backend.manager.services.project.actions.assign_users_to_project import (
-    AssignUsersToProjectAction,
-)
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
 from ai.backend.manager.services.project.actions.purge_project import PurgeProjectAction
@@ -87,10 +84,13 @@ from ai.backend.manager.services.project.actions.search_projects import (
     GetProjectAction,
     GlobalSearchProjectsAction,
 )
-from ai.backend.manager.services.project.actions.unassign_users import (
-    UnassignUsersFromProjectAction,
-)
 from ai.backend.manager.services.project.actions.update_project import UpdateProjectAction
+from ai.backend.manager.services.rbac.actions.roster.join_project import (
+    JoinProjectAction,
+)
+from ai.backend.manager.services.rbac.actions.roster.leave_project import (
+    LeaveProjectAction,
+)
 from ai.backend.manager.services.user.actions.keypair_ops import GetDefaultKeypairsAction
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -262,16 +262,14 @@ class ProjectAdapter(BaseAdapter):
         self, project_id: UUID, input: UnassignUsersFromProjectInput
     ) -> UnassignUsersFromProjectPayload:
         """Unassign users from a project."""
-        result = await self._processors.project.unassign_users_from_project.run(
-            UnassignUsersFromProjectAction(
+        result = await self._processors.rbac.leave_project.run(
+            LeaveProjectAction(
                 project_id=ProjectID(project_id),
-                unbinder=UserProjectEntityUnbinder(
-                    user_uuids=input.user_ids, project_id=project_id
-                ),
+                user_ids=[UserID(uid) for uid in input.user_ids],
             )
         )
         return UnassignUsersFromProjectPayload(
-            unassigned_users=await self._user_nodes(result.unassigned_users),
+            unassigned_users=await self._user_nodes(result.members),
             failed=[
                 UnassignUserError(user_id=f.user_id, message=f.reason) for f in result.failures
             ],
@@ -352,13 +350,15 @@ class ProjectAdapter(BaseAdapter):
         input: AssignUsersToProjectInput,
     ) -> AssignUsersToProjectPayload:
         """Assign users to a project."""
-        result = await self._processors.project.assign_users_to_project.run(
-            AssignUsersToProjectAction(
-                project_id=ProjectID(project_id), user_ids=input.user_ids, role_id=input.role_id
+        result = await self._processors.rbac.join_project.run(
+            JoinProjectAction(
+                project_id=ProjectID(project_id),
+                user_ids=[UserID(uid) for uid in input.user_ids],
+                role_id=RoleID(input.role_id),
             )
         )
         return AssignUsersToProjectPayload(
-            items=await self._user_nodes(result.assigned_users),
+            items=await self._user_nodes(result.members),
         )
 
     async def _user_nodes(self, users: Sequence[UserData]) -> list[UserNode]:

@@ -25,10 +25,6 @@ from ai.backend.manager.models.resource_usage import (
 )
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
-from ai.backend.manager.services.project.actions.assign_users_to_project import (
-    AssignUsersToProjectAction,
-    AssignUsersToProjectActionResult,
-)
 from ai.backend.manager.services.project.actions.create_project_dotfile import (
     CreateProjectDotfileAction,
     CreateProjectDotfileActionResult,
@@ -40,10 +36,6 @@ from ai.backend.manager.services.project.actions.delete_project_dotfile import (
 from ai.backend.manager.services.project.actions.purge_project import (
     PurgeProjectAction,
     PurgeProjectActionResult,
-)
-from ai.backend.manager.services.project.actions.unassign_users import (
-    UnassignUsersFromProjectAction,
-    UnassignUsersFromProjectActionResult,
 )
 from ai.backend.manager.services.project.actions.update_project import (
     UpdateProjectAction,
@@ -84,34 +76,12 @@ class ProjectService:
         self._group_repository = group_repositories.repository
 
     async def update_group(self, action: UpdateProjectAction) -> UpdateProjectActionResult:
-        # Convert user_uuids from list[str] to list[UUID] if provided
-        user_uuids_converted = None
-        user_uuids_list = action.user_uuids.optional_value()
-        if user_uuids_list:
-            user_uuids_converted = [UUID(user_uuid) for user_uuid in user_uuids_list]
-
-        group_data = await self._group_repository.modify_validated(
-            action.updater.project_id,
-            action.updater,
-            action.user_update_mode.optional_value(),
-            user_uuids_converted,
-        )
-        # If no group data is returned, it means only user updates were performed or no updates at all
+        group_data = await self._group_repository.modify_validated(action.updater)
         return UpdateProjectActionResult(data=group_data)
 
     async def purge_group(self, action: PurgeProjectAction) -> PurgeProjectActionResult:
         await self._group_repository.purge_group(action.project_id)
         return PurgeProjectActionResult(project_id=action.project_id)
-
-    async def unassign_users_from_project(
-        self, action: UnassignUsersFromProjectAction
-    ) -> UnassignUsersFromProjectActionResult:
-        result = await self._group_repository.unassign_users_from_project(action.unbinder)
-        return UnassignUsersFromProjectActionResult(
-            project_id=action.project_id,
-            unassigned_users=result.unassigned_users,
-            failures=result.failures,
-        )
 
     async def _get_project_stats_for_period(
         self,
@@ -170,16 +140,6 @@ class ProjectService:
         result = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
         log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
         return UsagePerPeriodActionResult(result=result)
-
-    async def assign_users_to_project(
-        self, action: AssignUsersToProjectAction
-    ) -> AssignUsersToProjectActionResult:
-        assigned_users = await self._group_repository.assign_users_to_project(
-            action.project_id, action.user_ids, action.role_id
-        )
-        return AssignUsersToProjectActionResult(
-            project_id=action.project_id, assigned_users=assigned_users
-        )
 
     async def create_dotfile(
         self, action: CreateProjectDotfileAction

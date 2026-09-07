@@ -2,6 +2,8 @@ import logging
 from collections.abc import Sequence
 from typing import cast
 
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import OperationType, RBACElementType, ScopeType
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac import (
@@ -16,7 +18,7 @@ from ai.backend.manager.repositories.permission_controller.creators import UserR
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
-from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.repositories.rbac.roster_repository import RbacRosterRepository
 from ai.backend.manager.services.permission_contoller.actions.assign_role import (
     AssignRoleAction,
     AssignRoleActionResult,
@@ -109,17 +111,17 @@ _GRANT_OPERATIONS: frozenset[OperationType] = frozenset({
 
 class PermissionControllerService:
     _repository: PermissionControllerRepository
-    _group_repository: ProjectRepository
+    _roster_repository: RbacRosterRepository
     _rbac_action_registry: Sequence[type[BaseRBACAction]]
 
     def __init__(
         self,
         repository: PermissionControllerRepository,
-        group_repository: ProjectRepository,
+        roster_repository: RbacRosterRepository,
         rbac_action_registry: Sequence[type[BaseRBACAction]],
     ) -> None:
         self._repository = repository
-        self._group_repository = group_repository
+        self._roster_repository = roster_repository
         self._rbac_action_registry = rbac_action_registry
 
     async def create_permission(
@@ -155,8 +157,8 @@ class PermissionControllerService:
         When project_id is provided, also binds the user to the project.
         """
         if action.input.project_id is not None:
-            await self._group_repository.bind_user_to_project(
-                action.input.user_id, action.input.project_id
+            await self._roster_repository.join_member(
+                ProjectID(action.input.project_id), UserID(action.input.user_id)
             )
         data = await self._repository.assign_role(action.input)
         return AssignRoleActionResult(data=data)
@@ -170,8 +172,8 @@ class PermissionControllerService:
         result = await self._repository.revoke_role(action.input)
         for prc in result.project_remaining_roles:
             if prc.remaining_count == 0:
-                await self._group_repository.unbind_user_from_project(
-                    action.input.user_id, prc.project_id
+                await self._roster_repository.leave_member(
+                    ProjectID(prc.project_id), UserID(action.input.user_id)
                 )
         return RevokeRoleActionResult(
             data=UserRoleRevocationData(
@@ -189,8 +191,8 @@ class PermissionControllerService:
         if action.project_id is not None:
             for spec in action.bulk_creator.specs:
                 user_role_spec = cast(UserRoleCreatorSpec, spec)
-                await self._group_repository.bind_user_to_project(
-                    user_role_spec.user_id, action.project_id
+                await self._roster_repository.join_member(
+                    ProjectID(action.project_id), UserID(user_role_spec.user_id)
                 )
         data = await self._repository.bulk_assign_role(action.bulk_creator)
         return BulkAssignRoleActionResult(data=data)

@@ -49,7 +49,7 @@ class TestBulkAssignRole:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -163,7 +163,7 @@ class TestBulkRevokeRole:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 

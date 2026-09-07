@@ -152,7 +152,7 @@ class TestGetRoleDetail:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -206,7 +206,7 @@ class TestAssignRole:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -272,7 +272,7 @@ class TestRevokeRole:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -309,7 +309,7 @@ class TestSearchRoles:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -388,7 +388,7 @@ class TestSearchUsersAssignedToRole:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -454,7 +454,7 @@ class TestCreatePermission:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -516,7 +516,7 @@ class TestDeletePermission:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -557,7 +557,7 @@ class TestSearchPermissions:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -621,7 +621,7 @@ class TestGetEntityTypes:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -651,7 +651,7 @@ class TestSearchEntities:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -710,7 +710,7 @@ class TestSearchElementAssociations:
     ) -> PermissionControllerService:
         return PermissionControllerService(
             repository=mock_repository,
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=[],
         )
 
@@ -782,7 +782,7 @@ class TestGetPermissionMatrix:
     def service(self) -> PermissionControllerService:
         return PermissionControllerService(
             repository=MagicMock(),
-            group_repository=MagicMock(),
+            roster_repository=MagicMock(),
             rbac_action_registry=RBAC_ACTION_REGISTRY,
         )
 

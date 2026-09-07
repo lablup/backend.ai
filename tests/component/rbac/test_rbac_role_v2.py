@@ -60,7 +60,7 @@ def permission_controller_processors(
 ) -> PermissionControllerProcessors:
     repo = PermissionControllerRepository(database_engine)
     service = PermissionControllerService(
-        repo, group_repository=MagicMock(), rbac_action_registry=[]
+        repo, roster_repository=MagicMock(), rbac_action_registry=[]
     )
     validators = ActionValidators(
         virtual_entity_rbac=mock_virtual_entity_rbac_validators(),

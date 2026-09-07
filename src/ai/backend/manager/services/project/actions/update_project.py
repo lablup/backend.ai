@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -6,16 +6,13 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.project.updaters import ProjectUpdater
-from ai.backend.manager.types import OptionalState
 
 
 @dataclass(frozen=True)
 class UpdateProjectAction(BaseSingleEntityAction):
-    """Edit one project, optionally rewriting who belongs to it."""
+    """Edit one project. Who belongs to it is the roster's own operation."""
 
     updater: ProjectUpdater
-    user_update_mode: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    user_uuids: OptionalState[list[str]] = field(default_factory=OptionalState[list[str]].nop)
 
     @override
     def entity_id(self) -> EntityIdentifier:
@@ -30,11 +27,6 @@ class UpdateProjectAction(BaseSingleEntityAction):
     @classmethod
     def action_name(cls) -> str:
         return "update_project"
-
-    def update_mode(self) -> str | None:
-        if self.user_uuids.optional_value():
-            return self.user_update_mode.optional_value()
-        return None
 
 
 @dataclass(frozen=True)

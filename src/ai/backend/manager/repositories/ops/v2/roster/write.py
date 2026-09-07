@@ -83,7 +83,7 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         if not user_ids:
             return []
         await self._refuse_personal_project(project_id)
-        if role_id is not None and not await self.row_exists(RoleRow, RoleRow.id, role_id):
+        if role_id is not None and not await self._role_exists(role_id):
             raise InvalidAPIParameters(f"Role not found: {role_id}")
         rows = await self._joinable_users(project_id, user_ids)
         if not rows:
@@ -137,6 +137,10 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
             members=[row.to_data() for row in joined_rows],
             failures=failures,
         )
+
+    async def _role_exists(self, role_id: RoleID) -> bool:
+        stmt = sa.select(sa.literal(1)).select_from(RoleRow).where(RoleRow.id == role_id)
+        return (await self._sess.execute(stmt)).first() is not None
 
     async def _joinable_users(
         self, project_id: ProjectID, user_ids: Collection[UserID]

@@ -16,31 +16,19 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
-from ai.backend.common.data.entity.types import EntityRef, ScopeRef
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, UserID
-from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ResourceSlot, SessionId, SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.project.types import (
-    ProjectData,
-    ProjectType,
-    UnassignUserFailure,
-    UnassignUsersResult,
-)
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.errors.resource import (
     PersonalProjectDeletionError,
-    PersonalProjectMemberAdditionError,
     ProjectHasActiveEndpointsError,
     ProjectHasVFoldersMountedError,
     ProjectNotFound,
 )
-from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -65,12 +53,10 @@ from ai.backend.manager.models.project.scopes import (
     DomainProjectOperationScope,
     UserProjectOperationScope,
 )
-from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.user import UserRow, users
+from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
@@ -78,22 +64,8 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
     vfolder_status_map,
 )
-from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.querier import (
-    BatchQuerier,
-    Querier,
-    execute_batch_querier,
-)
-from ai.backend.manager.repositories.ops.rbac.provider import (
-    EntityMembersAddition,
-    RBACOpsProvider,
-    RBACWriteOps,
-    ScopeUserMember,
-)
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.project.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.project.types import ProjectSearchResult
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
@@ -103,96 +75,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ProjectDBSource:
     _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
-    _rbac_ops_provider: RBACOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine, v2_ops_provider: V2DBOpsProvider) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
-        self._rbac_ops_provider = RBACOpsProvider(db)
-
-    async def _get_domain_id(self, w: RBACWriteOps, domain_name: str) -> DomainID:
-        result = await w.batch_query_in_global(
-            sa.select(DomainRow.id).where(DomainRow.name == domain_name),
-            BatchQuerier(pagination=NoPagination()),
-        )
-        if not result.rows:
-            raise DomainNotFound(f"Domain '{domain_name}' not found")
-        return DomainID(result.rows[0].id)
-
-    async def update_members(
-        self,
-        project_id: ProjectID,
-        user_update_mode: str,
-        user_ids: list[UserID],
-    ) -> None:
-        """Add or remove project members.
-
-        Membership is an association row, which the v2 ops layer has no primitive for,
-        so this stays on the legacy write ops.
-        """
-        async with self._rbac_ops_provider.write_ops() as w:
-            existing_group = await w.query(Querier(row_class=ProjectRow, pk_value=project_id))
-            if existing_group is None:
-                raise ProjectNotFound(f"Group not found: {project_id}")
-            if user_update_mode == "add":
-                await self._refuse_personal_project(w, project_id)
-                await self._add_users_to_project(w, project_id, user_ids)
-            elif user_update_mode == "remove":
-                await w.remove_bulk_members(
-                    ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    [EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=uid) for uid in user_ids],
-                )
-
-    async def _refuse_personal_project(self, w: RBACWriteOps, project_id: ProjectID) -> None:
-        """Refuse the write when the project is a personal one, which keeps its owner
-        as its only member."""
-        result = await w.batch_query_in_global(
-            sa.select(ProjectRow.id).where(
-                ProjectRow.id == project_id, ProjectRow.type == ProjectType.PERSONAL
-            ),
-            BatchQuerier(pagination=NoPagination()),
-        )
-        if result.rows:
-            raise PersonalProjectMemberAdditionError(
-                f"Personal project takes no members: {project_id}"
-            )
-
-    async def _users_addable_to_project(
-        self,
-        w: RBACWriteOps,
-        project_id: ProjectID,
-        user_ids: Sequence[UserID],
-    ) -> list[UserRow]:
-        """Users among ``user_ids`` that belong to the project's domain and are not
-        yet members of the project."""
-        project_domain_subq = (
-            sa.select(ProjectRow.domain_name).where(ProjectRow.id == project_id).scalar_subquery()
-        )
-        query = sa.select(UserRow).where(
-            UserRow.uuid.in_(user_ids)
-            & (UserRow.domain_name == project_domain_subq)
-            & ~user_scope_membership_exists(PROJECT_SCOPE_TYPE, project_id, UserRow.uuid)
-        )
-        result = await w.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
-        return [row.UserRow for row in result.rows]
-
-    async def _add_users_to_project(
-        self,
-        w: RBACWriteOps,
-        project_id: ProjectID,
-        user_ids: list[UserID],
-    ) -> None:
-        """Add users in the project's domain to the project, granting each new member
-        the project's ``auto_assign`` roles."""
-        new_user_rows = await self._users_addable_to_project(w, project_id, user_ids)
-        if not new_user_rows:
-            return
-        await w.add_bulk_members(
-            EntityMembersAddition(
-                scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                members=[ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
-            )
-        )
 
     async def mark_inactive(self, group_id: uuid.UUID) -> None:
         """Mark a group as inactive (soft delete)."""
@@ -526,124 +412,6 @@ class ProjectDBSource:
             storage_manager,
             storage_ptask_group,
         )
-
-    async def assign_users_to_project(
-        self, project_id: ProjectID, user_ids: list[UserID], role_id: UUID
-    ) -> list[UserData]:
-        """Assign users to a project with domain validation via the RBAC member ops.
-
-        Validates that the role exists, filters to users in the project's domain
-        that are not already assigned, writes each new member's virtual-entity
-        membership and scope association, and creates user-role mappings for the
-        specified role. Membership grants the project's ``auto_assign`` roles on
-        top of that role.
-
-        Returns the list of newly assigned users.
-        """
-        if not user_ids:
-            return []
-
-        async with self._rbac_ops_provider.write_ops() as w:
-            await self._refuse_personal_project(w, project_id)
-            # TODO: https://github.com/lablup/backend.ai/issues/10687
-            role = await w.query(Querier(row_class=RoleRow, pk_value=role_id))
-            if role is None:
-                raise InvalidAPIParameters(f"Role not found: {role_id}")
-
-            new_user_rows = await self._users_addable_to_project(w, project_id, user_ids)
-            if not new_user_rows:
-                return []
-
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    members=[ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
-                )
-            )
-            user_role_specs = [
-                UserRoleCreatorSpec(user_id=row.uuid, role_id=role_id) for row in new_user_rows
-            ]
-            await w.bulk_create(BulkCreator(specs=user_role_specs))
-
-            return [row.to_data() for row in new_user_rows]
-
-    async def unassign_users_from_project(
-        self, unbinder: UserProjectEntityUnbinder
-    ) -> UnassignUsersResult:
-        """Remove users from a project and return unassigned users and failures.
-
-        Deletes each member's virtual-entity membership and scope association via
-        the RBAC member ops. Reports which requested user IDs could not be
-        unassigned and why.
-        """
-        async with self._rbac_ops_provider.write_ops() as w:
-            requested_ids = set(unbinder.user_uuids)
-
-            # Find which requested UUIDs actually exist in the system
-            existing_query = sa.select(UserRow).where(UserRow.uuid.in_(unbinder.user_uuids))
-            existing_result = await w.batch_query_in_global(
-                existing_query, BatchQuerier(pagination=NoPagination())
-            )
-            existing_ids = {row.UserRow.uuid for row in existing_result.rows}
-
-            # Fetch users that are actually members before removing
-            actual_assoc_query = sa.select(UserRow).where(
-                UserRow.uuid.in_(unbinder.user_uuids)
-                & user_scope_membership_exists(
-                    PROJECT_SCOPE_TYPE, ProjectID(unbinder.project_id), UserRow.uuid
-                )
-            )
-            assoc_result = await w.batch_query_in_global(
-                actual_assoc_query, BatchQuerier(pagination=NoPagination())
-            )
-            assigned_rows = [row.UserRow for row in assoc_result.rows]
-            assigned_ids = {row.uuid for row in assigned_rows}
-            unassigned_users = [row.to_data() for row in assigned_rows]
-
-            await w.remove_bulk_members(
-                ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(unbinder.project_id)),
-                [
-                    EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=UserID(uid))
-                    for uid in unbinder.user_uuids
-                ],
-            )
-
-            # Compute failures
-            failures: list[UnassignUserFailure] = []
-            for uid in requested_ids - existing_ids:
-                failures.append(UnassignUserFailure(user_id=uid, reason="User does not exist."))
-            for uid in existing_ids - assigned_ids:
-                failures.append(
-                    UnassignUserFailure(user_id=uid, reason="User is not assigned to this project.")
-                )
-
-            return UnassignUsersResult(
-                unassigned_users=unassigned_users,
-                failures=failures,
-            )
-
-    async def bind_user_to_project(self, user_id: UserID, project_id: ProjectID) -> None:
-        """Add a user to a project as a scope member, granting the project's
-        ``auto_assign`` roles.
-
-        Idempotent: adding an existing member is a no-op.
-        """
-        async with self._rbac_ops_provider.write_ops() as w:
-            await self._refuse_personal_project(w, project_id)
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    members=[ScopeUserMember(user_id=user_id)],
-                )
-            )
-
-    async def unbind_user_from_project(self, user_id: UserID, project_id: ProjectID) -> None:
-        """Remove a user from a project (membership writes only)."""
-        async with self._rbac_ops_provider.write_ops() as w:
-            await w.remove_bulk_members(
-                ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                [EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=user_id)],
-            )
 
     async def get_project(self, project_id: UUID) -> ProjectData:
         """Get a single project by UUID.

@@ -19,6 +19,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
@@ -26,6 +27,7 @@ from ai.backend.common.exception import (
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.errors.resource import InvalidUserUpdateMode
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
@@ -53,6 +55,12 @@ from ai.backend.manager.services.project.actions.purge_project import (
     PurgeProjectAction,
 )
 from ai.backend.manager.services.project.actions.update_project import UpdateProjectAction
+from ai.backend.manager.services.rbac.actions.roster.join_project import (
+    JoinProjectAction,
+)
+from ai.backend.manager.services.rbac.actions.roster.leave_project import (
+    LeaveProjectAction,
+)
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -640,15 +648,19 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 self.container_registry,
             ),
         )
-        return UpdateProjectAction(
-            updater=updater,
-            user_update_mode=OptionalState[str].from_graphql(
-                self.user_update_mode,
-            ),
-            user_uuids=OptionalState[list[str]].from_graphql(
-                self.user_uuids,
-            ),
-        )
+        return UpdateProjectAction(updater=updater)
+
+    def roster_change(self, group_id: uuid.UUID) -> tuple[str, list[UserID]] | None:
+        """The roster change asked for beside the edit, if any: the mode and who it
+        names. Writing the roster is its own operation, so the mode does not travel on
+        the update."""
+        mode = None if self.user_update_mode is Undefined else self.user_update_mode
+        raw_user_ids = None if self.user_uuids is Undefined else self.user_uuids
+        if mode is not None and mode not in ("add", "remove"):
+            raise InvalidUserUpdateMode("invalid user_update_mode")
+        if not mode or not raw_user_ids:
+            return None
+        return mode, [UserID(uuid.UUID(raw)) for raw in raw_user_ids]
 
 
 class CreateGroup(graphene.Mutation):  # type: ignore[misc]
@@ -719,8 +731,19 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
     ) -> ModifyGroup:
         graph_ctx: GraphQueryContext = info.context
 
-        action = props.to_action(gid)
-        res = await graph_ctx.processors.project.update_project.run(action)
+        roster_change = props.roster_change(gid)
+        if roster_change is not None:
+            mode, user_ids = roster_change
+            project_id = ProjectID(gid)
+            if mode == "add":
+                await graph_ctx.processors.rbac.join_project.run(
+                    JoinProjectAction(project_id=project_id, user_ids=user_ids)
+                )
+            else:
+                await graph_ctx.processors.rbac.leave_project.run(
+                    LeaveProjectAction(project_id=project_id, user_ids=user_ids)
+                )
+        res = await graph_ctx.processors.project.update_project.run(props.to_action(gid))
         return cls(
             ok=True,
             msg="success",
