@@ -40,6 +40,7 @@ _EMAIL_INDEX: Final = "ix_entity_shares_recipient_email"
 _RECIPIENT_INDEX: Final = "ix_entity_shares_recipient"
 
 _ADDRESSED: Final = "addressed"
+_ACCEPTED_DOES_NOT_EXPIRE: Final = "accepted_does_not_expire"
 
 _BACKFILL_RECIPIENT: Final = sa.text("""
     UPDATE entity_shares s
@@ -113,21 +114,38 @@ def upgrade() -> None:
         "entity_shares",
         "recipient_entity_type IS NOT NULL OR recipient_email IS NOT NULL",
     )
+    op.create_check_constraint(
+        _ACCEPTED_DOES_NOT_EXPIRE,
+        "entity_shares",
+        "status <> 'accepted' OR expires_at IS NULL",
+    )
     op.create_index(
         _LIVE_EMAIL_INDEX,
         "entity_shares",
         ["recipient_email", "target_entity_type", "target_entity_id"],
         unique=True,
-        postgresql_where=sa.text("status = 'pending' AND recipient_email IS NOT NULL"),
+        postgresql_where=sa.text(
+            "status IN ('pending', 'accepted') AND recipient_email IS NOT NULL"
+        ),
     )
     op.create_index(
         _LIVE_RECIPIENT_INDEX,
         "entity_shares",
-        ["recipient_virtual_entity_id", "target_entity_type", "target_entity_id"],
+        [
+            "recipient_entity_type",
+            "recipient_entity_id",
+            "target_entity_type",
+            "target_entity_id",
+        ],
         unique=True,
-        postgresql_where=sa.text("status = 'pending' AND recipient_virtual_entity_id IS NOT NULL"),
+        postgresql_where=sa.text(
+            "status IN ('pending', 'accepted') AND recipient_entity_type IS NOT NULL"
+        ),
     )
     op.create_index(_TARGET_INDEX, "entity_shares", ["target_entity_type", "target_entity_id"])
+    op.create_index(
+        _RECIPIENT_INDEX, "entity_shares", ["recipient_entity_type", "recipient_entity_id"]
+    )
     op.create_index(_EMAIL_INDEX, "entity_shares", ["recipient_email"])
 
 
@@ -140,6 +158,9 @@ def downgrade() -> None:
     op.drop_index(_TARGET_INDEX, table_name="entity_shares")
     op.drop_index(_LIVE_RECIPIENT_INDEX, table_name="entity_shares")
     op.drop_index(_LIVE_EMAIL_INDEX, table_name="entity_shares")
+    op.drop_constraint(
+        op.f(f"ck_entity_shares_{_ACCEPTED_DOES_NOT_EXPIRE}"), "entity_shares", type_="check"
+    )
     op.drop_constraint(op.f(f"ck_entity_shares_{_ADDRESSED}"), "entity_shares", type_="check")
     op.drop_column("entity_shares", "expires_at")
     op.drop_column("entity_shares", "recipient_entity_id")
