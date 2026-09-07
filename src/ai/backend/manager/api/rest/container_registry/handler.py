@@ -31,6 +31,7 @@ from ai.backend.common.container_registry import (
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.dto.manager.registry.request import HarborWebhookRequestModel
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
@@ -81,8 +82,17 @@ class ContainerRegistryHandler:
     Dependencies are injected via constructor at registrar time.
     """
 
-    def __init__(self, *, container_registry: ContainerRegistryProcessors) -> None:
+    _container_registry: ContainerRegistryProcessors
+    _adapter: ContainerRegistryAdapter
+
+    def __init__(
+        self,
+        *,
+        container_registry: ContainerRegistryProcessors,
+        adapter: ContainerRegistryAdapter,
+    ) -> None:
         self._container_registry = container_registry
+        self._adapter = adapter
 
     # ------------------------------------------------------------------
     # POST /container-registries
@@ -104,11 +114,14 @@ class ContainerRegistryHandler:
             ssl_verify=params.ssl_verify,
             is_global=params.is_global,
             extra=params.extra,
-            allowed_groups=params.allowed_groups,
         )
         result = await self._container_registry.create_container_registry.run(
             CreateContainerRegistryAction(creator=creator)
         )
+        if params.allowed_groups is not None:
+            await self._adapter.apply_allowed_groups(
+                ContainerRegistryID(result.data.id), params.allowed_groups
+            )
 
         resp = PatchContainerRegistryResponseModel(
             id=result.data.id,
@@ -214,6 +227,10 @@ class ContainerRegistryHandler:
         registry_id = path.parsed.registry_id
         params = body.parsed
 
+        if params.allowed_groups is not None:
+            await self._adapter.apply_allowed_groups(
+                ContainerRegistryID(registry_id), params.allowed_groups
+            )
         updater = ContainerRegistryUpdater(
             registry_id=ContainerRegistryID(registry_id),
             url=OptionalState.update(params.url) if params.url is not None else OptionalState.nop(),
@@ -247,11 +264,6 @@ class ContainerRegistryHandler:
                 else TriState.nop()
             ),
             extra=(TriState.update(params.extra) if params.extra is not None else TriState.nop()),
-            allowed_groups=(
-                TriState.update(params.allowed_groups)
-                if params.allowed_groups is not None
-                else TriState.nop()
-            ),
         )
         result = await self._container_registry.update_container_registry.run(
             UpdateContainerRegistryAction(updater=updater)

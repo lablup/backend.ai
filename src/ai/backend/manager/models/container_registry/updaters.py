@@ -9,7 +9,7 @@ from typing import Any, override
 
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -20,10 +20,10 @@ from ai.backend.manager.types import OptionalState, TriState
 
 @dataclass
 class ContainerRegistryUpdater(DataUpdater[ContainerRegistryRow, ContainerRegistryData]):
-    """Edit a container registry's connection settings and allowed projects.
+    """Edit a container registry's connection settings.
 
-    ``allowed_groups`` names project associations, which are rows of their own; the
-    repository writes them beside the update.
+    The projects allowed on it are rows of their own, written by the relation
+    operations; a value whose change drags other writes along is not an updater field.
     """
 
     registry_id: ContainerRegistryID
@@ -38,15 +38,6 @@ class ContainerRegistryUpdater(DataUpdater[ContainerRegistryRow, ContainerRegist
     password: TriState[str] = field(default_factory=TriState[str].nop)
     ssl_verify: TriState[bool] = field(default_factory=TriState[bool].nop)
     extra: TriState[dict[str, Any]] = field(default_factory=TriState[dict[str, Any]].nop)
-    allowed_groups: TriState[AllowedGroupsModel] = field(
-        default_factory=TriState[AllowedGroupsModel].nop
-    )
-
-    @property
-    def has_allowed_groups_update(self) -> bool:
-        """Whether allowed_groups carries projects to add or remove."""
-        groups = self.allowed_groups.optional_value()
-        return groups is not None and (bool(groups.add) or bool(groups.remove))
 
     @property
     @override

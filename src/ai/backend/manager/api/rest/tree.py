@@ -165,7 +165,8 @@ def build_api_routes(
     )
     compute_sessions_handler = ComputeSessionsHandler(session=processors.session)
     container_registry_handler = ContainerRegistryHandler(
-        container_registry=processors.container_registry
+        container_registry=processors.container_registry,
+        adapter=adapters.container_registry,
     )
     deployment_handler = DeploymentAPIHandler(
         deployment=processors.deployment,

@@ -7,6 +7,7 @@ from collections.abc import Sequence
 
 from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
@@ -26,16 +27,23 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryTypeFilter
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.container_registry.conditions import ContainerRegistryConditions
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.creators import (
+    ContainerRegistryCreator,
+    ContainerRegistryProjectCreator,
+)
 from ai.backend.manager.models.container_registry.orders import (
     DEFAULT_FORWARD_ORDER,
     TIEBREAKER_ORDER,
     resolve_order,
 )
-from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.purgers import (
+    ContainerRegistryProjectPurger,
+    ContainerRegistryPurger,
+)
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -51,6 +59,9 @@ from ai.backend.manager.services.container_registry.actions.search_container_reg
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
 )
+from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
+from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
+from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
 from ai.backend.manager.types import OptionalState, TriState
 
 DEFAULT_PAGINATION_LIMIT = 10
@@ -89,12 +100,6 @@ class ContainerRegistryAdapter(BaseAdapter):
         input: CreateContainerRegistryInput,
     ) -> CreateContainerRegistryPayload:
         """Create a new container registry (superadmin only)."""
-        allowed_groups = None
-        if input.allowed_groups is not None:
-            allowed_groups = AllowedGroupsModel(
-                add=input.allowed_groups.add,
-                remove=input.allowed_groups.remove,
-            )
         creator = ContainerRegistryCreator(
             url=input.url,
             type=input.type,
@@ -105,11 +110,18 @@ class ContainerRegistryAdapter(BaseAdapter):
             password=input.password,
             ssl_verify=input.ssl_verify,
             extra=input.extra,
-            allowed_groups=allowed_groups,
         )
         result = await self._processors.container_registry.create_container_registry.run(
             CreateContainerRegistryAction(creator=creator)
         )
+        if input.allowed_groups is not None:
+            await self.apply_allowed_groups(
+                ContainerRegistryID(result.data.id),
+                AllowedGroupsModel(
+                    add=input.allowed_groups.add,
+                    remove=input.allowed_groups.remove,
+                ),
+            )
         return CreateContainerRegistryPayload(registry=self._data_to_dto(result.data))
 
     async def admin_update(
@@ -117,11 +129,13 @@ class ContainerRegistryAdapter(BaseAdapter):
         input: UpdateContainerRegistryInput,
     ) -> UpdateContainerRegistryPayload:
         """Update an existing container registry (superadmin only)."""
-        allowed_groups_model = None
         if input.allowed_groups is not None:
-            allowed_groups_model = AllowedGroupsModel(
-                add=input.allowed_groups.add,
-                remove=input.allowed_groups.remove,
+            await self.apply_allowed_groups(
+                ContainerRegistryID(input.id),
+                AllowedGroupsModel(
+                    add=input.allowed_groups.add,
+                    remove=input.allowed_groups.remove,
+                ),
             )
         updater = ContainerRegistryUpdater(
             registry_id=ContainerRegistryID(input.id),
@@ -152,16 +166,51 @@ class ContainerRegistryAdapter(BaseAdapter):
                 else TriState.nop()
             ),
             extra=(TriState.update(input.extra) if input.extra is not None else TriState.nop()),
-            allowed_groups=(
-                TriState.update(allowed_groups_model)
-                if allowed_groups_model is not None
-                else TriState.nop()
-            ),
         )
         result = await self._processors.container_registry.update_container_registry.run(
             UpdateContainerRegistryAction(updater=updater)
         )
         return UpdateContainerRegistryPayload(registry=self._data_to_dto(result.data))
+
+    async def apply_allowed_groups(
+        self,
+        registry_id: ContainerRegistryID,
+        allowed_groups: AllowedGroupsModel,
+    ) -> None:
+        """Link the registry to the projects named to add and unlink it from the ones
+        named to remove.
+
+        One run per direction, carrying every pair it names: the permission is asked of
+        the registry and of every project, and a project already allowed is left as it
+        stands. Removing where no named project was linked raises, as it did while the
+        repository wrote these rows beside the update.
+        """
+        if allowed_groups.add:
+            await self._processors.rbac.create_relation.run(
+                CreateRelationAction(
+                    pairs=[
+                        RelationPair(scope=ProjectID(uuid.UUID(raw)), target=registry_id)
+                        for raw in allowed_groups.add
+                    ],
+                    creator=ContainerRegistryProjectCreator(),
+                )
+            )
+        if not allowed_groups.remove:
+            return
+        result = await self._processors.rbac.purge_relation.run(
+            PurgeRelationAction(
+                pairs=[
+                    RelationPair(scope=ProjectID(uuid.UUID(raw)), target=registry_id)
+                    for raw in allowed_groups.remove
+                ],
+                purger=ContainerRegistryProjectPurger(),
+            )
+        )
+        if not any(unlink.unlinked for unlink in result.results):
+            raise ContainerRegistryGroupsAssociationNotFound(
+                f"Tried to remove non-existing associations for registry_id: {registry_id}, "
+                f"group_ids: {allowed_groups.remove}"
+            )
 
     async def admin_delete(
         self,

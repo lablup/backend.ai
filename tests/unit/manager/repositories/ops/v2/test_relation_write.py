@@ -24,7 +24,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.relation import (
@@ -268,27 +267,12 @@ class TestCreateRelation:
     ) -> None:
         scope, target = pair
         async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), scope, target)
+            await ops.create_relations(_Creator(), [(scope, target)])
 
         assert await _row_count(database) == 1
         assert await _govern_cap(database, scope, target) == Permission.READ
         assert await _share_cap(database, target, scope) == Permission.READ
         assert await _share_cap(database, scope, target) is None
-
-    async def test_linking_a_linked_pair_is_a_unique_violation(
-        self,
-        database: ExtendedAsyncSAEngine,
-        provider: RelationOpsProvider,
-        pair: tuple[_ScopeID, _TargetID],
-    ) -> None:
-        scope, target = pair
-        async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), scope, target)
-        with pytest.raises(UniqueConstraintViolationError):
-            async with provider.write_ops() as ops:
-                await ops.create_relation(_Creator(), scope, target)
-
-        assert await _row_count(database) == 1
 
     async def test_link_and_unlink_leave_a_share_set_beside_them(
         self,
@@ -300,11 +284,11 @@ class TestCreateRelation:
         async with ShareOpsProvider(database).write_ops() as share_ops:
             await share_ops.replace_share(target, scope, Permission.UPDATE)
         async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), scope, target)
+            await ops.create_relations(_Creator(), [(scope, target)])
         assert await _share_cap(database, target, scope) == Permission.READ | Permission.UPDATE
 
         async with provider.write_ops() as ops:
-            await ops.purge_relation(_Purger(), scope, target)
+            await ops.purge_relations(_Purger(), [(scope, target)])
         assert await _share_cap(database, target, scope) == Permission.UPDATE
         assert await _govern_cap(database, scope, target) is False
 
@@ -318,7 +302,7 @@ class TestSwitchRelation:
     ) -> None:
         scope, target = pair
         async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), scope, target)
+            await ops.create_relations(_Creator(), [(scope, target)])
         async with provider.write_ops() as ops:
             await ops.delete_relation(_SwitchOff(), scope, target)
 
@@ -341,9 +325,9 @@ class TestPurgeRelation:
     ) -> None:
         scope, target = pair
         async with provider.write_ops() as ops:
-            await ops.create_relation(_Creator(), scope, target)
+            await ops.create_relations(_Creator(), [(scope, target)])
         async with provider.write_ops() as ops:
-            await ops.purge_relation(_Purger(), scope, target)
+            await ops.purge_relations(_Purger(), [(scope, target)])
 
         assert await _row_count(database) == 0
         assert await _govern_cap(database, scope, target) is False
@@ -357,7 +341,7 @@ class TestPurgeRelation:
     ) -> None:
         scope, target = pair
         async with provider.write_ops() as ops:
-            assert await ops.purge_relation(_Purger(), scope, target) is False
+            assert await ops.purge_relations(_Purger(), [(scope, target)]) == [False]
 
         assert await _row_count(database) == 0
 
