@@ -51,7 +51,7 @@ class RateLimitSuccessCase:
 
 
 @dataclass(frozen=True)
-class RateLimitExceededCase:
+class RateLimitExceedCase:
     """A window state the request is refused under, and the limit the 429 reports."""
 
     description: str
@@ -229,11 +229,11 @@ class TestRlimMiddleware:
     @pytest.mark.parametrize(
         "case",
         [
-            RateLimitExceededCase(
+            RateLimitExceedCase(
                 description="exceeds by 1", limit=_RATE_LIMIT, count=_RATE_LIMIT + 1
             ),
-            RateLimitExceededCase(description="far exceeds limit", limit=_RATE_LIMIT, count=50000),
-            RateLimitExceededCase(description="zero limit always exceeds", limit=0, count=1),
+            RateLimitExceedCase(description="far exceeds limit", limit=_RATE_LIMIT, count=50000),
+            RateLimitExceedCase(description="zero limit always exceeds", limit=0, count=1),
         ],
         ids=lambda case: case.description,
     )
@@ -242,7 +242,7 @@ class TestRlimMiddleware:
         middleware: Any,
         caller: Caller,
         mock_handler: AsyncMock,
-        case: RateLimitExceededCase,
+        case: RateLimitExceedCase,
     ) -> None:
         """A request past the window it was counted in gets 429 and never reaches the handler."""
         # Arrange
