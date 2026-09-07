@@ -173,6 +173,7 @@ from ai.backend.manager.services.vfolder.actions.invite import (
     UpdateInvitedVFolderMountPermissionAction,
 )
 from ai.backend.manager.services.vfolder.actions.sharing import (
+    GlobalListSharedVFoldersAction,
     ListSharedVFoldersAction,
     PublicListSharedVFoldersAction,
     ShareVFolderAction,
@@ -1212,7 +1213,6 @@ class VFolderHandler:
         )
         result = await self._vfolder_sharing.share.run(
             ShareVFolderAction(
-                user_uuid=vfctx.user_uuid,
                 vfolder_uuid=VFolderUUID(row["id"]),
                 resource_policy=req.request["keypair"]["resource_policy"],
                 permission=VFolderPermission(params.permission.value),
@@ -1244,7 +1244,6 @@ class VFolderHandler:
         )
         result = await self._vfolder_sharing.unshare.run(
             UnshareVFolderAction(
-                user_uuid=vfctx.user_uuid,
                 vfolder_uuid=VFolderUUID(row["id"]),
                 resource_policy=req.request["keypair"]["resource_policy"],
                 emails=params.emails,
@@ -1563,17 +1562,20 @@ class VFolderHandler:
     ) -> APIResponse:
         params = query.parsed
         target_vfid = params.vfolder_id
-        shared_rows = (
-            (
-                await self._vfolder_sharing.public_list_shared.run(PublicListSharedVFoldersAction())
-            ).shared
-            if target_vfid is None
-            else (
+        if target_vfid is not None:
+            shared_rows = (
                 await self._vfolder_sharing.list_shared.run(
                     ListSharedVFoldersAction(vfolder_uuid=VFolderUUID(target_vfid))
                 )
             ).shared
-        )
+        elif ctx.is_superadmin or ctx.user_role == UserRole.MONITOR:
+            shared_rows = (
+                await self._vfolder_sharing.global_list_shared.run(GlobalListSharedVFoldersAction())
+            ).shared
+        else:
+            shared_rows = (
+                await self._vfolder_sharing.public_list_shared.run(PublicListSharedVFoldersAction())
+            ).shared
         shared_info = []
         for shared in shared_rows:
             shared_info.append(

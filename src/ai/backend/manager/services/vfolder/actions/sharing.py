@@ -29,7 +29,6 @@ class VFolderSharedInfo:
 class ShareVFolderAction(VFolderAction):
     """Share a group vfolder with users by granting permissions directly."""
 
-    user_uuid: uuid.UUID
     resource_policy: Mapping[str, Any]
     permission: VFolderPermission
     emails: list[str] = field(default_factory=list)
@@ -54,7 +53,6 @@ class ShareVFolderActionResult:
 class UnshareVFolderAction(VFolderAction):
     """Revoke direct sharing permissions from users."""
 
-    user_uuid: uuid.UUID
     resource_policy: Mapping[str, Any]
     emails: list[str] = field(default_factory=list)
 
@@ -119,9 +117,12 @@ class UpdateVFolderSharingStatusActionResult:
 
 @dataclass
 class PublicListSharedVFoldersAction(VFolderGlobalAction):
-    """List the sharing permissions granted across every vfolder.
+    """List the sharing permissions the requester is party to.
 
-    Read-only and open to any authenticated caller, as the legacy route was.
+    Read-only and open to any authenticated caller, as the legacy route was. The
+    requester bounds the rows, so no caller learns of a share on a folder they
+    neither hold, own, created, nor reach through their projects. The requester is
+    the user in context, never a field a caller fills in.
     """
 
     @override
@@ -137,4 +138,24 @@ class PublicListSharedVFoldersAction(VFolderGlobalAction):
 
 @dataclass
 class PublicListSharedVFoldersActionResult:
+    shared: list[VFolderSharedInfo] = field(default_factory=list)
+
+
+@dataclass
+class GlobalListSharedVFoldersAction(VFolderGlobalAction):
+    """List the sharing permissions granted across every vfolder."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "global_list_shared_vfolders"
+
+
+@dataclass
+class GlobalListSharedVFoldersActionResult:
     shared: list[VFolderSharedInfo] = field(default_factory=list)
