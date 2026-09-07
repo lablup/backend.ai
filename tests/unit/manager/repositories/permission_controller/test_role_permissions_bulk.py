@@ -1,7 +1,4 @@
-"""
-Tests for PermissionDBSource bulk role-permission methods:
-bulk_add_role_permissions, bulk_remove_role_permissions, replace_role_permissions.
-"""
+"""Tests for PermissionDBSource.replace_role_permissions."""
 
 from __future__ import annotations
 
@@ -30,14 +27,12 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
 )
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
-from ai.backend.manager.repositories.permission_controller.purgers import PermissionPurgerSpec
 from ai.backend.testutils.db import TableOrORM, with_tables
 
 if TYPE_CHECKING:
@@ -88,7 +83,7 @@ def _owner_specs(role_id: uuid.UUID, entity_type: RBACElementType) -> list[Permi
 
 
 class TestBulkRolePermissions:
-    """Tests for bulk add/remove/replace operations on PermissionDBSource."""
+    """Tests for replace_role_permissions on PermissionDBSource."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -174,120 +169,6 @@ class TestBulkRolePermissions:
         async with db.begin_readonly_session() as session:
             rows = (await session.execute(stmt)).scalars().all()
         return {permission.to_operation() for permission in rows}
-
-    # ---------- bulk_add_role_permissions ----------
-
-    async def test_bulk_add_against_missing_role_records_failures(
-        self, perm_db_source: PermissionDBSource
-    ) -> None:
-        ghost_role_id = uuid.uuid4()
-        creator = BulkCreator(
-            specs=[_spec(ghost_role_id, RBACElementType.SESSION, OperationType.READ)]
-        )
-        result = await perm_db_source.bulk_add_role_permissions(creator)
-        assert result.success_count() == 0
-        assert result.has_failures()
-
-    async def test_bulk_add_inserts_given_rows(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        perm_db_source: PermissionDBSource,
-    ) -> None:
-        role_id = await self._seed_role(db_with_cleanup)
-        creator = BulkCreator(specs=_owner_specs(role_id, RBACElementType.SESSION))
-        result = await perm_db_source.bulk_add_role_permissions(creator)
-        assert result.success_count() == len(ALL_OWNER_OPS)
-        assert not result.has_failures()
-        assert await self._list_operations(
-            db_with_cleanup, role_id, EntityType(RBACElementType.SESSION)
-        ) == set(ALL_OWNER_OPS)
-
-    async def test_bulk_add_duplicate_rows_are_recorded_as_failures(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        perm_db_source: PermissionDBSource,
-    ) -> None:
-        role_id = await self._seed_role(db_with_cleanup)
-        creator = BulkCreator(specs=_owner_specs(role_id, RBACElementType.SESSION))
-        first = await perm_db_source.bulk_add_role_permissions(creator)
-        assert first.success_count() == len(ALL_OWNER_OPS)
-        second = await perm_db_source.bulk_add_role_permissions(creator)
-        assert second.success_count() == 0
-        assert len(second.errors) == len(ALL_OWNER_OPS)
-        assert await self._count_permissions(
-            db_with_cleanup, role_id, EntityType(RBACElementType.SESSION)
-        ) == len(ALL_OWNER_OPS)
-
-    async def test_bulk_add_with_empty_creator_is_noop(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        perm_db_source: PermissionDBSource,
-    ) -> None:
-        role_id = await self._seed_role(db_with_cleanup)
-        before = await self._count_permissions(db_with_cleanup, role_id)
-        result = await perm_db_source.bulk_add_role_permissions(BulkCreator(specs=[]))
-        after = await self._count_permissions(db_with_cleanup, role_id)
-        assert before == after
-        assert result.success_count() == 0
-        assert not result.has_failures()
-
-    # ---------- bulk_remove_role_permissions ----------
-
-    async def test_bulk_remove_unknown_pk_returns_no_success(
-        self, perm_db_source: PermissionDBSource
-    ) -> None:
-        purgers = [Purger(spec=PermissionPurgerSpec(permission_id=uuid.uuid4()))]
-        result = await perm_db_source.bulk_remove_role_permissions(purgers)
-        assert result.success_count() == 0
-        assert not result.has_failures()
-
-    async def test_bulk_remove_drops_only_specified_rows(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        perm_db_source: PermissionDBSource,
-    ) -> None:
-        role_id = await self._seed_role(db_with_cleanup)
-        keep_id = await self._seed_permission(
-            db_with_cleanup,
-            _spec(role_id, RBACElementType.SESSION, OperationType.READ),
-        )
-        drop_id = await self._seed_permission(
-            db_with_cleanup,
-            _spec(role_id, RBACElementType.SESSION, OperationType.HARD_DELETE),
-        )
-        result = await perm_db_source.bulk_remove_role_permissions([
-            Purger(spec=PermissionPurgerSpec(permission_id=drop_id))
-        ])
-        assert result.success_count() == 1
-        remaining_ids = {keep_id}
-        async with db_with_cleanup.begin_readonly_session() as session:
-            rows = (
-                (
-                    await session.execute(
-                        sa.select(PermissionRow.id).where(PermissionRow.role_id == role_id)
-                    )
-                )
-                .scalars()
-                .all()
-            )
-        assert set(rows) == remaining_ids
-
-    async def test_bulk_remove_with_empty_list_is_noop(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        perm_db_source: PermissionDBSource,
-    ) -> None:
-        role_id = await self._seed_role(db_with_cleanup)
-        await self._seed_permission(
-            db_with_cleanup,
-            _spec(role_id, RBACElementType.SESSION, OperationType.READ),
-        )
-        before = await self._count_permissions(db_with_cleanup, role_id)
-        result = await perm_db_source.bulk_remove_role_permissions([])
-        after = await self._count_permissions(db_with_cleanup, role_id)
-        assert before == after
-        assert result.success_count() == 0
-        assert not result.has_failures()
 
     # ---------- replace_role_permissions ----------
 

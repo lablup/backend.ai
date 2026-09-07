@@ -12,6 +12,7 @@ from uuid import UUID
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import (
@@ -160,8 +161,6 @@ from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     BulkRoleAssignmentResultData,
-    BulkRolePermissionAddResultData,
-    BulkRolePermissionRemoveResultData,
     BulkRolePermissionReplaceResultData,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
@@ -174,7 +173,11 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
-from ai.backend.manager.errors.permission import ReplaceRolePermissionRoleIdMismatch
+from ai.backend.manager.errors.permission import (
+    PermissionAlreadyGranted,
+    ReplaceRolePermissionRoleIdMismatch,
+)
+from ai.backend.manager.errors.repository import EntityNotFoundError, RepositoryIntegrityError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
@@ -192,6 +195,7 @@ from ai.backend.manager.models.rbac_models.orders import (
 from ai.backend.manager.models.rbac_models.permission.conditions import (
     ScopedPermissionConditions,
 )
+from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.orders import ScopedPermissionOrders
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -212,10 +216,10 @@ from ai.backend.manager.repositories.permission_controller.creators import (
 )
 from ai.backend.manager.repositories.permission_controller.purgers import PermissionPurgerSpec
 from ai.backend.manager.repositories.permission_controller.updaters import PermissionUpdaterSpec
-from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
-from ai.backend.manager.services.permission_contoller.actions.bulk_add_role_permissions import (
-    BulkAddRolePermissionsAction,
+from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
+    AddRolePermissionAction,
 )
+from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
     BulkAssignRoleAction,
 )
@@ -1024,47 +1028,59 @@ class RBACAdapter(BaseAdapter):
         self,
         input: BulkAddRolePermissionsInputDTO,
     ) -> BulkAddRolePermissionsPayload:
-        """Bulk-insert scoped permission rows across one or more roles."""
-        specs = [self._permission_creator_spec(entry) for entry in input.permissions]
-        action_result = await self._processors.permission_controller.bulk_add_role_permissions.wait_for_complete(
-            BulkAddRolePermissionsAction(creator=BulkCreator(specs=specs))
-        )
-        result: BulkRolePermissionAddResultData = action_result.data
-        return BulkAddRolePermissionsPayload(
-            items=[self._permission_data_to_node(item) for item in result.successes],
-            failed=[
-                BulkAddRolePermissionFailureInfo(
-                    role_id=f.role_id,
-                    scope_type=f.scope_type,
-                    scope_id=f.scope_id,
-                    entity_type=f.entity_type,
-                    operation=f.permission.to_operation().value,
-                    message=f.message,
+        """Insert scoped permission rows across one or more roles, one entry at a time,
+        each answered for by its role; an entry the database refuses is reported
+        beside the ones that landed."""
+        items: list[PermissionNode] = []
+        failed: list[BulkAddRolePermissionFailureInfo] = []
+        for entry in input.permissions:
+            try:
+                result = await self._processors.permission_controller.add_role_permission.run(
+                    AddRolePermissionAction(
+                        role_id=RoleID(entry.role_id),
+                        creator=self._role_permission_creator(entry),
+                    )
                 )
-                for f in result.failures
-            ],
-        )
+            except (PermissionAlreadyGranted, RepositoryIntegrityError) as e:
+                failed.append(
+                    BulkAddRolePermissionFailureInfo(
+                        role_id=entry.role_id,
+                        scope_type=entry.scope_type,
+                        scope_id=entry.scope_id,
+                        entity_type=entry.entity_type,
+                        operation=entry.operation,
+                        message=str(e),
+                    )
+                )
+                continue
+            items.append(self._permission_data_to_node(result.data))
+        return BulkAddRolePermissionsPayload(items=items, failed=failed)
 
     async def bulk_remove_role_permissions(
         self,
         input: BulkRemoveRolePermissionsInputDTO,
     ) -> BulkRemoveRolePermissionsPayload:
-        """Bulk-delete permission rows by primary key."""
-        purgers: list[Purger[PermissionRow]] = [
-            Purger(spec=PermissionPurgerSpec(permission_id=pid)) for pid in input.permission_ids
-        ]
-        action_result = await self._processors.permission_controller.bulk_remove_role_permissions.wait_for_complete(
-            BulkRemoveRolePermissionsAction(purgers=purgers)
-        )
-        result: BulkRolePermissionRemoveResultData = action_result.data
+        """Delete permission rows by primary key, each answered for by its role. An id
+        matching no row is left out of the answer rather than reported."""
+        if not input.permission_ids:
+            return BulkRemoveRolePermissionsPayload(items=[], failed=[])
+        try:
+            result = await self._processors.permission_controller.bulk_remove_role_permissions.run(
+                BulkRemoveRolePermissionsAction(
+                    permission_ids=[PermissionID(pid) for pid in input.permission_ids]
+                )
+            )
+        except EntityNotFoundError:
+            return BulkRemoveRolePermissionsPayload(items=[], failed=[])
         return BulkRemoveRolePermissionsPayload(
-            items=[self._permission_data_to_node(item) for item in result.successes],
+            items=[self._permission_data_to_node(item) for item in result.successes.values()],
             failed=[
                 BulkRemoveRolePermissionFailureInfo(
-                    permission_id=f.permission_id,
-                    message=f.message,
+                    permission_id=permission_id,
+                    message=str(exception),
                 )
-                for f in result.failures
+                for permission_id, exception in result.errors.items()
+                if not isinstance(exception, EntityNotFoundError)
             ],
         )
 
@@ -1101,6 +1117,14 @@ class RBACAdapter(BaseAdapter):
                 )
                 for f in result.failures
             ],
+        )
+
+    def _role_permission_creator(self, entry: CreatePermissionInputDTO) -> RolePermissionCreator:
+        scope_type = RBACElementType(entry.scope_type)
+        return RolePermissionCreator(
+            scope=self._scope_identifier(scope_type, entry.scope_id),
+            entity_type=EntityType(RBACElementType(entry.entity_type)),
+            permission=Permission.from_operation(InternalOperationType(entry.operation)),
         )
 
     def _permission_creator_spec(self, entry: CreatePermissionInputDTO) -> PermissionCreatorSpec:
