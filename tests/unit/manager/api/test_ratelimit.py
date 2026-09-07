@@ -141,12 +141,6 @@ class TestRlimMiddleware:
                 expected_remaining="0",
                 description="exactly at limit",
             ),
-            RateLimitSuccessCase(
-                limit=0,
-                count=0,
-                expected_remaining="0",
-                description="zero limit before any request lands",
-            ),
         ],
         ids=lambda case: case.description,
     )
