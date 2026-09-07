@@ -13,6 +13,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import time
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
@@ -125,11 +126,31 @@ async def probe_caps(
     return compute_caps(tunnel_offload=tunnel_offload, readiness=readiness)
 
 
-async def publish_caps(etcd: AbstractKVStore, agent_id: str, caps: AgentNetworkCaps) -> None:
-    """Publish this agent's capabilities to etcd for the manager's backend selection."""
+async def publish_caps(
+    etcd: AbstractKVStore,
+    agent_id: str,
+    caps: AgentNetworkCaps,
+    *,
+    backend: str | None = None,
+    vtep_ip: str | None = None,
+) -> None:
+    """Publish this agent's capabilities to etcd for the manager's backend selection.
+
+    ``backend`` and ``vtep_ip`` go in the SAME record as the capabilities, and the record is
+    stamped with the time it was written. All three are what stop a stale advert being read as a
+    live one: an agent id restarted onto a different runtime republishes its backend under its own
+    key and leaves these capabilities standing, and a node whose VTEP has gone refuses every vxlan
+    session it is given. Written as one value, so the manager can never pair a backend with
+    capabilities that were not published together.
+    """
     await etcd.put(
         agent_caps_key(agent_id),
-        json.dumps(dataclasses.asdict(caps)),
+        json.dumps({
+            **dataclasses.asdict(caps),
+            "backend": backend,
+            "vtep_ip": vtep_ip,
+            "updated_at": time.time(),
+        }),
         scope=ConfigScopes.GLOBAL,
     )
 

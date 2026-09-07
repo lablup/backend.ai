@@ -480,3 +480,21 @@ whole prefixes and reads each session's three subtrees in turn.
 
 R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
 real nodes.
+
+Twenty-first round.
+
+| # | Was | Now |
+|---|-----|-----|
+| C43 | "unreadable is not stale" was applied to every child key and inverted at the ROOT. An unreadable session record was replaced with a fresh incarnation on sight -- and it may be the only thing naming the subnet and VNI a running session is on. Once it is gone, everything that session holds reads as an orphan to the next sweep, and a live data plane's VNI goes back to the pool | replaced only where no node says it still holds the session. A member record is that statement, and an unreadable one already counts as holding. Otherwise the create raises, retryably, and says which nodes are on it |
+| C44 | a capability record is durable and the backend was published under a SEPARATE key, so an agent id restarted onto a runtime that publishes nothing left the previous runtime's advert standing -- and the manager paired one with the other. Nothing expired it, nothing said which runtime wrote it, and the VTEP was not part of admission at all although a node without one refuses every vxlan session on arrival | the runtime, the tunnel endpoint and the publish time are in the SAME value as the capabilities, so they cannot be read as a pair that was never written as one. The manager requires all four, and an advert older than ten refresh intervals is not one |
+| C44 | `AgentNetworkCaps(**json.loads(raw))` validated nothing, so `backends: "vxlan"` satisfied `"vxlan" in caps.backends` by substring | a decoder that checks every field's type -- and rejects a payload that is not an object first, since `.get` on a list raises what no caller catches. My own new test found that one |
+| C40 | `_GENERATION_SHAPE` used `^...$` with `match`, and Python's `$` also matches before a trailing newline, so `"a-generation\n"` passed and then compared unequal to the same stamp without it. `_generation_stamp_of` still did `str()` of whatever it found | `fullmatch`, and every reader of a stamp goes through the one validator |
+| C38 | the config watcher survived a failed update but never retried it, and the watch event that carried the change is consumed either way -- so a momentary etcd failure left the change unapplied until some later edit arrived | a failed READ is retried with bounded backoff; a plugin's REFUSAL is reported and left, because retrying hands it the same value |
+
+Still not done, and unchanged: `AsyncEtcd.get_prefix` has no paginated form, so the sweep loads
+whole prefixes and reads each session's three subtrees in turn. There is no stated bound on
+session count.
+
+R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
+real nodes. The fail-closed capability gate added last round and the freshness gate added here
+both change what gets admitted, and neither has run against a real agent.
