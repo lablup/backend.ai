@@ -156,20 +156,14 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             UserUsageBucketEdge,
             UserUsageBucketGQL,
         )
-        from ai.backend.manager.models.resource_usage_history.scopes import (
-            UserUsageBucketOperationScope,
-        )
 
         if self.organization.domain_name is None:
             raise InvalidAPIParameters("User must belong to a domain to query usage buckets")
-        repository_scope = UserUsageBucketOperationScope(
-            resource_group=scope.resource_group_name,
+        payload = await info.context.adapters.resource_usage.gql_search_user_scoped(
+            resource_group_name=scope.resource_group_name,
             domain_name=self.organization.domain_name,
             project_id=scope.project_id,
             user_uuid=UUID(str(self.id)),
-        )
-        payload = await info.context.adapters.resource_usage.gql_search_user_scoped(
-            scope=repository_scope,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
