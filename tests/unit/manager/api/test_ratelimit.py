@@ -78,11 +78,26 @@ class TestRlimMiddleware:
         request["user"] = {"uuid": _USER_ID, "rate_limit": _RATE_LIMIT}
         return request
 
-    async def test_an_anonymous_query_is_judged_by_the_client_address_window(
+    @pytest.fixture
+    def mock_request(self, request: pytest.FixtureRequest) -> web.Request:
+        """The request named by the parametrized fixture."""
+        mock_request: web.Request = request.getfixturevalue(request.param)
+        return mock_request
+
+    @pytest.mark.parametrize(
+        ("mock_request", "expected_limit"),
+        [
+            ("mock_request_anonymous", _ANONYMOUS_RATELIMIT),
+            ("mock_request_authorized", _RATE_LIMIT),
+        ],
+        indirect=["mock_request"],
+    )
+    async def test_a_query_is_judged_by_its_own_window(
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
-        mock_request_anonymous: web.Request,
+        mock_request: web.Request,
+        expected_limit: int,
         mock_handler: AsyncMock,
     ) -> None:
         """The two windows stand apart, so the limit reported says which one governed."""
@@ -95,34 +110,11 @@ class TestRlimMiddleware:
         )
 
         # Act
-        response = await middleware(mock_request_anonymous, mock_handler)
-        await apply_reserved_response_headers(mock_request_anonymous, response)
+        response = await middleware(mock_request, mock_handler)
+        await apply_reserved_response_headers(mock_request, response)
 
         # Assert
-        assert response.headers["X-RateLimit-Limit"] == str(_ANONYMOUS_RATELIMIT)
-
-    async def test_an_authorized_query_is_judged_by_the_user_window(
-        self,
-        middleware: Any,
-        mock_valkey_client: MagicMock,
-        mock_request_authorized: web.Request,
-        mock_handler: AsyncMock,
-    ) -> None:
-        """The two windows stand apart, so the limit reported says which one governed."""
-        # Arrange
-        mock_valkey_client.consume_ip_rate_limit.return_value = RateLimitState(
-            count=1, limit=_ANONYMOUS_RATELIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
-        )
-        mock_valkey_client.consume_user_rate_limit.return_value = RateLimitState(
-            count=1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
-        )
-
-        # Act
-        response = await middleware(mock_request_authorized, mock_handler)
-        await apply_reserved_response_headers(mock_request_authorized, response)
-
-        # Assert
-        assert response.headers["X-RateLimit-Limit"] == str(_RATE_LIMIT)
+        assert response.headers["X-RateLimit-Limit"] == str(expected_limit)
 
     @pytest.mark.parametrize(
         "case",
