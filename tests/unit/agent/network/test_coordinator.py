@@ -23,6 +23,7 @@ from ai.backend.common.network.types import (
     Member,
     NetworkBackendKind,
     SessionNetMeta,
+    mac_for_ip,
 )
 
 _GENERATION = "gen-1"
@@ -56,6 +57,23 @@ class FakeEtcd:
         if self.store.get(key) != expected:
             return False
         del self.store[key]
+        return True
+
+    async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
+        if key in self.store:
+            return False
+        self.store[key] = val
+        return True
+
+    async def replace(self, key: str, initial_val: str, new_val: str, **kwargs: Any) -> bool:
+        """etcd's compare-and-swap on the value: the write lands only over what was expected.
+
+        Modelled because the join rests on it -- a membership published for another incarnation
+        must be refused, and one rewritten under the join must be lost rather than clobbered.
+        """
+        if self.store.get(key) != initial_val:
+            return False
+        self.store[key] = new_val
         return True
 
     def seed_session_meta(self, session_id: str = "s1", **fields: Any) -> str:
@@ -361,10 +379,11 @@ class TestALateJoin:
             """The manager tombstones the session the moment this node publishes its member."""
 
             @override
-            async def put(self, key: str, val: str, **kwargs: Any) -> None:
-                await super().put(key, val)
-                if key == member_key("s1", "a1"):
+            async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
+                created = await super().put_if_absent(key, val, **kwargs)
+                if created and key == member_key("s1", "a1"):
                     self.seed_session_meta(**{SESSION_META_STATE: "deleting"})
+                return created
 
         etcd = _TornDownMidJoin()
         etcd.seed_session_meta()
@@ -520,11 +539,12 @@ class TestARequestThatArrivedTooLate:
             this join publishes."""
 
             @override
-            async def put(self, key: str, val: str, **kwargs: Any) -> None:
-                await super().put(key, val)
-                if key == member_key("s1", "a1"):
+            async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
+                created = await super().put_if_absent(key, val, **kwargs)
+                if created and key == member_key("s1", "a1"):
                     self.seed_session_meta(**{SESSION_META_GENERATION: "g2"})
                     self.store[member_key("s1", "a1")] = newer
+                return created
 
         etcd = _RebuiltMidJoin()
         etcd.seed_session_meta()
@@ -550,6 +570,174 @@ class TestARequestThatArrivedTooLate:
         await coord.stop("s1")
 
         assert etcd.store[member_key("s1", "a1")] == newer
+
+
+class TestAnEarlierInstanceStillRunning:
+    """C12. The agent process that served an earlier incarnation of a session id does not stop
+    when the manager rebuilds it. Its membership write and its withdrawal are separate steps from
+    the checks in front of them, and an unconditional one of either reaches through to the live
+    session's record."""
+
+    async def test_a_stale_join_does_not_clobber_a_newer_membership(self) -> None:
+        newer = json.dumps(
+            Member(
+                agent_id="a1", host_ip="10.0.0.9", vtep_ip="10.0.0.9", joined=True, generation="g2"
+            ).to_etcd_payload()
+        )
+        etcd = FakeEtcd()
+        etcd.seed_session_meta()  # READY, incarnation _GENERATION
+        etcd.store[member_key("s1", "a1")] = newer
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+
+        with pytest.raises(SessionNetworkGone):
+            await coord.start(_META, _SELF)
+
+        assert etcd.store[member_key("s1", "a1")] == newer, (
+            "it wrote this node out of the session it is actually in"
+        )
+        assert backend.setup == []
+
+    async def test_a_membership_rewritten_under_the_join_is_not_overwritten(self) -> None:
+        """The read in front of the write is not the fence -- the write is. A newer join that
+        lands between them must win the compare-and-swap, not lose to a plain put."""
+
+        newer = json.dumps(
+            Member(
+                agent_id="a1", host_ip="10.0.0.9", vtep_ip="10.0.0.9", joined=True, generation="g2"
+            ).to_etcd_payload()
+        )
+
+        class _NewerJoinLandsFirst(FakeEtcd):
+            """A later incarnation publishes this node's membership the moment the stale join
+            finds the key absent and is about to claim it."""
+
+            def __init__(self) -> None:
+                super().__init__()
+                self.armed = True
+
+            @override
+            async def put_if_absent(self, key: str, val: str, **kwargs: Any) -> bool:
+                if key == member_key("s1", "a1") and self.armed:
+                    self.armed = False
+                    self.store[key] = newer
+                    return False
+                return await super().put_if_absent(key, val, **kwargs)
+
+        etcd = _NewerJoinLandsFirst()
+        etcd.seed_session_meta()
+        coord = _coordinator(etcd, RecordingBackend())
+
+        with pytest.raises(SessionNetworkGone):
+            await coord.start(_META, _SELF)
+
+        assert etcd.store[member_key("s1", "a1")] == newer
+
+    async def test_a_teardown_does_not_delete_a_membership_written_under_its_read(self) -> None:
+        """The generation check and the delete are two steps. A newer join between them publishes
+        a membership the check never saw, and an unconditional delete takes it."""
+
+        newer = json.dumps(
+            Member(
+                agent_id="a1", host_ip="10.0.0.9", vtep_ip="10.0.0.9", joined=True, generation="g2"
+            ).to_etcd_payload()
+        )
+
+        class _RejoinsAfterTheCheck(FakeEtcd):
+            def __init__(self) -> None:
+                super().__init__()
+                self.armed = False
+
+            @override
+            async def get(self, key: str, **kwargs: Any) -> str | None:
+                found = await super().get(key, **kwargs)
+                if key == member_key("s1", "a1") and self.armed:
+                    self.armed = False
+                    self.store[key] = newer
+                return found
+
+        etcd = _RejoinsAfterTheCheck()
+        etcd.seed_session_meta()
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.start(_META, _SELF)
+        etcd.armed = True
+
+        await coord.stop("s1")
+
+        assert etcd.store[member_key("s1", "a1")] == newer
+
+
+class TestATableSharedWithAnotherIncarnation:
+    """C13. The endpoints and members of a session id are one table however many incarnations have
+    used it. A record left by an earlier one -- by a create that was still running, or a cleanup
+    that has not finished -- names addresses and VTEPs the live session's kernels do not hold, and
+    programming it is silent: the frames leave and nothing answers."""
+
+    async def test_an_endpoint_of_another_incarnation_is_not_programmed(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_session_meta()
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint("k2", "10.128.5.22", mac_for_ip("10.128.5.22"), "a2")
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.start(_META, _SELF)
+        try:
+            assert backend.endpoints_added == [("10.128.5.22", "10.0.0.2")]
+            # A leftover from the incarnation this session id had before.
+            etcd.store["network/session/s1/endpoints/k9"] = json.dumps({
+                "ip": "10.128.5.99",
+                "mac": mac_for_ip("10.128.5.99"),
+                "agent_id": "a2",
+                "container_id": "k9",
+                "cluster_hostname": "sub9",
+                "generation": "gen-0",
+            })
+
+            await coord.reconcile_endpoints("s1")
+
+            assert backend.endpoints_added == [("10.128.5.22", "10.0.0.2")]
+            assert coord.resolve_cluster_name("s1", "sub9") is None
+        finally:
+            await coord.stop("s1")
+
+    async def test_a_member_of_another_incarnation_is_not_a_peer(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_session_meta()
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.start(_META, _SELF)
+        try:
+            etcd.store[member_key("s1", "a9")] = json.dumps(
+                Member(
+                    agent_id="a9",
+                    host_ip="10.0.0.9",
+                    vtep_ip="10.0.0.9",
+                    joined=True,
+                    generation="gen-0",
+                ).to_etcd_payload()
+            )
+
+            await coord.reconcile_peers("s1")
+
+            assert backend.added == []
+        finally:
+            await coord.stop("s1")
+
+    async def test_a_session_with_no_incarnation_still_sees_its_whole_table(self) -> None:
+        # A node-local BRIDGE session, or a manager from before the field: there is nothing to tell
+        # apart, and filtering on a generation nobody publishes would empty the table.
+        etcd = FakeEtcd()
+        etcd.seed_member(_PEER2)
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        local = SessionNetMeta(
+            session_id="s1", subnet="10.128.0.0/24", backend=NetworkBackendKind.BRIDGE, mtu=1500
+        )
+        await coord.start(local, _SELF)
+        try:
+            assert backend.added == ["a2"]
+        finally:
+            await coord.stop("s1")
 
 
 class TestReconcileEndpoints:

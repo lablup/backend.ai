@@ -1136,6 +1136,7 @@ class PrivNetServer:
             vni=cfg.vni,
             vxlan_port=cfg.vxlan_port,
             encryption_key=cfg.encryption_key,
+            generation=cfg.generation,
         )
 
     def _members_of(self, peer_vteps: Sequence[str]) -> list[Member]:
@@ -1501,6 +1502,8 @@ class PrivNetServer:
             )
 
     async def _dispatch_locked(self, req: PrivNetRequest, session_id: str) -> PrivNetResponse:
+        if (refusal := await self._wrong_incarnation(req, session_id)) is not None:
+            return refusal
         try:
             match req.op:
                 case PrivNetOp.SETUP_SESSION:
@@ -1568,6 +1571,59 @@ class PrivNetServer:
             return self._backends[str(backend)]
         except KeyError:
             raise PrivNetError("unsupported backend") from None
+
+    async def _wrong_incarnation(
+        self, req: PrivNetRequest, session_id: str
+    ) -> PrivNetResponse | None:
+        """Refuse a request issued for an incarnation of the session this node does not hold.
+
+        The lock above orders requests for one session id; it cannot tell whose they are. A session
+        id is reused, so a TEARDOWN_SESSION that was delayed across a teardown and a rebuild is, by
+        session id alone, a perfectly valid instruction to delete the data plane that is now live
+        -- and the same goes for DETACH_CONTAINER, DEL_PEER and the DNS redirect. The generation
+        the agent stamps on each request is the only thing that tells them apart.
+
+        Applied once, here, so a verb added later is fenced without being remembered. A request
+        that names no incarnation is not fenced: that is an agent older than the field, and every
+        node-wide op (the recovery probe, the port listing) uses the session field as a lock key.
+        """
+        if req.generation is None:
+            return None
+        live = await self._live_generation(session_id)
+        if live is None or live == req.generation:
+            return None
+        log.warning(
+            "refusing {} for session {}: it names incarnation {}, and this node holds {}",
+            req.op,
+            session_id,
+            req.generation,
+            live,
+        )
+        return PrivNetResponse(
+            ok=False,
+            error=(
+                f"session {session_id} on this node is incarnation {live}, and this request was"
+                f" issued for {req.generation}; refusing rather than acting on the data plane of a"
+                " session the request was not meant for"
+            ),
+        )
+
+    async def _live_generation(self, session_id: str) -> str | None:
+        """The incarnation of the session this node currently holds state for, if it names one.
+
+        The live entry first, the journal second -- the same order and the same reason as
+        `_binding_of`: after a restart the entry is gone and the record is all there is. None means
+        this node holds nothing under the id, or holds it from before the field, and there is
+        nothing to tell a request apart from.
+        """
+        entry = self._sessions.get(session_id)
+        if entry is not None:
+            return entry.meta.generation
+        raw_config = await self._journalled_config(session_id)
+        if raw_config is None:
+            return None
+        generation = raw_config.get("generation")
+        return str(generation) if generation else None
 
     async def _setup(self, session_id: str, raw_config: dict[str, Any]) -> None:
         cfg = policy.validate_network_config(raw_config)

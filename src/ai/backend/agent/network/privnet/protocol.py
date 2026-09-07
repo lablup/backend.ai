@@ -188,6 +188,14 @@ class PrivNetRequest:
     # agent's own numbers, exactly as they are when the agent writes the cgroup itself.
     cgroup_pid: int | None = None
     cgroup_limits: dict[str, str] | None = None
+    # WHICH incarnation of ``session_id`` this request is for. A session id is reused, and the
+    # privnet serializes requests per session but cannot tell one incarnation's from the next's:
+    # a TEARDOWN_SESSION delayed across a teardown and a rebuild is, by session id alone, a valid
+    # request to delete the data plane that is now live. Carried on every session-scoped request
+    # the agent makes for a session it set up, and checked against what this node actually holds
+    # (see the privnet server's generation guard). ``None`` from an agent older than the field, or
+    # on a node-wide op that names no session.
+    generation: str | None = None
 
     def encode(self) -> bytes:
         payload: dict[str, Any] = {"op": str(self.op), "session_id": self.session_id}
@@ -205,6 +213,8 @@ class PrivNetRequest:
             payload["cgroup_pid"] = self.cgroup_pid
         if self.cgroup_limits is not None:
             payload["cgroup_limits"] = self.cgroup_limits
+        if self.generation is not None:
+            payload["generation"] = self.generation
         for key in ("vtep_ip", "ip", "mac", "local_ip"):
             value = getattr(self, key)
             if value is not None:
@@ -258,6 +268,9 @@ class PrivNetRequest:
             and all(isinstance(k, str) and isinstance(v, str) for k, v in cgroup_limits.items())
         ):
             raise ProtocolError("cgroup_limits must be a string map")
+        generation = data.get("generation")
+        if generation is not None and (not isinstance(generation, str) or not generation):
+            raise ProtocolError("generation must be a non-empty string")
         return cls(
             op=op,
             session_id=session_id,
@@ -268,6 +281,7 @@ class PrivNetRequest:
             dns_port=dns_port,
             cgroup_pid=cgroup_pid,
             cgroup_limits=cgroup_limits,
+            generation=generation,
             **fields,
         )
 

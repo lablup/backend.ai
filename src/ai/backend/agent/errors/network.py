@@ -38,6 +38,30 @@ class UnknownPrivnetBackend(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class HostAddressesUnreadable(BackendAIError, web.HTTPInternalServerError):
+    """This node could not be asked which addresses it already carries.
+
+    The node-local subnet allocator hands out a block only if nothing on the host already answers
+    inside it: a leaked bridge, or one an agent still on the pre-node-wide code journalled where
+    this allocator cannot see it. Reading the failure as "no addresses" handed that block out
+    again, putting two bridges on one subnet with the same gateway -- which breaks quietly, on
+    whichever container's traffic happens to take the wrong one.
+
+    So the session is refused instead. Loud, and on the node that cannot answer for itself.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/host-addresses-unreadable"
+    error_title = "This node's own addresses could not be read."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class LocalSubnetPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
     """Raised when every node-local /24 block for session LOCAL bridges is taken."""
 

@@ -26,6 +26,9 @@ from ai.backend.common.network.types import DEFAULT_VXLAN_PORT, NetworkBackendKi
 # a UUID-ish token; container_id is a containerd id (hex) or a kernel UUID.
 _SESSION_ID_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _CONTAINER_ID_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+#: The manager mints this as a uuid4 hex; bounded and alphanumeric here because it is compared and
+#: journalled, never interpolated into a command.
+_GENERATION_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _MAC_RE = re.compile(r"\A[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}\Z")
 
 # The privnet only ever operates on RFC1918 space; a manager-provided subnet outside
@@ -66,6 +69,17 @@ class ValidatedNetworkConfig:
     #: would write a policy that the actual traffic does not match.
     vxlan_port: int
     encryption_key: str | None
+    #: Which incarnation of the session id this declaration is for, or None from an agent older
+    #: than the field. The session id alone does not say: it is reused, and a request that arrives
+    #: after the session was torn down and built again names the same one. See
+    #: ``SESSION_META_GENERATION``.
+    generation: str | None
+
+
+def validate_generation(value: object) -> str:
+    if not isinstance(value, str) or not _GENERATION_RE.match(value):
+        raise PolicyViolation("invalid generation")
+    return value
 
 
 def validate_session_id(value: str) -> str:
@@ -240,6 +254,9 @@ def validate_network_config(raw: dict[str, Any]) -> ValidatedNetworkConfig:
         if not (1 <= vxlan_port <= 65535):
             raise PolicyViolation("vxlan_port out of range")
 
+    generation_raw = raw.get("generation")
+    generation = validate_generation(generation_raw) if generation_raw is not None else None
+
     return ValidatedNetworkConfig(
         backend=backend,
         subnet=subnet,
@@ -247,4 +264,5 @@ def validate_network_config(raw: dict[str, Any]) -> ValidatedNetworkConfig:
         mtu=mtu,
         vxlan_port=vxlan_port,
         encryption_key=encryption_key,
+        generation=generation,
     )

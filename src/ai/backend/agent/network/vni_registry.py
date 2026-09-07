@@ -59,8 +59,20 @@ def config_digest(raw_config: Mapping[str, Any]) -> str:
 
     Not a secret and not a signature -- an agent that can declare a configuration can compute its
     digest. It answers one question: is this the SAME declaration the VNI is already bound to?
+
+    The incarnation counts as part of the declaration. A session id is reused, and the pool hands
+    a freed subnet and VNI straight back, so two incarnations of one session commonly declare an
+    identical set of these fields -- and a binding that could not tell them apart let a stale
+    request adopt, or release, the live one's devices.
+
+    Appended only when there is one, so a record written before the field keeps the digest its
+    claim on disk was made under. Rebuilding it from a journal after an upgrade otherwise names a
+    claim nothing holds, and the VNI stays reserved on the node for good.
     """
     parts = "|".join(f"{field}={raw_config.get(field)!r}" for field in _BOUND_FIELDS)
+    generation = raw_config.get("generation")
+    if generation is not None:
+        parts += f"|generation={generation!r}"
     return hashlib.sha256(parts.encode()).hexdigest()[:16]
 
 
