@@ -55,11 +55,17 @@ class ArtifactRegistryAdapter(BaseAdapter):
     async def get_registry_metas(
         self, registry_ids: list[uuid.UUID]
     ) -> list[ArtifactRegistryGQLNode]:
-        """Get metadata for multiple artifact registries by IDs."""
-        action_result = await self._processors.artifact_registry.get_registry_metas.run(
-            GetArtifactRegistryMetasAction(registry_ids=registry_ids)
+        """Get metadata for the named artifact registries.
+
+        An id the caller may not read is left out beside one matching no row, so the
+        caller cannot tell a denied registry from an absent one.
+        """
+        result = await self._processors.artifact_registry.get_registry_metas.run(
+            GetArtifactRegistryMetasAction(
+                registry_ids=[ArtifactRegistryID(registry_id) for registry_id in registry_ids]
+            )
         )
-        return [self._data_to_dto(item) for item in action_result.result]
+        return [self._data_to_dto(item.value) for item in result.items if item.value is not None]
 
     async def batch_load_by_ids(
         self, ids: Sequence[uuid.UUID]

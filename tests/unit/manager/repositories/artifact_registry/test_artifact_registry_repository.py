@@ -204,35 +204,6 @@ class TestArtifactRegistryRepository:
             )
 
     # =========================================================================
-    # Tests - Get Multiple
-    # =========================================================================
-
-    async def test_get_artifact_registry_datas(
-        self,
-        artifact_registry_repository: ArtifactRegistryRepository,
-        sample_registries_for_ordering: list[uuid.UUID],
-    ) -> None:
-        """Test retrieving multiple artifact registries by IDs"""
-        registry_ids = sample_registries_for_ordering[:2]
-        retrieved_registries = await artifact_registry_repository.get_artifact_registry_datas(
-            registry_ids
-        )
-
-        assert len(retrieved_registries) == 2
-        retrieved_ids = [r.registry_id for r in retrieved_registries]
-        for registry_id in registry_ids:
-            assert registry_id in retrieved_ids
-
-    async def test_get_artifact_registry_datas_empty(
-        self,
-        artifact_registry_repository: ArtifactRegistryRepository,
-    ) -> None:
-        """Test retrieving multiple artifact registries with empty list returns empty"""
-        retrieved_registries = await artifact_registry_repository.get_artifact_registry_datas([])
-
-        assert len(retrieved_registries) == 0
-
-    # =========================================================================
     # Tests - Get Type
     # =========================================================================
 

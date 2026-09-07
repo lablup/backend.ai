@@ -1,5 +1,6 @@
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
@@ -11,7 +12,6 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_meta impor
 )
 from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
     GetArtifactRegistryMetasAction,
-    GetArtifactRegistryMetasActionResult,
 )
 from ai.backend.manager.services.artifact_registry.actions.common.search import (
     SearchArtifactRegistriesAction,
@@ -127,8 +127,8 @@ class ArtifactRegistryProcessors:
     get_registry_meta: SingleEntityActionProcessor[
         GetArtifactRegistryMetaAction, GetArtifactRegistryMetaActionResult
     ]
-    get_registry_metas: GlobalActionProcessor[
-        GetArtifactRegistryMetasAction, GetArtifactRegistryMetasActionResult
+    get_registry_metas: PartialBulkActionProcessor[
+        GetArtifactRegistryMetasAction, ArtifactRegistryData
     ]
     search_artifact_registries: GlobalActionProcessor[
         SearchArtifactRegistriesAction, SearchArtifactRegistriesActionResult
@@ -184,6 +184,7 @@ class ArtifactRegistryProcessors:
         self.get_registry_meta = group.single_entity(
             GetArtifactRegistryMetaAction, service.get_registry_meta
         )
+        self.get_registry_metas = group.partial_bulk_get_ops(GetArtifactRegistryMetasAction)
 
         # Internal/batch actions without RBAC
         self.get_huggingface_registries = group.global_scope(
@@ -191,7 +192,4 @@ class ArtifactRegistryProcessors:
         )
         self.get_reservoir_registries = group.global_scope(
             GetReservoirRegistriesAction, service.get_reservoir_registries
-        )
-        self.get_registry_metas = group.global_scope(
-            GetArtifactRegistryMetasAction, service.get_registry_metas
         )
