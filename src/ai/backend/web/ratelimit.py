@@ -44,7 +44,7 @@ def manager_proxy_rate_limited(handler: Handler) -> Handler:
 
         valkey_client: ValkeyRateLimitClient = request.app["valkey_rate_limit"]
         state = await valkey_client.get_state(user_id)
-        if state is None or state.limit is None:
+        if state is None:
             return await handler(request)
 
         if state.count >= state.limit:
@@ -57,7 +57,7 @@ def manager_proxy_rate_limited(handler: Handler) -> Handler:
                 headers={
                     "X-RateLimit-Limit": str(state.limit),
                     "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": str(state.reset),
+                    "X-RateLimit-Reset": str(state.reset_after_seconds),
                     "X-RateLimit-Window": str(_RATELIMIT_WINDOW),
                 },
             )
