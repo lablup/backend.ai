@@ -16,6 +16,7 @@ from sqlalchemy.orm import load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
@@ -296,9 +297,7 @@ class UserDBSource:
         # the updater writes only the deprecated name column.
         new_domain_name = updater.domain_name.optional_value()
         if new_domain_name and new_domain_name != current_user.domain_name:
-            new_domain_id = await session.scalar(
-                sa.select(DomainRow.id).where(DomainRow.name == new_domain_name)
-            )
+            new_domain_id = await self._domain_id_by_name(session, new_domain_name)
             if new_domain_id is None:
                 raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
             to_update["domain_id"] = new_domain_id
@@ -547,6 +546,11 @@ class UserDBSource:
                 sa.delete(keypairs).where(keypairs.c.user == user_uuid),
             )
             return result.rowcount
+
+    async def _domain_id_by_name(self, session: SASession, domain_name: str) -> DomainID | None:
+        """The domain's id, or None where no domain goes by that name."""
+        query = sa.select(DomainRow.id).where(DomainRow.name == domain_name)
+        return (await session.execute(query)).scalar_one_or_none()
 
     async def _check_resource_policy_exists(
         self, session: SASession | AsyncConnection, policy_name: str
