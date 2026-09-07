@@ -760,7 +760,12 @@ class TestForwardAccept:
         assert forward_accept_check_args(4097) in rec.calls
         assert forward_accept_add_args(4097) not in rec.calls
 
-    async def test_setup_survives_missing_iptables(self) -> None:
+    async def test_setup_refuses_when_iptables_cannot_be_asked(self) -> None:
+        """A host that cannot answer "is this bridge allowed to forward?" is not a host with no
+        FORWARD policy. This backend already declares iptables required, so a node without it is
+        one no overlay session should have reached -- and treating the missing binary as "no rule
+        needed" turns a readiness failure into a session that comes up carrying nothing."""
+
         class _NoIptablesRunner(Recorder):
             @override
             async def __call__(self, argv: Sequence[str]) -> None:
@@ -769,7 +774,20 @@ class TestForwardAccept:
                 await super().__call__(argv)
 
         plugin = _plugin(_NoIptablesRunner())
-        await plugin.setup_session_network(_META, _SELF)  # must not raise
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(_META, _SELF)
+
+    async def test_a_denied_exec_is_refused_the_same_way(self) -> None:
+        class _DeniedRunner(Recorder):
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                if argv and argv[0] == "iptables":
+                    raise PermissionError(13, "Permission denied")
+                await super().__call__(argv)
+
+        plugin = _plugin(_DeniedRunner())
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(_META, _SELF)
 
     async def test_teardown_removes_forward_accept(self) -> None:
         rec = Recorder()

@@ -1708,11 +1708,26 @@ class TestARequestForAnotherIncarnation:
             assert resp.ok, resp.error
             assert h.backend.teardown_calls == ["s1"]
 
-    async def test_a_request_naming_no_incarnation_is_not_fenced(self, tmp_path: Path) -> None:
-        # An agent from before the field stamps nothing, and refusing it would break the upgrade
-        # in the direction that leaves data planes standing with nothing able to remove them.
+    async def test_a_request_naming_no_incarnation_is_refused_too(self, tmp_path: Path) -> None:
+        """An unstamped request for a session this node holds an incarnation for is exactly the
+        shape a stale one has, and cannot be told from it. What is fenced is decided by what the
+        node holds, not by what the request happens to carry -- otherwise omitting the field is a
+        way round the fence, and a caller that built its own client omits it by accident."""
         async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
             await self._live(h, "g2")
+
+            with pytest.raises(PrivNetClientError):
+                await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+
+            assert h.backend.teardown_calls == []
+
+    async def test_a_session_this_node_holds_no_incarnation_for_is_not_fenced(
+        self, tmp_path: Path
+    ) -> None:
+        # A node-local session, or one set up before the field: there is nothing to tell apart,
+        # and refusing here would leave data planes standing with nothing able to remove them.
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            await h.setup("s1")
 
             resp = await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
 

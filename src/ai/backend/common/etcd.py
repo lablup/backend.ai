@@ -225,6 +225,19 @@ class AbstractKVStore(ABC):
         pass
 
     @abstractmethod
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: Mapping[str, str],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
     async def delete_if_value(
         self,
         key: str,
@@ -758,6 +771,70 @@ class AsyncEtcd(AbstractKVStore):
                 .and_then([
                     TxnOp.put(mangled_key.encode(self.encoding), str(val).encode(self.encoding))
                 ])
+                .or_else([])
+            )
+
+            return cast(bool, result.succeeded())
+
+    @override
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: Mapping[str, str],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """
+        Atomically write ``key`` only if it is in the expected state AND every guard key still
+        holds exactly the bytes given for it.
+
+        ``expected`` is the target's own condition: ``None`` means it must not exist yet,
+        otherwise it must hold those exact bytes. ``guards`` are keys that are only READ --
+        typically the record whose ownership makes this write legitimate at all.
+
+        This is what a compare-and-swap on the target alone cannot express. A caller that checks
+        it still owns a session and then writes the session's child key has two operations, and
+        between them the session can be torn down and rebuilt: the child key it finds absent is
+        absent because somebody else's cleanup removed it, and creating it there attaches this
+        caller's state to a session that is not its. Naming the owning record as a guard makes the
+        check and the write one thing, which the store either applies whole or does not apply.
+
+        :return: ``True`` if the write landed, ``False`` if any condition failed.
+        """
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        conditions = []
+        if expected is None:
+            conditions.append(
+                Compare.create_revision(mangled_key.encode(self.encoding), CompareOp.EQUAL, 0)
+            )
+        else:
+            conditions.append(
+                Compare.value(
+                    mangled_key.encode(self.encoding),
+                    CompareOp.EQUAL,
+                    expected.encode(self.encoding),
+                )
+            )
+        for guard_key, guard_val in guards.items():
+            mangled_guard = self._mangle_key(f"{_slash(scope_prefix)}{guard_key}")
+            conditions.append(
+                Compare.value(
+                    mangled_guard.encode(self.encoding),
+                    CompareOp.EQUAL,
+                    guard_val.encode(self.encoding),
+                )
+            )
+
+        async with self.etcd.connect() as communicator:
+            result = await communicator.txn(
+                EtcdTransactionAction()
+                .when(conditions)
+                .and_then([TxnOp.put(mangled_key.encode(self.encoding), val.encode(self.encoding))])
                 .or_else([])
             )
 

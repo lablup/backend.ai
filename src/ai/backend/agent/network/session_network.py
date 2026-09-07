@@ -188,6 +188,11 @@ class SessionNetwork:
     # A vxlan session refuses to set up here in that case, rather than publishing a VTEP its peers
     # cannot reach and building an overlay that carries nothing.
     _vtep_ip: str | None
+    # The privnet client this node's sessions are bound on, or None when there is no privnet.
+    # Shared rather than rebuilt per caller: it is what carries each session's incarnation onto
+    # the wire (see `PrivNetClient.bind_session`), so a second client built elsewhere sends
+    # requests the privnet cannot tell apart from a stale one's.
+    _privnet_client: Any
     #: Backends whose surviving tunnels recovery could not bring down, and why.
     _recovery_incomplete: dict[str, str]
     #: Sessions this node holds state for but could not resume, and why.
@@ -209,11 +214,13 @@ class SessionNetwork:
         ipam: HostLocalIpam | None = None,
         vtep_ip: str | None = None,
         configured_dns: Sequence[str] = (),
+        privnet_client: Any = None,
     ) -> None:
         self._etcd = etcd
         self._agent_id = agent_id
         self._host_ip = host_ip
         self._vtep_ip = vtep_ip
+        self._privnet_client = privnet_client
         self._recovery_incomplete = {}
         self._unresumed = {}
         # Two interfaces onto the node's containers, and deliberately two objects. The lifecycle
@@ -1062,6 +1069,17 @@ class SessionNetwork:
             if attachment is not None:
                 self._attachments[container_id] = attachment
 
+    @property
+    def privnet_client(self) -> Any:
+        """The privnet client this node's sessions are bound on, or None without a privnet.
+
+        Handed out rather than rebuilt at each use: the binding that puts a session's incarnation
+        on the wire lives on this object (`PrivNetClient.bind_session`), and a second client built
+        from the same socket sends requests carrying none -- which the privnet cannot tell from a
+        stale incarnation's, and which it is therefore right to refuse.
+        """
+        return self._privnet_client
+
     def session_of(self, container_id: str) -> str | None:
         """The session a live container belongs to, from the attach record (rebuilt by `recover`
         after a restart). The privnet's port verbs need it to reach the right session lock."""
@@ -1811,6 +1829,7 @@ def build_session_network(
     # In privnet mode the LOCAL subnet lookup is a read-only RPC to the pool's owner; None
     # in-process, where owned_local_subnets answers directly.
     privnet_local_subnet: Callable[[str], Awaitable[str | None]] | None = None
+    privnet_client: Any = None
     if privnet_socket is not None:
         from ai.backend.agent.network.privnet.client import (
             PrivNetBackendProxy,
@@ -1819,6 +1838,7 @@ def build_session_network(
         )
 
         client = PrivNetClient(privnet_socket)
+        privnet_client = client
         proxy = PrivNetBackendProxy({}, {}, client=client, uplink=uplink)
         backends = {
             str(NetworkBackendKind.VXLAN): proxy,
@@ -1887,4 +1907,5 @@ def build_session_network(
         ipam=owned_ipam,
         vtep_ip=vtep_ip,
         configured_dns=configured_dns,
+        privnet_client=privnet_client,
     )

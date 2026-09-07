@@ -25,8 +25,16 @@ from typing import Any
 #: inference from an error string -- and a caller that needs a newer verb refuses instead of
 #: reading a failure as an answer.
 #:
-#: 1: the original verb set. 2: RECOVERY_STATUS. 3: ENCRYPTION_PROBE.
-PROTOCOL_VERSION: int = 3
+#: 1: the original verb set. 2: RECOVERY_STATUS. 3: ENCRYPTION_PROBE. 4: session requests carry
+#: the incarnation of the session id they are for, and a daemon that speaks this refuses one it
+#: does not hold.
+#:
+#: 4 is a FENCE, not a verb, which is why it is a version and not an optional field an old daemon
+#: may ignore. Agent and privnet are separate processes and upgrade separately: a daemon on 3
+#: reads the new field as noise and carries out a teardown issued for a session that no longer
+#: exists. A caller with a session to protect checks for 4 before it trusts one (see
+#: `PrivNetClient.bind_session`).
+PROTOCOL_VERSION: int = 4
 
 
 class PrivNetOp(enum.StrEnum):

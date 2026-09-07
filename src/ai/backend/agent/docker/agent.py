@@ -62,6 +62,7 @@ from ai.backend.agent.errors import (
     InvalidArgumentError,
     UnsupportedResource,
 )
+from ai.backend.agent.errors.network import ContainerLifecycleUnavailable
 from ai.backend.agent.errors.resources import PortPoolExhaustedError, ResourceError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
@@ -94,7 +95,7 @@ from ai.backend.agent.network.port_forward import (
     PortPublisher,
     forwards_for,
 )
-from ai.backend.agent.network.privnet.client import PrivNetClient, PrivNetPortForwarder
+from ai.backend.agent.network.privnet.client import PrivNetPortForwarder
 from ai.backend.agent.network.session_network import SessionNetwork
 from ai.backend.agent.network.vtep import uplink_for_ip, usable_vtep
 from ai.backend.agent.plugin.network import (
@@ -424,7 +425,17 @@ def _port_publisher(
     privnet_socket = local_config.agent.network_privnet_socket
     if privnet_socket is None:
         return PortForwarder()
-    return PrivNetPortForwarder(PrivNetClient(privnet_socket), session_network.session_of)
+    # The session network's own client, not a fresh one on the same socket. That object is where
+    # each session's incarnation is bound, and it is what stamps every request with it; a client
+    # built here carries none, so a PUBLISH or UNPUBLISH delayed across a teardown and a rebuild
+    # would reach the rules of the session that replaced the one it was issued for.
+    client = session_network.privnet_client
+    if client is None:
+        raise ContainerLifecycleUnavailable(
+            "this agent is configured with a privileged network helper, but its session network"
+            " holds no client for it; host port rules would be installed unfenced"
+        )
+    return PrivNetPortForwarder(client, session_network.session_of)
 
 
 class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):

@@ -61,6 +61,10 @@ PrivNetClientError = PrivilegedNetworkHelperFailed
 _RECOVERY_STATUS_VERSION = 2
 #: The protocol version that introduced ENCRYPTION_PROBE.
 _ENCRYPTION_PROBE_VERSION = 3
+#: The first protocol that FENCES a session request on the incarnation it names. A daemon below it
+#: reads the field as noise, so a request issued for a session that no longer exists is carried out
+#: against whatever holds its id now -- which is the whole failure the field exists to stop.
+_FENCED_SESSION_VERSION = 4
 #: How long one privnet verb may take. Generous, because the far side runs real privileged
 #: commands under a node-wide lock; finite, because without it one wedged command stops every
 #: session operation on this agent with nothing in the log to say why.
@@ -101,6 +105,40 @@ class PrivNetClient:
     def release_session(self, session_id: str) -> None:
         """Forget the incarnation, once this agent is done with the session."""
         self._generations.pop(session_id, None)
+
+    async def fencing_problems(self) -> dict[str, str]:
+        """Whether this daemon checks WHICH incarnation of a session a request was issued for.
+
+        Agent and privnet are separate processes and upgrade separately, so a daemon older than
+        the fence reads the incarnation as noise: the session comes up, and the first request
+        delayed across a teardown and a rebuild is carried out against whatever holds the id then.
+
+        Reported as readiness rather than checked per session. It is a property of the daemon, not
+        of a session; the manager reads readiness before it places anything here, so a node whose
+        helper cannot fence stops taking overlay sessions instead of failing them one at a time --
+        and a session already built cannot be un-built by a later refusal anyway.
+
+        A failure to ask is itself a problem, as it is for the other two probes.
+        """
+        try:
+            resp = await self.call(PrivNetRequest(PrivNetOp.RECOVERY_STATUS, "status"))
+        except (PrivNetClientError, ProtocolError, OSError) as e:
+            return {
+                "privnet:fencing": (
+                    f"this node's privnet could not report its protocol version ({e}), so whether"
+                    " it checks which incarnation of a session a request is for is unknown"
+                )
+            }
+        version = resp.version if resp.version is not None else 1
+        if version >= _FENCED_SESSION_VERSION:
+            return {}
+        return {
+            "privnet:fencing": (
+                f"this node's privnet speaks protocol {version}, which carries out a session"
+                " request without checking which incarnation of the session it was issued for"
+                f" (protocol {_FENCED_SESSION_VERSION} does); restart it on the agent's version"
+            )
+        }
 
     async def recovery_problems(self) -> dict[str, str]:
         """What the privnet says it could not take charge of.

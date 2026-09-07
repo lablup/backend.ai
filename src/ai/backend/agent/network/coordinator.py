@@ -189,7 +189,7 @@ class SessionNetworkCoordinator:
             # cleanup of an earlier one cannot take it back and a later one is not mistaken for it.
             generation=meta.generation,
         )
-        await self._publish_member(meta.session_id, published)
+        await self._publish_member(meta.session_id, published, fence)
         if fence is not None:
             await self._require_session_current(meta.session_id, fence, published)
         self._joined[meta.session_id] = meta.generation
@@ -566,43 +566,44 @@ class SessionNetworkCoordinator:
             " manager owns what happens to the session now"
         )
 
-    async def _publish_member(self, session_id: str, member: Member) -> None:
-        """Put this node into the session's membership, over nothing but its own incarnation.
+    async def _publish_member(self, session_id: str, member: Member, fence: str | None) -> None:
+        """Put this node into the session's membership, under the manager's record and over
+        nothing but this node's own incarnation.
 
-        An unconditional write is what let an agent instance still running for an earlier
-        incarnation clobber the membership a later one had published -- and then, on finding the
-        record moved on, delete exactly those bytes again (`_require_session_current`), leaving the
-        live data plane with no membership at all and the manager free to hand its VNI away.
+        Two things are wrong with writing the key on its own. An unconditional write let an agent
+        instance still running for an earlier incarnation clobber the membership a later one had
+        published -- and then, on finding the record moved on, delete exactly those bytes again
+        (`_require_session_current`), leaving the live data plane with no membership and the
+        manager free to hand its VNI away. And a compare-and-swap on this key alone still CREATES
+        it when it is absent: absent is what the manager's cleanup just made it, so the stale join
+        puts a member back under a session that no longer exists, where it blocks the teardown of
+        whatever replaces it and nothing ever comes for it.
 
-        There is no lock between reading the key and writing it, so the read is not the fence: the
-        write is. A record of another incarnation is refused, and one of ours is replaced by
-        compare-and-swap, which a concurrent newer write loses rather than slips through.
+        So the manager's record is named as a guard and the write is one store operation with the
+        check: it lands whole under the session this node is actually joining, or not at all.
 
         Raises:
-            SessionNetworkGone: the key belongs to another incarnation of the session.
+            SessionNetworkGone: the key belongs to another incarnation, or the record moved on.
         """
         payload = json.dumps(member.to_etcd_payload())
         key = member_key(session_id, member.agent_id)
+        guards = {session_meta_key(session_id): fence} if fence is not None else {}
         for _ in range(_MEMBER_PUBLISH_ATTEMPTS):
-            if await self._etcd.put_if_absent(key, payload):
-                return
             standing = await self._etcd.get(key)
-            if standing is None:
-                continue  # withdrawn under us; claim it again
             if standing == payload:
                 return
-            if not of_generation(standing, member.generation):
+            if standing is not None and not of_generation(standing, member.generation):
                 raise SessionNetworkGone(
                     f"this node's membership of session {session_id} is published for a later"
                     " incarnation than the one this request was issued for; not joining under a"
                     " descriptor the manager has moved on from"
                 )
-            if await self._etcd.replace(key, standing, payload):
+            if await self._etcd.compare_and_put(key, payload, expected=standing, guards=guards):
                 return
         raise SessionNetworkGone(
-            f"this node's membership of session {session_id} kept changing under this join"
-            f" ({_MEMBER_PUBLISH_ATTEMPTS} attempts); refusing rather than writing over whatever"
-            " is there now"
+            f"this node's membership of session {session_id} could not be published under the"
+            f" record this join read ({_MEMBER_PUBLISH_ATTEMPTS} attempts); the session has moved"
+            " on, or the key kept changing"
         )
 
     async def _read_members(self, session_id: str) -> dict[str, Member]:

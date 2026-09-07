@@ -22,6 +22,9 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | C10 | **A request acts only on the session it was issued for.** The descriptor an agent is handed is compared against the manager's record, incarnation first. | A launch RPC delayed across a teardown and a rebuild builds the old data plane and publishes the node as a member of the new session. | `TestARequestThatArrivedTooLate` |
 | C11 | **Nothing an earlier incarnation writes lands in a later one.** Endpoint, address and membership writes are compare-and-swaps that refuse another incarnation's bytes; a create that finds the record gone gives back what its own incarnation still holds. | A create stalled past the handover resumes into the live session: its addresses go under the live container ids, every peer programs them, and its rollback -- finding the record is not its -- cleans up nothing. | `TestACreateThatWokeUpInAnotherSession`, `TestAnEarlierInstanceStillRunning` |
 | C12 | **A table shared with another incarnation is read as one.** Endpoints and members carrying a different generation are not programmed. | A leftover record points this node's FDB and ARP at an address the live session's kernels do not hold, and the frames leave with nothing answering. | `TestATableSharedWithAnotherIncarnation` |
+| C13 | **A pool claim is owned by an incarnation, not a session id.** Adoption, partial-claim completion and release all match on both. | A later incarnation adopts a stalled one's block; the stalled one's cleanup gives it back, and the pool hands it to a third session while the live one is on it -- two tenants at one address range. | `TestASubnetTwoIncarnationsBothClaim` |
+| C14 | **A child key is created under the record that makes it legitimate, in one store operation.** Endpoint, address and member writes name the session record as a guard. | A stamp says whose a key is but cannot stop one being MADE: a stale create finds the address free (because the session was torn down) and attaches its state to a session that no longer exists. | `TestAChildKeyWrittenUnderNoRecord` |
+| C15 | **A cleanup that cannot finish is written down and retried.** The orphan sweep records what it owes per incarnation and clears it only when nothing is left. | The sweep has no tombstone to work from -- the record already names its successor -- so one transient etcd error leaks a VNI, a subnet and their keys for the cluster's life. | `TestACleanupThatCouldNotFinishIsRetried` |
 
 ## D — Data plane (agent)
 
@@ -35,7 +38,8 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | D5 | **The overlay is encrypted, or the session does not start.** Under the default policy a node that cannot do the profile is refused, not silently downgraded. | Cluster traffic crosses the wire in clear text. | G20, G21 |
 | D7 | **Recovery's rule listing is an answer or an error, never an empty host.** Only `rc == 0` says what a previous life left. | A missing binary or a denied exec reads as "no rules", and the node is reported ready over a plaintext-drop the next session given that VNI runs into. | `TestACommandThatNeverReturns` |
 | D8 | **The privnet acts only for the incarnation it holds.** Every session-scoped request names one, and the VNI binding is made under it. | The lock orders requests per session id but cannot say whose they are: a delayed TEARDOWN deletes the data plane of the session that replaced the one it was issued for. | `TestARequestForAnotherIncarnation` |
-| D9 | **A host check that could not run is not a host with nothing on it.** The FORWARD-ACCEPT probe skips only on a missing binary; the address inventory refuses the allocation rather than returning empty. | A denied exec leaves the overlay unprotected on a DROP-policy node, or hands out the block a leaked bridge is already on -- two gateways for one subnet. | `TestBlocksAlreadyOnTheHost`, `_ensure_forward_accept` |
+| D9 | **A host check that could not run is not a host with nothing on it.** Neither the FORWARD-ACCEPT probe nor the address inventory reports a failure as an empty host. | A denied exec leaves the overlay unprotected on a DROP-policy node, or hands out the block a leaked bridge is already on -- two gateways for one subnet. | `TestForwardAccept`, `TestBlocksAlreadyOnTheHost` |
+| D10 | **A request reaches the privnet through the client its session is bound on, and an unfenced daemon takes no overlay session.** The port forwarder shares the session network's client; the fence is a protocol version, and readiness blocks on it. | A second client on the same socket sends unstamped requests the privnet cannot tell from a stale one's; and a daemon older than the fence carries out a teardown issued for a session that no longer exists. | `TestARequestForAnotherIncarnation`, `_port_publisher` |
 
 ## R — Release quality
 
@@ -114,7 +118,7 @@ predates it. C8-C10 and D7 rest on unit evidence alone, and the agent-restart sc
 (A1/A2/A3/A9/A10) that would exercise the join/teardown ordering on real nodes remain unrun. Read
 the round as unverified against hardware until that log is replaced.
 
-Fourth round, against the same bar:
+Fifth round is below; fourth round, against the same bar:
 
 | # | Was | Now |
 |---|-----|-----|
@@ -124,3 +128,27 @@ Fourth round, against the same bar:
 | C4 | the agent's single-node meta deletion read the record and then deleted the key | it deletes the bytes it read, so a manager record published under the id in between survives |
 | D8 | the privnet identified a session by its id alone, in the RPC, in its journal, in `_SessionEntry` and in the VNI binding digest | every session-scoped request names its incarnation, the privnet refuses one it does not hold, and the digest tells two incarnations on the same subnet and VNI apart |
 | D9 | any `OSError` from the FORWARD-ACCEPT probe read as "no iptables here", and an unreadable address inventory read as "this host carries nothing" | only a missing binary skips the probe; an inventory that cannot answer refuses the allocation |
+
+
+Fifth round, against the same bar:
+
+| # | Was | Now |
+|---|-----|-----|
+| C13 | `_claimed_subnet` matched the session id alone, so a later incarnation adopted a stalled one's block -- and the stalled one's release then handed a live session's subnet back to the pool | ownership is (session, incarnation) through adoption, partial-claim completion and release; a claim from before the field is still adopted, and a retry of one incarnation still converges |
+| C14 | endpoint, address and member writes were compare-and-swaps on their own key, which still CREATES it when absent -- and absent is what a teardown had just made it | each is one store operation naming the session's record as a guard, so it lands under the session it is for or not at all |
+| C15 | the orphan sweep logged its failures and returned; nothing named what it had not given back | it writes the debt down per incarnation and the next create or teardown of that id pays it |
+| D10 | the Docker port publisher built its own privnet client, which carried no incarnation at all | it shares the session network's bound client, and a client is refused the port path if there is none |
+| D10 | the incarnation was an optional field a daemon on protocol 3 ignored, and a new daemon accepted unstamped requests for a session it held an incarnation for | protocol 4, readiness blocks a node whose helper is older, and what is fenced is decided by what the node holds rather than by what the request carries |
+| D9 | a missing iptables binary skipped the FORWARD-ACCEPT probe, though this backend already declares iptables required | the probe refuses; a readiness failure is no longer laundered into a session that comes up carrying nothing |
+
+R3 is still not re-run: the hardware evidence remains at `992faf053`, which predates all three of
+these rounds. Nothing in C8-C15 or D7-D10 has been exercised on real nodes, and the agent-restart
+scenarios (A1/A2/A3/A9/A10) that would cover overlapping restarts are still unrun. One risk this
+round adds is not covered by any unit test either: `HostAddressesUnreadable` and the FORWARD-ACCEPT
+refusal are new ways for a node to stop taking sessions, and only a real node shows how often they
+fire.
+
+Known and NOT addressed: two agent processes sharing one agent id and one incarnation are not told
+apart -- there is no process-incarnation token below the session generation. It is out of reach of
+this fencing scheme, which is per session, and is a misconfiguration rather than a race, but a node
+running two agents under one id can still have one withdraw the other's membership.
