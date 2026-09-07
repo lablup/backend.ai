@@ -31,8 +31,8 @@ _RESET_AFTER_SECONDS = 500
 
 
 @dataclass(frozen=True)
-class WithinWindowCase:
-    """A window the request stays within, and the quota headers it reports."""
+class RateLimitSuccessCase:
+    """A window state the request is served under, and the quota headers it reports."""
 
     description: str
     limit: int
@@ -41,8 +41,8 @@ class WithinWindowCase:
 
 
 @dataclass(frozen=True)
-class PastWindowCase:
-    """A window the request runs past, and the limit the 429 reports."""
+class RateLimitExceededCase:
+    """A window state the request is refused under, and the limit the 429 reports."""
 
     description: str
     limit: int
@@ -180,25 +180,25 @@ class TestRlimMiddleware:
     @pytest.mark.parametrize(
         "case",
         [
-            WithinWindowCase(
+            RateLimitSuccessCase(
                 description="within limit",
                 limit=_RATE_LIMIT,
                 count=10,
                 expected_remaining="29990",
             ),
-            WithinWindowCase(
+            RateLimitSuccessCase(
                 description="exactly at limit",
                 limit=_RATE_LIMIT,
                 count=_RATE_LIMIT,
                 expected_remaining="0",
             ),
-            WithinWindowCase(
+            RateLimitSuccessCase(
                 description="zero limit before any request lands",
                 limit=0,
                 count=0,
                 expected_remaining="0",
             ),
-            WithinWindowCase(
+            RateLimitSuccessCase(
                 description="the limit fixed for the window outranks the injected one",
                 limit=100,
                 count=10,
@@ -213,7 +213,7 @@ class TestRlimMiddleware:
         mock_valkey_client: MagicMock,
         mock_request_authorized: web.Request,
         mock_handler: AsyncMock,
-        case: WithinWindowCase,
+        case: RateLimitSuccessCase,
     ) -> None:
         """The headers report the window that stands, not the limit the request carried."""
         # Arrange
@@ -235,9 +235,11 @@ class TestRlimMiddleware:
     @pytest.mark.parametrize(
         "case",
         [
-            PastWindowCase(description="exceeds by 1", limit=_RATE_LIMIT, count=_RATE_LIMIT + 1),
-            PastWindowCase(description="far exceeds limit", limit=_RATE_LIMIT, count=50000),
-            PastWindowCase(description="zero limit always exceeds", limit=0, count=1),
+            RateLimitExceededCase(
+                description="exceeds by 1", limit=_RATE_LIMIT, count=_RATE_LIMIT + 1
+            ),
+            RateLimitExceededCase(description="far exceeds limit", limit=_RATE_LIMIT, count=50000),
+            RateLimitExceededCase(description="zero limit always exceeds", limit=0, count=1),
         ],
         ids=lambda case: case.description,
     )
@@ -247,7 +249,7 @@ class TestRlimMiddleware:
         mock_valkey_client: MagicMock,
         mock_request_authorized: web.Request,
         mock_handler: AsyncMock,
-        case: PastWindowCase,
+        case: RateLimitExceededCase,
     ) -> None:
         """A request past the window it was counted in gets 429 and never reaches the handler."""
         # Arrange
