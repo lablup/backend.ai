@@ -28,6 +28,7 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | C17 | **One agent id, one agent process.** The pid file is held under an exclusive lock. | Two agents under one id are one identity to the manager, the VNI registry and the privnet journal; no session-level fence separates them, so a restart's outgoing process can withdraw the incoming one's membership. | `_hold_pid_file` |
 | C18 | **A lost claim is one candidate; an expired guard is all of them.** Both allocators tell the two apart at the first miss. | Read as a conflict, an expired guard walks the whole VNI range -- ~16.7M swaps and prefix reads -- holding the manager and its etcd for as long as that takes. | `TestAGuardThatExpiredMidScan` |
 | C19 | **A claim from before the field is taken, not shared.** A legacy subnet or VNI is promoted to the adopting incarnation before it is used, all units or none. | Two incarnations read one claim as theirs: the newer runs on it, the older's cleanup gives it back, and the pool hands a live session's VNI or half its subnet to another tenant. | `TestALegacyClaimTwoIncarnationsCanRead`, `TestAWideBlockOnTwoIncarnations` |
+| C23 | **A live unstamped claim is TAKEN, not merely preserved.** The startup sweep and the reuse path stamp it with the incarnation its record names; a cleanup for an incarnation the record has moved on from will not take an unstamped claim. | Unstamped is compatible with every incarnation, so between "preserved" and "promoted" any earlier cleanup gives a running session's subnet and VNI back to the pool. | `test_the_sweep_takes_a_preserved_legacy_claim_rather_than_leaving_it`, `test_an_earlier_cleanup_does_not_take_a_live_unstamped_claim` |
 | C22 | **An unstamped claim is compatible, not garbage.** The reconciler judges by `of_generation`, the same rule the allocators use. | Comparing the two generations directly makes every claim carried over an upgrade a mismatch -- so the first start of the manager that upgraded them deletes the live subnet and VNI of every such session. | `test_a_live_sessions_legacy_subnet_survives_the_sweep` |
 | C21 | **A judgement and the delete it justifies are one operation.** The reconciler carries the record state it judged on into the delete as a guard. | It reads a claim, finds no session, and deletes -- while in between the session is rebuilt over that very unit. A re-read before the delete conditions it on the claim the sweep never judged, and takes a live tenant's subnet. | `test_a_claim_retaken_between_the_judgement_and_the_delete_survives` |
 | C20 | **The pool itself is reconcilable.** A sweep starts from the claims and asks each session, so it reaches what no record, tombstone or debt note names. | The one leak nothing can find: a cleanup whose debt write AND release both failed. | `TestAPoolClaimNothingNames` |
@@ -237,3 +238,27 @@ Still NOT done, and carried forward:
 
 R3 unchanged: no run against this HEAD, and none of C18-C22 or D7-D10 has been exercised on real
 nodes.
+
+
+Tenth round, against the same bar:
+
+| # | Was | Now |
+|---|-----|-----|
+| C23 | the last round PRESERVED a live unstamped claim and left it unstamped, and nothing on the production path ever promoted it -- `_existing_allocation` returns a READY allocation without touching the pool. Meanwhile `release_all` for ANY earlier incarnation takes an unstamped claim, because unstamped is compatible with all of them. So the window was open for as long as the session lived | the startup sweep stamps what it finds live and unstamped, and the reuse path takes the allocation its record names before handing it back. Both under the record they were judged by |
+| C23 | a cleanup knew only its own incarnation, so it could not tell "unstamped and mine" from "unstamped and the live session's" | `release_all` is told what the record names NOW; where that differs from the incarnation being cleaned up, unstamped claims are not its to take. Its own teardown -- where the tombstone IS the live record -- still takes them |
+| C20 | the per-session reconcile on id reuse covered child keys only, so an orphan subnet or VNI whose debt note was never written waited for a manager restart | `_reconcile_claims_of` covers the pool half, run where a debt or an unrecorded leak says something is owed under that id rather than on every create |
+| C15 | a per-session reconcile that failed was logged and the create carried on | it fails closed with `SessionCleanupPending`; a stale member key holds the VNI back and a stale reservation refuses the next kernel an address, so carrying on builds over state nothing could look at |
+
+The previous round's test for "the allocator still promotes it afterwards" called the allocator
+directly, which is not a path a running session takes -- the reuse path does not ask the pool for
+a block. Replaced with one that goes through `create_network`.
+
+Still NOT done, unchanged from the last round: no leader-only periodic reconciliation; no
+health/metric surface for `unrecoverable_leaks()`; the startup sweep is unpaginated and
+unbounded; and `compare_and_delete` is exercised only against the in-memory fake, never a real
+etcd transaction -- and the reconciler now rests on it entirely.
+
+R3 unchanged: no run against this HEAD. C18-C23 and D7-D10 remain unexercised on real nodes, and
+the upgrade path this round is about -- a session carried across the incarnation field, at the
+first start of the manager that upgraded it -- is a rolling restart, which is exactly the test
+that has not been run.
