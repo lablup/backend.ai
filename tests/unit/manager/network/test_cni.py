@@ -3005,6 +3005,44 @@ class TestARecordThatIsAnObjectButNotAnAllocation:
 
     _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
 
+    async def test_a_corrupted_record_does_not_cost_the_session_its_allocation(self) -> None:
+        """The one that matters. `{"vni": []}` has the key, so the sweep judged by identity;
+        identity read no VNI out of it, decided the session's real claim was not the one its
+        record named, and gave a LIVE VXLAN's VNI back to the pool under an exact-record guard --
+        for the next session to be handed. Preserving is the only safe answer to a record nobody
+        can read."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        subnet, vni = str(info.options["subnet"]), int(cast(int, info.options["vni"]))
+        record = json.loads(etcd.store[session_meta_key("s1")])
+        etcd.store[session_meta_key("s1")] = json.dumps({**record, "vni": []})
+
+        await plugin.reconcile_pool()
+
+        assert f"network/ipam/vni/{vni}" in etcd.store, "a live session's vni went back to the pool"
+        assert _allocated_key(subnet) in etcd.store, "a live session's subnet went back to the pool"
+
+    async def test_a_corrupted_record_stops_an_orphan_sweep_of_that_session(self) -> None:
+        # The same rule where the release happens rather than where the judgement does: what a
+        # cleanup must keep its hands off is what the LIVE record names, and that cannot be read.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        subnet, vni = str(info.options["subnet"]), int(cast(int, info.options["vni"]))
+        record = json.loads(etcd.store[session_meta_key("s1")])
+        generation = str(record["generation"])
+        etcd.store[session_meta_key("s1")] = json.dumps({
+            **record,
+            "subnet": ["not", "a", "subnet"],
+            "generation": "later",
+        })
+
+        assert await plugin._sweep_incarnation(cast(AsyncEtcd, etcd), "s1", generation) is False
+
+        assert f"network/ipam/vni/{vni}" in etcd.store
+        assert _allocated_key(subnet) in etcd.store
+
     async def test_a_vni_that_is_not_a_number_does_not_stop_the_sweep(self) -> None:
         etcd = FakeEtcd()
         plugin = _plugin_with(etcd)
@@ -3059,14 +3097,35 @@ class TestTheReconcileTicketAndTheClock:
         etcd = FakeEtcd()
         plugin = _plugin_with(etcd)
         assert await plugin._claim_reconcile_turn() is True
-        etcd.store[cni._RECONCILE_TICKET] = json.dumps({
+        aged = json.dumps({
             "at": time.time() - cni._RECONCILE_INTERVAL_SEC - 1,
             "by": plugin._reconcile_token,
         })
+        etcd.store[cni._RECONCILE_TICKET] = aged
+        plugin._reconcile_ticket = aged
 
-        await plugin._stamp_reconcile_done()
+        assert await plugin._hold_reconcile_turn() is True
 
         assert await _plugin_with(etcd)._claim_reconcile_turn() is False
+
+    async def test_a_long_sweep_does_not_stamp_over_the_turn_it_lost(self) -> None:
+        """A sweep that outlasts the interval loses the turn to the next manager. Re-dating
+        unconditionally then put the first manager's ticket back over the second's, and the two
+        traded the turn back and forth while both scanned the pool."""
+        etcd = FakeEtcd()
+        slow = _plugin_with(etcd)
+        assert await slow._claim_reconcile_turn() is True
+        # The interval passes while `slow` is still walking, and another manager takes the turn.
+        etcd.store[cni._RECONCILE_TICKET] = json.dumps({
+            "at": time.time() - cni._RECONCILE_INTERVAL_SEC - 1,
+            "by": slow._reconcile_token,
+        })
+        other = _plugin_with(etcd)
+        assert await other._claim_reconcile_turn() is True
+        taken = etcd.store[cni._RECONCILE_TICKET]
+
+        assert await slow._hold_reconcile_turn() is False, "it stamped over the new turn"
+        assert etcd.store[cni._RECONCILE_TICKET] == taken
 
 
 class TestADestroyThatFindsNoRecordAtAll:

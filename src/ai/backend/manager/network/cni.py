@@ -182,14 +182,67 @@ def _generation_of(raw: str | None) -> str | None:
     return str(generation) if generation is not None else None
 
 
-def _named_vni(meta: Mapping[str, Any]) -> int | None:
-    """The VNI this record names, or None if it names none it can be read as.
+def _reads_as_vni(named: Any) -> bool:
+    if named is None:
+        return True  # names no VNI, which is a thing a record is allowed to say
+    try:
+        int(named)
+    except (TypeError, ValueError):
+        return False
+    return True
 
-    Being a JSON object is not being a usable record. ``{"vni": []}`` and ``{"vni": "x"}`` are
-    objects, and ``int()`` over them raises TypeError and ValueError respectively -- neither of
-    which the parse site was catching, so such a key stopped whatever pass reached it. A field
-    that cannot be read as what it must be is reported and treated as absent: absent is a state
-    the callers already handle, and it never causes a delete.
+
+def _reads_as_subnet(named: Any) -> bool:
+    if named is None:
+        return True
+    if not isinstance(named, str):
+        return False
+    try:
+        ipaddress.ip_network(named)
+    except ValueError:
+        return False
+    return True
+
+
+def _allocation_readable(meta_raw: str) -> bool:
+    """Whether every allocation field this record carries can be read as what it must be.
+
+    Three states, not two. A field can be MISSING (the record has not got that far, or names no
+    VNI), VALID, or present and UNREADABLE -- and the third is not the first. Folding it into
+    "missing" is fail-open in the worst direction: a record like ``{"generation": "g1",
+    "vni": []}`` has the key, so the sweep judges by identity; identity then reads no VNI out of
+    it, decides the session's real claim is not the one it names, and gives a LIVE VXLAN's VNI
+    back to the pool for another tenant to be handed.
+
+    So a record whose allocation cannot be read is one this cannot judge at all. Everything under
+    that session is preserved and counted, and an operator is told which key to look at.
+    """
+    meta = _record(meta_raw)
+    if meta is None:
+        return False
+    unreadable = [
+        field
+        for field, reads in (("vni", _reads_as_vni), ("subnet", _reads_as_subnet))
+        if field in meta and not reads(meta.get(field))
+    ]
+    if unreadable:
+        CommonMetricRegistry.instance().network_pool.observe_invalid_record()
+        log.warning(
+            "a session record names {} that cannot be read ({}); nothing of that session is"
+            " judged from it",
+            " and ".join(unreadable),
+            ", ".join(f"{field}={meta.get(field)!r}" for field in unreadable),
+        )
+        return False
+    return True
+
+
+def _named_vni(meta: Mapping[str, Any]) -> int | None:
+    """The VNI this record names, or None where it names none.
+
+    Silent about a field it cannot read, because it is only asked of records
+    `_allocation_readable` has already passed -- which is where an unreadable one is reported and
+    where it stops being judged.
     """
     named = meta.get("vni")
     if named is None:
@@ -197,25 +250,17 @@ def _named_vni(meta: Mapping[str, Any]) -> int | None:
     try:
         return int(named)
     except (TypeError, ValueError):
-        CommonMetricRegistry.instance().network_pool.observe_invalid_record()
-        log.warning("ignoring a session record whose vni cannot be read: {!r}", named)
         return None
 
 
 def _named_subnet(meta: Mapping[str, Any]) -> str | None:
-    """The subnet this record names, or None if it names none it can be read as. See `_named_vni`."""
+    """The subnet this record names, or None where it names none. See `_named_vni`."""
     named = meta.get("subnet")
-    if named is None:
-        return None
     if not isinstance(named, str):
-        CommonMetricRegistry.instance().network_pool.observe_invalid_record()
-        log.warning("ignoring a session record whose subnet cannot be read: {!r}", named)
         return None
     try:
         ipaddress.ip_network(named)
     except ValueError:
-        CommonMetricRegistry.instance().network_pool.observe_invalid_record()
-        log.warning("ignoring a session record whose subnet is not a network: {!r}", named)
         return None
     return named
 
@@ -308,6 +353,12 @@ def _claim_is_live(meta_raw: str | None, raw: str, is_vni: bool, key: str | int)
     live = _generation_of(meta_raw)
     if live is None:
         return True
+    if not _allocation_readable(meta_raw):
+        # The record exists and names an incarnation, but what it names cannot be read. Nothing
+        # under this session is garbage until somebody has looked at it: preserved, counted, and
+        # reported. A leak an operator is told about beats a live session's addresses being handed
+        # to another tenant.
+        return True
     if _names_an_allocation(meta_raw, is_vni):
         # The record names one allocation of this kind, so identity settles it and the stamp adds
         # nothing. Asking the stamp as well kept a stray claim that happens to carry the live
@@ -366,6 +417,10 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
     _reconcile_task: asyncio.Task[None] | None
     #: Which manager this is, written on the ticket so a sweep can be traced to one.
     _reconcile_token: str
+    #: The exact ticket bytes this manager last wrote. Every rewrite is a compare-and-swap over
+    #: them, so a manager whose sweep ran long cannot stamp over the turn somebody else has since
+    #: taken.
+    _reconcile_ticket: str | None
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
@@ -375,6 +430,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         self._reconciliation_owed = False
         self._reconcile_task = None
         self._reconcile_token = uuid.uuid4().hex
+        self._reconcile_ticket = None
 
     @override
     async def init(self, context: Any = None) -> None:
@@ -404,6 +460,10 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # comes round, and `backendai_network_pool_reconcile_pending` says so until it succeeds.
         if await self._claim_reconcile_turn():
             await self._reconcile_pool_reporting()
+            # The startup pass dates the turn from its end too. Without this it was dated from the
+            # start, so on a cluster whose first sweep takes a while every manager coming up
+            # behind found an expired ticket and swept again.
+            await self._hold_reconcile_turn()
         self._reconcile_task = asyncio.create_task(self._reconcile_loop())
 
     async def _reconcile_loop(self) -> None:
@@ -424,7 +484,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     # manager take a turn while this one is still walking. Two concurrent passes
                     # are safe -- every delete is guarded and named by exact bytes -- but they are
                     # two full scans for one pass's worth of work.
-                    await self._stamp_reconcile_done()
+                    await self._hold_reconcile_turn()
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -453,9 +513,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         except Exception:
             log.warning("could not read the reconciliation ticket; sweeping anyway", exc_info=True)
             return True
-        ticket = json.dumps({"at": now, "by": self._reconcile_token})
+        ticket = self._ticket(now)
         if standing is None:
-            return await etcd.put_if_absent(_RECONCILE_TICKET, ticket)
+            if not await etcd.put_if_absent(_RECONCILE_TICKET, ticket):
+                return False
+            self._reconcile_ticket = ticket
+            return True
         swept_at = (_record(standing) or {}).get("at")
         if isinstance(swept_at, (int, float, str)):
             try:
@@ -464,18 +527,44 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 age = None  # unreadable ticket: take the turn and write a readable one
             if age is not None and 0.0 <= age < _RECONCILE_INTERVAL_SEC:
                 return False  # somebody swept recently
-        return await etcd.compare_and_put(_RECONCILE_TICKET, ticket, expected=standing, guards={})
+        if not await etcd.compare_and_put(_RECONCILE_TICKET, ticket, expected=standing, guards={}):
+            return False
+        self._reconcile_ticket = ticket
+        return True
 
-    async def _stamp_reconcile_done(self) -> None:
-        """Re-date this manager's ticket to now, so the interval runs from the end of the sweep."""
+    def _ticket(self, at: float) -> str:
+        return json.dumps({"at": at, "by": self._reconcile_token})
+
+    async def _hold_reconcile_turn(self) -> bool:
+        """Re-date this manager's ticket, but only over the bytes it put there.
+
+        The turn is a timestamp, not a lease, so a sweep that outlasts the interval lets another
+        manager take the turn from under this one. Re-dating unconditionally then let the first
+        manager stamp over the second's fresh ticket, and the two would trade the turn back and
+        forth. Compare-and-swap over this manager's own bytes instead: losing it means the turn is
+        somebody else's now, and this manager stops refreshing.
+
+        Called both while a long sweep runs and when it finishes, so the interval is measured from
+        the end of a pass rather than the start of one.
+
+        :return: ``True`` while this manager still holds the turn.
+        """
+        if self._reconcile_ticket is None:
+            return False
+        ticket = self._ticket(time.time())
         try:
-            await self._require_etcd().put(
-                _RECONCILE_TICKET,
-                json.dumps({"at": time.time(), "by": self._reconcile_token}),
-                scope=ConfigScopes.GLOBAL,
+            held = await self._require_etcd().compare_and_put(
+                _RECONCILE_TICKET, ticket, expected=self._reconcile_ticket, guards={}
             )
         except Exception:
             log.warning("could not re-date the reconciliation ticket", exc_info=True)
+            return True  # unknown, not lost: keep going rather than abandon a pass mid-way
+        if not held:
+            log.info("another manager has taken the reconciliation turn; not re-dating it")
+            self._reconcile_ticket = None
+            return False
+        self._reconcile_ticket = ticket
+        return True
 
     async def _reconcile_pool_reporting(self) -> None:
         """Run a reconciliation pass, and leave behind what its outcome means.
@@ -1134,6 +1223,18 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # carrying no incarnation (compatible with the one the record names) or one the record
         # names outright. Neither is this sweep's to give back.
         live_raw = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
+        if live_raw is not None and not _allocation_readable(live_raw):
+            # The same rule as the sweep's, at the place the release actually happens. What this
+            # cleanup may keep its hands off is decided by what the LIVE record names, and that
+            # cannot be read -- so nothing of this id goes back. The debt stays and this is
+            # retried; an operator has been told which record to look at.
+            log.error(
+                "not giving back session {}'s incarnation {}: the record that says what is live"
+                " cannot be read",
+                session_id,
+                generation,
+            )
+            return False
         live = _generation_of(live_raw)
         live_meta: Mapping[str, Any] = {}
         if live_raw is not None:
