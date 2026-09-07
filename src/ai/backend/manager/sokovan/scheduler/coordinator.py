@@ -423,13 +423,34 @@ class ScheduleCoordinator:
                 )
 
                 # Log any exceptions that occurred during parallel processing
+                failed = False
                 for resource_group_id, result in zip(resource_group_ids, results, strict=True):
                     if isinstance(result, BaseException):
+                        failed = True
                         log.error(
                             "Error processing resource group {} for {}: {}",
                             resource_group_id,
                             schedule_type.value,
                             result,
+                        )
+
+                # The manager looked at every kernel it has, and it did so whether or not there
+                # was anything to do -- an agent reads this to tell "the manager is not looking"
+                # from "the manager is looking and does not know this kernel", and the second is
+                # exactly the case where a resource group has nothing to find.
+                #
+                # Only when EVERY resource group came back. One group's query failing while
+                # another succeeded would otherwise publish a pass that never looked at the failed
+                # group's kernels, and an agent in that group would have its live kernels read as
+                # ones the manager does not know.
+                if not failed:
+                    try:
+                        await self._valkey_schedule.mark_manager_sweep()
+                    except Exception:
+                        # Not fatal. An agent that misses the mark waits rather than reaping,
+                        # which is the safe way round.
+                        log.warning(
+                            "could not record that the manager's kernel sweep ran", exc_info=True
                         )
 
             return True
@@ -644,16 +665,6 @@ class ScheduleCoordinator:
         )
 
         kernel_result = await self._repository.search_kernels_for_handler(querier)
-        # The manager's kernel bookkeeping ran, and it ran whether or not there was anything to
-        # do. Recorded BEFORE the early return below, because an agent uses this to tell "the
-        # manager is not looking" from "the manager is looking and does not know this kernel" --
-        # and the second is exactly the case where there is nothing here to find.
-        try:
-            await self._valkey_schedule.mark_manager_sweep()
-        except Exception:
-            # Not fatal to the pass. An agent that misses the mark waits rather than reaping,
-            # which is the safe way round.
-            log.warning("could not record that the manager's kernel sweep ran", exc_info=True)
 
         if not kernel_result.items:
             return

@@ -2998,6 +2998,77 @@ class TestOneUnreadableKeyDoesNotStopTheSweep:
         assert session_meta_key("s1") not in etcd.store
 
 
+class TestARecordThatIsAnObjectButNotAnAllocation:
+    """C32. Being a JSON object is not being a usable record. ``{"vni": []}`` is an object, and
+    ``int([])`` raises TypeError -- which no parse site was catching, so such a key stopped
+    whatever pass reached it just as surely as a non-object did."""
+
+    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+
+    async def test_a_vni_that_is_not_a_number_does_not_stop_the_sweep(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        record = json.loads(etcd.store[session_meta_key("s1")])
+        etcd.store[session_meta_key("s1")] = json.dumps({**record, "vni": []})
+        stray = "10.128.93.0/24"
+        etcd.store[_allocated_key(stray)] = _claim("s-gone", stray, "g-gone")
+
+        await plugin.reconcile_pool()
+
+        assert _allocated_key(stray) not in etcd.store
+
+    async def test_a_subnet_that_is_not_a_network_is_not_reused(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        record = json.loads(etcd.store[session_meta_key("s1")])
+        etcd.store[session_meta_key("s1")] = json.dumps({
+            **record,
+            "subnet": "not-a-network",
+            "_state": "ready",
+        })
+
+        assert await plugin._existing_allocation(cast(AsyncEtcd, etcd), "s1", []) is None
+
+    async def test_a_record_with_no_subnet_at_all_is_not_reused(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        etcd.store[session_meta_key("s1")] = json.dumps({"_state": "ready", "generation": "g1"})
+
+        assert await plugin._existing_allocation(cast(AsyncEtcd, etcd), "s1", []) is None
+
+
+class TestTheReconcileTicketAndTheClock:
+    """C33. Managers compare wall clocks on the ticket, so one running ahead could park the whole
+    cluster's reconciliation for as long as its clock is ahead."""
+
+    async def test_a_ticket_dated_in_the_future_is_not_trusted(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        etcd.store[cni._RECONCILE_TICKET] = json.dumps({
+            "at": time.time() + cni._RECONCILE_INTERVAL_SEC * 10,
+            "by": "a-fast-clock",
+        })
+
+        assert await plugin._claim_reconcile_turn() is True
+
+    async def test_the_interval_runs_from_when_the_sweep_finished(self) -> None:
+        # Dated from the start, a sweep that outlasts the interval lets the next manager take a
+        # turn while this one is still walking the pool.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        assert await plugin._claim_reconcile_turn() is True
+        etcd.store[cni._RECONCILE_TICKET] = json.dumps({
+            "at": time.time() - cni._RECONCILE_INTERVAL_SEC - 1,
+            "by": plugin._reconcile_token,
+        })
+
+        await plugin._stamp_reconcile_done()
+
+        assert await _plugin_with(etcd)._claim_reconcile_turn() is False
+
+
 class TestADestroyThatFindsNoRecordAtAll:
     """C7b. "No record" is what the destroy READ, not something it holds. A create claims the id
     with a compare-and-swap on that same key, so between the read and any delete it can publish a

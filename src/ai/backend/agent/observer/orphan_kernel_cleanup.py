@@ -32,10 +32,13 @@ class OrphanKernelCleanupObserver(AbstractObserver):
     A kernel is an orphan when the manager is checking this agent but is not
     checking that kernel. Two shapes of that, and both have to be covered:
 
-    - The manager checked it once and has stopped:
-      ``kernel.last_check < agent_last_check - THRESHOLD``.
-    - The manager has never checked it at all -- no presence entry, or one with
-      no ``last_check``. This is what an agent restart leaves behind: the
+    - (a) The manager checked it once and has stopped:
+      ``kernel.last_check < agent_last_check - THRESHOLD``. Needs
+      ``agent_last_check``; where that is absent this rule simply does not
+      apply, and rule (b) answers instead.
+    - (b) The manager has never checked it at all -- no presence entry, one with
+      no ``last_check``, or no ``agent_last_check`` for this agent because an
+      outage outlasted its TTL. This is what an agent restart leaves behind: the
       presence key's TTL passes while the agent is down, and the agent's own
       presence observer then recreates it with a presence and no ``last_check``.
       Read as "not enough information" it was skipped forever, which is why a
@@ -79,15 +82,13 @@ class OrphanKernelCleanupObserver(AbstractObserver):
 
     @override
     async def observe(self) -> None:
-        # 1. Get agent's last_check timestamp
+        # 1. Get agent's last_check timestamp. Absent is not a reason to stop: it is what an
+        #    outage longer than its 20-minute TTL leaves behind, and the manager only rewrites it
+        #    for agents that still have a kernel it knows about -- so on the node this reap exists
+        #    for, the one whose only kernel is the orphan, it never comes back. Stopping here left
+        #    exactly that node uncleaned for good. It is only the basis for rule (a) below; rule
+        #    (b) does not need it.
         agent_last_check = await self._valkey_schedule_client.get_agent_last_check(self._agent.id)
-        if agent_last_check is None:
-            # Manager hasn't checked this agent yet - do nothing
-            log.debug(
-                "No agent_last_check found for agent {}, skipping orphan cleanup", self._agent.id
-            )
-            self._unknown_since.clear()
-            return
 
         # 2. Only act while the manager is looking at kernels at all. Its silence is about the
         #    manager, not about any kernel, and reaping on it would empty a healthy node. Read
@@ -125,9 +126,13 @@ class OrphanKernelCleanupObserver(AbstractObserver):
         since_now = time.monotonic()
         for kernel_id, kernel in kernel_registry.items():
             status = statuses.get(kernel_id)
-            if status is not None and status.last_check is not None:
-                # The manager has checked this kernel at some point. It is an orphan once it has
-                # stopped, while the agent as a whole is still being checked.
+            if (
+                status is not None
+                and status.last_check is not None
+                and agent_last_check is not None
+            ):
+                # (a) The manager has checked this kernel at some point. It is an orphan once it
+                # has stopped, while the agent as a whole is still being checked.
                 if status.last_check < agent_last_check - ORPHAN_KERNEL_THRESHOLD_SEC:
                     orphan_kernels.append((kernel_id, kernel.session_id))
                     log.info(
@@ -139,7 +144,7 @@ class OrphanKernelCleanupObserver(AbstractObserver):
                         ORPHAN_KERNEL_THRESHOLD_SEC,
                     )
                 continue
-            # The manager has never checked this kernel, while it is checking this agent. Either
+            # (b) The manager has never checked this kernel, while it is sweeping. Either
             # it does not know the kernel (terminated while the agent was down, and the agent
             # re-adopted it on recovery) or it has not got to it yet. Debounced rather than
             # decided now, because only the second one resolves itself.
