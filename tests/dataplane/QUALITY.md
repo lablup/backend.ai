@@ -339,3 +339,23 @@ never been run.
 
 R3 unchanged: `compare_and_delete` is still exercised only against the in-memory fake, and there is
 still no two-manager rolling restart.
+
+Fourteenth round. The P1 was mine, from the round before.
+
+| # | Was | Now |
+|---|-----|-----|
+| A11 | the liveness gate I added deadlocked against the debounce it guards. The manager stamps `agent:last_check` only for agents that still have a kernel it knows about, so on the one node the reap exists for -- whose ONLY kernel is the orphan -- that timestamp never advances again. It went stale exactly while the debounce ran, and every pass cleared the debounce and returned | liveness is read cluster-wide (`manager:kernel_sweep_epoch`), stamped by the coordinator's kernel pass before its own empty-result return, so it advances whether or not any particular agent has kernels. The per-agent timestamp keeps its old job: telling a kernel the manager checked and stopped checking |
+| — | the unit test advanced the monotonic clock 600s and left the Redis clock at 1000, so the two could not contradict each other and the deadlock was invisible | both clocks move together, and a test for the reviewer's exact case -- the orphan is the only kernel on the node -- fails on the previous commit |
+| C30 | the sweep was conditional on traffic: startup, then retried only when a session id came round. A cluster where nobody starts sessions never has a next one, so a failed pass stayed unpaid until somebody restarted a manager. And on a rolling restart every manager swept at once | a periodic sweep whose turn is claimed by compare-and-swap on one key: exactly one manager per interval, and it keeps happening on an idle cluster. Leader election by CAS rather than by lock, because a lock leaves the others blocked and a rolling restart then sweeps once per manager in turn |
+| C31 | every value under these prefixes is written here as a JSON object and read back as one without checking. Syntactically valid JSON that is NOT an object raises AttributeError, not ValueError, so one hand-edited or half-written key aborted the whole reconciliation pass -- permanently | one `_record()` per module, used at every parse site. An unreadable claim is stepped over and logged; an unreadable session record is replaced at once rather than sat out for the whole handover window, and what it may have named is left to the reconciler, which judges claims and not records |
+
+Still not done. `get_prefix` has no pagination in this client, so the sweep is still a full scan --
+now once per cluster per interval instead of once per manager, which is the load, but not the
+memory. And the fully-idle case for the orphan reap remains: with zero manager-known RUNNING
+kernels in a resource group the coordinator's kernel pass still runs and stamps, but if the
+scheduler is not running that pass at all, nothing stamps and the agent waits rather than reaping.
+Waiting is the safe side.
+
+R3 unchanged: `compare_and_delete` and the new reconciliation ticket are both exercised only
+against the in-memory fake; no real etcd, no two-manager rolling restart, and A11 has never been
+waited out on real nodes.
