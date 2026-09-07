@@ -61,8 +61,23 @@ _RECONCILE_INTERVAL = 15.0
 _MEMBER_PUBLISH_ATTEMPTS = 3
 
 
-def _decode_member(agent_id: str, raw: str) -> Member:
-    return Member.from_etcd_payload(agent_id, json.loads(raw))
+def _decode_member(agent_id: str, raw: str) -> Member | None:
+    """One member record, or None if it is not one.
+
+    None rather than an exception, because the caller is walking a session's whole membership and
+    one bad value must not cost it the rest. A key that is not a JSON object, or an object missing
+    a field the record must carry, used to raise out of that walk -- so a single poison key under
+    a session stopped every reconcile pass it made, every fifteen seconds, and no new peer, FDB
+    entry or ARP entry landed for as long as it stood.
+    """
+    try:
+        payload = json.loads(raw)
+        if not isinstance(payload, Mapping):
+            raise ValueError("not a JSON object")
+        return Member.from_etcd_payload(agent_id, payload)
+    except (ValueError, KeyError, TypeError):
+        log.warning("ignoring the unreadable member record for agent {}", agent_id)
+        return None
 
 
 def _identity_of(record: Mapping[str, Any]) -> tuple[Any, ...]:
@@ -97,8 +112,16 @@ def _describe(identity: tuple[Any, ...]) -> str:
     )
 
 
-def _decode_endpoint(container_id: str, raw: str) -> EndpointAddr:
-    return EndpointAddr.from_etcd_payload(container_id, json.loads(raw))
+def _decode_endpoint(container_id: str, raw: str) -> EndpointAddr | None:
+    """One endpoint record, or None if it is not one. See `_decode_member`."""
+    try:
+        payload = json.loads(raw)
+        if not isinstance(payload, Mapping):
+            raise ValueError("not a JSON object")
+        return EndpointAddr.from_etcd_payload(container_id, payload)
+    except (ValueError, KeyError, TypeError):
+        log.warning("ignoring the unreadable endpoint record for container {}", container_id)
+        return None
 
 
 class SessionNetworkCoordinator:
@@ -492,7 +515,8 @@ class SessionNetworkCoordinator:
                 continue
             if not self._is_ours(session_id, value, f"endpoint {container_id}"):
                 continue
-            endpoints[str(container_id)] = _decode_endpoint(str(container_id), value)
+            if (endpoint := _decode_endpoint(str(container_id), value)) is not None:
+                endpoints[str(container_id)] = endpoint
         return endpoints
 
     async def _session_fence(self, meta: SessionNetMeta) -> str | None:
@@ -619,7 +643,8 @@ class SessionNetworkCoordinator:
                 continue
             if not self._is_ours(session_id, value, f"member {agent_id}"):
                 continue
-            members[str(agent_id)] = _decode_member(str(agent_id), value)
+            if (member := _decode_member(str(agent_id), value)) is not None:
+                members[str(agent_id)] = member
         return members
 
     def _is_ours(self, session_id: str, payload: str, what: str) -> bool:
