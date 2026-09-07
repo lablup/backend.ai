@@ -192,6 +192,12 @@ class _Listing:
             # A kernel holding no XFRM state and no vxlan device of its own: the honest default
             # for a test that is not about what else the node is running.
             return ""
+        if argv[0] == "iptables-save":
+            # Our chains, holding no per-VNI rule. Answered rather than left to the `-S` parse
+            # below, because recovery reads this one and an unreadable listing is a debt now, not
+            # an empty host -- see `_read_inventory`.
+            saved = argv[argv.index("-t") + 1] if "-t" in argv else "filter"
+            return f"*{saved}\nCOMMIT\n"
         table = argv[argv.index("-t") + 1] if "-t" in argv else "filter"
         builtin = argv[argv.index("-S") + 1]
         for owned_table, owned_builtin, chain in OWNED_CHAINS:
@@ -935,6 +941,106 @@ class TestRulesFromAPreviousLife:
         await plugin.prepare_recovery(spare=[4097])
         assert plaintext_drop_del_args(4097, 4789) not in rec.calls
         assert plugin.cleanup_debt() == {}
+
+
+class _RefusesLinkDown(Recorder):
+    """A host whose `ip link set ... down` fails until ``refusing`` is cleared."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.refusing = True
+
+    @override
+    async def __call__(self, argv: Sequence[str]) -> None:
+        await super().__call__(argv)
+        if self.refusing and list(argv[:3]) == ["ip", "link", "set"] and "down" in argv:
+            raise RuntimeError("RTNETLINK answers: Operation not permitted")
+
+
+class TestRulesOfATunnelThatWouldNotClose:
+    """The rules the sweep removes for a VNI ARE that VNI's protection -- the plaintext-drop, the
+    output mark and the egress guard. Taking them off a device the fail-close could not bring down
+    leaves a tunnel that is still forwarding, now unmarked and matching no XFRM policy, i.e. a
+    running container's traffic going out in clear text. So they stay until it is actually down."""
+
+    def _plugin_over_a_stuck_tunnel(self, rec: Recorder) -> VxlanNetworkPlugin:
+        return _plugin(
+            rec,
+            reader=_Listing(_iptables_save(_LEFTOVER_RULES)),
+            vxlans=[vxlan_dev(4097)],
+        )
+
+    async def test_they_are_left_in_place(self) -> None:
+        rec = _RefusesLinkDown()
+        plugin = self._plugin_over_a_stuck_tunnel(rec)
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.prepare_recovery()
+        assert plaintext_drop_del_args(4097, 4789) not in rec.calls
+        assert vxlan_dev(4097) in plugin.unclosed_devices()
+
+    async def test_a_different_vnis_leftovers_still_go(self) -> None:
+        # Only the stuck tunnel's own rules are held back; the sweep is not abandoned wholesale.
+        rec = _RefusesLinkDown()
+        leftovers = _LEFTOVER_RULES + _LEFTOVER_RULES.replace("0x1001", "0x1002").replace(
+            "-P INPUT ACCEPT\n-N BAI-VXLAN-IN\n-A INPUT -j BAI-VXLAN-IN\n", ""
+        )
+        plugin = _plugin(rec, reader=_Listing(_iptables_save(leftovers)), vxlans=[vxlan_dev(4097)])
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.prepare_recovery()
+        assert plaintext_drop_del_args(4097, 4789) not in rec.calls
+        assert plaintext_drop_del_args(4098, 4789) in rec.calls
+
+    async def test_they_go_once_the_tunnel_is_finally_down(self) -> None:
+        rec = _RefusesLinkDown()
+        plugin = self._plugin_over_a_stuck_tunnel(rec)
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.prepare_recovery()
+        rec.refusing = False
+        assert await plugin.retry_fail_close() == frozenset()
+        assert plaintext_drop_del_args(4097, 4789) in rec.calls
+
+
+class TestAFirewallThisNodeCannotRead:
+    """`iptables-save` failing is not the same answer as a host with no leftovers on it. Recovery
+    that takes it for one completes the preflight and reports the node ready over rules nothing
+    has looked at -- and the next session handed that VNI walks into them."""
+
+    def _blind(self) -> _Listing:
+        def answer(argv: Sequence[str]) -> str | None:
+            if argv[0] == "iptables-save":
+                raise RuntimeError("Another app is currently holding the xtables lock")
+            return None
+
+        return _Listing(answer)
+
+    async def test_the_node_reports_itself_unrecovered(self) -> None:
+        plugin = _plugin(Recorder(), reader=self._blind())
+        await plugin.prepare_recovery()
+        assert plugin.unclosed_devices()
+
+    async def test_a_session_is_refused_while_it_stands(self) -> None:
+        plugin = _plugin(Recorder(), reader=self._blind())
+        await plugin.prepare_recovery()
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await plugin.setup_session_network(_META, _SELF)
+
+    async def test_a_listing_that_finally_reads_clears_it(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, reader=self._blind())
+        await plugin.prepare_recovery()
+        plugin._reader = plugin._rule_inventory = _Listing(_iptables_save(_LEFTOVER_RULES))
+        assert await plugin.retry_fail_close() == frozenset()
+        assert plaintext_drop_del_args(4097, 4789) in rec.calls
+
+    async def test_a_spared_vni_stays_spared_across_the_retry(self) -> None:
+        # `retry_fail_close` has no caller to ask what to spare, so the preflight's set is kept:
+        # sweeping without it disarms a co-located agent's live session.
+        rec = Recorder()
+        plugin = _plugin(rec, reader=self._blind())
+        await plugin.prepare_recovery(spare=[4097])
+        plugin._reader = plugin._rule_inventory = _Listing(_iptables_save(_LEFTOVER_RULES))
+        await plugin.retry_fail_close()
+        assert plaintext_drop_del_args(4097, 4789) not in rec.calls
 
 
 class _RefusesRuleDeletes(Recorder):
@@ -3923,6 +4029,15 @@ class TestACommandThatNeverReturns:
         # The drift pass treats an empty listing as drift and reasserts; it must not hang instead.
         self._wedged(monkeypatch)
         assert await vx._read_command(["iptables-save", "-t", "filter"]) == ""
+
+    async def test_the_recovery_inventory_refuses_rather_than_reading_as_an_empty_host(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The same listing, asked for the opposite reason: recovery wants to know what a previous
+        # life left, so "I could not ask" must not come back as "there is nothing".
+        self._wedged(monkeypatch)
+        with pytest.raises(OverlayEncryptionUnavailable):
+            await vx._read_inventory(["iptables-save", "-t", "filter"])
 
     async def test_the_device_listing_refuses_rather_than_reporting_an_empty_host(
         self, monkeypatch: pytest.MonkeyPatch
