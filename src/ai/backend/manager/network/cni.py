@@ -134,6 +134,15 @@ def _debt_key(session_id: str, generation: str) -> str:
     return f"{_CLEANUP_DEBT_PREFIX}/{session_id}/{generation}"
 
 
+def _generation_stamp_of(raw: str) -> str | None:
+    """The incarnation a claim payload carries, or None where it carries none."""
+    try:
+        stamped = json.loads(raw).get(_GENERATION)
+    except ValueError:
+        return None
+    return str(stamped) if stamped is not None else None
+
+
 def _generation_of(raw: str | None) -> str | None:
     """The incarnation a session record names, or None when it names none."""
     if not raw:
@@ -427,6 +436,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 meta.get("vni"),
             )
             return None
+        # Take the allocation onto this record's incarnation before handing it back. A session
+        # carried over an upgrade holds it unstamped, and unstamped is compatible with EVERY
+        # incarnation -- so a cleanup for any earlier one would give this running session's subnet
+        # and VNI back to the pool. Preserving such a claim is not enough; it has to be taken.
+        # Under the record read above, so a promotion on behalf of a session that has moved on
+        # does not land.
+        await self._take_allocation(session_id, meta, raw)
         endpoint_ips: dict[str, str] = {}
         try:
             for endpoint in endpoints:
@@ -471,6 +487,38 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         return NetworkInfo(
             network_id=session_id, options={**_published(meta), "endpoint_ips": endpoint_ips}
         )
+
+    async def _take_allocation(self, session_id: str, meta: Mapping[str, Any], held: str) -> None:
+        """Stamp the subnet and VNI this record names with the incarnation it names.
+
+        Idempotent and best-effort: a promotion that cannot land leaves the claim as it was, which
+        is the state this call is trying to improve on rather than one it creates. Reported,
+        because while it stands an earlier incarnation's cleanup can still take the allocation.
+        """
+        generation = meta.get(_GENERATION)
+        if not generation:
+            return  # nothing to promote to
+        guards = {session_meta_key(session_id): held}
+        subnet = meta.get("subnet")
+        if subnet and not await self._subnet_allocator.promote(
+            str(subnet), session_id, str(generation), guards
+        ):
+            log.warning(
+                "session {}'s subnet {} still carries no incarnation; an earlier cleanup of this"
+                " id could still give it back",
+                session_id,
+                subnet,
+            )
+        vni = meta.get("vni")
+        if vni is not None and not await self._vni_allocator.promote(
+            int(vni), session_id, str(generation), guards
+        ):
+            log.warning(
+                "session {}'s vni {} still carries no incarnation; an earlier cleanup of this id"
+                " could still give it back",
+                session_id,
+                vni,
+            )
 
     async def _claim_session(
         self, etcd: AsyncEtcd, session_id: str, token: str, endpoints: list[Any]
@@ -759,9 +807,15 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         ):
             if not await self._delete_incarnation(etcd, session_id, prefix, key_of, generation):
                 complete = False
+        # What the record names NOW. This sweep is for an incarnation the record has moved on
+        # from, so an unstamped claim under this id may belong to the one it names instead --
+        # which is what a session carried over an upgrade holds.
+        live = _generation_of(
+            await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
+        )
         try:
-            stuck_vnis = await self._vni_allocator.release_all(session_id, generation)
-            stuck_blocks = await self._subnet_allocator.release_all(session_id, generation)
+            stuck_vnis = await self._vni_allocator.release_all(session_id, generation, live)
+            stuck_blocks = await self._subnet_allocator.release_all(session_id, generation, live)
         except Exception:
             log.exception(
                 "could not give back what session {}'s superseded create held", session_id
@@ -781,6 +835,31 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         own; `reconcile_pool` is what gives it back.
         """
         return dict(self._unrecoverable)
+
+    async def _reconcile_claims_of(self, etcd: AsyncEtcd, session_id: str) -> int:
+        """Give back this session's pool claims that its record does not name.
+
+        The scoped form of `reconcile_pool`, for the moment a session id comes back round. It
+        still reads the pool -- a claim nothing names cannot be found any other way -- so it is
+        called only where a debt says something is owed under this id.
+        """
+        released = 0
+        meta_raw = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
+        live = _generation_of(meta_raw)
+        if meta_raw is not None and live is None:
+            return 0  # a record from before the field; not this sweep's to judge
+        guard: Mapping[str, str | None] = {session_meta_key(session_id): meta_raw}
+        for unit, (owner, _stamp, raw) in (await self._subnet_allocator.claims()).items():
+            if owner != session_id or (meta_raw is not None and of_generation(raw, live)):
+                continue
+            if await self._subnet_allocator.release_unit(unit, raw, guard):
+                released += 1
+        for vni, (owner, _stamp, raw) in (await self._vni_allocator.claims()).items():
+            if owner != session_id or (meta_raw is not None and of_generation(raw, live)):
+                continue
+            if await self._vni_allocator.release_one(vni, raw, guard):
+                released += 1
+        return released
 
     async def reconcile_pool(self) -> int:
         """Give back every pool claim whose session no longer names its incarnation.
@@ -802,6 +881,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         """
         etcd = self._require_etcd()
         released = 0
+        #: Claims that are live but carry no incarnation, with the record that says so. Taken
+        #: after the walk -- see below.
+        unstamped: list[tuple[str, str, str]] = []
 
         # One read of each session's record per sweep, not one per claim. Safe to cache only
         # because the guard is re-checked inside every delete: a record that changed after it was
@@ -842,6 +924,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 # and this sweep cannot tell a legacy session still running from a leftover.
                 return None
             if of_generation(raw, live):
+                # Live. If it carries no incarnation it is live for EVERY one of them, which is
+                # how an earlier cleanup comes to take it -- so it is stamped here rather than
+                # merely left alone. Under the record it was judged by; a promotion that cannot
+                # land leaves the claim as it was, and the next reuse tries again.
+                if _generation_stamp_of(raw) is None:
+                    unstamped.append((session_id, str(live), meta_raw))
                 return None
             # Names another incarnation: garbage while it still says so.
             return {key: meta_raw}
@@ -870,6 +958,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     session_id,
                     generation,
                 )
+        # Everything the sweep found live but unstamped, taken onto the incarnation its record
+        # names. Done after the walk so the pool is not being read and rewritten at once.
+        for session_id, live, meta_raw in unstamped:
+            meta = json.loads(meta_raw)
+            await self._take_allocation(session_id, meta, meta_raw)
         released += await self._reclaim_session_keys(etcd)
         # Whatever the sweep gave back is no longer owed. Kept per session rather than cleared
         # wholesale: a leak this pass could not reach is still a leak.
@@ -1000,8 +1093,26 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     reclaimed,
                     session_id,
                 )
-        except Exception:
-            log.exception("could not reconcile session {}'s keys", session_id)
+        except Exception as e:
+            # Fail closed. A member key that outlived its incarnation holds this session's VNI
+            # back from reuse for a node that is not in it, and a stale address reservation
+            # refuses the next kernel an address: carrying on here builds a session over state
+            # nobody has been able to look at. The caller retries.
+            raise SessionCleanupPending(
+                f"could not reconcile what earlier incarnations of session {session_id} left"
+                f" ({e}); retrying rather than reusing the id over keys nothing has looked at"
+            ) from e
+        # The pool half of the same debt, and only where something is actually owed: a claim whose
+        # note could not be written is named by nothing, so the id coming back round is the one
+        # chance to reach it before a manager restart does. Reading the whole pool is not a cost
+        # to pay on every create, so it is paid where a debt or an unrecorded leak says to.
+        if owed or session_id in self._unrecoverable:
+            if reclaimed := await self._reconcile_claims_of(etcd, session_id):
+                log.warning(
+                    "reclaimed {} pool claim(s) of session {} that its record does not name",
+                    reclaimed,
+                    session_id,
+                )
 
     async def _finish_cleanup(self, etcd: AsyncEtcd, session_id: str, tombstone: str) -> bool:
         """Carry a session under a DELETING tombstone through to nothing left, and say whether it
@@ -1053,8 +1164,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         if not await still_ours():
             return False
         try:
-            stuck_vnis = await self._vni_allocator.release_all(session_id, generation)
-            stuck_blocks = await self._subnet_allocator.release_all(session_id, generation)
+            # The record this cleanup holds IS the live one -- it is the tombstone -- so an
+            # unstamped claim under this id is this cleanup's to take.
+            stuck_vnis = await self._vni_allocator.release_all(session_id, generation, generation)
+            stuck_blocks = await self._subnet_allocator.release_all(
+                session_id, generation, generation
+            )
         except Exception:
             log.exception("cleanup of session {} could not reach the pool", session_id)
             return False
