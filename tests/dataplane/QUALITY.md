@@ -403,3 +403,24 @@ runs. A lease needs an etcd client that exposes one.
 
 R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
 real nodes.
+
+Seventeenth round. The P1 is the same defect a third time, one layer further in: last round I
+stopped a field that would not PARSE from being read as absent, and left every field that parses
+into something it must not be.
+
+| # | Was | Now |
+|---|-----|-----|
+| C35 | the readability check asked only whether `int()` and `ip_network()` succeeded. `vni: null` on a vxlan record passes both, and read as "names no VNI" it makes a live VXLAN's real claim look like one its record does not name -- straight into the release. So do `vni: true` (bool is an int), `vni: 1.5` (int() truncates), `vni: 0` and `vni: 16777216` (outside the 24-bit field), and a public or IPv6 subnet | one `_parse_allocation`, checking the CONTRACT and not the parse: a vxlan record names a 24-bit VNI, any other backend names none, a subnet is private IPv4 aligned to its own prefix. Three states -- pending, allocated, corrupt -- with corrupt judged by nobody. The shared primitives live in `common/network/types.py`, so this is the same bar the agent's privnet policy already held the manager to |
+| C35 | only the reconciler validated, so a record it called corrupt was still published to the agents by the REUSE path -- which then refused it, and every retry of the session refused it again | reconcile, reuse, promotion and cleanup all go through that one parser |
+| — | the tests covered `vni: []` and nothing else | every value class above, parametrised. Ten of them fail on the previous commit |
+| C33 | `_hold_reconcile_turn` was called only after the sweep returned, while its own docstring said it was called during. A pass outlasting the interval still left an expired ticket for the next manager to start a second full scan over | the ticket is re-dated on a heartbeat for as long as the sweep runs, each time by compare-and-swap over this manager's own bytes. Losing it stops the heartbeat rather than stamping over whoever has the turn |
+
+Still not done. `AsyncEtcd.get_prefix` has no paginated form: it loads the whole result, and
+`_reclaim_session_keys` reads the session subtree, then each session's meta, then three prefixes
+per session in turn. Fixing it means adding paginated reads to the shared etcd client, which every
+`get_prefix` caller in the codebase then inherits -- its own change, not part of a network patch.
+
+The heartbeat is a lease emulated on a timestamp. A real lease would not need it.
+
+R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
+real nodes.

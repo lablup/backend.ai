@@ -35,6 +35,57 @@ on 4789 comes up and carries nothing. Moving either side off 4789 restores it.
 """
 
 DEFAULT_VNI_RANGE = (4096, 16777215)
+
+#: The VXLAN VNI is a 24-bit field. This is the wire's range, not the allocator's: a VNI outside
+#: what an operator configured the pool to hand out is unusual, but a VNI outside THIS is not a
+#: VNI at all.
+VNI_MIN, VNI_MAX = 1, (1 << 24) - 1
+
+#: The only address space a session overlay is ever carved from. Both sides check it: the agent
+#: because the manager's value reaches `ip` as an argument, the manager because a record naming a
+#: subnet from outside it is a record it should not act on.
+PRIVATE_POOLS: Final = (
+    ipaddress.IPv4Network("10.0.0.0/8"),
+    ipaddress.IPv4Network("172.16.0.0/12"),
+    ipaddress.IPv4Network("192.168.0.0/16"),
+)
+
+
+def reads_as_vni(value: Any) -> int | None:
+    """``value`` as a VXLAN VNI, or None if it is not one.
+
+    Strict about the type, not just about `int()`. ``bool`` is an ``int`` subclass and ``int()``
+    truncates a float, so ``true`` and ``1.5`` would both become segment identifiers nobody chose
+    -- and on the manager side, a value read as a VNI it is not is a value that makes a live
+    session's real VNI look unclaimed.
+    """
+    if isinstance(value, (bool, float)) or not isinstance(value, (int, str)):
+        return None
+    try:
+        vni = int(value)
+    except (TypeError, ValueError):
+        return None
+    return vni if VNI_MIN <= vni <= VNI_MAX else None
+
+
+def reads_as_overlay_subnet(value: Any) -> str | None:
+    """``value`` as a session overlay subnet, or None if it is not one.
+
+    IPv4, inside `PRIVATE_POOLS`, and aligned to its own prefix. A session block is claimed and
+    released by CIDR string, so a value that is a network but not one of these is not something
+    either side can act on.
+    """
+    if not isinstance(value, str):
+        return None
+    try:
+        net = ipaddress.ip_network(value, strict=True)
+    except ValueError:
+        return None
+    if not isinstance(net, ipaddress.IPv4Network):
+        return None
+    return value if any(net.subnet_of(pool) for pool in PRIVATE_POOLS) else None
+
+
 """The VNI pool the manager allocates from, and the range an agent checks a foreign tunnel
 against. Starts above the 0-4095 a hand-configured tunnel is most likely to use; the top is the
 24-bit VNI maximum."""
