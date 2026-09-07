@@ -9,8 +9,6 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-import sqlalchemy as sa
-
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
@@ -29,6 +27,7 @@ from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -334,6 +333,11 @@ from ai.backend.manager.services.deployment.actions.revision_operations import (
 from ai.backend.manager.services.deployment.actions.route.search_routes import SearchRoutesAction
 from ai.backend.manager.services.deployment.actions.route.update_route_traffic_status import (
     UpdateRouteTrafficStatusAction,
+)
+from ai.backend.manager.services.deployment.actions.scoped_search import (
+    ProjectDeploymentScopeItem,
+    ScopedSearchDeploymentsAction,
+    UserDeploymentScopeItem,
 )
 from ai.backend.manager.services.deployment.actions.search_deployments import (
     GlobalSearchDeploymentsAction,
@@ -726,34 +730,15 @@ class DeploymentAdapter(BaseAdapter):
         self,
         input: AdminSearchDeploymentsInput,
     ) -> AdminSearchDeploymentsPayload:
-        """Search deployments owned by the current user."""
+        """Search deployments created by the current user."""
         user = current_user()
         if user is None:
             raise RuntimeError("No authenticated user in context")
-        conditions: list[QueryCondition] = []
-        if input.filter:
-            conditions.extend(self._convert_deployment_filter(input.filter))
-        orders: list[QueryOrder] = (
-            self._convert_deployment_orders(input.order) if input.order else []
-        )
-
-        def _by_created_user() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.created_user == user.user_id
-
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_get_deployment_pagination_spec(),
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-            base_conditions=[_by_created_user],
-        )
-        action_result = await self._processors.deployment.global_search.run(
-            GlobalSearchDeploymentsAction(querier=querier)
+        action_result = await self._processors.deployment.scoped_search.run(
+            ScopedSearchDeploymentsAction(
+                items=[UserDeploymentScopeItem(user_id=UserID(user.user_id))],
+                querier=self._build_deployment_querier(input),
+            )
         )
         return AdminSearchDeploymentsPayload(
             items=[self._deployment_data_to_dto(item) for item in action_result.data],
@@ -768,30 +753,11 @@ class DeploymentAdapter(BaseAdapter):
         input: AdminSearchDeploymentsInput,
     ) -> AdminSearchDeploymentsPayload:
         """Search deployments within a specific project."""
-        conditions: list[QueryCondition] = []
-        if input.filter:
-            conditions.extend(self._convert_deployment_filter(input.filter))
-        orders: list[QueryOrder] = (
-            self._convert_deployment_orders(input.order) if input.order else []
-        )
-
-        def _by_project_id() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.project == project_id
-
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_get_deployment_pagination_spec(),
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-            base_conditions=[_by_project_id],
-        )
-        action_result = await self._processors.deployment.global_search.run(
-            GlobalSearchDeploymentsAction(querier=querier)
+        action_result = await self._processors.deployment.scoped_search.run(
+            ScopedSearchDeploymentsAction(
+                items=[ProjectDeploymentScopeItem(project_id=ProjectID(project_id))],
+                querier=self._build_deployment_querier(input),
+            )
         )
         return AdminSearchDeploymentsPayload(
             items=[self._deployment_data_to_dto(item) for item in action_result.data],

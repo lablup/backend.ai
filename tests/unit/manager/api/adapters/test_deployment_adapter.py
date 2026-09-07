@@ -2,18 +2,40 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any, override
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
+
+import pytest
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
-from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
 from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
+from ai.backend.manager.actions.action import BaseActionTriggerMeta
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.v2.global_scope.validator.superadmin import (
+    SuperAdminActionValidator,
+)
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
+from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.api.adapters.deployment.adapter import (
     DeploymentAdapter,
     _tristate_from_input,
@@ -27,6 +49,12 @@ from ai.backend.manager.data.deployment.types import (
     PresetAttributionData,
     ResourceConfigData,
 )
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.deployment.actions.scoped_search import (
+    ScopedSearchDeploymentsActionResult,
+)
+from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.types import TriState
 
 
@@ -115,3 +143,100 @@ class TestTriStateFromInput:
         result = _tristate_from_input(3)
         assert result.is_update()
         assert result.value() == 3
+
+
+class _RecordingScopeValidator(ScopeActionValidator):
+    """Lets every scoped read through and keeps the scopes it was asked about."""
+
+    def __init__(self) -> None:
+        self.seen: list[Sequence[ScopeRef]] = []
+
+    @override
+    async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
+        self.seen.append(action.scope_targets())
+
+
+class TestDeploymentSearchGates:
+    """my/project searches are answered by the scope gate, not the superadmin gate.
+
+    The processors come from the production wiring with the global gate kept as is and
+    the scope gate replaced by a recorder, so a regular user's search passing proves it
+    left the global (superadmin) path and names the scope it is answered for.
+    """
+
+    @pytest.fixture
+    def regular_user(self) -> UserData:
+        return UserData(
+            user_id=uuid4(),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+            domain_id=DomainID(uuid4()),
+        )
+
+    @pytest.fixture
+    def scope_gate(self) -> _RecordingScopeValidator:
+        return _RecordingScopeValidator()
+
+    @pytest.fixture
+    def adapter(self, scope_gate: _RecordingScopeValidator) -> DeploymentAdapter:
+        registry: ProcessorRegistry[Any] = ProcessorRegistry(
+            ProcessorDependencies(
+                monitors=ActionMonitors(),
+                validators=ActionValidators(
+                    scope=[scope_gate],
+                    global_scope=[SuperAdminActionValidator()],
+                ),
+                repository=OpsRepository(MagicMock()),
+            )
+        )
+        service = MagicMock()
+        service.scoped_search_deployments = AsyncMock(
+            return_value=ScopedSearchDeploymentsActionResult(
+                data=[], total_count=0, has_next_page=False, has_previous_page=False
+            )
+        )
+        processors = MagicMock()
+        processors.deployment = DeploymentProcessors(
+            registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), service
+        )
+        return DeploymentAdapter(processors, MagicMock())
+
+    async def test_my_search_is_answered_for_the_user_scope(
+        self,
+        adapter: DeploymentAdapter,
+        scope_gate: _RecordingScopeValidator,
+        regular_user: UserData,
+    ) -> None:
+        with with_user(regular_user):
+            payload = await adapter.my_search(AdminSearchDeploymentsInput(limit=10, offset=0))
+
+        assert payload.total_count == 0
+        assert scope_gate.seen == [
+            [ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=regular_user.user_id)]
+        ]
+
+    async def test_project_search_is_answered_for_the_project_scope(
+        self,
+        adapter: DeploymentAdapter,
+        scope_gate: _RecordingScopeValidator,
+        regular_user: UserData,
+    ) -> None:
+        project_id = uuid4()
+        with with_user(regular_user):
+            payload = await adapter.project_search(
+                project_id, AdminSearchDeploymentsInput(limit=10, offset=0)
+            )
+
+        assert payload.total_count == 0
+        assert scope_gate.seen == [[ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)]]
+
+    async def test_admin_search_keeps_the_superadmin_gate(
+        self,
+        adapter: DeploymentAdapter,
+        regular_user: UserData,
+    ) -> None:
+        with with_user(regular_user), pytest.raises(InsufficientPrivilege):
+            await adapter.admin_search(AdminSearchDeploymentsInput(limit=10, offset=0))

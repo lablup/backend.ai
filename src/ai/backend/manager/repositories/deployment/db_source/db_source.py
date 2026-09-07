@@ -72,7 +72,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
     DeploymentRevisionReadBundle,
-    DeploymentSummarySearchResult,
     DeploymentWithHistory,
     LegacyRevisionCreateReadBundle,
     ModelDeploymentAccessTokenData,
@@ -139,7 +138,6 @@ from ai.backend.manager.models.endpoint import (
     EndpointTokenRow,
 )
 from ai.backend.manager.models.endpoint.creators import DeploymentCreator
-from ai.backend.manager.models.endpoint.scopes import ProjectDeploymentOperationScope
 from ai.backend.manager.models.endpoint.updaters import (
     DeploymentRolloutClearUpdater,
     DeploymentUpdater,
@@ -172,6 +170,7 @@ from ai.backend.manager.models.scheduling_history.conditions import RouteHistory
 from ai.backend.manager.models.scheduling_history.updaters import (
     DeploymentHistoryAttemptUpdater,
 )
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.specs.creator import FieldToCreate
@@ -1227,33 +1226,29 @@ class DeploymentDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_deployments_in_project(
+    async def search_endpoints_in_scopes(
         self,
         querier: BatchQuerier,
-        scope: ProjectDeploymentOperationScope,
-    ) -> DeploymentSummarySearchResult:
-        """Search endpoints within a project scope with pagination and filtering.
-
-        Returns lightweight DeploymentSummaryData. Only the replica group
-        rows are eagerly loaded — ``to_summary_data`` reads the current /
-        deploying revision *ids* from them (not the full revision rows).
-        """
+        scopes: Sequence[OperationScope],
+    ) -> DeploymentInfoSearchResult:
+        """The modern search of :meth:`search_endpoints`, restricted to the scopes (OR)."""
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).options(
                 selectinload(EndpointRow.primary_replica_group_row),
                 selectinload(EndpointRow.target_replica_group_row),
+                selectinload(EndpointRow.deployment_policy),
             )
 
             result = await execute_batch_querier(
                 db_sess,
                 query,
                 querier,
-                scopes=[scope],
+                scopes=scopes,
             )
 
-            items = [row.EndpointRow.to_summary_data() for row in result.rows]
+            items = [row.EndpointRow.to_modern_deployment_info() for row in result.rows]
 
-            return DeploymentSummarySearchResult(
+            return DeploymentInfoSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

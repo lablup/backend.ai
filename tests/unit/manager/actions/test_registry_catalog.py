@@ -145,6 +145,9 @@ from ai.backend.manager.services.artifact_registry.processors import ArtifactReg
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.deployment.actions.scoped_search import (
+    ScopedSearchDeploymentsAction,
+)
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentPresetProcessors,
@@ -619,6 +622,22 @@ def test_rg_domain_read_is_a_scoped_permission_read() -> None:
     }
     assert recorded[ScopedSearchDomainsAction] == (
         DOMAIN_ENTITY_TYPE,
+        ActionKind.SCOPE,
+        ActionGate.PERMISSION,
+    )
+
+
+def test_scoped_deployment_read_is_a_scoped_permission_read() -> None:
+    """A user's own deployments and a project's deployments are read within that scope."""
+    registry = _ops_registry()
+    DeploymentProcessors(registry.group(GroupMeta(DEPLOYMENT_ENTITY_TYPE)), MagicMock())
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[ScopedSearchDeploymentsAction] == (
+        DEPLOYMENT_ENTITY_TYPE,
         ActionKind.SCOPE,
         ActionGate.PERMISSION,
     )
