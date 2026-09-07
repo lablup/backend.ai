@@ -31,6 +31,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 #: a slow or briefly disconnected agent is not thrown out, short enough that an advert left by a
 #: boot that is over stops being one.
 CAPS_FRESH_FOR_SEC = 600.0
+#: How far ahead of this manager's clock a published record may be dated before it stops being
+#: evidence of anything. Agents and managers do not share a clock, so a little skew is ordinary;
+#: a lot of it is a record that no age check can ever expire.
+CAPS_CLOCK_SKEW_SEC = 60.0
 
 # Which agent backend can serve which inter-container network driver.
 #
@@ -160,16 +164,35 @@ async def require_members_cni_ready(etcd: AsyncEtcd, member_agents: Iterable[str
         # one standing. There is no lease on this client to expire it, so the record carries the
         # time it was written and this is the expiry.
         age = time.time() - (caps.updated_at or 0.0)
-        if caps.updated_at is None or age > CAPS_FRESH_FOR_SEC:
+        # Bounded on BOTH sides. An advert dated in the future is not fresh, it is unusable: a
+        # comparison against `now` cannot expire it, and a clock far enough ahead would keep a
+        # dead node admitted indefinitely. (NaN and Infinity never reach here -- the decoder
+        # refuses them -- but a merely wrong clock does.)
+        if caps.updated_at is None or not -CAPS_CLOCK_SKEW_SEC <= age <= CAPS_FRESH_FOR_SEC:
             raise NetworkBackendMismatch(
-                f"agent '{agent_id}'s network capabilities were last published"
-                f" {int(age)}s ago (or never), which is longer than an agent that is running"
-                f" leaves them ({int(CAPS_FRESH_FOR_SEC)}s); they are not an advert about the node"
-                " that is there now"
+                f"agent '{agent_id}'s network capabilities are dated {int(age)}s ago (or"
+                f" never), outside the window an agent that is running keeps them in"
+                f" ({int(CAPS_FRESH_FOR_SEC)}s old at most, {int(CAPS_CLOCK_SKEW_SEC)}s ahead at"
+                " most); they are not an advert about the node that is there now"
             )
-        # From the same write as the capabilities, so this cannot pair a runtime with an advert
-        # some other runtime made under the same agent id.
-        if caps.backend is not None and caps.backend not in DRIVER_COMPATIBLE_BACKENDS["cni"]:
+        # The runtime that WROTE this advert, from the same write, compared against the runtime
+        # the agent says it is running now. Merely checking that the writer could serve CNI was
+        # not enough: an agent id restarted onto another runtime republishes its backend key
+        # immediately and may never publish capabilities at all, so the manager paired the new
+        # runtime with the old runtime's advert for as long as that advert stayed fresh.
+        running = await etcd.get(agent_backend_key(agent_id), scope=ConfigScopes.GLOBAL)
+        if caps.backend is None:
+            raise NetworkBackendMismatch(
+                f"agent '{agent_id}'s capabilities do not say which backend published them, so"
+                " they cannot be attached to the runtime it is running now"
+            )
+        if running is not None and caps.backend != running:
+            raise NetworkBackendMismatch(
+                f"agent '{agent_id}' is running the '{running}' backend but its network"
+                f" capabilities were published by '{caps.backend}'. The advert is from a boot that"
+                " is over; the runtime there now has not said it can serve this session."
+            )
+        if caps.backend not in DRIVER_COMPATIBLE_BACKENDS["cni"]:
             raise NetworkBackendMismatch(
                 f"agent '{agent_id}' published its capabilities from the '{caps.backend}'"
                 " backend, which cannot serve the 'cni' cluster network driver"

@@ -2031,6 +2031,17 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         The VTEP lets the manager pre-seed session membership, which is what removes the
         peer-publish race for a multi-node overlay. See `network/caps.py`.
         """
+        # Re-resolved every time, not read from what startup worked out. `usable_vtep` asks the
+        # host: the address must still be held by an interface that is up. An address can go while
+        # this process runs -- a link drops, DHCP hands out another, the uplink is re-cabled --
+        # and republishing the cached one kept refreshing the timestamp on an advert that had
+        # stopped being true. The manager reads that as a live node and places sessions whose
+        # VXLAN source address no longer exists.
+        if (vtep_ip := usable_vtep(self._host_ip)) != self._vtep_ip:
+            log.warning(
+                "this node's tunnel endpoint changed from {!r} to {!r}", self._vtep_ip, vtep_ip
+            )
+            self._vtep_ip = vtep_ip
         # A diagnostic signal for operators (e.g. VXLAN tunnel offload); best-effort, because a
         # failure to describe the uplink must not stop the agent from serving kernels.
         try:

@@ -498,3 +498,23 @@ session count.
 R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
 real nodes. The fail-closed capability gate added last round and the freshness gate added here
 both change what gets admitted, and neither has run against a real agent.
+
+Twenty-second round. Two of the three P1s are last round's fixes stopping one case short.
+
+| # | Was | Now |
+|---|-----|-----|
+| C43 | the holder check I added to protect the ownership root fired only where the root is not a JSON OBJECT. A READY record can be an object, be refused by every reuse path (a stamp that is not one, a vni a vxlan session cannot have, a subnet outside the pool), and still be the only thing naming what a running node is on -- and that one went straight to the takeover | every path that gives up on a READY root asks the nodes first. If any still says it holds the session, the record stands and the create raises retryably |
+| C44 | the runtime that WROTE an advert was checked only for being cni-capable, not for being the runtime running now. An agent id restarted onto another runtime republishes its backend key at once and may never publish capabilities, so the manager paired the new runtime with the old runtime's advert for as long as it stayed fresh | the two are compared for equality, and an advert that does not say who wrote it is not one |
+| C45 | the VTEP was resolved once at startup and the refresh republished the cached value, so a node whose link dropped or whose DHCP lease moved kept a FRESH advert naming an address it no longer holds -- and freshness is what the manager reads as liveness | the refresh re-resolves it against the host every time and retracts it when the host has stopped holding it |
+| C44 | `updated_at` was only checked for being a number. Python's json reads NaN and Infinity, and every comparison against NaN is false, so such a record never expired; a clock far enough ahead never expired either | finite, and bounded on both sides -- an advert dated further ahead than ordinary skew is not evidence of anything |
+| C38 | the config watcher retried a failed read four times, about seven seconds. The watch event is consumed either way, so a longer etcd outage lost the change until an operator edited the value again | retried until it is read, with capped backoff, cancelled with the task. A plugin's REFUSAL is still reported and left -- retrying hands it the same value |
+
+Still not done, and unchanged: `AsyncEtcd.get_prefix` has no paginated form, and there is no
+stated bound on session count.
+
+Worth saying plainly: three rounds have now added admission gates -- capabilities required, fresh,
+naming a VTEP, and written by the runtime that is running. Together they can refuse sessions a
+working deployment accepts today. Every one has a unit test and none has met a real agent.
+
+R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
+real nodes.

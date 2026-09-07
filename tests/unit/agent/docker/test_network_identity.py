@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 from typing import Any, cast
+from unittest import mock
 
 import pytest
 
@@ -58,8 +59,39 @@ class _AgentStub:
         self._session_network = _StubSessionNetwork()
 
 
-async def _publish(stub: _AgentStub) -> None:
-    await DockerAgent._publish_network_identity(cast(Any, stub))
+async def _publish(stub: _AgentStub, *, still_usable: bool = True) -> None:
+    """Run one refresh, saying whether the host still holds the advertised address.
+
+    The refresh re-resolves the VTEP against the live host rather than republishing what startup
+    worked out -- an address can go while the process runs -- so a test has to say what the host
+    would answer.
+    """
+    with mock.patch(
+        "ai.backend.agent.docker.agent.usable_vtep",
+        side_effect=lambda host_ip: host_ip if still_usable else None,
+    ):
+        await DockerAgent._publish_network_identity(cast(Any, stub))
+
+
+class TestAVtepThatWentAway:
+    """The refresh used to republish the address startup worked out, so a node whose link dropped
+    or whose DHCP lease changed kept a FRESH advert naming an address it no longer holds -- and
+    the manager, reading freshness as liveness, placed sessions whose VXLAN source address does
+    not exist."""
+
+    async def test_it_is_retracted_when_the_host_stops_holding_it(self) -> None:
+        stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
+        await _publish(stub, still_usable=False)
+        assert stub.etcd.deletes == ["network/agent/i-abc123/vtep"]
+        assert json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])["vtep_ip"] is None
+
+    async def test_the_advert_follows_the_address_back(self) -> None:
+        stub = _AgentStub(vtep_ip=None, host_ip="192.168.0.112")
+        await _publish(stub, still_usable=True)
+        assert stub.etcd.puts["network/agent/i-abc123/vtep"] == "192.168.0.112"
+        assert json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])["vtep_ip"] == (
+            "192.168.0.112"
+        )
 
 
 class TestPublishingTheVtep:
@@ -72,7 +104,7 @@ class TestPublishingTheVtep:
         # Skipping would leave an address published on an earlier boot in place, and peers
         # pre-seed straight from it -- by now it may belong to a different host.
         stub = _AgentStub(vtep_ip=None, host_ip="0.0.0.0")
-        await _publish(stub)
+        await _publish(stub, still_usable=False)
         assert "network/agent/i-abc123/vtep" not in stub.etcd.puts
         assert "network/agent/i-abc123/vtep" in stub.etcd.deletes
 
