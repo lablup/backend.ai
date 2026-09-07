@@ -30,7 +30,6 @@ from ai.backend.manager.api.rest.v2.path_params import (
     ProjectIdPathParam,
     ResourceGroupNamePathParam,
 )
-from ai.backend.manager.errors.resource import ResourceGroupNotFound
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
@@ -71,10 +70,7 @@ class V2ResourceGroupHandler:
         path: PathParam[ResourceGroupNamePathParam],
     ) -> APIResponse:
         """Retrieve a single resource group by name."""
-        results = await self._adapter.batch_load_by_names([path.parsed.name])
-        result = results[0]
-        if result is None:
-            raise ResourceGroupNotFound(path.parsed.name)
+        result = await self._adapter.get(path.parsed.name)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def update(

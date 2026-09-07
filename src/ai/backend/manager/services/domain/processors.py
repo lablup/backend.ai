@@ -1,10 +1,13 @@
-from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkLookupOpsResult,
     CreatedEntityOpsResult,
     EntityOpsResult,
     LookupOpsResult,
@@ -15,6 +18,8 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
 )
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAction
+from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
     CreateDomainDotfileAction,
@@ -53,6 +58,11 @@ from ai.backend.manager.services.domain.service import DomainService
 class DomainProcessors:
     get: SingleEntityActionProcessor[GetDomainAction, EntityOpsResult[DomainData]]
     lookup: LookupActionProcessor[LookupDomainAction, LookupOpsResult[DomainID]]
+    bulk_lookup: BulkLookupActionProcessor[
+        BulkLookupDomainsAction, BulkLookupOpsResult[DomainName, DomainID]
+    ]
+    # What the DataLoaders read: open to every authenticated caller.
+    bulk_get: PartialBulkActionProcessor[BulkGetDomainsAction, DomainData]
     global_search: GlobalActionProcessor[GlobalSearchDomainsAction, BatchOpsResult[DomainData]]
     scoped_search: ScopeActionProcessor[ScopedSearchDomainsAction, ScopedBatchOpsResult[DomainData]]
     update_domain: SingleEntityActionProcessor[UpdateDomainAction, EntityOpsResult[DomainData]]
@@ -82,6 +92,8 @@ class DomainProcessors:
     ) -> None:
         self.get = group.single_get_ops(GetDomainAction)
         self.lookup = group.public_lookup_ops(LookupDomainAction)
+        self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupDomainsAction)
+        self.bulk_get = group.public_partial_bulk_get_ops(BulkGetDomainsAction)
         self.global_search = group.global_search_ops(GlobalSearchDomainsAction)
         self.scoped_search = group.scope_search_ops(ScopedSearchDomainsAction)
         self.update_domain = group.single_guarded_update_ops(UpdateDomainAction)

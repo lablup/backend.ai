@@ -241,13 +241,16 @@ class DataLoaders:
     ) -> DataLoader[str, ResourceGroupGQL | None]:
         adapter = self._adapters.resource_group
 
-        async def load_fn(names: list[str]) -> list[ResourceGroupGQL | None]:
+        async def load_fn(names: list[str]) -> list[ResourceGroupGQL | Exception | None]:
             from ai.backend.manager.api.gql.resource_group.types import (  # pants: no-infer-dep
                 ResourceGroupGQL as RG,
             )
 
             dtos = await adapter.batch_load_by_names(names)
-            return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -257,13 +260,16 @@ class DataLoaders:
     ) -> DataLoader[ResourceGroupID, ResourceGroupGQL | None]:
         adapter = self._adapters.resource_group
 
-        async def load_fn(ids: list[ResourceGroupID]) -> list[ResourceGroupGQL | None]:
+        async def load_fn(ids: list[ResourceGroupID]) -> list[ResourceGroupGQL | Exception | None]:
             from ai.backend.manager.api.gql.resource_group.types import (  # pants: no-infer-dep
                 ResourceGroupGQL as RG,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RG.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -289,13 +295,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, NotificationChannel | None]:
         adapter = self._adapters.notification
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[NotificationChannel | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[NotificationChannel | Exception | None]:
             from ai.backend.manager.api.gql.notification.types import (  # pants: no-infer-dep
                 NotificationChannel as NC,
             )
 
             dtos = await adapter.batch_load_channels_by_ids(ids)
-            return [NC.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else NC.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -305,13 +314,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, NotificationRule | None]:
         adapter = self._adapters.notification
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[NotificationRule | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[NotificationRule | Exception | None]:
             from ai.backend.manager.api.gql.notification.types import (  # pants: no-infer-dep
                 NotificationRule as NR,
             )
 
             dtos = await adapter.batch_load_rules_by_ids(ids)
-            return [NR.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else NR.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -451,13 +463,16 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, ArtifactRevision | None]:
         adapter = self._adapters.artifact
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[ArtifactRevision | None]:
+        async def load_fn(ids: list[uuid.UUID]) -> list[ArtifactRevision | Exception | None]:
             from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
                 ArtifactRevision as ARev,
             )
 
             dtos = await adapter.batch_load_revisions_by_ids(ids)
-            return [ARev.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else ARev.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -696,13 +711,16 @@ class DataLoaders:
     ) -> DataLoader[str, DomainV2GQL | None]:
         adapter = self._adapters.domain
 
-        async def load_fn(names: list[str]) -> list[DomainV2GQL | None]:
+        async def load_fn(names: list[str]) -> list[DomainV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.domain_v2.types.node import (  # pants: no-infer-dep
                 DomainV2GQL as D,
             )
 
             dtos = await adapter.batch_load_by_names(names)
-            return [D.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else D.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -712,13 +730,16 @@ class DataLoaders:
     ) -> DataLoader[DomainID, DomainV2GQL | None]:
         adapter = self._adapters.domain
 
-        async def load_fn(ids: list[DomainID]) -> list[DomainV2GQL | None]:
+        async def load_fn(ids: list[DomainID]) -> list[DomainV2GQL | Exception | None]:
             from ai.backend.manager.api.gql.domain_v2.types.node import (  # pants: no-infer-dep
                 DomainV2GQL as D,
             )
 
             dtos = await adapter.batch_load_by_ids(ids)
-            return [D.from_pydantic(dto) if dto is not None else None for dto in dtos]
+            return [
+                dto if dto is None or isinstance(dto, Exception) else D.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 

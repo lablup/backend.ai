@@ -83,6 +83,7 @@ from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisi
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.services.artifact.actions.bulk_get import BulkGetArtifactsAction
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
@@ -105,6 +106,9 @@ from ai.backend.manager.services.artifact.actions.search import SearchArtifactsA
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
 from ai.backend.manager.services.artifact.revision.actions.approve import (
     ApproveArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact.revision.actions.bulk_get import (
+    BulkGetArtifactRevisionsAction,
 )
 from ai.backend.manager.services.artifact.revision.actions.cancel_import import CancelImportAction
 from ai.backend.manager.services.artifact.revision.actions.cleanup import (
@@ -213,47 +217,35 @@ class ArtifactAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def batch_load_by_ids(self, artifact_ids: Sequence[UUID]) -> list[ArtifactNode | None]:
-        """Batch load artifacts by their IDs for DataLoader use.
-
-        Returns ArtifactNode DTOs in the same order as the input artifact_ids list.
-        """
+    async def batch_load_by_ids(
+        self, artifact_ids: Sequence[UUID]
+    ) -> list[ArtifactNode | Exception | None]:
+        """Batch load artifacts by their IDs for DataLoader use, checked per artifact."""
         if not artifact_ids:
             return []
-
-        action_result = await self._processors.artifact.search_artifacts.run(
-            SearchArtifactsAction(
-                searcher=ArtifactSearcher(
-                    pagination=OffsetPagination(limit=len(artifact_ids)),
-                    conditions=[ArtifactConditions.by_ids(artifact_ids)],
-                )
-            )
+        result = await self._processors.artifact.bulk_get.run(
+            BulkGetArtifactsAction(ids=[ArtifactID(artifact_id) for artifact_id in artifact_ids])
         )
-
-        artifact_map = {item.id: self._data_to_dto(item) for item in action_result.data}
-        return [artifact_map.get(ArtifactID(artifact_id)) for artifact_id in artifact_ids]
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def batch_load_revisions_by_ids(
         self, revision_ids: Sequence[UUID]
-    ) -> list[ArtifactRevisionNode | None]:
-        """Batch load artifact revisions by their IDs for DataLoader use.
-
-        Returns ArtifactRevisionNode DTOs in the same order as the input revision_ids list.
-        """
+    ) -> list[ArtifactRevisionNode | Exception | None]:
+        """Batch load artifact revisions by their IDs for DataLoader use, checked per artifact."""
         if not revision_ids:
             return []
-
-        action_result = await self._processors.artifact.revision.search_revision.run(
-            SearchArtifactRevisionsAction(
-                searcher=ArtifactRevisionSearcher(
-                    pagination=OffsetPagination(limit=len(revision_ids)),
-                    conditions=[ArtifactRevisionConditions.by_ids(revision_ids)],
-                )
-            )
+        ids = [ArtifactRevisionID(revision_id) for revision_id in revision_ids]
+        return await self.batch_load_fields(
+            self._processors.artifact.revision.bulk_get,
+            BulkGetArtifactRevisionsAction(ids=ids),
+            ids,
+            self._revision_data_to_dto,
         )
-
-        revision_map = {item.id: self._revision_data_to_dto(item) for item in action_result.data}
-        return [revision_map.get(ArtifactRevisionID(revision_id)) for revision_id in revision_ids]
 
     async def get(self, artifact_id: UUID) -> ArtifactNode:
         """Retrieve a single artifact by ID."""
