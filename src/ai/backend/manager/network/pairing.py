@@ -14,6 +14,7 @@ unknown-but-allowed. Refusing on absence would take out working deployments the 
 
 import json
 import logging
+import time
 from collections.abc import Iterable
 
 from ai.backend.common.etcd import AbstractKVStore, AsyncEtcd, ConfigScopes
@@ -24,6 +25,12 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import NetworkBackendMismatch
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+#: How long a published capability record is taken as describing the node that is running now.
+#: The agent republishes every 60s, so this is many refreshes' worth of slack -- long enough that
+#: a slow or briefly disconnected agent is not thrown out, short enough that an advert left by a
+#: boot that is over stops being one.
+CAPS_FRESH_FOR_SEC = 600.0
 
 # Which agent backend can serve which inter-container network driver.
 #
@@ -134,7 +141,7 @@ async def require_members_cni_ready(etcd: AsyncEtcd, member_agents: Iterable[str
                 " its data plane is wired; until it does, this session cannot be placed on it."
             )
         try:
-            caps = AgentNetworkCaps(**json.loads(raw))
+            caps = AgentNetworkCaps.from_etcd_payload(json.loads(raw))
         except (ValueError, TypeError) as e:
             CommonMetricRegistry.instance().network_pool.observe_invalid_record()
             raise NetworkBackendMismatch(
@@ -146,6 +153,32 @@ async def require_members_cni_ready(etcd: AsyncEtcd, member_agents: Iterable[str
             raise NetworkBackendMismatch(
                 f"agent '{agent_id}' does not advertise the 'vxlan' data-plane backend, so a "
                 f"multi-node overlay session placed on it cannot come up: {reasons}"
+            )
+        # An advert is only about the node that is running NOW. The agent refreshes this on a
+        # timer, so one that has stopped moving is one whose publisher has stopped -- the agent is
+        # gone, or it came back on a runtime that does not publish these at all and left the last
+        # one standing. There is no lease on this client to expire it, so the record carries the
+        # time it was written and this is the expiry.
+        age = time.time() - (caps.updated_at or 0.0)
+        if caps.updated_at is None or age > CAPS_FRESH_FOR_SEC:
+            raise NetworkBackendMismatch(
+                f"agent '{agent_id}'s network capabilities were last published"
+                f" {int(age)}s ago (or never), which is longer than an agent that is running"
+                f" leaves them ({int(CAPS_FRESH_FOR_SEC)}s); they are not an advert about the node"
+                " that is there now"
+            )
+        # From the same write as the capabilities, so this cannot pair a runtime with an advert
+        # some other runtime made under the same agent id.
+        if caps.backend is not None and caps.backend not in DRIVER_COMPATIBLE_BACKENDS["cni"]:
+            raise NetworkBackendMismatch(
+                f"agent '{agent_id}' published its capabilities from the '{caps.backend}'"
+                " backend, which cannot serve the 'cni' cluster network driver"
+            )
+        if not caps.vtep_ip:
+            raise NetworkBackendMismatch(
+                f"agent '{agent_id}' holds no tunnel endpoint, so a vxlan session placed on it is"
+                " refused when it arrives. Set container.advertised-host (or bind-host) to a"
+                " routable address this host holds."
             )
 
 

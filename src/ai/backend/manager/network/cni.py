@@ -182,8 +182,9 @@ def _generation_stamp_of(raw: str) -> str | None:
     record = _record(raw)
     if record is None:
         return None
-    stamped = record.get(_GENERATION)
-    return str(stamped) if stamped is not None else None
+    # Through the one validator, like every other reader of a stamp. `str()` of whatever is there
+    # made a claim carrying `generation: []` compare as the incarnation "[]".
+    return reads_as_generation(record.get(_GENERATION))
 
 
 def _generation_of(raw: str | None) -> str | None:
@@ -1103,15 +1104,28 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 state = record.get(_STATE) if record is not None else None
                 if record is None:
                     # Nothing here was written by a manager running this code -- every record it
-                    # writes is a JSON object. So there is no owner to wait out: take it at once,
-                    # from its exact bytes, rather than sitting through the handover for a create
-                    # that does not exist. A new incarnation, because nothing the old bytes may
-                    # have named can be trusted; what they named is the pool reconciler's.
+                    # writes is a JSON object -- so there is no owner to wait out. But it may
+                    # still be the only thing naming a subnet and a VNI that a RUNNING session is
+                    # on: replacing it mints a new incarnation, and everything the old one holds
+                    # then reads as an orphan to the next sweep, which gives a live data plane's
+                    # VNI back to the pool. "Unreadable is not stale" holds here most of all --
+                    # this is the root the rest of the ownership hangs off.
+                    #
+                    # So it is replaced only where no node says it still holds the session. A
+                    # member record is that statement, and an unreadable one counts as holding.
+                    if holders := await self._members_still_holding(session_id):
+                        raise SessionCleanupPending(
+                            f"session {session_id}'s network record cannot be read, and"
+                            f" {', '.join(sorted(holders))} still hold its data plane. Not"
+                            " replacing it: what it names is what those nodes are running on."
+                            " The record needs an operator."
+                        )
                     fresh_over = claim(None)
                     if await etcd.replace(key, raw, fresh_over):
                         log.warning(
-                            "session {}'s network record could not be read; replacing it and"
-                            " leaving what it may have named to the pool reconciler",
+                            "session {}'s network record could not be read and no node holds it;"
+                            " replacing it and leaving what it may have named to the pool"
+                            " reconciler",
                             session_id,
                         )
                         return fresh_over, None

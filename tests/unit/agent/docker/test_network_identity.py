@@ -8,6 +8,7 @@ happens and the pairing check never fires. These pin the publishing itself.
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -50,7 +51,9 @@ class _AgentStub:
         self._host_ip = host_ip
         # Readiness asks the privileged helper whether it is up; None means this node does not
         # use one, which is the case that needs no socket.
-        self.local_config = SimpleNamespace(agent=SimpleNamespace(network_privnet_socket=None))
+        self.local_config = SimpleNamespace(
+            agent=SimpleNamespace(network_privnet_socket=None, backend="docker")
+        )
         # Readiness also reports what recovery could not close, and retries it on this same timer.
         self._session_network = _StubSessionNetwork()
 
@@ -77,6 +80,13 @@ class TestPublishingTheVtep:
         stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
         await _publish(stub)
         assert "network/agent/i-abc123/caps" in stub.etcd.puts
+        # The runtime, the tunnel endpoint and the time, in the SAME value as the capabilities:
+        # the manager cannot otherwise tell an advert this boot made from one an earlier boot on a
+        # different runtime left behind.
+        published = json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])
+        assert published["backend"] == "docker"
+        assert published["vtep_ip"] == "192.168.0.112"
+        assert isinstance(published["updated_at"], float)
 
     async def test_a_capability_probe_failure_does_not_block_the_vtep(
         self, monkeypatch: pytest.MonkeyPatch

@@ -2041,7 +2041,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 # and the answer it publishes is exactly what the retry changes.
                 recovery_problems=await self._session_network.retry_recovery_fail_close(),
             )
-            await publish_caps(self.etcd, str(self.id), caps)
+            await publish_caps(
+                self.etcd,
+                str(self.id),
+                caps,
+                backend=str(self.local_config.agent.backend),
+                vtep_ip=self._vtep_ip,
+            )
             for problem in caps.readiness:
                 # Once at startup, where an operator can act on it -- rather than at the first
                 # session scheduled here, which fails on one node with the reason buried in a

@@ -41,7 +41,7 @@ from ai.backend.manager.errors.network import (
     SubnetClaimStranded,
     VNIPoolExhausted,
 )
-from ai.backend.manager.network import cni
+from ai.backend.manager.network import cni, pairing
 from ai.backend.manager.network.cni import CNINetworkPlugin
 from ai.backend.manager.network.ipam import (
     DEFAULT_IPAM_POOL,
@@ -439,12 +439,22 @@ def _encryption_capable(etcd: FakeEtcd, *agent_ids: str) -> None:
     `required`, so a member that cannot encrypt refuses the session -- which is the point.
     """
     for agent_id in agent_ids:
-        etcd.store[f"network/agent/{agent_id}/caps"] = json.dumps({
-            "tunnel_offload": False,
-            "backends": ["vxlan"],
-            "readiness": [],
-            "encryption_profiles": [OVERLAY_ENCRYPTION_PROFILE],
-        })
+        etcd.store[f"network/agent/{agent_id}/caps"] = _caps(agent_id)
+
+
+def _caps(agent_id: str, **overrides: Any) -> str:
+    """What a running agent publishes: its capabilities, the runtime that published them, the
+    tunnel endpoint it holds, and when. All one value, because the manager reads them as one."""
+    return json.dumps({
+        "tunnel_offload": False,
+        "backends": ["vxlan"],
+        "readiness": [],
+        "encryption_profiles": [OVERLAY_ENCRYPTION_PROFILE],
+        "backend": "docker",
+        "vtep_ip": f"10.0.0.{abs(hash(agent_id)) % 250 + 1}",
+        "updated_at": time.time(),
+        **overrides,
+    })
 
 
 class TestCreateNetwork:
@@ -844,11 +854,7 @@ class TestEncryptingOnlyWhereEveryNodeCan:
     def _old(self, etcd: FakeEtcd, *agent_ids: str) -> None:
         """An agent from before the profile existed: it publishes caps, but not that field."""
         for agent_id in agent_ids:
-            etcd.store[f"network/agent/{agent_id}/caps"] = json.dumps({
-                "tunnel_offload": False,
-                "backends": ["vxlan"],
-                "readiness": [],
-            })
+            etcd.store[f"network/agent/{agent_id}/caps"] = _caps(agent_id, encryption_profiles=[])
 
     def _with_policy(self, etcd: FakeEtcd, policy: object) -> CNINetworkPlugin:
         plugin = CNINetworkPlugin({"overlay-encryption": policy}, {})
@@ -923,12 +929,9 @@ class TestEncryptingOnlyWhereEveryNodeCan:
     async def test_required_refuses_an_unknown_profile(self) -> None:
         etcd = FakeEtcd()
         _encryption_capable(etcd, "a1")
-        etcd.store["network/agent/a2/caps"] = json.dumps({
-            "tunnel_offload": False,
-            "backends": ["vxlan"],
-            "readiness": [],
-            "encryption_profiles": ["esp-aesgcm-esn-v99"],
-        })
+        etcd.store["network/agent/a2/caps"] = _caps(
+            "a2", encryption_profiles=["esp-aesgcm-esn-v99"]
+        )
         plugin = self._with_policy(etcd, "required")
         with pytest.raises(NetworkBackendMismatch, match="esp-aesgcm-esn-v99"):
             await plugin.create_network(
@@ -3508,6 +3511,115 @@ class TestTheCniPathIsFailClosed:
             identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
         )
         assert info.options["subnet"]
+
+
+class TestTheRecordIsTheRootOfOwnership:
+    """C43. "Unreadable is not stale" was applied to every child key and inverted at the root: an
+    unreadable session record was replaced with a fresh incarnation on sight. It may be the only
+    thing naming the subnet and VNI a running session is on, and once it is gone everything that
+    session holds reads as an orphan to the next sweep."""
+
+    _OPTIONS: dict[str, Any] = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    async def test_it_is_not_replaced_while_a_node_still_holds_the_session(self) -> None:
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={**self._OPTIONS, "member_agents": ["a1"]}
+        )
+        subnet, vni = str(info.options["subnet"]), int(cast(int, info.options["vni"]))
+        etcd.store[member_key("s1", "a1")] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": True,
+        })
+        corrupt = "[]"
+        etcd.store[session_meta_key("s1")] = corrupt
+
+        with pytest.raises(SessionCleanupPending, match="still hold its data plane"):
+            await plugin.create_network(
+                identifier="s1", options={**self._OPTIONS, "member_agents": ["a1"]}
+            )
+
+        assert etcd.store[session_meta_key("s1")] == corrupt, "the record was replaced"
+        assert f"network/ipam/vni/{vni}" in etcd.store
+        assert _allocated_key(subnet) in etcd.store
+
+    async def test_it_is_replaced_once_nothing_holds_it(self) -> None:
+        # Proven safe, not assumed: with no member saying it holds the session, an unreadable
+        # record names nothing anyone is running on and the id has to be usable again.
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        etcd.store[session_meta_key("s1")] = "[]"
+
+        info = await plugin.create_network(
+            identifier="s1", options={**self._OPTIONS, "member_agents": ["a1"]}
+        )
+
+        assert info.options["subnet"]
+
+
+class TestTheAdvertIsAboutTheNodeThatIsThereNow:
+    """C44. A capability record is durable and the backend was published under a separate key, so
+    an agent id restarted onto a runtime that publishes nothing left the previous runtime's advert
+    standing -- and the manager paired one with the other."""
+
+    async def test_a_stale_advert_is_refused(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/caps"] = _caps(
+            "a1", updated_at=time.time() - pairing.CAPS_FRESH_FOR_SEC - 1
+        )
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch, match="last published"):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
+
+    async def test_an_advert_from_a_runtime_that_cannot_serve_cni_is_refused(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/caps"] = _caps("a1", backend="kubernetes")
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch, match="published its capabilities from"):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
+
+    async def test_a_node_holding_no_tunnel_endpoint_is_refused(self) -> None:
+        # It publishes vxlan caps before it works out its VTEP, and refuses the session on arrival
+        # if it has none. Admitting it is a slower way of failing.
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/caps"] = _caps("a1", vtep_ip=None)
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch, match="no tunnel endpoint"):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
+
+    @pytest.mark.parametrize(
+        "bogus",
+        [
+            {"backends": "vxlan"},  # a string, which `in` matches by substring
+            {"readiness": [1, 2]},
+            {"tunnel_offload": "yes"},
+            {"updated_at": "recently"},
+            {"vtep_ip": ["10.0.0.1"]},
+        ],
+    )
+    async def test_a_record_whose_fields_are_the_wrong_type_is_refused(
+        self, bogus: dict[str, Any]
+    ) -> None:
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/caps"] = _caps("a1", **bogus)
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
 
 
 class TestTheReconcileTicketAndTheClock:
