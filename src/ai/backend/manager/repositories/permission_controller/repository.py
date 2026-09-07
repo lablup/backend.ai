@@ -23,9 +23,6 @@ from ai.backend.manager.data.permission.role import (
     BulkRoleAssignmentFailure,
     BulkRoleAssignmentResultData,
     BulkRolePermissionAddFailure,
-    BulkRolePermissionAddResultData,
-    BulkRolePermissionRemoveFailure,
-    BulkRolePermissionRemoveResultData,
     BulkRolePermissionReplaceResultData,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
@@ -136,46 +133,6 @@ class PermissionControllerRepository:
         """
         row = await self._db_source.update_permission(updater)
         return row.to_data()
-
-    @permission_controller_repository_resilience.apply()
-    async def bulk_add_role_permissions(
-        self,
-        creator: BulkCreator[PermissionRow],
-    ) -> BulkRolePermissionAddResultData:
-        result = await self._db_source.bulk_add_role_permissions(creator)
-        failures = [
-            BulkRolePermissionAddFailure(
-                role_id=(spec := cast(PermissionCreatorSpec, error.spec)).role_id,
-                scope_type=spec.scope_type,
-                scope_id=spec.scope_id,
-                entity_type=spec.entity_type,
-                permission=spec.permission,
-                message=str(error.exception),
-            )
-            for error in result.errors
-        ]
-        return BulkRolePermissionAddResultData(
-            successes=[row.to_data() for row in result.successes],
-            failures=failures,
-        )
-
-    @permission_controller_repository_resilience.apply()
-    async def bulk_remove_role_permissions(
-        self,
-        purgers: list[Purger[PermissionRow]],
-    ) -> BulkRolePermissionRemoveResultData:
-        result = await self._db_source.bulk_remove_role_permissions(purgers)
-        failures = [
-            BulkRolePermissionRemoveFailure(
-                permission_id=cast(uuid.UUID, error.purger.spec.pk_value()),
-                message=str(error.exception),
-            )
-            for error in result.errors
-        ]
-        return BulkRolePermissionRemoveResultData(
-            successes=[row.to_data() for row in result.successes],
-            failures=failures,
-        )
 
     @permission_controller_repository_resilience.apply()
     async def replace_role_permissions(

@@ -82,9 +82,7 @@ from ai.backend.manager.repositories.base.creator import (
     execute_creator,
 )
 from ai.backend.manager.repositories.base.purger import (
-    BulkPurgerResultWithFailures,
     Purger,
-    execute_bulk_purger_partial,
     execute_purger,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
@@ -278,22 +276,6 @@ class PermissionDBSource:
                     ProjectRoleCount(project_id=uuid.UUID(r[0]), remaining_count=r[1]) for r in rows
                 ],
             )
-
-    async def bulk_add_role_permissions(
-        self,
-        creator: BulkCreator[PermissionRow],
-    ) -> BulkCreatorResultWithFailures[PermissionRow]:
-        """Bulk-insert permission rows; per-row failures are reported separately."""
-        async with self._db.begin_session_read_committed() as db_session:
-            return await execute_bulk_creator_partial(db_session, creator)
-
-    async def bulk_remove_role_permissions(
-        self,
-        purgers: list[Purger[PermissionRow]],
-    ) -> BulkPurgerResultWithFailures[PermissionRow]:
-        """Bulk-delete permission rows by primary key; per-row failures are reported separately."""
-        async with self._db.begin_session_read_committed() as db_session:
-            return await execute_bulk_purger_partial(db_session, purgers)
 
     async def replace_role_permissions(
         self,

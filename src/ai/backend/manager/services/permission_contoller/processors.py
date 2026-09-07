@@ -1,25 +1,32 @@
+from ai.backend.common.data.entity.permission import PERMISSION_FIELD_TYPE
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
-from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult, EntityOpsResult
+from ai.backend.manager.actions.v2.ops.result import (
+    CreatedEntityOpsResult,
+    CreatedFieldOpsResult,
+    EntityOpsResult,
+)
 from ai.backend.manager.actions.v2.scope.processor import (
     ScopeActionProcessor as V2ScopeActionProcessor,
 )
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import RoleData
 
 from .actions import (
+    AddRolePermissionAction,
     AssignRoleAction,
     AssignRoleActionResult,
-    BulkAddRolePermissionsAction,
-    BulkAddRolePermissionsActionResult,
     BulkAssignRoleAction,
     BulkAssignRoleActionResult,
     BulkRemoveRolePermissionsAction,
-    BulkRemoveRolePermissionsActionResult,
     BulkRevokeRoleAction,
     BulkRevokeRoleActionResult,
     CreateGlobalRoleAction,
@@ -50,6 +57,10 @@ from .actions.get_permission_matrix import (
 from .actions.get_scope_types import (
     GetScopeTypesAction,
     GetScopeTypesActionResult,
+)
+from .actions.lookup_permission_owner import (
+    LookupBulkRolePermissionOwnerAction,
+    LookupRolePermissionOwnerAction,
 )
 from .actions.permission import (
     CreatePermissionAction,
@@ -103,11 +114,11 @@ class PermissionControllerProcessors:
     search_users_assigned_to_role: ActionProcessor[
         SearchUsersAssignedToRoleAction, SearchUsersAssignedToRoleActionResult
     ]
-    bulk_add_role_permissions: ActionProcessor[
-        BulkAddRolePermissionsAction, BulkAddRolePermissionsActionResult
+    add_role_permission: SingleEntityActionProcessor[
+        AddRolePermissionAction, CreatedFieldOpsResult[PermissionData]
     ]
-    bulk_remove_role_permissions: ActionProcessor[
-        BulkRemoveRolePermissionsAction, BulkRemoveRolePermissionsActionResult
+    bulk_remove_role_permissions: PartialBulkFieldActionProcessor[
+        BulkRemoveRolePermissionsAction, PermissionData
     ]
     replace_role_permissions: ActionProcessor[
         ReplaceRolePermissionsAction, ReplaceRolePermissionsActionResult
@@ -152,11 +163,15 @@ class PermissionControllerProcessors:
         self.search_users_assigned_to_role = ActionProcessor(
             service.search_users_assigned_to_role, action_monitors
         )
-        self.bulk_add_role_permissions = ActionProcessor(
-            service.bulk_add_role_permissions, action_monitors
+        permissions: LookupFieldGroup[PermissionData] = role_group.field_group(
+            FieldGroupMeta(PERMISSION_FIELD_TYPE),
+            PermissionData,
+            LookupRolePermissionOwnerAction,
+            LookupBulkRolePermissionOwnerAction,
         )
-        self.bulk_remove_role_permissions = ActionProcessor(
-            service.bulk_remove_role_permissions, action_monitors
+        self.add_role_permission = permissions.create_ops(AddRolePermissionAction)
+        self.bulk_remove_role_permissions = permissions.partial_bulk_purge_ops(
+            BulkRemoveRolePermissionsAction
         )
         self.replace_role_permissions = ActionProcessor(
             service.replace_role_permissions, action_monitors

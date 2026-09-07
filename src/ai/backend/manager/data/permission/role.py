@@ -253,27 +253,11 @@ class BulkRolePermissionAddFailure:
 
 
 @dataclass(frozen=True)
-class BulkRolePermissionRemoveFailure:
-    """Failure information for a single permission ID in bulk remove."""
-
-    permission_id: uuid.UUID
-    message: str
-
-
-@dataclass(frozen=True)
 class BulkRolePermissionAddResultData:
     """Result of bulk inserting role-permission rows."""
 
     successes: list[PermissionData] = field(default_factory=list)
     failures: list[BulkRolePermissionAddFailure] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class BulkRolePermissionRemoveResultData:
-    """Result of bulk deleting role-permission rows."""
-
-    successes: list[PermissionData] = field(default_factory=list)
-    failures: list[BulkRolePermissionRemoveFailure] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
