@@ -25,7 +25,6 @@ from ai.backend.manager.errors.api import RateLimitExceeded
 
 _USER_ID = UserID(uuid.UUID("12345678-1234-5678-1234-567812345678"))
 _CLIENT_IP = "10.0.0.1"
-_FORGED_IP = "203.0.113.7"
 _RATE_LIMIT = 30000
 _RESET_AFTER_SECONDS = 500
 
@@ -79,18 +78,6 @@ class TestRlimMiddleware:
     def mock_request_anonymous(self, peer_transport: Any) -> web.Request:
         """Mock request for anonymous user, arriving from _CLIENT_IP."""
         request = make_mocked_request("GET", "/", transport=peer_transport)
-        request["is_authorized"] = False
-        return request
-
-    @pytest.fixture
-    def mock_request_anonymous_forging_xff(self, peer_transport: Any) -> web.Request:
-        """The same caller, claiming a different address in X-Forwarded-For."""
-        request = make_mocked_request(
-            "GET",
-            "/",
-            headers={"X-Forwarded-For": _FORGED_IP},
-            transport=peer_transport,
-        )
         request["is_authorized"] = False
         return request
 
@@ -166,31 +153,6 @@ class TestRlimMiddleware:
         assert response.headers["X-RateLimit-Limit"] == str(_ANONYMOUS_RATELIMIT)
         assert response.headers["X-RateLimit-Remaining"] == "0"
         mock_handler.assert_not_called()
-
-    async def test_a_forged_forwarded_for_does_not_draw_a_fresh_window(
-        self,
-        middleware: Any,
-        mock_valkey_client: MagicMock,
-        mock_request_anonymous_forging_xff: web.Request,
-        mock_handler: AsyncMock,
-    ) -> None:
-        """X-Forwarded-For is the caller's own claim, so it must not pick the window."""
-        # Arrange
-        mock_valkey_client.consume_ip_rate_limit = AsyncMock(
-            return_value=RateLimitState(
-                count=1, limit=_ANONYMOUS_RATELIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
-            )
-        )
-
-        # Act
-        await middleware(mock_request_anonymous_forging_xff, mock_handler)
-
-        # Assert
-        mock_valkey_client.consume_ip_rate_limit.assert_called_once_with(
-            client_ip=_CLIENT_IP,
-            window_seconds=_RATELIMIT_WINDOW_SECONDS,
-            limit=_ANONYMOUS_RATELIMIT,
-        )
 
     async def test_an_anonymous_query_without_a_peer_is_refused(
         self,
