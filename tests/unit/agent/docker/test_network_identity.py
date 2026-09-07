@@ -36,7 +36,14 @@ class _RecordingEtcd:
 
 
 class _StubSessionNetwork:
-    """The one thing `_publish_network_identity` asks of the session network."""
+    """What `_publish_network_identity` asks of the session network.
+
+    `serving_vtep` is the endpoint sessions are actually built on, fixed when the agent started.
+    The advert is about that, not about what the host happens to hold now.
+    """
+
+    def __init__(self, serving_vtep: str | None) -> None:
+        self.serving_vtep = serving_vtep
 
     async def retry_recovery_fail_close(self) -> dict[str, str]:
         return {}
@@ -48,6 +55,7 @@ class _AgentStub:
     def __init__(self, vtep_ip: str | None, host_ip: str) -> None:
         self.etcd = _RecordingEtcd()
         self.id = "i-abc123"
+        self._boot_id = "boot-1"
         self._vtep_ip = vtep_ip
         self._host_ip = host_ip
         # Readiness asks the privileged helper whether it is up; None means this node does not
@@ -56,7 +64,7 @@ class _AgentStub:
             agent=SimpleNamespace(network_privnet_socket=None, backend="docker")
         )
         # Readiness also reports what recovery could not close, and retries it on this same timer.
-        self._session_network = _StubSessionNetwork()
+        self._session_network = _StubSessionNetwork(vtep_ip)
 
 
 async def _publish(stub: _AgentStub, *, still_usable: bool = True) -> None:
@@ -75,9 +83,10 @@ async def _publish(stub: _AgentStub, *, still_usable: bool = True) -> None:
 
 class TestAVtepThatWentAway:
     """The refresh used to republish the address startup worked out, so a node whose link dropped
-    or whose DHCP lease changed kept a FRESH advert naming an address it no longer holds -- and
-    the manager, reading freshness as liveness, placed sessions whose VXLAN source address does
-    not exist."""
+    kept a FRESH advert naming an address it no longer holds -- and the manager, reading freshness
+    as liveness, placed sessions whose VXLAN source address does not exist. Recomputing it instead
+    is the same mistake mirrored: the session network and the vxlan backend still hold what they
+    were built with, so the node would advertise ready and then refuse the session."""
 
     async def test_it_is_retracted_when_the_host_stops_holding_it(self) -> None:
         stub = _AgentStub(vtep_ip="192.168.0.112", host_ip="192.168.0.112")
@@ -85,13 +94,14 @@ class TestAVtepThatWentAway:
         assert stub.etcd.deletes == ["network/agent/i-abc123/vtep"]
         assert json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])["vtep_ip"] is None
 
-    async def test_the_advert_follows_the_address_back(self) -> None:
+    async def test_an_address_the_serving_path_never_took_is_not_advertised(self) -> None:
+        # The node came up with its interface down, so every session it can serve is refused. The
+        # interface coming back does not change that until the agent restarts, and advertising it
+        # would have the manager place sessions the serving path then turns away.
         stub = _AgentStub(vtep_ip=None, host_ip="192.168.0.112")
         await _publish(stub, still_usable=True)
-        assert stub.etcd.puts["network/agent/i-abc123/vtep"] == "192.168.0.112"
-        assert json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])["vtep_ip"] == (
-            "192.168.0.112"
-        )
+        assert "network/agent/i-abc123/vtep" not in stub.etcd.puts
+        assert json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])["vtep_ip"] is None
 
 
 class TestPublishingTheVtep:
@@ -117,6 +127,7 @@ class TestPublishingTheVtep:
         # different runtime left behind.
         published = json.loads(stub.etcd.puts["network/agent/i-abc123/caps"])
         assert published["backend"] == "docker"
+        assert published["boot_id"] == "boot-1"
         assert published["vtep_ip"] == "192.168.0.112"
         assert isinstance(published["updated_at"], float)
 
