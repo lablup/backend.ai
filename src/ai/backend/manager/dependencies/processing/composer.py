@@ -81,15 +81,11 @@ from ai.backend.manager.actions.validators.rbac import (
     RBACValidators,
     VirtualEntityRBACValidators,
 )
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.legacy import (
     LegacyScopeActionRBACValidator,
     LegacySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
@@ -381,10 +377,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         config_provider = setup_input.config_provider
         rbac_validators = RBACValidators(
             scope=ScopeActionRBACValidator(permission_controller_repository, config_provider),
-            single_entity=SingleEntityActionRBACValidator(
-                permission_controller_repository, config_provider
-            ),
-            bulk=BulkActionRBACValidator(permission_controller_repository, config_provider),
         )
         legacy_rbac_validators = LegacyRBACValidators(
             scope=LegacyScopeActionRBACValidator(permission_controller_repository),

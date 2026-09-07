@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
 from unittest.mock import MagicMock
@@ -33,21 +32,15 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
-from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.action.single_entity import BaseSingleEntityAction
-from ai.backend.manager.actions.action.types import ActionTarget, FieldData
+from ai.backend.manager.actions.action.types import FieldData
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.validator.bulk import DeniedEntity
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.legacy import (
     LegacyScopeActionRBACValidator,
     LegacySingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -86,27 +79,8 @@ _ORM_CLUSTER = (
 )
 
 
-@dataclass(frozen=True)
-class _RefTarget(ActionTarget):
-    """Wraps a bare ``RBACElementRef`` as an :class:`ActionTarget` for tests."""
-
-    ref: RBACElementRef
-
-    @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        return self.ref
-
-
 _TARGET_DOMAIN = "default"
 _TARGET_VFOLDER = "vf-1"
-_BULK_VFOLDER_GRANTED = "bulk-vf-granted"
-_BULK_VFOLDER_DENIED = "bulk-vf-denied"
-_BULK_REF_GRANTED = RBACElementRef(
-    element_type=RBACElementType.VFOLDER, element_id=_BULK_VFOLDER_GRANTED
-)
-_BULK_REF_DENIED = RBACElementRef(
-    element_type=RBACElementType.VFOLDER, element_id=_BULK_VFOLDER_DENIED
-)
 
 
 class _ProjectCreateAction(BaseScopeAction):
@@ -165,27 +139,6 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
     @override
     def field_data(self) -> FieldData | None:
         return None
-
-
-@dataclass
-class _BulkVfolderUpdateAction(BaseBulkAction[ActionTarget]):
-    """VFOLDER:UPDATE on multiple vfolders — exercises the bulk validator path."""
-
-    refs: list[RBACElementRef]
-
-    @override
-    def targets(self) -> list[ActionTarget]:
-        return [_RefTarget(ref=r) for r in self.refs]
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return EntityType.VFOLDER
-
-    @classmethod
-    @override
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
 
 
 def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
@@ -371,36 +324,6 @@ async def regular_user_with_vfolder_update(
     return _make_user_data(user_id, is_superadmin=False)
 
 
-@pytest.fixture
-def bulk_vfolder_action() -> _BulkVfolderUpdateAction:
-    return _BulkVfolderUpdateAction(
-        refs=[_BULK_REF_GRANTED, _BULK_REF_DENIED],
-    )
-
-
-@pytest.fixture
-async def regular_user_with_partial_bulk_vfolder_update(
-    db_with_rbac_tables: ExtendedAsyncSAEngine,
-) -> UserData:
-    """User granted VFOLDER:UPDATE only on ``_BULK_VFOLDER_GRANTED``.
-
-    Self-scope permission lets the bulk validator return a partial
-    success — the granted vfolder is allowed, the other denied.
-    """
-    user_id = uuid.uuid4()
-    role_id = uuid.uuid4()
-    await _seed_user_with_role(db_with_rbac_tables, user_id=user_id, role_id=role_id)
-    await _grant_permission(
-        db_with_rbac_tables,
-        role_id=role_id,
-        scope_type=ScopeType.VFOLDER,
-        scope_id=_BULK_VFOLDER_GRANTED,
-        entity_type=EntityType.VFOLDER,
-        operation=OperationType.UPDATE,
-    )
-    return _make_user_data(user_id, is_superadmin=False)
-
-
 class TestScopeActionRBACValidator:
     async def test_superadmin_bypasses_check(
         self,
@@ -446,52 +369,6 @@ class TestScopeActionRBACValidator:
         with with_user(regular_user_without_permission):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(scope_action, trigger_meta)
-
-
-class TestSingleEntityActionRBACValidator:
-    async def test_superadmin_bypasses_check(
-        self,
-        repository: PermissionControllerRepository,
-        single_entity_action: _VfolderUpdateAction,
-        trigger_meta: BaseActionTriggerMeta,
-        superadmin_user: UserData,
-    ) -> None:
-        validator = SingleEntityActionRBACValidator(repository, MagicMock())
-        with with_user(superadmin_user):
-            await validator.validate(single_entity_action, trigger_meta)
-
-    async def test_missing_user_raises(
-        self,
-        repository: PermissionControllerRepository,
-        single_entity_action: _VfolderUpdateAction,
-        trigger_meta: BaseActionTriggerMeta,
-    ) -> None:
-        validator = SingleEntityActionRBACValidator(repository, MagicMock())
-        with pytest.raises(UnreachableError):
-            await validator.validate(single_entity_action, trigger_meta)
-
-    async def test_non_superadmin_with_permission_passes(
-        self,
-        repository: PermissionControllerRepository,
-        single_entity_action: _VfolderUpdateAction,
-        trigger_meta: BaseActionTriggerMeta,
-        regular_user_with_vfolder_update: UserData,
-    ) -> None:
-        validator = SingleEntityActionRBACValidator(repository, MagicMock())
-        with with_user(regular_user_with_vfolder_update):
-            await validator.validate(single_entity_action, trigger_meta)
-
-    async def test_non_superadmin_without_permission_raises(
-        self,
-        repository: PermissionControllerRepository,
-        single_entity_action: _VfolderUpdateAction,
-        trigger_meta: BaseActionTriggerMeta,
-        regular_user_without_permission: UserData,
-    ) -> None:
-        validator = SingleEntityActionRBACValidator(repository, MagicMock())
-        with with_user(regular_user_without_permission):
-            with pytest.raises(NotEnoughPermission):
-                await validator.validate(single_entity_action, trigger_meta)
 
 
 class TestLegacySingleEntityActionRBACValidator:
@@ -582,79 +459,3 @@ class TestLegacyScopeActionRBACValidator:
         validator = LegacyScopeActionRBACValidator(repository)
         with with_user(regular_user_without_permission):
             await validator.validate(scope_action, trigger_meta)
-
-
-class TestBulkActionRBACValidator:
-    async def test_superadmin_bypasses_check(
-        self,
-        repository: PermissionControllerRepository,
-        bulk_vfolder_action: _BulkVfolderUpdateAction,
-        trigger_meta: BaseActionTriggerMeta,
-        superadmin_user: UserData,
-    ) -> None:
-        # No permission rows seeded; bypass must approve every ref.
-        validator = BulkActionRBACValidator(repository, MagicMock())
-        with with_user(superadmin_user):
-            result = await validator.validate(bulk_vfolder_action, trigger_meta)
-
-        assert result.allowed_entities == [_BULK_REF_GRANTED, _BULK_REF_DENIED]
-        assert result.denied_entities == []
-
-    async def test_missing_user_raises(
-        self,
-        repository: PermissionControllerRepository,
-        bulk_vfolder_action: _BulkVfolderUpdateAction,
-        trigger_meta: BaseActionTriggerMeta,
-    ) -> None:
-        validator = BulkActionRBACValidator(repository, MagicMock())
-        with pytest.raises(UnreachableError):
-            await validator.validate(bulk_vfolder_action, trigger_meta)
-
-    async def test_partial_permission_splits_allowed_and_denied(
-        self,
-        repository: PermissionControllerRepository,
-        bulk_vfolder_action: _BulkVfolderUpdateAction,
-        trigger_meta: BaseActionTriggerMeta,
-        regular_user_with_partial_bulk_vfolder_update: UserData,
-    ) -> None:
-        validator = BulkActionRBACValidator(repository, MagicMock())
-        with with_user(regular_user_with_partial_bulk_vfolder_update):
-            result = await validator.validate(bulk_vfolder_action, trigger_meta)
-
-        assert result.allowed_entities == [_BULK_REF_GRANTED]
-        assert result.denied_entities == [
-            DeniedEntity(entity_ref=_BULK_REF_DENIED, deny_reason="permission_denied"),
-        ]
-
-    async def test_no_permission_denies_every_entity(
-        self,
-        repository: PermissionControllerRepository,
-        bulk_vfolder_action: _BulkVfolderUpdateAction,
-        trigger_meta: BaseActionTriggerMeta,
-        regular_user_without_permission: UserData,
-    ) -> None:
-        validator = BulkActionRBACValidator(repository, MagicMock())
-        with with_user(regular_user_without_permission):
-            result = await validator.validate(bulk_vfolder_action, trigger_meta)
-
-        assert result.allowed_entities == []
-        assert result.denied_entities == [
-            DeniedEntity(entity_ref=_BULK_REF_GRANTED, deny_reason="permission_denied"),
-            DeniedEntity(entity_ref=_BULK_REF_DENIED, deny_reason="permission_denied"),
-        ]
-
-    async def test_empty_targets_returns_empty_result(
-        self,
-        repository: PermissionControllerRepository,
-        trigger_meta: BaseActionTriggerMeta,
-        regular_user_without_permission: UserData,
-    ) -> None:
-        validator = BulkActionRBACValidator(repository, MagicMock())
-        with with_user(regular_user_without_permission):
-            result = await validator.validate(
-                _BulkVfolderUpdateAction(refs=[]),
-                trigger_meta,
-            )
-
-        assert result.allowed_entities == []
-        assert result.denied_entities == []

@@ -81,7 +81,6 @@ from ai.backend.manager.services.user.service import UserService
 def _create_mock_validators() -> MagicMock:
     mock_rbac = MagicMock(spec=RBACValidators)
     mock_rbac.scope = AsyncMock()
-    mock_rbac.single_entity = AsyncMock()
     mock_validators = MagicMock(spec=ActionValidators)
     mock_validators.rbac = mock_rbac
     return mock_validators

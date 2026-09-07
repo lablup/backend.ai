@@ -40,7 +40,7 @@ _rbac_legacy_denied_total = SafeCounter(
 class LegacySingleEntityActionRBACValidator(SingleEntityActionValidator):
     """Non-enforcing RBAC validator for single-entity actions on legacy processors.
 
-    Runs the same permission check as `SingleEntityActionRBACValidator` but only
+    Runs the enforcing single-entity permission check, since removed, but only
     logs and records a metric when the check fails — never raises. Used so that
     legacy API endpoints retain their existing behavior while we gain visibility
     into which legacy call sites would be rejected under strict enforcement.

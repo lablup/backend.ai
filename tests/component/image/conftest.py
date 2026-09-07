@@ -13,11 +13,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -57,10 +53,6 @@ def image_processors(
     service = ImageService(agent_registry, repo, config_provider)
     mock_scope = MagicMock(spec=ScopeActionRBACValidator)
     mock_scope.validate = AsyncMock()
-    mock_single_entity = MagicMock(spec=SingleEntityActionRBACValidator)
-    mock_single_entity.validate = AsyncMock()
-    mock_bulk = MagicMock(spec=BulkActionRBACValidator)
-    mock_bulk.validate = AsyncMock()
     return ImageProcessors(processor_registry.group(GroupMeta(IMAGE_ENTITY_TYPE)), service)
 
 

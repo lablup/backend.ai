@@ -148,7 +148,7 @@ async def session_processors(
     scheduling_controller_mock: AsyncMock,
     processor_registry: ProcessorRegistry[Any],
 ) -> SessionProcessors:
-    """SessionProcessors with real SingleEntityActionRBACValidator.
+    """SessionProcessors with real single-entity RBAC validation.
 
     RBAC checks use check_permission_with_scope_chain() against the real DB.
     """

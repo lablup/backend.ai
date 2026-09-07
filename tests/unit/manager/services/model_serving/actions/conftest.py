@@ -4,11 +4,7 @@ import pytest
 
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
-from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
-from ai.backend.manager.actions.validators.rbac.single_entity import (
-    SingleEntityActionRBACValidator,
-)
 from ai.backend.testutils.action_validators import mock_virtual_entity_rbac_validators
 
 
@@ -18,7 +14,5 @@ def mock_action_validators() -> ActionValidators:
         virtual_entity_rbac=mock_virtual_entity_rbac_validators(),
         rbac=RBACValidators(
             scope=MagicMock(spec=ScopeActionRBACValidator),
-            single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
-            bulk=MagicMock(spec=BulkActionRBACValidator),
         ),
     )

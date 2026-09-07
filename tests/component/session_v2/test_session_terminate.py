@@ -1,7 +1,7 @@
 """Component tests for v2 Session terminate endpoint RBAC validation.
 
 Tests that the v2 POST /sessions/terminate endpoint enforces per-session RBAC via
-the BulkActionRBACValidator:
+the bulk RBAC validator:
 
 - Regular users can terminate their own sessions (owner permission via scope chain)
 - Regular users are denied on other users' sessions (403)
@@ -49,7 +49,7 @@ def stub_mark_terminating(scheduling_controller_mock: AsyncMock) -> AsyncMock:
 class TestSessionTerminateV2RBAC:
     """RBAC validation for v2 POST /sessions/terminate.
 
-    The terminate endpoint uses BulkActionProcessor with BulkActionRBACValidator.
+    The terminate endpoint runs every named session through the bulk RBAC validator.
     Superadmin bypasses RBAC; regular users can terminate sessions they own (via
     owner permission in user scope) and are denied on other users' sessions.
     Any denial fails the whole bulk request.

@@ -91,7 +91,7 @@ def vfolder_processors(
     rbac_permission_repo: PermissionControllerRepository,
     processor_registry: ProcessorRegistry[Any],
 ) -> VFolderProcessors:
-    """VFolderProcessors with real SingleEntityActionRBACValidator.
+    """VFolderProcessors with real single-entity RBAC validation.
 
     RBAC checks use check_permission_with_scope_chain() against the real DB.
     Without explicit RBAC permission grants, all access is denied (403).
