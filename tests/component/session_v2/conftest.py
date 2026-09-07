@@ -254,7 +254,7 @@ async def user_system_role(
 ) -> AsyncIterator[uuid.UUID]:
     """Create a system role with owner permissions for the regular user.
 
-    Replicates what the RoleManager does at user creation time:
+    Replicates what user provisioning does at user creation time:
     RoleRow + UserRoleRow + PermissionRows for owner-accessible entity types.
     """
     role_id = uuid.uuid4()

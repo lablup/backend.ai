@@ -78,10 +78,6 @@ from ai.backend.manager.services.permission_contoller.actions.replace_role_permi
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
 )
-from ai.backend.manager.services.permission_contoller.actions.resolve_effective_permissions import (
-    ResolveEffectivePermissionsAction,
-    ResolveEffectivePermissionsActionResult,
-)
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import (
     RevokeRoleAction,
     RevokeRoleActionResult,
@@ -121,10 +117,6 @@ from ai.backend.manager.services.permission_contoller.actions.update_permission 
 from ai.backend.manager.services.permission_contoller.actions.update_role import (
     UpdateRoleAction,
     UpdateRoleActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.update_role_permissions import (
-    UpdateRolePermissionsAction,
-    UpdateRolePermissionsActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -309,15 +301,6 @@ class PermissionControllerService:
         )
         return SearchUsersAssignedToRoleActionResult(result=result)
 
-    async def update_role_permissions(
-        self, action: UpdateRolePermissionsAction
-    ) -> UpdateRolePermissionsActionResult:
-        """Update role permissions using batch update."""
-        result = await self._repository.update_role_permissions(
-            input_data=action.input_data,
-        )
-        return UpdateRolePermissionsActionResult(role=result)
-
     async def bulk_add_role_permissions(
         self, action: BulkAddRolePermissionsAction
     ) -> BulkAddRolePermissionsActionResult:
@@ -406,15 +389,3 @@ class PermissionControllerService:
             actions = entity_map.setdefault(perm.element_type, {})
             actions[action_cls.action_name()] = perm
         return GetPermissionMatrixActionResult(matrix=result)
-
-    async def resolve_effective_permissions(
-        self, action: ResolveEffectivePermissionsAction
-    ) -> ResolveEffectivePermissionsActionResult:
-        """Resolve the set of permitted operations across a collection of per-target keys.
-
-        Traverses the scope chain and evaluates all role/permission assignments
-        to return all operations the user is authorized to perform on each
-        target key.
-        """
-        permissions = await self._repository.resolve_effective_permissions(action.keys)
-        return ResolveEffectivePermissionsActionResult(permissions=permissions)

@@ -37,7 +37,6 @@ from ai.backend.manager.data.permission.role import (
     PermissionResolutionKey,
     ProjectRoleCount,
     RoleListResult,
-    RolePermissionsUpdateInput,
     RoleRevocationResult,
     ScopeChainPermissionCheckInput,
     UserRoleAssignmentInput,
@@ -100,13 +99,7 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.permission_controller.creators import (
-    ObjectPermissionCreatorSpec,
-    PermissionCreatorSpec,
     UserRoleCreatorSpec,
-)
-from ai.backend.manager.repositories.permission_controller.purgers import (
-    ObjectPermissionPurgerSpec,
-    PermissionPurgerSpec,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -256,31 +249,6 @@ class PermissionDBSource:
         result = await execute_creator(db_session, creator)
         return result.row
 
-    async def _add_object_permission_to_role(
-        self,
-        db_session: SASession,
-        creator: Creator[ObjectPermissionRow],
-    ) -> ObjectPermissionRow:
-        """Add an object permission to a role (private, within transaction)."""
-        result = await execute_creator(db_session, creator)
-        return result.row
-
-    async def _remove_permission(
-        self,
-        db_session: SASession,
-        purger: Purger[PermissionRow],
-    ) -> None:
-        """Remove a permission (private, within transaction)."""
-        await execute_purger(db_session, purger)
-
-    async def _remove_object_permission_from_role(
-        self,
-        db_session: SASession,
-        purger: Purger[ObjectPermissionRow],
-    ) -> None:
-        """Remove an object permission from a role (private, within transaction)."""
-        await execute_purger(db_session, purger)
-
     async def update_role(self, updater: Updater[RoleRow]) -> RoleRow:
         async with self._db.begin_session() as db_session:
             result = await execute_updater(db_session, updater)
@@ -377,68 +345,6 @@ class PermissionDBSource:
                     ProjectRoleCount(project_id=uuid.UUID(r[0]), remaining_count=r[1]) for r in rows
                 ],
             )
-
-    async def update_role_permissions(
-        self,
-        input_data: RolePermissionsUpdateInput,
-    ) -> RoleRow:
-        """
-        Update role permissions in batch.
-
-        Args:
-            input_data: Batch update input containing scoped and object permissions
-
-        Returns:
-            Updated role with refreshed relationships
-
-        Raises:
-            RoleNotFound: If role does not exist
-        """
-        async with self._db.begin_session() as db_session:
-            # 0. Verify role exists
-            role_row = await self._get_role(db_session, input_data.role_id)
-
-            # 1. Add scoped permissions
-            for scoped_perm_input in input_data.add_scoped_permissions:
-                perm_creator = Creator(
-                    spec=PermissionCreatorSpec(
-                        role_id=input_data.role_id,
-                        scope_type=scoped_perm_input.scope_type,
-                        scope_id=scoped_perm_input.scope_id,
-                        entity_type=scoped_perm_input.entity_type,
-                        permission=scoped_perm_input.permission,
-                    )
-                )
-                await self._add_permission_to_group(db_session, perm_creator)
-
-            # 2. Remove scoped permissions
-            for perm_id in input_data.remove_scoped_permission_ids:
-                perm_purger = Purger(spec=PermissionPurgerSpec(permission_id=perm_id))
-                await self._remove_permission(db_session, perm_purger)
-
-            # 3. Add object permissions
-            for obj_perm_input in input_data.add_object_permissions:
-                obj_perm_creator = Creator(
-                    spec=ObjectPermissionCreatorSpec(
-                        role_id=input_data.role_id,
-                        entity_type=RBACElementType(obj_perm_input.entity_type.value),
-                        entity_id=obj_perm_input.entity_id,
-                        operation=obj_perm_input.operation,
-                        status=obj_perm_input.status,
-                    )
-                )
-                await self._add_object_permission_to_role(db_session, obj_perm_creator)
-
-            # 4. Remove object permissions
-            for obj_perm_id in input_data.remove_object_permission_ids:
-                obj_perm_purger = Purger(
-                    spec=ObjectPermissionPurgerSpec(object_permission_id=obj_perm_id)
-                )
-                await self._remove_object_permission_from_role(db_session, obj_perm_purger)
-
-            # 5. Refresh and return
-            await db_session.refresh(role_row)
-            return role_row
 
     async def bulk_add_role_permissions(
         self,
@@ -1142,23 +1048,6 @@ class PermissionDBSource:
             )
             .where(sa.and_(*filters))
         )
-
-    async def resolve_effective_permissions(
-        self,
-        keys: Collection[PermissionResolutionKey],
-    ) -> Mapping[PermissionResolutionKey, Permission]:
-        """Resolve the effective permissions for a collection of per-target keys.
-
-        Each input key represents one ``(user_id, element_type, entity_id,
-        subject_entity_type)`` combination. The result is a mapping keyed by
-        the same key object, with values being the bits the user holds on that
-        entity.
-
-        Keys sharing the same ``(user_id, element_type, subject_entity_type)``
-        share one SQL round-trip; distinct groups dispatch separately. Keys
-        that received no grant map to ``Permission.NONE``.
-        """
-        return await self._resolve_permissions_via_direct_scope_walk(keys)
 
     # ------------------------------------------------ virtual-entity-chain checks
 

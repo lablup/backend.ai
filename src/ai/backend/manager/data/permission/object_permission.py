@@ -25,19 +25,6 @@ class ObjectPermissionCreateInputBeforeRoleCreation:
 
 
 @dataclass
-class ObjectPermissionCreateInput:
-    """Input data for creating ObjectPermission for an existing role.
-
-    Used when adding object permissions to a role that already exists.
-    """
-
-    entity_type: EntityType
-    entity_id: str
-    operation: OperationType
-    status: PermissionStatus = PermissionStatus.ACTIVE
-
-
-@dataclass
 class ObjectPermissionData:
     id: uuid.UUID
     role_id: uuid.UUID

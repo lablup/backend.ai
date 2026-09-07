@@ -10,12 +10,10 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.bit import single_bit
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.status import PermissionStatus, RoleStatus
+from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
-    OperationType,
     Permission,
     RoleSource,
 )
@@ -24,7 +22,6 @@ from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -77,26 +74,6 @@ class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
             scope_id=self.scope_id,
             entity_type=self.entity_type,
             permission=single_bit(self.permission),
-        )
-
-
-@dataclass
-class ObjectPermissionCreatorSpec(CreatorSpec[ObjectPermissionRow]):
-    """CreatorSpec for object permissions."""
-
-    role_id: uuid.UUID
-    entity_type: RBACElementType
-    entity_id: str
-    operation: OperationType
-    status: PermissionStatus = PermissionStatus.ACTIVE
-
-    @override
-    def build_row(self) -> ObjectPermissionRow:
-        return ObjectPermissionRow(
-            role_id=self.role_id,
-            entity_type=self.entity_type.to_entity_type(),
-            entity_id=self.entity_id,
-            operation=self.operation,
         )
 
 

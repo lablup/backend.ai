@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Collection, Mapping
 from typing import cast
 
-from ai.backend.common.data.permission.types import OperationType, Permission, RBACElementType
+from ai.backend.common.data.permission.types import Permission, RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -33,7 +33,6 @@ from ai.backend.manager.data.permission.role import (
     RoleData,
     RoleDetailData,
     RoleListResult,
-    RolePermissionsUpdateInput,
     RoleRevocationResult,
     ScopeChainPermissionCheckInput,
     ScopePermissionCheckInput,
@@ -153,14 +152,6 @@ class PermissionControllerRepository:
     async def update_role(self, updater: Updater[RoleRow]) -> RoleData:
         result = await self._db_source.update_role(updater)
         return result.to_data()
-
-    @permission_controller_repository_resilience.apply()
-    async def update_role_permissions(
-        self, input_data: RolePermissionsUpdateInput
-    ) -> RoleDetailData:
-        """Update role permissions using batch update."""
-        result = await self._db_source.update_role_permissions(input_data=input_data)
-        return result.to_detail_data_without_users()
 
     @permission_controller_repository_resilience.apply()
     async def bulk_add_role_permissions(
@@ -445,21 +436,3 @@ class PermissionControllerRepository:
         """The bits each user holds on the key's entity type within the key's scope;
         a key nothing reaches maps to :attr:`Permission.NONE`."""
         return await self._db_source.governed_permissions(keys)
-
-    @permission_controller_repository_resilience.apply()
-    async def resolve_effective_permissions(
-        self,
-        keys: Collection[PermissionResolutionKey],
-    ) -> Mapping[PermissionResolutionKey, frozenset[OperationType]]:
-        """Resolve the set of permitted operations per target key.
-
-        Each input key represents one ``(user_id, element_type, entity_id,
-        subject_entity_type)`` combination. For each key, traverses the scope
-        chain (AUTO edges) and self-scope permissions to collect all operations
-        the user can perform.
-        """
-        granted = await self._db_source.resolve_effective_permissions(keys)
-        return {
-            key: frozenset(bit.to_operation() for bit in Permission if bit and bits & bit)
-            for key, bits in granted.items()
-        }

@@ -115,14 +115,23 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     ScopeBindingCreatorSpec,
     UserRoleCreatorSpec,
 )
-from ai.backend.manager.repositories.permission_controller.role_manager import (
-    ScopeSystemRoleData,
-)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # Rendered names are stored in ``roles.name`` (sa.String(64)).
 MAX_ROLE_NAME_LENGTH = 64
+
+
+class ScopeSystemRoleData(Protocol):
+    """The system role a scope grants its members, as the scope's own row describes it."""
+
+    def scope_id(self) -> ScopeId: ...
+
+    def role_name(self) -> str: ...
+
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
+        """The operations to grant per entity type."""
+        ...
 
 
 @dataclass(frozen=True)

@@ -1,8 +1,6 @@
 from .actions import (
     AssignRoleAction,
     AssignRoleActionResult,
-    CheckPermissionAction,
-    CheckPermissionActionResult,
     CreateRoleAction,
     CreateRoleActionResult,
     DeleteRoleAction,
@@ -14,8 +12,6 @@ from .actions import (
 __all__ = [
     "AssignRoleAction",
     "AssignRoleActionResult",
-    "CheckPermissionAction",
-    "CheckPermissionActionResult",
     "CreateRoleAction",
     "CreateRoleActionResult",
     "DeleteRoleAction",
