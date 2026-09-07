@@ -63,7 +63,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentOptions,
     DeploymentPolicyData,
     DeploymentState,
-    DeploymentSummaryData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
@@ -667,28 +666,6 @@ class EndpointRow(Base):
         be eagerly loaded.
         """
         return self.current_revision_row or self.deploying_revision_row
-
-    def to_summary_data(self) -> DeploymentSummaryData:
-        return DeploymentSummaryData(
-            id=self.id,
-            name=self.name,
-            created_user=self.created_user,
-            session_owner=self.session_owner,
-            domain=self.domain,
-            project=self.project,
-            resource_group=self.resource_group,
-            lifecycle_stage=self.lifecycle_stage,
-            tag=self.tag,
-            open_to_public=self.open_to_public or False,
-            url=self.url,
-            current_revision=self.current_revision_id,
-            deploying_revision=self.deploying_revision_id,
-            replicas=self.replicas,
-            desired_replicas=self.desired_replicas,
-            created_at=self.created_at,
-            destroyed_at=self.destroyed_at,
-            sub_step=self.sub_step,
-        )
 
     def to_data(self) -> EndpointData:
         """Convert to EndpointData.

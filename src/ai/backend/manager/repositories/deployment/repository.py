@@ -67,7 +67,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
     DeploymentRevisionReadBundle,
-    DeploymentSummarySearchResult,
     DeploymentWithHistory,
     FetchedModelDefinition,
     LegacyRevisionCreateReadBundle,
@@ -91,7 +90,6 @@ from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
 from ai.backend.manager.models.endpoint.creators import DeploymentCreator, EndpointTokenCreator
-from ai.backend.manager.models.endpoint.scopes import ProjectDeploymentOperationScope
 from ai.backend.manager.models.endpoint.updaters import (
     DeploymentUpdater,
     EndpointLifecycleBatchUpdater,
@@ -99,6 +97,7 @@ from ai.backend.manager.models.endpoint.updaters import (
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
@@ -1535,13 +1534,13 @@ class DeploymentRepository:
         return await self._db_source.search_legacy_endpoints(querier)
 
     @deployment_repository_resilience.apply()
-    async def search_deployments_in_project(
+    async def search_endpoints_in_scopes(
         self,
         querier: BatchQuerier,
-        scope: ProjectDeploymentOperationScope,
-    ) -> DeploymentSummarySearchResult:
-        """Search endpoints within a project scope with pagination and filtering."""
-        return await self._db_source.search_deployments_in_project(querier, scope)
+        scopes: Sequence[OperationScope],
+    ) -> DeploymentInfoSearchResult:
+        """The modern search of :meth:`search_endpoints`, restricted to the scopes (OR)."""
+        return await self._db_source.search_endpoints_in_scopes(querier, scopes)
 
     # ========== Access Token Operations ==========
 

@@ -11,10 +11,12 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.user.row import UserRow
 
 
 @dataclass(frozen=True)
@@ -43,6 +45,33 @@ class ProjectDeploymentOperationScope(OperationScope):
                 column=ProjectRow.id,
                 value=self.project_id,
                 error=ProjectNotFound(str(self.project_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class UserDeploymentOperationScope(OperationScope):
+    """The deployments one user created."""
+
+    user_id: UUID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.created_user == user_id
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        return [
+            ExistenceCheck(
+                column=UserRow.uuid,
+                value=self.user_id,
+                error=UserNotFound(f"User {self.user_id} not found"),
             ),
         ]
 

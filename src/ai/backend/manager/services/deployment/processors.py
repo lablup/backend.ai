@@ -150,13 +150,13 @@ from ai.backend.manager.services.deployment.actions.route import (
     UpdateRouteTrafficStatusAction,
     UpdateRouteTrafficStatusActionResult,
 )
+from ai.backend.manager.services.deployment.actions.scoped_search import (
+    ScopedSearchDeploymentsAction,
+    ScopedSearchDeploymentsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.search_deployments import (
     GlobalSearchDeploymentsAction,
     GlobalSearchDeploymentsActionResult,
-)
-from ai.backend.manager.services.deployment.actions.search_deployments_in_project import (
-    SearchDeploymentsInProjectAction,
-    SearchDeploymentsInProjectActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
     GlobalSearchLegacyDeploymentsAction,
@@ -206,8 +206,8 @@ class DeploymentProcessors:
     global_search_legacy: GlobalActionProcessor[
         GlobalSearchLegacyDeploymentsAction, GlobalSearchLegacyDeploymentsActionResult
     ]
-    search_deployments_in_project: ScopeActionProcessor[
-        SearchDeploymentsInProjectAction, SearchDeploymentsInProjectActionResult
+    scoped_search: ScopeActionProcessor[
+        ScopedSearchDeploymentsAction, ScopedSearchDeploymentsActionResult
     ]
     get_deployment_by_id: SingleEntityActionProcessor[
         GetDeploymentByIdAction, GetDeploymentByIdActionResult
@@ -356,8 +356,8 @@ class DeploymentProcessors:
         self.global_search_legacy = group.global_scope(
             GlobalSearchLegacyDeploymentsAction, service.search_legacy_deployments
         )
-        self.search_deployments_in_project = group.scope(
-            SearchDeploymentsInProjectAction, service.search_deployments_in_project
+        self.scoped_search = group.scope(
+            ScopedSearchDeploymentsAction, service.scoped_search_deployments
         )
         self.get_deployment_by_id = group.single_entity(
             GetDeploymentByIdAction, service.get_deployment_by_id

@@ -138,13 +138,13 @@ from ai.backend.manager.services.deployment.actions.route import (
     UpdateRouteTrafficStatusAction,
     UpdateRouteTrafficStatusActionResult,
 )
+from ai.backend.manager.services.deployment.actions.scoped_search import (
+    ScopedSearchDeploymentsAction,
+    ScopedSearchDeploymentsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.search_deployments import (
     GlobalSearchDeploymentsAction,
     GlobalSearchDeploymentsActionResult,
-)
-from ai.backend.manager.services.deployment.actions.search_deployments_in_project import (
-    SearchDeploymentsInProjectAction,
-    SearchDeploymentsInProjectActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
     GlobalSearchLegacyDeploymentsAction,
@@ -493,15 +493,15 @@ class DeploymentService:
             has_previous_page=result.has_previous_page,
         )
 
-    async def search_deployments_in_project(
-        self, action: SearchDeploymentsInProjectAction
-    ) -> SearchDeploymentsInProjectActionResult:
-        """Search deployments within a project scope."""
-        result = await self._deployment_repository.search_deployments_in_project(
-            action.querier, action.scope
+    async def scoped_search_deployments(
+        self, action: ScopedSearchDeploymentsAction
+    ) -> ScopedSearchDeploymentsActionResult:
+        """Search deployments within the scopes the action names."""
+        result = await self._deployment_repository.search_endpoints_in_scopes(
+            action.querier, action.operation_scopes()
         )
-        return SearchDeploymentsInProjectActionResult(
-            data=result.items,
+        return ScopedSearchDeploymentsActionResult(
+            data=[_convert_deployment_info_to_data(info) for info in result.items],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
