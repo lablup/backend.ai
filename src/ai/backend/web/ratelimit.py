@@ -1,13 +1,8 @@
 """Rate limiting for requests proxied to the manager.
 
-Reads the window the manager-side limiter (``manager/api/rest/ratelimit``) keeps, keyed
-by user for a signed-in caller and by address for an anonymous one; only the manager
-counts, ``manager_proxy_rate_limited()`` rejects when the count has already reached the
-limit. Without an open window the request is proxied and the manager alone limits it.
-
-The address is the one this server forwards, so a manager that resolves a different one
-(``trusted-proxies`` naming hops in front of it) opens a window this check does not
-find: the request is proxied and the manager limits it as before.
+Reads the window the manager-side limiter keeps — by user for a signed-in caller, by
+address otherwise — and refuses once the count has reached the limit. Only the manager
+counts.
 """
 
 from __future__ import annotations

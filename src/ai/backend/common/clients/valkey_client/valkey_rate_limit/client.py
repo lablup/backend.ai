@@ -129,6 +129,10 @@ class ValkeyRateLimitClient:
         return await self._consume_window(self._ip_window_key(client_ip), window_seconds, limit)
 
     async def _consume_window(self, key: str, window_seconds: int, limit: int) -> RateLimitState:
+        """
+        ``HSETNX`` and ``EXPIRE NX`` take their argument only from the request that opens
+        the window, so a later one leaves the limit and the deadline as they stand.
+        """
         batch = Batch(is_atomic=True)
         batch.hincrby(key, "count", 1)
         batch.hsetnx(key, "limit", str(limit))
