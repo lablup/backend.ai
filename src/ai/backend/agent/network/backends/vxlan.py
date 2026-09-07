@@ -1819,23 +1819,24 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         """Idempotently accept intra-bridge forwarding on the overlay bridge, so a DROP FORWARD
         policy (br_netfilter + a Docker/hardened host) cannot silently kill the overlay.
 
-        Skipped where there is no iptables to ask -- a host without it has no such policy either,
-        and requiring the rule there would refuse sessions that work. Everywhere else the install
-        has to succeed: a host that has iptables may well have the DROP policy this exists for, and
-        a refusal there is an overlay that carries nothing while reporting itself up.
+        Nothing here is skipped. A host with no iptables at all was allowed through on the
+        reasoning that it has no FORWARD policy either -- but this backend already declares
+        iptables a required binary (`readiness._REQUIRED_BINARIES`), so a node without it is one
+        no overlay session should have reached, and treating it as a host that needs no rule turns
+        a readiness failure into a session that comes up carrying nothing.
 
-        "No iptables" is a MISSING BINARY and nothing else. A denied exec, an exhausted process or
-        descriptor table, a broken interpreter -- none of them says this host is not filtering
-        FORWARD, and reading them as that skipped the rule on a host whose policy is DROP and
-        reported the session up over an overlay carrying nothing. They fail the setup instead.
+        A denied exec, an exhausted process or descriptor table, a broken interpreter say even
+        less: none of them is evidence about what this host filters. All of them fail the setup.
         """
         try:
             await self._runner(forward_accept_check_args(vni))
             return  # already present
-        except FileNotFoundError as e:
-            # No iptables binary: nothing on this host is filtering FORWARD.
-            log.debug("skipping overlay FORWARD-ACCEPT for {}: {}", bridge_dev(vni), e)
-            return
+        except OSError as e:
+            raise OverlayEncryptionUnavailable(
+                f"could not ask this host whether {bridge_dev(vni)} is allowed to forward"
+                f" ({e}); refusing the session rather than building an overlay that a FORWARD"
+                " policy may silently drop"
+            ) from e
         except RuntimeError:
             pass  # the rule is absent -- install it
         await self._runner(forward_accept_add_args(vni))

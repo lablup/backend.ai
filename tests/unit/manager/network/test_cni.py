@@ -10,11 +10,13 @@ import asyncio
 import ipaddress
 import json
 import time
+from collections.abc import Mapping
 from typing import Any, TypeVar, cast, override
 
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.network.keys import member_key
 from ai.backend.common.network.types import (
     OVERLAY_ENCRYPTION_PROFILE,
     Member,
@@ -83,6 +85,32 @@ class FakeEtcd:
         if self.store.get(key) != expected:
             return False
         del self.store[key]
+        return True
+
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: Mapping[str, str],
+        **kwargs: Any,
+    ) -> bool:
+        """One store operation over the target AND the keys that make writing it legitimate.
+
+        Modelled because a compare-and-swap on the target alone cannot express what a create
+        needs: it still CREATES a key that is absent, and absent is what a teardown of the session
+        just made it -- so the write attaches this create's state to a session that is not its.
+        """
+        if expected is None:
+            if key in self.store:
+                return False
+        elif self.store.get(key) != expected:
+            return False
+        for guard_key, guard_val in guards.items():
+            if self.store.get(guard_key) != guard_val:
+                return False
+        self.store[key] = val
         return True
 
     async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
@@ -1745,6 +1773,180 @@ class TestACreateThatWokeUpInAnotherSession:
         assert "network/session/s1/endpoints/k1" in etcd.store
 
 
+class TestASubnetTwoIncarnationsBothClaim:
+    """C15. Ownership of a pool claim is (session, incarnation), not the session id. A stalled
+    create's block adopted by the incarnation that replaced it is a block the stalled one's cleanup
+    still gives back -- and the pool then hands it to a third session while the live one is on it.
+    Two tenants at the same addresses, which is not a leak."""
+
+    async def test_a_later_incarnation_does_not_adopt_an_earlier_ones_block(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        stranded = await plugin._subnet_allocator.acquire("s1", generation="g1")
+
+        mine = await plugin._subnet_allocator.acquire("s1", generation="g2")
+
+        assert mine != stranded, "g2 took over a block g1's cleanup will give back"
+        assert await plugin._subnet_allocator.holder(stranded) == "s1"
+
+    async def test_the_earlier_incarnations_release_leaves_the_later_one_alone(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin._subnet_allocator.acquire("s1", generation="g1")
+        live = await plugin._subnet_allocator.acquire("s1", generation="g2")
+
+        await plugin._subnet_allocator.release_all("s1", "g1")
+
+        assert await plugin._subnet_allocator.holder(live) == "s1"
+
+    async def test_a_retry_of_the_same_incarnation_still_converges(self) -> None:
+        # The idempotency this ownership rule must not cost: a retried create of ONE incarnation
+        # lands on the block it already holds rather than claiming a second.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        first = await plugin._subnet_allocator.acquire("s1", generation="g1")
+
+        assert await plugin._subnet_allocator.acquire("s1", generation="g1") == first
+        assert len(_pool_claims(etcd)) == 1
+
+    async def test_a_claim_from_before_the_field_is_still_adopted(self) -> None:
+        # A manager older than the generation wrote no stamp, and nothing else will come back for
+        # what it left; refusing to adopt it would strand the block for the cluster's lifetime.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        legacy = await plugin._subnet_allocator.acquire("s1")
+
+        assert await plugin._subnet_allocator.acquire("s1", generation="g1") == legacy
+
+    async def test_the_same_holds_for_a_vni(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        stranded = await plugin._vni_allocator.acquire("s1", "g1")
+
+        mine = await plugin._vni_allocator.acquire("s1", "g2")
+
+        assert mine != stranded
+        assert await plugin._vni_allocator.holder(stranded) == "s1"
+
+
+class TestAChildKeyWrittenUnderNoRecord:
+    """C16. A stamp says whose a key is; it cannot stop the key being MADE. A stale create finding
+    an address free is finding it free because the session it belonged to was torn down, and the
+    endpoint or member key it then creates is attached to a session that no longer exists -- where
+    it blocks the teardown of whatever replaces it and nothing ever comes for it. So each write is
+    one store operation with the check that this create still holds the session's record."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    async def test_an_endpoint_is_not_created_under_a_record_that_moved_on(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        held = etcd.store[_META_KEY]
+        await plugin.destroy_network("s1")
+        assert _META_KEY not in etcd.store
+
+        with pytest.raises(EndpointSuperseded):
+            await plugin._endpoint_allocator.assign(
+                "s1",
+                "k1",
+                "10.128.0.0/24",
+                agent_id="a1",
+                generation=json.loads(held)["generation"],
+                guards={_META_KEY: held},
+            )
+
+        assert "network/session/s1/endpoints/k1" not in etcd.store
+        assert not [key for key in etcd.store if key.startswith("network/session/s1/ipam/")]
+
+    async def test_a_preseeded_member_is_not_created_under_one_either(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        etcd.store["network/agent/a1/vtep"] = "192.168.105.7"
+
+        await plugin._preseed_members("s1", ["a1"], "g1", held='{"gone": true}')
+
+        assert member_key("s1", "a1") not in etcd.store, (
+            "it put a member under a session whose record it does not hold; that key is what"
+            " holds a VNI back from reuse, and nothing would come for it"
+        )
+
+    async def test_the_guarded_write_still_lands_under_the_record_it_names(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        assert "network/session/s1/endpoints/k1" in etcd.store
+        assert info.options["endpoint_ips"] == {"k1": "10.128.0.1"}
+
+
+class TestACleanupThatCouldNotFinishIsRetried:
+    """C17. The orphan sweep has no tombstone to work from -- the record already names the
+    incarnation that replaced the one being given back -- so a failure there is a leak nothing
+    else can find. It writes down what it owes, and the next use of the session id pays it."""
+
+    _OPTIONS = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    class _PoolIsUnreachable(FakeEtcd):
+        def __init__(self) -> None:
+            super().__init__()
+            self.refusing = True
+
+        @override
+        async def delete_if_value(self, key: str, expected: str, **kwargs: Any) -> bool:
+            if self.refusing and key.startswith("network/ipam/"):
+                raise RuntimeError("etcd is unreachable")
+            return await super().delete_if_value(key, expected, **kwargs)
+
+    async def test_a_failed_sweep_is_written_down(self) -> None:
+        etcd = self._PoolIsUnreachable()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        held = etcd.store[_META_KEY]
+        generation = json.loads(held)["generation"]
+        etcd.store[_META_KEY] = json.dumps({**json.loads(held), "generation": "later"})
+
+        await plugin._rollback_create("s1", None, None, held)
+
+        assert f"network/cleanup-debt/s1/{generation}" in etcd.store
+
+    async def test_the_next_use_of_the_id_pays_it(self) -> None:
+        etcd = self._PoolIsUnreachable()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        held = etcd.store[_META_KEY]
+        generation = json.loads(held)["generation"]
+        # The session is rebuilt, so the sweep has no record of its own to hang off.
+        etcd.store[_META_KEY] = json.dumps({**json.loads(held), "generation": "later"})
+        await plugin._rollback_create("s1", None, None, held)
+        assert _pool_claims(etcd) != [], "nothing was owed"
+        etcd.refusing = False  # etcd is back
+
+        await plugin.drain_cleanup_debt("s1")
+
+        assert _pool_claims(etcd) == [], "the leak outlived the session"
+        assert f"network/cleanup-debt/s1/{generation}" not in etcd.store
+
+    async def test_a_sweep_that_finishes_owes_nothing(self) -> None:
+        etcd = self._PoolIsUnreachable()
+        etcd.refusing = False
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        held = etcd.store[_META_KEY]
+        generation = json.loads(held)["generation"]
+        etcd.store[_META_KEY] = json.dumps({**json.loads(held), "generation": "later"})
+
+        await plugin._rollback_create("s1", None, None, held)
+
+        assert f"network/cleanup-debt/s1/{generation}" not in etcd.store
+
+
 class TestADestroyThatFindsNoRecordAtAll:
     """C7b. "No record" is what the destroy READ, not something it holds. A create claims the id
     with a compare-and-swap on that same key, so between the read and any delete it can publish a
@@ -1862,9 +2064,11 @@ class TestAMetaThatOutlivedItsAllocation:
         plugin = _plugin_with(etcd)
         first = await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
         # Free the allocation behind the record's back, as a half-failed rollback does, and let
-        # another session take it.
-        await plugin._subnet_allocator.release(first.options["subnet"], "s1")
-        await plugin._vni_allocator.release(int(first.options["vni"]), "s1")
+        # another session take it. Released under the incarnation that claimed it -- ownership is
+        # (session, incarnation), so naming the session alone releases nothing.
+        generation = str(first.options["generation"])
+        await plugin._subnet_allocator.release(first.options["subnet"], "s1", generation)
+        await plugin._vni_allocator.release(int(first.options["vni"]), "s1", generation)
         stolen = await plugin._subnet_allocator.acquire("s2")
         assert stolen == first.options["subnet"]
 
@@ -1971,6 +2175,7 @@ class TestACreateThatFailedBesideOneThatDidNot:
                 session_id: str,
                 member_agents: list[str],
                 generation: str | None = None,
+                held: str | None = None,
             ) -> None:
                 reached.set()
                 await asyncio.sleep(0.05)

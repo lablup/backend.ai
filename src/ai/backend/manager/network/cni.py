@@ -108,6 +108,16 @@ _GENERATION: Final = SESSION_META_GENERATION
 _CREATE_HANDOVER_SEC: Final = 60.0
 _CREATE_POLL_SEC: Final = 0.5
 
+#: Where a cleanup that has no record left to hang off writes down what it still owes.
+#:
+#: A cleanup normally keeps the session's own record as its tombstone, and the retry finds it
+#: there. The one that cannot is the orphan sweep: by the time it runs, the record already names
+#: the incarnation that REPLACED the one being given back, so there is nothing under the session
+#: to mark. Its debt goes here instead, keyed by the incarnation, and stays until a sweep gets to
+#: the end -- otherwise one transient etcd error leaks a VNI, a subnet and their keys for the life
+#: of the cluster.
+_CLEANUP_DEBT_PREFIX: Final = "network/cleanup-debt"
+
 
 def _published(meta: Mapping[str, Any]) -> dict[str, Any]:
     """The session meta as its callers see it, without the create's own bookkeeping.
@@ -117,6 +127,10 @@ def _published(meta: Mapping[str, Any]) -> dict[str, Any]:
     that replaced the one it was issued for.
     """
     return {key: value for key, value in meta.items() if key not in (_OWNER, _STATE, _CLAIMED_AT)}
+
+
+def _debt_key(session_id: str, generation: str) -> str:
+    return f"{_CLEANUP_DEBT_PREFIX}/{session_id}/{generation}"
 
 
 def _generation_of(raw: str | None) -> str | None:
@@ -223,6 +237,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         requested_subnet = options.get("subnet")
 
         token = uuid.uuid4().hex
+        # Anything an earlier incarnation of this id could not give back, before this one claims
+        # from the same pools.
+        await self.drain_cleanup_debt(session_id)
         await self._require_members_cni_capable(member_agents)
         # A session start that failed downstream is retried with the same id, so this can be a
         # second call for a session that already has an allocation. Allocating again would give
@@ -642,19 +659,88 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             " giving back what that create still holds",
             session_id,
         )
+        # Written down BEFORE anything is given back, and cleared only when it all was. This
+        # sweep has no tombstone to work from -- the record already names the incarnation that
+        # replaced this one -- so without a note of its own, a single failed delete leaks a VNI, a
+        # subnet and their keys with nothing left anywhere that names them.
+        await self._owe_cleanup(etcd, session_id, generation)
+        await self._sweep_incarnation(etcd, session_id, generation)
+
+    async def _owe_cleanup(self, etcd: AsyncEtcd, session_id: str, generation: str) -> None:
+        """Record that an incarnation still has state to give back."""
+        try:
+            await etcd.put(
+                _debt_key(session_id, generation),
+                json.dumps({
+                    "session_id": session_id,
+                    _GENERATION: generation,
+                    "recorded_at": time.time(),
+                }),
+                scope=ConfigScopes.GLOBAL,
+            )
+        except Exception:
+            # Not fatal to the sweep that follows -- it may well succeed. Fatal to the RETRY, so
+            # it is said plainly rather than swallowed.
+            log.exception(
+                "could not record what session {}'s incarnation {} still owes; if the sweep below"
+                " does not finish, nothing will come back for it",
+                session_id,
+                generation,
+            )
+
+    async def _sweep_incarnation(self, etcd: AsyncEtcd, session_id: str, generation: str) -> bool:
+        """Give back everything one incarnation of a session still holds, and say whether it all
+        went.
+
+        The session's own record is never touched: by the time this runs it belongs to whatever
+        replaced this incarnation. Clears the debt when there is nothing left.
+        """
+        complete = True
         for prefix, key_of in (
             (endpoints_prefix, endpoint_key),
             (members_prefix, member_key),
             (session_ipam_prefix, session_ipam_key),
         ):
-            await self._delete_incarnation(etcd, session_id, prefix, key_of, generation)
+            if not await self._delete_incarnation(etcd, session_id, prefix, key_of, generation):
+                complete = False
         try:
-            await self._vni_allocator.release_all(session_id, generation)
-            await self._subnet_allocator.release_all(session_id, generation)
+            stuck_vnis = await self._vni_allocator.release_all(session_id, generation)
+            stuck_blocks = await self._subnet_allocator.release_all(session_id, generation)
         except Exception:
             log.exception(
                 "could not give back what session {}'s superseded create held", session_id
             )
+            return False
+        if stuck_vnis or stuck_blocks:
+            complete = False
+        if complete:
+            await etcd.delete(_debt_key(session_id, generation), scope=ConfigScopes.GLOBAL)
+        return complete
+
+    async def drain_cleanup_debt(self, session_id: str) -> None:
+        """Retry every unfinished sweep recorded for this session id.
+
+        Called where a session id is about to be used again -- a create, a teardown -- because
+        that is both the moment the leak matters and the moment somebody is already here to pay
+        it. Best-effort: a debt that will not clear stays written down for the next one.
+        """
+        etcd = self._require_etcd()
+        try:
+            owed = await etcd.get_prefix(
+                f"{_CLEANUP_DEBT_PREFIX}/{session_id}", scope=ConfigScopes.GLOBAL
+            )
+        except Exception:
+            log.exception("could not read what session {} still owes", session_id)
+            return
+        for generation, payload in dict(owed).items():
+            if not generation or not isinstance(payload, str):
+                continue
+            log.warning(
+                "retrying the cleanup session {}'s incarnation {} did not finish",
+                session_id,
+                generation,
+            )
+            await self._sweep_incarnation(etcd, session_id, str(generation))
 
     async def _finish_cleanup(self, etcd: AsyncEtcd, session_id: str, tombstone: str) -> bool:
         """Carry a session under a DELETING tombstone through to nothing left, and say whether it
@@ -771,22 +857,34 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         return complete
 
     async def _preseed_members(
-        self, session_id: str, member_agents: list[str], generation: str | None = None
+        self,
+        session_id: str,
+        member_agents: list[str],
+        generation: str | None = None,
+        held: str | None = None,
     ) -> None:
         """Publish each member agent's VTEP, but only where no record stands already.
 
         Never over one: the agent's own record carries ``joined=true``, the teardown
         acknowledgement `destroy_network` reads before it hands the VNI back to the pool.
+
+        Written under the session's own record when the caller holds one. A member key is what
+        holds a session's VNI back from reuse, so one CREATED on behalf of a session that has
+        since been torn down blocks the teardown of the session that replaced it -- and nothing
+        would ever come for it. A stamp says whose a key is; it cannot stop the key being made.
         """
         etcd = self._require_etcd()
+        guards = {session_meta_key(session_id): held} if held else {}
         for agent_id in member_agents:
             vtep = await etcd.get(agent_vtep_key(agent_id), scope=ConfigScopes.GLOBAL)
             if not vtep:
                 continue
             member = Member(agent_id=agent_id, host_ip=vtep, vtep_ip=vtep, generation=generation)
-            await etcd.put_if_absent(
+            await etcd.compare_and_put(
                 member_key(session_id, agent_id),
                 json.dumps(member.to_etcd_payload()),
+                expected=None,
+                guards=guards,
                 scope=ConfigScopes.GLOBAL,
             )
 
@@ -810,6 +908,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         and it never builds. One read before the tombstone could see neither.
         """
         etcd = self._require_etcd()
+        await self.drain_cleanup_debt(network_id)
         pending = await self._members_still_holding(network_id)
         if pending:
             # Raise, do not return. The caller (`TerminatedTransitionHook`) retries on failure and
