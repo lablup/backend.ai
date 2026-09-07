@@ -16,47 +16,34 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.web.reserved_response_headers import apply_reserved_response_headers
 from ai.backend.manager.api.rest.ratelimit.handler import (
-    _RATELIMIT_WINDOW,
+    _ANONYMOUS_RATELIMIT,
+    _RATELIMIT_WINDOW_SECONDS,
     make_rlim_middleware,
 )
 from ai.backend.manager.errors.api import RateLimitExceeded
-from ai.backend.manager.services.auth.actions.resolve_default_keypair_rate_limit import (
-    PublicResolveDefaultKeypairRateLimitAction,
-    PublicResolveDefaultKeypairRateLimitResult,
-)
 
 _USER_ID = UserID(uuid.UUID("12345678-1234-5678-1234-567812345678"))
-_RESET = 500
-
-
-@dataclass
-class RateLimitSuccessCase:
-    """Test case data for successful rate limit scenarios."""
-
-    rate_limit: int | None
-    rolling_count: int
-    expected_limit: str
-    expected_remaining: str
-    description: str = ""
+_RATE_LIMIT = 30000
+_RESET_AFTER_SECONDS = 500
 
 
 @dataclass(frozen=True)
-class WindowOpenCase:
-    """A window that opened without a limit and what the default keypair says."""
+class RateLimitSuccessCase:
+    """A window the request stays within, and the quota headers it reports."""
 
-    resolved_rate_limit: int | None
-    expected_limit: str
-    expected_store_limit_awaits: int
+    limit: int
+    count: int
+    expected_remaining: str
+    description: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class RateLimitExceedCase:
-    """Test case data for rate limit exceeded scenarios."""
+    """A window the request runs past, and the limit the 429 reports."""
 
-    rate_limit: int | None
-    rolling_count: int
-    expected_limit: str
-    description: str = ""
+    limit: int
+    count: int
+    description: str
 
 
 class TestRlimMiddleware:
@@ -64,22 +51,13 @@ class TestRlimMiddleware:
     def mock_valkey_client(self) -> MagicMock:
         """Mock ValkeyRateLimitClient."""
         client = MagicMock(spec=ValkeyRateLimitClient)
-        client.consume = AsyncMock()
+        client.consume_rate_limit = AsyncMock()
         return client
 
     @pytest.fixture
-    def mock_auth(self) -> MagicMock:
-        """Mock AuthProcessors resolving no default keypair limit."""
-        auth = MagicMock()
-        auth.public_resolve_default_keypair_rate_limit.run = AsyncMock(
-            return_value=PublicResolveDefaultKeypairRateLimitResult(rate_limit=None)
-        )
-        return auth
-
-    @pytest.fixture
-    def middleware(self, mock_valkey_client: MagicMock, mock_auth: MagicMock) -> Any:
+    def middleware(self, mock_valkey_client: MagicMock) -> Any:
         """Create the closure-based rate limit middleware."""
-        return make_rlim_middleware(mock_valkey_client, mock_auth)
+        return make_rlim_middleware(mock_valkey_client)
 
     @pytest.fixture
     def mock_handler(self) -> AsyncMock:
@@ -97,11 +75,10 @@ class TestRlimMiddleware:
 
     @pytest.fixture
     def mock_request_authorized(self) -> web.Request:
-        """Mock request for authorized user."""
+        """Mock request carrying the rate limit the auth middleware injected."""
         request = make_mocked_request("GET", "/")
         request["is_authorized"] = True
-        request["keypair"] = {"rate_limit": 30000}
-        request["user"] = {"uuid": _USER_ID}
+        request["user"] = {"uuid": _USER_ID, "rate_limit": _RATE_LIMIT}
         return request
 
     async def test_anonymous_query_returns_default_headers(
@@ -117,48 +94,63 @@ class TestRlimMiddleware:
         await apply_reserved_response_headers(mock_request_anonymous, response)
 
         # Assert
-        assert response.headers["X-RateLimit-Limit"] == "1000"
-        assert response.headers["X-RateLimit-Remaining"] == "1000"
-        assert response.headers["X-RateLimit-Reset"] == str(_RATELIMIT_WINDOW)
-        assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW)
+        assert response.headers["X-RateLimit-Limit"] == str(_ANONYMOUS_RATELIMIT)
+        assert response.headers["X-RateLimit-Remaining"] == str(_ANONYMOUS_RATELIMIT)
+        assert response.headers["X-RateLimit-Reset"] == str(_RATELIMIT_WINDOW_SECONDS)
+        assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW_SECONDS)
         mock_handler.assert_called_once_with(mock_request_anonymous)
 
         # Valkey should not be called for anonymous requests
-        mock_valkey_client.consume.assert_not_called()
+        mock_valkey_client.consume_rate_limit.assert_not_called()
+
+    async def test_authorized_query_counts_against_the_injected_limit(
+        self,
+        middleware: Any,
+        mock_valkey_client: MagicMock,
+        mock_request_authorized: web.Request,
+        mock_handler: AsyncMock,
+    ) -> None:
+        """The limit the auth middleware put on the request is what opens the window."""
+        # Arrange
+        mock_valkey_client.consume_rate_limit = AsyncMock(
+            return_value=RateLimitState(
+                count=1, limit=_RATE_LIMIT, reset_after_seconds=_RESET_AFTER_SECONDS
+            )
+        )
+
+        # Act
+        await middleware(mock_request_authorized, mock_handler)
+
+        # Assert
+        mock_valkey_client.consume_rate_limit.assert_called_once_with(
+            user_id=_USER_ID,
+            window_seconds=_RATELIMIT_WINDOW_SECONDS,
+            limit=_RATE_LIMIT,
+        )
 
     @pytest.mark.parametrize(
-        "test_case",
+        "case",
         [
             RateLimitSuccessCase(
-                rate_limit=30000,
-                rolling_count=10,
-                expected_limit="30000",
+                limit=_RATE_LIMIT,
+                count=10,
                 expected_remaining="29990",
                 description="within limit",
             ),
             RateLimitSuccessCase(
-                rate_limit=30000,
-                rolling_count=30000,
-                expected_limit="30000",
+                limit=_RATE_LIMIT,
+                count=_RATE_LIMIT,
                 expected_remaining="0",
                 description="exactly at limit",
             ),
             RateLimitSuccessCase(
-                rate_limit=None,
-                rolling_count=9999,
-                expected_limit="None",
-                expected_remaining="9999",
-                description="unlimited",
-            ),
-            RateLimitSuccessCase(
-                rate_limit=None,
-                rolling_count=999999,
-                expected_limit="None",
-                expected_remaining="999999",
-                description="unlimited with very high count",
+                limit=0,
+                count=0,
+                expected_remaining="0",
+                description="zero limit before any request lands",
             ),
         ],
-        ids=lambda tc: tc.description,
+        ids=lambda case: case.description,
     )
     async def test_authorized_query_within_rate_limit(
         self,
@@ -166,13 +158,13 @@ class TestRlimMiddleware:
         mock_valkey_client: MagicMock,
         mock_request_authorized: web.Request,
         mock_handler: AsyncMock,
-        test_case: RateLimitSuccessCase,
+        case: RateLimitSuccessCase,
     ) -> None:
         """Authorized requests within rate limit succeed and return correct headers."""
         # Arrange
-        mock_valkey_client.consume = AsyncMock(
+        mock_valkey_client.consume_rate_limit = AsyncMock(
             return_value=RateLimitState(
-                count=test_case.rolling_count, limit=test_case.rate_limit, reset=_RESET
+                count=case.count, limit=case.limit, reset_after_seconds=_RESET_AFTER_SECONDS
             )
         )
 
@@ -181,56 +173,26 @@ class TestRlimMiddleware:
         await apply_reserved_response_headers(mock_request_authorized, response)
 
         # Assert headers
-        assert response.headers["X-RateLimit-Limit"] == test_case.expected_limit
-        assert response.headers["X-RateLimit-Remaining"] == test_case.expected_remaining
-        assert response.headers["X-RateLimit-Reset"] == str(_RESET)
-        assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW)
+        assert response.headers["X-RateLimit-Limit"] == str(case.limit)
+        assert response.headers["X-RateLimit-Remaining"] == case.expected_remaining
+        assert response.headers["X-RateLimit-Reset"] == str(_RESET_AFTER_SECONDS)
+        assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW_SECONDS)
 
         # Handler should be called
         mock_handler.assert_called_once_with(mock_request_authorized)
 
-        # Valkey should be called for authorized requests
-        mock_valkey_client.consume.assert_called_once_with(
-            user_id=_USER_ID,
-            window=_RATELIMIT_WINDOW,
-        )
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            WindowOpenCase(
-                resolved_rate_limit=30000,
-                expected_limit="30000",
-                expected_store_limit_awaits=1,
-            ),
-            WindowOpenCase(
-                resolved_rate_limit=None,
-                expected_limit="None",
-                expected_store_limit_awaits=0,
-            ),
-        ],
-        ids=lambda case: f"default={case.resolved_rate_limit}",
-    )
-    async def test_window_opened_without_a_limit_takes_the_default_keypair_limit(
+    async def test_the_limit_fixed_for_the_window_outranks_the_injected_one(
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
-        mock_auth: MagicMock,
         mock_request_authorized: web.Request,
         mock_handler: AsyncMock,
-        case: WindowOpenCase,
     ) -> None:
-        """The first request of a window resolves the default keypair limit and fixes it."""
+        """A window keeps the limit it opened with, so a later change waits for the next one."""
         # Arrange
-        mock_valkey_client.consume = AsyncMock(
-            return_value=RateLimitState(count=1, limit=None, reset=_RESET)
-        )
-        mock_valkey_client.store_limit = AsyncMock(
-            return_value=RateLimitState(count=1, limit=case.resolved_rate_limit, reset=_RESET)
-        )
-        mock_auth.public_resolve_default_keypair_rate_limit.run = AsyncMock(
-            return_value=PublicResolveDefaultKeypairRateLimitResult(
-                rate_limit=case.resolved_rate_limit
+        mock_valkey_client.consume_rate_limit = AsyncMock(
+            return_value=RateLimitState(
+                count=10, limit=100, reset_after_seconds=_RESET_AFTER_SECONDS
             )
         )
 
@@ -239,56 +201,29 @@ class TestRlimMiddleware:
         await apply_reserved_response_headers(mock_request_authorized, response)
 
         # Assert
-        assert response.headers["X-RateLimit-Limit"] == case.expected_limit
-        mock_auth.public_resolve_default_keypair_rate_limit.run.assert_awaited_once_with(
-            PublicResolveDefaultKeypairRateLimitAction(user_id=_USER_ID)
-        )
-        assert mock_valkey_client.store_limit.await_count == case.expected_store_limit_awaits
-        mock_handler.assert_called_once_with(mock_request_authorized)
-
-    async def test_window_with_a_limit_does_not_resolve_the_default_keypair(
-        self,
-        middleware: Any,
-        mock_valkey_client: MagicMock,
-        mock_auth: MagicMock,
-        mock_request_authorized: web.Request,
-        mock_handler: AsyncMock,
-    ) -> None:
-        # Arrange
-        mock_valkey_client.consume = AsyncMock(
-            return_value=RateLimitState(count=10, limit=30000, reset=_RESET)
-        )
-
-        # Act
-        await middleware(mock_request_authorized, mock_handler)
-
-        # Assert
-        mock_auth.public_resolve_default_keypair_rate_limit.run.assert_not_called()
-        mock_valkey_client.store_limit.assert_not_called()
+        assert response.headers["X-RateLimit-Limit"] == "100"
+        assert response.headers["X-RateLimit-Remaining"] == "90"
 
     @pytest.mark.parametrize(
-        "test_case",
+        "case",
         [
             RateLimitExceedCase(
-                rate_limit=30000,
-                rolling_count=30001,
-                expected_limit="30000",
+                limit=_RATE_LIMIT,
+                count=_RATE_LIMIT + 1,
                 description="exceeds by 1",
             ),
             RateLimitExceedCase(
-                rate_limit=30000,
-                rolling_count=50000,
-                expected_limit="30000",
+                limit=_RATE_LIMIT,
+                count=50000,
                 description="far exceeds limit",
             ),
             RateLimitExceedCase(
-                rate_limit=0,
-                rolling_count=1,
-                expected_limit="0",
+                limit=0,
+                count=1,
                 description="zero limit always exceeds",
             ),
         ],
-        ids=lambda tc: tc.description,
+        ids=lambda case: case.description,
     )
     async def test_authorized_query_exceeds_rate_limit(
         self,
@@ -296,13 +231,13 @@ class TestRlimMiddleware:
         mock_valkey_client: MagicMock,
         mock_request_authorized: web.Request,
         mock_handler: AsyncMock,
-        test_case: RateLimitExceedCase,
+        case: RateLimitExceedCase,
     ) -> None:
         """Authorized requests exceeding rate limit raise RateLimitExceeded."""
         # Arrange
-        mock_valkey_client.consume = AsyncMock(
+        mock_valkey_client.consume_rate_limit = AsyncMock(
             return_value=RateLimitState(
-                count=test_case.rolling_count, limit=test_case.rate_limit, reset=_RESET
+                count=case.count, limit=case.limit, reset_after_seconds=_RESET_AFTER_SECONDS
             )
         )
 
@@ -311,16 +246,10 @@ class TestRlimMiddleware:
             await middleware(mock_request_authorized, mock_handler)
         response = web.Response(status=429)
         await apply_reserved_response_headers(mock_request_authorized, response)
-        assert response.headers["X-RateLimit-Limit"] == test_case.expected_limit
+        assert response.headers["X-RateLimit-Limit"] == str(case.limit)
         assert response.headers["X-RateLimit-Remaining"] == "0"
-        assert response.headers["X-RateLimit-Reset"] == str(_RESET)
-        assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW)
+        assert response.headers["X-RateLimit-Reset"] == str(_RESET_AFTER_SECONDS)
+        assert response.headers["X-RateLimit-Window"] == str(_RATELIMIT_WINDOW_SECONDS)
 
         # Handler should not be called when rate limit exceeded
         mock_handler.assert_not_called()
-
-        # Valkey should still be called
-        mock_valkey_client.consume.assert_called_once_with(
-            user_id=_USER_ID,
-            window=_RATELIMIT_WINDOW,
-        )

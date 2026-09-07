@@ -50,10 +50,6 @@ from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     PublicResolveAccessKeyScopeAction,
     PublicResolveAccessKeyScopeResult,
 )
-from ai.backend.manager.services.auth.actions.resolve_default_keypair_rate_limit import (
-    PublicResolveDefaultKeypairRateLimitAction,
-    PublicResolveDefaultKeypairRateLimitResult,
-)
 from ai.backend.manager.services.auth.actions.resolve_user_id_by_access_key import (
     ResolveUserIDByAccessKeyAction,
 )
@@ -124,9 +120,6 @@ class AuthProcessors:
     public_resolve_access_key_scope: PublicActionProcessor[
         PublicResolveAccessKeyScopeAction, PublicResolveAccessKeyScopeResult
     ]
-    public_resolve_default_keypair_rate_limit: PublicActionProcessor[
-        PublicResolveDefaultKeypairRateLimitAction, PublicResolveDefaultKeypairRateLimitResult
-    ]
     public_resolve_user_scope: PublicActionProcessor[
         PublicResolveUserScopeAction, PublicResolveUserScopeResult
     ]
@@ -181,9 +174,6 @@ class AuthProcessors:
         self.public_get_role = auth_group.public(PublicGetRoleAction, service.get_role)
         self.public_resolve_access_key_scope = auth_group.public(
             PublicResolveAccessKeyScopeAction, service.resolve_access_key_scope
-        )
-        self.public_resolve_default_keypair_rate_limit = auth_group.public(
-            PublicResolveDefaultKeypairRateLimitAction, service.resolve_default_keypair_rate_limit
         )
         self.public_resolve_user_scope = auth_group.public(
             PublicResolveUserScopeAction, service.resolve_user_scope

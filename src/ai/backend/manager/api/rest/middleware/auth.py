@@ -36,7 +36,7 @@ from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
-from sqlalchemy.orm import load_only
+from sqlalchemy.orm import aliased, load_only
 
 from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.entity.domain import DomainID
@@ -643,9 +643,16 @@ async def _query_auth_context_by_access_key(
 
     Only the columns that context carries are loaded, and the rows stay inside this session.
     """
+    default_keypair = aliased(KeyPairRow)
     async with db.begin_readonly_session_read_committed() as sess:
         result = await sess.execute(
-            sa.select(KeyPairRow, UserRow, KeyPairResourcePolicyRow, UserResourcePolicyRow)
+            sa.select(
+                KeyPairRow,
+                UserRow,
+                KeyPairResourcePolicyRow,
+                UserResourcePolicyRow,
+                default_keypair.rate_limit,
+            )
             .join(UserRow, UserRow.uuid == KeyPairRow.user)
             .join(
                 KeyPairResourcePolicyRow,
@@ -654,6 +661,10 @@ async def _query_auth_context_by_access_key(
             .join(
                 UserResourcePolicyRow,
                 UserResourcePolicyRow.name == UserRow.resource_policy,
+            )
+            .join(
+                default_keypair,
+                (default_keypair.user == UserRow.uuid) & default_keypair.is_default,
             )
             .options(
                 load_only(
@@ -681,7 +692,7 @@ async def _query_auth_context_by_access_key(
         if row is None:
             return None
 
-        keypair_row, user_row, keypair_policy_row, user_policy_row = row
+        keypair_row, user_row, keypair_policy_row, user_policy_row, default_rate_limit = row
         if user_row.status in _AUTH_DENIED_USER_STATUSES:
             raise AuthorizationFailed(f"User account is {user_row.status}")
         return _AuthContext(
@@ -693,6 +704,7 @@ async def _query_auth_context_by_access_key(
                 domain_id=DomainID(user_row.domain_id),
                 sudo_session_enabled=user_row.sudo_session_enabled,
                 allowed_client_ip=user_row.allowed_client_ip,
+                rate_limit=default_rate_limit,
                 resource_policy=user_policy_row.to_dataclass(),
             ),
             keypair=AuthenticatedKeypair(
@@ -703,7 +715,6 @@ async def _query_auth_context_by_access_key(
                     )
                 ),
                 is_admin=bool(keypair_row.is_admin),
-                rate_limit=keypair_row.rate_limit,
                 resource_policy=keypair_policy_row.to_dataclass(),
             ),
         )

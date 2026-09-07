@@ -43,8 +43,8 @@ valkey_rate_limit_resilience = Resilience(
 @dataclass(frozen=True)
 class RateLimitState:
     count: int
-    limit: int | None
-    reset: int
+    limit: int
+    reset_after_seconds: int
 
 
 class ValkeyRateLimitClient:
@@ -94,57 +94,37 @@ class ValkeyRateLimitClient:
         self._closed = True
         await self._client.disconnect()
 
+    def _window_key(self, user_id: UserID) -> str:
+        return f"user.{user_id}.rate_limit_window"
+
     @valkey_rate_limit_resilience.apply()
-    async def consume(self, user_id: UserID, window: int) -> RateLimitState:
+    async def consume_rate_limit(
+        self, user_id: UserID, window_seconds: int, limit: int
+    ) -> RateLimitState:
         """
         Consume one request of the user's current window and return its state.
 
         :param user_id: The user the counter is keyed by.
-        :param window: The window length in seconds, applied when the request opens a window.
-        :return: The count, the limit fixed for the window if any, and the seconds until it ends.
+        :param window_seconds: The window length, applied when the request opens a window.
+        :param limit: The limit to fix for the window, taken only when the request opens one.
+        :return: The count, the limit fixed for the window, and the seconds until it ends.
         """
-        key = f"user.{user_id}"
+        key = self._window_key(user_id)
         batch = Batch(is_atomic=True)
         batch.hincrby(key, "count", 1)
-        batch.expire(key, window, ExpireOptions.HasNoExpiry)
+        batch.hsetnx(key, "limit", str(limit))
+        batch.expire(key, window_seconds, ExpireOptions.HasNoExpiry)
         batch.hget(key, "limit")
         batch.ttl(key)
         async with self._client.client() as conn:
             results = await conn.exec(batch, raise_on_error=True)
         if results is None:
             raise UnreachableError("an atomic batch without WATCH cannot be aborted")
-        count, _, limit, reset = results
+        count, _, _, fixed_limit, ttl = results
         return RateLimitState(
             count=cast(int, count),
-            limit=int(cast(bytes, limit)) if limit is not None else None,
-            reset=cast(int, reset),
-        )
-
-    @valkey_rate_limit_resilience.apply()
-    async def store_limit(self, user_id: UserID, rate_limit: int) -> RateLimitState:
-        """
-        Fix the limit of the user's open window unless one is already fixed, and return
-        the state including the limit that stands.
-
-        :param user_id: The user the counter is keyed by.
-        :param rate_limit: The limit to fix for the window.
-        :return: The count, the limit fixed for the window and the seconds until it ends.
-        """
-        key = f"user.{user_id}"
-        batch = Batch(is_atomic=True)
-        batch.hsetnx(key, "limit", str(rate_limit))
-        batch.hget(key, "count")
-        batch.hget(key, "limit")
-        batch.ttl(key)
-        async with self._client.client() as conn:
-            results = await conn.exec(batch, raise_on_error=True)
-        if results is None:
-            raise UnreachableError("an atomic batch without WATCH cannot be aborted")
-        _, count, limit, reset = results
-        return RateLimitState(
-            count=int(cast(bytes, count)),
-            limit=int(cast(bytes, limit)) if limit is not None else None,
-            reset=cast(int, reset),
+            limit=int(cast(bytes, fixed_limit)),
+            reset_after_seconds=cast(int, ttl),
         )
 
     @valkey_rate_limit_resilience.apply()
@@ -154,8 +134,11 @@ class ValkeyRateLimitClient:
 
         :param user_id: The user the counter is keyed by.
         :return: The window state, or None when no window is open for the user.
+
+        ``consume_rate_limit()`` fixes the limit in the same atomic batch that opens a window,
+        so an open window always carries one.
         """
-        key = f"user.{user_id}"
+        key = self._window_key(user_id)
         batch = Batch(is_atomic=True)
         batch.hmget(key, ["count", "limit"])
         batch.ttl(key)
@@ -163,14 +146,14 @@ class ValkeyRateLimitClient:
             results = await conn.exec(batch, raise_on_error=True)
         if results is None:
             return None
-        fields, reset = cast(list[object], results)
+        fields, ttl = cast(list[object], results)
         count, limit = cast(list[object], fields)
         if count is None:
             return None
         return RateLimitState(
             count=int(cast(bytes, count)),
-            limit=int(cast(bytes, limit)) if limit is not None else None,
-            reset=cast(int, reset),
+            limit=int(cast(bytes, limit)),
+            reset_after_seconds=cast(int, ttl),
         )
 
     @valkey_rate_limit_resilience.apply()

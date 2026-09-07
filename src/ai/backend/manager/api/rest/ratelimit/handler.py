@@ -18,10 +18,6 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import Val
 from ai.backend.common.web.reserved_response_headers import reserve_response_headers
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import WebRequestHandler
-from ai.backend.manager.services.auth.actions.resolve_default_keypair_rate_limit import (
-    PublicResolveDefaultKeypairRateLimitAction,
-)
-from ai.backend.manager.services.auth.processors import AuthProcessors
 
 if TYPE_CHECKING:
     from aiohttp.typedefs import Middleware
@@ -29,28 +25,28 @@ from ai.backend.manager.errors.api import RateLimitExceeded
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_RATELIMIT_WINDOW: Final = 60 * 15
+_RATELIMIT_WINDOW_SECONDS: Final = 60 * 15
+_ANONYMOUS_RATELIMIT: Final = 1000
 
 
 @dataclass(frozen=True)
 class RateLimitQuota:
-    limit: int | None
+    limit: int
     remaining: int
-    reset: int
-    window: int
+    reset_after_seconds: int
+    window_seconds: int
 
     def apply_to(self, headers: CIMultiDict[str]) -> None:
         headers["X-RateLimit-Limit"] = str(self.limit)
         headers["X-RateLimit-Remaining"] = str(self.remaining)
-        headers["X-RateLimit-Reset"] = str(self.reset)
-        headers["X-RateLimit-Window"] = str(self.window)
+        headers["X-RateLimit-Reset"] = str(self.reset_after_seconds)
+        headers["X-RateLimit-Window"] = str(self.window_seconds)
 
 
 def make_rlim_middleware(
     valkey_client: ValkeyRateLimitClient,
-    auth: AuthProcessors,
 ) -> Middleware:
-    """Create a rate-limit middleware that captures its dependencies via closure."""
+    """Create a rate-limit middleware that captures *valkey_client* via closure."""
 
     @web.middleware
     async def rlim_middleware(
@@ -59,33 +55,29 @@ def make_rlim_middleware(
     ) -> web.StreamResponse:
         """Global middleware implementing a fixed-window rate limiter."""
         if request["is_authorized"]:
-            user_id = request["user"]["uuid"]
-            state = await valkey_client.consume(user_id=user_id, window=_RATELIMIT_WINDOW)
-            if state.limit is None:
-                resolved = await auth.public_resolve_default_keypair_rate_limit.run(
-                    PublicResolveDefaultKeypairRateLimitAction(user_id=user_id)
-                )
-                if resolved.rate_limit is not None:
-                    state = await valkey_client.store_limit(user_id, resolved.rate_limit)
-            if state.limit is not None and state.count > state.limit:
+            state = await valkey_client.consume_rate_limit(
+                user_id=request["user"]["uuid"],
+                window_seconds=_RATELIMIT_WINDOW_SECONDS,
+                limit=request["user"]["rate_limit"],
+            )
+            if state.count > state.limit:
                 reserve_response_headers(
                     request,
                     RateLimitQuota(
                         limit=state.limit,
                         remaining=0,
-                        reset=state.reset,
-                        window=_RATELIMIT_WINDOW,
+                        reset_after_seconds=state.reset_after_seconds,
+                        window_seconds=_RATELIMIT_WINDOW_SECONDS,
                     ),
                 )
                 raise RateLimitExceeded
-            remaining = state.limit - state.count if state.limit is not None else state.count
             reserve_response_headers(
                 request,
                 RateLimitQuota(
                     limit=state.limit,
-                    remaining=remaining,
-                    reset=state.reset,
-                    window=_RATELIMIT_WINDOW,
+                    remaining=state.limit - state.count,
+                    reset_after_seconds=state.reset_after_seconds,
+                    window_seconds=_RATELIMIT_WINDOW_SECONDS,
                 ),
             )
             return await handler(request)
@@ -93,10 +85,10 @@ def make_rlim_middleware(
         reserve_response_headers(
             request,
             RateLimitQuota(
-                limit=1000,
-                remaining=1000,
-                reset=_RATELIMIT_WINDOW,
-                window=_RATELIMIT_WINDOW,
+                limit=_ANONYMOUS_RATELIMIT,
+                remaining=_ANONYMOUS_RATELIMIT,
+                reset_after_seconds=_RATELIMIT_WINDOW_SECONDS,
+                window_seconds=_RATELIMIT_WINDOW_SECONDS,
             ),
         )
         return await handler(request)
