@@ -193,7 +193,7 @@ class TestRlimMiddleware:
                 expected_remaining="0",
             ),
             RateLimitSuccessCase(
-                description="the limit fixed for the window outranks the injected one",
+                description="a changed limit does not reach the window already open",
                 limit=100,
                 count=10,
                 expected_remaining="90",
@@ -208,7 +208,7 @@ class TestRlimMiddleware:
         mock_handler: AsyncMock,
         case: RateLimitSuccessCase,
     ) -> None:
-        """The headers report the window that stands, not the limit the request carried."""
+        """The headers report the window as it stands, whatever limit the request carried."""
         # Arrange
         caller.consumer.return_value = RateLimitState(
             count=case.count, limit=case.limit, reset_after_seconds=_RESET_AFTER_SECONDS
