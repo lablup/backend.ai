@@ -407,6 +407,13 @@ def _expected_preset_role_name(scope_id: UUID) -> str:
     return f"{_PRESET_NAME}-{str(scope_id)[:8]}"
 
 
+async def _preset_id(database: ExtendedAsyncSAEngine, name: str) -> UUID:
+    async with database.begin_readonly_session() as sess:
+        return (
+            await sess.execute(sa.select(RolePresetRow.id).where(RolePresetRow.name == name))
+        ).scalar_one()
+
+
 async def _virtual_entity_id(
     database: ExtendedAsyncSAEngine, scope_id: UUID, scope_type: ScopeType = _SCOPE_TYPE
 ) -> UUID | None:
@@ -507,6 +514,7 @@ class _RoleProbe:
     source: RoleSource
     status: RoleStatus
     auto_assign: bool
+    role_preset_id: UUID | None
 
 
 async def _scope_roles(database: ExtendedAsyncSAEngine, scope_id: UUID) -> dict[str, _RoleProbe]:
@@ -516,7 +524,12 @@ async def _scope_roles(database: ExtendedAsyncSAEngine, scope_id: UUID) -> dict[
         rows = (
             await sess.execute(
                 sa.select(
-                    RoleRow.name, RoleRow.id, RoleRow.source, RoleRow.status, RoleRow.auto_assign
+                    RoleRow.name,
+                    RoleRow.id,
+                    RoleRow.source,
+                    RoleRow.status,
+                    RoleRow.auto_assign,
+                    RoleRow.role_preset_id,
                 )
                 .join(role_node, role_node.entity_id == RoleRow.id)
                 .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == role_node.id)
@@ -528,7 +541,11 @@ async def _scope_roles(database: ExtendedAsyncSAEngine, scope_id: UUID) -> dict[
         ).all()
         return {
             row.name: _RoleProbe(
-                id=row.id, source=row.source, status=row.status, auto_assign=row.auto_assign
+                id=row.id,
+                source=row.source,
+                status=row.status,
+                auto_assign=row.auto_assign,
+                role_preset_id=row.role_preset_id,
             )
             for row in rows
         }
@@ -698,6 +715,24 @@ class TestRoleManagedGlobalEntityCreate:
         role = (await _scope_roles(database, data.id))[_expected_preset_role_name(data.id)]
         assert await _scope_governs_role(database, data.id, role.id)
 
+    async def test_a_preset_role_points_at_the_preset_it_came_from(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: OpsRepository[_EntityData],
+        presets: None,
+    ) -> None:
+        data = await repository.create_role_managed_global_entity(
+            _RoleManagedGlobalCreator(name="alpha")
+        )
+
+        roles = await _scope_roles(database, data.id)
+        assert roles[_expected_preset_role_name(data.id)].role_preset_id == await _preset_id(
+            database, _PRESET_NAME
+        )
+        assert roles["alpha-member"].role_preset_id == await _preset_id(
+            database, "preset-templated"
+        )
+
     async def test_create_renders_templated_preset_role_names(
         self,
         database: ExtendedAsyncSAEngine,
@@ -780,7 +815,9 @@ class TestRoleManagedEntityCreate:
             _RoleManagedCreator(name="a", parents=(parent_id,))
         )
 
-        assert _expected_preset_role_name(data.id) in await _scope_roles(database, data.id)
+        roles = await _scope_roles(database, data.id)
+        role = roles[_expected_preset_role_name(data.id)]
+        assert role.role_preset_id == await _preset_id(database, _PRESET_NAME)
 
     async def test_missing_created_in_target_fails_without_inserting(
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
