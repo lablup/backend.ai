@@ -972,6 +972,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     lifecycle_stage=EndpointLifecycle.READY,
                 )
                 db_sess.add(endpoint)
+                await db_sess.flush()
                 attach_primary_replica_group(db_sess, endpoint, current_revision_id=revision_id)
                 revision = DeploymentRevisionRow(
                     id=revision_id,

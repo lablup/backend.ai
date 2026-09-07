@@ -60,9 +60,6 @@ from ai.backend.manager.services.artifact.actions.delete_multi import (
 from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
 )
-from ai.backend.manager.services.artifact.actions.get_revisions import (
-    GetArtifactRevisionsAction,
-)
 from ai.backend.manager.services.artifact.actions.restore_multi import (
     RestoreArtifactsAction,
 )
@@ -1273,72 +1270,6 @@ class TestRetrieveModelsAction:
 
         assert len(result.result) == 2
         mock_storage_client.retrieve_huggingface_models.assert_called_once()
-
-
-class TestGetArtifactRevisionsAction:
-    """Test cases for GetArtifactRevisionsAction"""
-
-    @pytest.fixture
-    def mock_artifact_repository(self) -> MagicMock:
-        return MagicMock(spec=ArtifactRepository)
-
-    @pytest.fixture
-    def artifact_service(self, mock_artifact_repository: MagicMock) -> ArtifactService:
-        return ArtifactService(
-            artifact_repository=mock_artifact_repository,
-            artifact_registry_repository=MagicMock(spec=ArtifactRegistryRepository),
-            object_storage_repository=MagicMock(spec=ObjectStorageRepository),
-            vfs_storage_repository=MagicMock(spec=VFSStorageRepository),
-            huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
-            reservoir_registry_repository=MagicMock(spec=ReservoirRegistryRepository),
-            storage_manager=MagicMock(),
-            config_provider=MagicMock(),
-        )
-
-    async def test_artifact_with_multiple_versions(
-        self,
-        artifact_service: ArtifactService,
-        mock_artifact_repository: MagicMock,
-    ) -> None:
-        """Artifact with multiple versions returns sorted revision list"""
-        now = datetime.now(UTC)
-        artifact_id = uuid4()
-        revisions = [
-            ArtifactRevisionData(
-                id=ArtifactRevisionID(uuid4()),
-                artifact_id=ArtifactID(artifact_id),
-                version=f"v{i}",
-                readme=None,
-                size=1000 * i,
-                status=ArtifactStatus.AVAILABLE,
-                remote_status=None,
-                created_at=now,
-                updated_at=now,
-                digest=None,
-                verification_result=None,
-            )
-            for i in range(3)
-        ]
-        mock_artifact_repository.list_artifact_revisions = AsyncMock(return_value=revisions)
-
-        action = GetArtifactRevisionsAction(artifact_id=ArtifactID(artifact_id))
-        result = await artifact_service.get_revisions(action)
-
-        assert len(result.revisions) == 3
-        mock_artifact_repository.list_artifact_revisions.assert_called_once_with(artifact_id)
-
-    async def test_no_revisions_returns_empty(
-        self,
-        artifact_service: ArtifactService,
-        mock_artifact_repository: MagicMock,
-    ) -> None:
-        """No revisions returns empty list"""
-        mock_artifact_repository.list_artifact_revisions = AsyncMock(return_value=[])
-
-        action = GetArtifactRevisionsAction(artifact_id=ArtifactID(uuid4()))
-        result = await artifact_service.get_revisions(action)
-
-        assert result.revisions == []
 
 
 class TestSearchArtifactsWithRevisionsAction:

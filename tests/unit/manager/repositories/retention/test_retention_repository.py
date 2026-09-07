@@ -1060,11 +1060,14 @@ class TestDeploymentsRetention:
     async def test_endpoint_tokens_purged_by_expiry(
         self, db: ExtendedAsyncSAEngine, scope: _Scope
     ) -> None:
-        # endpoint id is irrelevant to expiry-based purge; use throwaway ids.
-        await self._add_token(db, scope, endpoint_id=DeploymentID(uuid.uuid4()), expires_at=_OLD)
-        await self._add_token(db, scope, endpoint_id=DeploymentID(uuid.uuid4()), expires_at=_NEW)
+        # Which endpoint a token belongs to is irrelevant to expiry-based purge.
+        endpoint_id = await self._add_endpoint(
+            db, scope, lifecycle=EndpointLifecycle.READY, destroyed_at=None
+        )
+        await self._add_token(db, scope, endpoint_id=endpoint_id, expires_at=_OLD)
+        await self._add_token(db, scope, endpoint_id=endpoint_id, expires_at=_NEW)
         # A never-expiring token (NULL expires_at) is preserved.
-        await self._add_token(db, scope, endpoint_id=DeploymentID(uuid.uuid4()), expires_at=None)
+        await self._add_token(db, scope, endpoint_id=endpoint_id, expires_at=None)
 
         spec = RetentionDrain(EndpointTokenRow, EndpointTokenRow.expires_at, _THRESHOLD)
         async with RetentionOpsProvider(db).write_ops() as w:
@@ -1076,9 +1079,8 @@ class TestDeploymentsRetention:
     async def test_fk_less_child_deleted_by_destroyed_endpoint(
         self, db: ExtendedAsyncSAEngine, scope: _Scope
     ) -> None:
-        # endpoint_tokens stand in for deployment_revisions: an FK-less child
-        # keyed by endpoint id, deleted when its parent endpoint is DESTROYED and
-        # past the boundary.
+        # A soft-deleted endpoint keeps its row, so ON DELETE CASCADE never fires:
+        # its children are deleted when it is DESTROYED and past the boundary.
         destroyed_id = await self._add_endpoint(
             db, scope, lifecycle=EndpointLifecycle.DESTROYED, destroyed_at=_OLD
         )

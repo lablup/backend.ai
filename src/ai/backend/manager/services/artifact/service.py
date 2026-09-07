@@ -63,10 +63,6 @@ from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
 )
-from ai.backend.manager.services.artifact.actions.get_revisions import (
-    GetArtifactRevisionsAction,
-    GetArtifactRevisionsActionResult,
-)
 from ai.backend.manager.services.artifact.actions.restore_multi import (
     RestoreArtifactsAction,
     RestoreArtifactsActionResult,
@@ -366,12 +362,6 @@ class ArtifactService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
-
-    async def get_revisions(
-        self, action: GetArtifactRevisionsAction
-    ) -> GetArtifactRevisionsActionResult:
-        revisions = await self._artifact_repository.list_artifact_revisions(action.artifact_id)
-        return GetArtifactRevisionsActionResult(revisions=revisions)
 
     async def update(self, action: UpdateArtifactAction) -> UpdateArtifactActionResult:
         updated_artifact = await self._artifact_repository.update_artifact(action.updater)

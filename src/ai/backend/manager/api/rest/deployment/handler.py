@@ -13,6 +13,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
@@ -32,7 +33,6 @@ from ai.backend.common.dto.manager.deployment import (
     ListRevisionsResponse,
     ListRoutesResponse,
     PaginationInfo,
-    RevisionFilter,
     RevisionPathParam,
     RouteFilter,
     RoutePathParam,
@@ -323,24 +323,16 @@ class DeploymentAPIHandler:
         body: BodyParam[SearchRevisionsRequest],
     ) -> APIResponse:
         """Search revisions for a deployment with filters, orders, and pagination."""
-        # Build querier using adapter, adding deployment filter
-        if body.parsed.filter is None:
-            body.parsed.filter = RevisionFilter(deployment_id=path.parsed.deployment_id)
-        else:
-            body.parsed.filter.deployment_id = path.parsed.deployment_id
+        searcher = self._revision_adapter.build_searcher(body.parsed)
 
-        querier = self._revision_adapter.build_querier(body.parsed)
-
-        # Call service action
         action_result = await self._deployment.search_revisions.run(
             SearchRevisionsAction(
-                deployment_id=DeploymentID(path.parsed.deployment_id), querier=querier
+                deployment_id=DeploymentID(path.parsed.deployment_id), searcher=searcher
             )
         )
 
-        # Build response
         resp = ListRevisionsResponse(
-            revisions=[await self._revision_dto(rev) for rev in action_result.data],
+            revisions=[await self._revision_dto(rev) for rev in action_result.items],
             pagination=PaginationInfo(
                 total=action_result.total_count,
                 offset=body.parsed.offset,
@@ -354,15 +346,10 @@ class DeploymentAPIHandler:
         path: PathParam[RevisionPathParam],
     ) -> APIResponse:
         """Get a specific revision."""
-        # Call service action - raises DeploymentRevisionNotFound if not found
         action_result = await self._deployment.get_revision_by_id.run(
-            GetRevisionByIdAction(
-                deployment_id=DeploymentID(path.parsed.deployment_id),
-                revision_id=DeploymentRevisionID(path.parsed.revision_id),
-            )
+            GetRevisionByIdAction(revision_id=DeploymentRevisionID(path.parsed.revision_id))
         )
 
-        # Build response
         resp = GetRevisionResponse(revision=await self._revision_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -437,8 +424,7 @@ class DeploymentAPIHandler:
         # Call service action
         action_result = await self._deployment.update_route_traffic_status.run(
             UpdateRouteTrafficStatusAction(
-                deployment_id=DeploymentID(path.parsed.deployment_id),
-                route_id=path.parsed.route_id,
+                route_id=ReplicaID(path.parsed.route_id),
                 traffic_status=manager_traffic_status,
             )
         )

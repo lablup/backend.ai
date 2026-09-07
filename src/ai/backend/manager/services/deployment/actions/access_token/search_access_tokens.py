@@ -1,17 +1,36 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.deployment import DEPLOYMENT_ENTITY_TYPE, DeploymentID
+from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment.actions.access_token.base import (
-    DeploymentAccessTokenBaseAction,
-)
+from ai.backend.manager.models.endpoint.row import EndpointTokenRow
+from ai.backend.manager.models.endpoint.scopes import DeploymentAccessTokenOperationScope
+from ai.backend.manager.models.endpoint.searchers import DeploymentAccessTokenSearcher
+from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass
-class SearchAccessTokensAction(DeploymentAccessTokenBaseAction):
-    querier: BatchQuerier
+class SearchAccessTokensAction(
+    OperationScopeOpsAction[EndpointTokenRow, ModelDeploymentAccessTokenData]
+):
+    """Page through the access tokens of one deployment.
+
+    The deployment is the scope, so ops applies that condition. Reading every
+    deployment's tokens is the global variant, which says so in its shape.
+    """
+
+    deployment_id: DeploymentID
+    searcher: DeploymentAccessTokenSearcher
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return DEPLOYMENT_ENTITY_TYPE
 
     @override
     @classmethod
@@ -19,14 +38,15 @@ class SearchAccessTokensAction(DeploymentAccessTokenBaseAction):
         return "search_access_tokens"
 
     @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (
+            ScopeRef(scope_type=ScopeType(DEPLOYMENT_ENTITY_TYPE), scope_id=self.deployment_id),
+        )
 
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return (DeploymentAccessTokenOperationScope(deployment_id=self.deployment_id),)
 
-@dataclass
-class SearchAccessTokensActionResult:
-    data: list[ModelDeploymentAccessTokenData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    @override
+    def to_searcher(self) -> DeploymentAccessTokenSearcher:
+        return self.searcher

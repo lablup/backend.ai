@@ -4,13 +4,29 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ai.backend.common.data.entity.deployment_revision import DEPLOYMENT_REVISION_FIELD_TYPE
+from ai.backend.common.data.entity.deployment_token import DEPLOYMENT_TOKEN_FIELD_TYPE
+from ai.backend.common.data.entity.replica import REPLICA_FIELD_TYPE
+from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.field.processor import SingleFieldActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
-from ai.backend.manager.actions.v2.ops.result import FieldOwnerLookupOpsResult
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    EntityOpsResult,
+    FieldOwnerLookupOpsResult,
+    ScopedFieldsOpsResult,
+)
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
-from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.data.deployment.types import (
+    ModelDeploymentAccessTokenData,
+    ModelDeploymentData,
+    ModelReplicaData,
+    ModelRevisionData,
+)
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
     BulkDeleteAccessTokensActionResult,
@@ -25,7 +41,6 @@ from ai.backend.manager.services.deployment.actions.access_token.delete_access_t
 )
 from ai.backend.manager.services.deployment.actions.access_token.get_access_token import (
     GetAccessTokenAction,
-    GetAccessTokenActionResult,
 )
 from ai.backend.manager.services.deployment.actions.access_token.global_search_access_tokens import (
     GlobalSearchAccessTokensAction,
@@ -33,7 +48,6 @@ from ai.backend.manager.services.deployment.actions.access_token.global_search_a
 )
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
-    SearchAccessTokensActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
@@ -89,17 +103,18 @@ from ai.backend.manager.services.deployment.actions.get_legacy_deployment_by_id 
 )
 from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
-    GetReplicaByIdActionResult,
 )
 from ai.backend.manager.services.deployment.actions.global_search_replicas import (
     GlobalSearchReplicasAction,
-    GlobalSearchReplicasActionResult,
 )
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
-    LookupAccessTokenDeploymentAction,
     LookupAutoScalingRuleDeploymentAction,
-    LookupRevisionDeploymentAction,
-    LookupRouteDeploymentAction,
+    LookupBulkDeploymentAccessTokenOwnerAction,
+    LookupBulkDeploymentRevisionOwnerAction,
+    LookupBulkReplicaOwnerAction,
+    LookupDeploymentAccessTokenOwnerAction,
+    LookupDeploymentRevisionOwnerAction,
+    LookupReplicaOwnerAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
@@ -107,7 +122,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
 )
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
-    GetRevisionByIdActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.global_search_revisions import (
     GlobalSearchRevisionsAction,
@@ -119,7 +133,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.search_revisi
 )
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
-    SearchRevisionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
     GlobalRefreshDeploymentRevisionsAction,
@@ -153,7 +166,6 @@ from ai.backend.manager.services.deployment.actions.search_legacy_deployments im
 )
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
-    SearchReplicasActionResult,
 )
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
@@ -173,15 +185,6 @@ class DeploymentProcessors:
 
     lookup_auto_scaling_rule_deployment: LookupActionProcessor[
         LookupAutoScalingRuleDeploymentAction, FieldOwnerLookupOpsResult
-    ]
-    lookup_access_token_deployment: LookupActionProcessor[
-        LookupAccessTokenDeploymentAction, FieldOwnerLookupOpsResult
-    ]
-    lookup_route_deployment: LookupActionProcessor[
-        LookupRouteDeploymentAction, FieldOwnerLookupOpsResult
-    ]
-    lookup_revision_deployment: LookupActionProcessor[
-        LookupRevisionDeploymentAction, FieldOwnerLookupOpsResult
     ]
 
     # Deployment CRUD
@@ -228,11 +231,11 @@ class DeploymentProcessors:
     add_model_revision: SingleEntityActionProcessor[
         AddModelRevisionAction, AddModelRevisionActionResult
     ]
-    get_revision_by_id: SingleEntityActionProcessor[
-        GetRevisionByIdAction, GetRevisionByIdActionResult
+    get_revision_by_id: SingleFieldActionProcessor[
+        GetRevisionByIdAction, EntityOpsResult[ModelRevisionData]
     ]
-    search_revisions: SingleEntityActionProcessor[
-        SearchRevisionsAction, SearchRevisionsActionResult
+    search_revisions: ScopeActionProcessor[
+        SearchRevisionsAction, ScopedFieldsOpsResult[ModelRevisionData]
     ]
     search_revision_resource_slots: GlobalActionProcessor[
         SearchRevisionResourceSlotsAction, SearchRevisionResourceSlotsActionResult
@@ -247,13 +250,17 @@ class DeploymentProcessors:
     # Route operations
     sync_replicas: SingleEntityActionProcessor[SyncReplicaAction, SyncReplicaActionResult]
     search_routes: GlobalActionProcessor[SearchRoutesAction, SearchRoutesActionResult]
-    update_route_traffic_status: SingleEntityActionProcessor[
+    update_route_traffic_status: SingleFieldActionProcessor[
         UpdateRouteTrafficStatusAction, UpdateRouteTrafficStatusActionResult
     ]
 
     # Replica operations
-    get_replica_by_id: SingleEntityActionProcessor[GetReplicaByIdAction, GetReplicaByIdActionResult]
-    search_replicas: SingleEntityActionProcessor[SearchReplicasAction, SearchReplicasActionResult]
+    get_replica_by_id: SingleFieldActionProcessor[
+        GetReplicaByIdAction, EntityOpsResult[ModelReplicaData]
+    ]
+    search_replicas: ScopeActionProcessor[
+        SearchReplicasAction, ScopedFieldsOpsResult[ModelReplicaData]
+    ]
 
     # Auto-scaling rules
     create_auto_scaling_rule: SingleEntityActionProcessor[
@@ -279,19 +286,21 @@ class DeploymentProcessors:
     create_access_token: SingleEntityActionProcessor[
         CreateAccessTokenAction, CreateAccessTokenActionResult
     ]
-    get_access_token: SingleEntityActionProcessor[GetAccessTokenAction, GetAccessTokenActionResult]
-    delete_access_token: SingleEntityActionProcessor[
+    get_access_token: SingleFieldActionProcessor[
+        GetAccessTokenAction, EntityOpsResult[ModelDeploymentAccessTokenData]
+    ]
+    delete_access_token: SingleFieldActionProcessor[
         DeleteAccessTokenAction, DeleteAccessTokenActionResult
     ]
     bulk_delete_access_tokens: GlobalActionProcessor[
         BulkDeleteAccessTokensAction, BulkDeleteAccessTokensActionResult
     ]
-    search_access_tokens: SingleEntityActionProcessor[
-        SearchAccessTokensAction, SearchAccessTokensActionResult
+    search_access_tokens: ScopeActionProcessor[
+        SearchAccessTokensAction, ScopedFieldsOpsResult[ModelDeploymentAccessTokenData]
     ]
 
     global_search_replicas: GlobalActionProcessor[
-        GlobalSearchReplicasAction, GlobalSearchReplicasActionResult
+        GlobalSearchReplicasAction, BatchOpsResult[ModelReplicaData]
     ]
     global_search_revisions: GlobalActionProcessor[
         GlobalSearchRevisionsAction, GlobalSearchRevisionsActionResult
@@ -303,17 +312,28 @@ class DeploymentProcessors:
     def __init__(
         self, group: ProcessorGroup[ModelDeploymentData], service: DeploymentService
     ) -> None:
+        revisions: LookupFieldGroup[ModelRevisionData] = group.field_group(
+            FieldGroupMeta(DEPLOYMENT_REVISION_FIELD_TYPE),
+            ModelRevisionData,
+            LookupDeploymentRevisionOwnerAction,
+            LookupBulkDeploymentRevisionOwnerAction,
+        )
+        replicas: LookupFieldGroup[ModelReplicaData] = group.field_group(
+            FieldGroupMeta(REPLICA_FIELD_TYPE),
+            ModelReplicaData,
+            LookupReplicaOwnerAction,
+            LookupBulkReplicaOwnerAction,
+        )
+        access_tokens: LookupFieldGroup[ModelDeploymentAccessTokenData] = group.field_group(
+            FieldGroupMeta(DEPLOYMENT_TOKEN_FIELD_TYPE),
+            ModelDeploymentAccessTokenData,
+            LookupDeploymentAccessTokenOwnerAction,
+            LookupBulkDeploymentAccessTokenOwnerAction,
+        )
         self.lookup_auto_scaling_rule_deployment = group.key_owner_lookup_ops(
             LookupAutoScalingRuleDeploymentAction
         )
-        self.lookup_access_token_deployment = group.key_owner_lookup_ops(
-            LookupAccessTokenDeploymentAction
-        )
-        self.lookup_route_deployment = group.key_owner_lookup_ops(LookupRouteDeploymentAction)
-        self.lookup_revision_deployment = group.key_owner_lookup_ops(LookupRevisionDeploymentAction)
-        self.global_search_replicas = group.global_scope(
-            GlobalSearchReplicasAction, service.global_search_replicas
-        )
+        self.global_search_replicas = replicas.global_search_ops(GlobalSearchReplicasAction)
         self.global_search_revisions = group.global_scope(
             GlobalSearchRevisionsAction, service.global_search_revisions
         )
@@ -363,10 +383,8 @@ class DeploymentProcessors:
         self.add_model_revision = group.single_entity(
             AddModelRevisionAction, service.add_model_revision
         )
-        self.get_revision_by_id = group.single_entity(
-            GetRevisionByIdAction, service.get_revision_by_id
-        )
-        self.search_revisions = group.single_entity(SearchRevisionsAction, service.search_revisions)
+        self.get_revision_by_id = revisions.get_ops(GetRevisionByIdAction)
+        self.search_revisions = revisions.search_ops(SearchRevisionsAction)
         self.search_revision_resource_slots = group.global_scope(
             SearchRevisionResourceSlotsAction, service.search_revision_resource_slots
         )
@@ -380,15 +398,13 @@ class DeploymentProcessors:
         # Route operations
         self.sync_replicas = group.single_entity(SyncReplicaAction, service.sync_replicas)
         self.search_routes = group.global_scope(SearchRoutesAction, service.search_routes)
-        self.update_route_traffic_status = group.single_entity(
+        self.update_route_traffic_status = replicas.single_field(
             UpdateRouteTrafficStatusAction, service.update_route_traffic_status
         )
 
         # Replica operations
-        self.get_replica_by_id = group.single_entity(
-            GetReplicaByIdAction, service.get_replica_by_id
-        )
-        self.search_replicas = group.single_entity(SearchReplicasAction, service.search_replicas)
+        self.get_replica_by_id = replicas.get_ops(GetReplicaByIdAction)
+        self.search_replicas = replicas.search_ops(SearchReplicasAction)
 
         # Auto-scaling rules
         self.create_auto_scaling_rule = group.single_entity(
@@ -414,13 +430,11 @@ class DeploymentProcessors:
         self.create_access_token = group.single_entity(
             CreateAccessTokenAction, service.create_access_token
         )
-        self.get_access_token = group.single_entity(GetAccessTokenAction, service.get_access_token)
-        self.delete_access_token = group.single_entity(
+        self.get_access_token = access_tokens.get_ops(GetAccessTokenAction)
+        self.delete_access_token = access_tokens.single_field(
             DeleteAccessTokenAction, service.delete_access_token
         )
         self.bulk_delete_access_tokens = group.global_scope(
             BulkDeleteAccessTokensAction, service.bulk_delete_access_tokens
         )
-        self.search_access_tokens = group.single_entity(
-            SearchAccessTokensAction, service.search_access_tokens
-        )
+        self.search_access_tokens = access_tokens.search_ops(SearchAccessTokensAction)

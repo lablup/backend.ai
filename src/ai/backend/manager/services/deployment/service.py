@@ -10,11 +10,8 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import (
-    ActivenessStatus,
     DeploymentStrategy,
-    LivenessStatus,
     ModelDeploymentStatus,
-    ReadinessStatus,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     MintEndpointTokenRequest,
@@ -31,16 +28,11 @@ from ai.backend.manager.data.deployment.types import (
     LegacyDeploymentData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
-    ModelReplicaData,
     ModelRevisionData,
     MountInfo,
     ReplicaStateData,
     ResourceSpec,
     RevisionRefreshResult,
-    RouteHealthStatus,
-    RouteInfo,
-    RouteStatus,
-    RouteTrafficStatus,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import RoutingNotFound
@@ -68,17 +60,9 @@ from ai.backend.manager.services.deployment.actions.access_token.delete_access_t
     DeleteAccessTokenAction,
     DeleteAccessTokenActionResult,
 )
-from ai.backend.manager.services.deployment.actions.access_token.get_access_token import (
-    GetAccessTokenAction,
-    GetAccessTokenActionResult,
-)
 from ai.backend.manager.services.deployment.actions.access_token.global_search_access_tokens import (
     GlobalSearchAccessTokensAction,
     GlobalSearchAccessTokensActionResult,
-)
-from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
-    SearchAccessTokensAction,
-    SearchAccessTokensActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
@@ -132,21 +116,9 @@ from ai.backend.manager.services.deployment.actions.get_legacy_deployment_by_id 
     GetLegacyDeploymentByIdAction,
     GetLegacyDeploymentByIdActionResult,
 )
-from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
-    GetReplicaByIdAction,
-    GetReplicaByIdActionResult,
-)
-from ai.backend.manager.services.deployment.actions.global_search_replicas import (
-    GlobalSearchReplicasAction,
-    GlobalSearchReplicasActionResult,
-)
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
     AddModelRevisionActionResult,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
-    GetRevisionByIdAction,
-    GetRevisionByIdActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.global_search_revisions import (
     GlobalSearchRevisionsAction,
@@ -155,10 +127,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.global_search
 from ai.backend.manager.services.deployment.actions.model_revision.search_revision_resource_slots import (
     SearchRevisionResourceSlotsAction,
     SearchRevisionResourceSlotsActionResult,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
-    SearchRevisionsAction,
-    SearchRevisionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
     GlobalRefreshDeploymentRevisionsAction,
@@ -189,10 +157,6 @@ from ai.backend.manager.services.deployment.actions.search_deployments_in_projec
 from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
     GlobalSearchLegacyDeploymentsAction,
     GlobalSearchLegacyDeploymentsActionResult,
-)
-from ai.backend.manager.services.deployment.actions.search_replicas import (
-    SearchReplicasAction,
-    SearchReplicasActionResult,
 )
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
@@ -306,63 +270,6 @@ def _convert_deployment_info_to_legacy_data(info: DeploymentInfo) -> LegacyDeplo
         created_user_id=info.metadata.created_user,
         policy=info.policy,
         sub_step=info.sub_step,
-    )
-
-
-_HEALTH_STATUS_TO_READINESS: dict[RouteHealthStatus, ReadinessStatus] = {
-    RouteHealthStatus.HEALTHY: ReadinessStatus.HEALTHY,
-    RouteHealthStatus.UNHEALTHY: ReadinessStatus.UNHEALTHY,
-    RouteHealthStatus.DEGRADED: ReadinessStatus.UNHEALTHY,
-    RouteHealthStatus.NOT_CHECKED: ReadinessStatus.NOT_CHECKED,
-}
-
-_ROUTE_STATUS_TO_LIVENESS: dict[RouteStatus, LivenessStatus] = {
-    RouteStatus.RUNNING: LivenessStatus.HEALTHY,
-    RouteStatus.PROVISIONING: LivenessStatus.NOT_CHECKED,
-    RouteStatus.TERMINATING: LivenessStatus.DEGRADED,
-    RouteStatus.TERMINATED: LivenessStatus.UNHEALTHY,
-    RouteStatus.FAILED_TO_START: LivenessStatus.UNHEALTHY,
-}
-
-
-def _resolve_activeness(
-    traffic_status: RouteTrafficStatus,
-    readiness: ReadinessStatus,
-    liveness: LivenessStatus,
-) -> ActivenessStatus:
-    """Determine activeness from traffic_status, readiness, and liveness.
-
-    A replica is ACTIVE only when:
-    - traffic_status is ACTIVE (admin hasn't disabled it), AND
-    - readiness is HEALTHY (health check passed), AND
-    - liveness is HEALTHY (container is running)
-    """
-    if traffic_status != RouteTrafficStatus.ACTIVE:
-        return ActivenessStatus.INACTIVE
-    if readiness != ReadinessStatus.HEALTHY:
-        return ActivenessStatus.INACTIVE
-    if liveness != LivenessStatus.HEALTHY:
-        return ActivenessStatus.INACTIVE
-    return ActivenessStatus.ACTIVE
-
-
-def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
-    """Convert RouteInfo to ModelReplicaData."""
-    readiness = _HEALTH_STATUS_TO_READINESS.get(route.health_status) or ReadinessStatus.NOT_CHECKED
-    liveness = _ROUTE_STATUS_TO_LIVENESS.get(route.status) or LivenessStatus.NOT_CHECKED
-    return ModelReplicaData(
-        id=route.route_id,
-        deployment_id=route.deployment_id,
-        revision_id=route.revision_id,
-        session_id=route.session_id,
-        readiness_status=readiness,
-        liveness_status=liveness,
-        activeness_status=_resolve_activeness(route.traffic_status, readiness, liveness),
-        status=route.status,
-        traffic_status=route.traffic_status,
-        health_status=route.health_status,
-        detail=route.error_data,
-        created_at=route.created_at,
     )
 
 
@@ -699,29 +606,6 @@ class DeploymentService:
         )
         return AddModelRevisionActionResult(revision=revision_data)
 
-    async def get_revision_by_id(
-        self, action: GetRevisionByIdAction
-    ) -> GetRevisionByIdActionResult:
-        revision = await self._deployment_repository.get_revision(action.revision_id)
-        return GetRevisionByIdActionResult(data=revision)
-
-    async def search_revisions(self, action: SearchRevisionsAction) -> SearchRevisionsActionResult:
-        """Search revisions with filtering and pagination.
-
-        Args:
-            action: Action containing BatchQuerier for filtering and pagination
-
-        Returns:
-            SearchRevisionsActionResult: Result containing list of revisions and pagination info
-        """
-        result = await self._deployment_repository.search_revisions(action.querier)
-        return SearchRevisionsActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
     async def global_search_revisions(
         self, action: GlobalSearchRevisionsAction
     ) -> GlobalSearchRevisionsActionResult:
@@ -1056,11 +940,6 @@ class DeploymentService:
         )
         return CreateAccessTokenActionResult(data=data)
 
-    async def get_access_token(self, action: GetAccessTokenAction) -> GetAccessTokenActionResult:
-        """Get an access token by ID."""
-        data = await self._deployment_repository.get_access_token(action.access_token_id)
-        return GetAccessTokenActionResult(data=data)
-
     async def delete_access_token(
         self, action: DeleteAccessTokenAction
     ) -> DeleteAccessTokenActionResult:
@@ -1079,38 +958,7 @@ class DeploymentService:
 
     # ========== Replica Operations ==========
 
-    async def get_replica_by_id(self, action: GetReplicaByIdAction) -> GetReplicaByIdActionResult:
-        """Get a replica by ID."""
-        route = await self._deployment_repository.get_route(action.replica_id)
-        if route is None:
-            return GetReplicaByIdActionResult(data=None)
-        return GetReplicaByIdActionResult(data=_convert_route_info_to_replica_data(route))
-
     # ========== Search Operations ==========
-
-    async def search_replicas(self, action: SearchReplicasAction) -> SearchReplicasActionResult:
-        """Search replicas with pagination, ordering, and filtering."""
-        result = await self._deployment_repository.search_routes(action.querier)
-        replicas = [_convert_route_info_to_replica_data(route) for route in result.items]
-        return SearchReplicasActionResult(
-            data=replicas,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def global_search_replicas(
-        self, action: GlobalSearchReplicasAction
-    ) -> GlobalSearchReplicasActionResult:
-        """Search replicas across every deployment."""
-        result = await self._deployment_repository.search_routes(action.querier)
-        replicas = [_convert_route_info_to_replica_data(route) for route in result.items]
-        return GlobalSearchReplicasActionResult(
-            data=replicas,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def global_search_access_tokens(
         self, action: GlobalSearchAccessTokensAction
@@ -1118,18 +966,6 @@ class DeploymentService:
         """Search access tokens across every deployment."""
         result = await self._deployment_repository.search_access_tokens(action.querier)
         return GlobalSearchAccessTokensActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_access_tokens(
-        self, action: SearchAccessTokensAction
-    ) -> SearchAccessTokensActionResult:
-        """Search access tokens with pagination and ordering."""
-        result = await self._deployment_repository.search_access_tokens(action.querier)
-        return SearchAccessTokensActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

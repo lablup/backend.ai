@@ -52,9 +52,6 @@ from ai.backend.manager.repositories.reservoir_registry.repository import (
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
-from ai.backend.manager.services.artifact.actions.get_revisions import (
-    GetArtifactRevisionsAction,
-)
 from ai.backend.manager.services.artifact.actions.upsert_multi import (
     UpsertArtifactsAction,
 )
@@ -507,27 +504,6 @@ class TestArtifactServiceRevisionOperations:
             updated_at=now,
             digest=None,
             verification_result=None,
-        )
-
-    async def test_get_artifact_revisions(
-        self,
-        artifact_service: ArtifactService,
-        mock_artifact_repository: MagicMock,
-        mock_revision_ops: MagicMock,
-        sample_artifact_data: ArtifactData,
-        sample_artifact_revision: ArtifactRevisionData,
-    ) -> None:
-        """Test getting artifact revisions via ArtifactService"""
-        mock_artifact_repository.list_artifact_revisions = AsyncMock(
-            return_value=[sample_artifact_revision]
-        )
-
-        action = GetArtifactRevisionsAction(artifact_id=sample_artifact_data.id)
-        result = await artifact_service.get_revisions(action)
-
-        assert result.revisions == [sample_artifact_revision]
-        mock_artifact_repository.list_artifact_revisions.assert_called_once_with(
-            sample_artifact_data.id
         )
 
     async def test_upsert_artifacts_with_revisions(

@@ -1,7 +1,10 @@
+from ai.backend.manager.actions.registry.field import FieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import ScopedFieldsOpsResult
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
-from ai.backend.manager.data.artifact.types import ArtifactData
+from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
@@ -16,7 +19,6 @@ from ai.backend.manager.services.artifact.actions.get import (
 )
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
-    GetArtifactRevisionsActionResult,
 )
 from ai.backend.manager.services.artifact.actions.restore_multi import (
     RestoreArtifactsAction,
@@ -64,8 +66,8 @@ class ArtifactProcessors:
     search_artifacts_with_revisions: GlobalActionProcessor[
         SearchArtifactsWithRevisionsAction, SearchArtifactsWithRevisionsActionResult
     ]
-    get_revisions: SingleEntityActionProcessor[
-        GetArtifactRevisionsAction, GetArtifactRevisionsActionResult
+    get_revisions: ScopeActionProcessor[
+        GetArtifactRevisionsAction, ScopedFieldsOpsResult[ArtifactRevisionData]
     ]
     update: SingleEntityActionProcessor[UpdateArtifactAction, UpdateArtifactActionResult]
     upsert_artifacts_with_revisions: GlobalActionProcessor[
@@ -85,6 +87,7 @@ class ArtifactProcessors:
     def __init__(
         self,
         group: ProcessorGroup[ArtifactData],
+        revisions: FieldGroup[ArtifactRevisionData],
         revision: ArtifactRevisionProcessors,
         service: ArtifactService,
     ) -> None:
@@ -96,7 +99,7 @@ class ArtifactProcessors:
         self.search_artifacts_with_revisions = group.global_scope(
             SearchArtifactsWithRevisionsAction, service.search_with_revisions
         )
-        self.get_revisions = group.single_entity(GetArtifactRevisionsAction, service.get_revisions)
+        self.get_revisions = revisions.search_ops(GetArtifactRevisionsAction)
         self.update = group.single_entity(UpdateArtifactAction, service.update)
         self.upsert_artifacts_with_revisions = group.global_scope(
             UpsertArtifactsAction, service.upsert_artifacts_with_revisions
