@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 import uuid
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 import pytest
 
@@ -12,54 +12,6 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
     ValkeyRateLimitClient,
 )
 from ai.backend.common.data.entity.user import UserID
-
-
-@pytest.fixture
-def consume_for_user(
-    test_valkey_rate_limit: ValkeyRateLimitClient,
-) -> Callable[..., Awaitable[RateLimitState]]:
-    """Counts a request against one user's window."""
-    return functools.partial(test_valkey_rate_limit.consume_user_rate_limit, UserID(uuid.uuid4()))
-
-
-@pytest.fixture
-def consume_for_other_user(
-    test_valkey_rate_limit: ValkeyRateLimitClient,
-) -> Callable[..., Awaitable[RateLimitState]]:
-    """Counts a request against a different user's window."""
-    return functools.partial(test_valkey_rate_limit.consume_user_rate_limit, UserID(uuid.uuid4()))
-
-
-@pytest.fixture
-def consume_for_ip(
-    test_valkey_rate_limit: ValkeyRateLimitClient,
-) -> Callable[..., Awaitable[RateLimitState]]:
-    """Counts a request against one address's window."""
-    return functools.partial(test_valkey_rate_limit.consume_ip_rate_limit, "10.0.0.1")
-
-
-@pytest.fixture
-def consume_for_other_ip(
-    test_valkey_rate_limit: ValkeyRateLimitClient,
-) -> Callable[..., Awaitable[RateLimitState]]:
-    """Counts a request against a different address's window."""
-    return functools.partial(test_valkey_rate_limit.consume_ip_rate_limit, "10.0.0.2")
-
-
-@pytest.fixture
-def consume(request: pytest.FixtureRequest) -> Callable[..., Awaitable[RateLimitState]]:
-    """The call named by the parametrized fixture."""
-    consume: Callable[..., Awaitable[RateLimitState]] = request.getfixturevalue(request.param)
-    return consume
-
-
-@pytest.fixture
-def consume_for_other_subject(
-    request: pytest.FixtureRequest,
-) -> Callable[..., Awaitable[RateLimitState]]:
-    """The same call for a different subject of the same kind."""
-    consume: Callable[..., Awaitable[RateLimitState]] = request.getfixturevalue(request.param)
-    return consume
 
 
 async def test_first_request_opens_the_window(
@@ -118,32 +70,47 @@ async def test_a_new_window_takes_the_limit_it_opens_with(
     assert state == RateLimitState(count=1, limit=10, reset_after_seconds=60)
 
 
-@pytest.mark.parametrize("consume", ["consume_for_user", "consume_for_ip"], indirect=True)
+@pytest.mark.parametrize(
+    ("consume", "subject"),
+    [
+        (ValkeyRateLimitClient.consume_user_rate_limit, UserID(uuid.uuid4())),
+        (ValkeyRateLimitClient.consume_ip_rate_limit, "10.0.0.1"),
+    ],
+    ids=["user", "ip"],
+)
 async def test_the_limit_of_the_open_window_stands(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
     consume: Callable[..., Awaitable[RateLimitState]],
+    subject: Any,
 ) -> None:
-    await consume(window_seconds=60, limit=30000)
+    await consume(test_valkey_rate_limit, subject, window_seconds=60, limit=30000)
 
-    state = await consume(window_seconds=60, limit=10)
+    state = await consume(test_valkey_rate_limit, subject, window_seconds=60, limit=10)
 
     assert state.limit == 30000
 
 
 @pytest.mark.parametrize(
-    ("consume", "consume_for_other_subject"),
+    ("consume", "subject", "other_subject"),
     [
-        ("consume_for_user", "consume_for_other_user"),
-        ("consume_for_ip", "consume_for_other_ip"),
+        (
+            ValkeyRateLimitClient.consume_user_rate_limit,
+            UserID(uuid.uuid4()),
+            UserID(uuid.uuid4()),
+        ),
+        (ValkeyRateLimitClient.consume_ip_rate_limit, "10.0.1.1", "10.0.1.2"),
     ],
-    indirect=True,
+    ids=["user", "ip"],
 )
 async def test_windows_are_keyed_by_their_subject(
+    test_valkey_rate_limit: ValkeyRateLimitClient,
     consume: Callable[..., Awaitable[RateLimitState]],
-    consume_for_other_subject: Callable[..., Awaitable[RateLimitState]],
+    subject: Any,
+    other_subject: Any,
 ) -> None:
-    await consume(window_seconds=60, limit=30000)
+    await consume(test_valkey_rate_limit, subject, window_seconds=60, limit=30000)
 
-    state = await consume_for_other_subject(window_seconds=60, limit=30000)
+    state = await consume(test_valkey_rate_limit, other_subject, window_seconds=60, limit=30000)
 
     assert state.count == 1
 
