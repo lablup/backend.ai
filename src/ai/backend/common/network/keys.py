@@ -26,6 +26,7 @@ __all__ = (
     "session_ipam_key",
     "agent_caps_key",
     "agent_backend_key",
+    "agent_boot_key",
     "agent_vtep_key",
 )
 
@@ -70,6 +71,16 @@ def session_ipam_key(session_id: str, ip: str) -> str:
 
 def agent_caps_key(agent_id: str) -> str:
     return f"network/agent/{agent_id}/caps"
+
+
+def agent_boot_key(agent_id: str) -> str:
+    """Where an agent records which run of itself is the current one.
+
+    Written by the base agent at every start, before any backend-specific publishing. It is what
+    lets the manager tell an advert this run made from one an earlier run of the same agent on the
+    same runtime left behind -- which comparing runtime names cannot do.
+    """
+    return f"network/agent/{agent_id}/boot"
 
 
 def agent_backend_key(agent_id: str) -> str:

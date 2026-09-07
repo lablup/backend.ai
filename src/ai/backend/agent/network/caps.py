@@ -22,6 +22,7 @@ from ai.backend.agent.network.readiness import Readiness, probe_readiness
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.network.keys import (
     agent_backend_key,
+    agent_boot_key,
     agent_caps_key,
     agent_vtep_key,
 )
@@ -133,6 +134,7 @@ async def publish_caps(
     *,
     backend: str | None = None,
     vtep_ip: str | None = None,
+    boot_id: str | None = None,
 ) -> None:
     """Publish this agent's capabilities to etcd for the manager's backend selection.
 
@@ -149,16 +151,28 @@ async def publish_caps(
             **dataclasses.asdict(caps),
             "backend": backend,
             "vtep_ip": vtep_ip,
+            "boot_id": boot_id,
             "updated_at": time.time(),
         }),
         scope=ConfigScopes.GLOBAL,
     )
 
 
-async def publish_backend(etcd: AbstractKVStore, agent_id: str, backend: str) -> None:
+async def publish_backend(
+    etcd: AbstractKVStore, agent_id: str, backend: str, boot_id: str | None = None
+) -> None:
     """Publish this agent's runtime backend (e.g. 'containerd') so the manager can enforce
-    the backend<->network-driver pairing invariant. Called at agent startup."""
+    the backend<->network-driver pairing invariant, and which run of the agent this is.
+
+    ``boot_id`` is written by every start, whatever backend it is, and BEFORE anything
+    backend-specific is published. That ordering is the point: an agent that comes back and then
+    fails to publish its capabilities -- or is a runtime that never publishes them -- has already
+    said that the advert standing under its id belongs to a run that is over. Comparing runtime
+    names cannot see a docker->docker restart; this can.
+    """
     await etcd.put(agent_backend_key(agent_id), backend, scope=ConfigScopes.GLOBAL)
+    if boot_id is not None:
+        await etcd.put(agent_boot_key(agent_id), boot_id, scope=ConfigScopes.GLOBAL)
 
 
 async def publish_vtep(etcd: AbstractKVStore, agent_id: str, vtep_ip: str) -> None:

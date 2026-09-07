@@ -20,6 +20,7 @@ from ai.backend.common.network.keys import member_key, session_ipam_key, session
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
     OVERLAY_ENCRYPTION_PROFILE,
+    AgentNetworkCaps,
     GenerationMatch,
     Member,
     NetworkBackendKind,
@@ -613,7 +614,10 @@ class TestCreateNetwork:
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/vtep"] = "192.168.105.7"
         etcd.store["network/agent/a2/vtep"] = "192.168.105.8"
-        _encryption_capable(etcd, "a1", "a2")
+        # The record the agent is ADMITTED on carries the endpoint too, and that is the one the
+        # pre-seed uses: the separate key is a second write nothing checked.
+        etcd.store["network/agent/a1/caps"] = _caps("a1", vtep_ip="192.168.105.7")
+        etcd.store["network/agent/a2/caps"] = _caps("a2", vtep_ip="192.168.105.8")
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(
             identifier="s1",
@@ -3734,6 +3738,115 @@ class TestTheAdvertIsAboutTheNodeThatIsThereNow:
             )
 
 
+class TestAJoinThatLandsWhileTheRootIsTakenOver:
+    """C46. Reading the membership and replacing the record are two operations, and an agent joins
+    between them: it reads the READY record, publishes its member, re-reads the record to confirm
+    it is still the one it joined, and only then builds. A manager that asked "is anybody holding
+    this?" first could be told no by a join that had not published yet -- and the node comes up on
+    the old descriptor while the manager allocates a new one."""
+
+    _OPTIONS: dict[str, Any] = {
+        "forced_backend": "vxlan",
+        "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+    }
+
+    async def test_a_join_landing_inside_the_window_puts_the_record_back(self) -> None:
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={**self._OPTIONS, "member_agents": ["a1"]}
+        )
+        subnet, vni = str(info.options["subnet"]), int(cast(int, info.options["vni"]))
+        record = json.loads(etcd.store[session_meta_key("s1")])
+        corrupt = json.dumps({**record, "vni": None})
+        etcd.store[session_meta_key("s1")] = corrupt
+
+        joined = False
+
+        class _JoinsAsTheFenceLands(CNINetworkPlugin):
+            @override
+            async def _members_still_holding(self, session_id: str) -> set[str]:
+                nonlocal joined
+                held = await super()._members_still_holding(session_id)
+                if not joined:
+                    # The agent's member publish lands after this manager has looked and before
+                    # it takes the record -- which is the whole window.
+                    joined = True
+                    etcd.store[member_key("s1", "a1")] = json.dumps({
+                        "host_ip": "10.0.0.1",
+                        "vtep_ip": "10.0.0.1",
+                        "joined": True,
+                    })
+                return held
+
+        racing = _wire(_JoinsAsTheFenceLands({}, {}), etcd)
+
+        with pytest.raises(SessionCleanupPending, match="joined by"):
+            await racing.create_network(
+                identifier="s1", options={**self._OPTIONS, "member_agents": ["a1"]}
+            )
+
+        assert etcd.store[session_meta_key("s1")] == corrupt, "the record was not put back"
+        assert f"network/ipam/vni/{vni}" in etcd.store
+        assert _allocated_key(subnet) in etcd.store
+
+
+class TestTheAdvertBelongsToOneRunOfTheAgent:
+    """C47. Comparing runtime names cannot see a restart onto the SAME runtime, and an agent that
+    comes back and then fails to publish -- or has not got there yet -- leaves the previous run's
+    advert standing and fresh. The base agent writes which run it is at every start, before
+    anything backend-specific, so a mismatch says the advert is from a boot that is over."""
+
+    async def test_an_advert_from_an_earlier_run_is_refused(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/backend"] = "docker"
+        etcd.store["network/agent/a1/boot"] = "run-2"
+        etcd.store["network/agent/a1/caps"] = _caps("a1", boot_id="run-1")
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch, match="is on run"):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
+
+    async def test_the_current_runs_advert_is_accepted(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/backend"] = "docker"
+        etcd.store["network/agent/a1/boot"] = "run-2"
+        etcd.store["network/agent/a1/caps"] = _caps("a1", boot_id="run-2")
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+        )
+        assert info.options["subnet"]
+
+    async def test_an_agent_that_publishes_no_boot_key_is_still_allowed(self) -> None:
+        # The key is new. An agent that predates it is not evidence of a stale advert.
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+        )
+        assert info.options["subnet"]
+
+    async def test_the_preseed_uses_the_endpoint_it_admitted_on(self) -> None:
+        """The capability record carries the endpoint AND there is a key of its own that also
+        does. Admitting on one and seeding peers from the other means peers program an address
+        nothing checked."""
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/caps"] = _caps("a1", vtep_ip="10.9.9.9")
+        etcd.store["network/agent/a1/vtep"] = "10.1.1.1"  # an older write, never validated
+        plugin = _plugin_with(etcd)
+
+        await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+        )
+
+        member = json.loads(etcd.store[member_key("s1", "a1")])
+        assert member["vtep_ip"] == "10.9.9.9"
+
+
 class TestTheReconcileTicketAndTheClock:
     """C33. Managers compare wall clocks on the ticket, so one running ahead could park the whole
     cluster's reconciliation for as long as its clock is ahead."""
@@ -4046,6 +4159,7 @@ class TestACreateThatFailedBesideOneThatDidNot:
                 member_agents: list[str],
                 generation: str | None = None,
                 held: str | None = None,
+                admitted: Mapping[str, AgentNetworkCaps] | None = None,
             ) -> None:
                 reached.set()
                 await asyncio.sleep(0.05)
