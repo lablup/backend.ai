@@ -674,13 +674,15 @@ class SubnetAllocator:
             )
         return stuck
 
-    async def claims(self) -> dict[str, tuple[str, str | None]]:
-        """Every unit block claimed in the pool, as ``unit -> (session_id, generation)``.
+    async def claims(self) -> dict[str, tuple[str, str | None, str]]:
+        """Every unit block claimed in the pool, as ``unit -> (session_id, generation, bytes)``.
 
         For the reconciler: the pool is the only place a claim is certain to appear, so a sweep
-        that starts here reaches what no meta, tombstone or debt note ever named.
+        that starts here reaches what no meta, tombstone or debt note ever named. The bytes come
+        back with it because they are what the judgement is made on, and re-reading them before
+        the delete would condition it on a claim the sweep never judged.
         """
-        found: dict[str, tuple[str, str | None]] = {}
+        found: dict[str, tuple[str, str | None, str]] = {}
         for key, raw in _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX)).items():
             try:
                 claim = json.loads(raw)
@@ -689,17 +691,23 @@ class SubnetAllocator:
             session_id = claim.get("session_id")
             if not session_id:
                 continue
-            found[unquote(key)] = (str(session_id), claim.get(SESSION_META_GENERATION))
+            found[unquote(key)] = (str(session_id), claim.get(SESSION_META_GENERATION), raw)
         return found
 
-    async def release_unit(self, unit: str, expected: str) -> bool:
-        """Give one unit block back, over the exact bytes it was read with."""
-        return await self._etcd.delete_if_value(_allocated_key(unit), expected)
+    async def release_unit(
+        self, unit: str, expected: str, guards: Mapping[str, str | None]
+    ) -> bool:
+        """Give one unit block back, over the bytes it was JUDGED on and under the record that
+        made it garbage.
 
-    async def raw_claim(self, unit: str) -> str | None:
-        """The bytes a unit block is claimed with, or None if it is free."""
-        raw = await self._etcd.get(_allocated_key(unit))
-        return raw if isinstance(raw, str) else None
+        Both, in one store operation. The claim's own bytes alone are not enough: the sweep
+        decided this unit was an orphan by reading a session record, and between that read and
+        this delete the record can appear and the unit be re-taken by the very session it now
+        names.
+        """
+        return await self._etcd.compare_and_delete(
+            _allocated_key(unit), expected, guards=dict(guards)
+        )
 
     async def holder(self, subnet: str) -> str | None:
         """The session every unit block of ``subnet`` is claimed by, or None if they disagree or
@@ -958,21 +966,10 @@ class VNIAllocator:
         payload = _vni_claim(session_id, generation)
         guard_keys = dict(guards or {})
         allocated = _flat(await self._etcd.get_prefix(_VNI_PREFIX))
-        if (mine := _own_vni(allocated, session_id, generation)) is not None:
-            held, raw = mine
-            if await self._claim_as_ours(held, raw, payload, guard_keys):
-                return held
-            # Could not be made this incarnation's: an unstamped claim left shared is one a
-            # cleanup of some OTHER incarnation reads as its own and deletes, handing a running
-            # session's VNI to the next. Take one of this incarnation's own instead.
-            log.warning(
-                "could not take session {}'s unstamped claim on vni {} for incarnation {};"
-                " claiming a vni of this incarnation's own instead",
-                session_id,
-                held,
-                generation,
-            )
-            await self._require_guards(session_id, guard_keys)
+        if (
+            mine := await self._adopt(allocated, session_id, generation, payload, guard_keys)
+        ) is not None:
+            return mine
         # The listing only rules VNIs out -- it is a snapshot, so a VNI it shows as free still
         # has to be won by CAS. It saves a round trip per VNI already taken, which is what the
         # plain low-to-high scan costs once the pool has any depth of live sessions.
@@ -992,10 +989,50 @@ class VNIAllocator:
             # here, once, rather than discovered at the end.
             await self._require_guards(session_id, guard_keys)
             allocated = _flat(await self._etcd.get_prefix(_VNI_PREFIX))
-            if (mine := _own_vni(allocated, session_id, generation)) is not None:
-                return mine[0]
+            # Adopted through the same path as the first lookup, promotion included. Returning
+            # `_own_vni` straight from here handed back a claim that still answers to any
+            # incarnation -- and this is the path a rolling upgrade takes, where an older manager
+            # is the one writing unstamped claims into the race.
+            if (
+                mine := await self._adopt(allocated, session_id, generation, payload, guard_keys)
+            ) is not None:
+                return mine
             taken = {int(key) for key in allocated if key.isdigit()}
         raise VNIPoolExhausted()
+
+    async def _adopt(
+        self,
+        allocated: Mapping[str, str],
+        session_id: str,
+        generation: str | None,
+        payload: str,
+        guards: Mapping[str, str],
+    ) -> int | None:
+        """The VNI this session already holds, made this incarnation's before it is handed back.
+
+        None when it holds none, or when the one it holds could not be taken -- an unstamped claim
+        left shared is one a cleanup of some OTHER incarnation reads as its own and deletes,
+        handing a running session's VNI to the next, so it is better to claim a fresh one.
+
+        Raises:
+            SessionRecordContested: the promotion could not land because the session's record
+                moved on, which is not a reason to go looking for another VNI.
+        """
+        mine = _own_vni(allocated, session_id, generation)
+        if mine is None:
+            return None
+        held, raw = mine
+        if await self._claim_as_ours(held, raw, payload, guards):
+            return held
+        log.warning(
+            "could not take session {}'s unstamped claim on vni {} for incarnation {}; claiming"
+            " a vni of this incarnation's own instead",
+            session_id,
+            held,
+            generation,
+        )
+        await self._require_guards(session_id, guards)
+        return None
 
     async def _claim_as_ours(
         self, vni: int, raw: str, payload: str, guards: Mapping[str, str]
@@ -1065,10 +1102,10 @@ class VNIAllocator:
             )
         return stuck
 
-    async def claims(self) -> dict[int, tuple[str, str | None]]:
-        """Every allocated VNI, as ``vni -> (session_id, generation)``. See
+    async def claims(self) -> dict[int, tuple[str, str | None, str]]:
+        """Every allocated VNI, as ``vni -> (session_id, generation, bytes)``. See
         `SubnetAllocator.claims`."""
-        found: dict[int, tuple[str, str | None]] = {}
+        found: dict[int, tuple[str, str | None, str]] = {}
         for key, raw in _flat(await self._etcd.get_prefix(_VNI_PREFIX)).items():
             if not key.isdigit():
                 continue
@@ -1079,17 +1116,15 @@ class VNIAllocator:
             session_id = claim.get("session_id")
             if not session_id:
                 continue
-            found[int(key)] = (str(session_id), claim.get(SESSION_META_GENERATION))
+            found[int(key)] = (str(session_id), claim.get(SESSION_META_GENERATION), raw)
         return found
 
-    async def release_one(self, vni: int, expected: str) -> bool:
-        """Give one VNI back, over the exact bytes it was read with."""
-        return await self._etcd.delete_if_value(f"{_VNI_PREFIX}/{vni}", expected)
-
-    async def raw_claim(self, vni: int) -> str | None:
-        """The bytes a VNI is claimed with, or None if it is free."""
-        raw = await self._etcd.get(f"{_VNI_PREFIX}/{vni}")
-        return raw if isinstance(raw, str) else None
+    async def release_one(self, vni: int, expected: str, guards: Mapping[str, str | None]) -> bool:
+        """Give one VNI back, over the bytes it was judged on and under the record that made it
+        garbage. See `SubnetAllocator.release_unit`."""
+        return await self._etcd.compare_and_delete(
+            f"{_VNI_PREFIX}/{vni}", expected, guards=dict(guards)
+        )
 
     async def holder(self, vni: int) -> str | None:
         """The session ``vni`` is claimed by, or None if it is free."""

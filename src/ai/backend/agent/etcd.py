@@ -173,6 +173,21 @@ class AgentEtcdClientView(AbstractKVStore):
         )
 
     @override
+    async def compare_and_delete(
+        self,
+        key: str,
+        expected: str,
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
+        return await self._etcd.compare_and_delete(
+            key, expected, guards=guards, scope=scope, scope_prefix_map=scope_prefix_map
+        )
+
+    @override
     async def delete_if_value(
         self,
         key: str,

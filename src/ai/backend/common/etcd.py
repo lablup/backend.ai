@@ -238,6 +238,18 @@ class AbstractKVStore(ABC):
         pass
 
     @abstractmethod
+    async def compare_and_delete(
+        self,
+        key: str,
+        expected: str,
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
     async def delete_if_value(
         self,
         key: str,
@@ -835,6 +847,63 @@ class AsyncEtcd(AbstractKVStore):
                 EtcdTransactionAction()
                 .when(conditions)
                 .and_then([TxnOp.put(mangled_key.encode(self.encoding), val.encode(self.encoding))])
+                .or_else([])
+            )
+
+            return cast(bool, result.succeeded())
+
+    @override
+    async def compare_and_delete(
+        self,
+        key: str,
+        expected: str,
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """
+        Atomically delete ``key`` only if it still holds ``expected`` AND every guard key is in
+        the state given for it: those exact bytes, or -- for a guard value of ``None`` -- absent.
+
+        The delete counterpart of :meth:`compare_and_put`, and needed for the same reason. A
+        caller that decides a key is garbage by reading something ELSE, and then deletes the key,
+        has made two operations out of one decision: between them the thing it read can change and
+        the key can be released and taken by somebody to whom it is not garbage at all. Naming
+        both in one transaction is what makes the decision and the delete the same event.
+
+        :return: ``True`` if this call deleted the key, ``False`` if any condition failed.
+        """
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        conditions = [
+            Compare.value(
+                mangled_key.encode(self.encoding),
+                CompareOp.EQUAL,
+                expected.encode(self.encoding),
+            )
+        ]
+        for guard_key, guard_val in guards.items():
+            mangled_guard = self._mangle_key(f"{_slash(scope_prefix)}{guard_key}")
+            if guard_val is None:
+                conditions.append(
+                    Compare.create_revision(mangled_guard.encode(self.encoding), CompareOp.EQUAL, 0)
+                )
+            else:
+                conditions.append(
+                    Compare.value(
+                        mangled_guard.encode(self.encoding),
+                        CompareOp.EQUAL,
+                        guard_val.encode(self.encoding),
+                    )
+                )
+
+        async with self.etcd.connect() as communicator:
+            result = await communicator.txn(
+                EtcdTransactionAction()
+                .when(conditions)
+                .and_then([TxnOp.delete(mangled_key.encode(self.encoding))])
                 .or_else([])
             )
 

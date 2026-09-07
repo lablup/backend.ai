@@ -28,6 +28,7 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | C17 | **One agent id, one agent process.** The pid file is held under an exclusive lock. | Two agents under one id are one identity to the manager, the VNI registry and the privnet journal; no session-level fence separates them, so a restart's outgoing process can withdraw the incoming one's membership. | `_hold_pid_file` |
 | C18 | **A lost claim is one candidate; an expired guard is all of them.** Both allocators tell the two apart at the first miss. | Read as a conflict, an expired guard walks the whole VNI range -- ~16.7M swaps and prefix reads -- holding the manager and its etcd for as long as that takes. | `TestAGuardThatExpiredMidScan` |
 | C19 | **A claim from before the field is taken, not shared.** A legacy subnet or VNI is promoted to the adopting incarnation before it is used, all units or none. | Two incarnations read one claim as theirs: the newer runs on it, the older's cleanup gives it back, and the pool hands a live session's VNI or half its subnet to another tenant. | `TestALegacyClaimTwoIncarnationsCanRead`, `TestAWideBlockOnTwoIncarnations` |
+| C21 | **A judgement and the delete it justifies are one operation.** The reconciler carries the record state it judged on into the delete as a guard. | It reads a claim, finds no session, and deletes -- while in between the session is rebuilt over that very unit. A re-read before the delete conditions it on the claim the sweep never judged, and takes a live tenant's subnet. | `test_a_claim_retaken_between_the_judgement_and_the_delete_survives` |
 | C20 | **The pool itself is reconcilable.** A sweep starts from the claims and asks each session, so it reaches what no record, tombstone or debt note names. | The one leak nothing can find: a cleanup whose debt write AND release both failed. | `TestAPoolClaimNothingNames` |
 | C15 | **A cleanup that cannot finish is written down and retried.** The orphan sweep records what it owes per incarnation and clears it only when nothing is left. | The sweep has no tombstone to work from -- the record already names its successor -- so one transient etcd error leaks a VNI, a subnet and their keys for the cluster's life. | `TestACleanupThatCouldNotFinishIsRetried` |
 
@@ -190,3 +191,22 @@ rather than narrowing it. `reconcile_pool` runs at every manager start and relea
 whose session does not name their incarnation -- correct by the model, and a release of live
 tenant state if the model is wrong anywhere. Nothing but a real multi-node run with restarts shows
 that. Read C18-C20 as reasoned and unit-tested, not as verified.
+
+
+Eighth round, against the same bar:
+
+| # | Was | Now |
+|---|-----|-----|
+| C21 | the reconciler judged a claim an orphan, then RE-READ the claim and deleted whatever it found -- so a unit released and re-taken between the two was deleted out from under the session that had just taken it. Worse than the leak it replaced: it deletes live state, and it runs at every manager start, so a rolling restart is where it would show | the bytes it judged on come back with the judgement, and the record that made the claim garbage is carried into the delete as a guard (`compare_and_delete`, where a guard of None means "still absent"). Judgement and delete are one store operation |
+| C19 | the VNI lost-CAS re-lookup returned `_own_vni` straight, skipping the promotion the first lookup does -- and that is the path a rolling upgrade takes, where an older manager writes the unstamped claims | both lookups go through `_adopt`, which promotes or declines |
+| C20 | the reconciler gave back subnets and VNIs only; a failed sweep's endpoint, member and address keys stayed, and a member key that outlives its incarnation holds the session's VNI back from reuse for a node that is not in it | `_reclaim_session_keys` sweeps those too, under the same guard, and `_unrecoverable` entries clear once nothing of that incarnation is held anywhere |
+
+NOT done, and still open from this round's review: there is no periodic sweeper -- `reconcile_pool`
+runs at manager start and nowhere else -- and `unrecoverable_leaks()` has no caller in production
+code. A manager that has been up for a week has neither reconciled nor reported. Wiring both into
+the manager's health surface is the remaining piece.
+
+R3 is unchanged and this round does not narrow it. The reconciler is still the most dangerous
+thing here: correct by the ownership model, and a release of live tenant state anywhere the model
+is wrong. The race above is now covered by a unit test; a rolling restart of two managers against
+real nodes is not.
