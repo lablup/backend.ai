@@ -14,7 +14,12 @@ from ai.backend.manager.services.deployment.actions.lookup_owner import (
 
 @dataclass
 class DeleteAccessTokenAction(BaseSingleFieldAction[DeploymentTokenID, DeploymentID]):
-    """Remove one access token, authorized against the deployment it grants access to."""
+    """Remove one access token, authorized against the deployment it grants access to.
+
+    Declares ``UPDATE`` like every other write to a field row: a field path carries
+    ``READ|UPDATE`` and nothing else, so a delete bit there is not expressible and the
+    check would fall back on the deployment's own deletion right.
+    """
 
     access_token_id: DeploymentTokenID
 
@@ -26,7 +31,7 @@ class DeleteAccessTokenAction(BaseSingleFieldAction[DeploymentTokenID, Deploymen
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.UPDATE
 
     @override
     def to_owner_lookup_action(self) -> LookupDeploymentAccessTokenOwnerAction:
