@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import ManagerHandler
@@ -18,9 +18,10 @@ def register_manager_api_routes(handler: ManagerHandler, route_deps: RouteDeps) 
 
     reg = RouteRegistry.create("manager", route_deps.cors_options)
 
+    reg.add("GET", "/announcement", handler.get_announcement, middlewares=[auth_required])
+
     # Superadmin endpoints
     reg.add("GET", "/status", handler.fetch_manager_status, middlewares=[superadmin_required])
-    reg.add("GET", "/announcement", handler.get_announcement, middlewares=[superadmin_required])
     reg.add("GET", "/prom", handler.get_manager_status_for_prom, middlewares=[superadmin_required])
     reg.add("PUT", "/status", handler.update_manager_status, middlewares=[superadmin_required])
     reg.add(

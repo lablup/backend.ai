@@ -62244,6 +62244,53 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
+    "/manager/announcement": {
+      "get": {
+        "operationId": "manager.get_announcement",
+        "tags": [
+          "manager"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "post": {
+        "operationId": "manager.update_announcement",
+        "tags": [
+          "manager"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAnnouncementRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/manager/status": {
       "get": {
         "operationId": "manager.fetch_manager_status",
@@ -62283,53 +62330,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateManagerStatusRequest"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
-      }
-    },
-    "/manager/announcement": {
-      "get": {
-        "operationId": "manager.get_announcement",
-        "tags": [
-          "manager"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "parameters": [],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
-      },
-      "post": {
-        "operationId": "manager.update_announcement",
-        "tags": [
-          "manager"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateAnnouncementRequest"
               }
             }
           }

@@ -3,7 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.services.manager_admin.actions.fetch_status import (
     FetchManagerStatusAction,
     FetchManagerStatusActionResult,
@@ -40,7 +43,7 @@ class ManagerAdminProcessors:
 
     fetch_status: GlobalActionProcessor[FetchManagerStatusAction, FetchManagerStatusActionResult]
     update_status: GlobalActionProcessor[UpdateManagerStatusAction, UpdateManagerStatusActionResult]
-    get_announcement: GlobalActionProcessor[GetAnnouncementAction, GetAnnouncementActionResult]
+    get_announcement: PublicActionProcessor[GetAnnouncementAction, GetAnnouncementActionResult]
     update_announcement: GlobalActionProcessor[
         UpdateAnnouncementAction, UpdateAnnouncementActionResult
     ]
@@ -52,7 +55,7 @@ class ManagerAdminProcessors:
     def __init__(self, group: ProcessorGroup[Any], service: ManagerAdminService) -> None:
         self.fetch_status = group.global_scope(FetchManagerStatusAction, service.fetch_status)
         self.update_status = group.global_scope(UpdateManagerStatusAction, service.update_status)
-        self.get_announcement = group.global_scope(GetAnnouncementAction, service.get_announcement)
+        self.get_announcement = group.public(GetAnnouncementAction, service.get_announcement)
         self.update_announcement = group.global_scope(
             UpdateAnnouncementAction, service.update_announcement
         )
