@@ -26,6 +26,7 @@ from ai.backend.common.data.entity.fair_share import (
     PROJECT_FAIR_SHARE_ENTITY_TYPE,
     USER_FAIR_SHARE_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.idle_checker import IDLE_CHECKER_ENTITY_TYPE
 from ai.backend.common.data.entity.image import IMAGE_ENTITY_TYPE
 from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
 from ai.backend.common.data.entity.manager_admin import MANAGER_ADMIN_ENTITY_TYPE
@@ -294,6 +295,7 @@ def create_services(args: ServiceArgs) -> Services:
         idle_checker=IdleCheckerService(
             repositories.idle_checker.repository,
             repositories.prometheus_query_preset.repository,
+            OpsRepository(repositories.v2_ops_provider),
         ),
         image=ImageService(
             args.agent_registry, repositories.image.repository, args.config_provider
@@ -580,9 +582,9 @@ def create_processors(
             services.user,
         ),
         idle_checker=IdleCheckerProcessors(
+            session_groups.group(GroupMeta(IDLE_CHECKER_ENTITY_TYPE)),
             session_groups.group(GroupMeta(SESSION_ENTITY_TYPE)),
             services.idle_checker,
-            action_monitors,
         ),
         image=ImageProcessors(
             container_registry_groups.group(GroupMeta(IMAGE_ENTITY_TYPE)), services.image

@@ -51,18 +51,16 @@ from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerConditions
+from ai.backend.manager.models.idle_checker.creators import IdleCheckerCreator
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
-from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.idle_checker.searchers import IdleCheckerSearcher
+from ai.backend.manager.models.idle_checker.updaters import IdleCheckerUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger, Updater
-from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerCreatorSpec
-from ai.backend.manager.repositories.idle_checker.purgers import IdleCheckerPurgerSpec
-from ai.backend.manager.repositories.idle_checker.updaters import IdleCheckerUpdaterSpec
 from ai.backend.manager.services.idle_checker.actions.admin_search import (
     AdminSearchIdleCheckersAction,
 )
 from ai.backend.manager.services.idle_checker.actions.create import CreateIdleCheckerAction
-from ai.backend.manager.services.idle_checker.actions.purge import PurgeIdleCheckerAction
+from ai.backend.manager.services.idle_checker.actions.purge import BulkPurgeIdleCheckersAction
 from ai.backend.manager.services.idle_checker.actions.update import UpdateIdleCheckerAction
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -85,20 +83,18 @@ class IdleCheckerAdapter(BaseAdapter):
         self,
         input: CreateIdleCheckerInput,
     ) -> CreateIdleCheckerPayload:
-        creator = Creator(
-            spec=IdleCheckerCreatorSpec(
-                name=input.name,
-                description=input.description,
-                target_session_types=input.target_session_types,
-                initial_grace_period_seconds=input.initial_grace_period_seconds,
-                spec=self._build_spec(input.checker_spec),
-            )
+        creator = IdleCheckerCreator(
+            name=input.name,
+            description=input.description,
+            target_session_types=input.target_session_types,
+            initial_grace_period_seconds=input.initial_grace_period_seconds,
+            spec=self._build_spec(input.checker_spec),
         )
-        action_result = await self._processors.idle_checker.create.wait_for_complete(
+        action_result = await self._processors.idle_checker.create.run(
             CreateIdleCheckerAction(creator=creator)
         )
         return CreateIdleCheckerPayload(
-            idle_checker=self._data_to_node(action_result.idle_checker),
+            idle_checker=self._data_to_node(action_result.data),
         )
 
     async def batch_load_by_ids(
@@ -109,12 +105,12 @@ class IdleCheckerAdapter(BaseAdapter):
 
         if not ids:
             return []
-        querier = BatchQuerier(
+        searcher = IdleCheckerSearcher(
             pagination=NoPagination(),
             conditions=[IdleCheckerConditions.by_ids(ids)],
         )
-        action_result = await self._processors.idle_checker.admin_search.wait_for_complete(
-            AdminSearchIdleCheckersAction(querier=querier)
+        action_result = await self._processors.idle_checker.admin_search.run(
+            AdminSearchIdleCheckersAction(searcher=searcher)
         )
         node_map = {node.id: node for node in map(self._data_to_node, action_result.items)}
         return [node_map.get(checker_id) for checker_id in ids]
@@ -122,7 +118,8 @@ class IdleCheckerAdapter(BaseAdapter):
     async def admin_search(self, input: SearchIdleCheckersInput) -> SearchIdleCheckerPayload:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            IdleCheckerSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_get_idle_checker_pagination_spec(),
@@ -133,8 +130,8 @@ class IdleCheckerAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.idle_checker.admin_search.wait_for_complete(
-            AdminSearchIdleCheckersAction(querier=querier)
+        action_result = await self._processors.idle_checker.admin_search.run(
+            AdminSearchIdleCheckersAction(searcher=searcher)
         )
         return SearchIdleCheckerPayload(
             items=[self._data_to_node(item) for item in action_result.items],
@@ -147,40 +144,45 @@ class IdleCheckerAdapter(BaseAdapter):
         self,
         input: UpdateIdleCheckerInput,
     ) -> UpdateIdleCheckerPayload:
-        updater: Updater[IdleCheckerRow] = Updater(
-            spec=IdleCheckerUpdaterSpec(
-                name=OptionalState.from_nullable(input.name),
-                description=(
-                    TriState.nop()
-                    if input.description is SENTINEL
-                    else TriState.nullify()
-                    if input.description is None
-                    else TriState.update(input.description)
-                ),
-                target_session_types=OptionalState.from_nullable(input.target_session_types),
-                initial_grace_period_seconds=OptionalState.from_nullable(
-                    input.initial_grace_period_seconds
-                ),
-                spec=self._build_spec_update(input.checker_spec),
+        updater = IdleCheckerUpdater(
+            checker_id=input.id,
+            name=OptionalState.from_nullable(input.name),
+            description=(
+                TriState.nop()
+                if input.description is SENTINEL
+                else TriState.nullify()
+                if input.description is None
+                else TriState.update(input.description)
             ),
-            pk_value=input.id,
+            target_session_types=OptionalState.from_nullable(input.target_session_types),
+            initial_grace_period_seconds=OptionalState.from_nullable(
+                input.initial_grace_period_seconds
+            ),
+            spec=self._build_spec_update(input.checker_spec),
         )
-        action_result = await self._processors.idle_checker.update.wait_for_complete(
+        action_result = await self._processors.idle_checker.update.run(
             UpdateIdleCheckerAction(updater=updater)
         )
         return UpdateIdleCheckerPayload(
-            idle_checker=self._data_to_node(action_result.idle_checker),
+            idle_checker=self._data_to_node(action_result.data),
         )
 
     async def admin_purge(
         self,
         input: PurgeIdleCheckerInput,
     ) -> PurgeIdleCheckerPayload:
-        purger = Purger(spec=IdleCheckerPurgerSpec(checker_id=input.id))
-        action_result = await self._processors.idle_checker.purge.wait_for_complete(
-            PurgeIdleCheckerAction(purger=purger)
+        """Purge the one checker the caller named.
+
+        The action answers per entity, so the single failure it can report is raised
+        here: the API names one checker and either removes it or fails.
+        """
+        action_result = await self._processors.idle_checker.bulk_purge.run(
+            BulkPurgeIdleCheckersAction(ids=[input.id])
         )
-        return PurgeIdleCheckerPayload(id=action_result.idle_checker.id)
+        error = action_result.errors().get(input.id)
+        if error is not None:
+            raise error
+        return PurgeIdleCheckerPayload(id=input.id)
 
     @staticmethod
     def _data_to_node(data: IdleCheckerData) -> IdleCheckerNode:

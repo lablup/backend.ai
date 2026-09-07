@@ -22,7 +22,6 @@ from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.idle_checker.types import (
     IdleCheckerAssignmentData,
-    IdleCheckerData,
     IdleCheckSession,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -30,7 +29,6 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import (
     IdleCheckerAssignmentNotFound,
     IdleCheckerAssignmentScopeNotFound,
-    IdleCheckerNotFound,
 )
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.row import DomainRow
@@ -54,8 +52,6 @@ from ai.backend.manager.repositories.base import (
     BatchUpdater,
     BulkCreator,
     BulkUpserter,
-    Creator,
-    Purger,
     Querier,
     Updater,
 )
@@ -102,35 +98,6 @@ class IdleCheckerDBSource:
 
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._ops = ops_provider
-
-    async def create(self, creator: Creator[IdleCheckerRow]) -> IdleCheckerData:
-        async with self._ops.write_ops() as w:
-            checker = (await w.create(creator)).row
-            return checker.to_data()
-
-    async def update(self, updater: Updater[IdleCheckerRow]) -> IdleCheckerData:
-        async with self._ops.write_ops() as w:
-            result = await w.update(updater)
-            if result is None:
-                raise IdleCheckerNotFound(str(updater.pk_value))
-            return result.row.to_data()
-
-    async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
-        async with self._ops.write_ops() as w:
-            result = await w.purge(purger)
-            if result is None:
-                raise IdleCheckerNotFound(str(purger.spec.pk_value()))
-            return result.row.to_data()
-
-    async def admin_search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
-        async with self._ops.read_ops() as r:
-            result = await r.batch_query_in_global(sa.select(IdleCheckerRow), querier)
-        return SearchResult(
-            items=[row.IdleCheckerRow.to_data() for row in result.rows],
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def create_assignment(
         self, spec: IdleCheckerAssignmentCreatorSpec

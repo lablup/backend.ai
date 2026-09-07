@@ -6,18 +6,16 @@ from typing import override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
-    IdleCheckerRow,
     SessionIdleCheckRow,
 )
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base import BatchPurgerSpec
-from ai.backend.manager.repositories.base.purger import PurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurgerSpec
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 
@@ -48,23 +46,6 @@ class IdleCheckerAssignmentPurgerSpec(RBACEntityPurgerSpec[IdleCheckerBindingRow
             element_type=RBACElementType.IDLE_CHECKER_ASSIGNMENT,
             element_id=str(self.assignment_id),
         )
-
-
-@dataclass
-class IdleCheckerPurgerSpec(PurgerSpec[IdleCheckerRow]):
-    checker_id: IdleCheckerID
-
-    @override
-    def row_class(self) -> type[IdleCheckerRow]:
-        return IdleCheckerRow
-
-    @override
-    def pk_value(self) -> IdleCheckerID:
-        return self.checker_id
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
 
 
 @dataclass

@@ -25,11 +25,9 @@ from ai.backend.common.dto.manager.v2.idle_checker.request import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import MetricLabelEntry
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import MetricLabelEntryInfo
 from ai.backend.common.types import SessionTypes
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
-from ai.backend.manager.services.idle_checker.actions.admin_search import (
-    SearchIdleCheckersActionResult,
-)
 
 
 class TestIdleCheckerAdapter:
@@ -70,8 +68,8 @@ class TestIdleCheckerAdapter:
     @pytest.fixture
     def mock_processors(self, idle_checker_data: list[IdleCheckerData]) -> MagicMock:
         processors = MagicMock()
-        processors.idle_checker.admin_search.wait_for_complete = AsyncMock(
-            return_value=SearchIdleCheckersActionResult(
+        processors.idle_checker.admin_search.run = AsyncMock(
+            return_value=BatchOpsResult(
                 items=list(reversed(idle_checker_data)),
                 total_count=len(idle_checker_data),
                 has_next_page=False,
