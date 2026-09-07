@@ -463,3 +463,20 @@ etcd client. The heartbeat is a lease emulated on a timestamp.
 
 R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
 real nodes.
+
+Twentieth round. Two P1s in decoding, one in scope -- and on the third I was wrong last round and
+argued the point.
+
+| # | Was | Now |
+|---|-----|-----|
+| C40 | ownership everywhere here is a comparison of one opaque token, and nothing checked that the token was one. A live record carrying `generation: []` became the live generation `"[]"` -- `_generation_of` did `str()` of whatever it found -- and every correctly stamped member, endpoint and address reservation under that session then compared as ANOTHER incarnation's and was deleted, teardown barrier included | `reads_as_generation` gives the stamp a shape. A value that is not one makes the record UNREADABLE, which no destructive path acts on, and `_generation_of` returns None rather than a stringified list |
+| C41 | `joined=bool(payload.get("joined", True))`. `0`, `null`, `[]` and `""` are all falsey, so a corrupt live member decoded cleanly into "this node has finished its teardown" -- which is the answer the manager reads before handing a VNI back to the pool. The decode-failure path was already safe; this one went straight through it | absent still means yes (legacy); present must be a real boolean, and anything else raises into the path that already reads a failed decode as "still holding" |
+| C42 | the CNI capability check was fail-open on an agent that had published nothing, borrowed from the overlay driver where it protects deployments older than the probe. There is no such history here, and only the docker agent publishes at all: `enroot/` and `singularity/` ship compute backends and wire no session network, so `build_docker_session_network` is the only thing that builds one | the BEP-1078 path is fail-closed. An agent that has said nothing, or whose caps cannot be read, is refused rather than handed a descriptor it cannot act on. The overlay driver keeps its fail-open, which is what that one is for |
+| — | I edited the BEP last round to say `enroot` and `singularity` ship provisioners for this seam, on the strength of the packages existing. They do not wire it. The proposal is back to naming Docker as the runtime wired today | |
+| C38 | the config watcher's `get_prefix` sat outside the guard, so one momentary etcd read failure ended the task and every later change went undelivered | the whole poll is guarded |
+
+Still not done, and unchanged: `AsyncEtcd.get_prefix` has no paginated form, so the sweep loads
+whole prefixes and reads each session's three subtrees in turn.
+
+R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
+real nodes.
