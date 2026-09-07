@@ -21,13 +21,15 @@ from ai.backend.web.ratelimit import manager_proxy_rate_limited
 _USER_ID = UserID(uuid.UUID("12345678-1234-5678-1234-567812345678"))
 _RATE_LIMIT = 1000
 _RESET = 500
+_ANONYMOUS_LIMIT = 7
+_CLIENT_IP = "10.0.0.1"
 _AUTHENTICATED_SESSION = {"authenticated": True, "token": {"user_id": str(_USER_ID)}}
 
 
 @pytest.fixture
 def mock_valkey_rate_limit_client() -> AsyncMock:
     client = AsyncMock(spec=ValkeyRateLimitClient)
-    client.get_state.return_value = RateLimitState(
+    client.get_user_state.return_value = RateLimitState(
         count=0, limit=_RATE_LIMIT, reset_after_seconds=_RESET
     )
     return client
@@ -35,6 +37,7 @@ def mock_valkey_rate_limit_client() -> AsyncMock:
 
 @pytest.fixture
 def proxied_request(mock_valkey_rate_limit_client: AsyncMock) -> web.Request:
+    """A proxied request the server can name no address for."""
     return make_mocked_request(
         "GET", "/func/session", app={"valkey_rate_limit": mock_valkey_rate_limit_client}
     )
@@ -62,9 +65,9 @@ class _PassThroughCase:
 @pytest.mark.parametrize(
     "case",
     [
-        # No login session: nothing to count against, the manager rejects it anyway.
+        # No login session and no address to key by: the manager limits it alone.
         _PassThroughCase(
-            id="unauthenticated",
+            id="unauthenticated-without-an-address",
             session={},
         ),
         # Session created before login stored the user id: no counter key, so exempt.
@@ -90,7 +93,7 @@ async def test_pass_through_without_rate_limiting(
     handler_response: web.Response,
 ) -> None:
     mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=case.session))
-    mock_valkey_rate_limit_client.get_state.return_value = case.state
+    mock_valkey_rate_limit_client.get_user_state.return_value = case.state
 
     response = await manager_proxy_rate_limited(handler)(proxied_request)
 
@@ -146,7 +149,7 @@ async def test_gates_on_the_user_count(
     handler: AsyncMock,
 ) -> None:
     mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=_AUTHENTICATED_SESSION))
-    mock_valkey_rate_limit_client.get_state.return_value = RateLimitState(
+    mock_valkey_rate_limit_client.get_user_state.return_value = RateLimitState(
         count=case.count, limit=_RATE_LIMIT, reset_after_seconds=_RESET
     )
 
@@ -155,7 +158,7 @@ async def test_gates_on_the_user_count(
     assert response.status == case.expected_status
     assert response.content_type == case.expected_content_type
     assert handler.await_count == case.expected_handler_awaits
-    mock_valkey_rate_limit_client.get_state.assert_awaited_once_with(_USER_ID)
+    mock_valkey_rate_limit_client.get_user_state.assert_awaited_once_with(_USER_ID)
     mock_valkey_rate_limit_client.consume_user_rate_limit.assert_not_called()
     mock_valkey_rate_limit_client.consume_ip_rate_limit.assert_not_called()
 
@@ -167,7 +170,7 @@ async def test_429_carries_the_rate_limit_headers(
     handler: AsyncMock,
 ) -> None:
     mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=_AUTHENTICATED_SESSION))
-    mock_valkey_rate_limit_client.get_state.return_value = RateLimitState(
+    mock_valkey_rate_limit_client.get_user_state.return_value = RateLimitState(
         count=_RATE_LIMIT, limit=_RATE_LIMIT, reset_after_seconds=_RESET
     )
 
@@ -177,3 +180,67 @@ async def test_429_carries_the_rate_limit_headers(
     assert response.headers["X-RateLimit-Remaining"] == "0"
     assert response.headers["X-RateLimit-Reset"] == str(_RESET)
     assert response.headers["X-RateLimit-Window"] == str(ratelimit._RATELIMIT_WINDOW)
+
+
+@pytest.fixture
+def anonymous_request(mock_valkey_rate_limit_client: AsyncMock) -> web.Request:
+    """A proxied request with no login session, arriving from _CLIENT_IP."""
+    return make_mocked_request(
+        "GET",
+        "/func/session",
+        headers={"X-Forwarded-For": _CLIENT_IP},
+        app={"valkey_rate_limit": mock_valkey_rate_limit_client},
+    )
+
+
+async def test_an_anonymous_query_is_judged_by_the_address_window(
+    mocker: MockerFixture,
+    mock_valkey_rate_limit_client: AsyncMock,
+    anonymous_request: web.Request,
+    handler: AsyncMock,
+) -> None:
+    """The two windows stand apart, so the limit reported says which one governed."""
+    mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value={}))
+    mock_valkey_rate_limit_client.get_ip_state.return_value = RateLimitState(
+        count=_ANONYMOUS_LIMIT, limit=_ANONYMOUS_LIMIT, reset_after_seconds=_RESET
+    )
+
+    response = await manager_proxy_rate_limited(handler)(anonymous_request)
+
+    assert response.status == 429
+    assert response.headers["X-RateLimit-Limit"] == str(_ANONYMOUS_LIMIT)
+    handler.assert_not_awaited()
+
+
+async def test_an_anonymous_query_below_the_address_limit_is_proxied(
+    mocker: MockerFixture,
+    mock_valkey_rate_limit_client: AsyncMock,
+    anonymous_request: web.Request,
+    handler: AsyncMock,
+    handler_response: web.Response,
+) -> None:
+    mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value={}))
+    mock_valkey_rate_limit_client.get_ip_state.return_value = RateLimitState(
+        count=_ANONYMOUS_LIMIT - 1, limit=_ANONYMOUS_LIMIT, reset_after_seconds=_RESET
+    )
+
+    response = await manager_proxy_rate_limited(handler)(anonymous_request)
+
+    assert response is handler_response
+    handler.assert_awaited_once_with(anonymous_request)
+
+
+async def test_an_anonymous_query_without_an_open_window_is_proxied(
+    mocker: MockerFixture,
+    mock_valkey_rate_limit_client: AsyncMock,
+    anonymous_request: web.Request,
+    handler: AsyncMock,
+    handler_response: web.Response,
+) -> None:
+    mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value={}))
+    mock_valkey_rate_limit_client.get_ip_state.return_value = None
+
+    response = await manager_proxy_rate_limited(handler)(anonymous_request)
+
+    assert response is handler_response
+    handler.assert_awaited_once_with(anonymous_request)

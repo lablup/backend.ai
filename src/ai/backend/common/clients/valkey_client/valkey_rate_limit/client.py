@@ -147,17 +147,28 @@ class ValkeyRateLimitClient:
         )
 
     @valkey_rate_limit_resilience.apply()
-    async def get_state(self, user_id: UserID) -> RateLimitState | None:
+    async def get_user_state(self, user_id: UserID) -> RateLimitState | None:
         """
         Read the user's current window without counting a request.
 
         :param user_id: The user the counter is keyed by.
         :return: The window state, or None when no window is open for the user.
-
-        ``consume_user_rate_limit()`` fixes the limit in the same atomic batch that opens a window,
-        so an open window always carries one.
         """
-        key = self._user_window_key(user_id)
+        return await self._read_window(self._user_window_key(user_id))
+
+    @valkey_rate_limit_resilience.apply()
+    async def get_ip_state(self, client_ip: str) -> RateLimitState | None:
+        """
+        Read the address's current window without counting a request.
+
+        :param client_ip: The address the counter is keyed by.
+        :return: The window state, or None when no window is open for the address.
+        """
+        return await self._read_window(self._ip_window_key(client_ip))
+
+    async def _read_window(self, key: str) -> RateLimitState | None:
+        """``consume_*`` fixes the limit in the same atomic batch that opens a window,
+        so an open window always carries one."""
         batch = Batch(is_atomic=True)
         batch.hmget(key, ["count", "limit"])
         batch.ttl(key)
