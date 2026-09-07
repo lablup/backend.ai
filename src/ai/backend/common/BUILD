@@ -7,9 +7,20 @@ python_sources(
     ],
 )
 
-# Dependency direction within common: dto may depend on schema, not the reverse.
+# Dependency direction within common: dto may depend on schema and tristate, not the reverse.
 # Paths starting with "/" are relative to this (common) directory.
 __dependencies_rules__(
+    # tristate: must not depend on dto.
+    (
+        "/tristate/**",
+        "!/dto/**",
+        "/**",
+        "//src/ai/backend/logging/**",
+        "//src/ai/backend/plugin/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
     # schema: must not depend on dto.
     (
         "/schema/**",

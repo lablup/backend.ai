@@ -9,11 +9,12 @@ import re
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import QueryDefinitionOrder
 
@@ -52,33 +53,38 @@ class CreateQueryDefinitionRequest(BaseRequestModel):
 class ModifyQueryDefinitionOptionsRequest(BaseRequestModel):
     """Options for modifying a prometheus query definition.
 
-    Each field is optional — only provided fields are updated.
+    Both keys are non-nullable in the stored options, so ``None`` is ignored like an
+    absent field.
     """
 
-    filter_labels: list[str] | None = Field(default=None, description="Allowed filter label keys")
-    group_labels: list[str] | None = Field(default=None, description="Allowed group-by label keys")
+    filter_labels: list[str] | None | Unset = Field(
+        default=UNSET, description="Allowed filter label keys"
+    )
+    group_labels: list[str] | None | Unset = Field(
+        default=UNSET, description="Allowed group-by label keys"
+    )
 
 
 class ModifyQueryDefinitionRequest(BaseRequestModel):
     """Request to modify a prometheus query definition.
 
-    Only ``time_window`` uses ``Sentinel`` because it is the only nullable DB column;
-    all other fields are non-nullable, so ``None`` simply means "do not update".
+    Every field defaults to ``UNSET``, so an absent field is left unchanged. ``None``
+    clears ``time_window`` -- the only nullable DB column -- and is ignored on the rest.
     """
 
-    name: str | None = Field(default=None, description="Human-readable name")
-    metric_name: str | None = Field(default=None, description="Prometheus metric name")
-    query_template: str | None = Field(
-        default=None, description="PromQL template with placeholders"
+    name: str | None | Unset = Field(default=UNSET, description="Human-readable name")
+    metric_name: str | None | Unset = Field(default=UNSET, description="Prometheus metric name")
+    query_template: str | None | Unset = Field(
+        default=UNSET, description="PromQL template with placeholders"
     )
-    time_window: str | Sentinel | None = Field(default=SENTINEL, description="Default time window")
-    options: ModifyQueryDefinitionOptionsRequest | None = Field(
-        default=None, description="Query definition options"
+    time_window: str | None | Unset = Field(default=UNSET, description="Default time window")
+    options: ModifyQueryDefinitionOptionsRequest | None | Unset = Field(
+        default=UNSET, description="Query definition options"
     )
 
     @field_validator("time_window", mode="after")
     @classmethod
-    def _validate_time_window(cls, v: str | Sentinel | None) -> str | Sentinel | None:
+    def _validate_time_window(cls, v: str | None | Unset) -> str | None | Unset:
         if isinstance(v, str) and not re.match(PROMETHEUS_DURATION_PATTERN, v):
             raise ValueError(f"Invalid Prometheus duration format: {v!r}")
         return v

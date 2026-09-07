@@ -78,7 +78,7 @@
     "prometheus-client~=0.21.1",
     "psutil~=7.0",
     "pycryptodome>=3.20.0",
-    "pydantic[email]~=2.11.3",
+    "pydantic[email]~=2.13.5",
     "pyhumps~=3.8.0",
     "pyotp~=2.9.0",
     "pyroscope-io~=0.8.8",

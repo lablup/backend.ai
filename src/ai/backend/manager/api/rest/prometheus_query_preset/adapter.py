@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.entity.prometheus_query_preset import (
     PrometheusQueryPresetID,
 )
@@ -12,6 +11,7 @@ from ai.backend.common.dto.clients.prometheus.response import MetricResponse
 from ai.backend.common.dto.manager.prometheus_query_preset import (
     MetricLabelEntryDTO,
     MetricValueDTO,
+    ModifyQueryDefinitionOptionsRequest,
     ModifyQueryDefinitionRequest,
     OrderDirection,
     QueryDefinitionDTO,
@@ -71,38 +71,15 @@ class PrometheusQueryPresetAdapter(BaseFilterAdapter):
         self, request: ModifyQueryDefinitionRequest, preset_id: UUID
     ) -> PrometheusQueryPresetUpdater:
         """Build the update spec from a modify request."""
+        options = OptionalState[ModifyQueryDefinitionOptionsRequest].from_unset(request.options)
         return PrometheusQueryPresetUpdater(
             preset_id=PrometheusQueryPresetID(preset_id),
-            name=(
-                OptionalState.update(request.name)
-                if request.name is not None
-                else OptionalState.nop()
-            ),
-            metric_name=(
-                OptionalState.update(request.metric_name)
-                if request.metric_name is not None
-                else OptionalState.nop()
-            ),
-            query_template=(
-                OptionalState.update(request.query_template)
-                if request.query_template is not None
-                else OptionalState.nop()
-            ),
-            time_window=TriState.nop()
-            if isinstance(request.time_window, Sentinel)
-            else TriState.nullify()
-            if request.time_window is None
-            else TriState.update(request.time_window),
-            filter_labels=(
-                OptionalState.update(request.options.filter_labels)
-                if request.options is not None and request.options.filter_labels is not None
-                else OptionalState.nop()
-            ),
-            group_labels=(
-                OptionalState.update(request.options.group_labels)
-                if request.options is not None and request.options.group_labels is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_unset(request.name),
+            metric_name=OptionalState.from_unset(request.metric_name),
+            query_template=OptionalState.from_unset(request.query_template),
+            time_window=TriState.from_unset(request.time_window),
+            filter_labels=options.and_optional(lambda o: o.filter_labels),
+            group_labels=options.and_optional(lambda o: o.group_labels),
         )
 
     def build_searcher(
