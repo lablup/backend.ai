@@ -10,6 +10,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import logging
+import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -623,7 +624,12 @@ class AgentNetworkCaps:
             raise ValueError("tunnel_offload is not a boolean")
         updated_at = payload.get("updated_at")
         if updated_at is not None and (
-            isinstance(updated_at, bool) or not isinstance(updated_at, (int, float))
+            isinstance(updated_at, bool)
+            or not isinstance(updated_at, (int, float))
+            # Python's json reads NaN and Infinity by default, and neither can be compared into an
+            # expiry: every comparison against NaN is false, so it never looks stale, and Infinity
+            # never gets there.
+            or not math.isfinite(updated_at)
         ):
             raise ValueError("updated_at is not a timestamp")
         return cls(

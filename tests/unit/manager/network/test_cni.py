@@ -687,7 +687,7 @@ class TestMemberBackendCompat:
     async def test_containerd_member_ok(self) -> None:
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/backend"] = "containerd"
-        _encryption_capable(etcd, "a1")
+        etcd.store["network/agent/a1/caps"] = _caps("a1", backend="containerd")
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(
             identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
@@ -3549,6 +3549,67 @@ class TestTheRecordIsTheRootOfOwnership:
         assert f"network/ipam/vni/{vni}" in etcd.store
         assert _allocated_key(subnet) in etcd.store
 
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("generation", []),  # an object, and its incarnation is not one
+            ("vni", None),  # a vxlan record naming no vni
+            ("vni", "not-a-vni"),
+            ("subnet", "8.8.8.0/24"),  # outside any private pool
+            ("backend", "something-else"),
+        ],
+    )
+    async def test_a_semantically_corrupt_ready_root_is_not_replaced_either(
+        self, field: str, value: Any
+    ) -> None:
+        """The first fix only covered a root that is not a JSON object at all. A READY record can
+        be an object, be refused by every reuse path, and still be the only thing naming what a
+        running node is on -- and that one went straight to the takeover."""
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={**self._OPTIONS, "member_agents": ["a1"]}
+        )
+        subnet, vni = str(info.options["subnet"]), int(cast(int, info.options["vni"]))
+        etcd.store[member_key("s1", "a1")] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": True,
+        })
+        record = json.loads(etcd.store[session_meta_key("s1")])
+        corrupt = json.dumps({**record, field: value})
+        etcd.store[session_meta_key("s1")] = corrupt
+
+        with pytest.raises(SessionCleanupPending, match="still hold its data plane"):
+            await plugin.create_network(
+                identifier="s1", options={**self._OPTIONS, "member_agents": ["a1"]}
+            )
+
+        assert etcd.store[session_meta_key("s1")] == corrupt
+        assert f"network/ipam/vni/{vni}" in etcd.store
+        assert _allocated_key(subnet) in etcd.store
+
+    async def test_a_ready_root_whose_allocation_is_gone_is_still_replaced(self) -> None:
+        # The case the takeover exists for must keep working: nothing holds the session and the
+        # pool no longer records its allocation, so the record is worth nothing and the id has to
+        # be usable again.
+        etcd = FakeEtcd()
+        _encryption_capable(etcd, "a1")
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={**self._OPTIONS, "member_agents": ["a1"]}
+        )
+        for key in [k for k in etcd.store if k.startswith("network/ipam/")]:
+            del etcd.store[key]
+        assert info.options["subnet"]
+
+        again = await plugin.create_network(
+            identifier="s1", options={**self._OPTIONS, "member_agents": ["a1"]}
+        )
+
+        assert again.options["subnet"]
+
     async def test_it_is_replaced_once_nothing_holds_it(self) -> None:
         # Proven safe, not assumed: with no member saying it holds the session, an unreadable
         # record names nothing anyone is running on and the id has to be usable again.
@@ -3571,16 +3632,67 @@ class TestTheAdvertIsAboutTheNodeThatIsThereNow:
 
     async def test_a_stale_advert_is_refused(self) -> None:
         etcd = FakeEtcd()
+        etcd.store["network/agent/a1/backend"] = "docker"
         etcd.store["network/agent/a1/caps"] = _caps(
             "a1", updated_at=time.time() - pairing.CAPS_FRESH_FOR_SEC - 1
         )
         plugin = _plugin_with(etcd)
-        with pytest.raises(NetworkBackendMismatch, match="last published"):
+        with pytest.raises(NetworkBackendMismatch, match="dated"):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
+
+    async def test_an_advert_written_by_a_runtime_that_is_gone_is_refused(self) -> None:
+        # The scenario the equality check exists for: the agent id came back on another runtime,
+        # which republished its backend key at once and has never published capabilities. Merely
+        # asking whether the WRITER could serve cni let the manager pair the new runtime with the
+        # old runtime's advert for as long as it stayed fresh.
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/backend"] = "containerd"
+        etcd.store["network/agent/a1/caps"] = _caps("a1", backend="docker")
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch, match="a boot that is over"):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
+
+    async def test_an_advert_with_no_publisher_is_refused(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/caps"] = _caps("a1", backend=None)
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch, match="do not say which backend"):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
+
+    async def test_an_advert_dated_in_the_future_is_refused(self) -> None:
+        # A clock far enough ahead is a record no age check can ever expire.
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/caps"] = _caps(
+            "a1", updated_at=time.time() + pairing.CAPS_CLOCK_SKEW_SEC + 60
+        )
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch, match="dated"):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
+
+    @pytest.mark.parametrize("bogus", ["NaN", "Infinity", "-Infinity"])
+    async def test_a_timestamp_that_is_not_a_number_is_refused(self, bogus: str) -> None:
+        # Python's json reads these. Every comparison against NaN is false, so it never expires.
+        etcd = FakeEtcd()
+        record = json.loads(_caps("a1"))
+        del record["updated_at"]
+        etcd.store["network/agent/a1/caps"] = json.dumps(record)[:-1] + f', "updated_at": {bogus}}}'
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch, match="cannot be read"):
             await plugin.create_network(
                 identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
             )
 
     async def test_an_advert_from_a_runtime_that_cannot_serve_cni_is_refused(self) -> None:
+        # No backend key, so the equality check above cannot answer and this is what is left:
+        # the runtime that WROTE the advert could not serve cni whoever is running now.
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/caps"] = _caps("a1", backend="kubernetes")
         plugin = _plugin_with(etcd)
