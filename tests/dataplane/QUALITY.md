@@ -518,3 +518,22 @@ working deployment accepts today. Every one has a unit test and none has met a r
 
 R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
 real nodes.
+
+Twenty-third round. Concurrency and serving-state, not validation.
+
+| # | Was | Now |
+|---|-----|-----|
+| C46 | reading the membership and replacing the root are two operations, and an agent joins between them -- it reads the READY record, publishes its member, re-reads to confirm, and only then builds. Asked first, the membership can answer "nobody" for a join that has not published yet, and the node comes up on the old descriptor while the manager allocates a new one | fenced first, then checked. The take IS the fence -- what it writes is a CREATING record, which the agent's own read refuses -- and the membership is read again after it lands. A holder that appeared gets its record back, byte for byte |
+| C45 | the refresh recomputed the endpoint from the host, but the session network and the vxlan backend hold what they were BUILT with. A node that came up with its link down would advertise ready the moment the link returned and then refuse every session offered to it | the advert is the serving endpoint, and it is withdrawn when the host stops matching it. Freshness now means "still true", not "still running" |
+| C47 | comparing runtime names cannot see a restart onto the same runtime, and an agent that comes back and then fails to publish leaves the previous run's advert fresh for the whole window | the base agent writes which run it is at every start, before anything backend-specific publishes, and the manager requires the advert to name that run |
+| C44 | the endpoint is in the capability record AND in a key of its own, and the manager admitted on one and pre-seeded peers from the other | `require_members_cni_ready` hands back the records it admitted on, and the pre-seed uses them. The separate key is the fallback for an agent that predates the field |
+| C38 | the config retry loop doubled `2**attempt` forever; past about a thousand tries -- eight hours of etcd being down -- it overflows a float and kills the watcher it exists to keep alive | the shift stops at the ceiling |
+
+Still not done. `AsyncEtcd.get_prefix` has no paginated form and there is no bound on session
+count. And a corrupt root is now preserved fail-closed with no tool to inspect, repair or
+quarantine it -- an operator has to edit etcd by hand, which is a gap this branch opened.
+
+R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
+real nodes. Four rounds of admission gates -- capability required, fresh, naming a VTEP, written
+by the running runtime and the running boot -- have each been unit-tested and none has met a real
+agent.

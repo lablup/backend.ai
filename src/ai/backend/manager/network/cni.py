@@ -44,6 +44,7 @@ from ai.backend.common.network.types import (
     VXLAN_OVERHEAD,
     VXLAN_PORT_MAX,
     VXLAN_PORT_MIN,
+    AgentNetworkCaps,
     GenerationMatch,
     Member,
     NetworkBackendKind,
@@ -738,7 +739,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # Anything an earlier incarnation of this id could not give back, before this one claims
         # from the same pools.
         await self.drain_cleanup_debt(session_id)
-        await self._require_members_cni_capable(member_agents)
+        admitted = await self._require_members_cni_capable(member_agents)
         # A session start that failed downstream is retried with the same id, so this can be a
         # second call for a session that already has an allocation. Allocating again would give
         # it a second subnet and VNI and leave the first ones claimed by nobody: destroy_network
@@ -853,7 +854,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # whose VTEP is not yet published are skipped — they fall back to self-publish +
             # watch convergence (no regression).
             if backend is NetworkBackendKind.VXLAN:
-                await self._preseed_members(session_id, member_agents, generation, held)
+                await self._preseed_members(session_id, member_agents, generation, held, admitted)
             # Ready only now: everything the session needs is on record. A waiter returns at
             # this point, and not before -- a create that fails after publishing undoes itself,
             # and anyone who had already been handed the half-built record would be holding a
@@ -1113,15 +1114,8 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     #
                     # So it is replaced only where no node says it still holds the session. A
                     # member record is that statement, and an unreadable one counts as holding.
-                    if holders := await self._members_still_holding(session_id):
-                        raise SessionCleanupPending(
-                            f"session {session_id}'s network record cannot be read, and"
-                            f" {', '.join(sorted(holders))} still hold its data plane. Not"
-                            " replacing it: what it names is what those nodes are running on."
-                            " The record needs an operator."
-                        )
                     fresh_over = claim(None)
-                    if await etcd.replace(key, raw, fresh_over):
+                    if await self._take_unreusable_root(etcd, session_id, raw, fresh_over):
                         log.warning(
                             "session {}'s network record could not be read and no node holds it;"
                             " replacing it and leaving what it may have named to the pool"
@@ -1171,13 +1165,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     # running on what it points at. Replacing it in the second case mints a new
                     # incarnation, and everything those nodes hold reads as an orphan to the next
                     # sweep. The root's own bytes cannot tell the two apart; the nodes can.
-                    if holders := await self._members_still_holding(session_id):
-                        raise SessionCleanupPending(
-                            f"session {session_id}'s network record cannot be reused and"
-                            f" {', '.join(sorted(holders))} still hold its data plane. Not"
-                            " replacing it: what it names is what those nodes are running on."
-                        )
-                    if await etcd.replace(key, raw, ours):
+                    if await self._take_unreusable_root(etcd, session_id, raw, ours):
                         log.warning(
                             "session {}'s network record outlived its allocation; building it"
                             " again",
@@ -1203,6 +1191,54 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     f" {_CREATE_HANDOVER_SEC * 2}s; another manager keeps taking it"
                 )
             await asyncio.sleep(_CREATE_POLL_SEC)
+
+    async def _take_unreusable_root(
+        self, etcd: AsyncEtcd, session_id: str, raw: str, fence: str
+    ) -> bool:
+        """Replace a record no create can reuse, but only if no node is running on what it names.
+
+        Fenced first, then checked -- not the other way round. Reading the membership and then
+        replacing are two operations, and an agent joins in between: it reads the READY record,
+        publishes its member, re-reads the record to confirm it is still the one it joined, and
+        only then builds the data plane. A manager that asked "is anybody holding this?" before it
+        took the record could be told no by a join that had not published yet, and the node would
+        come up on the old descriptor while the manager allocated a new one.
+
+        So the take goes first, and it IS the fence: everything this writes is a CREATING record,
+        which the agent's own read refuses, so a join that has not re-read yet aborts on its own.
+        Then the membership is read AGAIN, and a holder that appeared before the fence landed is
+        one this must stand down from -- the record goes back exactly as it was.
+
+        Raises:
+            SessionCleanupPending: a node still holds what the record names. Retryable.
+
+        :return: ``True`` if the record is now this call's.
+        """
+        key = session_meta_key(session_id)
+        if holders := await self._members_still_holding(session_id):
+            raise SessionCleanupPending(
+                f"session {session_id}'s network record cannot be reused and"
+                f" {', '.join(sorted(holders))} still hold its data plane. Not replacing it:"
+                " what it names is what those nodes are running on."
+            )
+        if not await etcd.replace(key, raw, fence):
+            return False
+        if holders := await self._members_still_holding(session_id):
+            # A join landed between the first read and the fence. Put the record back exactly as
+            # it was, so the node that joined is still on a record that names what it built.
+            if not await etcd.replace(key, fence, raw):
+                log.error(
+                    "session {}'s record could not be put back after a join was found under it;"
+                    " it now names an incarnation that allocated nothing, and {} are on the old"
+                    " one",
+                    session_id,
+                    ", ".join(sorted(holders)),
+                )
+            raise SessionCleanupPending(
+                f"session {session_id} was joined by {', '.join(sorted(holders))} while its"
+                " unusable record was being replaced; the record is theirs, not this create's"
+            )
+        return True
 
     async def _publish(
         self, etcd: AsyncEtcd, session_id: str, held: str, meta: Mapping[str, Any]
@@ -1878,6 +1914,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         member_agents: list[str],
         generation: str | None = None,
         held: str | None = None,
+        admitted: Mapping[str, AgentNetworkCaps] | None = None,
     ) -> None:
         """Publish each member agent's VTEP, but only where no record stands already.
 
@@ -1888,11 +1925,18 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         holds a session's VNI back from reuse, so one CREATED on behalf of a session that has
         since been torn down blocks the teardown of the session that replaced it -- and nothing
         would ever come for it. A stamp says whose a key is; it cannot stop the key being made.
+
+        The endpoint comes from the record the agent was ADMITTED on, not from the key of its own
+        that also carries it. Those are two writes, so reading the second after checking the first
+        seeds peers with an address nothing validated -- an older one, or one published between
+        the two. The separate key is the fallback for an agent that predates the field.
         """
         etcd = self._require_etcd()
         guards = {session_meta_key(session_id): held} if held else {}
         for agent_id in member_agents:
-            vtep = await etcd.get(agent_vtep_key(agent_id), scope=ConfigScopes.GLOBAL)
+            vtep = (admitted or {}).get(agent_id, AgentNetworkCaps(tunnel_offload=False)).vtep_ip
+            if not vtep:
+                vtep = await etcd.get(agent_vtep_key(agent_id), scope=ConfigScopes.GLOBAL)
             if not vtep:
                 continue
             member = Member(agent_id=agent_id, host_ip=vtep, vtep_ip=vtep, generation=generation)
@@ -2062,7 +2106,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 holding.add(str(agent_id))
         return holding
 
-    async def _require_members_cni_capable(self, member_agents: list[str]) -> None:
+    async def _require_members_cni_capable(
+        self, member_agents: list[str]
+    ) -> dict[str, AgentNetworkCaps]:
         """Refuse a member agent whose backend cannot serve the 'cni' driver.
 
         The symmetric check for 'overlay' lives in OverlayNetworkPlugin; both call the same guard
@@ -2070,7 +2116,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         """
         etcd = self._require_etcd()
         await require_members_can_serve_driver(etcd, "cni", member_agents)
-        await require_members_cni_ready(etcd, member_agents)
+        return await require_members_cni_ready(etcd, member_agents)
 
     def _select_backend(self, forced_backend: NetworkBackendKind | None) -> NetworkBackendKind:
         """The operator's forced backend wins; otherwise every multi-node cluster session uses

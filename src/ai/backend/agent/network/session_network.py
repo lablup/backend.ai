@@ -731,6 +731,17 @@ class SessionNetwork:
         plan = await backend.attach_endpoint(cast(Any, kernel_config), cast(Any, {}), meta=meta)
         return (session_id, plan, pid if pid is not None else _DEAD_TASK_PID)
 
+    @property
+    def serving_vtep(self) -> str | None:
+        """The tunnel endpoint this node will actually build a session on.
+
+        Fixed when this was constructed, because it is what every session already up was built
+        with and what peers have in their FDBs. Published as the node's advert rather than
+        whatever the host holds right now: the two are not the same thing, and it is this one that
+        decides whether a session offered to this node can be served at all.
+        """
+        return self._vtep_ip
+
     async def _reclaim_orphans(self, live: Mapping[str, str]) -> None:
         """Give back what the journals still hold for containers and sessions that are gone.
 

@@ -19,7 +19,11 @@ from collections.abc import Iterable
 
 from ai.backend.common.etcd import AbstractKVStore, AsyncEtcd, ConfigScopes
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.network.keys import agent_backend_key, agent_caps_key
+from ai.backend.common.network.keys import (
+    agent_backend_key,
+    agent_boot_key,
+    agent_caps_key,
+)
 from ai.backend.common.network.types import OVERLAY_ENCRYPTION_PROFILE, AgentNetworkCaps
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import NetworkBackendMismatch
@@ -123,7 +127,9 @@ async def require_members_can_serve_driver(
             )
 
 
-async def require_members_cni_ready(etcd: AsyncEtcd, member_agents: Iterable[str]) -> None:
+async def require_members_cni_ready(
+    etcd: AsyncEtcd, member_agents: Iterable[str]
+) -> dict[str, AgentNetworkCaps]:
     """Raise unless every member agent has SAID it can serve this session's data plane.
 
     Fail-closed, unlike `require_members_overlay_ready`, and the difference is the point. That one
@@ -135,7 +141,13 @@ async def require_members_cni_ready(etcd: AsyncEtcd, member_agents: Iterable[str
     cannot act on it, and the failure surfaces as a session stuck at create.
 
     An unreadable capability record is refused for the same reason: it is not an advert.
+
+    :return: the record each agent was admitted on, so what the session is built from is what was
+        checked. The tunnel endpoint lives in this record AND under a key of its own, and reading
+        the second after admitting on the first is how a session gets pre-seeded with an address
+        nobody validated.
     """
+    admitted: dict[str, AgentNetworkCaps] = {}
     for agent_id in member_agents:
         raw = await etcd.get(agent_caps_key(agent_id), scope=ConfigScopes.GLOBAL)
         if raw is None:
@@ -192,6 +204,18 @@ async def require_members_cni_ready(etcd: AsyncEtcd, member_agents: Iterable[str
                 f" capabilities were published by '{caps.backend}'. The advert is from a boot that"
                 " is over; the runtime there now has not said it can serve this session."
             )
+        # Which RUN wrote it, not only which runtime. The runtime name cannot see a restart onto
+        # the same runtime -- and an agent that comes back and then fails to publish, or has not
+        # got there yet, leaves the previous run's advert standing and fresh for as long as the
+        # window lasts. The base agent writes this key at every start, before it publishes
+        # anything else, so a mismatch is an advert from a run that is over.
+        booted = await etcd.get(agent_boot_key(agent_id), scope=ConfigScopes.GLOBAL)
+        if booted is not None and caps.boot_id != booted:
+            raise NetworkBackendMismatch(
+                f"agent '{agent_id}' is on run {booted}, and its network capabilities were"
+                f" published by run {caps.boot_id}. The advert is from a boot that is over; this"
+                " one has not said it can serve a cluster-network session."
+            )
         if caps.backend not in DRIVER_COMPATIBLE_BACKENDS["cni"]:
             raise NetworkBackendMismatch(
                 f"agent '{agent_id}' published its capabilities from the '{caps.backend}'"
@@ -203,6 +227,8 @@ async def require_members_cni_ready(etcd: AsyncEtcd, member_agents: Iterable[str
                 " refused when it arrives. Set container.advertised-host (or bind-host) to a"
                 " routable address this host holds."
             )
+        admitted[agent_id] = caps
+    return admitted
 
 
 async def require_members_overlay_ready(etcd: AsyncEtcd, member_agents: Iterable[str]) -> None:

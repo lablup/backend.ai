@@ -583,6 +583,11 @@ class AgentNetworkCaps:
     #: The tunnel endpoint this node held when it published. A node with none refuses every vxlan
     #: session on arrival, so admitting it is only a slower way of failing.
     vtep_ip: str | None = None
+    #: Which run of the agent published this. The base agent writes the same value under its own
+    #: key at every start, before anything backend-specific, so an advert whose boot id is not the
+    #: current one is one an earlier run left behind -- which a runtime name cannot tell you when
+    #: the runtime did not change.
+    boot_id: str | None = None
     #: When this was published, by the publisher's clock. The agent refreshes on a timer, so a
     #: record that has stopped moving is one whose publisher has stopped -- which is the only
     #: expiry available: this etcd client exposes no lease.
@@ -639,5 +644,6 @@ class AgentNetworkCaps:
             encryption_profiles=strs("encryption_profiles"),
             backend=_optional_str(payload, "backend"),
             vtep_ip=_optional_str(payload, "vtep_ip"),
+            boot_id=_optional_str(payload, "boot_id"),
             updated_at=float(updated_at) if updated_at is not None else None,
         )
