@@ -266,6 +266,47 @@ def _coordinator(etcd: FakeEtcd, backend: RecordingBackend) -> SessionNetworkCoo
     )
 
 
+class TestOnePoisonRecordDoesNotStopTheSession:
+    """A11b. One unreadable member or endpoint used to raise out of the whole walk, so the
+    session's reconcile failed every fifteen seconds for as long as the key stood -- no new peer,
+    no FDB entry, no ARP entry, on a session that reports itself fine. A value that is not a JSON
+    object raised AttributeError (not ValueError) inside `of_generation`; one that is an object
+    but missing a field raised KeyError out of the decode."""
+
+    @pytest.mark.parametrize(
+        "poison",
+        [
+            "[]",  # valid JSON, not an object
+            "null",
+            "{",  # not JSON at all
+            '{"vtep_ip": "10.0.0.9"}',  # an object missing host_ip, which a member must carry
+        ],
+    )
+    async def test_a_peer_beside_a_poison_member_is_still_programmed(self, poison: str) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.store[member_key("s1", "a-poison")] = poison
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+
+        await coord.reconcile_peers("s1")
+
+        assert backend.added == ["a2"], "one unreadable member cost the session its peers"
+
+    @pytest.mark.parametrize("poison", ["[]", "null", '{"ip": "10.128.0.9"}'])
+    async def test_an_endpoint_beside_a_poison_one_is_still_read(self, poison: str) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_endpoint("k1", ip="10.128.0.2", mac=mac_for_ip("10.128.0.2"), agent_id="a2")
+        etcd.store[f"{endpoints_prefix('s1')}k-poison"] = poison
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+
+        endpoints = await coord._read_endpoints("s1")
+
+        assert set(endpoints) == {"k1"}, "one unreadable endpoint cost the session its table"
+
+
 class TestReconcilePeers:
     async def test_adds_new_peers_excluding_self(self) -> None:
         etcd = FakeEtcd()

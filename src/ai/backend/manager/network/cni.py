@@ -36,10 +36,14 @@ from ai.backend.common.network.keys import (
 from ai.backend.common.network.types import (
     DEFAULT_VXLAN_PORT,
     ESP_OVERHEAD,
+    MTU_MAX,
+    MTU_MIN,
     SESSION_META_GENERATION,
     SESSION_META_READY,
     SESSION_META_STATE,
     VXLAN_OVERHEAD,
+    VXLAN_PORT_MAX,
+    VXLAN_PORT_MIN,
     Member,
     NetworkBackendKind,
     OverlayEncryptionPolicy,
@@ -51,6 +55,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import (
     EndpointSuperseded,
     ForcedBackendUnsupported,
+    ManagerNetworkMisconfigured,
     NetworkBackendMismatch,
     OverlayTeardownPending,
     SessionCleanupPending,
@@ -433,6 +438,68 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         self._reconcile_token = uuid.uuid4().hex
         self._reconcile_ticket = None
 
+    def _validated_config(self) -> tuple[int, int, str, int]:
+        """The operator's settings, or a refusal to start on them.
+
+        Checked HERE rather than where they are used, because where they are used is inside a
+        create that has already claimed the session and published a READY record. Every one of
+        these values travels to the agent, and the agent's privnet policy -- the trust boundary --
+        refuses an MTU or a port outside these ranges and a subnet outside RFC1918. Unvalidated,
+        the manager reported a healthy session over a descriptor no node could ever attach, and
+        every retry rebuilt the same one. A misconfigured manager should refuse to serve, not
+        serve unusably.
+
+        Raises:
+            ManagerNetworkMisconfigured: a setting no session built from it could be attached.
+        """
+        inter_container = (self.local_config.get("network") or {}).get("inter-container") or {}
+
+        def as_int(value: Any, what: str, default: int) -> int:
+            if value is None:
+                return default
+            if isinstance(value, (bool, float)) or not isinstance(value, (int, str)):
+                raise ManagerNetworkMisconfigured(f"{what} is not a whole number: {value!r}")
+            try:
+                return int(value)
+            except ValueError as e:
+                raise ManagerNetworkMisconfigured(f"{what} is not a whole number: {value!r}") from e
+
+        mtu = as_int(self.plugin_config.get("mtu"), "mtu", _DEFAULT_UNDERLAY_MTU)
+        if not mtu - _VXLAN_OVERHEAD - _ESP_OVERHEAD >= MTU_MIN or mtu > MTU_MAX:
+            raise ManagerNetworkMisconfigured(
+                f"mtu {mtu} leaves no usable overlay MTU: the underlay must be between"
+                f" {MTU_MIN + _VXLAN_OVERHEAD + _ESP_OVERHEAD} and {MTU_MAX}, because every kernel"
+                " gets this minus the tunnel and encryption overheads and every agent refuses"
+                f" anything outside {MTU_MIN}..{MTU_MAX}"
+            )
+        port = as_int(self.plugin_config.get("vxlan-port"), "vxlan-port", DEFAULT_VXLAN_PORT)
+        if not VXLAN_PORT_MIN <= port <= VXLAN_PORT_MAX:
+            raise ManagerNetworkMisconfigured(
+                f"vxlan-port {port} is outside {VXLAN_PORT_MIN}..{VXLAN_PORT_MAX}; the agents"
+                " refuse to bind it"
+            )
+        pool = str(inter_container.get("ipam-pool") or DEFAULT_IPAM_POOL)
+        if reads_as_overlay_subnet(pool) is None:
+            raise ManagerNetworkMisconfigured(
+                f"ipam-pool {pool!r} is not a private, prefix-aligned IPv4 network; every session"
+                " block is carved from it and every agent refuses a subnet outside RFC1918"
+            )
+        block_prefixlen = as_int(
+            inter_container.get("ipam-block-size"), "ipam-block-size", DEFAULT_BLOCK_PREFIXLEN
+        )
+        if not ipaddress.ip_network(pool).prefixlen <= block_prefixlen <= 30:
+            raise ManagerNetworkMisconfigured(
+                f"ipam-block-size /{block_prefixlen} is not a block the pool {pool} can be carved"
+                " into"
+            )
+        return mtu, port, pool, block_prefixlen
+
+    @override
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        await super().update_plugin_config(plugin_config)
+        # Refused here as at startup: an update that cannot serve is not one to carry on from.
+        self._validated_config()
+
     @override
     async def init(self, context: Any = None) -> None:
         # Build a dedicated AsyncEtcd from the manager's etcd config (same pattern as
@@ -445,11 +512,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         await self._etcd.open()
         # The overlay pool is the operator's: it is stretched across the session's nodes, so it
         # must not collide with anything those nodes already route.
-        inter_container = (self.local_config.get("network") or {}).get("inter-container") or {}
+        _mtu, _port, pool, block_prefixlen = self._validated_config()
         self._subnet_allocator = SubnetAllocator(
-            self._etcd,
-            pool=str(inter_container.get("ipam-pool") or DEFAULT_IPAM_POOL),
-            block_prefixlen=int(inter_container.get("ipam-block-size") or DEFAULT_BLOCK_PREFIXLEN),
+            self._etcd, pool=pool, block_prefixlen=block_prefixlen
         )
         self._vni_allocator = VNIAllocator(self._etcd)
         self._endpoint_allocator = EndpointAllocator(self._etcd)
@@ -630,10 +695,6 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             await self._etcd.close()
             self._etcd = None
 
-    @override
-    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
-        return await super().update_plugin_config(plugin_config)
-
     def _require_etcd(self) -> AsyncEtcd:
         if self._etcd is None:
             raise RuntimeError("CNINetworkPlugin is not initialized (call init() first)")
@@ -717,7 +778,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # gets) is that minus the tunnel overhead. Only the VXLAN backend encapsulates, so only
             # it pays the overhead; a non-encapsulating backend would keep the underlay MTU. When
             # encryption is on, the ESP overhead comes off the overlay MTU as well.
-            underlay_mtu = int(self.plugin_config.get("mtu") or _DEFAULT_UNDERLAY_MTU)
+            underlay_mtu, vxlan_port, _pool, _block = self._validated_config()
             if backend is NetworkBackendKind.VXLAN:
                 mtu = underlay_mtu - _VXLAN_OVERHEAD - (_ESP_OVERHEAD if encrypt else 0)
             else:
@@ -726,7 +787,6 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # value for a possibly heterogeneous cluster. Each agent re-derives its own node's
             # real underlay and refuses the session when this number does not fit, which turns a
             # silent black hole into a named error. See agent/network/path_mtu.py.
-            vxlan_port = int(self.plugin_config.get("vxlan-port") or DEFAULT_VXLAN_PORT)
 
             meta: dict[str, Any] = {
                 "subnet": subnet,
@@ -1249,19 +1309,18 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
 
         The session's own record is never touched: by the time this runs it belongs to whatever
         replaced this incarnation. Clears the debt when there is nothing left.
+
+        The live record is read and judged BEFORE anything is deleted. It used to be read after
+        the child keys were already gone, which made the fail-closed check cosmetic: a member key
+        is not information, it is the barrier that says this node still holds the VNI's data
+        plane, and a legacy unstamped one under a corrupt live record was deleted by
+        `_delete_incarnation` before this got as far as deciding not to touch anything. The peer
+        loses its tunnel and a later teardown gives the VNI back over a node that is still up.
         """
-        complete = True
-        for prefix, key_of in (
-            (endpoints_prefix, endpoint_key),
-            (members_prefix, member_key),
-            (session_ipam_prefix, session_ipam_key),
-        ):
-            if not await self._delete_incarnation(etcd, session_id, prefix, key_of, generation):
-                complete = False
         # What the record names NOW, and what it names it WITH. This sweep is for an incarnation
-        # the record has moved on from, so a claim under this id may be the live session's: one
-        # carrying no incarnation (compatible with the one the record names) or one the record
-        # names outright. Neither is this sweep's to give back.
+        # the record has moved on from, so anything under this id may be the live session's: a key
+        # or claim carrying no incarnation (compatible with the one the record names) or a claim
+        # the record names outright. None of it is this sweep's to take.
         live_raw = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
         live_allocation = (
             _parse_allocation(live_raw)
@@ -1269,12 +1328,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             else _Allocation(_AllocationState.PENDING)
         )
         if live_allocation.is_corrupt:
-            # The same rule as the sweep's, at the place the release actually happens. What this
-            # cleanup may keep its hands off is decided by what the LIVE record names, and that
-            # cannot be read -- so nothing of this id goes back. The debt stays and this is
+            # Nothing of this id is touched: what this cleanup may keep its hands off is decided
+            # by what the LIVE record names, and that cannot be read. The debt stays and this is
             # retried; an operator has been told which record to look at.
             log.error(
-                "not giving back session {}'s incarnation {}: the record that says what is live"
+                "not sweeping session {}'s incarnation {}: the record that says what is live"
                 " cannot be read",
                 session_id,
                 generation,
@@ -1283,6 +1341,14 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         live = _generation_of(live_raw)
         live_vni = live_allocation.vni
         live_subnet = live_allocation.subnet
+        complete = True
+        for prefix, key_of in (
+            (endpoints_prefix, endpoint_key),
+            (members_prefix, member_key),
+            (session_ipam_prefix, session_ipam_key),
+        ):
+            if not await self._delete_incarnation(etcd, session_id, prefix, key_of, generation):
+                complete = False
         try:
             stuck_vnis = await self._vni_allocator.release_all(
                 session_id, generation, live, live_vni

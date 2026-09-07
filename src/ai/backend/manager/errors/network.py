@@ -220,3 +220,27 @@ class SessionRecordContested(BackendAIError, web.HTTPConflict):
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.CONFLICT,
         )
+
+
+class ManagerNetworkMisconfigured(BackendAIError, web.HTTPInternalServerError):
+    """An overlay setting no session built from it could be attached.
+
+    Every one of these values travels to the agent, whose privnet policy is the trust boundary and
+    refuses an MTU or a port outside its ranges and a subnet outside RFC1918. Checked when the
+    plugin starts or its config changes rather than inside a create, because by then the create
+    has claimed the session and would publish a READY record over a descriptor no node can use --
+    a healthy-looking session that never attaches, and a retry that rebuilds the same one.
+
+    Not retryable: an operator has to change the setting.
+    """
+
+    error_type = "https://api.backend.ai/probs/manager/network-misconfigured"
+    error_title = "The cluster network plugin is configured with a value no agent can accept."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

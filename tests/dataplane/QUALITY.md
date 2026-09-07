@@ -424,3 +424,22 @@ The heartbeat is a lease emulated on a timestamp. A real lease would not need it
 
 R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
 real nodes.
+
+Eighteenth round. Two P1s, and the first is the mapping check I made in `_record` twice over --
+in the manager, and never in the one shared function both sides call.
+
+| # | Was | Now |
+|---|-----|-----|
+| C36 | `of_generation` documents unreadable as False and asks only for ValueError. A value like `[]` raises AttributeError instead, out of every walk that reaches it: on the AGENT that is the session's whole membership and endpoint pass, every fifteen seconds, for as long as the key stands -- no new peer, no FDB entry, no ARP entry, on a session reporting itself fine. An object missing a required field did the same through KeyError in the decode | `of_generation` refuses anything that is not a mapping, and the agent's member and endpoint walks isolate a record they cannot decode and carry on with the rest |
+| C37 | the fail-closed check on a corrupt live record read that record AFTER the child keys were already deleted, which made it cosmetic. A member key is the barrier saying a node still holds the VNI's data plane, and a legacy unstamped one is compatible with every incarnation -- so it went first, the peer lost its tunnel, and a later teardown could give the VNI back over a node that is still up | the live record is read and judged before anything is touched |
+| C38 | nothing validated the plugin's own configuration. An MTU, VXLAN port or IPAM pool the agents refuse was accepted, a session claimed, and a READY record published over a descriptor no node could attach -- and every retry rebuilt the same one | `_validated_config()` at startup and on every config update, against the same ranges the agent's privnet policy enforces. A misconfigured manager refuses to serve rather than serving unusably |
+
+Still not done, and unchanged: `AsyncEtcd.get_prefix` has no paginated form, so the sweep still
+loads whole prefixes and reads each session's three subtrees in turn. That fix belongs in the
+shared etcd client, where every caller inherits it.
+
+The heartbeat is a lease emulated on a timestamp. An event-loop stall or a long etcd outage can
+still let a second sweep start; the deletes are guarded so the risk is load, not corruption.
+
+R3 unchanged: no real etcd, no two-manager rolling restart, and A11 has never been waited out on
+real nodes.
