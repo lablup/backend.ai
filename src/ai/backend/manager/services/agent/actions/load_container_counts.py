@@ -13,7 +13,11 @@ from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 @dataclass(frozen=True)
 class LoadContainerCountsAction(BaseGlobalAction):
-    """Action to load container counts."""
+    """Load the container counts the admin search shows, behind the SUPERADMIN gate.
+
+    A DataLoader reads them per named agent through
+    :class:`BulkLoadContainerCountsAction` instead.
+    """
 
     agent_ids: Sequence[AgentId]
 
