@@ -13,6 +13,7 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
     RateLimitState,
     ValkeyRateLimitClient,
 )
+from ai.backend.common.contexts.client_ip import with_client_ip
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.web.reserved_response_headers import apply_reserved_response_headers
@@ -70,20 +71,8 @@ class TestRlimMiddleware:
         return handler
 
     @pytest.fixture
-    def peer_transport(self) -> Any:
-        """A transport reporting a peer, as every socket-backed request has one."""
-        return MagicMock(**{"get_extra_info.return_value": (_CLIENT_IP, 51234)})
-
-    @pytest.fixture
-    def mock_request_anonymous(self, peer_transport: Any) -> web.Request:
-        """Mock request for anonymous user, arriving from _CLIENT_IP."""
-        request = make_mocked_request("GET", "/", transport=peer_transport)
-        request["is_authorized"] = False
-        return request
-
-    @pytest.fixture
-    def mock_request_anonymous_without_peer(self) -> web.Request:
-        """A request with no transport, which no socket-backed request is."""
+    def mock_request_anonymous(self) -> web.Request:
+        """Mock request for anonymous user."""
         request = make_mocked_request("GET", "/")
         request["is_authorized"] = False
         return request
@@ -112,7 +101,8 @@ class TestRlimMiddleware:
         )
 
         # Act
-        response = await middleware(mock_request_anonymous, mock_handler)
+        with with_client_ip(_CLIENT_IP):
+            response = await middleware(mock_request_anonymous, mock_handler)
         await apply_reserved_response_headers(mock_request_anonymous, response)
 
         # Assert
@@ -146,7 +136,7 @@ class TestRlimMiddleware:
         )
 
         # Act & Assert
-        with pytest.raises(RateLimitExceeded):
+        with pytest.raises(RateLimitExceeded), with_client_ip(_CLIENT_IP):
             await middleware(mock_request_anonymous, mock_handler)
         response = web.Response(status=429)
         await apply_reserved_response_headers(mock_request_anonymous, response)
@@ -154,17 +144,17 @@ class TestRlimMiddleware:
         assert response.headers["X-RateLimit-Remaining"] == "0"
         mock_handler.assert_not_called()
 
-    async def test_an_anonymous_query_without_a_peer_is_refused(
+    async def test_an_anonymous_query_without_a_client_address_is_refused(
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
-        mock_request_anonymous_without_peer: web.Request,
+        mock_request_anonymous: web.Request,
         mock_handler: AsyncMock,
     ) -> None:
-        """No peer means no window to count in, and serving uncounted is not the answer."""
+        """No address means no window to count in, and serving uncounted is not the answer."""
         # Act & Assert
         with pytest.raises(UnreachableError):
-            await middleware(mock_request_anonymous_without_peer, mock_handler)
+            await middleware(mock_request_anonymous, mock_handler)
         mock_valkey_client.consume_ip_rate_limit.assert_not_called()
         mock_handler.assert_not_called()
 
