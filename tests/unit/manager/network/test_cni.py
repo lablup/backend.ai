@@ -16,16 +16,19 @@ from typing import Any, TypeVar, cast, override
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.network.keys import member_key, session_meta_key
+from ai.backend.common.network.keys import member_key, session_ipam_key, session_meta_key
 from ai.backend.common.network.types import (
+    DEFAULT_VXLAN_PORT,
     OVERLAY_ENCRYPTION_PROFILE,
     Member,
     NetworkBackendKind,
     mac_for_ip,
+    of_generation,
 )
 from ai.backend.manager.errors.network import (
     EndpointSuperseded,
     ForcedBackendUnsupported,
+    ManagerNetworkMisconfigured,
     NetworkBackendMismatch,
     NetworkPoolExhausted,
     OverlayTeardownPending,
@@ -39,6 +42,7 @@ from ai.backend.manager.errors.network import (
 from ai.backend.manager.network import cni
 from ai.backend.manager.network.cni import CNINetworkPlugin
 from ai.backend.manager.network.ipam import (
+    DEFAULT_IPAM_POOL,
     EndpointAllocator,
     SubnetAllocator,
     VNIAllocator,
@@ -3182,6 +3186,108 @@ class _SlowSweep(CNINetworkPlugin):
     async def _reconcile_pool_reporting(self) -> None:
         self.sweeping.set()
         await self.finish.wait()
+
+
+class TestOnePoisonKeyDoesNotStopEverything:
+    """C36. `of_generation` documented unreadable as False and asked only for ValueError, so a
+    value like `[]` raised AttributeError out of every walk that reached it. On the agent that is
+    the session's whole membership pass, every fifteen seconds, for as long as the key stands."""
+
+    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+
+    @pytest.mark.parametrize("poison", ["[]", "null", "12345", '"a string"'])
+    def test_of_generation_refuses_a_payload_that_is_not_an_object(self, poison: str) -> None:
+        assert of_generation(poison, "g1") is False
+        assert of_generation(poison, None) is False
+
+    async def test_a_poison_member_key_does_not_stop_the_reclaim(self) -> None:
+        # Under a LIVE record, so every key is judged by `of_generation` rather than swept
+        # wholesale -- which is the path the poison value is on.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        etcd.store[member_key("s1", "a1")] = "[]"
+        etcd.store[member_key("s1", "a2")] = json.dumps({
+            "host_ip": "10.0.0.2",
+            "vtep_ip": "10.0.0.2",
+            "joined": True,
+            "generation": "an-older-one",
+        })
+
+        await plugin.reconcile_pool()
+
+        assert member_key("s1", "a2") not in etcd.store, "one poison key stopped the sweep"
+
+
+class TestACorruptRecordStopsTheSweepBeforeItTouchesAnything:
+    """C37. The fail-closed check read the live record AFTER the child keys were already deleted,
+    which made it cosmetic. A member key is not information -- it is the barrier that says this
+    node still holds the VNI's data plane -- and a legacy unstamped one is compatible with every
+    incarnation, so it went first and the peer lost its tunnel."""
+
+    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+
+    async def test_no_child_key_is_touched_when_the_live_record_is_corrupt(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        generation = str(info.options["generation"])
+        # What a live agent of the incarnation the record now names wrote, in the legacy
+        # unstamped form -- compatible with every incarnation, so this sweep's by every test but
+        # the one that matters.
+        etcd.store[member_key("s1", "a1")] = json.dumps({
+            "host_ip": "10.0.0.1",
+            "vtep_ip": "10.0.0.1",
+            "joined": True,
+        })
+        etcd.store[session_ipam_key("s1", "10.128.0.5")] = json.dumps({"container_id": "k1"})
+        record = json.loads(etcd.store[session_meta_key("s1")])
+        etcd.store[session_meta_key("s1")] = json.dumps({
+            **record,
+            "vni": None,
+            "generation": "later",
+        })
+
+        assert await plugin._sweep_incarnation(cast(AsyncEtcd, etcd), "s1", generation) is False
+
+        assert member_key("s1", "a1") in etcd.store, "the teardown barrier was deleted"
+        assert session_ipam_key("s1", "10.128.0.5") in etcd.store
+
+
+class TestConfigurationTheAgentsWouldRefuse:
+    """C38. Every one of these travels to the agent, whose privnet policy refuses it. Unchecked,
+    the manager claimed the session, published a READY record over a descriptor no node could
+    attach, and every retry rebuilt the same one."""
+
+    @pytest.mark.parametrize(
+        ("plugin_config", "local_config"),
+        [
+            ({"mtu": 500}, {}),
+            ({"mtu": 100000}, {}),
+            ({"mtu": "not-a-number"}, {}),
+            ({"mtu": 1.5}, {}),
+            ({"vxlan-port": 80}, {}),
+            ({"vxlan-port": 70000}, {}),
+            ({}, {"network": {"inter-container": {"ipam-pool": "8.8.8.0/24"}}}),
+            ({}, {"network": {"inter-container": {"ipam-pool": "fd00::/64"}}}),
+            ({}, {"network": {"inter-container": {"ipam-block-size": 8}}}),
+        ],
+    )
+    def test_it_refuses_rather_than_serving_unusably(
+        self, plugin_config: dict[str, Any], local_config: dict[str, Any]
+    ) -> None:
+        plugin = CNINetworkPlugin(plugin_config, local_config)
+        with pytest.raises(ManagerNetworkMisconfigured):
+            plugin._validated_config()
+
+    def test_the_defaults_are_accepted(self) -> None:
+        mtu, port, pool, block = CNINetworkPlugin({}, {})._validated_config()
+        assert (mtu, port, pool, block) == (1500, DEFAULT_VXLAN_PORT, DEFAULT_IPAM_POOL, 24)
+
+    async def test_a_bad_update_is_refused(self) -> None:
+        plugin = CNINetworkPlugin({}, {})
+        with pytest.raises(ManagerNetworkMisconfigured):
+            await plugin.update_plugin_config({"mtu": 100})
 
 
 class TestTheReconcileTicketAndTheClock:

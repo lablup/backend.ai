@@ -41,6 +41,13 @@ DEFAULT_VNI_RANGE = (4096, 16777215)
 #: VNI at all.
 VNI_MIN, VNI_MAX = 1, (1 << 24) - 1
 
+#: What an overlay MTU may be. Below the IPv4 minimum reassembly buffer nothing can be relied on
+#: to arrive; above the largest jumbo frame no NIC in the path will carry it.
+MTU_MIN, MTU_MAX = 576, 9000
+#: The VXLAN service port must be unprivileged: the agent binds it, and a privileged one would
+#: have the overlay contend with a listener the node already trusts.
+VXLAN_PORT_MIN, VXLAN_PORT_MAX = 1024, 65535
+
 #: The only address space a session overlay is ever carved from. Both sides check it: the agent
 #: because the manager's value reaches `ip` as an argument, the manager because a record naming a
 #: subnet from outside it is a record it should not act on.
@@ -132,9 +139,16 @@ def of_generation(raw: str, generation: str | None) -> bool:
     See ``SESSION_META_GENERATION``.
     """
     try:
-        stamped = json.loads(raw).get(SESSION_META_GENERATION)
+        record = json.loads(raw)
     except ValueError:
         return False
+    if not isinstance(record, Mapping):
+        # Valid JSON that is not an object -- ``null``, ``[]``, a bare number. ``.get`` on it
+        # raises AttributeError, which is not what any caller here catches, so one such key under
+        # a session stopped every reconciliation that reached it: on the agent, the session's
+        # whole membership pass, every fifteen seconds, for as long as the key stood.
+        return False
+    stamped = record.get(SESSION_META_GENERATION)
     return stamped is None or stamped == generation
 
 
