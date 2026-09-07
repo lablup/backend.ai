@@ -381,6 +381,23 @@ def _wire[P: CNINetworkPlugin](plugin: P, etcd: FakeEtcd) -> P:
     return plugin
 
 
+def _rebuilt_as(generation: str) -> str:
+    """The record a rebuild of a session id actually leaves behind.
+
+    `_claim_session` claims the id with a fresh record: an owner, a state, and the new
+    incarnation. It names no subnet and no VNI -- those are written at publish, by the create
+    that allocates them. Rewriting the generation of a PUBLISHED record instead would make one
+    that names an allocation some other incarnation holds, which no path writes and which the
+    sweeps read (rightly) as a live session on that allocation.
+    """
+    return json.dumps({
+        "_owner": "another-manager",
+        "_state": "creating",
+        "_claimed_at": time.time(),
+        "generation": generation,
+    })
+
+
 def _plugin_with(etcd: FakeEtcd) -> CNINetworkPlugin:
     return _wire(CNINetworkPlugin({}, {}), etcd)
 
@@ -1966,7 +1983,7 @@ class TestACleanupThatCouldNotFinishIsRetried:
         await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
         held = etcd.store[_META_KEY]
         generation = json.loads(held)["generation"]
-        etcd.store[_META_KEY] = json.dumps({**json.loads(held), "generation": "later"})
+        etcd.store[_META_KEY] = _rebuilt_as("later")
 
         await plugin._rollback_create("s1", None, None, held)
 
@@ -1979,7 +1996,7 @@ class TestACleanupThatCouldNotFinishIsRetried:
         held = etcd.store[_META_KEY]
         generation = json.loads(held)["generation"]
         # The session is rebuilt, so the sweep has no record of its own to hang off.
-        etcd.store[_META_KEY] = json.dumps({**json.loads(held), "generation": "later"})
+        etcd.store[_META_KEY] = _rebuilt_as("later")
         await plugin._rollback_create("s1", None, None, held)
         assert _pool_claims(etcd) != [], "nothing was owed"
         etcd.refusing = False  # etcd is back
@@ -2283,8 +2300,7 @@ class TestAPoolClaimNothingNames:
         etcd = FakeEtcd()
         plugin = _plugin_with(etcd)
         await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
-        record = json.loads(etcd.store[_META_KEY])
-        etcd.store[_META_KEY] = json.dumps({**record, "generation": "later"})
+        etcd.store[_META_KEY] = _rebuilt_as("later")
 
         await plugin.reconcile_pool()
 
@@ -2670,6 +2686,89 @@ class TestAPoolClaimNothingNames:
         assert plugin.unrecoverable_leaks() == {}
         plugin._unrecoverable["s1"] = "g1"
         assert plugin.unrecoverable_leaks() == {"s1": "g1"}
+
+
+class TestWhatSaysAClaimIsInUse:
+    """C27. Two ways for a claim to be in use, and every sweep has to know both. The reconciler
+    learned them one at a time, and each half on its own is wrong in a different direction: asking
+    only about the stamp gave away half of a live session's block, asking only whether the record
+    names it gave away the claims of every create still in flight. And the scoped sweep -- the one
+    a CREATE runs -- was never taught either."""
+
+    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+
+    async def test_the_scoped_drain_reclaims_a_stray_unstamped_claim(self) -> None:
+        # The same claim `reconcile_pool` reclaims. The two sweeps asked the question separately
+        # and so answered it differently, and this is the one a create runs.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        stray = "10.128.99.0/24"
+        etcd.store[_allocated_key(stray)] = _claim("s1", stray)
+        etcd.store["network/ipam/vni/9999"] = json.dumps({"session_id": "s1"})
+        etcd.store["network/cleanup-debt/s1/gone"] = json.dumps({"session_id": "s1"})
+
+        await plugin.drain_cleanup_debt("s1")
+
+        assert _allocated_key(stray) not in etcd.store
+        assert "network/ipam/vni/9999" not in etcd.store
+
+    async def test_the_scoped_drain_keeps_the_live_allocation(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        subnet, vni = str(info.options["subnet"]), int(info.options["vni"])
+        # Carried over an upgrade: the claims carry no incarnation at all.
+        etcd.store[_allocated_key(subnet)] = _claim("s1", subnet)
+        etcd.store[f"network/ipam/vni/{vni}"] = json.dumps({"session_id": "s1"})
+        etcd.store["network/cleanup-debt/s1/gone"] = json.dumps({"session_id": "s1"})
+
+        await plugin.drain_cleanup_debt("s1")
+
+        assert _allocated_key(subnet) in etcd.store
+        assert f"network/ipam/vni/{vni}" in etcd.store
+
+    async def test_a_unit_stamped_with_a_dead_incarnation_of_a_live_block_is_kept(self) -> None:
+        """A promotion that could not put back what it had already rewritten leaves a block whose
+        units sit on two incarnations -- the code that does it says so. Judged unit by unit, the
+        one carrying the superseded incarnation is an orphan; judged by the record, it is half of
+        the block a live session is running on. Giving it back puts another tenant there."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1",
+            options={
+                "forced_backend": "vxlan",
+                "endpoints": [{"container_id": f"k{i}", "agent_id": "a1"} for i in range(300)],
+            },
+        )
+        subnet = str(info.options["subnet"])
+        units = [str(u) for u in ipaddress.ip_network(subnet).subnets(new_prefix=24)]
+        assert len(units) > 1, "premise: a block of more than one unit"
+        etcd.store[_allocated_key(units[0])] = _claim("s1", subnet)  # unstamped
+        etcd.store[_allocated_key(units[1])] = _claim("s1", subnet, "an-older-one")
+
+        await plugin.reconcile_pool()
+
+        assert [u for u in units if _allocated_key(u) in etcd.store] == units
+
+    async def test_an_orphan_sweep_leaves_the_block_the_record_names(self) -> None:
+        # The same rule where the release happens rather than where the judgement does: a cleanup
+        # for a superseded incarnation must not take a unit the LIVE record names, whatever that
+        # unit is stamped with.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        subnet, vni = str(info.options["subnet"]), int(info.options["vni"])
+        held = etcd.store[_META_KEY]
+        generation = json.loads(held)["generation"]
+        # The record moved to a later incarnation, still naming this allocation.
+        etcd.store[_META_KEY] = json.dumps({**json.loads(held), "generation": "later"})
+
+        await plugin._sweep_incarnation(cast(AsyncEtcd, etcd), "s1", generation)
+
+        assert _allocated_key(subnet) in etcd.store, "a live session's block was given back"
+        assert f"network/ipam/vni/{vni}" in etcd.store, "a live session's vni was given back"
 
 
 class TestADestroyThatFindsNoRecordAtAll:
