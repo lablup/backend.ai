@@ -1164,9 +1164,19 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     published = await self._existing_allocation(etcd, session_id, endpoints)
                     if published is not None:
                         return "", published
-                    # Finished, and worth nothing: the pool no longer records the subnet and the
-                    # VNI it names as this session's, so there is no owner to wait for. Take it
-                    # from those exact bytes and build the session again.
+                    # Finished, and not reusable. That has two causes and only one of them is
+                    # safe to build over. The record may have outlived its allocation -- nothing
+                    # holds it, nobody is on it -- or it may be intact enough to be READY, corrupt
+                    # enough that `_existing_allocation` refuses it, and named by nodes that are
+                    # running on what it points at. Replacing it in the second case mints a new
+                    # incarnation, and everything those nodes hold reads as an orphan to the next
+                    # sweep. The root's own bytes cannot tell the two apart; the nodes can.
+                    if holders := await self._members_still_holding(session_id):
+                        raise SessionCleanupPending(
+                            f"session {session_id}'s network record cannot be reused and"
+                            f" {', '.join(sorted(holders))} still hold its data plane. Not"
+                            " replacing it: what it names is what those nodes are running on."
+                        )
                     if await etcd.replace(key, raw, ours):
                         log.warning(
                             "session {}'s network record outlived its allocation; building it"
