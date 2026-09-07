@@ -15,49 +15,51 @@ from ai.backend.common.data.entity.user import UserID
 
 
 @pytest.fixture
-def user_window(
+def consume_for_user(
     test_valkey_rate_limit: ValkeyRateLimitClient,
 ) -> Callable[..., Awaitable[RateLimitState]]:
-    """Counts requests against one user's window."""
+    """Counts a request against one user's window."""
     return functools.partial(test_valkey_rate_limit.consume_user_rate_limit, UserID(uuid.uuid4()))
 
 
 @pytest.fixture
-def other_user_window(
+def consume_for_other_user(
     test_valkey_rate_limit: ValkeyRateLimitClient,
 ) -> Callable[..., Awaitable[RateLimitState]]:
-    """Counts requests against a different user's window."""
+    """Counts a request against a different user's window."""
     return functools.partial(test_valkey_rate_limit.consume_user_rate_limit, UserID(uuid.uuid4()))
 
 
 @pytest.fixture
-def ip_window(
+def consume_for_ip(
     test_valkey_rate_limit: ValkeyRateLimitClient,
 ) -> Callable[..., Awaitable[RateLimitState]]:
-    """Counts requests against one address's window."""
+    """Counts a request against one address's window."""
     return functools.partial(test_valkey_rate_limit.consume_ip_rate_limit, "10.0.0.1")
 
 
 @pytest.fixture
-def other_ip_window(
+def consume_for_other_ip(
     test_valkey_rate_limit: ValkeyRateLimitClient,
 ) -> Callable[..., Awaitable[RateLimitState]]:
-    """Counts requests against a different address's window."""
+    """Counts a request against a different address's window."""
     return functools.partial(test_valkey_rate_limit.consume_ip_rate_limit, "10.0.0.2")
 
 
 @pytest.fixture
-def window(request: pytest.FixtureRequest) -> Callable[..., Awaitable[RateLimitState]]:
-    """The window named by the parametrized fixture."""
-    window: Callable[..., Awaitable[RateLimitState]] = request.getfixturevalue(request.param)
-    return window
+def consume(request: pytest.FixtureRequest) -> Callable[..., Awaitable[RateLimitState]]:
+    """The call named by the parametrized fixture."""
+    consume: Callable[..., Awaitable[RateLimitState]] = request.getfixturevalue(request.param)
+    return consume
 
 
 @pytest.fixture
-def other_window(request: pytest.FixtureRequest) -> Callable[..., Awaitable[RateLimitState]]:
-    """A window of the same kind, keyed by a different subject."""
-    other: Callable[..., Awaitable[RateLimitState]] = request.getfixturevalue(request.param)
-    return other
+def consume_for_other_subject(
+    request: pytest.FixtureRequest,
+) -> Callable[..., Awaitable[RateLimitState]]:
+    """The same call for a different subject of the same kind."""
+    consume: Callable[..., Awaitable[RateLimitState]] = request.getfixturevalue(request.param)
+    return consume
 
 
 async def test_first_request_opens_the_window(
@@ -116,32 +118,32 @@ async def test_a_new_window_takes_the_limit_it_opens_with(
     assert state == RateLimitState(count=1, limit=10, reset_after_seconds=60)
 
 
-@pytest.mark.parametrize("window", ["user_window", "ip_window"], indirect=True)
+@pytest.mark.parametrize("consume", ["consume_for_user", "consume_for_ip"], indirect=True)
 async def test_the_limit_of_the_open_window_stands(
-    window: Callable[..., Awaitable[RateLimitState]],
+    consume: Callable[..., Awaitable[RateLimitState]],
 ) -> None:
-    await window(window_seconds=60, limit=30000)
+    await consume(window_seconds=60, limit=30000)
 
-    state = await window(window_seconds=60, limit=10)
+    state = await consume(window_seconds=60, limit=10)
 
     assert state.limit == 30000
 
 
 @pytest.mark.parametrize(
-    ("window", "other_window"),
+    ("consume", "consume_for_other_subject"),
     [
-        ("user_window", "other_user_window"),
-        ("ip_window", "other_ip_window"),
+        ("consume_for_user", "consume_for_other_user"),
+        ("consume_for_ip", "consume_for_other_ip"),
     ],
     indirect=True,
 )
 async def test_windows_are_keyed_by_their_subject(
-    window: Callable[..., Awaitable[RateLimitState]],
-    other_window: Callable[..., Awaitable[RateLimitState]],
+    consume: Callable[..., Awaitable[RateLimitState]],
+    consume_for_other_subject: Callable[..., Awaitable[RateLimitState]],
 ) -> None:
-    await window(window_seconds=60, limit=30000)
+    await consume(window_seconds=60, limit=30000)
 
-    state = await other_window(window_seconds=60, limit=30000)
+    state = await consume_for_other_subject(window_seconds=60, limit=30000)
 
     assert state.count == 1
 
