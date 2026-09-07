@@ -13,14 +13,10 @@ from ai.backend.manager.repositories.base import BatchQuerier
 
 @dataclass(frozen=True)
 class SearchAgentsAction(BaseGlobalAction):
-    """A page read across every agent.
+    """A page read across every agent, behind the SUPERADMIN gate.
 
-    The gate belongs on SUPERADMIN -- both surfaces already declare it -- but the
-    action stays public until the agent DataLoaders stop reaching for it. A
-    DataLoader must name its entities and be checked per entity
-    (``partial_bulk_get_ops``); reading them through this search is what forces
-    the gate open. Moving the loaders needs a bulk key lookup that does not exist
-    yet, so it is a change of its own.
+    The admin search surfaces are the only callers: the agent DataLoaders name
+    their entities and are checked per entity through the bulk get.
     """
 
     querier: BatchQuerier

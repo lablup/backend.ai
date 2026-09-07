@@ -95,6 +95,20 @@ class AgentRepository:
         return await self._stateful_source.read_agent_container_counts(agent_ids)
 
     @agent_repository_resilience.apply()
+    async def load_container_counts_by_uuid(
+        self, agent_uuids: Sequence[AgentUUID]
+    ) -> Mapping[AgentUUID, int]:
+        """The container count of each named agent; an unknown uuid is absent."""
+        names = await self._db_source.agent_names_by_uuid(agent_uuids)
+        if not names:
+            return {}
+        uuids = list(names)
+        counts = await self._stateful_source.read_agent_container_counts([
+            names[uuid] for uuid in uuids
+        ])
+        return dict(zip(uuids, counts, strict=True))
+
+    @agent_repository_resilience.apply()
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
         return await self._db_source.get_by_id(agent_id)
 

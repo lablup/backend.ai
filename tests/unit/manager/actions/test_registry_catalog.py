@@ -107,9 +107,16 @@ from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
+from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
+    BulkLoadContainerCountsAction,
+)
 from ai.backend.manager.services.agent.actions.bulk_lookup import BulkLookupAgentsAction
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
+)
+from ai.backend.manager.services.agent.actions.load_container_counts import (
+    LoadContainerCountsAction,
 )
 from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
 from ai.backend.manager.services.agent.actions.lookup_resource_owner import (
@@ -536,8 +543,16 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
             ActionGate.PERMISSION,
         ),
         GetTotalResourcesAction: (AGENT_ENTITY_TYPE, ActionKind.GLOBAL, ActionGate.PERMISSION),
-        # Public until the agent DataLoaders stop reading agents through this search.
-        SearchAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.GLOBAL, ActionGate.PUBLIC),
+        # Admin search surfaces only: the DataLoaders read per named agent below.
+        SearchAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.GLOBAL, ActionGate.PERMISSION),
+        LoadContainerCountsAction: (AGENT_ENTITY_TYPE, ActionKind.GLOBAL, ActionGate.PERMISSION),
+        # What the DataLoaders read: checked per agent.
+        BulkGetAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.BULK, ActionGate.PERMISSION),
+        BulkLoadContainerCountsAction: (
+            AGENT_ENTITY_TYPE,
+            ActionKind.BULK,
+            ActionGate.PERMISSION,
+        ),
         # The lookup carries no permission; the read that follows it is checked.
         LookupAgentAction: (AGENT_ENTITY_TYPE, ActionKind.LOOKUP, ActionGate.PUBLIC),
         BulkLookupAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.LOOKUP, ActionGate.PUBLIC),

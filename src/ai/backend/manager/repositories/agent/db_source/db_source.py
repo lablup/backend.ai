@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Collection
+from collections.abc import Collection, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId, ImageID
@@ -79,6 +80,20 @@ class AgentDBSource:
             for image_row in results:
                 images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
             return images_data
+
+    async def agent_names_by_uuid(
+        self, agent_uuids: Sequence[AgentUUID]
+    ) -> Mapping[AgentUUID, AgentId]:
+        """The name column of each named agent; an unknown uuid is absent."""
+        if not agent_uuids:
+            return {}
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            rows = (
+                await db_session.execute(
+                    sa.select(AgentRow.uuid, AgentRow.id).where(AgentRow.uuid.in_(agent_uuids))
+                )
+            ).all()
+        return {AgentUUID(row[0]): AgentId(row[1]) for row in rows}
 
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
         async with self._db.begin_readonly_session_read_committed() as db_session:

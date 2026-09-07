@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.agent.request import (
     AdminSearchAgentsInput,
@@ -34,6 +36,7 @@ from ai.backend.common.types import AgentId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
+from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.orders import (
     DEFAULT_BACKWARD_ORDER,
@@ -43,14 +46,19 @@ from ai.backend.manager.models.agent.orders import (
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.resource_slot.searchers import AgentResourceSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
+from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
+    BulkLoadContainerCountsAction,
+)
+from ai.backend.manager.services.agent.actions.bulk_lookup import BulkLookupAgentsAction
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
 )
-from ai.backend.manager.services.agent.actions.load_container_counts import (
-    LoadContainerCountsAction,
+from ai.backend.manager.services.agent.actions.scoped_search_resources import (
+    ScopedSearchAgentResourcesAction,
 )
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 from ai.backend.manager.services.agent.actions.update_resource_group import (
@@ -72,35 +80,99 @@ class AgentAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_by_ids(self, agent_ids: Sequence[AgentId]) -> list[AgentNode | None]:
-        """Batch load agents by ID for DataLoader use.
+    async def batch_load_by_ids(
+        self, agent_ids: Sequence[AgentId]
+    ) -> list[AgentNode | Exception | None]:
+        """Batch load agents by name for DataLoader use.
 
-        Returns AgentNode DTOs in the same order as the input agent_ids list.
+        One answer per name in the given order: the node, ``None`` for a name matching
+        no agent, and the denial for one the caller may not read. The names resolve
+        into uuids first, since that is what each agent is checked by; the slot rows
+        are a field read of the agents that passed.
         """
         if not agent_ids:
             return []
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[AgentConditions.by_ids(agent_ids)],
+        lookup = await self._processors.agent.bulk_lookup.run(
+            BulkLookupAgentsAction(agent_ids=agent_ids)
         )
-        action_result = await self._processors.agent.search_agents.run(
-            SearchAgentsAction(querier=querier)
+        uuids = [lookup.resolved[agent_id] for agent_id in agent_ids if agent_id in lookup.resolved]
+        got = await self._processors.agent.bulk_get.run(BulkGetAgentsAction(ids=uuids))
+        agents = got.values()
+        errors = got.errors()
+        resources = await self._load_resources([agent.uuid for agent in agents.values()])
+        nodes: list[AgentNode | Exception | None] = []
+        for agent_id in agent_ids:
+            uuid = lookup.resolved.get(agent_id)
+            if uuid is None:
+                nodes.append(None)
+                continue
+            agent = agents.get(uuid)
+            if agent is None:
+                nodes.append(self.batch_load_failure(errors.get(uuid)))
+                continue
+            nodes.append(
+                self._data_to_dto(
+                    AgentDetailData(
+                        agent=agent, resources=resources.get(agent.id, []), permissions=[]
+                    )
+                )
+            )
+        return nodes
+
+    async def _load_resources(
+        self, agent_uuids: Sequence[AgentUUID]
+    ) -> Mapping[AgentId, list[AgentResourceData]]:
+        """The slot rows of the named agents, keyed by the agent's name column."""
+        if not agent_uuids:
+            return {}
+        result = await self._processors.agent.scoped_search_resources.run(
+            ScopedSearchAgentResourcesAction(
+                agent_uuids=agent_uuids,
+                searcher=AgentResourceSearcher(pagination=NoPagination()),
+            )
         )
-        agent_map = {detail.agent.id: self._data_to_dto(detail) for detail in action_result.agents}
-        return [agent_map.get(agent_id) for agent_id in agent_ids]
+        resources: dict[AgentId, list[AgentResourceData]] = {}
+        for item in result.items:
+            resources.setdefault(AgentId(item.agent_id), []).append(item)
+        return resources
 
-    async def batch_load_container_counts(self, agent_ids: Sequence[AgentId]) -> list[int]:
-        """Batch load container counts for agents by ID for DataLoader use.
+    async def batch_load_container_counts(
+        self, agent_ids: Sequence[AgentId]
+    ) -> list[int | Exception]:
+        """Batch load container counts by agent name for DataLoader use.
 
-        Returns container counts in the same order as the input agent_ids list.
-        Returns 0 for agents not found.
+        One answer per name in the given order: the count, ``0`` for a name matching
+        no agent, and the denial for one the caller may not read. Checked the way the
+        agents themselves are: through the bulk get, per agent.
         """
         if not agent_ids:
             return []
-        action_result = await self._processors.agent.load_container_counts.run(
-            LoadContainerCountsAction(agent_ids=agent_ids)
+        lookup = await self._processors.agent.bulk_lookup.run(
+            BulkLookupAgentsAction(agent_ids=agent_ids)
         )
-        return list(action_result.container_counts)
+        uuids = [lookup.resolved[agent_id] for agent_id in agent_ids if agent_id in lookup.resolved]
+        got = await self._processors.agent.bulk_get.run(BulkGetAgentsAction(ids=uuids))
+        permitted = [uuid for uuid in uuids if uuid in got.values()]
+        counts: Mapping[EntityIdentifier, int] = {}
+        count_errors: Mapping[EntityIdentifier, Exception] = {}
+        if permitted:
+            counted = await self._processors.agent.bulk_load_container_counts.run(
+                BulkLoadContainerCountsAction(agent_uuids=permitted)
+            )
+            counts = counted.values()
+            count_errors = counted.errors()
+        answers: list[int | Exception] = []
+        for agent_id in agent_ids:
+            uuid = lookup.resolved.get(agent_id)
+            if uuid is None:
+                answers.append(0)
+                continue
+            error = self.batch_load_failure(got.errors().get(uuid) or count_errors.get(uuid))
+            if error is not None:
+                answers.append(error)
+                continue
+            answers.append(counts.get(uuid, 0))
+        return answers
 
     # ------------------------------------------------------------------ search
 

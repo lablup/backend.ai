@@ -5,11 +5,9 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -19,6 +17,10 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
+from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
+from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
+    BulkLoadContainerCountsAction,
+)
 from ai.backend.manager.services.agent.actions.bulk_lookup import BulkLookupAgentsAction
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
@@ -76,6 +78,8 @@ class AgentProcessors:
     bulk_lookup: BulkLookupActionProcessor[
         BulkLookupAgentsAction, BulkLookupOpsResult[AgentId, AgentUUID]
     ]
+    bulk_get: PartialBulkActionProcessor[BulkGetAgentsAction, AgentData]
+    bulk_load_container_counts: PartialBulkActionProcessor[BulkLoadContainerCountsAction, int]
     scoped_search_resources: BulkActionProcessor[
         ScopedSearchAgentResourcesAction, ScopedFieldsOpsResult[AgentResourceData]
     ]
@@ -97,8 +101,8 @@ class AgentProcessors:
     get_total_resources: GlobalActionProcessor[
         GetTotalResourcesAction, GetTotalResourcesActionResult
     ]
-    search_agents: PublicActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
-    load_container_counts: PublicActionProcessor[
+    search_agents: GlobalActionProcessor[SearchAgentsAction, SearchAgentsActionResult]
+    load_container_counts: GlobalActionProcessor[
         LoadContainerCountsAction, LoadContainerCountsActionResult
     ]
 
@@ -110,6 +114,10 @@ class AgentProcessors:
     ) -> None:
         self.lookup = group.public_lookup_ops(LookupAgentAction)
         self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupAgentsAction)
+        self.bulk_get = group.partial_bulk_get_ops(BulkGetAgentsAction)
+        self.bulk_load_container_counts = group.partial_bulk(
+            BulkLoadContainerCountsAction, service.bulk_load_container_counts
+        )
         resources: LookupFieldGroup[AgentResourceData] = group.field_group(
             FieldGroupMeta(AGENT_RESOURCE_FIELD_TYPE),
             AgentResourceData,
@@ -143,7 +151,7 @@ class AgentProcessors:
         self.get_total_resources = group.global_scope(
             GetTotalResourcesAction, service.get_total_resources
         )
-        self.search_agents = group.public(SearchAgentsAction, service.search_agents)
-        self.load_container_counts = group.public(
+        self.search_agents = group.global_scope(SearchAgentsAction, service.search_agents)
+        self.load_container_counts = group.global_scope(
             LoadContainerCountsAction, service.load_container_counts
         )
