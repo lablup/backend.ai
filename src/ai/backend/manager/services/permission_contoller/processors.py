@@ -32,8 +32,6 @@ from .actions import (
     SearchUsersAssignedToRoleActionResult,
     UpdateRoleAction,
     UpdateRoleActionResult,
-    UpdateRolePermissionsAction,
-    UpdateRolePermissionsActionResult,
 )
 from .actions.get_entity_types import (
     GetEntityTypesAction,
@@ -94,9 +92,6 @@ class PermissionControllerProcessors:
     search_users_assigned_to_role: ActionProcessor[
         SearchUsersAssignedToRoleAction, SearchUsersAssignedToRoleActionResult
     ]
-    update_role_permissions: ActionProcessor[
-        UpdateRolePermissionsAction, UpdateRolePermissionsActionResult
-    ]
     bulk_add_role_permissions: ActionProcessor[
         BulkAddRolePermissionsAction, BulkAddRolePermissionsActionResult
     ]
@@ -143,9 +138,6 @@ class PermissionControllerProcessors:
         )
         self.search_users_assigned_to_role = ActionProcessor(
             service.search_users_assigned_to_role, action_monitors
-        )
-        self.update_role_permissions = ActionProcessor(
-            service.update_role_permissions, action_monitors
         )
         self.bulk_add_role_permissions = ActionProcessor(
             service.bulk_add_role_permissions, action_monitors

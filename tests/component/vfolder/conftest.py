@@ -435,7 +435,7 @@ async def user_system_role(
 ) -> AsyncIterator[uuid.UUID]:
     """Provision the RBAC SYSTEM role for the regular user.
 
-    Replicates what RoleManager does at user-creation time:
+    Replicates what user provisioning does at user-creation time:
     RoleRow (source=SYSTEM) + UserRoleRow + scope mapping + owner PermissionRows.
     The base regular_user_fixture inserts user rows directly and skips this, so
     flows that resolve the user's system role (e.g. accept_invitation) require it.

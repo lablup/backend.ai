@@ -5,7 +5,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.specs.types import ConflictCheck
@@ -44,25 +43,6 @@ class PermissionPurgerSpec(PurgerSpec[PermissionRow]):
     @override
     def pk_value(self) -> uuid.UUID:
         return self.permission_id
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
-
-
-@dataclass
-class ObjectPermissionPurgerSpec(PurgerSpec[ObjectPermissionRow]):
-    """PurgerSpec for deleting an object permission."""
-
-    object_permission_id: uuid.UUID
-
-    @override
-    def row_class(self) -> type[ObjectPermissionRow]:
-        return ObjectPermissionRow
-
-    @override
-    def pk_value(self) -> uuid.UUID:
-        return self.object_permission_id
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:

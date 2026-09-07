@@ -103,10 +103,8 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     ScopeDeletion,
     ScopeEntityMember,
     ScopeMember,
-    ScopeUserMember,
-)
-from ai.backend.manager.repositories.permission_controller.role_manager import (
     ScopeSystemRoleData,
+    ScopeUserMember,
 )
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder

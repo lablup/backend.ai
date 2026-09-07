@@ -9,7 +9,6 @@ from .bulk_remove_role_permissions import (
     BulkRemoveRolePermissionsActionResult,
 )
 from .bulk_revoke_role import BulkRevokeRoleAction, BulkRevokeRoleActionResult
-from .check_permission import CheckPermissionAction, CheckPermissionActionResult
 from .create_role import CreateRoleAction, CreateRoleActionResult
 from .delete_role import DeleteRoleAction, DeleteRoleActionResult
 from .get_permission_matrix import GetPermissionMatrixAction, GetPermissionMatrixActionResult
@@ -18,10 +17,6 @@ from .purge_role import PurgeRoleAction, PurgeRoleActionResult
 from .replace_role_permissions import (
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
-)
-from .resolve_effective_permissions import (
-    ResolveEffectivePermissionsAction,
-    ResolveEffectivePermissionsActionResult,
 )
 from .revoke_role import RevokeRoleAction, RevokeRoleActionResult
 from .search_permissions import (
@@ -39,10 +34,6 @@ from .search_users_assigned_to_role import (
 )
 from .update_permission import UpdatePermissionAction, UpdatePermissionActionResult
 from .update_role import UpdateRoleAction, UpdateRoleActionResult
-from .update_role_permissions import (
-    UpdateRolePermissionsAction,
-    UpdateRolePermissionsActionResult,
-)
 
 __all__ = [
     "AssignRoleAction",
@@ -55,8 +46,6 @@ __all__ = [
     "BulkRemoveRolePermissionsActionResult",
     "BulkRevokeRoleAction",
     "BulkRevokeRoleActionResult",
-    "CheckPermissionAction",
-    "CheckPermissionActionResult",
     "CreateRoleAction",
     "CreateRoleActionResult",
     "DeleteRoleAction",
@@ -69,8 +58,6 @@ __all__ = [
     "PurgeRoleActionResult",
     "ReplaceRolePermissionsAction",
     "ReplaceRolePermissionsActionResult",
-    "ResolveEffectivePermissionsAction",
-    "ResolveEffectivePermissionsActionResult",
     "RevokeRoleAction",
     "RevokeRoleActionResult",
     "SearchRolesAction",
@@ -85,6 +72,4 @@ __all__ = [
     "UpdatePermissionActionResult",
     "UpdateRoleAction",
     "UpdateRoleActionResult",
-    "UpdateRolePermissionsAction",
-    "UpdateRolePermissionsActionResult",
 ]

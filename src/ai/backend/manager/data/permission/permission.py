@@ -30,19 +30,6 @@ class PermissionData:
     created_at: datetime
 
 
-@dataclass
-class ScopedPermissionCreateInput:
-    """
-    Input for creating a scoped permission using scope information.
-    Used in update_role_permissions API to add permissions by scope.
-    """
-
-    scope_type: ScopeType
-    scope_id: str
-    entity_type: EntityType
-    permission: Permission
-
-
 @dataclass(frozen=True)
 class PermissionListResult(SearchResult[PermissionData]):
     """Result of scoped permission search with pagination info."""

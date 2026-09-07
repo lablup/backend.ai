@@ -43,7 +43,6 @@ from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     RoleData,
     RoleDetailData,
-    RolePermissionsUpdateInput,
     RoleRevocationResult,
     UserRoleAssignmentData,
     UserRoleAssignmentInput,
@@ -85,9 +84,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_users_assig
     SearchUsersAssignedToRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.update_role import UpdateRoleAction
-from ai.backend.manager.services.permission_contoller.actions.update_role_permissions import (
-    UpdateRolePermissionsAction,
-)
 from ai.backend.manager.services.permission_contoller.service import (
     PermissionControllerService,
 )
@@ -831,46 +827,6 @@ class TestSearchPermissions:
 
         assert result.result.has_next_page is True
         assert result.result.has_previous_page is True
-
-
-class TestUpdateRolePermissions:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.update_role_permissions = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            group_repository=MagicMock(),
-            rbac_action_registry=[],
-        )
-
-    async def test_update_role_permissions(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        role_id = uuid.uuid4()
-        detail = _make_role_detail_data(role_id=role_id)
-        mock_repository.update_role_permissions.return_value = detail
-
-        input_data = RolePermissionsUpdateInput(
-            role_id=role_id,
-            add_scoped_permissions=[],
-            remove_scoped_permission_ids=[uuid.uuid4()],
-            add_object_permissions=[],
-            remove_object_permission_ids=[],
-        )
-        action = UpdateRolePermissionsAction(input_data=input_data)
-        result = await service.update_role_permissions(action)
-
-        mock_repository.update_role_permissions.assert_called_once_with(input_data=input_data)
-        assert result.role.id == role_id
 
 
 class TestGetEntityTypes:
