@@ -63,8 +63,8 @@ entity type, shape, operation, gate and backing.
   `entity_type` is `user` (BEP-1076). It is a scope action, not a relation.
 - Enrolling and the role grant land in one ops primitive. A user on a roster without the
   role the caller named is not a state the operation may leave behind.
-- `enroll_members` narrows to the project's own domain and to users not already on the
-  roster; `enroll_member` does neither, because the caller that uses it — a
+- `join_members` narrows to the project's own domain and to users not already on the
+  roster; `join_member` does neither, because the caller that uses it — a
   project-scoped role grant — has already decided.
 
 ## The personal-project refusal is an ops invariant

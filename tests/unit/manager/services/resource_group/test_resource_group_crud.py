@@ -20,41 +20,31 @@ from typing import Any
 
 import pytest
 
-from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
-from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.creators import (
+    ResourceGroupCreator,
+    ResourceGroupForDomainRelationCreator,
+)
+from ai.backend.manager.models.resource_group.purgers import (
+    ResourceGroupForDomainRelationPurger,
+)
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.rbac.scope_binder import (
-    RBACScopeBinder,
-    RBACScopeBindingPair,
-)
+from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupForDomainCreatorSpec,
     ResourceGroupForKeypairsCreatorSpec,
 )
 from ai.backend.manager.repositories.resource_group.purgers import (
     create_resource_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
-from ai.backend.manager.repositories.resource_group.scope_binders import (
-    ResourceGroupDomainEntityUnbinder,
-)
-from ai.backend.manager.services.resource_group.actions.associate_with_domain import (
-    AssociateResourceGroupWithDomainsAction,
-)
 from ai.backend.manager.services.resource_group.actions.associate_with_keypair import (
     AssociateResourceGroupWithKeypairsAction,
 )
 from ai.backend.manager.services.resource_group.actions.create import CreateResourceGroupAction
-from ai.backend.manager.services.resource_group.actions.disassociate_with_domain import (
-    DisassociateResourceGroupWithDomainsAction,
-)
 from ai.backend.manager.services.resource_group.actions.disassociate_with_keypair import (
     DisassociateResourceGroupWithKeypairsAction,
 )
@@ -268,7 +258,7 @@ class TestScalingGroupCRUD:
 
 
 class TestScalingGroupDomainAssociation:
-    """Domain association add/remove/check via the processor layer."""
+    """Domain association add/remove/check through the relation operations."""
 
     # ------------------------------------------------------------------
     # S-1: Associate single domain
@@ -278,31 +268,16 @@ class TestScalingGroupDomainAssociation:
         self,
         resource_group_service: ResourceGroupService,
         resource_group_repository: ResourceGroupRepository,
+        rbac_relation_repository: RbacRelationRepository,
         domain_fixture: DomainFixtureData,
         database_fixture: None,
     ) -> None:
-        """S-1: Associate a scaling group with a single domain; association exists in DB."""
+        """S-1: Link a scaling group to a single domain; the association exists in DB."""
         name = f"assoc-dom-{uuid.uuid4().hex[:8]}"
         sg = await _create_sgroup(resource_group_service, name)
         try:
-            binder = RBACScopeBinder(
-                pairs=[
-                    RBACScopeBindingPair(
-                        spec=ResourceGroupForDomainCreatorSpec(
-                            resource_group_id=sg.id,
-                            domain_id=domain_fixture.domain_id,
-                        ),
-                        entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, str(sg.id)),
-                        scope_ref=RBACElementRef(
-                            RBACElementType.DOMAIN, str(domain_fixture.domain_id)
-                        ),
-                    )
-                ]
-            )
-            await resource_group_service.associate_resource_group_with_domains(
-                AssociateResourceGroupWithDomainsAction(
-                    domain_id=DomainID(uuid.uuid4()), binder=binder
-                )
+            await rbac_relation_repository.create(
+                [(domain_fixture.domain_id, sg.id)], ResourceGroupForDomainRelationCreator()
             )
 
             exists = await resource_group_repository.check_resource_group_domain_association_exists(
@@ -321,35 +296,17 @@ class TestScalingGroupDomainAssociation:
         self,
         resource_group_service: ResourceGroupService,
         resource_group_repository: ResourceGroupRepository,
+        rbac_relation_repository: RbacRelationRepository,
         domain_fixture: DomainFixtureData,
         database_fixture: None,
     ) -> None:
-        """S-3: Disassociate domain; check_exists returns False afterwards."""
+        """S-3: Unlink the domain; check_exists returns False afterwards."""
         name = f"disassoc-dom-{uuid.uuid4().hex[:8]}"
         sg = await _create_sgroup(resource_group_service, name)
         try:
-            # First associate
-            binder = RBACScopeBinder(
-                pairs=[
-                    RBACScopeBindingPair(
-                        spec=ResourceGroupForDomainCreatorSpec(
-                            resource_group_id=sg.id,
-                            domain_id=domain_fixture.domain_id,
-                        ),
-                        entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, str(sg.id)),
-                        scope_ref=RBACElementRef(
-                            RBACElementType.DOMAIN, str(domain_fixture.domain_id)
-                        ),
-                    )
-                ]
+            await rbac_relation_repository.create(
+                [(domain_fixture.domain_id, sg.id)], ResourceGroupForDomainRelationCreator()
             )
-            await resource_group_service.associate_resource_group_with_domains(
-                AssociateResourceGroupWithDomainsAction(
-                    domain_id=DomainID(uuid.uuid4()), binder=binder
-                )
-            )
-
-            # Verify association exists
             assert (
                 await resource_group_repository.check_resource_group_domain_association_exists(
                     resource_group_id=sg.id,
@@ -357,18 +314,11 @@ class TestScalingGroupDomainAssociation:
                 )
             ) is True
 
-            # Now disassociate
-            unbinder = ResourceGroupDomainEntityUnbinder(
-                resource_group_ids=[sg.id],
-                domain_id=domain_fixture.domain_id,
+            unlinked = await rbac_relation_repository.purge(
+                [(domain_fixture.domain_id, sg.id)], ResourceGroupForDomainRelationPurger()
             )
-            await resource_group_service.disassociate_resource_group_with_domains(
-                DisassociateResourceGroupWithDomainsAction(
-                    domain_id=DomainID(uuid.uuid4()), unbinder=unbinder
-                )
-            )
+            assert unlinked == [True]
 
-            # Association should be gone
             exists = await resource_group_repository.check_resource_group_domain_association_exists(
                 resource_group_id=sg.id,
                 domain_id=domain_fixture.domain_id,
@@ -385,14 +335,14 @@ class TestScalingGroupDomainAssociation:
         self,
         resource_group_service: ResourceGroupService,
         resource_group_repository: ResourceGroupRepository,
+        rbac_relation_repository: RbacRelationRepository,
         domain_fixture: DomainFixtureData,
         database_fixture: None,
     ) -> None:
-        """S-5: check_scaling_group_domain_association_exists returns True/False correctly."""
+        """S-5: check_resource_group_domain_association_exists answers True and False."""
         name = f"check-assoc-{uuid.uuid4().hex[:8]}"
         sg = await _create_sgroup(resource_group_service, name)
         try:
-            # Before association: False
             assert (
                 await resource_group_repository.check_resource_group_domain_association_exists(
                     resource_group_id=sg.id,
@@ -400,25 +350,8 @@ class TestScalingGroupDomainAssociation:
                 )
             ) is False
 
-            # After association: True
-            binder = RBACScopeBinder(
-                pairs=[
-                    RBACScopeBindingPair(
-                        spec=ResourceGroupForDomainCreatorSpec(
-                            resource_group_id=sg.id,
-                            domain_id=domain_fixture.domain_id,
-                        ),
-                        entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, str(sg.id)),
-                        scope_ref=RBACElementRef(
-                            RBACElementType.DOMAIN, str(domain_fixture.domain_id)
-                        ),
-                    )
-                ]
-            )
-            await resource_group_service.associate_resource_group_with_domains(
-                AssociateResourceGroupWithDomainsAction(
-                    domain_id=DomainID(uuid.uuid4()), binder=binder
-                )
+            await rbac_relation_repository.create(
+                [(domain_fixture.domain_id, sg.id)], ResourceGroupForDomainRelationCreator()
             )
             assert (
                 await resource_group_repository.check_resource_group_domain_association_exists(
@@ -426,6 +359,24 @@ class TestScalingGroupDomainAssociation:
                     domain_id=domain_fixture.domain_id,
                 )
             ) is True
+        finally:
+            await _purge_sgroup(resource_group_service, sg.id)
+
+    async def test_unlinking_an_unlinked_pair_is_silent(
+        self,
+        resource_group_service: ResourceGroupService,
+        rbac_relation_repository: RbacRelationRepository,
+        domain_fixture: DomainFixtureData,
+        database_fixture: None,
+    ) -> None:
+        """Unlinking a pair that was never linked answers False and raises nothing."""
+        name = f"unlinked-dom-{uuid.uuid4().hex[:8]}"
+        sg = await _create_sgroup(resource_group_service, name)
+        try:
+            unlinked = await rbac_relation_repository.purge(
+                [(domain_fixture.domain_id, sg.id)], ResourceGroupForDomainRelationPurger()
+            )
+            assert unlinked == [False]
         finally:
             await _purge_sgroup(resource_group_service, sg.id)
 

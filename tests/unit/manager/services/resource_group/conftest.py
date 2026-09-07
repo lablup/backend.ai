@@ -78,6 +78,8 @@ from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingR
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.resource_group.service import ResourceGroupService
@@ -193,6 +195,12 @@ async def database_fixture(
 # ---------------------------------------------------------------------------
 # Service / repository fixtures (moved from tests/component/resource_group/conftest.py)
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def rbac_relation_repository(database_engine: ExtendedAsyncSAEngine) -> RbacRelationRepository:
+    """The relation writes the resource group's associations go through."""
+    return RbacRelationRepository(RelationOpsProvider(database_engine))
 
 
 @pytest.fixture

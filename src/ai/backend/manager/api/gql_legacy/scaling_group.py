@@ -16,13 +16,11 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.domain import DomainRow
@@ -37,47 +35,42 @@ from ai.backend.manager.models.resource_group import (
     sgroups_for_groups,
     sgroups_for_keypairs,
 )
-from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.creators import (
+    ResourceGroupCreator,
+    ResourceGroupForDomainRelationCreator,
+    ResourceGroupForProjectRelationCreator,
+)
+from ai.backend.manager.models.resource_group.purgers import (
+    ResourceGroupForDomainRelationPurger,
+    ResourceGroupForProjectRelationPurger,
+)
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.rbac.scope_binder import (
-    RBACScopeBinder,
-    RBACScopeBindingPair,
-)
 from ai.backend.manager.repositories.resource_group.creators import (
-    ResourceGroupForDomainCreatorSpec,
     ResourceGroupForKeypairsCreatorSpec,
-    ResourceGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.resource_group.purgers import (
     create_resource_group_for_keypairs_purger,
 )
-from ai.backend.manager.repositories.resource_group.scope_binders import (
-    ResourceGroupDomainEntityUnbinder,
-    ResourceGroupProjectEntityUnbinder,
-)
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
-from ai.backend.manager.services.resource_group.actions.associate_with_domain import (
-    AssociateResourceGroupWithDomainsAction,
-)
+from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
+from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
+from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
 from ai.backend.manager.services.resource_group.actions.associate_with_keypair import (
     AssociateResourceGroupWithKeypairsAction,
-)
-from ai.backend.manager.services.resource_group.actions.associate_with_user_group import (
-    AssociateResourceGroupWithUserGroupsAction,
 )
 from ai.backend.manager.services.resource_group.actions.create import (
     CreateResourceGroupAction,
 )
-from ai.backend.manager.services.resource_group.actions.disassociate_with_domain import (
-    DisassociateResourceGroupWithDomainsAction,
-)
 from ai.backend.manager.services.resource_group.actions.disassociate_with_keypair import (
     DisassociateResourceGroupWithKeypairsAction,
 )
-from ai.backend.manager.services.resource_group.actions.disassociate_with_user_group import (
-    DisassociateResourceGroupWithUserGroupsAction,
+from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_domain import (
+    GetAllowedResourceGroupsForDomainAction,
+)
+from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_project import (
+    GetAllowedResourceGroupsForProjectAction,
 )
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.services.resource_group.actions.purge_resource_group import (
@@ -142,6 +135,80 @@ async def _resolve_resource_group_ids(
     scaling_groups: Sequence[str],
 ) -> list[ResourceGroupID]:
     return [await _resolve_resource_group_id(graph_ctx, name) for name in scaling_groups]
+
+
+async def _link_resource_groups_to_domain(
+    graph_ctx: GraphQueryContext,
+    domain_id: DomainID,
+    resource_group_ids: Sequence[ResourceGroupID],
+) -> None:
+    """Link the domain to every named resource group in one run."""
+    if not resource_group_ids:
+        return
+    await graph_ctx.processors.rbac.create_relation.run(
+        CreateRelationAction(
+            pairs=[
+                RelationPair(scope=domain_id, target=resource_group_id)
+                for resource_group_id in resource_group_ids
+            ],
+            creator=ResourceGroupForDomainRelationCreator(),
+        )
+    )
+
+
+async def _unlink_resource_groups_from_domain(
+    graph_ctx: GraphQueryContext,
+    domain_id: DomainID,
+    resource_group_ids: Sequence[ResourceGroupID],
+) -> None:
+    if not resource_group_ids:
+        return
+    await graph_ctx.processors.rbac.purge_relation.run(
+        PurgeRelationAction(
+            pairs=[
+                RelationPair(scope=domain_id, target=resource_group_id)
+                for resource_group_id in resource_group_ids
+            ],
+            purger=ResourceGroupForDomainRelationPurger(),
+        )
+    )
+
+
+async def _link_resource_groups_to_project(
+    graph_ctx: GraphQueryContext,
+    project_id: ProjectID,
+    resource_group_ids: Sequence[ResourceGroupID],
+) -> None:
+    """Link the project to every named resource group in one run."""
+    if not resource_group_ids:
+        return
+    await graph_ctx.processors.rbac.create_relation.run(
+        CreateRelationAction(
+            pairs=[
+                RelationPair(scope=project_id, target=resource_group_id)
+                for resource_group_id in resource_group_ids
+            ],
+            creator=ResourceGroupForProjectRelationCreator(),
+        )
+    )
+
+
+async def _unlink_resource_groups_from_project(
+    graph_ctx: GraphQueryContext,
+    project_id: ProjectID,
+    resource_group_ids: Sequence[ResourceGroupID],
+) -> None:
+    if not resource_group_ids:
+        return
+    await graph_ctx.processors.rbac.purge_relation.run(
+        PurgeRelationAction(
+            pairs=[
+                RelationPair(scope=project_id, target=resource_group_id)
+                for resource_group_id in resource_group_ids
+            ],
+            purger=ResourceGroupForProjectRelationPurger(),
+        )
+    )
 
 
 @graphene_federation.key("id")
@@ -833,24 +900,7 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[misc]
             )
         ).entity_id()
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = AssociateResourceGroupWithDomainsAction(
-            domain_id=domain_id,
-            binder=RBACScopeBinder(
-                pairs=[
-                    RBACScopeBindingPair(
-                        spec=ResourceGroupForDomainCreatorSpec(
-                            resource_group_id=resource_group_id,
-                            domain_id=domain_id,
-                        ),
-                        entity_ref=RBACElementRef(
-                            RBACElementType.RESOURCE_GROUP, str(resource_group_id)
-                        ),
-                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_id)),
-                    )
-                ]
-            ),
-        )
-        await graph_ctx.processors.resource_group.associate_resource_group_with_domains.run(action)
+        await _link_resource_groups_to_domain(graph_ctx, domain_id, [resource_group_id])
         return cls(ok=True, msg="success")
 
 
@@ -880,26 +930,9 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
                 LookupDomainAction(name=DomainName(domain))
             )
         ).entity_id()
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
-        action = AssociateResourceGroupWithDomainsAction(
-            domain_id=domain_id,
-            binder=RBACScopeBinder(
-                pairs=[
-                    RBACScopeBindingPair(
-                        spec=ResourceGroupForDomainCreatorSpec(
-                            resource_group_id=resource_group_id,
-                            domain_id=domain_id,
-                        ),
-                        entity_ref=RBACElementRef(
-                            RBACElementType.RESOURCE_GROUP, str(resource_group_id)
-                        ),
-                        scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_id)),
-                    )
-                    for resource_group_id in resource_group_ids
-                ]
-            ),
+        await _link_resource_groups_to_domain(
+            graph_ctx, domain_id, await _resolve_resource_group_ids(graph_ctx, scaling_groups)
         )
-        await graph_ctx.processors.resource_group.associate_resource_group_with_domains.run(action)
         return cls(ok=True, msg="success")
 
 
@@ -928,16 +961,7 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[mis
             )
         ).entity_id()
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = DisassociateResourceGroupWithDomainsAction(
-            domain_id=domain_id,
-            unbinder=ResourceGroupDomainEntityUnbinder(
-                resource_group_ids=[resource_group_id],
-                domain_id=domain_id,
-            ),
-        )
-        await graph_ctx.processors.resource_group.disassociate_resource_group_with_domains.run(
-            action
-        )
+        await _unlink_resource_groups_from_domain(graph_ctx, domain_id, [resource_group_id])
         return cls(ok=True, msg="success")
 
 
@@ -967,16 +991,8 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
                 LookupDomainAction(name=DomainName(domain))
             )
         ).entity_id()
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
-        action = DisassociateResourceGroupWithDomainsAction(
-            domain_id=domain_id,
-            unbinder=ResourceGroupDomainEntityUnbinder(
-                resource_group_ids=resource_group_ids,
-                domain_id=domain_id,
-            ),
-        )
-        await graph_ctx.processors.resource_group.disassociate_resource_group_with_domains.run(
-            action
+        await _unlink_resource_groups_from_domain(
+            graph_ctx, domain_id, await _resolve_resource_group_ids(graph_ctx, scaling_groups)
         )
         return cls(ok=True, msg="success")
 
@@ -1003,15 +1019,11 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):  # type: ignore
                 LookupDomainAction(name=DomainName(domain))
             )
         ).entity_id()
-        action = DisassociateResourceGroupWithDomainsAction(
-            domain_id=domain_id,
-            unbinder=ResourceGroupDomainEntityUnbinder(
-                resource_group_ids=None,
-                domain_id=domain_id,
-            ),
+        allowed = await graph_ctx.processors.resource_group.get_allowed_rgs_for_domain.run(
+            GetAllowedResourceGroupsForDomainAction(domain_id=domain_id)
         )
-        await graph_ctx.processors.resource_group.disassociate_resource_group_with_domains.run(
-            action
+        await _unlink_resource_groups_from_domain(
+            graph_ctx, domain_id, await _resolve_resource_group_ids(graph_ctx, allowed.items)
         )
         return cls(ok=True, msg="success")
 
@@ -1036,25 +1048,8 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):  # type: ignore[mis
     ) -> AssociateScalingGroupWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = AssociateResourceGroupWithUserGroupsAction(
-            project_id=ProjectID(user_group),
-            binder=RBACScopeBinder(
-                pairs=[
-                    RBACScopeBindingPair(
-                        spec=ResourceGroupForProjectCreatorSpec(
-                            resource_group_id=resource_group_id,
-                            project=user_group,
-                        ),
-                        entity_ref=RBACElementRef(
-                            RBACElementType.RESOURCE_GROUP, str(resource_group_id)
-                        ),
-                        scope_ref=RBACElementRef(RBACElementType.PROJECT, str(user_group)),
-                    )
-                ]
-            ),
-        )
-        await graph_ctx.processors.resource_group.associate_resource_group_with_user_groups.run(
-            action
+        await _link_resource_groups_to_project(
+            graph_ctx, ProjectID(user_group), [resource_group_id]
         )
         return cls(ok=True, msg="success")
 
@@ -1080,27 +1075,10 @@ class AssociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore[mi
         user_group: uuid.UUID,
     ) -> AssociateScalingGroupsWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
-        action = AssociateResourceGroupWithUserGroupsAction(
-            project_id=ProjectID(user_group),
-            binder=RBACScopeBinder(
-                pairs=[
-                    RBACScopeBindingPair(
-                        spec=ResourceGroupForProjectCreatorSpec(
-                            resource_group_id=resource_group_id,
-                            project=user_group,
-                        ),
-                        entity_ref=RBACElementRef(
-                            RBACElementType.RESOURCE_GROUP, str(resource_group_id)
-                        ),
-                        scope_ref=RBACElementRef(RBACElementType.PROJECT, str(user_group)),
-                    )
-                    for resource_group_id in resource_group_ids
-                ]
-            ),
-        )
-        await graph_ctx.processors.resource_group.associate_resource_group_with_user_groups.run(
-            action
+        await _link_resource_groups_to_project(
+            graph_ctx,
+            ProjectID(user_group),
+            await _resolve_resource_group_ids(graph_ctx, scaling_groups),
         )
         return cls(ok=True, msg="success")
 
@@ -1125,15 +1103,8 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):  # type: ignore[
     ) -> DisassociateScalingGroupWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
-        action = DisassociateResourceGroupWithUserGroupsAction(
-            project_id=ProjectID(user_group),
-            unbinder=ResourceGroupProjectEntityUnbinder(
-                resource_group_ids=[resource_group_id],
-                project=user_group,
-            ),
-        )
-        await graph_ctx.processors.resource_group.disassociate_resource_group_with_user_groups.run(
-            action
+        await _unlink_resource_groups_from_project(
+            graph_ctx, ProjectID(user_group), [resource_group_id]
         )
         return cls(ok=True, msg="success")
 
@@ -1159,16 +1130,10 @@ class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore
         user_group: uuid.UUID,
     ) -> DisassociateScalingGroupsWithUserGroup:
         graph_ctx: GraphQueryContext = info.context
-        resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
-        action = DisassociateResourceGroupWithUserGroupsAction(
-            project_id=ProjectID(user_group),
-            unbinder=ResourceGroupProjectEntityUnbinder(
-                resource_group_ids=resource_group_ids,
-                project=user_group,
-            ),
-        )
-        await graph_ctx.processors.resource_group.disassociate_resource_group_with_user_groups.run(
-            action
+        await _unlink_resource_groups_from_project(
+            graph_ctx,
+            ProjectID(user_group),
+            await _resolve_resource_group_ids(graph_ctx, scaling_groups),
         )
         return cls(ok=True, msg="success")
 
@@ -1190,15 +1155,12 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):  # type: ignore[
         user_group: uuid.UUID,
     ) -> DisassociateAllScalingGroupsWithGroup:
         graph_ctx: GraphQueryContext = info.context
-        action = DisassociateResourceGroupWithUserGroupsAction(
-            project_id=ProjectID(user_group),
-            unbinder=ResourceGroupProjectEntityUnbinder(
-                resource_group_ids=None,
-                project=user_group,
-            ),
+        project_id = ProjectID(user_group)
+        allowed = await graph_ctx.processors.resource_group.get_allowed_rgs_for_project.run(
+            GetAllowedResourceGroupsForProjectAction(project_id=project_id)
         )
-        await graph_ctx.processors.resource_group.disassociate_resource_group_with_user_groups.run(
-            action
+        await _unlink_resource_groups_from_project(
+            graph_ctx, project_id, await _resolve_resource_group_ids(graph_ctx, allowed.items)
         )
         return cls(ok=True, msg="success")
 

@@ -75,7 +75,7 @@ def _node(entity_id: uuid.UUID, scope_type: ScopeType) -> sa.ScalarSelect[Any]:
 
 
 class TestEnrollUsersInProject:
-    """Tests for RbacRosterRepository.enroll_members"""
+    """Tests for RbacRosterRepository.join_members"""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:
@@ -617,7 +617,7 @@ class TestEnrollUsersInProject:
 
 
 class TestWithdrawUsersFromProject:
-    """Tests for RbacRosterRepository.withdraw_members"""
+    """Tests for RbacRosterRepository.leave_members"""
 
     @pytest.fixture
     def test_password_info(self) -> PasswordInfo:

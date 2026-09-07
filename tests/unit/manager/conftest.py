@@ -12,7 +12,11 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import (
+    DOMAIN_ENTITY_TYPE,
+    DomainID,
+    DomainName,
+)
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
@@ -150,6 +154,7 @@ def domain_factory() -> DomainFactory:
     from ai.backend.manager.models.domain import (
         domains,
     )  # lazy: avoid registering DomainRow globally
+    from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
     async def _create(
         engine: ExtendedAsyncSAEngine,
@@ -171,6 +176,13 @@ def domain_factory() -> DomainFactory:
                 sa.insert(domains).values(values).returning(domains.c.id, domains.c.name)
             )
             row = result.one()
+            # The node ops writes when a domain is created. A relation expects both
+            # sides to be in the graph already.
+            await conn.execute(
+                sa.insert(VirtualEntityRow.__table__).values(
+                    entity_type=DOMAIN_ENTITY_TYPE, entity_id=row.id
+                )
+            )
         return DomainFixtureData(domain_name=DomainName(row.name), domain_id=DomainID(row.id))
 
     return _create

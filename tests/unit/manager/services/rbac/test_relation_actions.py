@@ -21,7 +21,12 @@ from ai.backend.common.data.entity.container_registry import (
     CONTAINER_REGISTRY_SCOPE_TYPE,
     ContainerRegistryID,
 )
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
+from ai.backend.common.data.entity.resource_group import (
+    RESOURCE_GROUP_SCOPE_TYPE,
+    ResourceGroupID,
+)
 from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
@@ -34,12 +39,22 @@ from ai.backend.manager.actions.v2.relation.trigger import RelationActionTrigger
 from ai.backend.manager.models.audit_log.creators import RelationAuditLogCreator
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryProjectCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryProjectPurger
+from ai.backend.manager.models.resource_group.creators import (
+    ResourceGroupForDomainRelationCreator,
+    ResourceGroupForProjectRelationCreator,
+)
+from ai.backend.manager.models.resource_group.purgers import (
+    ResourceGroupForDomainRelationPurger,
+    ResourceGroupForProjectRelationPurger,
+)
 from ai.backend.manager.services.rbac.actions.relation.base import RelationPair
 from ai.backend.manager.services.rbac.actions.relation.create import CreateRelationAction
 from ai.backend.manager.services.rbac.actions.relation.purge import PurgeRelationAction
 
 _PROJECT_ID = ProjectID(uuid.uuid4())
+_DOMAIN_ID = DomainID(uuid.uuid4())
 _REGISTRY_ID = ContainerRegistryID(uuid.uuid4())
+_RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 
 
 class TestEveryPairBecomesTheRunsScopes:
@@ -68,6 +83,50 @@ class TestEveryPairBecomesTheRunsScopes:
                 [
                     (PROJECT_SCOPE_TYPE, _PROJECT_ID),
                     (CONTAINER_REGISTRY_SCOPE_TYPE, _REGISTRY_ID),
+                ],
+            ),
+            (
+                CreateRelationAction(
+                    pairs=[RelationPair(scope=_PROJECT_ID, target=_RESOURCE_GROUP_ID)],
+                    creator=ResourceGroupForProjectRelationCreator(),
+                ),
+                ActionOperationType.CREATE,
+                [
+                    (PROJECT_SCOPE_TYPE, _PROJECT_ID),
+                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                ],
+            ),
+            (
+                PurgeRelationAction(
+                    pairs=[RelationPair(scope=_PROJECT_ID, target=_RESOURCE_GROUP_ID)],
+                    purger=ResourceGroupForProjectRelationPurger(),
+                ),
+                ActionOperationType.DELETE,
+                [
+                    (PROJECT_SCOPE_TYPE, _PROJECT_ID),
+                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                ],
+            ),
+            (
+                CreateRelationAction(
+                    pairs=[RelationPair(scope=_DOMAIN_ID, target=_RESOURCE_GROUP_ID)],
+                    creator=ResourceGroupForDomainRelationCreator(),
+                ),
+                ActionOperationType.CREATE,
+                [
+                    (DOMAIN_SCOPE_TYPE, _DOMAIN_ID),
+                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
+                ],
+            ),
+            (
+                PurgeRelationAction(
+                    pairs=[RelationPair(scope=_DOMAIN_ID, target=_RESOURCE_GROUP_ID)],
+                    purger=ResourceGroupForDomainRelationPurger(),
+                ),
+                ActionOperationType.DELETE,
+                [
+                    (DOMAIN_SCOPE_TYPE, _DOMAIN_ID),
+                    (RESOURCE_GROUP_SCOPE_TYPE, _RESOURCE_GROUP_ID),
                 ],
             ),
         ],

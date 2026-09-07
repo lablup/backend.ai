@@ -14,33 +14,17 @@ from ai.backend.manager.repositories.resource_group import ResourceGroupReposito
 
 if TYPE_CHECKING:
     from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
-from ai.backend.manager.services.resource_group.actions.associate_with_domain import (
-    AssociateResourceGroupWithDomainsAction,
-    AssociateResourceGroupWithDomainsActionResult,
-)
 from ai.backend.manager.services.resource_group.actions.associate_with_keypair import (
     AssociateResourceGroupWithKeypairsAction,
     AssociateResourceGroupWithKeypairsActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.associate_with_user_group import (
-    AssociateResourceGroupWithUserGroupsAction,
-    AssociateResourceGroupWithUserGroupsActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.create import (
     CreateResourceGroupAction,
     CreateResourceGroupActionResult,
 )
-from ai.backend.manager.services.resource_group.actions.disassociate_with_domain import (
-    DisassociateResourceGroupWithDomainsAction,
-    DisassociateResourceGroupWithDomainsActionResult,
-)
 from ai.backend.manager.services.resource_group.actions.disassociate_with_keypair import (
     DisassociateResourceGroupWithKeypairsAction,
     DisassociateResourceGroupWithKeypairsActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.disassociate_with_user_group import (
-    DisassociateResourceGroupWithUserGroupsAction,
-    DisassociateResourceGroupWithUserGroupsActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.get_allowed_domains_for_rg import (
     GetAllowedDomainsForResourceGroupAction,
@@ -49,6 +33,14 @@ from ai.backend.manager.services.resource_group.actions.get_allowed_domains_for_
 from ai.backend.manager.services.resource_group.actions.get_allowed_projects_for_rg import (
     GetAllowedProjectsForResourceGroupAction,
     GetAllowedProjectsForResourceGroupActionResult,
+)
+from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_domain import (
+    GetAllowedResourceGroupsForDomainAction,
+    GetAllowedResourceGroupsForDomainActionResult,
+)
+from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_project import (
+    GetAllowedResourceGroupsForProjectAction,
+    GetAllowedResourceGroupsForProjectActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.get_resource_info import (
     GetResourceInfoAction,
@@ -81,22 +73,6 @@ from ai.backend.manager.services.resource_group.actions.resolve_resource_group_i
 from ai.backend.manager.services.resource_group.actions.update import (
     UpdateResourceGroupAction,
     UpdateResourceGroupActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.update_allowed_domains_for_rg import (
-    UpdateAllowedDomainsForResourceGroupAction,
-    UpdateAllowedDomainsForResourceGroupActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.update_allowed_projects_for_rg import (
-    UpdateAllowedProjectsForResourceGroupAction,
-    UpdateAllowedProjectsForResourceGroupActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.update_allowed_rgs_for_domain import (
-    UpdateAllowedResourceGroupsForDomainAction,
-    UpdateAllowedResourceGroupsForDomainActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.update_allowed_rgs_for_project import (
-    UpdateAllowedResourceGroupsForProjectAction,
-    UpdateAllowedResourceGroupsForProjectActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.update_fair_share_spec import (
     UpdateFairShareSpecAction,
@@ -223,20 +199,6 @@ class ResourceGroupService:
             options=options,
         )
 
-    async def associate_resource_group_with_domains(
-        self, action: AssociateResourceGroupWithDomainsAction
-    ) -> AssociateResourceGroupWithDomainsActionResult:
-        """Associates a resource group with multiple domains."""
-        await self._repository.associate_resource_group_with_domains(action.binder)
-        return AssociateResourceGroupWithDomainsActionResult()
-
-    async def disassociate_resource_group_with_domains(
-        self, action: DisassociateResourceGroupWithDomainsAction
-    ) -> DisassociateResourceGroupWithDomainsActionResult:
-        """Disassociates a resource group from multiple domains."""
-        await self._repository.disassociate_resource_group_with_domains(action.unbinder)
-        return DisassociateResourceGroupWithDomainsActionResult()
-
     async def associate_resource_group_with_keypairs(
         self, action: AssociateResourceGroupWithKeypairsAction
     ) -> AssociateResourceGroupWithKeypairsActionResult:
@@ -250,20 +212,6 @@ class ResourceGroupService:
         """Disassociates a resource group from multiple keypairs."""
         await self._repository.disassociate_resource_group_with_keypairs(action.purger)
         return DisassociateResourceGroupWithKeypairsActionResult()
-
-    async def associate_resource_group_with_user_groups(
-        self, action: AssociateResourceGroupWithUserGroupsAction
-    ) -> AssociateResourceGroupWithUserGroupsActionResult:
-        """Associates a resource group with multiple user groups (projects)."""
-        await self._repository.associate_resource_group_with_user_groups(action.binder)
-        return AssociateResourceGroupWithUserGroupsActionResult()
-
-    async def disassociate_resource_group_with_user_groups(
-        self, action: DisassociateResourceGroupWithUserGroupsAction
-    ) -> DisassociateResourceGroupWithUserGroupsActionResult:
-        """Disassociates a single resource group from a user group (project)."""
-        await self._repository.disassociate_resource_group_with_user_groups(action.unbinder)
-        return DisassociateResourceGroupWithUserGroupsActionResult()
 
     async def get_resource_info(self, action: GetResourceInfoAction) -> GetResourceInfoActionResult:
         """Get aggregated resource information for a resource group.
@@ -355,54 +303,6 @@ class ResourceGroupService:
 
     # Allow / Disallow operations
 
-    async def update_allowed_resource_groups_for_domain(
-        self,
-        action: UpdateAllowedResourceGroupsForDomainAction,
-    ) -> UpdateAllowedResourceGroupsForDomainActionResult:
-        """Atomically add/remove allowed resource groups for a domain."""
-        items = await self._repository.update_allowed_resource_groups_for_domain(
-            domain_name=action.domain_name,
-            add=action.add,
-            remove=action.remove,
-        )
-        return UpdateAllowedResourceGroupsForDomainActionResult(allowed_resource_groups=items)
-
-    async def update_allowed_resource_groups_for_project(
-        self,
-        action: UpdateAllowedResourceGroupsForProjectAction,
-    ) -> UpdateAllowedResourceGroupsForProjectActionResult:
-        """Atomically add/remove allowed resource groups for a project."""
-        items = await self._repository.update_allowed_resource_groups_for_project(
-            project_id=action.project_id,
-            add=action.add,
-            remove=action.remove,
-        )
-        return UpdateAllowedResourceGroupsForProjectActionResult(allowed_resource_groups=items)
-
-    async def update_allowed_domains_for_resource_group(
-        self,
-        action: UpdateAllowedDomainsForResourceGroupAction,
-    ) -> UpdateAllowedDomainsForResourceGroupActionResult:
-        """Atomically add/remove allowed domains for a resource group."""
-        items = await self._repository.update_allowed_domains_for_resource_group(
-            resource_group_id=action.resource_group_id,
-            add=action.add,
-            remove=action.remove,
-        )
-        return UpdateAllowedDomainsForResourceGroupActionResult(allowed_domains=items)
-
-    async def update_allowed_projects_for_resource_group(
-        self,
-        action: UpdateAllowedProjectsForResourceGroupAction,
-    ) -> UpdateAllowedProjectsForResourceGroupActionResult:
-        """Atomically add/remove allowed projects for a resource group."""
-        items = await self._repository.update_allowed_projects_for_resource_group(
-            resource_group_id=action.resource_group_id,
-            add=action.add,
-            remove=action.remove,
-        )
-        return UpdateAllowedProjectsForResourceGroupActionResult(allowed_projects=items)
-
     async def get_allowed_domains_for_resource_group(
         self,
         action: GetAllowedDomainsForResourceGroupAction,
@@ -422,3 +322,19 @@ class ResourceGroupService:
             action.resource_group_id,
         )
         return GetAllowedProjectsForResourceGroupActionResult(items=items)
+
+    async def get_allowed_resource_groups_for_domain(
+        self,
+        action: GetAllowedResourceGroupsForDomainAction,
+    ) -> GetAllowedResourceGroupsForDomainActionResult:
+        """Get the resource groups a domain may schedule on."""
+        items = await self._repository.get_allowed_resource_groups_for_domain(action.domain_id)
+        return GetAllowedResourceGroupsForDomainActionResult(items=items)
+
+    async def get_allowed_resource_groups_for_project(
+        self,
+        action: GetAllowedResourceGroupsForProjectAction,
+    ) -> GetAllowedResourceGroupsForProjectActionResult:
+        """Get the resource groups a project may schedule on."""
+        items = await self._repository.get_allowed_resource_groups_for_project(action.project_id)
+        return GetAllowedResourceGroupsForProjectActionResult(items=items)

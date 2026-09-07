@@ -31,6 +31,7 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderInvitationRow,
     VFolderRow,
 )
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
@@ -57,6 +58,7 @@ class TestInvitationGettersUsernameFallback:
             database_connection,
             [
                 # FK order: parents first
+                VirtualEntityRow,
                 DomainRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,

@@ -358,7 +358,7 @@ class TestRoleAssignment:
 
     # --- the project roster ---
 
-    async def test_enroll_member_puts_the_user_on_the_project_list(
+    async def test_join_member_puts_the_user_on_the_project_list(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
@@ -400,7 +400,7 @@ class TestRoleAssignment:
             )
             assert assoc.fetchall() == []
 
-    async def test_enroll_member_does_not_bind_project_into_user_scope(
+    async def test_join_member_does_not_bind_project_into_user_scope(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
@@ -445,7 +445,7 @@ class TestRoleAssignment:
         assert list(bindings_into_user_scope) == []
         assert list(memberships_in_project_scope) == [user_vs_id]
 
-    async def test_enroll_member_is_idempotent(
+    async def test_join_member_is_idempotent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,
@@ -479,7 +479,7 @@ class TestRoleAssignment:
             ).all()
             assert len(edges) == 1
 
-    async def test_withdraw_member_removes_the_roster_edge(
+    async def test_leave_member_removes_the_roster_edge(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         roster_repository: RbacRosterRepository,

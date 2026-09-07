@@ -49,6 +49,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.project import ProjectRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -59,6 +60,7 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.user import UserRow
@@ -73,10 +75,9 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.rbac.provider import (
-    EntityMembersAddition,
     RBACOpsProvider,
-    ScopeUserMember,
 )
+from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
@@ -159,6 +160,8 @@ class TestCheckPermissionViaVirtualEntity:
                 DomainRow,
                 UserResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                ProjectRow,
                 RoleRow,
                 UserRoleRow,
                 UserRow,
@@ -657,6 +660,13 @@ class TestUserRosterEnrollment:
         return RBACOpsProvider(db_with_rbac_tables)
 
     @pytest.fixture
+    def roster_provider(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> RosterOpsProvider:
+        return RosterOpsProvider(db_with_rbac_tables)
+
+    @pytest.fixture
     def ids(self) -> VSChainFixture:
         return VSChainFixture()
 
@@ -708,6 +718,25 @@ class TestUserRosterEnrollment:
             )
             await db_sess.flush()
 
+            project_policy_name = f"test-rbac-project-policy-{uuid.uuid4().hex[:8]}"
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=project_policy_name,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_network_count=0,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                ProjectRow(
+                    id=project_id,
+                    name=f"project-{uuid.uuid4().hex[:8]}",
+                    domain_name=domain_name,
+                    total_resource_slots=ResourceSlot(),
+                    resource_policy=project_policy_name,
+                )
+            )
             db_sess.add(RoleRow(id=ids.role_id, name="project-role", status=RoleStatus.ACTIVE))
             await db_sess.flush()
             db_sess.add(UserRoleRow(user_id=ids.user_id, role_id=ids.role_id))
@@ -783,6 +812,7 @@ class TestUserRosterEnrollment:
     async def _enroll_user_in_project(
         self,
         ops_provider: RBACOpsProvider,
+        roster_provider: RosterOpsProvider,
         project_scope: ScopeRef,
         user_scope: ScopeRef,
         user_id: UserID,
@@ -790,17 +820,15 @@ class TestUserRosterEnrollment:
         async with ops_provider.write_ops() as w:
             await w.ensure_scope(project_scope)
             await w.ensure_scope(user_scope)
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=project_scope, members=[ScopeUserMember(user_id=user_id)]
-                )
-            )
+        async with roster_provider.write_ops() as roster:
+            await roster.join_member(ProjectID(project_scope.scope_id), user_id)
 
     async def test_project_grant_does_not_reach_what_the_member_owns(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         ops_provider: RBACOpsProvider,
+        roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
     ) -> None:
         """A project-scope grant must not resolve onto a vfolder enrolled only in the
@@ -809,7 +837,9 @@ class TestUserRosterEnrollment:
         user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
         await self._grant_on_project(db_with_rbac_tables, ids, ids.owner_scope_id)
 
-        await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
+        await self._enroll_user_in_project(
+            ops_provider, roster_provider, project_scope, user_scope, ids.user_id
+        )
         await self._own_vfolder_in_user_vs(db_with_rbac_tables, ids)
 
         key = OwnCheckKey(
@@ -828,6 +858,7 @@ class TestUserRosterEnrollment:
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         ops_provider: RBACOpsProvider,
+        roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
     ) -> None:
         """The same grant does reach a session enrolled in the project's virtual entity,
@@ -842,7 +873,9 @@ class TestUserRosterEnrollment:
             entity_type=PermEntityType.SESSION,
         )
 
-        await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
+        await self._enroll_user_in_project(
+            ops_provider, roster_provider, project_scope, user_scope, ids.user_id
+        )
         await self._enroll_session_in_project_vs(
             db_with_rbac_tables, ids.owner_scope_id, session_id
         )
@@ -892,6 +925,7 @@ class TestUserRosterEnrollment:
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         ops_provider: RBACOpsProvider,
+        roster_provider: RosterOpsProvider,
         repository: PermissionControllerRepository,
         ids: VSChainFixture,
         cap: Permission | None,
@@ -909,7 +943,9 @@ class TestUserRosterEnrollment:
             ids.owner_scope_id,
             entity_type=PermEntityType.SESSION,
         )
-        await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
+        await self._enroll_user_in_project(
+            ops_provider, roster_provider, project_scope, user_scope, ids.user_id
+        )
         await self._put_vfolder_in_project_vs(
             db_with_rbac_tables, ids.owner_scope_id, vfolder_id, cap
         )
@@ -975,6 +1011,7 @@ class TestUserRosterEnrollment:
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         ops_provider: RBACOpsProvider,
+        roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
         cap: Permission | None,
         reaches: bool,
@@ -991,7 +1028,9 @@ class TestUserRosterEnrollment:
             ids.owner_scope_id,
             entity_type=PermEntityType.PROJECT,
         )
-        await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
+        await self._enroll_user_in_project(
+            ops_provider, roster_provider, project_scope, user_scope, ids.user_id
+        )
         await self._govern_resource_group_from_project(
             db_with_rbac_tables, ids.owner_scope_id, other_project_id, cap
         )
@@ -1009,6 +1048,7 @@ class TestUserRosterEnrollment:
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         ops_provider: RBACOpsProvider,
+        roster_provider: RosterOpsProvider,
         ids: VSChainFixture,
     ) -> None:
         """A project role holding user UPDATE resolves to READ over the member user:
@@ -1024,7 +1064,9 @@ class TestUserRosterEnrollment:
             permission=Permission.READ | Permission.UPDATE,
         )
 
-        await self._enroll_user_in_project(ops_provider, project_scope, user_scope, ids.user_id)
+        await self._enroll_user_in_project(
+            ops_provider, roster_provider, project_scope, user_scope, ids.user_id
+        )
 
         key = OwnCheckKey(user_id=ids.user_id, entity=UserID(ids.user_id))
         resolved = await db_source.owned_permissions([key])

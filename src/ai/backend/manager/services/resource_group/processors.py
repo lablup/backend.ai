@@ -15,17 +15,9 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
-from ai.backend.manager.services.resource_group.actions.associate_with_domain import (
-    AssociateResourceGroupWithDomainsAction,
-    AssociateResourceGroupWithDomainsActionResult,
-)
 from ai.backend.manager.services.resource_group.actions.associate_with_keypair import (
     AssociateResourceGroupWithKeypairsAction,
     AssociateResourceGroupWithKeypairsActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.associate_with_user_group import (
-    AssociateResourceGroupWithUserGroupsAction,
-    AssociateResourceGroupWithUserGroupsActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.bulk_get import (
     BulkGetResourceGroupsAction,
@@ -37,17 +29,9 @@ from ai.backend.manager.services.resource_group.actions.create import (
     CreateResourceGroupAction,
     CreateResourceGroupActionResult,
 )
-from ai.backend.manager.services.resource_group.actions.disassociate_with_domain import (
-    DisassociateResourceGroupWithDomainsAction,
-    DisassociateResourceGroupWithDomainsActionResult,
-)
 from ai.backend.manager.services.resource_group.actions.disassociate_with_keypair import (
     DisassociateResourceGroupWithKeypairsAction,
     DisassociateResourceGroupWithKeypairsActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.disassociate_with_user_group import (
-    DisassociateResourceGroupWithUserGroupsAction,
-    DisassociateResourceGroupWithUserGroupsActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.get_allowed_domains_for_rg import (
     GetAllowedDomainsForResourceGroupAction,
@@ -56,6 +40,14 @@ from ai.backend.manager.services.resource_group.actions.get_allowed_domains_for_
 from ai.backend.manager.services.resource_group.actions.get_allowed_projects_for_rg import (
     GetAllowedProjectsForResourceGroupAction,
     GetAllowedProjectsForResourceGroupActionResult,
+)
+from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_domain import (
+    GetAllowedResourceGroupsForDomainAction,
+    GetAllowedResourceGroupsForDomainActionResult,
+)
+from ai.backend.manager.services.resource_group.actions.get_allowed_rgs_for_project import (
+    GetAllowedResourceGroupsForProjectAction,
+    GetAllowedResourceGroupsForProjectActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.get_resource_info import (
     GetResourceInfoAction,
@@ -92,22 +84,6 @@ from ai.backend.manager.services.resource_group.actions.scoped_search import (
 from ai.backend.manager.services.resource_group.actions.update import (
     UpdateResourceGroupAction,
     UpdateResourceGroupActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.update_allowed_domains_for_rg import (
-    UpdateAllowedDomainsForResourceGroupAction,
-    UpdateAllowedDomainsForResourceGroupActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.update_allowed_projects_for_rg import (
-    UpdateAllowedProjectsForResourceGroupAction,
-    UpdateAllowedProjectsForResourceGroupActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.update_allowed_rgs_for_domain import (
-    UpdateAllowedResourceGroupsForDomainAction,
-    UpdateAllowedResourceGroupsForDomainActionResult,
-)
-from ai.backend.manager.services.resource_group.actions.update_allowed_rgs_for_project import (
-    UpdateAllowedResourceGroupsForProjectAction,
-    UpdateAllowedResourceGroupsForProjectActionResult,
 )
 from ai.backend.manager.services.resource_group.actions.update_fair_share_spec import (
     UpdateFairShareSpecAction,
@@ -155,12 +131,6 @@ class ResourceGroupProcessors:
         ReplaceDefaultSessionOptionsAction,
         ReplaceDefaultSessionOptionsActionResult,
     ]
-    associate_resource_group_with_domains: SingleEntityActionProcessor[
-        AssociateResourceGroupWithDomainsAction, AssociateResourceGroupWithDomainsActionResult
-    ]
-    disassociate_resource_group_with_domains: SingleEntityActionProcessor[
-        DisassociateResourceGroupWithDomainsAction, DisassociateResourceGroupWithDomainsActionResult
-    ]
     associate_resource_group_with_keypairs: SingleEntityActionProcessor[
         AssociateResourceGroupWithKeypairsAction, AssociateResourceGroupWithKeypairsActionResult
     ]
@@ -168,28 +138,13 @@ class ResourceGroupProcessors:
         DisassociateResourceGroupWithKeypairsAction,
         DisassociateResourceGroupWithKeypairsActionResult,
     ]
-    associate_resource_group_with_user_groups: SingleEntityActionProcessor[
-        AssociateResourceGroupWithUserGroupsAction, AssociateResourceGroupWithUserGroupsActionResult
+    get_allowed_rgs_for_domain: SingleEntityActionProcessor[
+        GetAllowedResourceGroupsForDomainAction,
+        GetAllowedResourceGroupsForDomainActionResult,
     ]
-    disassociate_resource_group_with_user_groups: SingleEntityActionProcessor[
-        DisassociateResourceGroupWithUserGroupsAction,
-        DisassociateResourceGroupWithUserGroupsActionResult,
-    ]
-    update_allowed_rgs_for_domain: SingleEntityActionProcessor[
-        UpdateAllowedResourceGroupsForDomainAction,
-        UpdateAllowedResourceGroupsForDomainActionResult,
-    ]
-    update_allowed_rgs_for_project: SingleEntityActionProcessor[
-        UpdateAllowedResourceGroupsForProjectAction,
-        UpdateAllowedResourceGroupsForProjectActionResult,
-    ]
-    update_allowed_domains_for_rg: SingleEntityActionProcessor[
-        UpdateAllowedDomainsForResourceGroupAction,
-        UpdateAllowedDomainsForResourceGroupActionResult,
-    ]
-    update_allowed_projects_for_rg: SingleEntityActionProcessor[
-        UpdateAllowedProjectsForResourceGroupAction,
-        UpdateAllowedProjectsForResourceGroupActionResult,
+    get_allowed_rgs_for_project: SingleEntityActionProcessor[
+        GetAllowedResourceGroupsForProjectAction,
+        GetAllowedResourceGroupsForProjectActionResult,
     ]
     get_allowed_domains_for_rg: SingleEntityActionProcessor[
         GetAllowedDomainsForResourceGroupAction,
@@ -240,13 +195,6 @@ class ResourceGroupProcessors:
         self.replace_default_session_options = group.single_entity(
             ReplaceDefaultSessionOptionsAction, service.replace_default_session_options
         )
-        self.associate_resource_group_with_domains = group.single_entity(
-            AssociateResourceGroupWithDomainsAction, service.associate_resource_group_with_domains
-        )
-        self.disassociate_resource_group_with_domains = group.single_entity(
-            DisassociateResourceGroupWithDomainsAction,
-            service.disassociate_resource_group_with_domains,
-        )
         self.associate_resource_group_with_keypairs = group.single_entity(
             AssociateResourceGroupWithKeypairsAction, service.associate_resource_group_with_keypairs
         )
@@ -254,29 +202,13 @@ class ResourceGroupProcessors:
             DisassociateResourceGroupWithKeypairsAction,
             service.disassociate_resource_group_with_keypairs,
         )
-        self.associate_resource_group_with_user_groups = group.single_entity(
-            AssociateResourceGroupWithUserGroupsAction,
-            service.associate_resource_group_with_user_groups,
+        self.get_allowed_rgs_for_domain = group.single_entity(
+            GetAllowedResourceGroupsForDomainAction,
+            service.get_allowed_resource_groups_for_domain,
         )
-        self.disassociate_resource_group_with_user_groups = group.single_entity(
-            DisassociateResourceGroupWithUserGroupsAction,
-            service.disassociate_resource_group_with_user_groups,
-        )
-        self.update_allowed_rgs_for_domain = group.single_entity(
-            UpdateAllowedResourceGroupsForDomainAction,
-            service.update_allowed_resource_groups_for_domain,
-        )
-        self.update_allowed_rgs_for_project = group.single_entity(
-            UpdateAllowedResourceGroupsForProjectAction,
-            service.update_allowed_resource_groups_for_project,
-        )
-        self.update_allowed_domains_for_rg = group.single_entity(
-            UpdateAllowedDomainsForResourceGroupAction,
-            service.update_allowed_domains_for_resource_group,
-        )
-        self.update_allowed_projects_for_rg = group.single_entity(
-            UpdateAllowedProjectsForResourceGroupAction,
-            service.update_allowed_projects_for_resource_group,
+        self.get_allowed_rgs_for_project = group.single_entity(
+            GetAllowedResourceGroupsForProjectAction,
+            service.get_allowed_resource_groups_for_project,
         )
         self.get_allowed_domains_for_rg = group.single_entity(
             GetAllowedDomainsForResourceGroupAction, service.get_allowed_domains_for_resource_group
