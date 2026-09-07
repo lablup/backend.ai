@@ -64,6 +64,9 @@ def upgrade() -> None:
     op.drop_index(_OLD_TARGET_INDEX, table_name="entity_invitations")
     op.drop_index(_OLD_PENDING_INDEX, table_name="entity_invitations")
     op.rename_table("entity_invitations", "entity_shares")
+    op.execute(
+        "ALTER TABLE entity_shares RENAME CONSTRAINT pk_entity_invitations TO pk_entity_shares"
+    )
     op.alter_column("entity_shares", "inviter_user_id", new_column_name="sharer_user_id")
     op.drop_constraint(
         op.f("fk_entity_invitations_inviter_user_id_users"), "entity_shares", type_="foreignkey"
@@ -151,8 +154,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute(sa.text("DELETE FROM entity_shares WHERE recipient_email IS NULL"))
-    op.drop_constraint(op.f("fk_entity_shares_recipient"), "entity_shares", type_="foreignkey")
-    op.drop_constraint(op.f("fk_entity_shares_target"), "entity_shares", type_="foreignkey")
+    op.drop_constraint("recipient", "entity_shares", type_="foreignkey")
+    op.drop_constraint("target", "entity_shares", type_="foreignkey")
     op.drop_index(_RECIPIENT_INDEX, table_name="entity_shares")
     op.drop_index(_EMAIL_INDEX, table_name="entity_shares")
     op.drop_index(_TARGET_INDEX, table_name="entity_shares")
@@ -168,18 +171,21 @@ def downgrade() -> None:
     op.alter_column(
         "entity_shares", "recipient_email", new_column_name="invitee_email", nullable=False
     )
-    op.drop_constraint(op.f("fk_entity_shares_sharer_user_id"), "entity_shares", type_="foreignkey")
+    op.drop_constraint("sharer_user_id", "entity_shares", type_="foreignkey")
     op.execute(sa.text("DELETE FROM entity_shares WHERE sharer_user_id IS NULL"))
     op.alter_column("entity_shares", "sharer_user_id", nullable=False)
     op.alter_column("entity_shares", "sharer_user_id", new_column_name="inviter_user_id")
     op.create_foreign_key(
-        "inviter_user_id",
+        op.f("fk_entity_invitations_inviter_user_id_users"),
         "entity_shares",
         "users",
         ["inviter_user_id"],
         ["uuid"],
         onupdate="CASCADE",
         ondelete="CASCADE",
+    )
+    op.execute(
+        "ALTER TABLE entity_shares RENAME CONSTRAINT pk_entity_shares TO pk_entity_invitations"
     )
     op.rename_table("entity_shares", "entity_invitations")
     op.create_index(
