@@ -151,7 +151,7 @@ class ValkeyRateLimitClient:
         )
 
     @valkey_rate_limit_resilience.apply()
-    async def get_user_window_state(self, user_id: UserID) -> RateLimitState | None:
+    async def get_user_rate_limit(self, user_id: UserID) -> RateLimitState | None:
         """
         Read the user's current window without counting a request.
 
@@ -161,7 +161,7 @@ class ValkeyRateLimitClient:
         return await self._read_window_state(self._user_window_key(user_id))
 
     @valkey_rate_limit_resilience.apply()
-    async def get_ip_window_state(self, client_ip: str) -> RateLimitState | None:
+    async def get_ip_rate_limit(self, client_ip: str) -> RateLimitState | None:
         """
         Read the address's current window without counting a request.
 
