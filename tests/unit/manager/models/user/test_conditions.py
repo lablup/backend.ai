@@ -51,6 +51,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.db import TableOrORM, with_tables
@@ -420,6 +421,7 @@ class TestUserNestedSearchIntegration:
         return UserDBSource(
             db=db_with_cleanup,
             v2_ops_provider=V2DBOpsProvider(db_with_cleanup),
+            share_ops_provider=ShareOpsProvider(db_with_cleanup),
             key_provider_pool=KeyProviderPool(
                 providers=[], write_provider_type=KeyProviderType.PLAIN
             ),
