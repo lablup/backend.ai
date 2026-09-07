@@ -156,7 +156,8 @@ async def test_gates_on_the_user_count(
     assert response.content_type == case.expected_content_type
     assert handler.await_count == case.expected_handler_awaits
     mock_valkey_rate_limit_client.get_state.assert_awaited_once_with(_USER_ID)
-    mock_valkey_rate_limit_client.consume_rate_limit.assert_not_called()
+    mock_valkey_rate_limit_client.consume_user_rate_limit.assert_not_called()
+    mock_valkey_rate_limit_client.consume_ip_rate_limit.assert_not_called()
 
 
 async def test_429_carries_the_rate_limit_headers(
