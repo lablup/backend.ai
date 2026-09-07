@@ -1823,11 +1823,16 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         and requiring the rule there would refuse sessions that work. Everywhere else the install
         has to succeed: a host that has iptables may well have the DROP policy this exists for, and
         a refusal there is an overlay that carries nothing while reporting itself up.
+
+        "No iptables" is a MISSING BINARY and nothing else. A denied exec, an exhausted process or
+        descriptor table, a broken interpreter -- none of them says this host is not filtering
+        FORWARD, and reading them as that skipped the rule on a host whose policy is DROP and
+        reported the session up over an overlay carrying nothing. They fail the setup instead.
         """
         try:
             await self._runner(forward_accept_check_args(vni))
             return  # already present
-        except OSError as e:
+        except FileNotFoundError as e:
             # No iptables binary: nothing on this host is filtering FORWARD.
             log.debug("skipping overlay FORWARD-ACCEPT for {}: {}", bridge_dev(vni), e)
             return

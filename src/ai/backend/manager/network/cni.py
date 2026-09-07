@@ -601,13 +601,60 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             owner = json.loads(held).get(_OWNER) if held else None
         except ValueError:
             owner = None
-        tombstone = _tombstone(subnet, vni, owner, _generation_of(held))
+        generation = _generation_of(held)
+        tombstone = _tombstone(subnet, vni, owner, generation)
         if not held or not await etcd.replace(session_meta_key(session_id), held, tombstone):
-            log.info(
-                "not rolling back session {}: its record is no longer this create's", session_id
-            )
+            # The record is not this create's any more. It was either taken over -- in which case
+            # the new owner inherited this incarnation and everything claimed for it is still the
+            # session's -- or the session was destroyed and built again, and this create is the
+            # only thing that still names what ITS incarnation holds. Nobody else will: a cleanup
+            # is scoped to the generation on the record, and that is no longer this one.
+            await self._release_orphaned_incarnation(etcd, session_id, generation)
             return
         await self._finish_cleanup(etcd, session_id, tombstone)
+
+    async def _release_orphaned_incarnation(
+        self, etcd: AsyncEtcd, session_id: str, generation: str | None
+    ) -> None:
+        """Give back what this create claimed, once the session has moved on without it.
+
+        Only when the record names a DIFFERENT incarnation. The same one means a takeover: another
+        manager is finishing this very allocation, and everything here is its to keep. A record
+        that has moved on means the session was destroyed and rebuilt, and what this create holds
+        -- its pool claims, and any endpoint or address key it wrote before finding out -- is named
+        by nothing else. Left alone it leaked for the cluster's lifetime; released without a fence
+        it would take the live session's with it.
+
+        The record itself is not touched: it is the new incarnation's.
+        """
+        if generation is None:
+            return  # nothing to scope a release to; a wildcard here would reach the live session
+        current = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
+        if _generation_of(current) == generation:
+            log.info(
+                "not rolling back session {}: its record is no longer this create's, but still"
+                " names the incarnation this create was building",
+                session_id,
+            )
+            return
+        log.warning(
+            "session {} was rebuilt while a create of an earlier incarnation was still running;"
+            " giving back what that create still holds",
+            session_id,
+        )
+        for prefix, key_of in (
+            (endpoints_prefix, endpoint_key),
+            (members_prefix, member_key),
+            (session_ipam_prefix, session_ipam_key),
+        ):
+            await self._delete_incarnation(etcd, session_id, prefix, key_of, generation)
+        try:
+            await self._vni_allocator.release_all(session_id, generation)
+            await self._subnet_allocator.release_all(session_id, generation)
+        except Exception:
+            log.exception(
+                "could not give back what session {}'s superseded create held", session_id
+            )
 
     async def _finish_cleanup(self, etcd: AsyncEtcd, session_id: str, tombstone: str) -> bool:
         """Carry a session under a DELETING tombstone through to nothing left, and say whether it

@@ -1652,12 +1652,124 @@ class TestReclaimingIsRetriedToo:
             assert h.server._unreclaimed_sessions == {}
 
 
+class TestARequestForAnotherIncarnation:
+    """D8. The privnet serializes requests per session id, and a session id is reused. By that id
+    alone a TEARDOWN_SESSION delayed across a teardown and a rebuild is a perfectly valid
+    instruction to delete the data plane that is now live -- the lock orders the requests, it does
+    not say whose they are. The generation the agent stamps on each one is what tells them apart."""
+
+    _VXLAN = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4138, "mtu": 1412}
+
+    async def _live(self, h: _Harness, generation: str) -> None:
+        resp = await h.client().call(
+            PrivNetRequest(
+                PrivNetOp.SETUP_SESSION,
+                "s1",
+                network_config={**self._VXLAN, "generation": generation},
+                generation=generation,
+            )
+        )
+        assert resp.ok, resp.error
+
+    async def test_a_stale_teardown_does_not_delete_the_live_data_plane(
+        self, tmp_path: Path
+    ) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            await self._live(h, "g2")
+
+            with pytest.raises(PrivNetClientError) as refused:
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1", generation="g1")
+                )
+
+            assert "g1" in str(refused.value) and "g2" in str(refused.value)
+            assert h.backend.teardown_calls == [], "it tore down a session it was not asked for"
+            assert "s1" in h.server._sessions
+
+    async def test_a_stale_withdrawal_is_refused_too(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            await self._live(h, "g2")
+
+            with pytest.raises(PrivNetClientError):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, "s1", generation="g1")
+                )
+
+            assert "s1" in h.server._sessions
+
+    async def test_the_live_incarnations_teardown_still_goes_through(self, tmp_path: Path) -> None:
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            await self._live(h, "g2")
+
+            resp = await h.client().call(
+                PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1", generation="g2")
+            )
+
+            assert resp.ok, resp.error
+            assert h.backend.teardown_calls == ["s1"]
+
+    async def test_a_request_naming_no_incarnation_is_not_fenced(self, tmp_path: Path) -> None:
+        # An agent from before the field stamps nothing, and refusing it would break the upgrade
+        # in the direction that leaves data planes standing with nothing able to remove them.
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            await self._live(h, "g2")
+
+            resp = await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1"))
+
+            assert resp.ok, resp.error
+            assert h.backend.teardown_calls == ["s1"]
+
+    async def test_the_fence_answers_from_the_journal_when_there_is_no_live_entry(
+        self, tmp_path: Path
+    ) -> None:
+        # What a privnet has after its own restart: the in-memory entry is gone and the journal is
+        # all there is to tell one incarnation from the next.
+        async with _Harness(_StubRuntime(), state_dir=tmp_path) as h:
+            await self._live(h, "g2")
+            h.server._sessions.pop("s1")
+            assert "s1" in await h.journal.sessions()
+
+            with pytest.raises(PrivNetClientError):
+                await h.client().call(
+                    PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "s1", generation="g1")
+                )
+
+            assert h.backend.teardown_calls == []
+
+    async def test_two_incarnations_on_one_subnet_and_vni_bind_differently(self) -> None:
+        # The pool hands a freed subnet and VNI straight back, so two incarnations of a session
+        # commonly declare an identical set of fields. The binding must still tell them apart.
+        first = {**self._VXLAN, "generation": "g1"}
+        second = {**self._VXLAN, "generation": "g2"}
+        assert config_digest(first) != config_digest(second)
+
+    async def test_a_declaration_without_one_keeps_its_old_digest(self) -> None:
+        # A claim written before the field must still be releasable under the name it was made
+        # under, or the VNI stays reserved on the node for good.
+        assert config_digest(dict(self._VXLAN)) == config_digest({
+            **self._VXLAN,
+            "generation": None,
+        })
+
+
 class TestTheAgentFacingProxy:
     """The facade the agent's coordinator drives. Every verb here crosses the process boundary,
     so what it does with a failure is what the agent believes about the host."""
 
     def _proxy(self, calls: list[PrivNetRequest], *, fail: bool = False) -> PrivNetBackendProxy:
         class _Client:
+            def __init__(self) -> None:
+                self.bound: dict[str, str] = {}
+
+            def bind_session(self, session_id: str, generation: str | None) -> None:
+                if generation is None:
+                    self.bound.pop(session_id, None)
+                else:
+                    self.bound[session_id] = generation
+
+            def release_session(self, session_id: str) -> None:
+                self.bound.pop(session_id, None)
+
             async def call(self, request: PrivNetRequest) -> PrivNetResponse:
                 calls.append(request)
                 if fail:
@@ -1690,6 +1802,9 @@ class TestTheAgentFacingProxy:
         )
         assert [c.op for c in calls] == [PrivNetOp.ADOPT_SESSION]
         assert calls[0].network_config == {
+            # The declaration names which incarnation of the session id it is for; this meta
+            # carries none, and a missing one is not a conflict (an older manager publishes none).
+            "generation": None,
             "backend": "vxlan",
             "subnet": "10.128.5.0/24",
             "vni": 4138,

@@ -16,6 +16,7 @@ config — so it holds no CAP_NET_ADMIN / CAP_SYS_ADMIN.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast, override
@@ -71,9 +72,35 @@ PrivNetUnreachable = PrivilegedNetworkHelperUnreachable
 
 class PrivNetClient:
     _socket_path: str
+    #: session_id -> the incarnation this agent set the session up for. Stamped onto every
+    #: session-scoped request so the privnet can refuse one issued for an incarnation it no longer
+    #: holds -- see `bind_session`.
+    _generations: dict[str, str]
 
     def __init__(self, socket_path: str) -> None:
         self._socket_path = socket_path
+        self._generations = {}
+
+    def bind_session(self, session_id: str, generation: str | None) -> None:
+        """Remember which incarnation of ``session_id`` this agent is working on.
+
+        Every later request for it carries this, and the privnet refuses one that names an
+        incarnation it does not hold. The alternative is to thread the generation through each of
+        the fifteen call sites, several of which are handed only a session id (`detach`,
+        `teardown_session_network`, the port forwarder) -- and the one that is missed is the hole.
+
+        A session with no generation (a node-local BRIDGE session, or a manager older than the
+        field) binds nothing: there is no incarnation to name, and stamping a request with one the
+        privnet cannot check gains nothing.
+        """
+        if generation is None:
+            self._generations.pop(session_id, None)
+            return
+        self._generations[session_id] = generation
+
+    def release_session(self, session_id: str) -> None:
+        """Forget the incarnation, once this agent is done with the session."""
+        self._generations.pop(session_id, None)
 
     async def recovery_problems(self) -> dict[str, str]:
         """What the privnet says it could not take charge of.
@@ -163,6 +190,7 @@ class PrivNetClient:
         return None
 
     async def call(self, req: PrivNetRequest) -> PrivNetResponse:
+        req = self._stamped(req)
         try:
             async with asyncio.timeout(_CALL_TIMEOUT_SEC):
                 return await self._call(req)
@@ -174,6 +202,21 @@ class PrivNetClient:
                 f"the privileged network helper at {self._socket_path} did not answer"
                 f" {req.op} within {_CALL_TIMEOUT_SEC:.0f}s"
             ) from e
+
+    def _stamped(self, req: PrivNetRequest) -> PrivNetRequest:
+        """The request, naming the incarnation this agent bound for its session.
+
+        Done here rather than at each call site so that a verb added later is fenced by default.
+        A request that already names one is left alone (SETUP/ADOPT carry theirs in the network
+        config), and a session id nothing is bound for is not a session -- the node-wide ops use
+        the field as a lock key.
+        """
+        if req.generation is not None:
+            return req
+        generation = self._generations.get(req.session_id)
+        if generation is None:
+            return req
+        return dataclasses.replace(req, generation=generation)
 
     async def _call(self, req: PrivNetRequest) -> PrivNetResponse:
         try:
@@ -262,6 +305,11 @@ def _network_config_from_meta(meta: SessionNetMeta) -> dict[str, Any]:
         "subnet": meta.subnet or None,
         "vni": meta.vni,
         "mtu": meta.mtu,
+        # Which incarnation of the session id this declaration is for. Journalled with the rest,
+        # so the privnet still knows it after its own restart, and part of the VNI binding digest
+        # -- two incarnations that happen to draw the same subnet and VNI are otherwise the same
+        # declaration by every field the privnet compares.
+        "generation": meta.generation,
         # Not defaulted on the far side: an operator who moved the overlay off 4789 did so because
         # the fabric drops it, and a privnet that quietly used 4789 would build a tunnel nothing
         # carries -- with the agent's own ESP policy written for the other port.
@@ -305,11 +353,15 @@ class PrivNetBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
 
     @override
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        # Bound BEFORE the call, so a setup that fails partway still has its later requests --
+        # the teardown that unwinds it, above all -- naming the incarnation it was building.
+        self._client.bind_session(meta.session_id, meta.generation)
         await self._client.call(
             PrivNetRequest(
                 op=PrivNetOp.SETUP_SESSION,
                 session_id=meta.session_id,
                 network_config=_network_config_from_meta(meta),
+                generation=meta.generation,
             )
         )
 
@@ -329,11 +381,13 @@ class PrivNetBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
         rebuilding them, so sending it here cuts the network out from under every container already
         running on them -- the very containers this call exists to keep serving.
         """
+        self._client.bind_session(meta.session_id, meta.generation)
         await self._client.call(
             PrivNetRequest(
                 PrivNetOp.ADOPT_SESSION,
                 meta.session_id,
                 network_config=_network_config_from_meta(meta),
+                generation=meta.generation,
             )
         )
 
@@ -348,12 +402,16 @@ class PrivNetBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
         free while all of it is still here.
         """
         await self._client.call(PrivNetRequest(PrivNetOp.WITHDRAW_SESSION, session_id))
+        # Only once it landed: a failed withdrawal is retried, and the retry must still name the
+        # incarnation whose state this node is trying to let go of.
+        self._client.release_session(session_id)
 
     @override
     async def teardown_session_network(self, session_id: str) -> None:
         await self._client.call(
             PrivNetRequest(op=PrivNetOp.TEARDOWN_SESSION, session_id=session_id)
         )
+        self._client.release_session(session_id)
 
     @override
     async def ensure_session_security(self, session_id: str, peers: Sequence[Member]) -> None:

@@ -73,6 +73,7 @@ from pathlib import Path
 from typing import override
 
 from ai.backend.agent.errors.network import (
+    HostAddressesUnreadable,
     LocalSubnetLayoutChanged,
     LocalSubnetPoolExhausted,
 )
@@ -165,20 +166,33 @@ def host_ipv4_addresses() -> frozenset[str]:
     agent still running the pre-node-wide code keeps its claims in a store this one cannot see, and
     a leaked bridge is in no store at all — both leave an address sitting on the node, and handing
     that block out again puts two bridges on one subnet with the same gateway.
+
+    A failure here is not an empty host. Allocating "without them" is allocating without the only
+    check that sees those two cases, so it hands out exactly the block they are on — and the
+    result is two gateways answering for one subnet, which fails on some containers' traffic and
+    not others. The session is refused instead.
+
+    Raises:
+        HostAddressesUnreadable: this node's addresses could not be read.
     """
     found: set[str] = set()
     try:
         import psutil
-    except ImportError:  # pragma: no cover - psutil is an agent dependency
-        return frozenset()
+    except ImportError as e:  # pragma: no cover - psutil is an agent dependency
+        raise HostAddressesUnreadable(
+            "psutil is not installed, so this node cannot be asked which addresses it already"
+            " carries; refusing to hand out a node-local block that may already be in use"
+        ) from e
     try:
         for addrs in psutil.net_if_addrs().values():
             for addr in addrs:
                 if addr.family == socket.AF_INET and addr.address:
                     found.add(addr.address)
-    except Exception as e:  # pragma: no cover - reading host state must never fail allocation
-        log.warning("could not read this host's addresses ({!r}); allocating without them", e)
-        return frozenset()
+    except Exception as e:
+        raise HostAddressesUnreadable(
+            f"could not read this host's addresses ({e!r}); refusing to hand out a node-local"
+            " block that may already be in use"
+        ) from e
     return frozenset(found)
 
 

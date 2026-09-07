@@ -30,6 +30,7 @@ from ai.backend.common.network.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import (
+    EndpointSuperseded,
     NetworkPoolExhausted,
     RequestedSubnetInvalid,
     RequestedSubnetUnavailable,
@@ -42,6 +43,12 @@ if TYPE_CHECKING:
 
 DEFAULT_IPAM_POOL = "10.128.0.0/12"
 DEFAULT_BLOCK_PREFIXLEN = 24
+
+#: How many times `EndpointAllocator.assign` re-reads an endpoint record that changed under its
+#: compare-and-swap before it gives up. More than one because a concurrent create of the SAME
+#: incarnation writes the same values and is not a conflict; bounded because a record that will not
+#: settle is a caller's retry, not a loop to spin in.
+_SETTLE_ATTEMPTS = 3
 
 _ALLOCATED_PREFIX = "network/ipam/allocated"
 _VNI_PREFIX = "network/ipam/vni"
@@ -567,22 +574,50 @@ class EndpointAllocator:
             A container holding an address that no record mentions is a kernel the rest of the
             session cannot reach, on a session that reports itself healthy -- so the record is
             written here whether this call made the claim or found it.
+
+            Written over nothing but this incarnation's own record. A create stalled across a
+            teardown and a rebuild of the same session id resumes holding the old subnet, and an
+            unconditional write here put its addresses under the LIVE session's container ids --
+            which every peer then programs into its FDB and ARP. There is no lock to hold across
+            the two writes, so the fence is the record itself: only bytes carrying this
+            incarnation's generation are replaced, and only by compare-and-swap.
+
+            Raises:
+                EndpointSuperseded: the record belongs to another incarnation of the session.
             """
             mac = mac_for_ip(ip)
-            await self._etcd.put(
-                endpoint_key(session_id, container_id),
-                json.dumps(
-                    EndpointAddr(
-                        container_id=container_id,
-                        ip=ip,
-                        mac=mac,
-                        agent_id=agent_id,
-                        cluster_hostname=cluster_hostname,
-                        generation=generation,
-                    ).to_etcd_payload()
-                ),
+            payload = json.dumps(
+                EndpointAddr(
+                    container_id=container_id,
+                    ip=ip,
+                    mac=mac,
+                    agent_id=agent_id,
+                    cluster_hostname=cluster_hostname,
+                    generation=generation,
+                ).to_etcd_payload()
             )
-            return ip, mac
+            key = endpoint_key(session_id, container_id)
+            for _ in range(_SETTLE_ATTEMPTS):
+                if await self._etcd.put_if_absent(key, payload):
+                    return ip, mac
+                standing = await self._etcd.get(key)
+                if standing is None:
+                    continue  # deleted under us; claim it again
+                if standing == payload:
+                    return ip, mac
+                if not of_generation(standing, generation):
+                    raise EndpointSuperseded(
+                        f"session {session_id}'s endpoint record for container {container_id}"
+                        " belongs to a later incarnation of the session; not writing this"
+                        " create's addresses over the one its peers are using"
+                    )
+                if await self._etcd.replace(key, standing, payload):
+                    return ip, mac
+            raise EndpointSuperseded(
+                f"session {session_id}'s endpoint record for container {container_id} kept"
+                f" changing under this create ({_SETTLE_ATTEMPTS} attempts); retrying rather than"
+                " overwriting whatever is there now"
+            )
 
         held = _flat(await self._etcd.get_prefix(session_ipam_prefix(session_id)))
         for ip, raw in held.items():

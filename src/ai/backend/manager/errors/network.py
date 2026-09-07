@@ -181,6 +181,29 @@ class SessionCleanupPending(BackendAIError, web.HTTPConflict):
         )
 
 
+class EndpointSuperseded(BackendAIError, web.HTTPConflict):
+    """This create's endpoint write would have landed on another incarnation of the session.
+
+    A session id is reused. A create stalled long enough for its session to be torn down and built
+    again resumes holding the old subnet and the old generation, and the endpoint record it writes
+    is what every peer programs FDB and ARP from. Refused rather than written, so the stale create
+    unwinds instead of pointing the live session's peers at addresses nothing holds.
+
+    Retryable: the retry reads the record that is actually there.
+    """
+
+    error_type = "https://api.backend.ai/probs/manager/session-endpoint-superseded"
+    error_title = "The session's endpoint record belongs to a later incarnation."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class SessionRecordContested(BackendAIError, web.HTTPConflict):
     """Another manager took this session's network record while a create was running.
 

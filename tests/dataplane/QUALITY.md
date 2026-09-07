@@ -20,6 +20,8 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | C8 | **One incarnation's cleanup never reaches another's.** A session id is reused; every key and claim carries the incarnation that wrote it, and each delete names one. | A cleanup paused between its tombstone check and its delete resumes into the session that replaced the one it came for, and gives that session's VNI back to the pool. | `TestACleanupPausedBetweenItsCheckAndItsDelete`, `TestAnAllocationReusedWhileItIsBeingDestroyed` |
 | C9 | **A node is in the session, or it never builds.** Membership is published before any device exists, and the teardown reads the table again after fencing the record. | The manager sees an empty table, hands the VNI to the next session, and only then does a joining node create a tunnel on it. | `TestANodeThatJoinsAsTheRecordIsFenced`, `TestJoiningBeforeBuilding` |
 | C10 | **A request acts only on the session it was issued for.** The descriptor an agent is handed is compared against the manager's record, incarnation first. | A launch RPC delayed across a teardown and a rebuild builds the old data plane and publishes the node as a member of the new session. | `TestARequestThatArrivedTooLate` |
+| C11 | **Nothing an earlier incarnation writes lands in a later one.** Endpoint, address and membership writes are compare-and-swaps that refuse another incarnation's bytes; a create that finds the record gone gives back what its own incarnation still holds. | A create stalled past the handover resumes into the live session: its addresses go under the live container ids, every peer programs them, and its rollback -- finding the record is not its -- cleans up nothing. | `TestACreateThatWokeUpInAnotherSession`, `TestAnEarlierInstanceStillRunning` |
+| C12 | **A table shared with another incarnation is read as one.** Endpoints and members carrying a different generation are not programmed. | A leftover record points this node's FDB and ARP at an address the live session's kernels do not hold, and the frames leave with nothing answering. | `TestATableSharedWithAnotherIncarnation` |
 
 ## D — Data plane (agent)
 
@@ -32,6 +34,8 @@ The scenario ids (`G*`, `A*`) are the ones in `SCENARIOS.md`.
 | D6 | **What reaches the manager names the failure.** A node whose privileged helper is down says so, with the socket and what it means. | An operator sees errno 111 and cannot tell which node, or that its whole data plane is down. | `TestWhatReachesTheManagerWhenThePrivnetIsDown` |
 | D5 | **The overlay is encrypted, or the session does not start.** Under the default policy a node that cannot do the profile is refused, not silently downgraded. | Cluster traffic crosses the wire in clear text. | G20, G21 |
 | D7 | **Recovery's rule listing is an answer or an error, never an empty host.** Only `rc == 0` says what a previous life left. | A missing binary or a denied exec reads as "no rules", and the node is reported ready over a plaintext-drop the next session given that VNI runs into. | `TestACommandThatNeverReturns` |
+| D8 | **The privnet acts only for the incarnation it holds.** Every session-scoped request names one, and the VNI binding is made under it. | The lock orders requests per session id but cannot say whose they are: a delayed TEARDOWN deletes the data plane of the session that replaced the one it was issued for. | `TestARequestForAnotherIncarnation` |
+| D9 | **A host check that could not run is not a host with nothing on it.** The FORWARD-ACCEPT probe skips only on a missing binary; the address inventory refuses the allocation rather than returning empty. | A denied exec leaves the overlay unprotected on a DROP-policy node, or hands out the block a leaked bridge is already on -- two gateways for one subnet. | `TestBlocksAlreadyOnTheHost`, `_ensure_forward_accept` |
 
 ## R — Release quality
 
@@ -109,3 +113,14 @@ R3 has NOT been re-run for this round: the hardware evidence above is still at `
 predates it. C8-C10 and D7 rest on unit evidence alone, and the agent-restart scenarios
 (A1/A2/A3/A9/A10) that would exercise the join/teardown ordering on real nodes remain unrun. Read
 the round as unverified against hardware until that log is replaced.
+
+Fourth round, against the same bar:
+
+| # | Was | Now |
+|---|-----|-----|
+| C11 | a create stalled past the handover wrote its endpoint record unconditionally, so its addresses landed under the live session's container ids; and its rollback, finding the record was not its, returned having cleaned up nothing | the endpoint write is a compare-and-swap that refuses another incarnation's bytes, and a rollback whose record has moved on gives back what its own incarnation still holds |
+| C11 | the join wrote this node's member key unconditionally and then deleted exactly those bytes -- so an earlier agent instance clobbered a later one's membership and then removed it, leaving a live data plane with none | the publish refuses another incarnation and replaces its own by compare-and-swap; the withdrawal deletes the bytes it read, not the key |
+| C12 | endpoints and members were read whole, whichever incarnation wrote them | a record of another incarnation is not programmed, and does not answer as a cluster name |
+| C4 | the agent's single-node meta deletion read the record and then deleted the key | it deletes the bytes it read, so a manager record published under the id in between survives |
+| D8 | the privnet identified a session by its id alone, in the RPC, in its journal, in `_SessionEntry` and in the VNI binding digest | every session-scoped request names its incarnation, the privnet refuses one it does not hold, and the digest tells two incarnations on the same subnet and VNI apart |
+| D9 | any `OSError` from the FORWARD-ACCEPT probe read as "no iptables here", and an unreadable address inventory read as "this host carries nothing" | only a missing binary skips the probe; an inventory that cannot answer refuses the allocation |

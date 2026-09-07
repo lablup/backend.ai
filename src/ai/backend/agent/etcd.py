@@ -138,6 +138,20 @@ class AgentEtcdClientView(AbstractKVStore):
         )
 
     @override
+    async def put_if_absent(
+        self,
+        key: str,
+        val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        scope_prefix_map = self._augment_scope_prefix_map(scope_prefix_map)
+        return await self._etcd.put_if_absent(
+            key, val, scope=scope, scope_prefix_map=scope_prefix_map
+        )
+
+    @override
     async def delete_if_value(
         self,
         key: str,

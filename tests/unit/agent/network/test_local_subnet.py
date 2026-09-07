@@ -1,9 +1,13 @@
 import asyncio
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
+import psutil
 import pytest
 
 from ai.backend.agent.errors.network import (
+    HostAddressesUnreadable,
     LocalSubnetLayoutChanged,
     LocalSubnetPoolExhausted,
 )
@@ -555,11 +559,38 @@ class TestTheHostIsTheLastWord:
         assert await alloc.allocate("s1") == 0
 
     async def test_a_reader_that_returns_nothing_allocates_as_before(self, state_dir: Path) -> None:
-        """psutil missing, or the read failing, must degrade to the journal alone rather than
-        refusing every session."""
+        """A host carrying no address in this pool is an answer, and the journal alone is then the
+        whole picture. Distinct from a reader that could not answer -- see below."""
         alloc = self._alloc(state_dir, [])
 
         assert await alloc.allocate("s1") == 0
+
+    async def test_a_reader_that_cannot_answer_refuses_the_allocation(
+        self, state_dir: Path
+    ) -> None:
+        """ "I could not read this host" is not "this host carries nothing". Allocating without the
+        check hands out the block a leaked bridge -- or one a pre-node-wide agent journalled where
+        this allocator cannot see it -- is already on, and two gateways then answer for one subnet.
+        """
+
+        def _unreadable() -> Iterable[str]:
+            raise HostAddressesUnreadable("psutil is not answering")
+
+        alloc = self._alloc(state_dir, [])
+        alloc._host_addresses = _unreadable
+
+        with pytest.raises(HostAddressesUnreadable):
+            await alloc.allocate("s1")
+
+    def test_the_real_reader_raises_rather_than_reporting_an_empty_host(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def _boom() -> dict[str, list[Any]]:
+            raise OSError(24, "Too many open files")
+
+        monkeypatch.setattr(psutil, "net_if_addrs", _boom)
+        with pytest.raises(HostAddressesUnreadable):
+            host_ipv4_addresses()
 
     def test_the_production_factory_wires_the_real_reader(self, tmp_path: Path) -> None:
         """The class stays pure so tests are hermetic; the composition root is where the host
