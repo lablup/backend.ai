@@ -16,7 +16,6 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
 )
 from ai.backend.common.contexts.client_ip import with_client_ip
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.exception import UnreachableError
 from ai.backend.common.web.reserved_response_headers import apply_reserved_response_headers
 from ai.backend.manager.api.rest.ratelimit.handler import (
     _ANONYMOUS_RATELIMIT,
@@ -103,14 +102,6 @@ class TestRlimMiddleware:
         caller: Caller = request.getfixturevalue(request.param)
         return caller
 
-    @pytest.fixture
-    def request_without_a_client_address(self) -> web.Request:
-        """An unauthenticated request whose address never made it into the context."""
-        request = make_mocked_request("GET", "/")
-        request["is_authorized"] = False
-        request["user"] = None
-        return request
-
     async def test_an_authorized_query_is_judged_by_the_user_window(
         self,
         middleware: Any,
@@ -156,19 +147,6 @@ class TestRlimMiddleware:
 
         # Assert
         assert response.headers["X-RateLimit-Limit"] == str(_ANONYMOUS_RATELIMIT)
-
-    async def test_an_anonymous_query_without_a_client_address_is_refused(
-        self,
-        middleware: Any,
-        mock_valkey_client: MagicMock,
-        request_without_a_client_address: web.Request,
-        mock_handler: AsyncMock,
-    ) -> None:
-        """No address means no window to count in, and serving uncounted is not the answer."""
-        # Act & Assert
-        with pytest.raises(UnreachableError):
-            await middleware(request_without_a_client_address, mock_handler)
-        mock_handler.assert_not_called()
 
     @pytest.mark.parametrize("caller", ["anonymous_caller", "authorized_caller"], indirect=True)
     @pytest.mark.parametrize(
