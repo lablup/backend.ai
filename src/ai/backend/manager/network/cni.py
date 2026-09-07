@@ -16,6 +16,8 @@ import logging
 import time
 import uuid
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any, Final, override
 
 from ai.backend.common.configs.etcd import EtcdConfig
@@ -42,6 +44,8 @@ from ai.backend.common.network.types import (
     NetworkBackendKind,
     OverlayEncryptionPolicy,
     of_generation,
+    reads_as_overlay_subnet,
+    reads_as_vni,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import (
@@ -131,6 +135,10 @@ _RECONCILE_TICKET: Final = "network/reconcile-ticket"
 #: How often the pool is swept, cluster-wide. Long: it is a safety net under the debt notes and
 #: the per-session reconciliation, not the thing that normally gives claims back.
 _RECONCILE_INTERVAL_SEC: Final = 600.0
+#: How often a sweep in progress re-dates its own ticket. A fraction of the interval, so a pass
+#: that outlasts one keeps the turn instead of inviting a second manager to start over the top of
+#: it. This is what the ticket lacks that a lease would give it for free.
+_RECONCILE_HEARTBEAT_SEC: Final = _RECONCILE_INTERVAL_SEC / 4
 
 
 def _published(meta: Mapping[str, Any]) -> dict[str, Any]:
@@ -182,90 +190,100 @@ def _generation_of(raw: str | None) -> str | None:
     return str(generation) if generation is not None else None
 
 
-def _reads_as_vni(named: Any) -> bool:
-    if named is None:
-        return True  # names no VNI, which is a thing a record is allowed to say
-    try:
-        int(named)
-    except (TypeError, ValueError):
-        return False
-    return True
+class _AllocationState(StrEnum):
+    #: A valid record that has not allocated anything yet -- it has claimed the session id and
+    #: names neither a subnet nor a VNI. Nothing about it can be judged by identity.
+    PENDING = "pending"
+    #: A valid record naming a complete allocation.
+    ALLOCATED = "allocated"
+    #: A record whose allocation cannot be read as what the contract says it must be. Nothing
+    #: under the session is judged from it, by anybody.
+    CORRUPT = "corrupt"
 
 
-def _reads_as_subnet(named: Any) -> bool:
-    if named is None:
-        return True
-    if not isinstance(named, str):
-        return False
-    try:
-        ipaddress.ip_network(named)
-    except ValueError:
-        return False
-    return True
+@dataclass(frozen=True)
+class _Allocation:
+    """What a session record says it holds, once.
+
+    One parser for every path that acts on a record -- the reconciler, the reuse path, the
+    cleanup. When only the reconciler validated, ownership was decided by one set of rules and
+    what the manager handed its agents by another, so a record the sweep called corrupt was still
+    published to the agents that then refused it.
+    """
+
+    state: _AllocationState
+    subnet: str | None = None
+    vni: int | None = None
+
+    @property
+    def is_corrupt(self) -> bool:
+        return self.state is _AllocationState.CORRUPT
 
 
-def _allocation_readable(meta_raw: str) -> bool:
-    """Whether every allocation field this record carries can be read as what it must be.
+def _parse_allocation(meta_raw: str) -> _Allocation:
+    """What ``meta_raw`` names, or that it names nothing anyone can act on.
 
-    Three states, not two. A field can be MISSING (the record has not got that far, or names no
-    VNI), VALID, or present and UNREADABLE -- and the third is not the first. Folding it into
-    "missing" is fail-open in the worst direction: a record like ``{"generation": "g1",
-    "vni": []}`` has the key, so the sweep judges by identity; identity then reads no VNI out of
-    it, decides the session's real claim is not the one it names, and gives a LIVE VXLAN's VNI
-    back to the pool for another tenant to be handed.
+    Three states, and the middle one is what a looser check gets wrong. A field can be MISSING
+    (the record has not got that far), VALID, or present and NOT WHAT IT MUST BE -- and folding
+    the third into the first is fail-open in the worst direction. ``{"backend": "vxlan", "vni":
+    null}`` parses, and read as "names no VNI" it makes a live VXLAN's real VNI claim look like
+    one the record does not name: the sweep gives it back to the pool, and the next session is
+    handed it.
 
-    So a record whose allocation cannot be read is one this cannot judge at all. Everything under
-    that session is preserved and counted, and an operator is told which key to look at.
+    So the check is the CONTRACT, not the parse. A vxlan record names a VNI in the 24-bit range;
+    any other backend names none. A subnet is IPv4, private, and aligned to its own prefix -- the
+    same bar the agent's privnet policy holds the manager to, since that is the boundary these
+    values actually cross.
+
+    A DELETING tombstone is exempt from the backend coupling: it carries what the record it
+    replaced named, and not which backend named it.
     """
     meta = _record(meta_raw)
     if meta is None:
-        return False
-    unreadable = [
-        field
-        for field, reads in (("vni", _reads_as_vni), ("subnet", _reads_as_subnet))
-        if field in meta and not reads(meta.get(field))
-    ]
-    if unreadable:
+        return _Allocation(_AllocationState.CORRUPT)
+    if "subnet" not in meta and "vni" not in meta:
+        return _Allocation(_AllocationState.PENDING)
+
+    def corrupt(why: str) -> _Allocation:
         CommonMetricRegistry.instance().network_pool.observe_invalid_record()
         log.warning(
-            "a session record names {} that cannot be read ({}); nothing of that session is"
-            " judged from it",
-            " and ".join(unreadable),
-            ", ".join(f"{field}={meta.get(field)!r}" for field in unreadable),
+            "a session record names an allocation this cannot act on ({}); nothing of that"
+            " session is judged from it. subnet={!r} vni={!r} backend={!r}",
+            why,
+            meta.get("subnet"),
+            meta.get("vni"),
+            meta.get("backend"),
         )
-        return False
-    return True
+        return _Allocation(_AllocationState.CORRUPT)
+
+    raw_subnet = meta.get("subnet")
+    subnet = None if raw_subnet is None else reads_as_overlay_subnet(raw_subnet)
+    if raw_subnet is not None and subnet is None:
+        return corrupt("subnet is not a private, prefix-aligned IPv4 network")
+
+    raw_vni = meta.get("vni")
+    vni = None if raw_vni is None else reads_as_vni(raw_vni)
+    if raw_vni is not None and vni is None:
+        return corrupt("vni is not a 24-bit VXLAN network identifier")
+
+    if meta.get(_STATE) != _DELETING:
+        raw_backend = meta.get("backend")
+        if not isinstance(raw_backend, str):
+            return corrupt("backend is not one this manager knows")
+        try:
+            backend = NetworkBackendKind(raw_backend)
+        except ValueError:
+            return corrupt("backend is not one this manager knows")
+        if backend is NetworkBackendKind.VXLAN and vni is None:
+            return corrupt("a vxlan session names no vni")
+        if backend is not NetworkBackendKind.VXLAN and vni is not None:
+            return corrupt(f"a {backend} session names a vni")
+        if subnet is None:
+            return corrupt("an allocated session names no subnet")
+    return _Allocation(_AllocationState.ALLOCATED, subnet, vni)
 
 
-def _named_vni(meta: Mapping[str, Any]) -> int | None:
-    """The VNI this record names, or None where it names none.
-
-    Silent about a field it cannot read, because it is only asked of records
-    `_allocation_readable` has already passed -- which is where an unreadable one is reported and
-    where it stops being judged.
-    """
-    named = meta.get("vni")
-    if named is None:
-        return None
-    try:
-        return int(named)
-    except (TypeError, ValueError):
-        return None
-
-
-def _named_subnet(meta: Mapping[str, Any]) -> str | None:
-    """The subnet this record names, or None where it names none. See `_named_vni`."""
-    named = meta.get("subnet")
-    if not isinstance(named, str):
-        return None
-    try:
-        ipaddress.ip_network(named)
-    except ValueError:
-        return None
-    return named
-
-
-def _record_names(meta_raw: str, raw: str, is_vni: bool, key: str | int) -> bool:
+def _record_names(allocation: _Allocation, raw: str, is_vni: bool, key: str | int) -> bool:
     """Whether the session's record names THIS claim.
 
     Identity, not compatibility. Compatibility (`of_generation`) says whether a claim COULD belong
@@ -279,16 +297,13 @@ def _record_names(meta_raw: str, raw: str, is_vni: bool, key: str | int) -> bool
     A unit block must also lie inside the block the record names. The payload is what identifies
     the claim, and a payload naming a block the unit is not part of identifies nothing.
     """
-    meta = _record(meta_raw)
-    if meta is None:
-        return False
     if is_vni:
-        named_vni = _named_vni(meta)
+        named_vni = allocation.vni
         try:
             return named_vni is not None and named_vni == int(key)
         except (TypeError, ValueError):
             return False
-    named_subnet = _named_subnet(meta)
+    named_subnet = allocation.subnet
     if named_subnet is None:
         return False
     claim = _record(raw)
@@ -311,21 +326,6 @@ def _record_names(meta_raw: str, raw: str, is_vni: bool, key: str | int) -> bool
         and isinstance(block, ipaddress.IPv6Network)
         and unit.subnet_of(block)
     )
-
-
-def _names_an_allocation(meta_raw: str, is_vni: bool) -> bool:
-    """Whether the record has got as far as naming an allocation of this kind.
-
-    A record claims the session id before anything is allocated for it, so it carries no
-    ``subnet`` and no ``vni`` key at all until the create publishes. From that point on it names
-    exactly one of each -- ``vni`` as null for a backend that uses none -- and it goes on naming
-    them under a DELETING tombstone. So the presence of the key, not its value, is what says
-    whether the record can answer for a claim of this kind.
-    """
-    meta = _record(meta_raw)
-    if meta is None:
-        return False
-    return ("vni" if is_vni else "subnet") in meta
 
 
 def _claim_is_live(meta_raw: str | None, raw: str, is_vni: bool, key: str | int) -> bool:
@@ -353,19 +353,20 @@ def _claim_is_live(meta_raw: str | None, raw: str, is_vni: bool, key: str | int)
     live = _generation_of(meta_raw)
     if live is None:
         return True
-    if not _allocation_readable(meta_raw):
-        # The record exists and names an incarnation, but what it names cannot be read. Nothing
-        # under this session is garbage until somebody has looked at it: preserved, counted, and
-        # reported. A leak an operator is told about beats a live session's addresses being handed
-        # to another tenant.
+    allocation = _parse_allocation(meta_raw)
+    if allocation.is_corrupt:
+        # The record exists and names an incarnation, but what it names is not something anyone
+        # can act on. Nothing under this session is garbage until somebody has looked at it:
+        # preserved, counted, and reported. A leak an operator is told about beats a live
+        # session's addresses being handed to another tenant.
         return True
-    if _names_an_allocation(meta_raw, is_vni):
-        # The record names one allocation of this kind, so identity settles it and the stamp adds
-        # nothing. Asking the stamp as well kept a stray claim that happens to carry the live
-        # incarnation -- a block a create walked away from when it could not take the one it
-        # already held, say -- for as long as the session lived: promotion follows the record, so
-        # nothing ever moved it, and it looked live, so nothing reclaimed it.
-        return _record_names(meta_raw, raw, is_vni, key)
+    if allocation.state is _AllocationState.ALLOCATED:
+        # The record names an allocation, so identity settles it and the stamp adds nothing.
+        # Asking the stamp as well kept a stray claim that happens to carry the live incarnation
+        # -- a block a create walked away from when it could not take the one it already held,
+        # say -- for as long as the session lived: promotion follows the record, so nothing ever
+        # moved it, and it looked live, so nothing reclaimed it.
+        return _record_names(allocation, raw, is_vni, key)
     # Still building: it names nothing yet, and the stamp is the only thing that can say. This is
     # what a create in flight holds, and a sweep that asked identity here reclaimed the pool
     # claims of every create running at the time.
@@ -459,11 +460,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # not carry on as if it had: the pass stays owed, it is retried the next time a session id
         # comes round, and `backendai_network_pool_reconcile_pending` says so until it succeeds.
         if await self._claim_reconcile_turn():
-            await self._reconcile_pool_reporting()
-            # The startup pass dates the turn from its end too. Without this it was dated from the
-            # start, so on a cluster whose first sweep takes a while every manager coming up
-            # behind found an expired ticket and swept again.
-            await self._hold_reconcile_turn()
+            await self._sweep_holding_the_turn()
         self._reconcile_task = asyncio.create_task(self._reconcile_loop())
 
     async def _reconcile_loop(self) -> None:
@@ -478,13 +475,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             try:
                 await asyncio.sleep(_RECONCILE_INTERVAL_SEC)
                 if await self._claim_reconcile_turn():
-                    await self._reconcile_pool_reporting()
-                    # Dated from when the pass FINISHED, not when it started: on a pool big enough
-                    # for the sweep to outlast the interval, the start time would let the next
-                    # manager take a turn while this one is still walking. Two concurrent passes
-                    # are safe -- every delete is guarded and named by exact bytes -- but they are
-                    # two full scans for one pass's worth of work.
-                    await self._hold_reconcile_turn()
+                    await self._sweep_holding_the_turn()
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -535,6 +526,40 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
     def _ticket(self, at: float) -> str:
         return json.dumps({"at": at, "by": self._reconcile_token})
 
+    async def _sweep_holding_the_turn(self) -> None:
+        """Sweep, keeping the turn re-dated for as long as it takes.
+
+        The turn is a timestamp, so a pass that outlasts the interval leaves an expired ticket
+        behind it and the next manager starts a second full scan over the top of this one. Two
+        passes are safe -- every delete is guarded and named by exact bytes -- but they are two
+        scans of the whole pool for one pass's worth of work, on exactly the cluster too big to
+        sweep inside an interval.
+
+        So the ticket is re-dated while the sweep runs, not only when it ends. Every re-dating is
+        a compare-and-swap over this manager's own bytes: if the turn was taken anyway, the
+        heartbeat stops rather than stamping over whoever has it, and this pass finishes on its
+        own. A lease is what would do this without a heartbeat, and this etcd client has none.
+        """
+
+        async def heartbeat() -> None:
+            while True:
+                await asyncio.sleep(_RECONCILE_HEARTBEAT_SEC)
+                if not await self._hold_reconcile_turn():
+                    return
+
+        beat = asyncio.create_task(heartbeat())
+        try:
+            await self._reconcile_pool_reporting()
+        finally:
+            beat.cancel()
+            try:
+                await beat
+            except asyncio.CancelledError:
+                pass
+        # Dated from when the pass FINISHED, so the next interval starts here rather than at the
+        # top of a sweep whose length nobody knows in advance.
+        await self._hold_reconcile_turn()
+
     async def _hold_reconcile_turn(self) -> bool:
         """Re-date this manager's ticket, but only over the bytes it put there.
 
@@ -544,8 +569,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         forth. Compare-and-swap over this manager's own bytes instead: losing it means the turn is
         somebody else's now, and this manager stops refreshing.
 
-        Called both while a long sweep runs and when it finishes, so the interval is measured from
-        the end of a pass rather than the start of one.
+        Called on a heartbeat while a long sweep runs and again when it finishes -- see
+        `_sweep_holding_the_turn` -- so the interval is measured from the end of a pass rather
+        than the start of one.
 
         :return: ``True`` while this manager still holds the turn.
         """
@@ -798,18 +824,25 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # to hand back: the subnet and VNI it names are not committed until whoever owns it
             # says so, and a create that fails after this point takes them away again.
             return None
-        subnet = _named_subnet(meta)
-        if subnet is None:
+        # The SAME parser the sweep judges ownership with. When only the sweep validated, a
+        # record the sweep called corrupt was still published to the agents -- which then refused
+        # it, and every retry of the session refused it again.
+        allocation = _parse_allocation(raw)
+        if allocation.state is not _AllocationState.ALLOCATED:
             log.warning(
-                "session {}'s network record names no subnet this can read; allocating again",
+                "session {}'s network record does not name an allocation this can act on;"
+                " allocating again",
                 session_id,
             )
+            return None
+        subnet = allocation.subnet
+        if subnet is None:
             return None
         # A meta is only worth reusing while the pool still agrees it is ours. A rollback that
         # freed the allocation but could not delete the record leaves one that names a block and
         # a VNI the next session may already hold; returning it would hand this session their
         # data plane. Treat that as no allocation at all and build a fresh one.
-        if not await self._still_ours(session_id, subnet, _named_vni(meta)):
+        if not await self._still_ours(session_id, subnet, allocation.vni):
             log.warning(
                 "session {}'s recorded overlay allocation (subnet {}, vni {}) is no longer held"
                 " by it; allocating again",
@@ -866,7 +899,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # allocation that has already gone back to the pool.
         # The pool as well as the record. A claim can move between the promotion above and here,
         # and the record alone does not say who holds the block.
-        if not await self._still_ours(session_id, subnet, _named_vni(meta)):
+        if not await self._still_ours(session_id, subnet, allocation.vni):
             log.warning(
                 "session {}'s allocation stopped being its own while its endpoints were being"
                 " written; not handing it back",
@@ -915,7 +948,14 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             return True  # nothing to promote to
         guards = {session_meta_key(session_id): held}
         taken = True
-        subnet = _named_subnet(meta)
+        allocation = _parse_allocation(json.dumps(dict(meta)))
+        if allocation.is_corrupt:
+            log.warning(
+                "not taking session {}'s allocation: its record does not name one this can act on",
+                session_id,
+            )
+            return False
+        subnet = allocation.subnet
         if subnet and not await self._subnet_allocator.promote(
             subnet, session_id, str(generation), guards, allocated
         ):
@@ -925,7 +965,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 subnet,
             )
             taken = False
-        vni = _named_vni(meta)
+        vni = allocation.vni
         if vni is not None and not await self._vni_allocator.promote(
             vni, session_id, str(generation), guards
         ):
@@ -1223,7 +1263,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # carrying no incarnation (compatible with the one the record names) or one the record
         # names outright. Neither is this sweep's to give back.
         live_raw = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
-        if live_raw is not None and not _allocation_readable(live_raw):
+        live_allocation = (
+            _parse_allocation(live_raw)
+            if live_raw is not None
+            else _Allocation(_AllocationState.PENDING)
+        )
+        if live_allocation.is_corrupt:
             # The same rule as the sweep's, at the place the release actually happens. What this
             # cleanup may keep its hands off is decided by what the LIVE record names, and that
             # cannot be read -- so nothing of this id goes back. The debt stays and this is
@@ -1236,11 +1281,8 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             )
             return False
         live = _generation_of(live_raw)
-        live_meta: Mapping[str, Any] = {}
-        if live_raw is not None:
-            live_meta = _record(live_raw) or {}
-        live_vni = _named_vni(live_meta)
-        live_subnet = _named_subnet(live_meta)
+        live_vni = live_allocation.vni
+        live_subnet = live_allocation.subnet
         try:
             stuck_vnis = await self._vni_allocator.release_all(
                 session_id, generation, live, live_vni

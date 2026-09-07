@@ -3077,6 +3077,113 @@ class TestARecordThatIsAnObjectButNotAnAllocation:
         assert await plugin._existing_allocation(cast(AsyncEtcd, etcd), "s1", []) is None
 
 
+class TestTheRecordContractNotJustTheParse:
+    """C35. The first cut asked only whether a value PARSED. `vni: null` parses, `vni: true`
+    parses to 1, `vni: 0` and `vni: 16777216` are integers, and a public or IPv6 subnet is a
+    network. Each of them makes a live session's real claim look like one its record does not
+    name -- which is the sweep's cue to give it back to the pool. The bar is the contract the
+    agent's privnet policy already holds the manager to."""
+
+    _OPTIONS: dict[str, Any] = {"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+
+    async def _live(self, etcd: FakeEtcd, plugin: CNINetworkPlugin) -> tuple[str, int]:
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        return str(info.options["subnet"]), int(cast(int, info.options["vni"]))
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("vni", None),  # a vxlan session that names no vni
+            ("vni", True),  # bool is an int subclass; int(True) is 1
+            ("vni", 1.5),  # int() truncates
+            ("vni", 0),  # below the 24-bit range
+            ("vni", 1 << 24),  # above it
+            ("vni", "not-a-vni"),
+            ("subnet", None),
+            ("subnet", "8.8.8.0/24"),  # public
+            ("subnet", "fd00::/64"),  # not IPv4
+            ("subnet", "10.128.0.1/24"),  # not aligned to its own prefix
+            ("backend", "something-else"),
+        ],
+    )
+    async def test_a_live_session_keeps_its_allocation(self, field: str, value: Any) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        subnet, vni = await self._live(etcd, plugin)
+        record = json.loads(etcd.store[session_meta_key("s1")])
+        etcd.store[session_meta_key("s1")] = json.dumps({**record, field: value})
+
+        await plugin.reconcile_pool()
+
+        assert f"network/ipam/vni/{vni}" in etcd.store, f"{field}={value!r} cost a live vni"
+        assert _allocated_key(subnet) in etcd.store, f"{field}={value!r} cost a live subnet"
+
+    async def test_a_non_vxlan_record_that_names_a_vni_is_not_acted_on(self) -> None:
+        # The coupling the other way round: only a vxlan session has a VNI, so one on any other
+        # backend is a record nobody should judge from.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        subnet, vni = await self._live(etcd, plugin)
+        record = json.loads(etcd.store[session_meta_key("s1")])
+        etcd.store[session_meta_key("s1")] = json.dumps({**record, "backend": "bridge"})
+
+        await plugin.reconcile_pool()
+
+        assert f"network/ipam/vni/{vni}" in etcd.store
+
+    async def test_a_record_that_does_not_name_a_valid_allocation_is_not_reused(self) -> None:
+        """The reuse path has to use the SAME parser. It did not, so a record the sweep called
+        corrupt was still handed to the agents -- which refuse it, and every retry refused it
+        again."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await self._live(etcd, plugin)
+        record = json.loads(etcd.store[session_meta_key("s1")])
+        etcd.store[session_meta_key("s1")] = json.dumps({**record, "vni": None})
+
+        assert await plugin._existing_allocation(cast(AsyncEtcd, etcd), "s1", []) is None
+
+    async def test_a_valid_allocation_is_still_reused(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        subnet, vni = await self._live(etcd, plugin)
+
+        reused = await plugin._existing_allocation(cast(AsyncEtcd, etcd), "s1", [])
+
+        assert reused is not None
+        assert reused.options["subnet"] == subnet
+        assert reused.options["vni"] == vni
+
+    async def test_a_creating_record_that_has_allocated_nothing_is_not_corrupt(self) -> None:
+        # PENDING is not CORRUPT: a record that has claimed the id and named nothing yet is what
+        # every create holds before it publishes.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        held, _ = await plugin._claim_session(cast(AsyncEtcd, etcd), "s1", "tok", [])
+        generation = json.loads(held)["generation"]
+        await plugin._subnet_allocator.acquire("s1", generation=generation)
+        await plugin._vni_allocator.acquire("s1", generation)
+
+        assert await plugin.reconcile_pool() == 0
+
+
+class _SlowSweep(CNINetworkPlugin):
+    """A plugin whose reconciliation pass takes as long as the test wants it to."""
+
+    sweeping: asyncio.Event
+    finish: asyncio.Event
+
+    def __init__(self, plugin_config: dict[str, Any], local_config: dict[str, Any]) -> None:
+        super().__init__(plugin_config, local_config)
+        self.sweeping = asyncio.Event()
+        self.finish = asyncio.Event()
+
+    @override
+    async def _reconcile_pool_reporting(self) -> None:
+        self.sweeping.set()
+        await self.finish.wait()
+
+
 class TestTheReconcileTicketAndTheClock:
     """C33. Managers compare wall clocks on the ticket, so one running ahead could park the whole
     cluster's reconciliation for as long as its clock is ahead."""
@@ -3107,6 +3214,29 @@ class TestTheReconcileTicketAndTheClock:
         assert await plugin._hold_reconcile_turn() is True
 
         assert await _plugin_with(etcd)._claim_reconcile_turn() is False
+
+    async def test_a_long_sweep_keeps_the_turn_while_it_runs(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The ticket is a timestamp, so a pass that outlasts the interval leaves an expired one
+        behind it and the next manager starts a second full scan over the top. Re-dating only at
+        the END could not prevent that -- which is what the comment claimed and the code did
+        not."""
+        etcd = FakeEtcd()
+        plugin = _SlowSweep({}, {})
+        _wire(plugin, etcd)
+        monkeypatch.setattr("ai.backend.manager.network.cni._RECONCILE_HEARTBEAT_SEC", 0.01)
+
+        assert await plugin._claim_reconcile_turn() is True
+        first = etcd.store[cni._RECONCILE_TICKET]
+        sweep = asyncio.create_task(plugin._sweep_holding_the_turn())
+        await plugin.sweeping.wait()
+        await asyncio.sleep(0.05)
+        beaten = etcd.store[cni._RECONCILE_TICKET]
+        plugin.finish.set()
+        await sweep
+
+        assert beaten != first, "the turn was not re-dated while the sweep ran"
 
     async def test_a_long_sweep_does_not_stamp_over_the_turn_it_lost(self) -> None:
         """A sweep that outlasts the interval loses the turn to the next manager. Re-dating
