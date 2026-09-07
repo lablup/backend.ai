@@ -37,7 +37,6 @@ from ai.backend.manager.data.permission.association_scopes_entities import (
 from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
-    ObjectPermissionCreateInputBeforeRoleCreation,
     ObjectPermissionData,
 )
 from ai.backend.manager.data.permission.permission import PermissionData
@@ -50,12 +49,10 @@ from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
-from ai.backend.manager.data.permission.status import PermissionStatus, RoleStatus
-from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
-from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
     GetEntityTypesAction,
 )
@@ -140,117 +137,6 @@ def _make_querier(limit: int = 10, offset: int = 0) -> BatchQuerier:
         orders=[],
         pagination=OffsetPagination(limit=limit, offset=offset),
     )
-
-
-class TestCreateRole:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.create_role = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(
-            repository=mock_repository,
-            group_repository=MagicMock(),
-            rbac_action_registry=[],
-        )
-
-    async def test_create_role_returns_role_data(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        role_data = _make_role_data(name="admin-role", source=RoleSource.CUSTOM)
-        mock_repository.create_role.return_value = role_data
-
-        creator = MagicMock()
-        action = CreateRoleAction(creator=creator)
-
-        result = await service.create_role(action)
-
-        mock_repository.create_role.assert_called_once()
-        assert result.data.name == "admin-role"
-        assert result.data.source == RoleSource.CUSTOM
-
-    async def test_create_role_with_object_permissions(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        role_data = _make_role_data()
-        mock_repository.create_role.return_value = role_data
-
-        obj_perm = ObjectPermissionCreateInputBeforeRoleCreation(
-            entity_type=LegacyEntityType.USER,
-            entity_id="user-1",
-            operation=OperationType.READ,
-            status=PermissionStatus.ACTIVE,
-        )
-        creator = MagicMock()
-        action = CreateRoleAction(creator=creator, object_permissions=[obj_perm])
-
-        result = await service.create_role(action)
-
-        call_args = mock_repository.create_role.call_args[0][0]
-        assert len(call_args.object_permissions) == 1
-        assert result.data is not None
-
-    async def test_create_role_default_timestamps(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        now = datetime.now(tz=UTC)
-        role_data = _make_role_data()
-        mock_repository.create_role.return_value = role_data
-
-        action = CreateRoleAction(creator=MagicMock())
-        result = await service.create_role(action)
-
-        assert result.data.created_at is not None
-        assert result.data.updated_at is not None
-        assert result.data.created_at <= now or result.data.created_at >= now
-
-    async def test_create_role_forwards_scope_refs(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        role_data = _make_role_data()
-        mock_repository.create_role.return_value = role_data
-
-        scope_refs = [
-            RBACElementRef(element_type=RBACElementType.DOMAIN, element_id="domain-1"),
-            RBACElementRef(element_type=RBACElementType.PROJECT, element_id="project-1"),
-        ]
-        creator = MagicMock()
-        action = CreateRoleAction(creator=creator, scope_refs=scope_refs)
-
-        await service.create_role(action)
-
-        call_args = mock_repository.create_role.call_args[0][0]
-        assert len(call_args.scope_refs) == 2
-        assert call_args.scope_refs[0] == scope_refs[0]
-        assert call_args.scope_refs[1] == scope_refs[1]
-
-    async def test_create_role_without_scope_refs_defaults_to_empty(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        role_data = _make_role_data()
-        mock_repository.create_role.return_value = role_data
-
-        action = CreateRoleAction(creator=MagicMock())
-
-        await service.create_role(action)
-
-        call_args = mock_repository.create_role.call_args[0][0]
-        assert len(call_args.scope_refs) == 0
 
 
 class TestGetRoleDetail:

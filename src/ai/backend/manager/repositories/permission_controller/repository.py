@@ -65,7 +65,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     UserRoleCreatorSpec,
 )
 
-from .db_source.db_source import CreateRoleInput, PermissionDBSource
+from .db_source.db_source import PermissionDBSource
 
 permission_controller_repository_resilience = Resilience(
     policies=[
@@ -91,16 +91,6 @@ class PermissionControllerRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = PermissionDBSource(db)
-
-    @permission_controller_repository_resilience.apply()
-    async def create_role(self, input_data: CreateRoleInput) -> RoleData:
-        """
-        Create a new role in the database.
-
-        Returns the created role data.
-        """
-        role_row = await self._db_source.create_role(input_data)
-        return role_row.to_data()
 
     @permission_controller_repository_resilience.apply()
     async def create_permission(

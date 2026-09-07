@@ -7,7 +7,7 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
-from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
+from ai.backend.manager.models.rbac_models.role.creators import GlobalRoleCreator, RoleCreator
 from ai.backend.manager.models.rbac_models.role.purgers import RolePurger
 from ai.backend.manager.models.rbac_models.role.queriers import RoleQuerier
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -20,20 +20,29 @@ from ai.backend.manager.types import OptionalState, TriState
 
 
 class TestRoleCreator:
-    def test_the_scope_owns_and_governs_the_new_role(self) -> None:
-        scope = ProjectID(uuid.uuid4())
-        creator = RoleCreator(name="reader", scope=scope)
+    def test_each_scope_owns_and_governs_the_new_role(self) -> None:
+        scopes = (ProjectID(uuid.uuid4()), ProjectID(uuid.uuid4()))
+        creator = RoleCreator(name="reader", scopes=scopes)
 
         row = creator.build_row()
 
-        assert creator.created_in(row) == (scope,)
+        assert creator.created_in(row) == scopes
+        assert row.name == "reader"
+        assert row.source == RoleSource.CUSTOM
+        assert row.status == RoleStatus.ACTIVE
+
+    def test_a_global_role_is_created_in_no_scope(self) -> None:
+        creator = GlobalRoleCreator(name="reader")
+
+        row = creator.build_row()
+
         assert row.name == "reader"
         assert row.source == RoleSource.CUSTOM
         assert row.status == RoleStatus.ACTIVE
 
     def test_the_entity_id_is_read_off_the_settled_row(self) -> None:
         role_id = RoleID(uuid.uuid4())
-        creator = RoleCreator(name="reader", scope=ProjectID(uuid.uuid4()))
+        creator = RoleCreator(name="reader", scopes=(ProjectID(uuid.uuid4()),))
 
         entity_id = creator.entity_id(RoleRow(id=role_id, name="reader"))
 

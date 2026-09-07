@@ -150,16 +150,15 @@ async def role_registered_in_project(
                 .values(entity_type=PROJECT_ENTITY_TYPE, entity_id=group_fixture)
                 .returning(nodes.c.id)
             )
+        # Creating the role provisioned its node and self-membership.
         role_node = await conn.scalar(
-            sa.insert(nodes)
-            .values(entity_type=ROLE_ENTITY_TYPE, entity_id=role_id)
-            .returning(nodes.c.id)
+            sa.select(nodes.c.id).where(
+                nodes.c.entity_type == ROLE_ENTITY_TYPE,
+                nodes.c.entity_id == role_id,
+            )
         )
         await conn.execute(
-            sa.insert(edges).values([
-                {"virtual_entity_id": role_node, "member_entity_id": role_node},
-                {"virtual_entity_id": scope_node, "member_entity_id": role_node},
-            ])
+            sa.insert(edges).values(virtual_entity_id=scope_node, member_entity_id=role_node)
         )
 
     yield role_id
