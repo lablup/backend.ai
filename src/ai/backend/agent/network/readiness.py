@@ -310,6 +310,11 @@ async def probe_readiness(
                 # on it looks healthy from every other angle, and the manager goes on scheduling
                 # onto it -- while that session's VNI can be handed out underneath it.
                 blocking.append(f"the privileged network helper has not recovered {what}: {why}")
+            # Blocking for the same reason, one step earlier: a helper that does not check which
+            # incarnation of a session a request was issued for will act on a stale one, and the
+            # two processes upgrade separately, so this is a real state and not a hypothetical.
+            for _what, why in sorted((await client.fencing_problems()).items()):
+                blocking.append(why)
     devices, unreadable = await describe_vxlan_devices()
     advisory = foreign_conflicts(devices, port=port, vni_range=vni_range)
     if unreadable:
