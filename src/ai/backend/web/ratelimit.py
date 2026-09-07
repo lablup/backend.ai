@@ -43,12 +43,12 @@ async def _open_window(request: web.Request) -> RateLimitState | None:
         client_ip = get_client_ip(request)
         if client_ip is None:
             return None
-        return await valkey_client.get_ip_state(client_ip)
+        return await valkey_client.get_ip_window_state(client_ip)
     token = session.get("token") or {}
     raw_user_id = token.get("user_id")
     if raw_user_id is None:
         return None
-    return await valkey_client.get_user_state(UserID(uuid.UUID(raw_user_id)))
+    return await valkey_client.get_user_window_state(UserID(uuid.UUID(raw_user_id)))
 
 
 def manager_proxy_rate_limited(handler: Handler) -> Handler:
