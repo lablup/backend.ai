@@ -8,6 +8,7 @@ proposals/BEP-1078 and its sub-documents `control-plane.md` and `agent-plugin-v2
 from __future__ import annotations
 
 import ipaddress
+import json
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -54,6 +55,36 @@ not committed to anybody."""
 
 SESSION_META_READY: Final = "ready"
 """The one value of ``SESSION_META_STATE`` that means the record may be acted on."""
+
+SESSION_META_GENERATION: Final = "generation"
+"""Where the manager records WHICH incarnation of a session id a record, a claim or a key belongs
+to.
+
+A session id is reused: a session torn down and started again under the same id gets a fresh
+subnet, VNI and endpoints, and every key of the old one is indistinguishable from the new one's by
+name alone. The generation is minted once, when the record is created out of nothing, and carried
+unchanged by everything that incarnation writes -- pool claims, endpoints, the per-session IPAM
+reservations and each node's member record -- so a cleanup, a late agent join or a superseded
+create can tell its own incarnation from the one that replaced it. See
+`CNINetworkPlugin._finish_cleanup` and `SessionNetworkCoordinator._session_fence`."""
+
+
+def of_generation(raw: str, generation: str | None) -> bool:
+    """Whether a record carrying ``raw`` may be acted on by a call working for ``generation``.
+
+    True for a record of that same incarnation, and for one carrying no generation at all -- what
+    a component from before the field wrote, and what nothing else will ever come back for. False
+    for one stamped with a DIFFERENT incarnation: that belongs to the session which replaced the
+    one being cleaned up, and it is live. Unreadable is False -- a value this cannot parse is not
+    one it may claim to own.
+
+    See ``SESSION_META_GENERATION``.
+    """
+    try:
+        stamped = json.loads(raw).get(SESSION_META_GENERATION)
+    except ValueError:
+        return False
+    return stamped is None or stamped == generation
 
 
 def mac_for_ip(ip: str) -> str:
@@ -133,6 +164,11 @@ class SessionNetMeta:
     since the manager encrypts by default (see `CNINetworkPlugin._encryption_enabled`). The root is
     distributed via etcd like ``vni``; the backend derives pair-and-12-hour-generation keys and
     programs only those into XFRM. See overlay-encryption.md."""
+    generation: str | None = None
+    """Which incarnation of ``session_id`` this descriptor names -- see ``SESSION_META_GENERATION``.
+
+    ``None`` on a single-node BRIDGE meta the agent writes for itself, and on one from a manager
+    older than the field."""
 
 
 @dataclass(frozen=True)
@@ -154,13 +190,24 @@ class Member:
     says "this node holds host state for the session". Only the second is an acknowledgement, so
     only the second may hold the session's VNI back from reuse.
     """
+    generation: str | None = None
+    """Which incarnation of the session this membership is of -- see ``SESSION_META_GENERATION``.
+
+    A session id is reused, so a member key alone does not say which of its incarnations wrote it.
+    Carrying the generation is what lets a cleanup delete its own incarnation's membership without
+    reaching the one a node published for the session that replaced it."""
 
     def to_etcd_payload(self) -> dict[str, str | bool | None]:
         """The member's etcd value (``agent_id`` is the key, not part of the value).
 
         Single source of the on-wire member schema — used by both the agent (self-publish)
         and the manager (pre-seed) so the two never drift."""
-        return {"host_ip": self.host_ip, "vtep_ip": self.vtep_ip, "joined": self.joined}
+        return {
+            "host_ip": self.host_ip,
+            "vtep_ip": self.vtep_ip,
+            "joined": self.joined,
+            "generation": self.generation,
+        }
 
     @classmethod
     def from_etcd_payload(cls, agent_id: str, payload: Mapping[str, Any]) -> Member:
@@ -171,6 +218,7 @@ class Member:
             # A record written before this field existed came from an agent: the manager's
             # pre-seed is newer than the field, so the older shape can only be a self-publish.
             joined=bool(payload.get("joined", True)),
+            generation=payload.get("generation"),
         )
 
 
@@ -196,6 +244,10 @@ class EndpointAddr:
     cluster_hostname: str | None = None
     """The kernel's in-cluster hostname. ``None`` only for endpoints written before this field
     existed (backward-compatible decode); a name-less endpoint is simply not resolvable by name."""
+    generation: str | None = None
+    """Which incarnation of the session this endpoint belongs to -- see
+    ``SESSION_META_GENERATION``. What lets a cleanup delete its own incarnation's endpoints and
+    leave the ones a later session built under the same id."""
 
     def to_etcd_payload(self) -> dict[str, str | None]:
         """The endpoint's etcd value (``container_id`` is the key, but kept in the value too for
@@ -207,6 +259,7 @@ class EndpointAddr:
             "agent_id": self.agent_id,
             "container_id": self.container_id,
             "cluster_hostname": self.cluster_hostname,
+            "generation": self.generation,
         }
 
     @classmethod
@@ -217,6 +270,7 @@ class EndpointAddr:
             mac=payload["mac"],
             agent_id=payload["agent_id"],
             cluster_hostname=payload.get("cluster_hostname"),
+            generation=payload.get("generation"),
         )
 
 
