@@ -18,7 +18,7 @@ from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.updaters import EndpointReplicaGroupUpdater
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupDeployUpdater
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import (
@@ -98,8 +98,8 @@ class DeployingFinalizingHandler(DeploymentHandler):
     ) -> DeploymentExecutionResult:
         successes: list[DeploymentWithHistory] = []
         failures: list[DeploymentExecutionError] = []
-        group_updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = []
-        endpoint_updaters: list[DataUpdater[EndpointRow, DeploymentInfo]] = []
+        group_updaters: list[GuardedDataUpdater[ReplicaGroupRow, ReplicaGroupData]] = []
+        endpoint_updaters: list[GuardedDataUpdater[EndpointRow, DeploymentInfo]] = []
         to_finalize: list[DeploymentWithHistory] = []
 
         for deployment in deployments:

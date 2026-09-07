@@ -90,7 +90,7 @@ class ArtifactRepository:
         Raises ArtifactNotFoundError if the artifact is gone or already deleted.
         """
         async with self._v2_ops.write_ops() as w:
-            data = await w.update_guarded_data(updater)
+            data = await w.update_data(updater)
             if data is None:
                 raise ArtifactNotFoundError(f"Artifact with ID {updater.artifact_id} not found")
             return data

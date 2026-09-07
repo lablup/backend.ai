@@ -1,26 +1,34 @@
 """Update specs of the v2 lineage.
 
 Updates carry no membership work, so the roots differ only in how they pick what to
-write: by id, by id behind a guard, or by conditions.
+write: by id, or by conditions. The single-row root carries its guard, and the one
+that has none says so once rather than every spec repeating it.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, final, override
 from uuid import UUID
 
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 
 
-class DataUpdater[TRow: Base, TData](ABC):
-    """Update spec for one row: the target row, the values to set, and how the
-    updated row becomes data."""
+class GuardedDataUpdater[TRow: Base, TData](ABC):
+    """Update spec for one row: the target row, the values to set, the guards the row
+    must satisfy, and how the updated row becomes data.
+
+    The id names exactly one row — this is not a condition-selected write. A guard is a
+    precondition on that row's current values, carried in the statement so the read and
+    the write cannot part ways. The root every single-row updater shares, so one ops
+    path serves both and a spec carrying guards cannot reach a path that would skip
+    them; a spec with none answers an empty list once via :class:`DataUpdater`.
+    """
 
     @property
     @abstractmethod
@@ -45,52 +53,11 @@ class DataUpdater[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def build_values(self) -> dict[str, Any]:
-        """Build the column-to-value mapping to set."""
-        raise NotImplementedError
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        """The conditions the named row must satisfy, each with the error it answers.
 
-    @property
-    @abstractmethod
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        """Return integrity error checks for declarative error matching."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def to_data(self, row: TRow) -> TData:
-        """Convert the updated row into its ``data/`` type."""
-        raise NotImplementedError
-
-
-class GuardedDataUpdater[TRow: Base, TData](ABC):
-    """Update spec for one row that declines to write unless its guard holds.
-
-    The id still names exactly one row — this is not a condition-selected write. The
-    guard is a precondition on that row's current values, carried in the statement so
-    the read and the write cannot part ways.
-    """
-
-    @property
-    @abstractmethod
-    def row_class(self) -> type[TRow]:
-        """Return the ORM class for table access and PK detection."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def target_id_column(self) -> InstrumentedAttribute[Any]:
-        """Return the column that carries the id the row is written by."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def target_id_value(self) -> UUID:
-        """Return the id of the row to write."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def guard_conditions(self) -> list[QueryCondition]:
-        """Return the preconditions the row must satisfy (AND combined).
-
-        They narrow nothing: the row is already named. A row failing them is left
-        alone and the operation reports that it wrote nothing.
+        They narrow nothing: the row is already named. A row failing one is left alone
+        and the first failing check's error is raised.
         """
         raise NotImplementedError
 
@@ -109,6 +76,20 @@ class GuardedDataUpdater[TRow: Base, TData](ABC):
     def to_data(self, row: TRow) -> TData:
         """Convert the updated row into its ``data/`` type."""
         raise NotImplementedError
+
+
+class DataUpdater[TRow: Base, TData](GuardedDataUpdater[TRow, TData], ABC):
+    """Update spec of a row nothing about its own state can refuse.
+
+    Everything :class:`GuardedDataUpdater` describes, with no guards: a row that is
+    there is written. A spec that needs a guard inherits the guarded root directly
+    rather than answering here.
+    """
+
+    @final
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return ()
 
 
 class DataBatchUpdater[TRow: Base, TData](ABC):

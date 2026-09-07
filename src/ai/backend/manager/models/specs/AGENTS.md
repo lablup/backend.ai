@@ -42,14 +42,30 @@ and is read through an entity's permission like a field, while belonging to neit
 
 | Operation | Roots | Why |
 |---|---|---|
-| creator | `GlobalEntityCreator` / `EntityCreator` / `RoleManagedGlobalEntityCreator` / `RoleManagedEntityCreator` / `FieldCreator` / `SidecarCreator` | only a create settles what a row belongs to |
-| purger | `EntityPurger` / `EntityBatchPurger` / `FieldPurger` / `GuardedFieldPurger` / `FieldBatchPurger` | removing an entity removes what it left in the graph; a field row splits further on how it is picked: by id, or by id behind a precondition; the batch roots pick by subquery instead of by id |
-| updater | `DataUpdater` / `GuardedDataUpdater` | an update never changes what a row belongs to, so the roots split on how the row is picked: by id, or by id behind a precondition |
+| creator | `GlobalEntityCreator` / `GuardedEntityCreator` / `RoleManagedGlobalEntityCreator` / `RoleManagedEntityCreator` / `FieldCreator` / `SidecarCreator` | only a create settles what a row belongs to |
+| purger | `GuardedEntityPurger` / `EntityBatchPurger` / `GuardedFieldPurger` / `FieldBatchPurger` | removing an entity removes what it left in the graph; the batch roots pick by subquery instead of by id |
+| updater | `GuardedDataUpdater` / `DataBatchUpdater` | an update never changes what a row belongs to, so the roots split on how the row is picked: by id, or by conditions |
 
 The roots are deliberately unrelated. Do NOT extract a common base across them
 or type any function against "any creator/purger" — the absence of a common supertype
 is the enforcement. Reuse execution logic through ops-layer helpers that take plain
 values (`row_class`, `pk_value`, ...).
+
+## A single-row write carries its guard on the root
+
+- `GuardedEntityCreator.precondition_checks()`, `GuardedDataUpdater.guard_checks()`,
+  `GuardedEntityPurger.guard_checks()` and `GuardedFieldPurger.guard_checks()` are
+  abstract on the root. `EntityCreator`, `DataUpdater`, `EntityPurger` and `FieldPurger`
+  answer an empty list under `@final`; a spec that refuses inherits the guarded root
+  directly.
+- A `GuardCheck` is a condition on the row already named, paired with the error to
+  raise when it fails. It rides on the UPDATE / DELETE statement; ops tells a missing
+  row (`EntityNotFoundError`) from a refusing one (the first failing check's error)
+  with one read of that row after the statement touched nothing.
+- A `PreconditionCheck` names rows elsewhere whose presence turns a create away; a
+  `ConflictCheck` names rows a purge must not leave behind. Neither is a guard.
+- Do NOT translate a refusal in the caller. The error a guard answers is declared on
+  the spec, and the repository has no `None` to branch on for it.
 
 ## An entity answers its own id
 

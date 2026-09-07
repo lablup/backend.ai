@@ -1,14 +1,16 @@
 """Delete specs of the v2 lineage.
 
-The roots below are deliberately unrelated — no common ABC. See AGENTS.md
-in this package before typing anything against more than one of them.
+The roots below are deliberately unrelated — no common ABC — with one exception per
+single-row root: it carries its guard, and the spec that has none says so once rather
+than every spec repeating it. See AGENTS.md in this package before typing anything
+against more than one of them.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, final, override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -16,15 +18,19 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.specs.types import ConflictCheck
+from ai.backend.manager.models.specs.types import ConflictCheck, GuardCheck
 
 
-class EntityPurger[TRow: Base, TData](ABC):
+class GuardedEntityPurger[TRow: Base, TData](ABC):
     """Delete spec of one entity named by id.
 
     Removing the row removes what it left in the RBAC graph. Declared separately from
     ``pk_value()`` because a primary key is not always the entity id.
+
+    The id names exactly one row. A guard is a precondition on that row's current
+    values, carried in the statement so the read and the delete cannot part ways. The
+    root every entity purger shares, so one ops path serves both; a spec with no guard
+    answers an empty list once via :class:`EntityPurger`.
     """
 
     @abstractmethod
@@ -42,30 +48,12 @@ class EntityPurger[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        raise NotImplementedError
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        """The conditions the named row must satisfy, each with the error it answers.
 
-    @abstractmethod
-    def to_data(self, row: TRow) -> TData:
-        raise NotImplementedError
-
-
-class FieldPurger[TRow: Base, TData: FieldData](ABC):
-    """Delete spec of a field row — authorized through its owner, like an update
-    to the owning entity; no scope to tear down."""
-
-    @abstractmethod
-    def row_class(self) -> type[TRow]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def target_id_column(self) -> InstrumentedAttribute[Any]:
-        """Return the column carrying the field id, which the delete keys on."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def target_id_value(self) -> UUID:
-        """Return the id of the field row to delete."""
+        They narrow nothing: the row is already named. A row failing one is left alone
+        and the first failing check's error is raised.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -75,14 +63,27 @@ class FieldPurger[TRow: Base, TData: FieldData](ABC):
     @abstractmethod
     def to_data(self, row: TRow) -> TData:
         raise NotImplementedError
+
+
+class EntityPurger[TRow: Base, TData](GuardedEntityPurger[TRow, TData], ABC):
+    """Delete spec of an entity nothing about its own state can refuse.
+
+    Everything :class:`GuardedEntityPurger` describes, with no guards. A spec that
+    needs one inherits the guarded root directly rather than answering here.
+    """
+
+    @final
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return ()
 
 
 class GuardedFieldPurger[TRow: Base, TData: FieldData](ABC):
-    """Delete spec of a field row that declines to delete unless its guard holds.
+    """Delete spec of a field row — authorized through its owner, like an update
+    to the owning entity; no scope to tear down.
 
-    The id still names exactly one row. The guard is a precondition on that row's
-    current values, carried in the statement so the read and the delete cannot part
-    ways.
+    Carries its guard as :class:`GuardedEntityPurger` does; a spec with none answers
+    an empty list once via :class:`FieldPurger`.
     """
 
     @abstractmethod
@@ -100,12 +101,8 @@ class GuardedFieldPurger[TRow: Base, TData: FieldData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def guard_conditions(self) -> list[QueryCondition]:
-        """Return the preconditions the row must satisfy (AND combined).
-
-        They narrow nothing: the row is already named. A row failing them is left
-        alone and the operation reports that it removed nothing.
-        """
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        """The conditions the named row must satisfy, each with the error it answers."""
         raise NotImplementedError
 
     @abstractmethod
@@ -115,6 +112,15 @@ class GuardedFieldPurger[TRow: Base, TData: FieldData](ABC):
     @abstractmethod
     def to_data(self, row: TRow) -> TData:
         raise NotImplementedError
+
+
+class FieldPurger[TRow: Base, TData: FieldData](GuardedFieldPurger[TRow, TData], ABC):
+    """Delete spec of a field row nothing about its own state can refuse."""
+
+    @final
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return ()
 
 
 class FieldBatchPurger[TOwnerID: EntityIdentifier, TRow: Base, TData](ABC):
@@ -144,7 +150,7 @@ class FieldBatchPurger[TOwnerID: EntityIdentifier, TRow: Base, TData](ABC):
 
 class EntityBatchPurger[TRow: Base, TData](ABC):
     """Delete spec for every entity row a subquery selects; each row's RBAC graph goes
-    with it, as :class:`EntityPurger` does for one.
+    with it, as :class:`GuardedEntityPurger` does for one.
 
     Deliberately NOT a :class:`FieldBatchPurger` subtype — the hooks are duplicated
     instead — so an entity spec cannot flow through the field path and leave its virtual

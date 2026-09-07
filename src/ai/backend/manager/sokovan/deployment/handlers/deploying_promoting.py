@@ -18,7 +18,7 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupDeployUpdater
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import (
@@ -105,7 +105,7 @@ class DeployingPromotingHandler(DeploymentHandler):
 
         completed: list[DeploymentWithHistory] = []
         failures: list[DeploymentExecutionError] = []
-        group_updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = []
+        group_updaters: list[GuardedDataUpdater[ReplicaGroupRow, ReplicaGroupData]] = []
 
         for deployment in deployments:
             info = deployment.deployment_info

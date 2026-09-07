@@ -39,7 +39,7 @@ from ai.backend.manager.models.keypair.row import generate_keypair_data
 from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.scopes import (
     DomainUserOperationScope,
@@ -326,25 +326,23 @@ class UserRepository:
         return await self._db_source.keypair(keypair_id)
 
     @user_repository_resilience.apply()
-    async def purge_keypair(self, keypair_id: KeyPairID) -> KeyPairData | None:
-        """Remove one keypair unless it is the key its user authorizes with.
-
-        ``None`` when nothing was removed — the row is gone, or the guard refused.
-        """
+    async def purge_keypair(self, keypair_id: KeyPairID) -> KeyPairData:
+        """Remove one keypair unless it is the key its user authorizes with."""
         async with self._v2_ops.write_ops() as w:
-            return await w.purge_guarded_field_entity(
-                NonDefaultKeypairPurger(keypair_id=keypair_id)
-            )
+            data = await w.purge_field_entity(NonDefaultKeypairPurger(keypair_id=keypair_id))
+            if data is None:
+                raise KeyPairNotFound(f"Keypair not found: {keypair_id}")
+            return data
 
     @user_repository_resilience.apply()
-    async def update_keypair(self, updater: KeypairUpdater) -> KeyPairData | None:
+    async def update_keypair(self, updater: KeypairUpdater) -> KeyPairData:
         """Write one keypair's settings unless the write would deactivate the key its
-        user authorizes with.
-
-        ``None`` when nothing was written — the row is gone, or the guard refused.
-        """
+        user authorizes with."""
         async with self._v2_ops.write_ops() as w:
-            return await w.update_guarded_data(updater)
+            data = await w.update_data(updater)
+            if data is None:
+                raise KeyPairNotFound(f"Keypair not found: {updater.target_id_value()}")
+            return data
 
     @user_repository_resilience.apply()
     async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
@@ -377,7 +375,9 @@ class UserRepository:
         return await self._db_source.admin_search_keypairs(querier)
 
     @user_repository_resilience.apply()
-    async def update_keypair_column(self, updater: DataUpdater[Any, KeyPairData]) -> KeyPairData:
+    async def update_keypair_column(
+        self, updater: GuardedDataUpdater[Any, KeyPairData]
+    ) -> KeyPairData:
         """Write one column of a keypair row."""
         async with self._v2_ops.write_ops() as w:
             data = await w.update_data(updater)

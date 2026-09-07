@@ -183,10 +183,10 @@ class AgentRepository:
 
     @agent_repository_resilience.apply()
     async def mark_agent_exit(self, updater: AgentExitStatusUpdater) -> AgentId | None:
-        """Record the agent's exit, returning it when the write landed and ``None``
-        when the agent was already terminal."""
+        """Record the agent's exit; ``None`` when the agent is gone, and the spec's
+        error when it was already terminal."""
         async with self._v2_ops.write_ops() as w:
-            return await w.update_guarded_data(updater)
+            return await w.update_data(updater)
 
     @agent_repository_resilience.apply()
     async def update_agent_status(self, updater: AgentStatusUpdater) -> None:

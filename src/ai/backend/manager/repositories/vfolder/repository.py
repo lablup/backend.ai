@@ -581,26 +581,12 @@ class VfolderRepository:
             mount_key = str(VFolderID.from_row(vfolder_row))
 
         async with self._v2_ops.write_ops() as w:
-            data = await w.update_guarded_data(
+            data = await w.update_data(
                 VFolderTrashUpdater(vfolder_id=updater.vfolder_id, mount_key=mount_key)
             )
-        if data is not None:
-            return data
-
-        async with self._db.begin_readonly_session_read_committed() as session:
-            refused = await self._get_vfolder_by_id(session, updater.vfolder_id)
-            if refused is None:
+            if data is None:
                 raise VFolderNotFound()
-            if refused.status in VFolderOperationStatus.purge_in_progress():
-                raise VFolderFilterStatusFailed(f"VFolder is being purged: {updater.vfolder_id}")
-            mount_sessions = await get_sessions_by_mounted_folder(
-                session, VFolderID.from_str(mount_key)
-            )
-        session_ids = [str(sid) for sid in mount_sessions]
-        raise VFolderDeletionNotAllowed(
-            "Cannot delete the vfolder. "
-            f"The vfolder(id: {updater.vfolder_id}) is mounted on sessions(ids: {session_ids})."
-        )
+            return data
 
     @vfolder_repository_resilience.apply()
     async def update_vfolder_attribute(self, updater: VFolderAttributeUpdater) -> VFolderData:
@@ -609,10 +595,10 @@ class VfolderRepository:
         Returns updated VFolderData.
         """
         async with self._v2_ops.write_ops() as w:
-            data = await w.update_guarded_data(updater)
-            if data is not None:
-                return data
-        raise await self._refusal_error(updater.vfolder_id)
+            data = await w.update_data(updater)
+            if data is None:
+                raise VFolderNotFound()
+            return data
 
     @vfolder_repository_resilience.apply()
     async def move_vfolders_to_trash(self, vfolder_ids: list[uuid.UUID]) -> list[VFolderData]:
@@ -683,14 +669,6 @@ class VfolderRepository:
             for row in vfolder_rows:
                 await session.refresh(row, attribute_names=["updated_at"])
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
-
-    async def _refusal_error(self, vfolder_id: uuid.UUID) -> BackendAIError:
-        """Name why a guarded write touched nothing: the row is gone, or a purge holds it."""
-        async with self._db.begin_readonly_session_read_committed() as session:
-            row = await self._get_vfolder_by_id(session, vfolder_id)
-        if row is None:
-            return VFolderNotFound()
-        return VFolderFilterStatusFailed(f"VFolder is being purged: {vfolder_id}")
 
     async def _fetch_vfolders_with_linked_model_cards(
         self,

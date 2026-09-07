@@ -8,6 +8,7 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -35,6 +36,25 @@ class AgentConnectionUnavailable(BackendAIError, web.HTTPServiceUnavailable):
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class AgentAlreadyExited(BackendAIError, web.HTTPConflict):
+    """Raised when an exit is recorded for an agent already in a terminal status."""
+
+    error_type = "https://api.backend.ai/probs/agent-already-exited"
+    error_title = "Agent has already exited."
+
+    def __init__(self, agent_uuid: AgentUUID) -> None:
+        self.agent_uuid = agent_uuid
+        super().__init__(f"Agent {agent_uuid} is already in a terminal status.")
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 

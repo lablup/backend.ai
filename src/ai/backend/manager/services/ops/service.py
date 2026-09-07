@@ -860,7 +860,7 @@ class GuardedUpdateService[TData]:
         self._repository = repository
 
     async def execute(self, action: GuardedUpdateOpsAction[Any, TData]) -> EntityOpsResult[TData]:
-        return EntityOpsResult(data=await self._repository.update_guarded(action.to_updater()))
+        return EntityOpsResult(data=await self._repository.update(action.to_updater()))
 
 
 class PartialBulkUpdateService[TData]:

@@ -24,7 +24,6 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
     InvalidUserUpdateMode,
     ProjectNotFound,
-    ProjectPurgeInProgress,
 )
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
@@ -87,14 +86,7 @@ class ProjectRepository:
                 project_id, user_update_mode, [UserID(uid) for uid in user_uuids]
             )
         async with self._v2_ops.write_ops() as w:
-            data = await w.update_guarded_data(updater)
-            if data is None and await w.row_exists(
-                updater.row_class, updater.target_id_column(), updater.target_id_value()
-            ):
-                raise ProjectPurgeInProgress(
-                    f"Project is being purged: {updater.target_id_value()}"
-                )
-            return data
+            return await w.update_data(updater)
 
     @project_repository_resilience.apply()
     async def update_dotfiles(self, updater: ProjectDotfilesUpdater) -> ProjectData:

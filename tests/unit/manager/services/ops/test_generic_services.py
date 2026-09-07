@@ -94,6 +94,8 @@ from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
     EntityPurger,
     FieldPurger,
+    GuardedEntityPurger,
+    GuardedFieldPurger,
 )
 from ai.backend.manager.models.specs.querier import DataQuerier
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
@@ -102,7 +104,11 @@ from ai.backend.manager.models.specs.types import (
     ConflictCheck,
     IntegrityErrorCheck,
 )
-from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
+from ai.backend.manager.models.specs.updater import (
+    DataBatchUpdater,
+    DataUpdater,
+    GuardedDataUpdater,
+)
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
     FieldUpserter,
@@ -640,7 +646,7 @@ class _DeleteAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _Pres
     updater: _PresetUpdater
 
     @override
-    def to_updater(self) -> DataUpdater[RolePresetRow, _PresetData]:
+    def to_updater(self) -> GuardedDataUpdater[RolePresetRow, _PresetData]:
         return self.updater
 
     @override
@@ -693,7 +699,7 @@ class _UpdateAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _Pres
     updater: _PresetUpdater
 
     @override
-    def to_updater(self) -> DataUpdater[RolePresetRow, _PresetData]:
+    def to_updater(self) -> GuardedDataUpdater[RolePresetRow, _PresetData]:
         return self.updater
 
     @override
@@ -717,7 +723,7 @@ class _PurgeAction(BaseSingleEntityAction, EntityPurgeOpsAction[RolePresetRow, _
     purger: _PresetPurger
 
     @override
-    def to_purger(self) -> EntityPurger[RolePresetRow, _PresetData]:
+    def to_purger(self) -> GuardedEntityPurger[RolePresetRow, _PresetData]:
         return self.purger
 
     @override
@@ -831,7 +837,9 @@ class _BulkUpdateAction(BaseBulkAction, PartialBulkUpdateOpsAction[RolePresetRow
     updaters: dict[EntityIdentifier, _PresetUpdater]
 
     @override
-    def to_updaters(self) -> Mapping[EntityIdentifier, DataUpdater[RolePresetRow, _PresetData]]:
+    def to_updaters(
+        self,
+    ) -> Mapping[EntityIdentifier, GuardedDataUpdater[RolePresetRow, _PresetData]]:
         return self.updaters
 
     @override
@@ -855,7 +863,9 @@ class _BulkPurgeAction(BaseBulkAction, EntityPartialBulkPurgeOpsAction[RolePrese
     purgers: dict[EntityIdentifier, _PresetPurger]
 
     @override
-    def to_purgers(self) -> Mapping[EntityIdentifier, EntityPurger[RolePresetRow, _PresetData]]:
+    def to_purgers(
+        self,
+    ) -> Mapping[EntityIdentifier, GuardedEntityPurger[RolePresetRow, _PresetData]]:
         return self.purgers
 
     @override
@@ -961,7 +971,9 @@ class _BulkPurgeGlobalAction(
     purgers: dict[EntityIdentifier, _PresetGlobalPurger]
 
     @override
-    def to_purgers(self) -> Mapping[EntityIdentifier, EntityPurger[RolePresetRow, _PresetData]]:
+    def to_purgers(
+        self,
+    ) -> Mapping[EntityIdentifier, GuardedEntityPurger[RolePresetRow, _PresetData]]:
         return self.purgers
 
     @override
@@ -1016,7 +1028,7 @@ class _BulkPurgeFieldAction(
     purgers: dict[_FieldID, _PresetFieldPurger]
 
     @override
-    def to_purgers(self) -> Mapping[_FieldID, FieldPurger[RolePresetRow, _PresetFieldData]]:
+    def to_purgers(self) -> Mapping[_FieldID, GuardedFieldPurger[RolePresetRow, _PresetFieldData]]:
         return self.purgers
 
 

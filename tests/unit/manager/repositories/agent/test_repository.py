@@ -43,7 +43,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.agent import AgentHasConflictingSessions
+from ai.backend.manager.errors.agent import AgentAlreadyExited, AgentHasConflictingSessions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater
@@ -372,16 +372,16 @@ class TestAgentRepositoryDB:
         assert agent_uuid is not None
         before = await agent_repository.get_by_id(lost_agent.agent_id)
 
-        written = await agent_repository.mark_agent_exit(
-            AgentExitStatusUpdater(
-                agent_uuid=agent_uuid,
-                status=AgentStatus.TERMINATED,
-                status_changed=datetime.now(tzutc()),
-                lost_at=OptionalState.update(datetime.now(tzutc())),
+        with pytest.raises(AgentAlreadyExited):
+            await agent_repository.mark_agent_exit(
+                AgentExitStatusUpdater(
+                    agent_uuid=agent_uuid,
+                    status=AgentStatus.TERMINATED,
+                    status_changed=datetime.now(tzutc()),
+                    lost_at=OptionalState.update(datetime.now(tzutc())),
+                )
             )
-        )
 
-        assert written is None
         after = await agent_repository.get_by_id(lost_agent.agent_id)
         assert after.status == AgentStatus.LOST
         assert after.lost_at == before.lost_at

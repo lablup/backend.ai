@@ -33,6 +33,22 @@ class ConflictCheck:
 
 
 @dataclass(frozen=True)
+class GuardCheck:
+    """A condition the named row must satisfy for an updater or a purger to write it.
+
+    Rides on the statement, so no read stands between the check and the write. A row
+    failing it is left alone and the write answers with the error declared here.
+    Unlike :class:`ConflictCheck`, this names the row already picked, not other rows.
+    """
+
+    condition: QueryCondition
+    """Condition on the named row (e.g., lambda: RoleRow.source == RoleSource.CUSTOM)."""
+
+    error: BackendAIError
+    """The error to raise when the row does not satisfy the condition."""
+
+
+@dataclass(frozen=True)
 class PreconditionCheck:
     """A state elsewhere that forbids the write, declared beside the spec that makes it.
 
@@ -42,9 +58,9 @@ class PreconditionCheck:
     impossible. What to look for is declared here and run by the ops that writes, so
     the spec stays a value.
 
-    Unlike the guard conditions an updater or a purger carries, this is not a condition
-    the named row must satisfy: it names rows whose presence turns the write away, and
-    failing it raises rather than writing nothing.
+    Unlike the :class:`GuardCheck` an updater or a purger carries, this is not a
+    condition the named row must satisfy: it names rows whose presence turns the write
+    away.
     """
 
     finder: sa.Select[Any]

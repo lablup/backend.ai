@@ -21,7 +21,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
 from ai.backend.manager.repositories.replica_group.types import (
     ApplyWritesResult,
@@ -117,8 +117,8 @@ class ReplicaGroupRepository:
     async def apply_writes(
         self,
         *,
-        group_updaters: Sequence[DataUpdater[ReplicaGroupRow, ReplicaGroupData]],
-        endpoint_updaters: Sequence[DataUpdater[EndpointRow, DeploymentInfo]],
+        group_updaters: Sequence[GuardedDataUpdater[ReplicaGroupRow, ReplicaGroupData]],
+        endpoint_updaters: Sequence[GuardedDataUpdater[EndpointRow, DeploymentInfo]],
     ) -> ApplyWritesResult:
         return await self._db_source.apply_writes(
             group_updaters=group_updaters,

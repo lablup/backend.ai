@@ -17,9 +17,9 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderPermissionData,
 )
-from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed, VFolderFilterStatusFailed
 from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.row import VFolderPermissionRow, VFolderRow
@@ -52,8 +52,13 @@ class VFolderAttributeUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
         return self.vfolder_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
-        return [VFolderConditions.not_being_purged()]
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=VFolderConditions.not_being_purged(),
+                error=VFolderFilterStatusFailed(f"VFolder is being purged: {self.vfolder_id}"),
+            ),
+        )
 
     @property
     @override
@@ -169,7 +174,7 @@ class VFolderTrashUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
         return self.vfolder_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
+    def guard_checks(self) -> Sequence[GuardCheck]:
         def not_mounted() -> sa.sql.expression.ColumnElement[bool]:
             return sa.not_(
                 sa.exists(
@@ -182,7 +187,19 @@ class VFolderTrashUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
                 )
             )
 
-        return [VFolderConditions.not_being_purged(), not_mounted]
+        return (
+            GuardCheck(
+                condition=VFolderConditions.not_being_purged(),
+                error=VFolderFilterStatusFailed(f"VFolder is being purged: {self.vfolder_id}"),
+            ),
+            GuardCheck(
+                condition=not_mounted,
+                error=VFolderDeletionNotAllowed(
+                    "Cannot delete the vfolder. "
+                    f"The vfolder(id: {self.vfolder_id}) is mounted on a running session."
+                ),
+            ),
+        )
 
     @property
     @override

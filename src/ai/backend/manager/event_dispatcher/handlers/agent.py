@@ -18,6 +18,7 @@ from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert
+from ai.backend.manager.errors.agent import AgentAlreadyExited
 from ai.backend.manager.errors.resource import InstanceNotFound
 from ai.backend.manager.models.agent import AgentStatus, agents
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
@@ -76,14 +77,17 @@ class AgentEventHandler:
         agent_uuid = await self._agent_repository.lookup_uuid(agent_id)
         if agent_uuid is not None:
             now = datetime.now(tzutc())
-            written = await self._agent_repository.mark_agent_exit(
-                AgentExitStatusUpdater(
-                    agent_uuid=agent_uuid,
-                    status=status,
-                    status_changed=now,
-                    lost_at=OptionalState.update(now),
+            try:
+                written = await self._agent_repository.mark_agent_exit(
+                    AgentExitStatusUpdater(
+                        agent_uuid=agent_uuid,
+                        status=status,
+                        status_changed=now,
+                        lost_at=OptionalState.update(now),
+                    )
                 )
-            )
+            except AgentAlreadyExited:
+                written = None
             if written is not None:
                 match status:
                     case AgentStatus.LOST:

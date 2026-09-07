@@ -59,7 +59,7 @@ from ai.backend.manager.models.specs.creator import (
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
-from ai.backend.manager.models.specs.purger import EntityPurger
+from ai.backend.manager.models.specs.purger import GuardedEntityPurger
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -199,12 +199,14 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
     async def purge_entity[TRow: Base, TData](
-        self, purger: EntityPurger[TRow, TData]
+        self, purger: GuardedEntityPurger[TRow, TData]
     ) -> TData | None:
-        """Delete one entity row and the RBAC graph it left; ``None`` if already gone."""
+        """Delete the entity row the id names while its guards hold, and the RBAC
+        graph it left; ``None`` if already gone, the failing guard's error if it
+        refused."""
         await self._validate_conflict_checks(purger.conflict_checks())
         row = await self._delete_row_returning(
-            purger.row_class(), purger.target_id_column(), purger.entity_id()
+            purger.row_class(), purger.target_id_column(), purger.entity_id(), purger.guard_checks()
         )
         if row is None:
             return None
@@ -212,7 +214,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         return purger.to_data(row)
 
     async def partial_bulk_purge_entities[TRow: Base, TData](
-        self, purgers: Mapping[EntityIdentifier, EntityPurger[TRow, TData]]
+        self, purgers: Mapping[EntityIdentifier, GuardedEntityPurger[TRow, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Delete each named entity independently, a row and its teardown sharing one
         savepoint; a missing row raises :class:`EntityNotFoundError`."""

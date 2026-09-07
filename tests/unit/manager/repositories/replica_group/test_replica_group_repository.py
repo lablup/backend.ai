@@ -63,7 +63,7 @@ from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -421,7 +421,7 @@ class TestReplicaGroupRepository:
         two_group_ids: tuple[ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         first_id, second_id = two_group_ids
-        updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = [
+        updaters: list[GuardedDataUpdater[ReplicaGroupRow, ReplicaGroupData]] = [
             ReplicaGroupDeployUpdater(
                 replica_group_id=first_id,
                 lifecycle=OptionalState.update(ReplicaGroupLifecycle.DRAINING),
@@ -518,7 +518,7 @@ class TestReplicaGroupRepository:
         two_group_ids: tuple[ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         first_id, second_id = two_group_ids
-        updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = [
+        updaters: list[GuardedDataUpdater[ReplicaGroupRow, ReplicaGroupData]] = [
             ReplicaGroupScalingUpdater(
                 replica_group_id=first_id,
                 desired_current_replica_count=OptionalState.update(5),
