@@ -2522,6 +2522,92 @@ class TestAPoolClaimNothingNames:
 
         assert _pool_claims(etcd) == [], "the session's own teardown could not give its pool back"
 
+    async def test_promotion_does_not_take_a_block_another_session_now_holds(self) -> None:
+        """The race the promotion opened. A promotion driven from a RECORD has no claim in front
+        of it: between the record being read and the promotion arriving, the block can be given
+        back and re-allocated -- and a compare-and-swap that names only "whatever bytes are there"
+        rewrites the new owner's claim into this session's."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        subnet = str(info.options["subnet"])
+        generation = str(info.options["generation"])
+        # s1's record still names the block; the block is s2's now.
+        for unit_key in list(_flat_claims(etcd)):
+            etcd.store[f"network/ipam/allocated/{unit_key}"] = _claim("s2", subnet, "g2")
+
+        assert not await plugin._subnet_allocator.promote(
+            subnet, "s1", generation, {_META_KEY: etcd.store[_META_KEY]}
+        )
+
+        assert await plugin._subnet_allocator.holder(subnet) == "s2", (
+            "it rewrote another session's claim into this one's"
+        )
+
+    async def test_a_reuse_that_cannot_take_its_allocation_hands_back_nothing(self) -> None:
+        """A promotion that fails must stop the reuse, not merely log.
+
+        Aimed past `_still_ours`, which only asks who owns the units: here s1 still owns them, but
+        they record a DIFFERENT block, so the record names an allocation this session does not
+        hold in the shape it thinks. Without the check the reuse hands back a NetworkInfo whose
+        data plane is built on that record.
+        """
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        subnet = str(info.options["subnet"])
+        for unit_key in list(_flat_claims(etcd)):
+            etcd.store[f"network/ipam/allocated/{unit_key}"] = _claim("s1", "10.99.0.0/24")
+        assert await plugin._subnet_allocator.holder(subnet) == "s1", "premise: still s1's units"
+
+        assert await plugin._existing_allocation(cast(AsyncEtcd, etcd), "s1", []) is None
+
+    async def test_an_extra_unstamped_claim_of_a_live_session_is_reclaimed(self) -> None:
+        """Compatibility is not use. A session whose record names subnet A can carry a second,
+        older claim on B under the same id: unstamped, so compatible with every incarnation, so
+        read as live -- while nothing promotes it (promotion follows the record) and nothing
+        reclaims it. It stays for the life of the cluster."""
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        stray = "10.128.99.0/24"
+        etcd.store[_allocated_key(stray)] = _claim("s1", stray)
+        stray_vni = 9999
+        etcd.store[f"network/ipam/vni/{stray_vni}"] = json.dumps({"session_id": "s1"})
+
+        await plugin.reconcile_pool()
+
+        assert _allocated_key(stray) not in etcd.store, "a claim the record never named was kept"
+        assert f"network/ipam/vni/{stray_vni}" not in etcd.store
+
+    async def test_it_promotes_a_session_once_however_many_units_it_holds(self) -> None:
+        # A wide block is many units; queueing a promotion per unit re-reads the whole pool each
+        # time, which is quadratic in the number of legacy sessions.
+        class _CountingPoolReads(FakeEtcd):
+            def __init__(self) -> None:
+                super().__init__()
+                self.pool_reads = 0
+
+            @override
+            async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
+                if prefix == "network/ipam/allocated":
+                    self.pool_reads += 1
+                return await super().get_prefix(prefix, **kwargs)
+
+        etcd = _CountingPoolReads()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "endpoints": [], "subnet": None}
+        )
+        subnet = str(info.options["subnet"])
+        for unit_key in list(_flat_claims(etcd)):
+            etcd.store[f"network/ipam/allocated/{unit_key}"] = _claim("s1", subnet)
+        etcd.pool_reads = 0
+
+        await plugin.reconcile_pool()
+
+        assert etcd.pool_reads <= 3, f"it read the whole pool {etcd.pool_reads} times"
+
     async def test_a_legacy_child_key_of_a_gone_session_is_reclaimed(self) -> None:
         """The mirror of the rule above. An unstamped key is compatible with every incarnation,
         so where a record EXISTS it is live and stays -- but where there is no record at all,
