@@ -31,7 +31,7 @@ _RESET_AFTER_SECONDS = 500
 
 
 @dataclass(frozen=True)
-class Caller:
+class MockCaller:
     """A caller as the middleware meets it: the request it arrives on, and the client
     call that opens the window its identity keys."""
 
@@ -80,26 +80,26 @@ class TestRlimMiddleware:
         return handler
 
     @pytest.fixture
-    def anonymous_caller(self, mock_valkey_client: MagicMock) -> Iterator[Caller]:
+    def anonymous_caller(self, mock_valkey_client: MagicMock) -> Iterator[MockCaller]:
         """An unauthenticated caller, whose address the request context carries."""
         request = make_mocked_request("GET", "/")
         request["is_authorized"] = False
         request["user"] = None
         with with_client_ip(_CLIENT_IP):
-            yield Caller(request=request, consumer=mock_valkey_client.consume_ip_rate_limit)
+            yield MockCaller(request=request, consumer=mock_valkey_client.consume_ip_rate_limit)
 
     @pytest.fixture
-    def authorized_caller(self, mock_valkey_client: MagicMock) -> Caller:
+    def authorized_caller(self, mock_valkey_client: MagicMock) -> MockCaller:
         """A caller the auth middleware resolved, carrying the rate limit it injected."""
         request = make_mocked_request("GET", "/")
         request["is_authorized"] = True
         request["user"] = {"uuid": _USER_ID, "rate_limit": _RATE_LIMIT}
-        return Caller(request=request, consumer=mock_valkey_client.consume_user_rate_limit)
+        return MockCaller(request=request, consumer=mock_valkey_client.consume_user_rate_limit)
 
     @pytest.fixture
-    def caller(self, request: pytest.FixtureRequest) -> Caller:
+    def caller(self, request: pytest.FixtureRequest) -> MockCaller:
         """The caller named by the parametrized fixture."""
-        caller: Caller = request.getfixturevalue(request.param)
+        caller: MockCaller = request.getfixturevalue(request.param)
         return caller
 
     @pytest.mark.parametrize(
@@ -114,7 +114,7 @@ class TestRlimMiddleware:
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
-        caller: Caller,
+        caller: MockCaller,
         expected_limit: int,
         mock_handler: AsyncMock,
     ) -> None:
@@ -168,7 +168,7 @@ class TestRlimMiddleware:
     async def test_the_quota_headers_report_the_window(
         self,
         middleware: Any,
-        caller: Caller,
+        caller: MockCaller,
         mock_handler: AsyncMock,
         case: RateLimitSuccessCase,
     ) -> None:
@@ -214,7 +214,7 @@ class TestRlimMiddleware:
     async def test_a_query_past_its_window_is_refused(
         self,
         middleware: Any,
-        caller: Caller,
+        caller: MockCaller,
         mock_handler: AsyncMock,
         case: RateLimitExceedCase,
     ) -> None:
