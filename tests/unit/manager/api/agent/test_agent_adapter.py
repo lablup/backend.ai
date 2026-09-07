@@ -7,11 +7,13 @@ and AgentDetailData to AgentDTO.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from decimal import Decimal
 
 import pytest
 
 from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.agent_resource import AgentResourceID
 from ai.backend.common.dto.manager.agent.request import (
     AgentFilter,
     AgentOrder,
@@ -25,9 +27,10 @@ from ai.backend.common.dto.manager.agent.types import (
     OrderDirection,
 )
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.types import AgentId, ResourceSlot
+from ai.backend.common.types import AgentId
 from ai.backend.manager.api.rest.agent.adapter import AgentAdapter
 from ai.backend.manager.data.agent.types import AgentData, AgentDetailData, AgentStatus
+from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 
 
@@ -316,18 +319,13 @@ class TestAgentAdapterConvertToDTO:
         region: str = "us-east-1",
         resource_group: str = "default",
         schedulable: bool = True,
-        available_slots: ResourceSlot | None = None,
-        occupied_slots: ResourceSlot | None = None,
+        resources: Sequence[AgentResourceData] = (),
         addr: str = "tcp://127.0.0.1:6001",
         architecture: str = "x86_64",
         version: str = "24.12.0",
     ) -> AgentDetailData:
         if agent_id is None:
             agent_id = AgentId("i-test-agent-001")
-        if available_slots is None:
-            available_slots = ResourceSlot()
-        if occupied_slots is None:
-            occupied_slots = ResourceSlot()
         agent = AgentData(
             uuid=AgentUUID(uuid.uuid4()),
             id=agent_id,
@@ -336,8 +334,6 @@ class TestAgentAdapterConvertToDTO:
             region=region,
             resource_group=resource_group,
             schedulable=schedulable,
-            available_slots=available_slots,
-            occupied_slots=occupied_slots,
             addr=addr,
             public_host=None,
             first_contact=None,
@@ -348,7 +344,19 @@ class TestAgentAdapterConvertToDTO:
             public_key=None,
             auto_terminate_abusing_kernel=False,
         )
-        return AgentDetailData(agent=agent, permissions=[])
+        return AgentDetailData(agent=agent, resources=resources, permissions=[])
+
+    def _resource(
+        self, agent_id: str, slot_name: str, capacity: str, used: str
+    ) -> AgentResourceData:
+        return AgentResourceData(
+            id=AgentResourceID(uuid.uuid4()),
+            agent_id=agent_id,
+            slot_name=slot_name,
+            capacity=Decimal(capacity),
+            reserved=Decimal(0),
+            used=Decimal(used),
+        )
 
     def test_convert_basic(self, adapter: AgentAdapter) -> None:
         """Test basic conversion of AgentDetailData to AgentDTO."""
@@ -368,11 +376,11 @@ class TestAgentAdapterConvertToDTO:
 
     def test_convert_resource_slots(self, adapter: AgentAdapter) -> None:
         """Test ResourceSlot serialization in DTO conversion."""
-        available = ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")})
-        occupied = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")})
         data = self._make_agent_detail_data(
-            available_slots=available,
-            occupied_slots=occupied,
+            resources=[
+                self._resource("i-test-agent-001", "cpu", "4", "2"),
+                self._resource("i-test-agent-001", "mem", "8589934592", "4294967296"),
+            ],
         )
 
         dto = adapter.convert_to_dto(data)
@@ -382,10 +390,7 @@ class TestAgentAdapterConvertToDTO:
 
     def test_convert_empty_resource_slots(self, adapter: AgentAdapter) -> None:
         """Test conversion with empty ResourceSlots."""
-        data = self._make_agent_detail_data(
-            available_slots=ResourceSlot(),
-            occupied_slots=ResourceSlot(),
-        )
+        data = self._make_agent_detail_data(resources=[])
 
         dto = adapter.convert_to_dto(data)
 

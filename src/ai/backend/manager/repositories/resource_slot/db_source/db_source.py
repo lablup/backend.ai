@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_slot.types import (
-    AgentResourceData,
     AgentResourceDrift,
     AgentResourceSearchResult,
     OrphanedAllocation,
@@ -103,16 +102,7 @@ class ResourceSlotDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(AgentResourceRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [
-                AgentResourceData(
-                    agent_id=row.AgentResourceRow.agent_id,
-                    slot_name=row.AgentResourceRow.slot_name,
-                    capacity=row.AgentResourceRow.capacity,
-                    reserved=row.AgentResourceRow.reserved,
-                    used=row.AgentResourceRow.used,
-                )
-                for row in result.rows
-            ]
+            items = [row.AgentResourceRow.to_data() for row in result.rows]
             return AgentResourceSearchResult(
                 items=items,
                 total_count=result.total_count,

@@ -268,13 +268,15 @@ class AgentAdapter(BaseAdapter):
     def _data_to_dto(detail: AgentDetailData) -> AgentNode:
         """Convert data layer type to Pydantic DTO."""
         data = detail.agent
+        available_slots = detail.available_slots()
+        occupied_slots = detail.occupied_slots()
         return AgentNode(
             id=str(data.id),
             uuid=data.uuid,
             resource_info=AgentResourceInfo(
-                capacity=dict(data.available_slots.to_json()),
-                used=dict(data.occupied_slots.to_json()),
-                free=dict((data.available_slots - data.occupied_slots).to_json()),
+                capacity=dict(available_slots.to_json()),
+                used=dict(occupied_slots.to_json()),
+                free=dict((available_slots - occupied_slots).to_json()),
             ),
             status_info=AgentStatusInfo(
                 status=data.status.name,

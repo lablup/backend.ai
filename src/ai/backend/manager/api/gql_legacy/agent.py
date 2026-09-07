@@ -27,7 +27,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAllocMapsManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
-from ai.backend.manager.data.agent.types import AgentData
+from ai.backend.manager.data.agent.types import AgentDetailData
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.models.agent import (
@@ -180,7 +180,8 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         return cls.from_data(agent_list[0])
 
     @classmethod
-    def from_data(cls, data: AgentData) -> Self:
+    def from_data(cls, detail: AgentDetailData) -> Self:
+        data = detail.agent
         return cls(
             id=data.id,
             row_id=data.id,
@@ -189,8 +190,8 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
             region=data.region,
             scaling_group=data.resource_group,
             schedulable=data.schedulable,
-            available_slots=data.available_slots.to_json(),
-            occupied_slots=data.occupied_slots.to_json(),
+            available_slots=detail.available_slots().to_json(),
+            occupied_slots=detail.occupied_slots().to_json(),
             addr=data.addr,
             architecture=data.architecture,
             first_contact=data.first_contact,
@@ -341,9 +342,9 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         agent_list = await graph_ctx.agent_repository.list_data(condition)
 
         result: list[AgentNode] = []
-        for agent in sorted(agent_list, key=lambda obj: list_order[obj.id]):
+        for agent in sorted(agent_list, key=lambda obj: list_order[obj.agent.id]):
             agent_node = cls.from_data(agent)
-            agent_node.permissions = agent_permissions.get(agent.id, [])
+            agent_node.permissions = agent_permissions.get(agent.agent.id, [])
             result.append(agent_node)
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
@@ -397,8 +398,11 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
     compute_containers = graphene.List(ComputeContainer, status=graphene.String())
 
     @classmethod
-    def from_data(cls, data: AgentData) -> Self:
+    def from_data(cls, detail: AgentDetailData) -> Self:
         mega = 2**20
+        data = detail.agent
+        available_slots = detail.available_slots()
+        occupied_slots = detail.occupied_slots()
         return cls(
             id=data.id,
             status=data.status.name,
@@ -406,8 +410,8 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
             region=data.region,
             scaling_group=data.resource_group,
             schedulable=data.schedulable,
-            available_slots=data.available_slots.to_json(),
-            occupied_slots=data.occupied_slots.to_json(),
+            available_slots=detail.available_slots().to_json(),
+            occupied_slots=detail.occupied_slots().to_json(),
             addr=data.addr,
             architecture=data.architecture,
             first_contact=data.first_contact,
@@ -416,14 +420,14 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
             compute_plugins=data.compute_plugins,
             auto_terminate_abusing_kernel=False,  # legacy field
             # legacy fields
-            mem_slots=data.available_slots.get("mem", 0) // mega,
-            cpu_slots=data.available_slots.get("cpu", 0),
-            gpu_slots=data.available_slots.get("cuda.device", 0),
-            tpu_slots=data.available_slots.get("tpu.device", 0),
-            used_mem_slots=data.occupied_slots.get("mem", 0) // mega,
-            used_cpu_slots=float(data.occupied_slots.get("cpu", 0)),
-            used_gpu_slots=float(data.occupied_slots.get("cuda.device", 0)),
-            used_tpu_slots=float(data.occupied_slots.get("tpu.device", 0)),
+            mem_slots=available_slots.get("mem", 0) // mega,
+            cpu_slots=available_slots.get("cpu", 0),
+            gpu_slots=available_slots.get("cuda.device", 0),
+            tpu_slots=available_slots.get("tpu.device", 0),
+            used_mem_slots=occupied_slots.get("mem", 0) // mega,
+            used_cpu_slots=float(occupied_slots.get("cpu", 0)),
+            used_gpu_slots=float(occupied_slots.get("cuda.device", 0)),
+            used_tpu_slots=float(occupied_slots.get("tpu.device", 0)),
         )
 
     async def resolve_compute_containers(
@@ -582,7 +586,8 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
         condition = [QueryConditions.by_ids(agent_ids)]
         agent_list = await graph_ctx.agent_repository.list_data(condition)
         return [
-            cls.from_data(agent) for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
+            cls.from_data(agent)
+            for agent in sorted(agent_list, key=lambda obj: list_order[obj.agent.id])
         ]
 
     @classmethod
@@ -738,14 +743,15 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
     architecture = graphene.String()
 
     @classmethod
-    def from_data(cls, data: AgentData) -> Self:
+    def from_data(cls, detail: AgentDetailData) -> Self:
+        data = detail.agent
         return cls(
             id=data.id,
             status=data.status.name,
             scaling_group=data.resource_group,
             schedulable=data.schedulable,
-            available_slots=data.available_slots.to_json(),
-            occupied_slots=data.occupied_slots.to_json(),
+            available_slots=detail.available_slots().to_json(),
+            occupied_slots=detail.occupied_slots().to_json(),
             architecture=data.architecture,
         )
 
@@ -794,7 +800,16 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         async with graph_ctx.db.begin_readonly_session() as session:
             result = await session.scalars(query)
             agent_list = result.unique().all()
-            return [cls.from_data(agent.to_data()) for agent in agent_list]
+            return [
+                cls.from_data(
+                    AgentDetailData(
+                        agent=agent.to_data(),
+                        resources=agent.resources_by_rank(),
+                        permissions=list(ADMIN_PERMISSIONS),
+                    )
+                )
+                for agent in agent_list
+            ]
 
     @classmethod
     async def load_count(
@@ -871,7 +886,8 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         condition = [QueryConditions.by_ids(agent_ids)]
         agent_list = await graph_ctx.agent_repository.list_data(condition)
         return [
-            cls.from_data(agent) for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
+            cls.from_data(agent)
+            for agent in sorted(agent_list, key=lambda obj: list_order[obj.agent.id])
         ]
 
 

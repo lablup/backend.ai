@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from ai.backend.manager.data.resource_slot.types import (
-    AgentResourceData,
     ResourceAllocationData,
     ResourceOccupancy,
 )
@@ -43,15 +42,7 @@ class ResourceSlotService:
         self, action: GetAgentResourceBySlotAction
     ) -> GetAgentResourceBySlotResult:
         row = await self._repository.get_agent_resource_by_slot(action.agent_id, action.slot_name)
-        return GetAgentResourceBySlotResult(
-            item=AgentResourceData(
-                agent_id=row.agent_id,
-                slot_name=row.slot_name,
-                capacity=row.capacity,
-                reserved=row.reserved,
-                used=row.used,
-            )
-        )
+        return GetAgentResourceBySlotResult(item=row.to_data())
 
     async def search_agent_resources(
         self, action: GlobalSearchAgentResourcesAction

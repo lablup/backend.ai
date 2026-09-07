@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
+from ai.backend.common.data.entity.agent_resource import AgentResourceID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.data.entity.types import EntityData, EntityIdentifier, FieldData
 from ai.backend.common.types import ResourceSlot, SlotQuantity
@@ -63,7 +64,10 @@ class ResourceSlotTypeData(EntityData):
 
 
 @dataclass(frozen=True)
-class AgentResourceData:
+class AgentResourceData(FieldData):
+    """One slot's amount on one agent. ``agent_id`` is the agent's name column."""
+
+    id: AgentResourceID
     agent_id: str
     slot_name: str
     capacity: Decimal

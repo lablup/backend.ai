@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.agent_resource import AgentResourceID
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
     AgentResourceSearchResult,
@@ -49,6 +50,7 @@ class TestAgentResources:
         querier: BatchQuerier,
     ) -> None:
         item = AgentResourceData(
+            id=AgentResourceID(uuid.uuid4()),
             agent_id="agent-1",
             slot_name="cpu",
             capacity=Decimal("8"),
@@ -99,6 +101,7 @@ class TestAgentResources:
             return_value=AgentResourceSearchResult(
                 items=[
                     AgentResourceData(
+                        id=AgentResourceID(uuid.uuid4()),
                         agent_id=f"agent-{i}",
                         slot_name="cpu",
                         capacity=Decimal("8"),

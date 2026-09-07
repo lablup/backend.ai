@@ -83,13 +83,7 @@ class AgentDBSource:
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
         async with self._db.begin_readonly_session_read_committed() as db_session:
             agent_row: AgentRow | None = await db_session.scalar(
-                sa.select(AgentRow)
-                .where(AgentRow.id == agent_id)
-                .options(
-                    selectinload(AgentRow.agent_resource_rows).joinedload(
-                        AgentResourceRow.slot_type_row
-                    )
-                )
+                sa.select(AgentRow).where(AgentRow.id == agent_id)
             )
             if agent_row is None:
                 log.error("Agent with id {} not found", agent_id)
@@ -252,11 +246,14 @@ class AgentDBSource:
                 querier,
             )
             agent_rows: list[AgentRow] = [row.AgentRow for row in result.rows]
-            items = [agent_row.to_data() for agent_row in agent_rows]
             admin_permissions = list(ADMIN_AGENT_PERMISSIONS)
             agents_with_permissions = [
-                AgentDetailData(agent=agent_data, permissions=admin_permissions)
-                for agent_data in items
+                AgentDetailData(
+                    agent=agent_row.to_data(),
+                    resources=agent_row.resources_by_rank(),
+                    permissions=admin_permissions,
+                )
+                for agent_row in agent_rows
             ]
 
             return AgentListResult(
