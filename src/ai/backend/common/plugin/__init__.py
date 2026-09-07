@@ -199,6 +199,9 @@ class BasePluginContext[P: AbstractPlugin]:
     #: to the ceiling. Unbounded in count, because the alternative is losing the change.
     _CONFIG_RETRY_BACKOFF_SEC = 0.5
     _CONFIG_RETRY_CEILING_SEC = 30.0
+    #: Where the doubling stops. Past this the delay is the ceiling anyway, and the shift is only
+    #: a way to overflow.
+    _CONFIG_RETRY_MAX_SHIFT = 8
 
     async def _watcher(self, plugin_name: str) -> None:
         # As wait_timeout applies to the waiting for an internal async queue,
@@ -224,7 +227,10 @@ class BasePluginContext[P: AbstractPlugin]:
                         self._CONFIG_RETRY_CEILING_SEC,
                     )
                 )
-                attempt += 1
+                # Stops climbing once the ceiling is reached. Left to grow, `2**attempt` overflows
+                # a float somewhere past a thousand tries -- about eight hours of retrying -- and
+                # the watcher this loop exists to keep alive dies of the arithmetic.
+                attempt = min(attempt + 1, self._CONFIG_RETRY_MAX_SHIFT)
 
     async def _apply_config(self, plugin_name: str) -> bool:
         """Read the plugin's configuration and hand it over. False if that could not be done.

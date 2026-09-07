@@ -2031,17 +2031,26 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         The VTEP lets the manager pre-seed session membership, which is what removes the
         peer-publish race for a multi-node overlay. See `network/caps.py`.
         """
-        # Re-resolved every time, not read from what startup worked out. `usable_vtep` asks the
-        # host: the address must still be held by an interface that is up. An address can go while
-        # this process runs -- a link drops, DHCP hands out another, the uplink is re-cabled --
-        # and republishing the cached one kept refreshing the timestamp on an advert that had
-        # stopped being true. The manager reads that as a live node and places sessions whose
-        # VXLAN source address no longer exists.
-        if (vtep_ip := usable_vtep(self._host_ip)) != self._vtep_ip:
+        # What this node advertises is what it can actually SERVE, and that is fixed for the life
+        # of the process: the session network and the vxlan backend hold the endpoint they were
+        # built with, and every session already up was built on it. So the host is asked afresh
+        # each time -- an address can go while this process runs, a link drops, DHCP hands out
+        # another -- but the answer only ever decides whether to keep advertising, never what to
+        # advertise. Republishing a recomputed address would have said "ready" on a node whose
+        # serving path refuses the session, and refreshing the cached one kept the timestamp
+        # moving on an advert that had stopped being true. Both are the same mistake: the advert
+        # has to be about the serving state, not about the host.
+        serving = self._session_network.serving_vtep
+        live = usable_vtep(self._host_ip)
+        self._vtep_ip = serving if live == serving else None
+        if live != serving:
             log.warning(
-                "this node's tunnel endpoint changed from {!r} to {!r}", self._vtep_ip, vtep_ip
+                "this node's tunnel endpoint has moved ({!r} is what sessions are served on,"
+                " {!r} is what the host holds now); withdrawing from multi-node overlay work"
+                " until this agent is restarted",
+                serving,
+                live,
             )
-            self._vtep_ip = vtep_ip
         # A diagnostic signal for operators (e.g. VXLAN tunnel offload); best-effort, because a
         # failure to describe the uplink must not stop the agent from serving kernels.
         try:
@@ -2058,6 +2067,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 caps,
                 backend=str(self.local_config.agent.backend),
                 vtep_ip=self._vtep_ip,
+                boot_id=self._boot_id,
             )
             for problem in caps.readiness:
                 # Once at startup, where an operator can act on it -- rather than at the first

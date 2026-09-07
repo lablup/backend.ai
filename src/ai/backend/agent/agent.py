@@ -11,6 +11,7 @@ import signal
 import sys
 import time
 import traceback
+import uuid
 import weakref
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
@@ -925,6 +926,9 @@ class AbstractAgent[
         self.etcd = etcd
         self.local_config = local_config
         self.id = AgentId(local_config.agent.defaulted_id)
+        # Which run of this agent this is. Published before anything else, so an advert an earlier
+        # run left under the same id is contradicted from the moment this one starts.
+        self._boot_id = uuid.uuid4().hex
         self.local_instance_id = generate_local_instance_id(__file__)
         self.agent_class = agent_class
         self.agent_public_key = agent_public_key
@@ -971,7 +975,11 @@ class AbstractAgent[
         # driver against it: a driver only one backend can serve must not be handed to an agent of
         # the other kind, or the session comes up with kernels that cannot reach each other and
         # nothing says so. Without this the guard reads an absent key and permits everything.
-        await publish_backend(self.etcd, str(self.id), str(self.local_config.agent.backend))
+        # Before anything backend-specific publishes, so an advert left by an earlier run is
+        # already contradicted by the time a manager could read the two together.
+        await publish_backend(
+            self.etcd, str(self.id), str(self.local_config.agent.backend), self._boot_id
+        )
         self.container_lifecycle_queue = asyncio.Queue()
 
         if self.local_config.redis is None:
