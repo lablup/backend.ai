@@ -157,7 +157,7 @@ class TestRlimMiddleware:
                 expected_remaining="0",
             ),
             RateLimitSuccessCase(
-                description="a changed limit does not reach the window already open",
+                description="the limit the window holds, not the one asked for",
                 limit=100,
                 count=10,
                 expected_remaining="90",
