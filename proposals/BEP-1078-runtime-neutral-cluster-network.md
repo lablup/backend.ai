@@ -37,8 +37,10 @@ to hand over a container's network namespace.
 | Backend | agent | how the L2 domain is realized (`vxlan`, `bridge`) |
 | Runtime seam | agent | netns of a container, by PID |
 
-Docker is the runtime wired today. The seam names no runtime type, so a provisioner for another
-one implements the same contract, but this proposal does not claim more than one exists.
+The seam names no runtime type: what a backend has to provide is a container's netns by PID, and
+a netns does not care which daemon made it. `docker`, `enroot` and `singularity` ship provisioners
+for it in this repository and `containerd` is named by the same enum; a backend that arrives
+without the seam is refused on its published capabilities rather than by this list.
 
 An agent joins a session by publishing a member record; it removes that record only once its
 teardown has completed, which is what the manager reads before it reuses an allocation.
