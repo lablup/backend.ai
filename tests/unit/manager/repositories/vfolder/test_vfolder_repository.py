@@ -395,9 +395,7 @@ class TestVfolderRepository:
             usage_mode=VFolderUsageMode.MODEL,
         )
 
-        creation = await vfolder_repository.create_vfolder_with_permission(
-            creator, create_owner_permission=True
-        )
+        creation = await vfolder_repository.create_vfolder_with_permission(creator)
 
         vfolder_data = creation.vfolder
         assert vfolder_data.name == creator.name

@@ -50,6 +50,7 @@ from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -81,9 +82,10 @@ class UserRepository:
         self,
         db: ExtendedAsyncSAEngine,
         v2_ops_provider: V2DBOpsProvider,
+        share_ops_provider: ShareOpsProvider,
         key_provider_pool: KeyProviderPool,
     ) -> None:
-        self._db_source = UserDBSource(db, v2_ops_provider, key_provider_pool)
+        self._db_source = UserDBSource(db, v2_ops_provider, share_ops_provider, key_provider_pool)
         self._v2_ops = v2_ops_provider
         self._key_provider_pool = key_provider_pool
 

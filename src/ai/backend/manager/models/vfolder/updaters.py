@@ -10,17 +10,19 @@ import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderMountPermission,
     VFolderOperationStatus,
+    VFolderPermissionData,
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
-from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.types import OptionalState
 
 
@@ -194,3 +196,46 @@ class VFolderTrashUpdater(GuardedDataUpdater[VFolderRow, VFolderData]):
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
         return row.to_data()
+
+
+@dataclass
+class VFolderMountPermissionUpdater(DataUpdater[VFolderPermissionRow, VFolderPermissionData]):
+    """Sets what the named mount permission row grants.
+
+    Callers hold the folder and the user rather than this row's id, which
+    ``VFolderMountPermissionLookup`` turns into one.
+    """
+
+    permission_id: VFolderPermissionID
+    permission: VFolderMountPermission
+
+    @property
+    @override
+    def row_class(self) -> type[VFolderPermissionRow]:
+        return VFolderPermissionRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return VFolderPermissionRow.id
+
+    @override
+    def target_id_value(self) -> VFolderPermissionID:
+        return self.permission_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"permission": self.permission}
+
+    @override
+    def to_data(self, row: VFolderPermissionRow) -> VFolderPermissionData:
+        return VFolderPermissionData(
+            id=VFolderPermissionID(row.id),
+            vfolder=row.vfolder,
+            user=row.user,
+            permission=row.permission or VFolderMountPermission.READ_WRITE,
+        )

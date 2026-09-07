@@ -19,6 +19,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -36,6 +37,7 @@ from ai.backend.manager.data.user.types import (
     UserSearchResult,
 )
 from ai.backend.manager.errors.keypair import NoDefaultKeypairResourcePolicy
+from ai.backend.manager.errors.resource import PersonalProjectNotFound
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
     KeyPairNotFound,
@@ -58,6 +60,7 @@ from ai.backend.manager.models.keypair.row import (
     keypairs,
 )
 from ai.backend.manager.models.keypair.scopes import UserKeypairOperationScope
+from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
@@ -99,8 +102,10 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
+from ai.backend.manager.models.vfolder.purgers import VFolderUserPermissionBatchPurger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import (
     FullUserCreator,
@@ -118,6 +123,7 @@ class UserDBSource:
 
     _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
+    _share_ops: ShareOpsProvider
     _user_ops_provider: UserOpsProvider
     _key_provider_pool: KeyProviderPool
 
@@ -125,10 +131,12 @@ class UserDBSource:
         self,
         db: ExtendedAsyncSAEngine,
         v2_ops_provider: V2DBOpsProvider,
+        share_ops_provider: ShareOpsProvider,
         key_provider_pool: KeyProviderPool,
     ) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
+        self._share_ops = share_ops_provider
         self._user_ops_provider = UserOpsProvider(db)
         self._key_provider_pool = key_provider_pool
 
@@ -388,10 +396,10 @@ class UserDBSource:
         resources it holds outlive the account rather than going with it.
         """
         user_id = UserID(user_uuid)
+        await self._revoke_shared_vfolders(user_uuid)
         async with self._v2_ops.write_ops() as w:
             await w.batch_purge_field_entities(user_id, UserErrorLogPurger())
             await w.batch_purge_field_entities(user_id, UserKeyPairPurger())
-            await w.batch_purge_field_entities(user_id, UserVFolderPermissionPurger())
             await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
             # Placement groups the user still owns: their deployments were either
             # delegated (the groups moved with them) or deleted by now.
@@ -499,9 +507,6 @@ class UserDBSource:
         """
         target_vfs: list[VFolderDeletionInfo] = []
         async with self._db.begin_session() as db_session:
-            await db_session.execute(
-                vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
-            )
             result = await db_session.scalars(
                 sa.select(VFolderRow).where(
                     sa.and_(
@@ -742,6 +747,39 @@ class UserDBSource:
                     pass
         return False
 
+    async def _revoke_shared_vfolders(
+        self, user_uuid: UUID, vfolder_ids: Sequence[UUID] | None = None
+    ) -> None:
+        """Take back what a user was lent: the legacy mount rows and the share caps.
+
+        Without ``vfolder_ids`` every folder they hold goes; the purge answers with the
+        folders it took back, so no separate read stands between the two writes. What a
+        person is lent lands in the project that is theirs alone (BEP-1077 5.5), which
+        is the scope the caps come off.
+        """
+        user_id = UserID(user_uuid)
+        async with self._share_ops.write_ops() as w:
+            if vfolder_ids is None:
+                taken = await w.batch_purge_field_entities(user_id, UserVFolderPermissionPurger())
+            else:
+                if not vfolder_ids:
+                    return
+                taken = []
+                for vfolder_id in vfolder_ids:
+                    await w.batch_purge_field_entities(
+                        VFolderUUID(vfolder_id),
+                        VFolderUserPermissionBatchPurger(user_id=user_uuid),
+                    )
+                    taken.append(VFolderUUID(vfolder_id))
+            if not taken:
+                return
+            personal_project = await w.lookup_entity_id(
+                PersonalProjectOfUserLookup(user_id=user_id)
+            )
+            if personal_project is None:
+                raise PersonalProjectNotFound(f"User '{user_uuid}' has no personal project.")
+            await w.unshare(personal_project, taken)
+
     async def _migrate_shared_vfolders(
         self,
         conn: AsyncConnection,
@@ -791,11 +829,9 @@ class UserDBSource:
                 & (vfolder_invitations.c.vfolder.in_(migrate_vfolder_ids))
             )
             await conn.execute(delete_query)
-            delete_query = sa.delete(vfolder_permissions).where(
-                (vfolder_permissions.c.user == target_user_uuid)
-                & (vfolder_permissions.c.vfolder.in_(migrate_vfolder_ids))
-            )
-            await conn.execute(delete_query)
+            # The target user becomes the owner, so what they held as an invitee goes:
+            # the mount row and the share cap alike.
+            await self._revoke_shared_vfolders(target_user_uuid, migrate_vfolder_ids)
 
             rowcount = 0
             for item in migrate_updates:

@@ -284,6 +284,12 @@ class TestShareVfolderWithUsersMembership:
                     status=VFolderOperationStatus.READY,
                 )
             )
+            sess.add(
+                VirtualEntityRow(
+                    entity_type=PermissionEntityType.VFOLDER.value,
+                    entity_id=vfolder_id,
+                )
+            )
             await sess.flush()
         yield vfolder_id
 
@@ -293,6 +299,7 @@ class TestShareVfolderWithUsersMembership:
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_fixture: DomainFixtureData,
         user_resource_policy: str,
+        project_resource_policy: str,
         project: UUID,
         project_scope_id: UUID,
     ) -> AsyncGenerator[str, None]:
@@ -336,6 +343,27 @@ class TestShareVfolderWithUsersMembership:
                     scope_id=str(project),
                     entity_type=PermissionEntityType.USER,
                     entity_id=str(user_uuid),
+                )
+            )
+            personal_project_id = uuid4()
+            sess.add(
+                ProjectRow(
+                    id=personal_project_id,
+                    name=f"personal-{personal_project_id.hex[:8]}",
+                    domain_name=domain_fixture.domain_name,
+                    resource_policy=project_resource_policy,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                    type=ProjectType.PERSONAL,
+                    creator_id=user_uuid,
+                )
+            )
+            sess.add(
+                VirtualEntityRow(
+                    entity_type=PermissionScopeType.PROJECT.value,
+                    entity_id=personal_project_id,
                 )
             )
             await sess.flush()

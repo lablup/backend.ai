@@ -42,6 +42,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -106,6 +107,7 @@ def server_module_registries(
             UserRepository(
                 database_engine,
                 v2_ops,
+                ShareOpsProvider(database_engine),
                 KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
             ),
             MagicMock(),

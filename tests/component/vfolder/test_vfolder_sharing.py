@@ -9,6 +9,9 @@ import sqlalchemy as sa
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.vfolder import VFOLDER_ENTITY_TYPE
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder import (
     ListSharedVFoldersQuery,
@@ -26,7 +29,11 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOwnershipType,
 )
+from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.vfolder import vfolder_permissions
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -577,3 +584,175 @@ class TestHostPermissionValidation:
                 group_vf["name"],
                 UnshareVFolderReq(emails=["nonexistent-user@no-domain.test"]),
             )
+
+
+async def _legacy_mount_permissions(
+    db_engine: Any, vfolder_id: uuid.UUID
+) -> dict[uuid.UUID, VFolderMountPermission]:
+    """What ``vfolder_permissions`` says each user holds on the folder."""
+    async with db_engine.begin() as conn:
+        rows = (
+            await conn.execute(
+                sa.select(vfolder_permissions.c.user, vfolder_permissions.c.permission).where(
+                    vfolder_permissions.c.vfolder == vfolder_id
+                )
+            )
+        ).fetchall()
+    return {row.user: VFolderMountPermission(row.permission) for row in rows}
+
+
+async def _share_caps(db_engine: Any, vfolder_id: uuid.UUID) -> dict[uuid.UUID, Permission]:
+    """What the share graph lends the folder to, keyed by whose personal project it is.
+
+    A person is lent a folder into the project that is theirs alone, so the project's
+    creator is the user the cap answers for.
+    """
+    scope = sa.alias(VirtualEntityRow.__table__, "scope")
+    member = sa.alias(VirtualEntityRow.__table__, "member")
+    stmt = (
+        sa.select(ProjectRow.creator_id, EntityMembershipCapRow.permission)
+        .select_from(
+            sa.join(
+                EntityMembershipRow.__table__,
+                scope,
+                scope.c.id == EntityMembershipRow.virtual_entity_id,
+            )
+            .join(member, member.c.id == EntityMembershipRow.member_entity_id)
+            .join(ProjectRow.__table__, ProjectRow.id == scope.c.entity_id)
+            .join(
+                EntityMembershipCapRow.__table__,
+                EntityMembershipCapRow.membership_id == EntityMembershipRow.id,
+            )
+        )
+        .where(
+            EntityMembershipRow.capped.is_(True),
+            scope.c.entity_type == PROJECT_ENTITY_TYPE,
+            member.c.entity_type == VFOLDER_ENTITY_TYPE,
+            member.c.entity_id == vfolder_id,
+            ProjectRow.type == ProjectType.PERSONAL,
+        )
+    )
+    async with db_engine.begin() as conn:
+        rows = (await conn.execute(stmt)).fetchall()
+    caps: dict[uuid.UUID, Permission] = {}
+    for row in rows:
+        caps[row.creator_id] = caps.get(row.creator_id, Permission.NONE) | Permission(
+            row.permission
+        )
+    return caps
+
+
+_WRITABLE_CAP = Permission.READ | Permission.UPDATE | Permission.SOFT_DELETE
+_EXPECTED_CAP: dict[VFolderMountPermission, Permission] = {
+    VFolderMountPermission.READ_ONLY: Permission.READ,
+    VFolderMountPermission.READ_WRITE: _WRITABLE_CAP,
+    VFolderMountPermission.RW_DELETE: _WRITABLE_CAP,
+}
+
+
+async def _assert_tables_agree(db_engine: Any, vfolder_id: uuid.UUID) -> None:
+    """The legacy mount rows and the share caps name the same people, bit for bit."""
+    legacy = await _legacy_mount_permissions(db_engine, vfolder_id)
+    caps = await _share_caps(db_engine, vfolder_id)
+    assert caps.keys() == legacy.keys()
+    for user_id, permission in legacy.items():
+        assert caps[user_id] == _EXPECTED_CAP[permission]
+
+
+class TestSharingWritesBothTables:
+    """Every sharing write puts a share cap beside the legacy mount row (BA-7665).
+
+    Reads still go through ``vfolder_permissions``, so the two are kept in step
+    rather than one replacing the other.
+    """
+
+    async def test_share_writes_the_cap_beside_the_mount_row(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_factory: VFolderFactory,
+        regular_user_fixture: Any,
+        group_fixture: uuid.UUID,
+        db_engine: Any,
+    ) -> None:
+        """Scenario: sharing a project folder read-only writes both tables, and the
+        cap carries READ alone."""
+        group_vf = await vfolder_factory(
+            ownership_type=VFolderOwnershipType.GROUP,
+            group=str(group_fixture),
+        )
+        await admin_registry.vfolder.share(
+            group_vf["name"],
+            ShareVFolderReq(
+                permission=VFolderPermissionField.READ_ONLY,
+                emails=[regular_user_fixture.email],
+            ),
+        )
+        await _assert_tables_agree(db_engine, uuid.UUID(str(group_vf["id"])))
+        caps = await _share_caps(db_engine, uuid.UUID(str(group_vf["id"])))
+        assert caps[regular_user_fixture.user_uuid] == Permission.READ
+
+    async def test_read_write_lends_a_wider_cap_than_read_only(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_factory: VFolderFactory,
+        regular_user_fixture: Any,
+        group_fixture: uuid.UUID,
+        db_engine: Any,
+    ) -> None:
+        """Scenario: re-sharing the same folder read-write raises the cap to
+        READ|UPDATE — the two mount permissions are not stored as the same cap."""
+        group_vf = await vfolder_factory(
+            ownership_type=VFolderOwnershipType.GROUP,
+            group=str(group_fixture),
+        )
+        vfolder_id = uuid.UUID(str(group_vf["id"]))
+        await admin_registry.vfolder.share(
+            group_vf["name"],
+            ShareVFolderReq(
+                permission=VFolderPermissionField.READ_ONLY,
+                emails=[regular_user_fixture.email],
+            ),
+        )
+        read_only_cap = (await _share_caps(db_engine, vfolder_id))[regular_user_fixture.user_uuid]
+
+        await admin_registry.vfolder.share(
+            group_vf["name"],
+            ShareVFolderReq(
+                permission=VFolderPermissionField.READ_WRITE,
+                emails=[regular_user_fixture.email],
+            ),
+        )
+        read_write_cap = (await _share_caps(db_engine, vfolder_id))[regular_user_fixture.user_uuid]
+
+        assert read_only_cap == Permission.READ
+        assert read_write_cap == _WRITABLE_CAP
+        assert read_only_cap != read_write_cap
+        await _assert_tables_agree(db_engine, vfolder_id)
+
+    async def test_unshare_takes_the_cap_back_with_the_mount_row(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_factory: VFolderFactory,
+        regular_user_fixture: Any,
+        group_fixture: uuid.UUID,
+        db_engine: Any,
+    ) -> None:
+        """Scenario: unsharing leaves neither table holding anything for the user."""
+        group_vf = await vfolder_factory(
+            ownership_type=VFolderOwnershipType.GROUP,
+            group=str(group_fixture),
+        )
+        vfolder_id = uuid.UUID(str(group_vf["id"]))
+        await admin_registry.vfolder.share(
+            group_vf["name"],
+            ShareVFolderReq(
+                permission=VFolderPermissionField.READ_WRITE,
+                emails=[regular_user_fixture.email],
+            ),
+        )
+        await admin_registry.vfolder.unshare(
+            group_vf["name"],
+            UnshareVFolderReq(emails=[regular_user_fixture.email]),
+        )
+        assert await _legacy_mount_permissions(db_engine, vfolder_id) == {}
+        assert await _share_caps(db_engine, vfolder_id) == {}

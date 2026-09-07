@@ -100,6 +100,7 @@ def vfolder_processors(
     user_repository = UserRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = VFolderService(

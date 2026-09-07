@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Self
 
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.repository import UserRepository
 
@@ -11,7 +12,12 @@ class UserRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = UserRepository(args.db, args.v2_ops_provider, args.key_provider_pool)
+        repository = UserRepository(
+            args.db,
+            args.v2_ops_provider,
+            ShareOpsProvider(args.db),
+            args.key_provider_pool,
+        )
 
         return cls(
             repository=repository,
