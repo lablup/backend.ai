@@ -1,34 +1,29 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.permission.role import RoleData
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
+from ai.backend.manager.models.rbac_models.role.purgers import RolePurger
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 
 
-@dataclass
-class PurgeRoleAction(RoleAction):
-    """Action for permanently removing a role from the database (hard delete)."""
+@dataclass(frozen=True)
+class PurgeRoleAction(PurgeEntityOpsAction[RoleRow, RoleData]):
+    """Remove one role for good."""
 
-    purger: Purger[RoleRow]
+    role_id: RoleID
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.purger.spec.pk_value())
+    def entity_id(self) -> EntityIdentifier:
+        return self.role_id
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
-
-
-@dataclass
-class PurgeRoleActionResult(BaseActionResult):
-    data: RoleData
+    def action_name(cls) -> str:
+        return "purge_role"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.data.id)
+    def to_purger(self) -> RolePurger:
+        return RolePurger(role_id=self.role_id)

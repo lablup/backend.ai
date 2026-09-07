@@ -11,6 +11,7 @@ from __future__ import annotations
 from http import HTTPStatus
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.permission.types import (
     EntityType,
     ScopeType,
@@ -52,8 +53,8 @@ from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.repositories.base import Creator, Purger, Updater
+from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater
+from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
 from ai.backend.manager.services.permission_contoller.actions import (
     AssignRoleAction,
@@ -173,10 +174,10 @@ class RBACHandler:
 
         role_id = path.parsed.role_id
         updater = self._role_adapter.build_updater(body.parsed, role_id)
-        action_result = await self._permission_controller.update_role.wait_for_complete(
+        result = await self._permission_controller.update_role.run(
             UpdateRoleAction(updater=updater)
         )
-        resp = UpdateRoleResponse(role=self._role_adapter.convert_to_dto(action_result.data))
+        resp = UpdateRoleResponse(role=self._role_adapter.convert_to_dto(result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def delete_role(
@@ -188,10 +189,8 @@ class RBACHandler:
         if not ctx.is_superadmin:
             raise NotEnoughPermission("Only superadmin can delete roles.")
 
-        role_id = body.parsed.role_id
-        updater: Updater[RoleRow] = self._role_adapter.build_deleter(role_id)
-        await self._permission_controller.delete_role.wait_for_complete(
-            DeleteRoleAction(updater=updater)
+        await self._permission_controller.delete_role.run(
+            DeleteRoleAction(updater=RoleSoftDeleteUpdater(role_id=RoleID(body.parsed.role_id)))
         )
         resp = DeleteRoleResponse(deleted=True)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -205,10 +204,8 @@ class RBACHandler:
         if not ctx.is_superadmin:
             raise NotEnoughPermission("Only superadmin can purge roles.")
 
-        role_id = body.parsed.role_id
-        purger: Purger[RoleRow] = self._role_adapter.build_purger(role_id)
-        await self._permission_controller.purge_role.wait_for_complete(
-            PurgeRoleAction(purger=purger)
+        await self._permission_controller.purge_role.run(
+            PurgeRoleAction(role_id=RoleID(body.parsed.role_id))
         )
         resp = DeleteRoleResponse(deleted=True)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

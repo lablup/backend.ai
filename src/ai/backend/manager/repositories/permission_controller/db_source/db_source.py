@@ -249,27 +249,6 @@ class PermissionDBSource:
         result = await execute_creator(db_session, creator)
         return result.row
 
-    async def update_role(self, updater: Updater[RoleRow]) -> RoleRow:
-        async with self._db.begin_session() as db_session:
-            result = await execute_updater(db_session, updater)
-            if result is None:
-                raise ObjectNotFound(f"Role with ID {updater.pk_value} does not exist.")
-            return result.row
-
-    async def delete_role(self, updater: Updater[RoleRow]) -> RoleRow:
-        async with self._db.begin_session() as db_session:
-            result = await execute_updater(db_session, updater)
-            if result is None:
-                raise ObjectNotFound(f"Role with ID {updater.pk_value} does not exist.")
-            return result.row
-
-    async def purge_role(self, purger: Purger[RoleRow]) -> RoleRow:
-        async with self._db.begin_session() as db_session:
-            result = await execute_purger(db_session, purger)
-            if result is None:
-                raise ObjectNotFound(f"Role with ID {purger.spec.pk_value()} does not exist.")
-            return result.row
-
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
         async with self._db.begin_session() as db_session:
             return await self._assign_role_in_session(db_session, data)

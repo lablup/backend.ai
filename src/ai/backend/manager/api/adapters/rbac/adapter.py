@@ -11,6 +11,7 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType, ScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import OperationType as InternalOperationType
@@ -190,6 +191,7 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.role.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.role.scopes import ScopedRoleOperationScope
+from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.virtual_entity.conditions import OwningScopeConditions
@@ -201,14 +203,8 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     RoleCreatorSpec,
     UserRoleCreatorSpec,
 )
-from ai.backend.manager.repositories.permission_controller.purgers import (
-    PermissionPurgerSpec,
-    RolePurgerSpec,
-)
-from ai.backend.manager.repositories.permission_controller.updaters import (
-    PermissionUpdaterSpec,
-    RoleUpdaterSpec,
-)
+from ai.backend.manager.repositories.permission_controller.purgers import PermissionPurgerSpec
+from ai.backend.manager.repositories.permission_controller.updaters import PermissionUpdaterSpec
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.bulk_add_role_permissions import (
     BulkAddRolePermissionsAction,
@@ -832,31 +828,28 @@ class RBACAdapter(BaseAdapter):
     async def update(self, role_id: UUID, input: UpdateRoleInput) -> UpdateRolePayload:
         """Update an existing role."""
         updater = self._build_updater(role_id, input)
-        action_result = await self._processors.permission_controller.update_role.wait_for_complete(
+        result = await self._processors.permission_controller.update_role.run(
             UpdateRoleAction(updater=updater)
         )
-        return UpdateRolePayload(role=self._role_data_to_node(action_result.data))
+        return UpdateRolePayload(role=self._role_data_to_node(result.data))
 
     # ------------------------------------------------------------------ delete
 
     async def delete(self, role_id: UUID) -> DeleteRolePayload:
         """Soft-delete a role (marks status as DELETED)."""
-        spec = RoleUpdaterSpec(status=OptionalState.update(InternalRoleStatus.DELETED))
-        updater = Updater(spec=spec, pk_value=role_id)
-        action_result = await self._processors.permission_controller.delete_role.wait_for_complete(
-            DeleteRoleAction(updater=updater)
+        result = await self._processors.permission_controller.delete_role.run(
+            DeleteRoleAction(updater=RoleSoftDeleteUpdater(role_id=RoleID(role_id)))
         )
-        return DeleteRolePayload(id=action_result.data.id)
+        return DeleteRolePayload(id=result.data.id)
 
     # ------------------------------------------------------------------ purge
 
     async def purge(self, role_id: UUID) -> PurgeRolePayload:
         """Hard-delete a role from the database."""
-        purger: Purger[RoleRow] = Purger(spec=RolePurgerSpec(role_id=role_id))
-        action_result = await self._processors.permission_controller.purge_role.wait_for_complete(
-            PurgeRoleAction(purger=purger)
+        result = await self._processors.permission_controller.purge_role.run(
+            PurgeRoleAction(role_id=RoleID(role_id))
         )
-        return PurgeRolePayload(id=action_result.data.id)
+        return PurgeRolePayload(id=result.data.id)
 
     # ------------------------------------------------------------------ delete_permission
 
@@ -1781,16 +1774,13 @@ class RBACAdapter(BaseAdapter):
                 result.append(EntityScopeOrders.registered_at(ascending))
         return result
 
-    def _build_updater(self, role_id: UUID, input: UpdateRoleInput) -> Updater[RoleRow]:
+    def _build_updater(self, role_id: UUID, input: UpdateRoleInput) -> RoleUpdater:
         name: OptionalState[str] = OptionalState.nop()
-        status: OptionalState[InternalRoleStatus] = OptionalState.nop()
         description: TriState[str] = TriState.nop()
         auto_assign: OptionalState[bool] = OptionalState.nop()
 
         if input.name is not None:
             name = OptionalState.update(input.name)
-        if input.status is not None:
-            status = OptionalState.update(InternalRoleStatus(input.status.value))
         if input.description is not SENTINEL:
             if input.description is None:
                 description = TriState.nullify()
@@ -1799,10 +1789,9 @@ class RBACAdapter(BaseAdapter):
         if input.auto_assign is not None:
             auto_assign = OptionalState.update(input.auto_assign)
 
-        spec = RoleUpdaterSpec(
-            name=name, status=status, description=description, auto_assign=auto_assign
+        return RoleUpdater(
+            role_id=RoleID(role_id), name=name, description=description, auto_assign=auto_assign
         )
-        return Updater(spec=spec, pk_value=role_id)
 
     @staticmethod
     def _role_data_to_node(data: RoleData) -> RoleNode:

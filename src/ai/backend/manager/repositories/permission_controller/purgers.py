@@ -6,28 +6,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import PurgerSpec
-
-
-@dataclass
-class RolePurgerSpec(PurgerSpec[RoleRow]):
-    """PurgerSpec for deleting a role."""
-
-    role_id: uuid.UUID
-
-    @override
-    def row_class(self) -> type[RoleRow]:
-        return RoleRow
-
-    @override
-    def pk_value(self) -> uuid.UUID:
-        return self.role_id
-
-    @override
-    def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
 
 
 @dataclass
