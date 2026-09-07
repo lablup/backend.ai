@@ -7001,6 +7001,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -7017,6 +7018,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -7321,6 +7323,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -7340,6 +7343,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -9348,6 +9352,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -9380,6 +9385,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -9676,6 +9682,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -9715,6 +9722,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -10037,6 +10045,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -10083,6 +10092,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -10459,6 +10469,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -21191,6 +21202,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -21261,6 +21273,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -35260,6 +35273,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -35276,6 +35290,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -35431,6 +35446,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -35447,6 +35463,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -36484,6 +36501,7 @@
         "type": "object"
       },
       "ArtifactFilterOptions": {
+        "description": "Filtering options for artifacts.",
         "properties": {
           "artifact_type": {
             "anyOf": [
@@ -36646,6 +36664,7 @@
         "type": "object"
       },
       "ArtifactOrderingOptions": {
+        "description": "Ordering options for artifact queries.",
         "properties": {
           "order_by": {
             "items": {
@@ -36677,6 +36696,7 @@
         "type": "string"
       },
       "BackwardPaginationOptions": {
+        "description": "Backward pagination: fetch items before a given cursor.",
         "properties": {
           "before": {
             "anyOf": [
@@ -36707,6 +36727,7 @@
         "type": "object"
       },
       "ForwardPaginationOptions": {
+        "description": "Forward pagination: fetch items after a given cursor.",
         "properties": {
           "after": {
             "anyOf": [
@@ -36737,6 +36758,7 @@
         "type": "object"
       },
       "OffsetBasedPaginationOptions": {
+        "description": "Standard offset/limit pagination options.",
         "properties": {
           "offset": {
             "anyOf": [
@@ -36806,6 +36828,7 @@
         "type": "object"
       },
       "StringFilterData": {
+        "description": "Data class that corresponds 1:1 with StringFilter for API requests.",
         "properties": {
           "contains": {
             "anyOf": [
@@ -42093,6 +42116,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -42121,6 +42145,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -42152,6 +42177,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -42289,6 +42315,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               },
               {
@@ -42606,7 +42633,7 @@
         "type": "object"
       },
       "ModifyQueryDefinitionOptionsRequest": {
-        "description": "Options for modifying a prometheus query definition.\n\nEach field is optional — only provided fields are updated.",
+        "description": "Options for modifying a prometheus query definition.\n\nBoth keys are non-nullable in the stored options, so ``None`` is ignored like an\nabsent field.",
         "properties": {
           "filter_labels": {
             "anyOf": [
@@ -42620,7 +42647,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Allowed filter label keys",
             "title": "Filter Labels"
           },
@@ -42636,7 +42662,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Allowed group-by label keys",
             "title": "Group Labels"
           }
@@ -42645,7 +42670,7 @@
         "type": "object"
       },
       "ModifyQueryDefinitionRequest": {
-        "description": "Request to modify a prometheus query definition.\n\nOnly ``time_window`` uses ``Sentinel`` because it is the only nullable DB column;\nall other fields are non-nullable, so ``None`` simply means \"do not update\".",
+        "description": "Request to modify a prometheus query definition.\n\nEvery field defaults to ``UNSET``, so an absent field is left unchanged. ``None``\nclears ``time_window`` -- the only nullable DB column -- and is ignored on the rest.",
         "properties": {
           "name": {
             "anyOf": [
@@ -42656,7 +42681,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Human-readable name",
             "title": "Name"
           },
@@ -42669,7 +42693,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "Prometheus metric name",
             "title": "Metric Name"
           },
@@ -42682,7 +42705,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "description": "PromQL template with placeholders",
             "title": "Query Template"
           },
@@ -42692,13 +42714,9 @@
                 "type": "string"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
             "description": "Default time window",
             "title": "Time Window"
           },
@@ -42711,8 +42729,8 @@
                 "type": "null"
               }
             ],
-            "default": null,
-            "description": "Query definition options"
+            "description": "Query definition options",
+            "title": "Options"
           }
         },
         "title": "ModifyQueryDefinitionRequest",
