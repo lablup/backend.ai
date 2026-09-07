@@ -131,7 +131,7 @@ create can tell its own incarnation from the one that replaced it. See
 #: What an incarnation stamp may look like. Minted as `uuid4().hex`, but not required to be one:
 #: the point is that it is a short, opaque, comparable token, so anything that is not is a value
 #: nothing should be judged against.
-_GENERATION_SHAPE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+_GENERATION_SHAPE = re.compile(r"[A-Za-z0-9._-]{1,64}")
 
 
 def reads_as_generation(value: Any) -> str | None:
@@ -145,7 +145,10 @@ def reads_as_generation(value: Any) -> str | None:
     """
     if not isinstance(value, str):
         return None
-    return value if _GENERATION_SHAPE.match(value) else None
+    # fullmatch, not match: Python's `$` also matches just before a trailing newline, so
+    # "a-generation\n" passed the shape check and then compared unequal to the same stamp without
+    # it -- every correctly stamped key under that session read as another incarnation's.
+    return value if _GENERATION_SHAPE.fullmatch(value) else None
 
 
 class GenerationMatch(StrEnum):
@@ -570,6 +573,19 @@ class AgentNetworkCaps:
 
     tunnel_offload: bool
     backends: list[str] = field(default_factory=list)
+    #: The agent backend that published this. Carried HERE rather than read from the separate
+    #: backend key, so the two cannot be read as a pair that was never written as one: an agent id
+    #: restarted onto a different runtime republishes its backend and leaves the old caps standing,
+    #: and a manager reading one of each would admit a node on a capability the runtime it is
+    #: actually running never claimed.
+    backend: str | None = None
+    #: The tunnel endpoint this node held when it published. A node with none refuses every vxlan
+    #: session on arrival, so admitting it is only a slower way of failing.
+    vtep_ip: str | None = None
+    #: When this was published, by the publisher's clock. The agent refreshes on a timer, so a
+    #: record that has stopped moving is one whose publisher has stopped -- which is the only
+    #: expiry available: this etcd client exposes no lease.
+    updated_at: float | None = None
     #: What would stop this node from serving an overlay session, in the operator's words; empty
     #: when nothing would. Published rather than enforced: the node still refuses a session it
     #: cannot protect when one arrives, and that guard belongs in the data-plane backend. This is
@@ -578,3 +594,44 @@ class AgentNetworkCaps:
     #: The overlay encryption profiles this node can hold up ITS end of. Absent -- which is what an
     #: agent from before this field publishes -- means none: see `OVERLAY_ENCRYPTION_PROFILE`.
     encryption_profiles: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_etcd_payload(cls, payload: Mapping[str, Any]) -> AgentNetworkCaps:
+        """Decode a published capability record, refusing anything that is not one.
+
+        A dataclass built by ``cls(**json.loads(raw))`` accepts every field's value unchecked, so
+        ``backends: "vxlan"`` (a string, not a list) satisfied ``"vxlan" in caps.backends`` by
+        substring, and a number where a timestamp belongs sailed through to arithmetic.
+
+        Raises:
+            ValueError: the payload is not a capability record.
+        """
+
+        if not isinstance(payload, Mapping):
+            # Checked first, and by type rather than by trying: `.get` on a list raises
+            # AttributeError, which is not what a caller guarding a decode catches.
+            raise ValueError("not a JSON object")
+
+        def strs(field_name: str) -> list[str]:
+            value = payload.get(field_name, [])
+            if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+                raise ValueError(f"{field_name} is not a list of strings")
+            return value
+
+        offload = payload.get("tunnel_offload", False)
+        if not isinstance(offload, bool):
+            raise ValueError("tunnel_offload is not a boolean")
+        updated_at = payload.get("updated_at")
+        if updated_at is not None and (
+            isinstance(updated_at, bool) or not isinstance(updated_at, (int, float))
+        ):
+            raise ValueError("updated_at is not a timestamp")
+        return cls(
+            tunnel_offload=offload,
+            backends=strs("backends"),
+            readiness=strs("readiness"),
+            encryption_profiles=strs("encryption_profiles"),
+            backend=_optional_str(payload, "backend"),
+            vtep_ip=_optional_str(payload, "vtep_ip"),
+            updated_at=float(updated_at) if updated_at is not None else None,
+        )
