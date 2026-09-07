@@ -161,6 +161,23 @@ class TestTheLockIsNotTheSetupLock:
         await asyncio.gather(start, stop)
         assert _SESSION not in network._dns_servers
 
+    async def test_an_attach_arriving_after_the_stop_does_not_revive_it(self) -> None:
+        # The lock stops a start and a stop from crossing; it does not stop one that arrives
+        # after. Teardown stops the resolver before it drops the coordinator, and a kernel
+        # attaching in that window used to bring the resolver and its :53 redirect back.
+        backend = _Backend()
+        backend.release.set()
+        network = _network(backend)
+        await network.ensure_cluster_dns(_SESSION)
+        await network._stop_cluster_dns(_SESSION)
+        backend.redirects.clear()
+
+        network._tearing_down.add(_SESSION)
+        await network.ensure_cluster_dns(_SESSION)
+
+        assert backend.redirects == [], "a late attach restarted a torn-down session's resolver"
+        assert _SESSION not in network._dns_servers
+
     async def test_the_lock_dict_shrinks_back_to_empty(self) -> None:
         backend = _Backend()
         backend.release.set()

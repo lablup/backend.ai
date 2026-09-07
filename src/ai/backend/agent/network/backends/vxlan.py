@@ -721,6 +721,9 @@ OWNED_CHAINS: Final = (
     ("filter", "OUTPUT", CHAIN_GUARD),
     ("mangle", "OUTPUT", CHAIN_MARK),
 )
+_OWNED_CHAIN_NAMES: Final = frozenset(chain for _table, _hook, chain in OWNED_CHAINS)
+#: The VNI, out of the normalised u32 expression `_vni_match` writes.
+_U32_VNI: Final = re.compile(r"@12>>8=(\d+)$")
 
 
 def _vni_match(vni: int, dstport: int) -> list[str]:
@@ -900,6 +903,37 @@ def _as_int_text(token: str) -> str:
         return str(int(token, 0))
     except ValueError:
         return token
+
+
+def parse_owned_vni_rules(listing: str) -> frozenset[tuple[int, int]]:
+    """The ``(vni, udp port)`` pairs our own chains carry rules for, from ``iptables-save``.
+
+    Rules outlive the process that installed them, and the in-memory record of what a failed
+    setup owes does not -- so after a restart this is the only thing that finds them.
+    """
+    found: set[tuple[int, int]] = set()
+    for line in listing.splitlines():
+        tokens = line.split()
+        if len(tokens) < 2 or tokens[0] != "-A" or tokens[1] not in _OWNED_CHAIN_NAMES:
+            continue
+        port: int | None = None
+        vni: int | None = None
+        for index, token in enumerate(tokens[:-1]):
+            if token == "--dport":
+                port = _as_port(tokens[index + 1])
+            elif token == "--u32":
+                matched = _U32_VNI.search(_normalise_u32(tokens[index + 1]))
+                vni = int(matched.group(1)) if matched else None
+        if port is not None and vni is not None:
+            found.add((vni, port))
+    return frozenset(found)
+
+
+def _as_port(token: str) -> int | None:
+    try:
+        return int(token, 0)
+    except ValueError:
+        return None  # a multiport list or a range: not a rule of ours
 
 
 def parse_up_vxlan_devices(listing: str) -> frozenset[str]:
@@ -2709,6 +2743,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 self._unclosed_devices.discard(device)
             else:
                 failed.append(device)
+        await self._sweep_orphan_rules(spare)
         self._preflight_done = True
         if failed:
             # Do NOT prune. A claim is what stops another agent removing the SAs of a pair still
@@ -2726,6 +2761,32 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         pruned = await self._pair_journal.prune(self._journal_owner, live_sessions=())
         if pruned:
             log.info("dropped {} stale ESP pair claim(s) left by a previous life", pruned)
+
+    async def _sweep_orphan_rules(self, spare: Collection[int]) -> None:
+        """Remove the per-VNI rules a previous life left in our chains, and owe what will not go.
+
+        The debt a failed setup records is memory, and rules are not: without this a restart
+        forgets them, and the next session given that VNI runs into a stranger's plaintext-drop.
+        """
+        try:
+            listings = [
+                await self._reader(["iptables-save", "-t", "filter"]),
+                await self._reader(["iptables-save", "-t", "mangle"]),
+            ]
+        except Exception:
+            log.exception("could not read this host's firewall rules before recovery")
+            return
+        found: set[tuple[int, int]] = set()
+        for listing in listings:
+            found |= parse_owned_vni_rules(listing)
+        spared = set(spare)
+        for vni, dstport in sorted(found):
+            if vni in spared:
+                continue  # another agent's live session on this node; not ours to disarm
+            log.warning(
+                "removing the rules a previous life left for vni {} on udp/{}", vni, dstport
+            )
+            self._owe_cleanup(vni, dstport, await self._remove_partial_rules(vni, dstport))
 
     async def _require_no_conflict(self, vni: int, dstport: int) -> None:
         """Refuse a VNI another VXLAN on this host already carries on the same port.

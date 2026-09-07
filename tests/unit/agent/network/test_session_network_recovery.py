@@ -29,13 +29,21 @@ class _Backend:
     """A network backend, as much of one as recovery touches."""
 
     def __init__(
-        self, *, preflight_error: Exception | None = None, still_up: frozenset[str] = frozenset()
+        self,
+        *,
+        preflight_error: Exception | None = None,
+        still_up: frozenset[str] = frozenset(),
+        debt: dict[str, str] | None = None,
+        clears_debt_after: int = 1 << 30,
     ) -> None:
         self.preflight_error = preflight_error
         self.still_up = still_up
         self.preflight_calls = 0
         self.spared: frozenset[int] = frozenset()
         self.retry_calls = 0
+        #: What a failed setup left on the host that this backend could not take back.
+        self.debt = dict(debt or {})
+        self.clears_debt_after = clears_debt_after
 
     async def prepare_recovery(self, spare: Collection[int] = ()) -> None:
         self.preflight_calls += 1
@@ -45,7 +53,11 @@ class _Backend:
 
     async def retry_fail_close(self) -> frozenset[str]:
         self.retry_calls += 1
-        return self.still_up
+        self.debt = dict(self.debt) if self.retry_calls < self.clears_debt_after else {}
+        return self.still_up | frozenset(self.debt)
+
+    def cleanup_debt(self) -> dict[str, str]:
+        return dict(self.debt)
 
 
 def _network(**backends: _Backend) -> SessionNetwork:
@@ -457,3 +469,44 @@ class TestARecordTheManagerHasNotFinished:
         network = self._network_reading(self._READY)
         meta = await network._read_session_meta("s1")
         assert meta is not None and meta.subnet == "10.128.5.0/24"
+
+
+class TestWhatAFailedSetupStillOwes:
+    """A setup that failed leaves rules behind long after recovery is over. Nothing else comes
+    back for them, and the value this returns IS what the agent publishes as its readiness -- so
+    a node whose backend refuses every new session must not be reported as ready."""
+
+    _DEBT = {"vxlan:leftover:vni4097": "rules that would drop the next session on this VNI"}
+
+    async def test_a_backend_that_owes_is_retried_even_though_recovery_succeeded(self) -> None:
+        backend = _Backend(debt=dict(self._DEBT))
+        network = _network(vxlan=backend)
+        # Nothing failed recovery: the backend is not in `_recovery_incomplete`, and the retry
+        # used to walk only over that.
+        assert "vxlan" not in network._recovery_incomplete
+
+        await network.retry_recovery_fail_close()
+
+        assert backend.retry_calls == 1, "the debt was never retried"
+
+    async def test_the_debt_goes_out_with_the_readiness_report(self) -> None:
+        backend = _Backend(debt=dict(self._DEBT))
+        network = _network(vxlan=backend)
+        reported = await network.retry_recovery_fail_close()
+        assert "vxlan:leftover:vni4097" in reported
+
+    async def test_it_stops_being_reported_once_it_is_gone(self) -> None:
+        backend = _Backend(debt=dict(self._DEBT), clears_debt_after=1)
+        network = _network(vxlan=backend)
+        reported = await network.retry_recovery_fail_close()
+        assert "vxlan:leftover:vni4097" not in reported
+        assert "vxlan:leftover:vni4097" not in network.recovery_problems()
+
+    async def test_debt_alone_does_not_count_as_a_tunnel_left_up(self) -> None:
+        # `_recovery_incomplete` is for what recovery could not close; conflating the two would
+        # hold up the stale-claim prune over rules that no surviving tunnel has anything to do
+        # with.
+        backend = _Backend(debt=dict(self._DEBT))
+        network = _network(vxlan=backend)
+        await network.retry_recovery_fail_close()
+        assert "vxlan" not in network._recovery_incomplete

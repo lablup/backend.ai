@@ -374,6 +374,31 @@ class SubnetAllocator:
             )
         return stuck
 
+    async def release_all(self, session_id: str) -> list[str]:
+        """Give back every unit block claimed by this session, whatever any meta says.
+
+        The claim names the session, so this reaches what a record never got to name: a create
+        cancelled between the claim and its publish, and a partial claim that would not go back.
+        """
+        payload_of = {}
+        for key, raw in _flat(await self._etcd.get_prefix(_ALLOCATED_PREFIX)).items():
+            if _claimed_subnet(raw, session_id) is not None:
+                payload_of[unquote(key)] = raw
+        stuck: list[str] = []
+        for unit, payload in payload_of.items():
+            try:
+                await self._etcd.delete_if_value(_allocated_key(unit), payload)
+            except Exception:
+                stuck.append(unit)
+        if stuck:
+            log.error(
+                "could not give back {} unit block(s) of session {}: {}",
+                len(stuck),
+                session_id,
+                ", ".join(sorted(stuck)),
+            )
+        return stuck
+
     async def holder(self, subnet: str) -> str | None:
         """The session every unit block of ``subnet`` is claimed by, or None if they disagree or
         any of them is free. Used to tell a live allocation from a record that outlived one."""
@@ -571,6 +596,30 @@ class VNIAllocator:
                 return mine
             taken = {int(key) for key in allocated if key.isdigit()}
         raise VNIPoolExhausted()
+
+    async def release_all(self, session_id: str) -> list[int]:
+        """Give back every VNI claimed by this session, whatever any meta says.
+
+        The counterpart of `SubnetAllocator.release_all`, and there for the same case: a claim
+        the record that should have named it never reached.
+        """
+        payload = json.dumps({"session_id": session_id})
+        stuck: list[int] = []
+        for key, raw in _flat(await self._etcd.get_prefix(_VNI_PREFIX)).items():
+            if raw != payload or not key.isdigit():
+                continue
+            try:
+                await self._etcd.delete_if_value(f"{_VNI_PREFIX}/{key}", payload)
+            except Exception:
+                stuck.append(int(key))
+        if stuck:
+            log.error(
+                "could not give back {} VNI(s) of session {}: {}",
+                len(stuck),
+                session_id,
+                ", ".join(str(vni) for vni in sorted(stuck)),
+            )
+        return stuck
 
     async def holder(self, vni: int) -> str | None:
         """The session ``vni`` is claimed by, or None if it is free."""

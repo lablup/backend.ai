@@ -58,6 +58,7 @@ from ai.backend.agent.network.backends.vxlan import (
     overlay_mac_capability_args,
     parse_owned_policies,
     parse_owned_sa_endpoints,
+    parse_owned_vni_rules,
     parse_sa_identities,
     plaintext_drop_add_args,
     plaintext_drop_check_args,
@@ -881,6 +882,59 @@ class TestPlaintextDrop:
         with pytest.raises(OverlayEncryptionUnavailable):
             await plugin.setup_session_network(_ENC_META, _SELF)
         assert {vxlan_dev(4097), bridge_dev(4097)} <= plugin.unclosed_devices()
+
+
+_LEFTOVER_RULES = (
+    "-P INPUT ACCEPT\n"
+    "-N BAI-VXLAN-IN\n"
+    "-A INPUT -j BAI-VXLAN-IN\n"
+    "-A BAI-VXLAN-IN -p udp -m udp --dport 4789 -m u32 --u32"
+    ' "0x0>>0x16&0x3c@0xc>>0x8=0x1001" -m policy --dir in --pol none -j DROP\n'
+)
+
+
+def _iptables_save(rules: str) -> Callable[[Sequence[str]], str | None]:
+    """A reader that answers `iptables-save -t filter` with these rules and nothing else."""
+
+    def answer(argv: Sequence[str]) -> str | None:
+        if argv[0] != "iptables-save":
+            return None
+        return rules if argv[argv.index("-t") + 1] == "filter" else ""
+
+    return answer
+
+
+class TestRulesFromAPreviousLife:
+    """The debt a failed setup records is memory; the rules are the host's. So a restart has to
+    find them by reading our own chains -- otherwise the next session handed that VNI runs into a
+    plaintext-drop nobody remembers installing."""
+
+    def test_the_vni_and_port_are_read_out_of_our_chains(self) -> None:
+        assert parse_owned_vni_rules(_LEFTOVER_RULES) == frozenset({(4097, 4789)})
+
+    def test_a_rule_in_somebody_elses_chain_is_not_ours(self) -> None:
+        listing = _LEFTOVER_RULES.replace("BAI-VXLAN-IN", "SOMEONE-ELSE")
+        assert parse_owned_vni_rules(listing) == frozenset()
+
+    async def test_the_preflight_removes_them(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, reader=_Listing(_iptables_save(_LEFTOVER_RULES)))
+        await plugin.prepare_recovery()
+        assert plaintext_drop_del_args(4097, 4789) in rec.calls
+        assert plugin.cleanup_debt() == {}
+
+    async def test_one_it_cannot_remove_is_owed_again(self) -> None:
+        rec = Recorder(fail_on=lambda argv: argv[0] == "iptables" and "-D" in argv)
+        plugin = _plugin(rec, reader=_Listing(_iptables_save(_LEFTOVER_RULES)))
+        await plugin.prepare_recovery()
+        assert list(plugin.cleanup_debt()) == ["vxlan:leftover:vni4097"]
+
+    async def test_another_agents_live_vni_is_left_alone(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec, reader=_Listing(_iptables_save(_LEFTOVER_RULES)))
+        await plugin.prepare_recovery(spare=[4097])
+        assert plaintext_drop_del_args(4097, 4789) not in rec.calls
+        assert plugin.cleanup_debt() == {}
 
 
 class _RefusesRuleDeletes(Recorder):

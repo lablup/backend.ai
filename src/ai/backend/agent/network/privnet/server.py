@@ -1643,7 +1643,14 @@ class PrivNetServer:
         # Journal before the host is mutated: a record with no device is reconciled away on the
         # next boot, while a device with no record is one nobody can ever name again.
         await self._journal.record_session(session_id, dict(raw_config))
-        await backend.setup_session_network(meta, self._self_member(meta.backend))
+        try:
+            await backend.setup_session_network(meta, self._self_member(meta.backend))
+        except BaseException:
+            # A setup that failed may have left rules or a device its own undo could not remove.
+            # The fail-close timer is what comes back for those, and it stops once there is
+            # nothing left -- so a failure long after recovery has to start it again.
+            self._start_fail_close_retry(backend)
+            raise
         self._sessions[session_id] = _SessionEntry(meta, backend, digest)
         self._now_managed(session_id)
 
