@@ -121,6 +121,17 @@ _CREATE_POLL_SEC: Final = 0.5
 #: of the cluster.
 _CLEANUP_DEBT_PREFIX: Final = "network/cleanup-debt"
 
+#: Who swept the pool last, and when. The turn is claimed by compare-and-swap, so of all the
+#: managers in an HA set exactly one sweeps per interval -- the others read a fresh ticket and do
+#: nothing. That is both halves of the same problem: a sweep has to keep happening on a cluster
+#: where nobody is creating sessions (the retry on the next create never comes), and it must not
+#: happen on every manager at once (a rolling restart would otherwise put one full pool scan per
+#: manager on etcd at the same moment).
+_RECONCILE_TICKET: Final = "network/reconcile-ticket"
+#: How often the pool is swept, cluster-wide. Long: it is a safety net under the debt notes and
+#: the per-session reconciliation, not the thing that normally gives claims back.
+_RECONCILE_INTERVAL_SEC: Final = 600.0
+
 
 def _published(meta: Mapping[str, Any]) -> dict[str, Any]:
     """The session meta as its callers see it, without the create's own bookkeeping.
@@ -136,12 +147,27 @@ def _debt_key(session_id: str, generation: str) -> str:
     return f"{_CLEANUP_DEBT_PREFIX}/{session_id}/{generation}"
 
 
-def _generation_stamp_of(raw: str) -> str | None:
-    """The incarnation a claim payload carries, or None where it carries none."""
+def _record(raw: str) -> dict[str, Any] | None:
+    """``raw`` as the object a session record or a claim is, or None if it is not one.
+
+    The same rule as `ipam._record`, and there for the same reason: syntactically valid JSON that
+    is not an object raises AttributeError rather than ValueError, and one such key under
+    ``network/`` aborted the whole reconciliation pass. A key nothing here can read is isolated
+    and counted, not allowed to stop the sweep reaching the rest.
+    """
     try:
-        stamped = json.loads(raw).get(_GENERATION)
+        parsed = json.loads(raw)
     except ValueError:
         return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _generation_stamp_of(raw: str) -> str | None:
+    """The incarnation a claim payload carries, or None where it carries none."""
+    record = _record(raw)
+    if record is None:
+        return None
+    stamped = record.get(_GENERATION)
     return str(stamped) if stamped is not None else None
 
 
@@ -149,10 +175,10 @@ def _generation_of(raw: str | None) -> str | None:
     """The incarnation a session record names, or None when it names none."""
     if not raw:
         return None
-    try:
-        generation = json.loads(raw).get(_GENERATION)
-    except ValueError:
+    record = _record(raw)
+    if record is None:
         return None
+    generation = record.get(_GENERATION)
     return str(generation) if generation is not None else None
 
 
@@ -170,9 +196,8 @@ def _record_names(meta_raw: str, raw: str, is_vni: bool, key: str | int) -> bool
     A unit block must also lie inside the block the record names. The payload is what identifies
     the claim, and a payload naming a block the unit is not part of identifies nothing.
     """
-    try:
-        meta = json.loads(meta_raw)
-    except ValueError:
+    meta = _record(meta_raw)
+    if meta is None:
         return False
     if is_vni:
         named_vni = meta.get("vni")
@@ -180,9 +205,10 @@ def _record_names(meta_raw: str, raw: str, is_vni: bool, key: str | int) -> bool
     named_subnet = meta.get("subnet")
     if named_subnet is None:
         return False
+    claim = _record(raw)
+    if claim is None or claim.get("subnet") != named_subnet:
+        return False
     try:
-        if json.loads(raw).get("subnet") != named_subnet:
-            return False
         unit = ipaddress.ip_network(str(key))
         block = ipaddress.ip_network(str(named_subnet))
     except ValueError:
@@ -210,9 +236,8 @@ def _names_an_allocation(meta_raw: str, is_vni: bool) -> bool:
     them under a DELETING tombstone. So the presence of the key, not its value, is what says
     whether the record can answer for a claim of this kind.
     """
-    try:
-        meta = json.loads(meta_raw)
-    except ValueError:
+    meta = _record(meta_raw)
+    if meta is None:
         return False
     return ("vni" if is_vni else "subnet") in meta
 
@@ -296,6 +321,10 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
     #: evidence an orphan claim exists, so a pass that could not run leaves nothing else to find
     #: it: it is retried where a session id comes round, and reported until it goes through.
     _reconciliation_owed: bool
+    #: The periodic sweep. Cancelled before etcd is closed, or its next pass runs on a shut client.
+    _reconcile_task: asyncio.Task[None] | None
+    #: Which manager this is, written on the ticket so a sweep can be traced to one.
+    _reconcile_token: str
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
@@ -303,6 +332,8 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         self._forced_backend = None
         self._unrecoverable = {}
         self._reconciliation_owed = False
+        self._reconcile_task = None
+        self._reconcile_token = uuid.uuid4().hex
 
     @override
     async def init(self, context: Any = None) -> None:
@@ -330,7 +361,58 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # sessions -- refusing to start over a transient etcd error would be worse -- but it does
         # not carry on as if it had: the pass stays owed, it is retried the next time a session id
         # comes round, and `backendai_network_pool_reconcile_pending` says so until it succeeds.
-        await self._reconcile_pool_reporting()
+        if await self._claim_reconcile_turn():
+            await self._reconcile_pool_reporting()
+        self._reconcile_task = asyncio.create_task(self._reconcile_loop())
+
+    async def _reconcile_loop(self) -> None:
+        """Sweep the pool on a timer, once per cluster per interval.
+
+        The retry on the next use of a session id is not enough on its own: a cluster where nobody
+        is starting sessions never has a next use, so a failed startup sweep would stay unpaid and
+        an orphan claim would sit in the pool until somebody restarted a manager. This is what
+        makes the recovery eventual rather than conditional on traffic.
+        """
+        while True:
+            try:
+                await asyncio.sleep(_RECONCILE_INTERVAL_SEC)
+                if await self._claim_reconcile_turn():
+                    await self._reconcile_pool_reporting()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # Never let one bad pass end the loop; the next one is the retry.
+                log.exception("the periodic overlay pool reconciliation raised")
+
+    async def _claim_reconcile_turn(self) -> bool:
+        """Whether this manager is the one to sweep now.
+
+        Leader election by compare-and-swap on a single key rather than by a lock: the sweep is
+        idempotent and cheap to skip, so all that is needed is that one manager wins and the rest
+        find out without waiting. A lock would leave every other manager blocked on it, and a
+        rolling restart would then run the sweep once per manager in turn instead of once.
+
+        Fails OPEN -- an unreadable ticket means this manager sweeps. A pass too many costs a pool
+        read; a pass too few is a claim nobody reclaims.
+        """
+        etcd = self._require_etcd()
+        now = time.time()
+        try:
+            standing = await etcd.get(_RECONCILE_TICKET, scope=ConfigScopes.GLOBAL)
+        except Exception:
+            log.warning("could not read the reconciliation ticket; sweeping anyway", exc_info=True)
+            return True
+        ticket = json.dumps({"at": now, "by": self._reconcile_token})
+        if standing is None:
+            return await etcd.put_if_absent(_RECONCILE_TICKET, ticket)
+        swept_at = (_record(standing) or {}).get("at")
+        if isinstance(swept_at, (int, float, str)):
+            try:
+                if now - float(swept_at) < _RECONCILE_INTERVAL_SEC:
+                    return False  # somebody swept recently
+            except ValueError:
+                pass  # unreadable ticket: take the turn and write a readable one
+        return await etcd.compare_and_put(_RECONCILE_TICKET, ticket, expected=standing, guards={})
 
     async def _reconcile_pool_reporting(self) -> None:
         """Run a reconciliation pass, and leave behind what its outcome means.
@@ -359,6 +441,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
 
     @override
     async def cleanup(self) -> None:
+        if self._reconcile_task is not None:
+            self._reconcile_task.cancel()
+            try:
+                await self._reconcile_task
+            except asyncio.CancelledError:
+                pass
+            self._reconcile_task = None
         if self._etcd is not None:
             await self._etcd.close()
             self._etcd = None
@@ -545,7 +634,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         raw = await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
         if raw is None:
             return None
-        meta = json.loads(raw)
+        meta = _record(raw)
+        if meta is None:
+            # Nothing here can be read as an allocation, so there is none to hand back. The
+            # caller takes the record and builds again; whatever the unreadable one named is
+            # reached by the pool reconciler, which judges claims and not records.
+            log.warning("session {}'s network record is unreadable; allocating again", session_id)
+            return None
         if meta.get(_STATE) not in (None, _READY):
             # Still being built, by us on a previous attempt or by another manager. Not something
             # to hand back: the subnet and VNI it names are not committed until whoever owns it
@@ -729,12 +824,29 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             if await etcd.put_if_absent(key, fresh):
                 return fresh, None
             raw = await etcd.get(key, scope=ConfigScopes.GLOBAL)
+            record = _record(raw) if raw is not None else None
             if raw is not None:
-                state = json.loads(raw).get(_STATE)
+                state = record.get(_STATE) if record is not None else None
+                if record is None:
+                    # Nothing here was written by a manager running this code -- every record it
+                    # writes is a JSON object. So there is no owner to wait out: take it at once,
+                    # from its exact bytes, rather than sitting through the handover for a create
+                    # that does not exist. A new incarnation, because nothing the old bytes may
+                    # have named can be trusted; what they named is the pool reconciler's.
+                    fresh_over = claim(None)
+                    if await etcd.replace(key, raw, fresh_over):
+                        log.warning(
+                            "session {}'s network record could not be read; replacing it and"
+                            " leaving what it may have named to the pool reconciler",
+                            session_id,
+                        )
+                        return fresh_over, None
+                    await asyncio.sleep(_CREATE_POLL_SEC)
+                    continue
                 # Anything taken over is taken over WITH its incarnation; only the put_if_absent
                 # paths (above, and after a cleanup that finished) mint a new one.
                 ours = claim(_generation_of(raw))
-                if state == _DELETING:
+                if state == _DELETING and record is not None:
                     # A cleanup that did not get to the end. Never taken over as a create: the
                     # tombstone names a subnet and a VNI that are still allocated, and building
                     # over it would run a session on keys somebody else is still deleting. Finish
@@ -742,7 +854,6 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     # managers that read this same record do not both delete from it. Losing that
                     # take is not an error: fall through to the poll and come back to whatever is
                     # there now.
-                    record = json.loads(raw)
                     mine = _tombstone(
                         record.get("subnet"),
                         record.get("vni"),
@@ -842,10 +953,8 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # nothing left to give it back from, and the block and the VNI leaked for the cluster's
         # lifetime. It also let a new creator in while the old rollback was still deleting, whose
         # keys the old rollback then removed.
-        try:
-            owner = json.loads(held).get(_OWNER) if held else None
-        except ValueError:
-            owner = None
+        record = _record(held) if held else None
+        owner = record.get(_OWNER) if record is not None else None
         generation = _generation_of(held)
         tombstone = _tombstone(subnet, vni, owner, generation)
         if not held or not await etcd.replace(session_meta_key(session_id), held, tombstone):
@@ -959,10 +1068,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         live = _generation_of(live_raw)
         live_meta: Mapping[str, Any] = {}
         if live_raw is not None:
-            try:
-                live_meta = json.loads(live_raw)
-            except ValueError:
-                live_meta = {}
+            live_meta = _record(live_raw) or {}
         live_vni = live_meta.get("vni")
         live_subnet = live_meta.get("subnet")
         try:
@@ -1130,7 +1236,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         allocated = await self._subnet_allocator.pool_listing() if to_take else {}
         for session_id, (_live, meta_raw) in to_take.items():
             if not await self._take_allocation(
-                session_id, json.loads(meta_raw), meta_raw, allocated
+                session_id, _record(meta_raw) or {}, meta_raw, allocated
             ):
                 log.warning(
                     "session {}'s allocation could not be taken onto the incarnation its record"
@@ -1500,7 +1606,19 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     " stays as a tombstone naming what is left, and this retries"
                 )
             return
-        meta = json.loads(raw)
+        parsed = _record(raw)
+        if parsed is None:
+            # Unreadable: it names nothing this can give back, and leaving it stops the id being
+            # used again. Removed over its own exact bytes, and what it may have named is left to
+            # the pool reconciler -- which reads claims, not records.
+            log.warning(
+                "session {}'s network record is unreadable; removing it and leaving what it may"
+                " have named to the pool reconciler",
+                network_id,
+            )
+            await etcd.delete_if_value(session_meta_key(network_id), raw)
+            return
+        meta = parsed
         if meta.get(_STATE) == _CREATING and not self._create_gave_up(meta):
             # A create is building this session right now. Deleting its keys from under it takes
             # away the record its own rollback needs, and what it had already claimed from the
@@ -1581,8 +1699,8 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             # them has touched the host -- counting it would hold every session's VNI forever on
             # a node that never received a kernel.
             try:
-                member = Member.from_etcd_payload(str(agent_id), json.loads(payload))
-            except (ValueError, KeyError):
+                member = Member.from_etcd_payload(str(agent_id), _record(payload) or {})
+            except (ValueError, KeyError, AttributeError):
                 # Unreadable is not "gone": something wrote it, so assume it is still holding.
                 holding.add(str(agent_id))
                 continue
