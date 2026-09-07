@@ -17,7 +17,7 @@ from ai.backend.common.data.entity.role import ROLE_ENTITY_TYPE, RoleID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.entity.vfolder_permission import VFolderPermissionID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.user import UserPurgeFailure
@@ -81,10 +81,13 @@ class UserKeyPairPurger(FieldBatchPurger[UserID, KeyPairRow, KeyPairID]):
 
 
 @dataclass
-class UserVFolderPermissionPurger(
-    FieldBatchPurger[UserID, VFolderPermissionRow, VFolderPermissionID]
-):
-    """Clears the vfolder permissions granted to a user."""
+class UserVFolderPermissionPurger(FieldBatchPurger[UserID, VFolderPermissionRow, VFolderUUID]):
+    """Clears the vfolder permissions granted to a user.
+
+    Answers with the folders taken back rather than the rows removed: what the caller
+    does next is take the share caps off those folders, and the row ids name nothing
+    it can act on.
+    """
 
     @override
     def build_subquery(self, owner_id: UserID) -> sa.sql.Select[Any]:
@@ -95,8 +98,8 @@ class UserVFolderPermissionPurger(
         return ()
 
     @override
-    def to_data(self, row: VFolderPermissionRow) -> VFolderPermissionID:
-        return VFolderPermissionID(row.id)
+    def to_data(self, row: VFolderPermissionRow) -> VFolderUUID:
+        return VFolderUUID(row.vfolder)
 
 
 @dataclass

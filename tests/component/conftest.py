@@ -159,6 +159,7 @@ from ai.backend.manager.repositories.db.engine import (
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -1546,6 +1547,7 @@ def auth_processors(
     user_repository = UserRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     group_repository = ProjectRepository(

@@ -70,6 +70,7 @@ from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project import ProjectRow, ProjectType
+from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user import (
@@ -113,6 +114,7 @@ from ai.backend.manager.models.vfolder.creators import (
     VFolderBaseCreator,
     VFolderPermissionCreator,
 )
+from ai.backend.manager.models.vfolder.lookups import VFolderMountPermissionLookup
 from ai.backend.manager.models.vfolder.purgers import (
     VFolderPurger,
     VFolderUserPermissionBatchPurger,
@@ -124,6 +126,7 @@ from ai.backend.manager.models.vfolder.scopes import (
 )
 from ai.backend.manager.models.vfolder.updaters import (
     VFolderAttributeUpdater,
+    VFolderMountPermissionUpdater,
     VFolderReadyUpdater,
     VFolderSoftDeleteUpdater,
     VFolderTrashUpdater,
@@ -135,6 +138,7 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.integrity import match_integrity_error
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
 from ai.backend.manager.repositories.vfolder.purge_guards import (
     find_active_vfolder_references,
     vfolder_reference_conflict_checks,
@@ -518,9 +522,7 @@ class VfolderRepository:
             return ProjectID(project_id)
 
     @vfolder_repository_resilience.apply()
-    async def create_vfolder_with_permission(
-        self, creator: VFolderBaseCreator, create_owner_permission: bool = False
-    ) -> VFolderCreation:
+    async def create_vfolder_with_permission(self, creator: VFolderBaseCreator) -> VFolderCreation:
         """Write the vfolder row and answer with what making its storage folder needs.
 
         The host the folder asks for is checked here rather than by the caller, so a
@@ -535,19 +537,6 @@ class VfolderRepository:
         limits = await self._storage_limits(creator)
         async with self._v2_ops.write_ops() as w:
             created = await w.create_entity(creator)
-
-            # Only a personally-owned folder records an owner permission here; the
-            # model store folder's owner share is BA-7665.
-            if create_owner_permission and isinstance(creator, PersonalVFolderCreator):
-                await w.create_field(
-                    created.id,
-                    VFolderPermissionCreator(
-                        user_id=creator.user,
-                        permission=VFolderMountPermission.OWNER_PERM,
-                    ),
-                )
-                await w.replace_share(UserID(creator.user), created.id, Permission.READ)
-
             return VFolderCreation(
                 vfolder=created,
                 max_quota_scope_size=limits[0],
@@ -937,6 +926,75 @@ class VfolderRepository:
                 for row in permission_rows
             ]
 
+    async def _landing_project(self, w: V2ShareWriteOps, user_id: uuid.UUID) -> ProjectID:
+        """Where what a person is given lands (BEP-1077 5.5).
+
+        Read through the write ops so the scope, the mount row and the cap are settled
+        in one transaction. Raises ``PersonalProjectNotFound`` when the user has none:
+        every account is given one, so its absence is a broken account.
+        """
+        project_id = await w.lookup_entity_id(PersonalProjectOfUserLookup(user_id=UserID(user_id)))
+        if project_id is None:
+            raise PersonalProjectNotFound(f"User '{user_id}' has no personal project.")
+        return project_id
+
+    async def _grant_mount_permission(
+        self,
+        w: V2ShareWriteOps,
+        vfolder_id: VFolderUUID,
+        user_id: uuid.UUID,
+        permission: VFolderMountPermission,
+    ) -> VFolderPermissionData:
+        """Give a user the folder: the legacy mount row and the share cap together."""
+        created = await w.create_field(
+            vfolder_id, VFolderPermissionCreator(user_id=user_id, permission=permission)
+        )
+        await w.replace_share(
+            await self._landing_project(w, user_id),
+            vfolder_id,
+            _mount_permission_cap(permission),
+        )
+        return created
+
+    async def _restate_mount_permission(
+        self,
+        w: V2ShareWriteOps,
+        vfolder_id: VFolderUUID,
+        user_id: uuid.UUID,
+        permission: VFolderMountPermission,
+    ) -> VFolderPermissionData | None:
+        """Set what a user already holds on the folder to ``permission``.
+
+        ``None`` when they hold nothing, which leaves the share cap alone: raising
+        what was never lent is the grant path's business.
+        """
+        found = await w.lookup_field_by_key(
+            VFolderMountPermissionLookup(vfolder_id=vfolder_id, user_id=user_id)
+        )
+        if found is None:
+            return None
+        permission_id, _ = found
+        updated = await w.update_data(
+            VFolderMountPermissionUpdater(permission_id=permission_id, permission=permission)
+        )
+        if updated is None:
+            return None
+        await w.replace_share(
+            await self._landing_project(w, user_id),
+            vfolder_id,
+            _mount_permission_cap(permission),
+        )
+        return updated
+
+    async def _revoke_mount_permission(
+        self, w: V2ShareWriteOps, vfolder_id: VFolderUUID, user_id: uuid.UUID
+    ) -> None:
+        """Take the folder back from a user: the legacy mount row and the share cap."""
+        await w.batch_purge_field_entities(
+            vfolder_id, VFolderUserPermissionBatchPurger(user_id=user_id)
+        )
+        await w.unshare(await self._landing_project(w, user_id), [vfolder_id])
+
     @vfolder_repository_resilience.apply()
     async def create_vfolder_permission(
         self,
@@ -947,29 +1005,18 @@ class VfolderRepository:
         """
         Create a VFolder permission entry.
         """
-        # What is given to a person lands in that person's personal project (BEP-1077).
-        personal_project = await self.get_personal_project_id(user_id)
         async with self._v2_ops.write_ops() as w:
-            created = await w.create_field(
-                VFolderUUID(vfolder_id),
-                VFolderPermissionCreator(user_id=user_id, permission=permission),
+            return await self._grant_mount_permission(
+                w, VFolderUUID(vfolder_id), user_id, permission
             )
-            await w.replace_share(
-                personal_project, VFolderUUID(vfolder_id), _mount_permission_cap(permission)
-            )
-            return created
 
     @vfolder_repository_resilience.apply()
     async def delete_vfolder_permission(self, vfolder_id: uuid.UUID, user_id: uuid.UUID) -> None:
         """
         Delete a VFolder permission entry.
         """
-        personal_project = await self.get_personal_project_id(user_id)
         async with self._v2_ops.write_ops() as w:
-            await w.batch_purge_field_entities(
-                VFolderUUID(vfolder_id), VFolderUserPermissionBatchPurger(user_id=user_id)
-            )
-            await w.unshare(personal_project, [VFolderUUID(vfolder_id)])
+            await self._revoke_mount_permission(w, VFolderUUID(vfolder_id), user_id)
 
     @vfolder_repository_resilience.apply()
     async def get_vfolder_invitations_by_vfolder(
@@ -1462,18 +1509,8 @@ class VfolderRepository:
         """
         Update the permission of an invited user for a specific vfolder.
         """
-        async with self._db.begin_session() as session:
-            query = (
-                sa.update(VFolderPermissionRow)
-                .where(
-                    sa.and_(
-                        VFolderPermissionRow.vfolder == vfolder_id,
-                        VFolderPermissionRow.user == user_id,
-                    )
-                )
-                .values(permission=permission)
-            )
-            await session.execute(query)
+        async with self._v2_ops.write_ops() as w:
+            await self._restate_mount_permission(w, VFolderUUID(vfolder_id), user_id, permission)
 
     @vfolder_repository_resilience.apply()
     async def get_pending_invitations_for_user(
@@ -1790,7 +1827,7 @@ class VfolderRepository:
         Share a group vfolder with users by granting permissions directly.
         Returns list of emails that were shared with.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             conn = await session.connection()
             await ensure_host_permission_allowed(
                 conn,
@@ -1826,31 +1863,18 @@ class VfolderRepository:
                     object_name="user",
                 )
 
-            existing_query = sa.select(VFolderPermissionRow.user).where(
-                (VFolderPermissionRow.user.in_(users_to_share))
-                & (VFolderPermissionRow.vfolder == vfolder_id),
-            )
-            result = await session.execute(existing_query)
-            users_with_existing_perm = [row.user for row in result.fetchall()]
-            new_users = list(set(users_to_share) - set(users_with_existing_perm))
-
-            for _user in new_users:
-                insert_stmt = sa.insert(VFolderPermissionRow).values(
-                    permission=permission,
-                    vfolder=vfolder_id,
-                    user=_user,
+        async with self._v2_ops.write_ops() as w:
+            for user_id in users_to_share:
+                # Whoever already holds the folder has what they hold restated; the
+                # rest are given it. Both write the cap beside the mount row.
+                restated = await self._restate_mount_permission(
+                    w, VFolderUUID(vfolder_id), user_id, permission
                 )
-                await session.execute(insert_stmt)
-            for _user in users_with_existing_perm:
-                update_stmt = (
-                    sa.update(VFolderPermissionRow)
-                    .values(permission=permission)
-                    .where(VFolderPermissionRow.vfolder == vfolder_id)
-                    .where(VFolderPermissionRow.user == _user)
-                )
-                await session.execute(update_stmt)
-
-            return emails_to_share
+                if restated is None:
+                    await self._grant_mount_permission(
+                        w, VFolderUUID(vfolder_id), user_id, permission
+                    )
+        return emails_to_share
 
     @vfolder_repository_resilience.apply()
     async def unshare_vfolder_from_users(
@@ -1867,7 +1891,7 @@ class VfolderRepository:
         Revoke direct sharing permissions from users.
         Returns list of emails that were unshared.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             conn = await session.connection()
             await ensure_host_permission_allowed(
                 conn,
@@ -1890,13 +1914,10 @@ class VfolderRepository:
             if len(users_to_unshare) < 1:
                 raise ObjectNotFound(object_name="user(s).")
 
-            delete_stmt = sa.delete(VFolderPermissionRow).where(
-                (VFolderPermissionRow.vfolder == vfolder_id)
-                & (VFolderPermissionRow.user.in_(users_to_unshare)),
-            )
-            await session.execute(delete_stmt)
-
-            return emails
+        async with self._v2_ops.write_ops() as w:
+            for user_id in users_to_unshare:
+                await self._revoke_mount_permission(w, VFolderUUID(vfolder_id), user_id)
+        return emails
 
     @vfolder_repository_resilience.apply()
     async def list_shared_vfolder_permissions(
@@ -1955,23 +1976,11 @@ class VfolderRepository:
         """
         Batch update and/or delete sharing permissions for a vfolder.
         """
-        async with self._db.begin_session() as session:
-            if to_delete:
-                delete_stmt = (
-                    sa.delete(VFolderPermissionRow)
-                    .where(VFolderPermissionRow.vfolder == vfolder_id)
-                    .where(VFolderPermissionRow.user.in_(to_delete))
-                )
-                await session.execute(delete_stmt)
-
+        async with self._v2_ops.write_ops() as w:
+            for user_id in to_delete:
+                await self._revoke_mount_permission(w, VFolderUUID(vfolder_id), user_id)
             for user_id, perm in to_update:
-                update_stmt = (
-                    sa.update(VFolderPermissionRow)
-                    .values(permission=perm)
-                    .where(VFolderPermissionRow.vfolder == vfolder_id)
-                    .where(VFolderPermissionRow.user == user_id)
-                )
-                await session.execute(update_stmt)
+                await self._restate_mount_permission(w, VFolderUUID(vfolder_id), user_id, perm)
 
     @vfolder_repository_resilience.apply()
     async def check_vfolder_accessible(
@@ -2233,7 +2242,8 @@ class VfolderRepository:
                 await conn.execute(del_query)
 
             # Also clear what the new owner held from when they were an invitee; the
-            # ownership below replaces it uncapped.
+            # ownership below replaces it uncapped. Their legacy mount row is left
+            # standing — accepting a later invitation reads it (BA-5277).
             async with self._v2_ops.write_ops() as w:
                 await w.unshare(new_owner_project, [VFolderUUID(vfolder_id)])
 

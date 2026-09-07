@@ -129,6 +129,7 @@ def vfolder_processors(
     user_repository = UserRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = VFolderService(
@@ -154,6 +155,7 @@ def vfolder_file_processors(
     user_repository = UserRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = VFolderFileService(
@@ -175,6 +177,7 @@ def vfolder_invite_processors(
     user_repository = UserRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = VFolderInviteService(
@@ -197,6 +200,7 @@ def vfolder_sharing_processors(
     user_repository = UserRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ShareOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = VFolderSharingService(

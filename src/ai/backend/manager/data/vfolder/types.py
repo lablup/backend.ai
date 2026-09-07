@@ -74,12 +74,20 @@ class VFolderMountPermission(enum.StrEnum):
         return None
 
     def to_rbac_operation(self) -> set[OperationType]:
+        """What a mount permission lets its holder do inside a session.
+
+        Two answers: reading, and reading with writing. ``wd`` answers as ``rw``
+        (BEP-1077 5.7) — it stays a value the legacy read paths gate on, but it buys
+        nothing the graph does not already give ``rw``.
+        """
         match self:
             case VFolderMountPermission.READ_ONLY:
                 return {OperationType.READ}
-            case VFolderMountPermission.READ_WRITE:
-                return {OperationType.READ, OperationType.UPDATE, OperationType.SOFT_DELETE}
-            case VFolderMountPermission.RW_DELETE | VFolderMountPermission.OWNER_PERM:
+            case (
+                VFolderMountPermission.READ_WRITE
+                | VFolderMountPermission.RW_DELETE
+                | VFolderMountPermission.OWNER_PERM
+            ):
                 return {OperationType.READ, OperationType.UPDATE, OperationType.SOFT_DELETE}
 
 
