@@ -157,6 +157,28 @@ class ProjectDBSource:
                 f"Personal project takes no members: {project_id}"
             )
 
+    async def _refuse_cross_domain_user(
+        self, w: RBACWriteOps, user_id: UserID, project_id: ProjectID
+    ) -> None:
+        """Refuse the write when the user is outside the project's domain — the same
+        constraint :meth:`_users_addable_to_project` applies on the roster path.
+        A missing user or project falls here too: neither can be in the other's domain.
+        """
+        project_domain_subq = (
+            sa.select(ProjectRow.domain_name).where(ProjectRow.id == project_id).scalar_subquery()
+        )
+        result = await w.batch_query_in_global(
+            sa.select(UserRow.uuid).where(
+                (UserRow.uuid == user_id) & (UserRow.domain_name == project_domain_subq)
+            ),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        if not result.rows:
+            raise InvalidAPIParameters(
+                f"User {user_id} is outside the domain of project {project_id}: "
+                "project membership stays within a single domain."
+            )
+
     async def _users_addable_to_project(
         self,
         w: RBACWriteOps,
@@ -626,10 +648,12 @@ class ProjectDBSource:
         """Add a user to a project as a scope member, granting the project's
         ``auto_assign`` roles.
 
-        Idempotent: adding an existing member is a no-op.
+        Idempotent: adding an existing member is a no-op. The user must be in the
+        project's domain.
         """
         async with self._rbac_ops_provider.write_ops() as w:
             await self._refuse_personal_project(w, project_id)
+            await self._refuse_cross_domain_user(w, user_id, project_id)
             await w.add_bulk_members(
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),

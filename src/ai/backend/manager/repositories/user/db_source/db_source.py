@@ -292,12 +292,16 @@ class UserDBSource:
                     f"Username '{new_username}' is already taken by another user."
                 )
 
-        # Check if new domain_name exists
+        # Check if new domain_name exists, and carry the move over to domain_id:
+        # the updater writes only the deprecated name column.
         new_domain_name = updater.domain_name.optional_value()
         if new_domain_name and new_domain_name != current_user.domain_name:
-            domain_exists = await self._check_domain_exists(session, new_domain_name)
-            if not domain_exists:
+            new_domain_id = await session.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == new_domain_name)
+            )
+            if new_domain_id is None:
                 raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
+            to_update["domain_id"] = new_domain_id
 
         # Check if new resource_policy exists
         new_resource_policy = updater.resource_policy.optional_value()
@@ -329,10 +333,13 @@ class UserDBSource:
             await self._sync_keypair_roles(session, updated_user.uuid, role)
 
         # Handle group updates through the RBAC member ops in its own transaction.
+        # A domain move invalidates every membership the user holds — projects are
+        # domain-scoped — so re-sync then too, with or without group_ids given.
         group_ids = updater.group_ids_value
-        if group_ids is not None:
+        domain_moved = updated_user.domain_name != current_user.domain_name
+        if group_ids is not None or domain_moved:
             await self._sync_user_project_memberships(
-                updated_user.uuid, updated_user.domain_name, group_ids
+                updated_user.uuid, updated_user.domain_name, group_ids or []
             )
         return UserData.from_row(updated_user)
 
@@ -540,13 +547,6 @@ class UserDBSource:
                 sa.delete(keypairs).where(keypairs.c.user == user_uuid),
             )
             return result.rowcount
-
-    async def _check_domain_exists(
-        self, session: SASession | AsyncConnection, domain_name: str
-    ) -> bool:
-        query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
-        result = await session.scalar(query)
-        return result is not None
 
     async def _check_resource_policy_exists(
         self, session: SASession | AsyncConnection, policy_name: str

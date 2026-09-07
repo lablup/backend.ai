@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.role import (
@@ -240,6 +241,42 @@ class TestRoleAssignment:
         )
 
     @pytest.fixture
+    async def other_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
+        domain_name = f"other-domain-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                DomainRow(
+                    id=domain_id,
+                    name=domain_name,
+                    description="Other domain",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                    allowed_docker_registries=[],
+                    dotfiles=b"",
+                    integration_id=None,
+                )
+            )
+            await session.commit()
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
+
+    @pytest.fixture
+    async def user_in_other_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        other_domain: DomainFixtureData,
+        user_resource_policy: str,
+        test_password_info: PasswordInfo,
+    ) -> uuid.UUID:
+        return await self._create_user(
+            db_with_cleanup, other_domain.domain_name, user_resource_policy, test_password_info
+        )
+
+    @pytest.fixture
     async def project_scoped_role(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -443,6 +480,31 @@ class TestRoleAssignment:
                 )
             )
             assert len(assoc.fetchall()) == 1
+
+    async def test_bind_user_to_project_refuses_cross_domain_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: ProjectDBSource,
+        user_in_other_domain: uuid.UUID,
+        test_project: uuid.UUID,
+    ) -> None:
+        """A user outside the project's domain is refused, leaving no membership row —
+        project membership stays within a single domain."""
+        with pytest.raises(InvalidAPIParameters):
+            await group_db_source.bind_user_to_project(
+                UserID(user_in_other_domain), ProjectID(test_project)
+            )
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            assoc = await session.execute(
+                sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(test_project),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(user_in_other_domain),
+                )
+            )
+            assert assoc.fetchall() == []
 
     async def test_unbind_user_from_project_removes_associations(
         self,
