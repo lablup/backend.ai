@@ -803,26 +803,37 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         etcd = self._require_etcd()
         released = 0
 
-        async def is_orphan(session_id: str, generation: str | None) -> bool:
-            live = _generation_of(
-                await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
-            )
-            if live is None:
-                # No record at all, or one from before the field. Only the first is an orphan, and
-                # a record that exists is not this sweep's to judge -- it may be a legacy session
-                # still running.
-                return (
-                    await etcd.get(session_meta_key(session_id), scope=ConfigScopes.GLOBAL)
-                ) is None
-            return live != generation
+        async def orphan_guard(
+            session_id: str, generation: str | None
+        ) -> Mapping[str, str | None] | None:
+            """The condition under which this claim is garbage, or None if it is live.
 
-        for unit, (session_id, generation) in (await self._subnet_allocator.claims()).items():
-            if not await is_orphan(session_id, generation):
+            Returned as a CONDITION rather than a yes/no, because the answer stops being true the
+            moment it is given: the record can appear, or change, and the claim be released and
+            taken by the session it then names. The delete carries this back and the store checks
+            it again as one operation with the delete -- so a sweep that judged on a record that
+            has since moved on takes nothing.
+            """
+            key = session_meta_key(session_id)
+            meta_raw = await etcd.get(key, scope=ConfigScopes.GLOBAL)
+            if meta_raw is None:
+                # No record: garbage only while there is still none.
+                return {key: None}
+            live = _generation_of(meta_raw)
+            if live is None:
+                # A record from before the incarnation field. It exists, so something made it,
+                # and this sweep cannot tell a legacy session still running from a leftover.
+                return None
+            if live == generation:
+                return None
+            # Names another incarnation: garbage while it still says so.
+            return {key: meta_raw}
+
+        for unit, (session_id, generation, raw) in (await self._subnet_allocator.claims()).items():
+            guard = await orphan_guard(session_id, generation)
+            if guard is None:
                 continue
-            raw = await self._subnet_allocator.raw_claim(unit)
-            if raw is None:
-                continue
-            if await self._subnet_allocator.release_unit(unit, raw):
+            if await self._subnet_allocator.release_unit(unit, raw, guard):
                 released += 1
                 log.warning(
                     "reclaimed unit block {}: session {} does not name incarnation {}",
@@ -830,13 +841,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     session_id,
                     generation,
                 )
-        for vni, (session_id, generation) in (await self._vni_allocator.claims()).items():
-            if not await is_orphan(session_id, generation):
+        for vni, (session_id, generation, raw) in (await self._vni_allocator.claims()).items():
+            guard = await orphan_guard(session_id, generation)
+            if guard is None:
                 continue
-            raw = await self._vni_allocator.raw_claim(vni)
-            if raw is None:
-                continue
-            if await self._vni_allocator.release_one(vni, raw):
+            if await self._vni_allocator.release_one(vni, raw, guard):
                 released += 1
                 log.warning(
                     "reclaimed vni {}: session {} does not name incarnation {}",
@@ -844,7 +853,80 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                     session_id,
                     generation,
                 )
+        released += await self._reclaim_session_keys(etcd)
+        # Whatever the sweep gave back is no longer owed. Kept per session rather than cleared
+        # wholesale: a leak this pass could not reach is still a leak.
+        for session_id in list(self._unrecoverable):
+            if not await self._still_owed(etcd, session_id, self._unrecoverable[session_id]):
+                del self._unrecoverable[session_id]
         return released
+
+    async def _reclaim_session_keys(self, etcd: AsyncEtcd) -> int:
+        """Delete the endpoint, member and address keys of incarnations no session names.
+
+        The pool is not the whole of what a cleanup owes. A sweep that could neither release nor
+        record leaves these too, and while a member key stands the manager holds the session's VNI
+        back from reuse for a node that is not in the session -- so the id itself becomes unusable.
+
+        Judged and deleted as one operation, the same as the pool claims: the record the key is
+        garbage by is named as the guard.
+        """
+        reclaimed = 0
+        try:
+            listing = await etcd.get_prefix("network/session", scope=ConfigScopes.GLOBAL)
+        except Exception:
+            log.exception("could not list the session subtree while reconciling")
+            return 0
+        # The first path segment of whatever the listing returns. `get_prefix` gives a nested
+        # mapping whose top level is already the session id, but taking the segment works on a
+        # flat listing too, and this sweep must not depend on which shape it is handed.
+        for session_id in sorted({str(key).split("/", 1)[0] for key in dict(listing) if key}):
+            if not session_id:
+                continue
+            meta_key = session_meta_key(str(session_id))
+            meta_raw = await etcd.get(meta_key, scope=ConfigScopes.GLOBAL)
+            live = _generation_of(meta_raw)
+            if meta_raw is not None and live is None:
+                continue  # a record from before the field; not this sweep's to judge
+            guard: Mapping[str, str | None] = {meta_key: meta_raw}
+            for prefix, key_of in (
+                (endpoints_prefix, endpoint_key),
+                (members_prefix, member_key),
+                (session_ipam_prefix, session_ipam_key),
+            ):
+                found = await etcd.get_prefix(
+                    prefix(str(session_id)).rstrip("/"), scope=ConfigScopes.GLOBAL
+                )
+                for name, payload in dict(found).items():
+                    if not name or not isinstance(payload, str):
+                        continue
+                    if of_generation(payload, live):
+                        continue  # this incarnation's, or from before the field
+                    if await etcd.compare_and_delete(
+                        key_of(str(session_id), str(name)), payload, guards=dict(guard)
+                    ):
+                        reclaimed += 1
+                        log.warning(
+                            "reclaimed {}: session {} does not name the incarnation that wrote it",
+                            key_of(str(session_id), str(name)),
+                            session_id,
+                        )
+        return reclaimed
+
+    async def _still_owed(self, etcd: AsyncEtcd, session_id: str, generation: str) -> bool:
+        """Whether anything of this incarnation is still held anywhere."""
+        for unit, (owner, stamped, _raw) in (await self._subnet_allocator.claims()).items():
+            if owner == session_id and stamped == generation:
+                return True
+        for vni, (owner, stamped, _raw) in (await self._vni_allocator.claims()).items():
+            if owner == session_id and stamped == generation:
+                return True
+        for prefix in (endpoints_prefix, members_prefix, session_ipam_prefix):
+            found = await etcd.get_prefix(prefix(session_id).rstrip("/"), scope=ConfigScopes.GLOBAL)
+            for _name, payload in dict(found).items():
+                if isinstance(payload, str) and _generation_of(payload) == generation:
+                    return True
+        return False
 
     async def drain_cleanup_debt(self, session_id: str) -> None:
         """Retry every unfinished sweep recorded for this session id.

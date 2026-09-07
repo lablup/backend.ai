@@ -87,6 +87,31 @@ class FakeEtcd:
         del self.store[key]
         return True
 
+    async def compare_and_delete(
+        self,
+        key: str,
+        expected: str,
+        *,
+        guards: Mapping[str, str | None],
+        **kwargs: Any,
+    ) -> bool:
+        """Delete over the target's own bytes AND the state of the keys that made it garbage.
+
+        Modelled because the reconciler rests on it: it decides a claim is an orphan by reading a
+        session record, and between that read and the delete the record can appear and the claim
+        be re-taken by the session it then names. A guard value of None means "must be absent".
+        """
+        if self.store.get(key) != expected:
+            return False
+        for guard_key, guard_val in guards.items():
+            if guard_val is None:
+                if guard_key in self.store:
+                    return False
+            elif self.store.get(guard_key) != guard_val:
+                return False
+        del self.store[key]
+        return True
+
     async def compare_and_put(
         self,
         key: str,
@@ -2275,6 +2300,82 @@ class TestAPoolClaimNothingNames:
 
         assert await plugin.reconcile_pool() == 0
         assert _pool_claims(etcd) != []
+
+    async def test_a_claim_retaken_between_the_judgement_and_the_delete_survives(self) -> None:
+        """The race the static cases cannot show. The sweep decides a claim is an orphan by
+        reading a session record; between that read and the delete the record can appear and the
+        claim be released and taken by the very session it now names. A delete conditioned on what
+        is there NOW rather than on what was judged takes a live tenant's subnet."""
+
+        class _ReallocatesAfterTheJudgement(FakeEtcd):
+            """Rebuilds the session -- with the same unit block -- the moment the sweep reads its
+            record and finds none."""
+
+            def __init__(self) -> None:
+                super().__init__()
+                self.armed = False
+                self.rebuild: Any = None
+
+            @override
+            async def get(self, key: str, **kwargs: Any) -> str | None:
+                found = await super().get(key, **kwargs)
+                if self.armed and key == _META_KEY and found is None:
+                    self.armed = False
+                    hook, self.rebuild = self.rebuild, None
+                    if hook is not None:
+                        await hook()
+                return found
+
+        etcd = _ReallocatesAfterTheJudgement()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        first = dict(_flat_claims(etcd))
+        # The session's record is gone and its claims are not: the shape the sweep is for.
+        del etcd.store[_META_KEY]
+
+        async def rebuild() -> None:
+            # ... but s1 comes back, over the very same units, while the sweep is deciding.
+            for unit_key in first:
+                etcd.store[f"network/ipam/allocated/{unit_key}"] = json.dumps({
+                    "session_id": "s1",
+                    "subnet": json.loads(first[unit_key])["subnet"],
+                    "generation": "g-new",
+                })
+            etcd.store[_META_KEY] = json.dumps({
+                "_state": "ready",
+                "generation": "g-new",
+                "subnet": json.loads(next(iter(first.values())))["subnet"],
+            })
+
+        etcd.rebuild = rebuild
+        etcd.armed = True
+
+        await plugin.reconcile_pool()
+
+        surviving = _flat_claims(etcd)
+        assert surviving, "it deleted the claims of the session that had just been rebuilt"
+        assert all(json.loads(raw)["generation"] == "g-new" for raw in surviving.values()), (
+            f"a live claim was taken: {surviving}"
+        )
+
+    async def test_a_stale_session_key_is_reclaimed_too(self) -> None:
+        # The pool is not the whole of what a failed sweep leaves: a member key that outlives its
+        # incarnation holds the session's VNI back from reuse for a node that is not in it.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        record = json.loads(etcd.store[_META_KEY])
+        etcd.store[member_key("s1", "a9")] = json.dumps(
+            Member(
+                agent_id="a9", host_ip="10.0.0.9", vtep_ip="10.0.0.9", joined=True, generation="old"
+            ).to_etcd_payload()
+        )
+        etcd.store[_META_KEY] = json.dumps(record)  # the live record still names its own
+
+        await plugin.reconcile_pool()
+
+        assert member_key("s1", "a9") not in etcd.store
+        assert _META_KEY in etcd.store, "it took the live session's record"
 
     async def test_what_it_could_not_record_is_reported(self) -> None:
         etcd = FakeEtcd()
