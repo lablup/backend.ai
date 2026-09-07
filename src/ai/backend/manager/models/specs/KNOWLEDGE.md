@@ -1,9 +1,9 @@
 ---
 name: write-spec-design
 type: design-rationale
-description: write-spec selection criteria (Entity/Global/Field/Sidecar/Relation), why a row two entities own belongs to neither position, why switching a relation off keeps both reads, why the roots share no common ABC, what a sidecar row is and why it belongs to neither position, why the role-managed root is not an EntityCreator subtype, why a global entity is provisioned in the graph, how a field row's owner is read, the two graph relations (own, govern), how created_in combines them, relation and cap-based sharing, open entity-type strings
+description: write-spec selection criteria (Entity/Global/Field/Sidecar/Relation), why a row two entities own belongs to neither position, why switching a relation off keeps both reads, why the roots share no common ABC, why a guard lives on the root and how ops diagnoses a refusal, what a sidecar row is and why it belongs to neither position, why the role-managed root is not an EntityCreator subtype, why a global entity is provisioned in the graph, how a field row's owner is read, the two graph relations (own, govern), how created_in combines them, relation and cap-based sharing, open entity-type strings
 scope: src/ai/backend/manager/models/specs
-keywords: [RelationCreator, RelationPurger, RelationLifecycleUpdater, EntityCreator, GlobalEntityCreator, FieldCreator, RoleManagedEntityCreator, SidecarCreator, FieldOwnerLookup, RoleTemplateSource, created_in, create_relation, entity_id, virtual-entity, preset-role, DataUpdater, soft-delete]
+keywords: [RelationCreator, RelationPurger, RelationLifecycleUpdater, EntityCreator, GlobalEntityCreator, FieldCreator, RoleManagedEntityCreator, SidecarCreator, FieldOwnerLookup, RoleTemplateSource, created_in, create_relation, entity_id, virtual-entity, preset-role, DataUpdater, GuardCheck, guard_checks, soft-delete]
 sources:
   - src/ai/backend/manager/models/specs/creator.py
   - src/ai/backend/manager/models/specs/lookup.py
@@ -78,6 +78,28 @@ execution path.
 - Duplicating method declarations across roots is the price of making that path
   inexpressible.
 - Execution-logic reuse happens via ops helpers that take plain values.
+
+## The guard lives on the root so no path can skip it
+
+- A creator, an updater and a single-row purger each have a root that declares its
+  guard as abstract and one subtype that answers an empty list under `@final`. One ops
+  path serves both, so a spec with a guard cannot be handed to a path that would write
+  without it — the shape enforces it, as the absent common ABC does elsewhere.
+- Two unrelated roots instead (`DataUpdater` beside `GuardedDataUpdater`, as it once
+  was) doubled the ops, service, action and group surfaces and left the refusal
+  generic: the write answered `None`, the caller re-read the row
+  to tell a missing one from a refusing one, and each caller invented its own error.
+- With the error on the check, the diagnosis moves into ops: after a statement
+  touched nothing, one SELECT of the named row evaluates every guard condition beside
+  it. No row means gone; the first `false` names the error. A row every guard now
+  passes changed between the two statements, and the first guard answers for it — the
+  write did refuse, and re-running it would be a second write the caller did not ask
+  for.
+- Failure stays at one round trip, which is what `row_exists` cost before. A spec whose
+  `guard_checks()` is empty pays nothing: the diagnosis runs only when there is a
+  guard to blame.
+- `RolePurger` states its SYSTEM refusal as a guard rather than a conflict check: the
+  condition is on the row being removed, not on rows it would leave behind.
 
 ## The role-managed root not being a subtype is the same mechanism
 

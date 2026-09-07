@@ -135,11 +135,11 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
         one must not cost the invitee access they already had. An invitation without a
         cap hands over every operation on every field.
         """
-        row = await self._update_guarded_row_returning(
+        row = await self._update_row_returning(
             updater.row_class,
             updater.target_id_column(),
             updater.target_id_value(),
-            updater.guard_conditions(),
+            updater.guard_checks(),
             updater.build_values(),
             updater.integrity_error_checks,
         )
@@ -228,11 +228,11 @@ class V2ShareWriteOps(V2WriteOps, V2CapOps):
         Where it landed is derived from the recipient the row names, the same way
         acceptance derived it.
         """
-        row = await self._update_guarded_row_returning(
+        row = await self._update_row_returning(
             updater.row_class,
             updater.target_id_column(),
             updater.target_id_value(),
-            updater.guard_conditions(),
+            updater.guard_checks(),
             updater.build_values(),
             updater.integrity_error_checks,
         )

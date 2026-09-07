@@ -24,8 +24,8 @@ from ai.backend.manager.models.specs.creator import (
 from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
-    EntityPurger,
-    FieldPurger,
+    GuardedEntityPurger,
+    GuardedFieldPurger,
 )
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
@@ -34,11 +34,7 @@ from ai.backend.manager.models.specs.querier import (
     OwnedFieldQuerier,
 )
 from ai.backend.manager.models.specs.searcher import Searcher
-from ai.backend.manager.models.specs.updater import (
-    DataBatchUpdater,
-    DataUpdater,
-    GuardedDataUpdater,
-)
+from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
     FieldUpserter,
@@ -411,7 +407,7 @@ class EntityPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     """Carries the delete spec of one entity named by id."""
 
     @abstractmethod
-    def to_purger(self) -> EntityPurger[TRow, TData]:
+    def to_purger(self) -> GuardedEntityPurger[TRow, TData]:
         """Return the hard-delete spec this action executes."""
         raise NotImplementedError
 
@@ -421,7 +417,7 @@ class FieldPurgeOpsAction[TRow: Base, TData: FieldData](OpsBackendAction):
     shape names, like an update to the owning entity."""
 
     @abstractmethod
-    def to_purger(self) -> FieldPurger[TRow, TData]:
+    def to_purger(self) -> GuardedFieldPurger[TRow, TData]:
         """Return the hard-delete spec this action executes."""
         raise NotImplementedError
 
@@ -431,7 +427,7 @@ class GlobalEntityPartialBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction)
     separately; no membership involved."""
 
     @abstractmethod
-    def to_purgers(self) -> Mapping[EntityIdentifier, EntityPurger[TRow, TData]]:
+    def to_purgers(self) -> Mapping[EntityIdentifier, GuardedEntityPurger[TRow, TData]]:
         """Return the delete spec for each entity this action names."""
         raise NotImplementedError
 
@@ -441,7 +437,7 @@ class EntityPartialBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     every row's scope is torn down with it."""
 
     @abstractmethod
-    def to_purgers(self) -> Mapping[EntityIdentifier, EntityPurger[TRow, TData]]:
+    def to_purgers(self) -> Mapping[EntityIdentifier, GuardedEntityPurger[TRow, TData]]:
         """Return the delete spec for each entity this action names."""
         raise NotImplementedError
 
@@ -453,7 +449,7 @@ class FieldPartialBulkPurgeOpsAction[TFieldID: FieldIdentifier, TRow: Base, TDat
     authorized through the entities owning them."""
 
     @abstractmethod
-    def to_purgers(self) -> Mapping[TFieldID, FieldPurger[TRow, TData]]:
+    def to_purgers(self) -> Mapping[TFieldID, GuardedFieldPurger[TRow, TData]]:
         """Return the delete spec for each row this action names."""
         raise NotImplementedError
 
@@ -512,7 +508,7 @@ class FieldUpsertOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData
 
 class UpdateOpsAction[TRow: Base, TData](OpsBackendAction):
     @abstractmethod
-    def to_updater(self) -> DataUpdater[TRow, TData]:
+    def to_updater(self) -> GuardedDataUpdater[TRow, TData]:
         """Return the update spec this action executes.
 
         A soft delete uses this too: which column marks a row deleted is domain
@@ -525,14 +521,13 @@ class UpdateOpsAction[TRow: Base, TData](OpsBackendAction):
 class GuardedUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
     """An update that declines to write unless the named row's guard holds.
 
-    Kept apart from :class:`UpdateOpsAction` because the two answer differently: a
-    guarded write that touched nothing reports the refusal, while a plain one has only
-    "no such row" to report.
+    Every updater carries its guard now, so this answers as :class:`UpdateOpsAction`
+    does; kept until the guarded action surfaces are retired.
     """
 
     @abstractmethod
     def to_updater(self) -> GuardedDataUpdater[TRow, TData]:
-        """Return the guarded update spec this action executes."""
+        """Return the update spec this action executes."""
         raise NotImplementedError
 
 
@@ -548,7 +543,7 @@ class PartialBulkUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
     """
 
     @abstractmethod
-    def to_updaters(self) -> Mapping[EntityIdentifier, DataUpdater[TRow, TData]]:
+    def to_updaters(self) -> Mapping[EntityIdentifier, GuardedDataUpdater[TRow, TData]]:
         """Return the update spec for each entity this action names."""
         raise NotImplementedError
 

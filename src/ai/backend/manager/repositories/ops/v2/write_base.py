@@ -27,7 +27,7 @@ from ai.backend.manager.errors.repository import (
     UpsertEmptyResultError,
 )
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import ConflictCheck, GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
 
@@ -177,39 +177,12 @@ class V2WriteOpsBase(V2OpsBase):
         row_class: type[TRow],
         id_column: InstrumentedAttribute[Any],
         id_value: Any,
+        guards: Sequence[GuardCheck],
         values: dict[str, Any],
         checks: Sequence[IntegrityErrorCheck],
     ) -> TRow | None:
-        """Update the row the id names and return it; ``None`` if no row matched.
-
-        With nothing to set, reads the current row instead, so callers can tell
-        "nothing to change" apart from "row not found".
-        """
-        table = row_class.__table__
-        if not values:
-            existing = await self._sess.execute(sa.select(row_class).where(id_column == id_value))
-            return existing.scalar_one_or_none()
-        stmt = (
-            sa.update(table).values(values).where(id_column == id_value).returning(*table.columns)
-        )
-        # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
-        select_stmt = sa.select(row_class).from_statement(stmt)
-        try:
-            result = await self._sess.execute(select_stmt)
-        except sa.exc.IntegrityError as e:
-            self._match_integrity_error(self._parse_integrity_error(e), checks)
-        return result.scalar_one_or_none()
-
-    async def _update_guarded_row_returning[TRow: Base](
-        self,
-        row_class: type[TRow],
-        id_column: InstrumentedAttribute[Any],
-        id_value: Any,
-        guards: Sequence[Callable[[], sa.sql.expression.ColumnElement[bool]]],
-        values: dict[str, Any],
-        checks: Sequence[IntegrityErrorCheck],
-    ) -> TRow | None:
-        """Update the row the id names while its guards hold; ``None`` if none matched.
+        """Update the row the id names while its guards hold and return it; ``None``
+        if the row is gone, the first failing guard's error if it refused.
 
         The guards ride on the statement, so no separate read and no row lock stand
         between the check and the write. With nothing to set, reads the current row
@@ -221,30 +194,72 @@ class V2WriteOpsBase(V2OpsBase):
             return existing.scalar_one_or_none()
         stmt = sa.update(table).values(values).where(id_column == id_value)
         for guard in guards:
-            stmt = stmt.where(guard())
+            stmt = stmt.where(guard.condition())
         # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
         select_stmt = sa.select(row_class).from_statement(stmt.returning(*table.columns))
         try:
             result = await self._sess.execute(select_stmt)
         except sa.exc.IntegrityError as e:
             self._match_integrity_error(self._parse_integrity_error(e), checks)
-        return result.scalar_one_or_none()
+        row = result.scalar_one_or_none()
+        if row is None:
+            await self._raise_failing_guard(row_class, id_column, id_value, guards)
+        return row
+
+    async def _raise_failing_guard(
+        self,
+        row_class: type[Base],
+        id_column: InstrumentedAttribute[Any],
+        id_value: Any,
+        guards: Sequence[GuardCheck],
+    ) -> None:
+        """Tell a missing row from a refusing one after a write touched nothing.
+
+        One read of the named row, evaluating every guard beside it. Returns when the
+        row is gone; raises the first failing guard's error otherwise. A row every guard
+        now passes changed under the write, so the first guard answers for it.
+        """
+        if not guards:
+            return
+        stmt = (
+            sa.select(*[guard.condition().label(f"guard_{i}") for i, guard in enumerate(guards)])
+            .select_from(row_class.__table__)
+            .where(id_column == id_value)
+        )
+        row = (await self._sess.execute(stmt)).mappings().first()
+        if row is None:
+            return
+        for i, guard in enumerate(guards):
+            if not row[f"guard_{i}"]:
+                raise guard.error
+        raise guards[0].error
 
     async def _delete_row_returning[TRow: Base](
-        self, row_class: type[TRow], id_column: InstrumentedAttribute[Any], id_value: Any
+        self,
+        row_class: type[TRow],
+        id_column: InstrumentedAttribute[Any],
+        id_value: Any,
+        guards: Sequence[GuardCheck],
     ) -> TRow | None:
+        """Delete the row the id names while its guards hold and return it; ``None``
+        if the row is gone, the first failing guard's error if it refused."""
         table = row_class.__table__
-        stmt = sa.delete(table).where(id_column == id_value).returning(*table.columns)
+        stmt = sa.delete(table).where(id_column == id_value)
+        for guard in guards:
+            stmt = stmt.where(guard.condition())
         # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
         # Calling the row class instead would go through its __init__, which many rows
         # narrow to the caller-supplied columns — a server-generated one then arrives as
         # an unexpected keyword and the purge fails on rows it can read back perfectly.
-        select_stmt = sa.select(row_class).from_statement(stmt)
+        select_stmt = sa.select(row_class).from_statement(stmt.returning(*table.columns))
         try:
             result = await self._sess.execute(select_stmt)
         except sa.exc.IntegrityError as e:
             raise self._parse_integrity_error(e) from e
-        return result.scalar_one_or_none()
+        row = result.scalar_one_or_none()
+        if row is None:
+            await self._raise_failing_guard(row_class, id_column, id_value, guards)
+        return row
 
     async def _upsert_row_returning[TRow: Base](
         self,

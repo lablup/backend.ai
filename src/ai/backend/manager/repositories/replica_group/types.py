@@ -15,7 +15,7 @@ from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.creators import (
     ReplicaGroupHistoryCreator,
 )
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupAutoscaleReconcileView,
     ReplicaGroupLifecycleReconcileView,
@@ -58,7 +58,7 @@ class ReplicaGroupReconcileTransition:
 
     deployment_id: DeploymentID
     history_creator: ReplicaGroupHistoryCreator
-    status_updater: DataUpdater[ReplicaGroupRow, ReplicaGroupData] | None = None
+    status_updater: GuardedDataUpdater[ReplicaGroupRow, ReplicaGroupData] | None = None
 
 
 @dataclass

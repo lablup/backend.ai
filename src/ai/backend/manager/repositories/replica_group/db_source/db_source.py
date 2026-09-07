@@ -43,7 +43,7 @@ from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.reconciler.write import ReconcileTransition
 from ai.backend.manager.repositories.ops.v2.replica_group.provider import ReplicaGroupOpsProvider
 from ai.backend.manager.repositories.ops.v2.replica_group.query import ReplicaGroupQueryOps
@@ -253,8 +253,8 @@ class ReplicaGroupDBSource:
     async def apply_writes(
         self,
         *,
-        group_updaters: Sequence[DataUpdater[ReplicaGroupRow, ReplicaGroupData]],
-        endpoint_updaters: Sequence[DataUpdater[EndpointRow, DeploymentInfo]],
+        group_updaters: Sequence[GuardedDataUpdater[ReplicaGroupRow, ReplicaGroupData]],
+        endpoint_updaters: Sequence[GuardedDataUpdater[EndpointRow, DeploymentInfo]],
     ) -> ApplyWritesResult:
         """Apply the given replica-group and endpoint updates in one transaction and return which
         rows were actually updated. Each update names one row, so a row that is gone is simply

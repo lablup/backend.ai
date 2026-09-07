@@ -25,7 +25,7 @@ from ai.backend.manager.models.replica_group.updaters import (
     ReplicaGroupDeployUpdater,
     ReplicaGroupLifecycleUpdater,
 )
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
@@ -106,8 +106,8 @@ class DeployingRollingBackHandler(DeploymentHandler):
     ) -> DeploymentExecutionResult:
         rollback_targets: list[DeploymentWithHistory] = []
         failures: list[DeploymentExecutionError] = []
-        group_updaters: list[DataUpdater[ReplicaGroupRow, ReplicaGroupData]] = []
-        endpoint_updaters: list[DataUpdater[EndpointRow, DeploymentInfo]] = []
+        group_updaters: list[GuardedDataUpdater[ReplicaGroupRow, ReplicaGroupData]] = []
+        endpoint_updaters: list[GuardedDataUpdater[EndpointRow, DeploymentInfo]] = []
 
         for deployment in deployments:
             info = deployment.deployment_info

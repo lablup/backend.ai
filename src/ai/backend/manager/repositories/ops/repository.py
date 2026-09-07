@@ -17,7 +17,7 @@ from ai.backend.common.data.entity.types import (
     RuntimeEntityID,
 )
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
-from ai.backend.manager.errors.repository import EntityNotFoundError, EntityWriteRefusedError
+from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
@@ -39,8 +39,8 @@ from ai.backend.manager.models.specs.lookup import (
 )
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
-    EntityPurger,
-    FieldPurger,
+    GuardedEntityPurger,
+    GuardedFieldPurger,
 )
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
@@ -50,11 +50,7 @@ from ai.backend.manager.models.specs.querier import (
 )
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
 from ai.backend.manager.models.specs.types import BulkResultWithFailures, EntityWithFieldsResult
-from ai.backend.manager.models.specs.updater import (
-    DataBatchUpdater,
-    DataUpdater,
-    GuardedDataUpdater,
-)
+from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
     FieldUpserter,
@@ -372,8 +368,12 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.atomic_create_dangling_fields_with_nested(creators, field_creators)
 
-    async def purge_entity(self, purger: EntityPurger[Any, TData]) -> TData:
-        """Hard-delete one entity row, tearing its scope down with it."""
+    async def purge_entity(self, purger: GuardedEntityPurger[Any, TData]) -> TData:
+        """Hard-delete one entity row, tearing its scope down with it.
+
+        A row the spec's guard refuses raises the guard's own error; a missing row
+        raises :class:`EntityNotFoundError`.
+        """
         async with self._ops.write_ops() as w:
             data = await w.purge_entity(purger)
             if data is None:
@@ -383,9 +383,10 @@ class OpsRepository[TData]:
             return data
 
     async def purge_field_entity[TFieldData: FieldData](
-        self, purger: FieldPurger[Any, TFieldData]
+        self, purger: GuardedFieldPurger[Any, TFieldData]
     ) -> TFieldData:
-        """Hard-delete one field row; authorized through the owner, no membership work."""
+        """Hard-delete one field row; authorized through the owner, no membership work.
+        Refused and missing rows answer as :meth:`purge_entity` does."""
         async with self._ops.write_ops() as w:
             data = await w.purge_field_entity(purger)
             if data is None:
@@ -395,14 +396,14 @@ class OpsRepository[TData]:
             return data
 
     async def partial_bulk_purge_entities(
-        self, purgers: Mapping[EntityIdentifier, EntityPurger[Any, TData]]
+        self, purgers: Mapping[EntityIdentifier, GuardedEntityPurger[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Hard-delete each named entity independently, answering for every one."""
         async with self._ops.write_ops() as w:
             return await w.partial_bulk_purge_entities(purgers)
 
     async def partial_bulk_purge_field_entities[TFieldData: FieldData](
-        self, purgers: Mapping[FieldIdentifier, FieldPurger[Any, TFieldData]]
+        self, purgers: Mapping[FieldIdentifier, GuardedFieldPurger[Any, TFieldData]]
     ) -> BulkFieldOpsResult[TFieldData]:
         """Hard-delete each named field row independently; authorized through the owner."""
         async with self._ops.write_ops() as w:
@@ -438,7 +439,12 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.upsert_field_entity(owner_id, upserter)
 
-    async def update(self, updater: DataUpdater[Any, TData]) -> TData:
+    async def update(self, updater: GuardedDataUpdater[Any, TData]) -> TData:
+        """Apply the update, telling a missing row from a refused one.
+
+        The guards ride on the UPDATE; a row that refused answers with the error its
+        spec declared, and a row that is gone with :class:`EntityNotFoundError`.
+        """
         async with self._ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
@@ -447,25 +453,8 @@ class OpsRepository[TData]:
                 )
             return data
 
-    async def update_guarded(self, updater: GuardedDataUpdater[Any, TData]) -> TData:
-        """Apply a guarded update, telling a missing row from a refused one.
-
-        The guard rides on the UPDATE, so the row it declined is read back in the same
-        session rather than re-checked against a later state.
-        """
-        async with self._ops.write_ops() as w:
-            data = await w.update_guarded_data(updater)
-            if data is not None:
-                return data
-            row_name = f"{updater.row_class.__name__} {updater.target_id_value()}"
-            if await w.row_exists(
-                updater.row_class, updater.target_id_column(), updater.target_id_value()
-            ):
-                raise EntityWriteRefusedError(f"{row_name} refused the write")
-            raise EntityNotFoundError(f"{row_name} not found")
-
     async def partial_bulk_update(
-        self, updaters: Mapping[EntityIdentifier, DataUpdater[Any, TData]]
+        self, updaters: Mapping[EntityIdentifier, GuardedDataUpdater[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Update each named entity independently, answering for every one of them.
 

@@ -29,7 +29,7 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.mixins.history import ReconcileHistoryMixin
 from ai.backend.manager.models.specs.creator import FieldCreator, FieldToCreate
-from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
+from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 
@@ -50,7 +50,7 @@ class ReconcileTransition[
     owner_id: TOwnerID
     history_creator: FieldCreator[TOwnerID, THistoryRow, THistoryData]
     match_conditions: Sequence[QueryCondition]
-    status_updater: DataUpdater[TStatusRow, TStatusData] | None = None
+    status_updater: GuardedDataUpdater[TStatusRow, TStatusData] | None = None
 
 
 @dataclass
@@ -85,6 +85,7 @@ class ReconcileWriteOps(V2WriteOps):
                     transition.status_updater.row_class,
                     transition.status_updater.target_id_column(),
                     transition.status_updater.target_id_value(),
+                    transition.status_updater.guard_checks(),
                     transition.status_updater.build_values(),
                     transition.status_updater.integrity_error_checks,
                 )

@@ -17,8 +17,8 @@ from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRo
 from ai.backend.manager.models.artifact_registries.updaters import ArtifactRegistryMetaUpdater
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
-from ai.backend.manager.models.specs.purger import EntityPurger
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.purger import GuardedEntityPurger
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 
 
@@ -41,7 +41,7 @@ class ArtifactRegistryWriteOps(V2WriteOps):
 
     async def update_registry[TRow: Base, TData](
         self,
-        updater: DataUpdater[TRow, TData],
+        updater: GuardedDataUpdater[TRow, TData],
         meta_updater: ArtifactRegistryMetaUpdater,
     ) -> TData | None:
         """Edit a registry and its name; ``None`` if the registry is gone."""
@@ -49,6 +49,7 @@ class ArtifactRegistryWriteOps(V2WriteOps):
             updater.row_class,
             updater.target_id_column(),
             updater.target_id_value(),
+            updater.guard_checks(),
             updater.build_values(),
             updater.integrity_error_checks,
         )
@@ -58,6 +59,7 @@ class ArtifactRegistryWriteOps(V2WriteOps):
             meta_updater.row_class,
             meta_updater.target_id_column(),
             meta_updater.target_id_value(),
+            meta_updater.guard_checks(),
             meta_updater.build_values(),
             meta_updater.integrity_error_checks,
         )
@@ -65,7 +67,7 @@ class ArtifactRegistryWriteOps(V2WriteOps):
         return updater.to_data(row)
 
     async def purge_registry[TRow: Base, TData](
-        self, purger: EntityPurger[TRow, TData]
+        self, purger: GuardedEntityPurger[TRow, TData]
     ) -> TData | None:
         """Delete a registry, the row naming it, and the graph node it was."""
         await self._sess.execute(

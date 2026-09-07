@@ -31,7 +31,7 @@ TRow = TypeVar("TRow", bound=Base)
 class UpdaterSpec[TRow: Base](ABC):
     """Abstract base class defining values to update for single-row updates.
 
-    Deprecated: use ``DataUpdater`` / ``GuardedDataUpdater`` in
+    Deprecated: use ``DataUpdater`` in
     ``models/specs/updater.py``.
 
     Implementations specify what to update by providing:
