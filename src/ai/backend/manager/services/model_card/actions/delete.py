@@ -10,6 +10,12 @@ from ai.backend.manager.services.model_card.actions.base import ModelCardSingleE
 
 @dataclass
 class DeleteModelCardAction(ModelCardSingleEntityAction):
+    """Delete one model card.
+
+    ``PURGE`` because the row is removed rather than marked deleted, matching the
+    bulk form of the same operation.
+    """
+
     purger: ModelCardPurger
     options: DeleteModelCardOptions
 
@@ -21,7 +27,7 @@ class DeleteModelCardAction(ModelCardSingleEntityAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.PURGE
 
 
 @dataclass

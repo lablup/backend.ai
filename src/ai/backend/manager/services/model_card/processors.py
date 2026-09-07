@@ -1,11 +1,13 @@
 from typing import Any
 
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.model_card_resource_requirement import (
     MODEL_CARD_RESOURCE_REQUIREMENT_FIELD_TYPE,
 )
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.bulk.processor import BulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
@@ -27,7 +29,6 @@ from ai.backend.manager.services.model_card.actions.available_presets import (
 )
 from ai.backend.manager.services.model_card.actions.bulk_delete import (
     BulkDeleteModelCardAction,
-    BulkDeleteModelCardActionResult,
 )
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import (
@@ -66,7 +67,7 @@ class ModelCardProcessors:
     ]
     update: SingleEntityActionProcessor[UpdateModelCardAction, UpdateModelCardActionResult]
     delete: SingleEntityActionProcessor[DeleteModelCardAction, DeleteModelCardActionResult]
-    bulk_delete: GlobalActionProcessor[BulkDeleteModelCardAction, BulkDeleteModelCardActionResult]
+    bulk_delete: PartialBulkActionProcessor[BulkDeleteModelCardAction, ModelCardID]
     get: SingleEntityActionProcessor[GetModelCardAction, EntityOpsResult[ModelCardData]]
     global_search: GlobalActionProcessor[
         GlobalSearchModelCardsAction, BatchOpsResult[ModelCardData]
@@ -85,7 +86,7 @@ class ModelCardProcessors:
         self.create = group.entity_create_with_fields_ops(CreateModelCardAction)
         self.update = group.single_entity(UpdateModelCardAction, service.update)
         self.delete = group.single_entity(DeleteModelCardAction, service.delete)
-        self.bulk_delete = group.global_scope(BulkDeleteModelCardAction, service.bulk_delete)
+        self.bulk_delete = group.partial_bulk(BulkDeleteModelCardAction, service.bulk_delete)
         self.get = group.single_get_ops(GetModelCardAction)
         self.global_search = group.global_search_ops(GlobalSearchModelCardsAction)
         self.search_in_project = group.scope_search_ops(SearchModelCardsInProjectAction)

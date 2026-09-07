@@ -176,9 +176,7 @@ class ModelCardDBSource:
                         deleted_id = await self._delete_card(sp, purger, options)
                     successes.append(deleted_id)
                 except Exception as exc:
-                    failures.append(
-                        BulkModelCardDeleteFailure(card_id=purger.card_id, message=str(exc))
-                    )
+                    failures.append(BulkModelCardDeleteFailure(card_id=purger.card_id, error=exc))
         return BulkModelCardDeleteResultData(successes=successes, failures=failures)
 
     async def _delete_card(

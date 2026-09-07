@@ -1,16 +1,23 @@
-from dataclasses import dataclass
-from typing import override
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
+from typing import Self, override
 
+from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.model_card.types import BulkModelCardDeleteResultData
-from ai.backend.manager.models.model_card.purgers import ModelCardPurger
-from ai.backend.manager.services.model_card.actions.base import ModelCardAction
+from ai.backend.manager.actions.v2.bulk.base import BasePartialBulkAction
 
 
 @dataclass
-class BulkDeleteModelCardAction(ModelCardAction):
-    purgers: list[ModelCardPurger]
+class BulkDeleteModelCardAction(BasePartialBulkAction):
+    """Delete the named model cards, answering for each one.
+
+    ``PURGE`` because the row is removed rather than marked deleted, which is also
+    what the cascade behind ``options`` acts on.
+    """
+
+    ids: Sequence[ModelCardID]
     options: DeleteModelCardOptions
 
     @override
@@ -21,9 +28,13 @@ class BulkDeleteModelCardAction(ModelCardAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.PURGE
 
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.ids)
 
-@dataclass
-class BulkDeleteModelCardActionResult:
-    data: BulkModelCardDeleteResultData
+    @override
+    def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
+        allowed = frozenset(entity_ids)
+        return replace(self, ids=[card_id for card_id in self.ids if card_id in allowed])
