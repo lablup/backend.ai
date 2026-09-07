@@ -941,6 +941,26 @@ class TestEncryptingOnlyWhereEveryNodeCan:
         assert info.options["encryption_key"] is None
 
 
+class _CountingCas(FakeEtcd):
+    """Counts the guarded writes a claim attempt costs, so a scan that should have stopped is
+    visible as a number rather than as a wait."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.cas = 0
+
+    @override
+    async def compare_and_put(self, key: str, val: str, **kwargs: Any) -> bool:
+        self.cas += 1
+        return await super().compare_and_put(key, val, **kwargs)
+
+
+def _flat_claims(etcd: FakeEtcd) -> dict[str, str]:
+    """The pool listing as the allocator reads it: unit key (quoted) -> claim bytes."""
+    head = "network/ipam/allocated/"
+    return {key[len(head) :]: value for key, value in etcd.store.items() if key.startswith(head)}
+
+
 def _pool_claims(etcd: FakeEtcd) -> list[str]:
     """Every subnet/VNI claim standing in the shared pool."""
     return sorted(
@@ -2066,6 +2086,202 @@ class TestTheGuardIsWiredIntoTheRealPath:
         await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
 
         assert _META_KEY in etcd.guarded[member_key("s1", "a1")]
+
+
+class TestAGuardThatExpiredMidScan:
+    """C19. A lost compare-and-swap has two causes that mean opposite things: the candidate was
+    taken, or the session's record moved on. Read as the first, an expired guard makes every
+    candidate lose in turn -- 16 million VNIs, each costing a swap and a prefix read -- and one
+    stale create holds the manager and its etcd for as long as that takes."""
+
+    async def test_a_vni_scan_stops_instead_of_walking_the_pool(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store[_META_KEY] = "the record this create holds"
+        allocator = _vni_allocator(etcd, vni_range=(4096, 16_777_215))
+        # The record moves on before the claim is attempted, so every swap will lose.
+        etcd.store[_META_KEY] = "somebody else's now"
+
+        with pytest.raises(SessionRecordContested):
+            await allocator.acquire("s1", "g1", {_META_KEY: "the record this create holds"})
+
+    async def test_it_costs_one_attempt_not_the_whole_range(self) -> None:
+        etcd = _CountingCas()
+        etcd.store[_META_KEY] = "moved on"
+        allocator = _vni_allocator(etcd, vni_range=(4096, 16_777_215))
+
+        with pytest.raises(SessionRecordContested):
+            await allocator.acquire("s1", "g1", {_META_KEY: "held"})
+
+        assert etcd.cas <= 2, f"it tried {etcd.cas} candidates on a record it no longer held"
+
+    async def test_a_subnet_scan_stops_too(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store[_META_KEY] = "moved on"
+        allocator = _subnet_allocator(etcd)
+
+        with pytest.raises(SessionRecordContested):
+            await allocator.acquire("s1", generation="g1", guards={_META_KEY: "held"})
+
+    async def test_a_live_guard_still_skips_a_taken_candidate(self) -> None:
+        # The fence must not turn an ordinary conflict into a failure.
+        etcd = FakeEtcd()
+        etcd.store[_META_KEY] = "held"
+        allocator = _vni_allocator(etcd, vni_range=(4096, 4098))
+        etcd.store["network/ipam/vni/4096"] = json.dumps({"session_id": "other"})
+
+        got = await allocator.acquire("s1", "g1", {_META_KEY: "held"})
+
+        assert got == 4097
+
+
+class TestALegacyClaimTwoIncarnationsCanRead:
+    """C20. A claim from before the incarnation field answers to whoever asks (`of_generation`).
+    That is right for finding it and wrong for keeping it: a new incarnation starts using the VNI,
+    a delayed cleanup of the old one reads the same claim as its own and gives the VNI back, and
+    the pool hands a running session's VNI to the next."""
+
+    async def test_a_legacy_vni_is_promoted_before_it_is_used(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store[_META_KEY] = "held"
+        allocator = _vni_allocator(etcd, vni_range=(4096, 4100))
+        etcd.store["network/ipam/vni/4096"] = json.dumps({"session_id": "s1"})
+
+        got = await allocator.acquire("s1", "g2", {_META_KEY: "held"})
+
+        assert got == 4096
+        assert json.loads(etcd.store["network/ipam/vni/4096"])["generation"] == "g2", (
+            "the claim still answers to any incarnation that asks"
+        )
+
+    async def test_the_old_incarnations_cleanup_no_longer_takes_it(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store[_META_KEY] = "held"
+        allocator = _vni_allocator(etcd, vni_range=(4096, 4100))
+        etcd.store["network/ipam/vni/4096"] = json.dumps({"session_id": "s1"})
+        got = await allocator.acquire("s1", "g2", {_META_KEY: "held"})
+
+        await allocator.release_all("s1", "g1")
+
+        assert await allocator.holder(got) == "s1", "a stale cleanup took a running session's vni"
+
+    async def test_a_promotion_that_cannot_land_does_not_hand_the_claim_back(self) -> None:
+        # The guard is gone, so the promotion must not land -- and an unpromoted legacy claim
+        # must not be returned as this incarnation's.
+        etcd = FakeEtcd()
+        allocator = _vni_allocator(etcd, vni_range=(4096, 4100))
+        etcd.store["network/ipam/vni/4096"] = json.dumps({"session_id": "s1"})
+
+        with pytest.raises(SessionRecordContested):
+            await allocator.acquire("s1", "g2", {_META_KEY: "held"})
+
+        assert "generation" not in json.loads(etcd.store["network/ipam/vni/4096"])
+
+
+class TestAWideBlockOnTwoIncarnations:
+    """C21. A block promoted unit by unit can end up half on one incarnation and half on another.
+    An old cleanup then takes the legacy half while the session runs on the whole block, and the
+    pool hands that half to a tenant whose addresses overlap it."""
+
+    async def test_a_promotion_that_fails_partway_leaves_the_block_as_it_was(self) -> None:
+        class _RefusesTheSecondUnit(FakeEtcd):
+            def __init__(self) -> None:
+                super().__init__()
+                self.seen = 0
+
+            @override
+            async def compare_and_put(self, key: str, val: str, **kwargs: Any) -> bool:
+                if key.startswith("network/ipam/allocated/"):
+                    self.seen += 1
+                    if self.seen == 2:
+                        return False
+                return await super().compare_and_put(key, val, **kwargs)
+
+        etcd = _RefusesTheSecondUnit()
+        allocator = _subnet_allocator(etcd)
+        for unit in ("10.128.0.0/24", "10.128.1.0/24"):
+            etcd.store[_allocated_key(unit)] = _claim("s1", "10.128.0.0/23")
+
+        assert not await allocator._claim_as_ours(
+            _flat_claims(etcd), "10.128.0.0/23", "s1", "g1", {}
+        )
+
+        stamped = [
+            json.loads(etcd.store[_allocated_key(u)]).get("generation")
+            for u in ("10.128.0.0/24", "10.128.1.0/24")
+        ]
+        assert stamped == [None, None], f"the block was left on two incarnations: {stamped}"
+
+    async def test_a_completed_partial_claim_ends_on_one_incarnation(self) -> None:
+        etcd = FakeEtcd()
+        allocator = _subnet_allocator(etcd)
+        # Half of a /23 claimed before the incarnation field existed.
+        etcd.store[_allocated_key("10.128.0.0/24")] = _claim("s1", "10.128.0.0/23")
+
+        got = await allocator.acquire("s1", host_count=400, generation="g1")
+
+        assert got == "10.128.0.0/23"
+        stamped = {
+            json.loads(etcd.store[_allocated_key(u)]).get("generation")
+            for u in ("10.128.0.0/24", "10.128.1.0/24")
+        }
+        assert stamped == {"g1"}, f"the block answers to more than one incarnation: {stamped}"
+
+
+class TestAPoolClaimNothingNames:
+    """C22. A sweep whose debt note could not be written AND whose release failed leaves a subnet
+    and a VNI that no record, tombstone or debt key mentions. The pool is then the only evidence
+    they exist, so the reconciler starts there and asks the session -- not from a list of what is
+    owed, which is exactly what was lost."""
+
+    _OPTIONS = {"forced_backend": "vxlan"}
+
+    async def test_a_claim_whose_session_is_gone_is_reclaimed(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        del etcd.store[_META_KEY]  # the record went; the claims did not
+
+        assert await plugin.reconcile_pool() > 0
+        assert _pool_claims(etcd) == []
+
+    async def test_a_claim_of_a_superseded_incarnation_is_reclaimed(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+        record = json.loads(etcd.store[_META_KEY])
+        etcd.store[_META_KEY] = json.dumps({**record, "generation": "later"})
+
+        await plugin.reconcile_pool()
+
+        assert _pool_claims(etcd) == []
+
+    async def test_a_live_sessions_claims_are_left_alone(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options=dict(self._OPTIONS))
+
+        assert await plugin.reconcile_pool() == 0
+
+        assert await plugin._subnet_allocator.holder(str(info.options["subnet"])) == "s1"
+        assert await plugin._vni_allocator.holder(int(cast(int, info.options["vni"]))) == "s1"
+
+    async def test_a_create_still_building_keeps_its_claims(self) -> None:
+        # Its record is CREATING, not READY -- and that record is what says the claims are its.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        held, _ = await plugin._claim_session(cast(AsyncEtcd, etcd), "s1", "tok", [])
+        generation = json.loads(held)["generation"]
+        await plugin._subnet_allocator.acquire("s1", generation=generation)
+
+        assert await plugin.reconcile_pool() == 0
+        assert _pool_claims(etcd) != []
+
+    async def test_what_it_could_not_record_is_reported(self) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        assert plugin.unrecoverable_leaks() == {}
+        plugin._unrecoverable["s1"] = "g1"
+        assert plugin.unrecoverable_leaks() == {"s1": "g1"}
 
 
 class TestADestroyThatFindsNoRecordAtAll:
