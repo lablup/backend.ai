@@ -274,7 +274,7 @@ def upgrade() -> None:
         startup_command = sa.Column("startup_command", sa.Text(), nullable=True)
         result: sa.Column[str] = sa.Column(
             "result",
-            pgsql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresults", create_type=False),
+            pgsql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresults", create_type=True),
             server_default="UNDEFINED",
             nullable=False,
         )
