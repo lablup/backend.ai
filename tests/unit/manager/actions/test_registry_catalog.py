@@ -112,6 +112,13 @@ from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
 )
 from ai.backend.manager.services.agent.actions.lookup import LookupAgentAction
+from ai.backend.manager.services.agent.actions.lookup_resource_owner import (
+    LookupAgentResourceOwnerAction,
+    LookupBulkAgentResourceOwnerAction,
+)
+from ai.backend.manager.services.agent.actions.scoped_search_resources import (
+    ScopedSearchAgentResourcesAction,
+)
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
@@ -486,6 +493,23 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
         # The lookup carries no permission; the read that follows it is checked.
         LookupAgentAction: (AGENT_ENTITY_TYPE, ActionKind.LOOKUP, ActionGate.PUBLIC),
         BulkLookupAgentsAction: (AGENT_ENTITY_TYPE, ActionKind.LOOKUP, ActionGate.PUBLIC),
+        # The slot rows are field rows of the agent: read per named agent, owner resolved
+        # through the lookups the field group builds.
+        LookupAgentResourceOwnerAction: (
+            AGENT_ENTITY_TYPE,
+            ActionKind.LOOKUP,
+            ActionGate.PERMISSION,
+        ),
+        LookupBulkAgentResourceOwnerAction: (
+            AGENT_ENTITY_TYPE,
+            ActionKind.LOOKUP,
+            ActionGate.PERMISSION,
+        ),
+        ScopedSearchAgentResourcesAction: (
+            AGENT_ENTITY_TYPE,
+            ActionKind.BULK,
+            ActionGate.PERMISSION,
+        ),
     }
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
