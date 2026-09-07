@@ -9,6 +9,7 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
@@ -32,18 +33,18 @@ from ai.backend.manager.models.user import UserRow
 class DomainUsageBucketOperationScope(OperationScope):
     """Scope for domain usage bucket queries."""
 
-    resource_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
 
     @override
     def to_condition(self) -> QueryCondition:
-        resource_group = self.resource_group
+        resource_group_id = self.resource_group_id
         domain_name = self.domain_name
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
                 DomainUsageBucketRow.domain_name == domain_name,
-                DomainUsageBucketRow.resource_group == resource_group,
+                DomainUsageBucketRow.resource_group_id == resource_group_id,
             )
 
         return inner
@@ -53,9 +54,11 @@ class DomainUsageBucketOperationScope(OperationScope):
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
-                column=ResourceGroupRow.name,
-                value=self.resource_group,
-                error=ResourceGroupNotFound(self.resource_group),
+                column=ResourceGroupRow.id,
+                value=self.resource_group_id,
+                error=ResourceGroupNotFound(
+                    extra_data={"resource_group_id": str(self.resource_group_id)}
+                ),
             ),
             ExistenceCheck(
                 column=DomainRow.name,
@@ -69,13 +72,13 @@ class DomainUsageBucketOperationScope(OperationScope):
 class ProjectUsageBucketOperationScope(OperationScope):
     """Scope for project usage bucket queries."""
 
-    resource_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
     project_id: uuid.UUID
 
     @override
     def to_condition(self) -> QueryCondition:
-        resource_group = self.resource_group
+        resource_group_id = self.resource_group_id
         domain_name = self.domain_name
         project_id = self.project_id
 
@@ -83,7 +86,7 @@ class ProjectUsageBucketOperationScope(OperationScope):
             return sa.and_(
                 ProjectUsageBucketRow.domain_name == domain_name,
                 ProjectUsageBucketRow.project_id == project_id,
-                ProjectUsageBucketRow.resource_group == resource_group,
+                ProjectUsageBucketRow.resource_group_id == resource_group_id,
             )
 
         return inner
@@ -93,9 +96,11 @@ class ProjectUsageBucketOperationScope(OperationScope):
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
-                column=ResourceGroupRow.name,
-                value=self.resource_group,
-                error=ResourceGroupNotFound(self.resource_group),
+                column=ResourceGroupRow.id,
+                value=self.resource_group_id,
+                error=ResourceGroupNotFound(
+                    extra_data={"resource_group_id": str(self.resource_group_id)}
+                ),
             ),
             ExistenceCheck(
                 column=DomainRow.name,
@@ -114,14 +119,14 @@ class ProjectUsageBucketOperationScope(OperationScope):
 class UserUsageBucketOperationScope(OperationScope):
     """Scope for user usage bucket queries."""
 
-    resource_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
     project_id: uuid.UUID
     user_uuid: uuid.UUID
 
     @override
     def to_condition(self) -> QueryCondition:
-        resource_group = self.resource_group
+        resource_group_id = self.resource_group_id
         domain_name = self.domain_name
         project_id = self.project_id
         user_uuid = self.user_uuid
@@ -131,7 +136,7 @@ class UserUsageBucketOperationScope(OperationScope):
                 UserUsageBucketRow.domain_name == domain_name,
                 UserUsageBucketRow.project_id == project_id,
                 UserUsageBucketRow.user_uuid == user_uuid,
-                UserUsageBucketRow.resource_group == resource_group,
+                UserUsageBucketRow.resource_group_id == resource_group_id,
             )
 
         return inner
@@ -141,9 +146,11 @@ class UserUsageBucketOperationScope(OperationScope):
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
-                column=ResourceGroupRow.name,
-                value=self.resource_group,
-                error=ResourceGroupNotFound(self.resource_group),
+                column=ResourceGroupRow.id,
+                value=self.resource_group_id,
+                error=ResourceGroupNotFound(
+                    extra_data={"resource_group_id": str(self.resource_group_id)}
+                ),
             ),
             ExistenceCheck(
                 column=DomainRow.name,

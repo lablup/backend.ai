@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable, Mapping
 from datetime import date
 from decimal import Decimal
 
 from ai.backend.common.data.entity.resource_group import (
-    RESOURCE_GROUP_SCOPE_TYPE,
     ResourceGroupID,
     ResourceGroupName,
 )
-from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.query import DateFilter as DateFilterDTO
 from ai.backend.common.dto.manager.v2.fair_share.types import (
@@ -57,11 +56,6 @@ from ai.backend.manager.models.resource_usage_history.row import (
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.resource_usage_history.scopes import (
-    DomainUsageBucketOperationScope,
-    ProjectUsageBucketOperationScope,
-    UserUsageBucketOperationScope,
-)
 from ai.backend.manager.models.resource_usage_history.searchers import (
     DomainUsageBucketSearcher,
     ProjectUsageBucketSearcher,
@@ -89,6 +83,11 @@ from ai.backend.manager.services.resource_usage.actions.global_search_project_us
 )
 from ai.backend.manager.services.resource_usage.actions.global_search_user_usage_buckets import (
     GlobalSearchUserUsageBucketsAction,
+)
+from ai.backend.manager.services.resource_usage.actions.scope_items import (
+    DomainUsageBucketScopeItem,
+    ProjectUsageBucketScopeItem,
+    UserUsageBucketScopeItem,
 )
 from ai.backend.manager.services.resource_usage.actions.search_domain_usage_buckets import (
     SearchDomainUsageBucketsAction,
@@ -274,10 +273,6 @@ class ResourceUsageAdapter(BaseAdapter):
         """Search domain usage buckets scoped to a domain/resource-group."""
         limit = input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT
         offset = input.offset if input.offset is not None else 0
-        scope = DomainUsageBucketOperationScope(
-            domain_name=input.domain_name,
-            resource_group=input.resource_group,
-        )
         resource_group_id = await self._resource_group_id(input.resource_group)
         querier = BatchQuerier(
             conditions=[],
@@ -286,10 +281,12 @@ class ResourceUsageAdapter(BaseAdapter):
         )
         action_result = await self._processors.resource_usage.search_domain_usage_buckets.run(
             SearchDomainUsageBucketsAction(
-                scope_target=ScopeRef(
-                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
-                ),
-                scope=scope,
+                items=[
+                    DomainUsageBucketScopeItem(
+                        resource_group_id=resource_group_id,
+                        domain_name=input.domain_name,
+                    )
+                ],
                 searcher=DomainUsageBucketSearcher(
                     pagination=querier.pagination,
                     conditions=querier.conditions,
@@ -312,11 +309,6 @@ class ResourceUsageAdapter(BaseAdapter):
         """Search project usage buckets scoped to a domain/resource-group/project."""
         limit = input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT
         offset = input.offset if input.offset is not None else 0
-        scope = ProjectUsageBucketOperationScope(
-            domain_name=input.domain_name,
-            resource_group=input.resource_group,
-            project_id=input.project_id,
-        )
         resource_group_id = await self._resource_group_id(input.resource_group)
         querier = BatchQuerier(
             conditions=[],
@@ -325,10 +317,13 @@ class ResourceUsageAdapter(BaseAdapter):
         )
         action_result = await self._processors.resource_usage.search_project_usage_buckets.run(
             SearchProjectUsageBucketsAction(
-                scope_target=ScopeRef(
-                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
-                ),
-                scope=scope,
+                items=[
+                    ProjectUsageBucketScopeItem(
+                        resource_group_id=resource_group_id,
+                        domain_name=input.domain_name,
+                        project_id=input.project_id,
+                    )
+                ],
                 searcher=ProjectUsageBucketSearcher(
                     pagination=querier.pagination,
                     conditions=querier.conditions,
@@ -351,12 +346,6 @@ class ResourceUsageAdapter(BaseAdapter):
         """Search user usage buckets scoped to a domain/resource-group/project/user."""
         limit = input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT
         offset = input.offset if input.offset is not None else 0
-        scope = UserUsageBucketOperationScope(
-            domain_name=input.domain_name,
-            resource_group=input.resource_group,
-            project_id=input.project_id,
-            user_uuid=input.user_uuid,
-        )
         resource_group_id = await self._resource_group_id(input.resource_group)
         querier = BatchQuerier(
             conditions=[],
@@ -365,10 +354,14 @@ class ResourceUsageAdapter(BaseAdapter):
         )
         action_result = await self._processors.resource_usage.search_user_usage_buckets.run(
             SearchUserUsageBucketsAction(
-                scope_target=ScopeRef(
-                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
-                ),
-                scope=scope,
+                items=[
+                    UserUsageBucketScopeItem(
+                        resource_group_id=resource_group_id,
+                        domain_name=input.domain_name,
+                        project_id=input.project_id,
+                        user_uuid=input.user_uuid,
+                    )
+                ],
                 searcher=UserUsageBucketSearcher(
                     pagination=querier.pagination,
                     conditions=querier.conditions,
@@ -389,7 +382,8 @@ class ResourceUsageAdapter(BaseAdapter):
 
     async def gql_search_domain_scoped(
         self,
-        scope: DomainUsageBucketOperationScope,
+        resource_group_name: str,
+        domain_name: str,
         filter: DomainUsageBucketFilter | None = None,
         order: list[DomainUsageBucketOrderBy] | None = None,
         first: int | None = None,
@@ -413,13 +407,15 @@ class ResourceUsageAdapter(BaseAdapter):
             limit=limit,
             offset=offset,
         )
-        resource_group_id = await self._resource_group_id(scope.resource_group)
+        resource_group_id = await self._resource_group_id(resource_group_name)
         action_result = await self._processors.resource_usage.search_domain_usage_buckets.run(
             SearchDomainUsageBucketsAction(
-                scope_target=ScopeRef(
-                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
-                ),
-                scope=scope,
+                items=[
+                    DomainUsageBucketScopeItem(
+                        resource_group_id=resource_group_id,
+                        domain_name=domain_name,
+                    )
+                ],
                 searcher=DomainUsageBucketSearcher(
                     pagination=querier.pagination,
                     conditions=querier.conditions,
@@ -436,7 +432,9 @@ class ResourceUsageAdapter(BaseAdapter):
 
     async def gql_search_project_scoped(
         self,
-        scope: ProjectUsageBucketOperationScope,
+        resource_group_name: str,
+        domain_name: str,
+        project_id: uuid.UUID,
         filter: ProjectUsageBucketFilter | None = None,
         order: list[ProjectUsageBucketOrderBy] | None = None,
         first: int | None = None,
@@ -460,13 +458,16 @@ class ResourceUsageAdapter(BaseAdapter):
             limit=limit,
             offset=offset,
         )
-        resource_group_id = await self._resource_group_id(scope.resource_group)
+        resource_group_id = await self._resource_group_id(resource_group_name)
         action_result = await self._processors.resource_usage.search_project_usage_buckets.run(
             SearchProjectUsageBucketsAction(
-                scope_target=ScopeRef(
-                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
-                ),
-                scope=scope,
+                items=[
+                    ProjectUsageBucketScopeItem(
+                        resource_group_id=resource_group_id,
+                        domain_name=domain_name,
+                        project_id=project_id,
+                    )
+                ],
                 searcher=ProjectUsageBucketSearcher(
                     pagination=querier.pagination,
                     conditions=querier.conditions,
@@ -483,7 +484,10 @@ class ResourceUsageAdapter(BaseAdapter):
 
     async def gql_search_user_scoped(
         self,
-        scope: UserUsageBucketOperationScope,
+        resource_group_name: str,
+        domain_name: str,
+        project_id: uuid.UUID,
+        user_uuid: uuid.UUID,
         filter: UserUsageBucketFilter | None = None,
         order: list[UserUsageBucketOrderBy] | None = None,
         first: int | None = None,
@@ -507,13 +511,17 @@ class ResourceUsageAdapter(BaseAdapter):
             limit=limit,
             offset=offset,
         )
-        resource_group_id = await self._resource_group_id(scope.resource_group)
+        resource_group_id = await self._resource_group_id(resource_group_name)
         action_result = await self._processors.resource_usage.search_user_usage_buckets.run(
             SearchUserUsageBucketsAction(
-                scope_target=ScopeRef(
-                    scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
-                ),
-                scope=scope,
+                items=[
+                    UserUsageBucketScopeItem(
+                        resource_group_id=resource_group_id,
+                        domain_name=domain_name,
+                        project_id=project_id,
+                        user_uuid=user_uuid,
+                    )
+                ],
                 searcher=UserUsageBucketSearcher(
                     pagination=querier.pagination,
                     conditions=querier.conditions,

@@ -9,21 +9,22 @@ from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.resource_usage_history.types import DomainUsageBucketData
 from ai.backend.manager.models.resource_usage_history.row import DomainUsageBucketRow
-from ai.backend.manager.models.resource_usage_history.scopes import DomainUsageBucketOperationScope
 from ai.backend.manager.models.resource_usage_history.searchers import (
     DomainUsageBucketSearcher,
 )
 from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.services.resource_usage.actions.scope_items import (
+    DomainUsageBucketScopeItem,
+)
 
 
 @dataclass
 class SearchDomainUsageBucketsAction(
     OperationScopeOpsAction[DomainUsageBucketRow, DomainUsageBucketData]
 ):
-    """Page through the domain usage buckets of one scope."""
+    """Page through the domain usage buckets the named resource groups hold, combined with OR."""
 
-    scope_target: ScopeRef
-    scope: DomainUsageBucketOperationScope
+    items: Sequence[DomainUsageBucketScopeItem]
     searcher: DomainUsageBucketSearcher
 
     @override
@@ -38,11 +39,11 @@ class SearchDomainUsageBucketsAction(
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
-        return (self.scope_target,)
+        return [item.scope_ref() for item in self.items]
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (self.scope,)
+        return [item.operation_scope() for item in self.items]
 
     @override
     def to_searcher(self) -> DomainUsageBucketSearcher:

@@ -164,17 +164,10 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             DomainUsageBucketEdge,
             DomainUsageBucketGQL,
         )
-        from ai.backend.manager.models.resource_usage_history.scopes import (
-            DomainUsageBucketOperationScope,
-        )
-
-        repository_scope = DomainUsageBucketOperationScope(
-            resource_group=scope.resource_group_name,
-            domain_name=self.basic_info.name,
-        )
 
         payload = await info.context.adapters.resource_usage.gql_search_domain_scoped(
-            scope=repository_scope,
+            resource_group_name=scope.resource_group_name,
+            domain_name=self.basic_info.name,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
