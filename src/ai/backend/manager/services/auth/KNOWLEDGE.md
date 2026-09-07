@@ -63,14 +63,6 @@ status: draft
 `get_ssh_keypair` · `generate_ssh_keypair` · `upload_ssh_keypair` 는 로그인한 사용자가
 자기 세션의 액세스 키에 대해 하는 조작이고, 키 생성은 이쪽에만 있다.
 
-## 액세스 키로 사용자를 찾는 lookup
-
-`lookup_user_by_access_key` 는 액세스 키라는 외부 키를 사용자 id 로 바꾸므로 lookup 이다.
-인증을 먼저 확인하고, 키가 가리킨 사용자에 대한 읽기 권한을 그 다음에 확인한다. 서비스
-메서드 없이 `KeypairAccessKeyUserLookup` 스펙으로 ops 를 탄다. `services/user` 의
-`lookup_keypair_owner_by_access_key` 는 같은 키에서 키페어 행의 소유자를 찾고, 이쪽은
-사용자 자신을 답한다 — 쿼리는 같다.
-
 ## 로그인 세션과 이력은 사용자의 field group 이다
 
 두 행 모두 사용자가 소유하는 field row 이므로 조회는 `user_group.field_group(...)` 이

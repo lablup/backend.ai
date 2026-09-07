@@ -2,7 +2,6 @@ from typing import Any
 
 from ai.backend.common.data.entity.login_history import LOGIN_HISTORY_FIELD_TYPE
 from ai.backend.common.data.entity.login_session import LOGIN_SESSION_FIELD_TYPE
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.registry.types import FieldGroupMeta
@@ -12,10 +11,8 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
-from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
-    LookupOpsResult,
     ScopedFieldsOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -49,9 +46,6 @@ from ai.backend.manager.services.auth.actions.lookup_login_session_owner import 
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     PublicResolveAccessKeyScopeAction,
     PublicResolveAccessKeyScopeResult,
-)
-from ai.backend.manager.services.auth.actions.resolve_user_id_by_access_key import (
-    ResolveUserIDByAccessKeyAction,
 )
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     PublicResolveUserScopeAction,
@@ -143,9 +137,6 @@ class AuthProcessors:
     revoke_login_session: SingleFieldActionProcessor[
         RevokeLoginSessionAction, RevokeLoginSessionActionResult
     ]
-    resolve_user_id_by_access_key: LookupActionProcessor[
-        ResolveUserIDByAccessKeyAction, LookupOpsResult[UserID]
-    ]
     login_sessions: LookupFieldGroup[LoginSessionData]
     login_history: LookupFieldGroup[LoginHistoryData]
     search_login_sessions: ScopeActionProcessor[
@@ -202,7 +193,6 @@ class AuthProcessors:
         self.upload_ssh_keypair = user_group.single_entity(
             UploadSSHKeypairAction, service.upload_ssh_keypair
         )
-        self.resolve_user_id_by_access_key = user_group.lookup_ops(ResolveUserIDByAccessKeyAction)
         self.login_sessions = user_group.field_group(
             FieldGroupMeta(LOGIN_SESSION_FIELD_TYPE),
             LoginSessionData,
