@@ -12,10 +12,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.types import AgentId
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.errors.agent import AgentAlreadyExited
 from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState
 
@@ -95,8 +95,13 @@ class AgentExitStatusUpdater(GuardedDataUpdater[AgentRow, AgentId]):
         return self.agent_uuid
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
-        return [AgentConditions.by_status_not_in(TERMINAL_AGENT_STATUSES)]
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=AgentConditions.by_status_not_in(TERMINAL_AGENT_STATUSES),
+                error=AgentAlreadyExited(self.agent_uuid),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:

@@ -12,10 +12,11 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.manager.data.artifact.types import ArtifactAvailability, ArtifactData
+from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.models.artifact.conditions import ArtifactConditions
 from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import (
     DataBatchUpdater,
     DataUpdater,
@@ -28,8 +29,7 @@ from ai.backend.manager.types import TriState
 class ArtifactUpdater(GuardedDataUpdater[ArtifactRow, ArtifactData]):
     """Edit one artifact's readonly flag and description.
 
-    Guarded on availability: a deleted artifact is left alone and the caller is told
-    nothing was written.
+    Guarded on availability: a deleted artifact is left alone and answers as not found.
     """
 
     artifact_id: ArtifactID
@@ -55,8 +55,13 @@ class ArtifactUpdater(GuardedDataUpdater[ArtifactRow, ArtifactData]):
         return ()
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
-        return [lambda: ArtifactRow.availability != ArtifactAvailability.DELETED]
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=lambda: ArtifactRow.availability != ArtifactAvailability.DELETED,
+                error=ArtifactNotFoundError(f"Artifact with ID {self.artifact_id} is deleted"),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:

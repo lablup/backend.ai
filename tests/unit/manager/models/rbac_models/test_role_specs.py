@@ -69,8 +69,9 @@ class TestRoleUpdater:
     def test_edit_and_soft_delete_guard_on_a_custom_source(self) -> None:
         role_id = RoleID(uuid.uuid4())
         for updater in (RoleUpdater(role_id=role_id), RoleSoftDeleteUpdater(role_id=role_id)):
-            (guard,) = updater.guard_conditions()
-            assert str(guard()) == str(RoleRow.source == RoleSource.CUSTOM)
+            (guard,) = updater.guard_checks()
+            assert str(guard.condition()) == str(RoleRow.source == RoleSource.CUSTOM)
+            assert isinstance(guard.error, SystemRoleNotEditable)
 
     def test_soft_delete_and_restore_write_constants(self) -> None:
         role_id = RoleID(uuid.uuid4())
@@ -103,5 +104,7 @@ class TestRoleReadAndPurgeSpecs:
     def test_the_purger_declines_a_system_role(self) -> None:
         purger = RolePurger(role_id=RoleID(uuid.uuid4()))
 
-        (check,) = purger.conflict_checks()
-        assert isinstance(check.error, SystemRoleNotEditable)
+        (guard,) = purger.guard_checks()
+        assert str(guard.condition()) == str(RoleRow.source == RoleSource.CUSTOM)
+        assert isinstance(guard.error, SystemRoleNotEditable)
+        assert purger.conflict_checks() == ()

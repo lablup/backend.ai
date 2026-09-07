@@ -12,11 +12,14 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
-from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.errors.resource import (
+    PersonalProjectDeletionError,
+    ProjectPurgeInProgress,
+)
 from ai.backend.manager.models.condition_utils import negate_conditions
 from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -57,8 +60,13 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
         return self.project_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
-        return [ProjectConditions.not_being_purged()]
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=ProjectConditions.not_being_purged(),
+                error=ProjectPurgeInProgress(f"Project is being purged: {self.project_id}"),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -141,11 +149,21 @@ class ProjectSoftDeleteUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
         return self.project_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
-        return [
-            ProjectConditions.not_being_purged(),
-            negate_conditions([ProjectConditions.by_type_equals(ProjectType.PERSONAL)]),
-        ]
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=ProjectConditions.not_being_purged(),
+                error=ProjectPurgeInProgress(f"Project is being purged: {self.project_id}"),
+            ),
+            GuardCheck(
+                condition=negate_conditions([
+                    ProjectConditions.by_type_equals(ProjectType.PERSONAL)
+                ]),
+                error=PersonalProjectDeletionError(
+                    f"Project {self.project_id} is a personal project."
+                ),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -182,8 +200,13 @@ class ProjectRestoreUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
         return self.project_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
-        return [ProjectConditions.not_being_purged()]
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=ProjectConditions.not_being_purged(),
+                error=ProjectPurgeInProgress(f"Project is being purged: {self.project_id}"),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:

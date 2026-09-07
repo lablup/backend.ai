@@ -23,9 +23,10 @@ from ai.backend.manager.data.entity_share.types import (
     EntityShareData,
     EntityShareStatus,
 )
+from ai.backend.manager.errors.entity_share import EntityShareNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.row import UserRow
 
@@ -91,7 +92,7 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
         return inner
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
+    def guard_checks(self) -> Sequence[GuardCheck]:
         def pending() -> sa.sql.expression.ColumnElement[bool]:
             return EntityShareRow.status == EntityShareStatus.PENDING
 
@@ -101,7 +102,22 @@ class _RecipientInvitationUpdater(GuardedDataUpdater[EntityShareRow, EntityShare
                 EntityShareRow.expires_at > sa.func.now(),
             )
 
-        return [pending, in_time, self.addressed_to_scope()]
+        return (
+            GuardCheck(
+                condition=pending,
+                error=EntityShareNotFound(f"No open offer {self.share_id} to answer"),
+            ),
+            GuardCheck(
+                condition=in_time,
+                error=EntityShareNotFound(f"Offer {self.share_id} has expired"),
+            ),
+            GuardCheck(
+                condition=self.addressed_to_scope(),
+                error=EntityShareNotFound(
+                    f"Offer {self.share_id} is not addressed to {self.answering_scope}"
+                ),
+            ),
+        )
 
     @property
     @override
@@ -154,11 +170,22 @@ class EntityShareLeaveUpdater(_RecipientInvitationUpdater):
     """
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
+    def guard_checks(self) -> Sequence[GuardCheck]:
         def taken() -> sa.sql.expression.ColumnElement[bool]:
             return EntityShareRow.status == EntityShareStatus.ACCEPTED
 
-        return [taken, self.addressed_to_scope()]
+        return (
+            GuardCheck(
+                condition=taken,
+                error=EntityShareNotFound(f"No held share {self.share_id} to give back"),
+            ),
+            GuardCheck(
+                condition=self.addressed_to_scope(),
+                error=EntityShareNotFound(
+                    f"Share {self.share_id} is not held by {self.answering_scope}"
+                ),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -191,11 +218,16 @@ class EntityShareRevokeUpdater(GuardedDataUpdater[EntityShareRow, EntityShareDat
         return self.share_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
+    def guard_checks(self) -> Sequence[GuardCheck]:
         def taken() -> sa.sql.expression.ColumnElement[bool]:
             return EntityShareRow.status == EntityShareStatus.ACCEPTED
 
-        return [taken]
+        return (
+            GuardCheck(
+                condition=taken,
+                error=EntityShareNotFound(f"No held share {self.share_id} to take back"),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -235,11 +267,16 @@ class EntityShareCancelUpdater(GuardedDataUpdater[EntityShareRow, EntityShareDat
         return self.share_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
+    def guard_checks(self) -> Sequence[GuardCheck]:
         def pending() -> sa.sql.expression.ColumnElement[bool]:
             return EntityShareRow.status == EntityShareStatus.PENDING
 
-        return [pending]
+        return (
+            GuardCheck(
+                condition=pending,
+                error=EntityShareNotFound(f"No open offer {self.share_id} to cancel"),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:

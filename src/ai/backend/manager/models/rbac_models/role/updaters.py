@@ -18,10 +18,10 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
-from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
 from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -52,8 +52,13 @@ class RoleUpdater(GuardedDataUpdater[RoleRow, RoleData]):
         return self.role_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
-        return [RoleConditions.by_source_equals(RoleSource.CUSTOM)]
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=RoleConditions.by_source_equals(RoleSource.CUSTOM),
+                error=SystemRoleNotEditable(f"Role {self.role_id} is a SYSTEM role."),
+            ),
+        )
 
     @property
     @override
@@ -96,8 +101,13 @@ class RoleSoftDeleteUpdater(GuardedDataUpdater[RoleRow, RoleData]):
         return self.role_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
-        return [RoleConditions.by_source_equals(RoleSource.CUSTOM)]
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=RoleConditions.by_source_equals(RoleSource.CUSTOM),
+                error=SystemRoleNotEditable(f"Role {self.role_id} is a SYSTEM role."),
+            ),
+        )
 
     @property
     @override

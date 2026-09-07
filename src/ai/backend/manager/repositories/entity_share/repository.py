@@ -65,7 +65,7 @@ class EntityShareRepository:
     ) -> EntityShareData:
         """Turn down what was offered, lending nothing."""
         async with self._ops.write_ops() as w:
-            data = await w.update_guarded_data(
+            data = await w.update_data(
                 EntityShareRejectUpdater(share_id=share_id, answering_scope=answering_scope)
             )
             if data is None:
@@ -95,7 +95,7 @@ class EntityShareRepository:
     async def cancel(self, share_id: EntityShareID) -> EntityShareData:
         """Withdraw the offer before it was answered."""
         async with self._ops.write_ops() as w:
-            data = await w.update_guarded_data(EntityShareCancelUpdater(share_id=share_id))
+            data = await w.update_data(EntityShareCancelUpdater(share_id=share_id))
             if data is None:
                 raise EntityShareNotFound(f"No open offer {share_id} to cancel")
             return data

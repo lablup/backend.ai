@@ -18,7 +18,7 @@ from ai.backend.manager.data.user.types import (
     UserInfoContext,
 )
 from ai.backend.manager.errors.storage import DotfileCreationFailed
-from ai.backend.manager.errors.user import KeyPairForbidden, UserPurgeFailure
+from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.domain.row import verify_dotfile_name
 from ai.backend.manager.models.keypair.updaters import (
     KeypairBootstrapScriptUpdater,
@@ -310,26 +310,12 @@ class UserService:
         return GetKeypairActionResult(keypair=keypair)
 
     async def update_keypair(self, action: UpdateKeypairAction) -> UpdateKeypairActionResult:
-        """Write the keypair's settings. Nothing written means the row is gone or the
-        guard refused; one more read tells the two apart."""
         written = await self._user_repository.update_keypair(action.to_updater())
-        if written is not None:
-            return UpdateKeypairActionResult(keypair=written)
-        await self._user_repository.keypair(action.keypair_id)
-        raise KeyPairForbidden(
-            "Cannot deactivate the default access key. Switch the default access key first."
-        )
+        return UpdateKeypairActionResult(keypair=written)
 
     async def purge_keypair(self, action: PurgeKeypairAction) -> PurgeKeypairActionResult:
-        """Remove the keypair. Nothing removed is told apart the same way a refused
-        edit is."""
         removed = await self._user_repository.purge_keypair(action.keypair_id)
-        if removed is not None:
-            return PurgeKeypairActionResult(keypair=removed)
-        await self._user_repository.keypair(action.keypair_id)
-        raise KeyPairForbidden(
-            "Cannot delete the default access key. Switch the default access key first."
-        )
+        return PurgeKeypairActionResult(keypair=removed)
 
     async def switch_default_access_key(
         self, action: SwitchDefaultAccessKeyAction

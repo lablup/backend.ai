@@ -12,10 +12,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.domain.types import DomainData, DomainStatus
-from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.errors.resource import DomainPurgeInProgress
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -52,8 +52,13 @@ class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         return self.domain_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
-        return [DomainConditions.not_being_purged()]
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=DomainConditions.not_being_purged(),
+                error=DomainPurgeInProgress(f"Domain is being purged: {self.domain_id}"),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -133,8 +138,13 @@ class DomainSoftDeleteUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         return self.domain_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
-        return [DomainConditions.not_being_purged()]
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=DomainConditions.not_being_purged(),
+                error=DomainPurgeInProgress(f"Domain is being purged: {self.domain_id}"),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -171,8 +181,13 @@ class DomainRestoreUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         return self.domain_id
 
     @override
-    def guard_conditions(self) -> list[QueryCondition]:
-        return [DomainConditions.not_being_purged()]
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=DomainConditions.not_being_purged(),
+                error=DomainPurgeInProgress(f"Domain is being purged: {self.domain_id}"),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:

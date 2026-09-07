@@ -15,7 +15,7 @@ from ai.backend.common.data.permission.types import RoleSource
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
-from ai.backend.manager.errors.repository import EntityNotFoundError, EntityWriteRefusedError
+from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
@@ -99,9 +99,9 @@ class TestRoleWrite:
         self, repository: OpsRepository[RoleData], db_with_tables: ExtendedAsyncSAEngine
     ) -> None:
         role_id = await self._insert_role(db_with_tables, RoleSource.CUSTOM)
-        updated = await repository.update_guarded(self._rename(role_id))
+        updated = await repository.update(self._rename(role_id))
         assert updated.name == "renamed"
-        deleted = await repository.update_guarded(RoleSoftDeleteUpdater(role_id=role_id))
+        deleted = await repository.update(RoleSoftDeleteUpdater(role_id=role_id))
         assert deleted.status == RoleStatus.DELETED
         assert deleted.deleted_at is not None
         purged = await repository.purge_entity(RolePurger(role_id=role_id))
@@ -112,15 +112,15 @@ class TestRoleWrite:
         self, repository: OpsRepository[RoleData], db_with_tables: ExtendedAsyncSAEngine
     ) -> None:
         role_id = await self._insert_role(db_with_tables, RoleSource.SYSTEM)
-        with pytest.raises(EntityWriteRefusedError):
-            await repository.update_guarded(self._rename(role_id))
+        with pytest.raises(SystemRoleNotEditable):
+            await repository.update(self._rename(role_id))
 
     async def test_system_role_delete_is_refused(
         self, repository: OpsRepository[RoleData], db_with_tables: ExtendedAsyncSAEngine
     ) -> None:
         role_id = await self._insert_role(db_with_tables, RoleSource.SYSTEM)
-        with pytest.raises(EntityWriteRefusedError):
-            await repository.update_guarded(RoleSoftDeleteUpdater(role_id=role_id))
+        with pytest.raises(SystemRoleNotEditable):
+            await repository.update(RoleSoftDeleteUpdater(role_id=role_id))
 
     async def test_system_role_purge_is_refused(
         self, repository: OpsRepository[RoleData], db_with_tables: ExtendedAsyncSAEngine
@@ -133,9 +133,9 @@ class TestRoleWrite:
     async def test_missing_role_raises_not_found(self, repository: OpsRepository[RoleData]) -> None:
         role_id = RoleID(uuid.uuid4())
         with pytest.raises(EntityNotFoundError):
-            await repository.update_guarded(self._rename(role_id))
+            await repository.update(self._rename(role_id))
         with pytest.raises(EntityNotFoundError):
-            await repository.update_guarded(RoleSoftDeleteUpdater(role_id=role_id))
+            await repository.update(RoleSoftDeleteUpdater(role_id=role_id))
         with pytest.raises(EntityNotFoundError):
             await repository.purge_entity(RolePurger(role_id=role_id))
 
