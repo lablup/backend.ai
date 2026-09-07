@@ -169,6 +169,15 @@ from ai.backend.manager.services.prometheus_query_preset_category.processors imp
     PrometheusQueryPresetCategoryProcessors,
 )
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
+from ai.backend.manager.services.resource_preset.actions.check_presets import (
+    CheckResourcePresetsAction,
+)
+from ai.backend.manager.services.resource_preset.actions.get_preset import (
+    GetResourcePresetAction,
+)
+from ai.backend.manager.services.resource_preset.actions.list_presets import (
+    ListResourcePresetsAction,
+)
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
@@ -434,6 +443,42 @@ def test_action_name_is_unique_across_v2_actions() -> None:
             f"{cls.__module__}.{cls.__qualname__} and {holder.__module__}.{holder.__qualname__} "
             f"both record as {name!r}; declare a distinct action_name() on one of them."
         )
+
+
+def test_resource_preset_reads_keep_their_judged_gates() -> None:
+    """Pins the three preset reads BA-7710 ruled on, so a rewiring has to restate them.
+
+    A preset is a catalog: its name, resource slots and shared memory hold no owner
+    and no secret. The two reads a session launcher makes start from a resource group
+    name and stay public; the read the admin route makes starts from the preset's id,
+    so it is judged on that entity like the update and the delete beside it.
+    """
+    registry = _ops_registry()
+    ResourcePresetProcessors(registry.group(GroupMeta(RESOURCE_PRESET_ENTITY_TYPE)), MagicMock())
+
+    judged = {
+        ListResourcePresetsAction: (
+            RESOURCE_PRESET_ENTITY_TYPE,
+            ActionKind.GLOBAL,
+            ActionGate.PUBLIC,
+        ),
+        CheckResourcePresetsAction: (
+            RESOURCE_PRESET_ENTITY_TYPE,
+            ActionKind.GLOBAL,
+            ActionGate.PUBLIC,
+        ),
+        GetResourcePresetAction: (
+            RESOURCE_PRESET_ENTITY_TYPE,
+            ActionKind.SINGLE_ENTITY,
+            ActionGate.PERMISSION,
+        ),
+    }
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.action_cls in judged
+    }
+    assert recorded == judged
 
 
 def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:

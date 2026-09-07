@@ -16,6 +16,12 @@ from ai.backend.manager.services.resource_preset.actions.base import ResourcePre
 
 @dataclass
 class CheckResourcePresetsAction(ResourcePresetAction):
+    """List the presets a resource group offers, against the caller's own limits.
+
+    Public for the reason the listing beside it is, and the occupancy it adds is
+    the caller's own: the keypair, group and domain it reports on are theirs.
+    """
+
     access_key: AccessKey
     resource_policy: Mapping[str, Any]
     domain_name: str

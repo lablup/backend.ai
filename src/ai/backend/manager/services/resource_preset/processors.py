@@ -5,7 +5,7 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     PublicActionProcessor,
 )
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
-from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
+from ai.backend.manager.actions.v2.ops.result import EntityOpsResult, LookupOpsResult
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
@@ -19,6 +19,9 @@ from ai.backend.manager.services.resource_preset.actions.create_preset import (
 from ai.backend.manager.services.resource_preset.actions.delete_preset import (
     DeleteResourcePresetAction,
     DeleteResourcePresetActionResult,
+)
+from ai.backend.manager.services.resource_preset.actions.get_preset import (
+    GetResourcePresetAction,
 )
 from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
@@ -49,6 +52,9 @@ class ResourcePresetProcessors:
     delete_preset: SingleEntityActionProcessor[
         DeleteResourcePresetAction, DeleteResourcePresetActionResult
     ]
+    get_preset: SingleEntityActionProcessor[
+        GetResourcePresetAction, EntityOpsResult[ResourcePresetData]
+    ]
     list_presets: PublicActionProcessor[ListResourcePresetsAction, ListResourcePresetsResult]
     check_presets: PublicActionProcessor[
         CheckResourcePresetsAction, CheckResourcePresetsActionResult
@@ -64,6 +70,7 @@ class ResourcePresetProcessors:
         self.create_preset = group.global_scope(CreateResourcePresetAction, service.create_preset)
         self.update_preset = group.single_entity(UpdateResourcePresetAction, service.update_preset)
         self.delete_preset = group.single_entity(DeleteResourcePresetAction, service.delete_preset)
+        self.get_preset = group.single_get_ops(GetResourcePresetAction)
         self.list_presets = group.public(ListResourcePresetsAction, service.list_presets)
         self.check_presets = group.public(CheckResourcePresetsAction, service.check_presets)
         self.search_presets_v2 = group.global_scope(

@@ -33,14 +33,13 @@ from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
 from ai.backend.manager.models.resource_preset.conditions import ResourcePresetConditions
 from ai.backend.manager.models.resource_preset.orders import ResourcePresetOrders
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.creators import ResourcePresetCreatorSpec
@@ -50,6 +49,9 @@ from ai.backend.manager.services.resource_preset.actions.create_preset import (
 )
 from ai.backend.manager.services.resource_preset.actions.delete_preset import (
     DeleteResourcePresetAction,
+)
+from ai.backend.manager.services.resource_preset.actions.get_preset import (
+    GetResourcePresetAction,
 )
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
@@ -118,16 +120,15 @@ class ResourcePresetAdapter(BaseAdapter):
 
     async def get(self, preset_id: UUID) -> ResourcePresetNode:
         """Get a single resource preset by ID."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1),
-            conditions=[lambda: ResourcePresetRow.id == preset_id],
-        )
-        result = await self._processors.resource_preset.search_presets_v2.run(
-            SearchResourcePresetsV2Action(querier=querier)
-        )
-        if not result.presets:
-            raise ResourcePresetNotFound()
-        return self._data_to_node(result.presets[0])
+        try:
+            result = await self._processors.resource_preset.get_preset.run(
+                GetResourcePresetAction(preset_id=ResourcePresetID(preset_id))
+            )
+        except EntityNotFoundError as e:
+            # The generic repository names no domain; the route answered with the
+            # preset's own error before and keeps doing so.
+            raise ResourcePresetNotFound() from e
+        return self._data_to_node(result.data)
 
     async def create(
         self,
